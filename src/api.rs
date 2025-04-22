@@ -215,6 +215,11 @@ impl ApiClient {
         
         Self::new(config)
     }
+    
+    /// Get the API configuration
+    pub fn get_config(&self) -> &ApiConfig {
+        &self.config
+    }
 }
 
 #[cfg(test)]

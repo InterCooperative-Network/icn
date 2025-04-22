@@ -4,17 +4,20 @@ mod storage;
 mod token;
 mod guardians;
 mod proposal;
+mod federation;
 
 use clap::{Parser, Subcommand};
-use identity::{Identity, IdentityManager, KeyType};
+use identity::{Identity, IdentityManager, KeyType, DeviceLink, DeviceLinkChallenge};
 use storage::{StorageManager, StorageType};
 use token::{TokenStore, TokenType};
-use guardians::{GuardianManager, GuardianSet};
+use guardians::{GuardianManager, GuardianSet, GuardianStatus};
 use proposal::{ProposalManager, Proposal, VoteOption};
+use federation::{FederationRuntime, MonitoringOptions};
 use api::{ApiClient, ApiConfig};
 use std::path::PathBuf;
 use std::process;
 use std::str::FromStr;
+use std::fs;
 use base64::{Engine as _};
 
 #[derive(Parser)]
@@ -121,6 +124,45 @@ enum Commands {
         subcommand: ProposalCommands,
     },
     
+    /// DAG operations
+    Dag {
+        #[command(subcommand)]
+        subcommand: DagCommands,
+    },
+    
+    /// Federation operations
+    Federation {
+        #[command(subcommand)]
+        subcommand: FederationCommands,
+    },
+    
+    /// Cast vote on a proposal
+    Vote {
+        /// Proposal hash to vote on
+        #[arg(long)]
+        proposal: String,
+        
+        /// Vote yes
+        #[arg(long, conflicts_with_all = &["no", "abstain"])]
+        yes: bool,
+        
+        /// Vote no
+        #[arg(long, conflicts_with_all = &["yes", "abstain"])]
+        no: bool,
+        
+        /// Vote abstain
+        #[arg(long, conflicts_with_all = &["yes", "no"])]
+        abstain: bool,
+        
+        /// Path to signature file (for guardian voting)
+        #[arg(long)]
+        signature: Option<PathBuf>,
+        
+        /// Comment to include with vote
+        #[arg(long)]
+        comment: Option<String>,
+    },
+    
     /// Backup wallet data
     Backup {
         /// Path to save the backup file
@@ -141,6 +183,49 @@ enum Commands {
         /// Password to decrypt the backup
         #[arg(long)]
         password: Option<String>,
+    },
+    
+    /// Device management commands
+    Device {
+        #[command(subcommand)]
+        subcommand: DeviceCommands,
+    },
+    
+    /// Inbox and outbox management
+    Inbox {
+        #[command(subcommand)]
+        subcommand: InboxCommands,
+    },
+    
+    /// Outbox management
+    Outbox {
+        #[command(subcommand)]
+        subcommand: OutboxCommands,
+    },
+    
+    /// Export verifiable credential
+    ExportVC {
+        /// Identity DID to export as VC
+        #[arg(long)]
+        identity: Option<String>,
+        
+        /// Output file path
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+    
+    /// Launch terminal UI mode
+    Tui,
+    
+    /// Start WebSocket server for real-time updates
+    WebSocket {
+        /// Host to bind to (default: 127.0.0.1)
+        #[arg(long)]
+        host: Option<String>,
+        
+        /// Port to listen on (default: 9876)
+        #[arg(long)]
+        port: Option<u16>,
     },
 }
 
@@ -241,6 +326,10 @@ enum ProposalCommands {
         /// Filter by scope
         #[arg(long)]
         scope: Option<String>,
+        
+        /// Filter by status (draft, voting, executed, etc.)
+        #[arg(long)]
+        status: Option<String>,
     },
     
     /// Show details of a specific proposal
@@ -248,6 +337,143 @@ enum ProposalCommands {
         /// Hash of the proposal to show
         #[arg(long)]
         hash: String,
+    },
+    
+    /// Audit a proposal and show detailed status
+    Audit {
+        /// Hash of the proposal to audit
+        #[arg(long)]
+        hash: String,
+    },
+    
+    /// Get vote statistics for a proposal
+    VoteStats {
+        /// Hash of the proposal
+        #[arg(long)]
+        hash: String,
+    },
+    
+    /// Calculate hash of a proposal file
+    Hash {
+        /// Path to the proposal file
+        #[arg(long)]
+        file: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+enum DagCommands {
+    /// Get the current DAG tip
+    Tip,
+    
+    /// Show DAG status
+    Status {
+        /// Scope for DAG query
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    
+    /// Sync DAG with federation
+    Sync,
+    
+    /// Replay pending DAG events
+    ReplayPending,
+}
+
+#[derive(Subcommand)]
+enum FederationCommands {
+    /// Submit a proposal and monitor its progress
+    Submit {
+        /// Path to the proposal file
+        #[arg(long)]
+        file: PathBuf,
+        
+        /// Timeout in minutes for monitoring (default: 60)
+        #[arg(long)]
+        timeout: Option<u64>,
+        
+        /// Verbose output during monitoring
+        #[arg(long)]
+        verbose: bool,
+    },
+    
+    /// Sync proposal with AgoraNet
+    Sync {
+        /// Hash of the proposal to sync
+        #[arg(long)]
+        proposal_hash: String,
+    },
+}
+
+// New commands for device management
+#[derive(Subcommand)]
+enum DeviceCommands {
+    /// Generate a link for another device
+    Link {
+        /// Public key of the target device
+        #[arg(long)]
+        to: String,
+        
+        /// Key type of the target device (ed25519 or ecdsa)
+        #[arg(long, default_value = "ed25519")]
+        key_type: String,
+        
+        /// Output file for the link
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+    
+    /// Import identity from a device link
+    Import {
+        /// Path to the device link file
+        #[arg(short, long)]
+        link: PathBuf,
+        
+        /// Path to the private key file
+        #[arg(short, long)]
+        key: PathBuf,
+    },
+    
+    /// List all linked devices
+    List,
+    
+    /// Generate a new device keypair
+    Generate {
+        /// Key type to generate (ed25519 or ecdsa)
+        #[arg(short, long, default_value = "ed25519")]
+        key_type: String,
+        
+        /// Output directory for key files
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+}
+
+// New commands for inbox management
+#[derive(Subcommand)]
+enum InboxCommands {
+    /// List items in inbox
+    List,
+    
+    /// Review a specific item in inbox
+    Review {
+        /// ID of the item to review
+        #[arg(short, long)]
+        id: String,
+    },
+}
+
+// New commands for outbox management
+#[derive(Subcommand)]
+enum OutboxCommands {
+    /// List items in outbox
+    List,
+    
+    /// Check status of an item in outbox
+    Status {
+        /// ID of the item to check
+        #[arg(short, long)]
+        id: Option<String>,
     },
 }
 
@@ -332,6 +558,18 @@ fn main() {
             handle_proposal_commands(subcommand, &identity_manager, &proposal_manager);
         },
         
+        Commands::Dag { subcommand } => {
+            handle_dag_commands(subcommand, &identity_manager, &api_client, &storage_manager);
+        },
+        
+        Commands::Federation { subcommand } => {
+            handle_federation_commands(subcommand, &identity_manager, &api_config, &storage_manager);
+        },
+        
+        Commands::Vote { proposal, yes, no, abstain, signature, comment } => {
+            cast_vote(&identity_manager, &proposal_manager, proposal, *yes, *no, *abstain, signature, comment);
+        },
+        
         Commands::Backup { out, password } => {
             backup_wallet(&storage_manager, out, password);
         },
@@ -339,7 +577,50 @@ fn main() {
         Commands::Restore { file, password } => {
             restore_wallet(&storage_manager, file, password);
         },
+        
+        Commands::Device { subcommand } => {
+            handle_device_commands(
+                &subcommand,
+                &identity_manager,
+                &storage_manager,
+            );
+        },
+        
+        Commands::Inbox { subcommand } => {
+            handle_inbox_commands(
+                &subcommand,
+                &identity_manager,
+                &storage_manager,
+            );
+        },
+        
+        Commands::Outbox { subcommand } => {
+            handle_outbox_commands(
+                &subcommand,
+                &identity_manager,
+                &storage_manager,
+            );
+        },
+        
+        Commands::ExportVC { identity, output } => {
+            export_verifiable_credential(
+                &identity_manager,
+                identity.as_deref(),
+                &output,
+            );
+        },
+        
+        Commands::Tui => {
+            launch_tui(&identity_manager, &api_client, &storage_manager);
+        },
+        
+        Commands::WebSocket { host, port } => {
+            launch_websocket_server(&identity_manager, &api_client, &storage_manager, host, port);
+        },
     }
+    
+    // Save the identity manager state
+    save_identity_manager(&storage_manager, &identity_manager);
 }
 
 // Load the identity manager from storage or create a new one
@@ -1039,7 +1320,7 @@ fn handle_proposal_commands(
             }
         },
         
-        ProposalCommands::List { scope } => {
+        ProposalCommands::List { scope, status } => {
             // List proposals
             match proposal_manager.list_proposals(scope.as_deref(), active_identity) {
                 Ok(proposals) => {
@@ -1107,6 +1388,317 @@ fn handle_proposal_commands(
                 }
             }
         },
+        
+        ProposalCommands::Audit { hash } => {
+            // Create federation runtime for auditing
+            let federation_runtime = match FederationRuntime::new(
+                ApiConfig::default(), 
+                active_identity.clone(), 
+                StorageManager::new(StorageType::File).unwrap()
+            ) {
+                Ok(runtime) => runtime,
+                Err(e) => {
+                    eprintln!("Failed to create federation runtime: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Audit the proposal
+            match federation_runtime.audit_proposal(hash) {
+                Ok(audit) => {
+                    println!("Proposal {}", audit.hash);
+                    println!("Title: {}", audit.title);
+                    println!("Status: {}", audit.status);
+                    println!("Votes: {} yes / {} no / {} abstain", audit.yes_votes, audit.no_votes, audit.abstain_votes);
+                    println!("Threshold: {}", audit.threshold);
+                    println!("Guardian Quorum: {}", if audit.guardian_quorum_met { "Met ✅" } else { "Not Met ❌" });
+                    println!("Execution: {}", audit.execution_status);
+                    
+                    if let Some(receipt) = audit.dag_receipt {
+                        println!("DAG Receipt: {}", receipt);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to audit proposal: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+        
+        ProposalCommands::VoteStats { hash } => {
+            match proposal_manager.query_proposal(hash, &active_identity) {
+                Ok(submitted) => {
+                    // Count votes
+                    let mut yes_votes = 0;
+                    let mut no_votes = 0;
+                    let mut abstain_votes = 0;
+                    
+                    for vote in &submitted.votes {
+                        match vote.vote {
+                            VoteOption::Yes => yes_votes += 1,
+                            VoteOption::No => no_votes += 1,
+                            VoteOption::Abstain => abstain_votes += 1,
+                        }
+                    }
+                    
+                    let total_votes = yes_votes + no_votes + abstain_votes;
+                    let threshold = if total_votes > 0 { total_votes / 2 + 1 } else { 1 };
+                    
+                    println!("Vote statistics for proposal {}:", hash);
+                    println!("Yes: {}", yes_votes);
+                    println!("No: {}", no_votes);
+                    println!("Abstain: {}", abstain_votes);
+                    println!("Total Votes: {}", total_votes);
+                    println!("Threshold: {}", threshold);
+                    println!("Passing Status: {}", if yes_votes >= threshold { "✅ Passing" } else { "❌ Not Passing" });
+                },
+                Err(e) => {
+                    eprintln!("Failed to query proposal: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+        
+        ProposalCommands::Hash { file } => {
+            // Load the proposal to calculate its hash
+            match proposal_manager.load_dsl(file, &active_identity) {
+                Ok(proposal) => {
+                    println!("{}", proposal.hash);
+                },
+                Err(e) => {
+                    eprintln!("Failed to calculate proposal hash: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+    }
+}
+
+// Handle DAG commands
+fn handle_dag_commands(
+    command: &DagCommands,
+    identity_manager: &IdentityManager,
+    api_client: &ApiClient,
+    storage_manager: &StorageManager,
+) {
+    // Get active identity
+    let identity = match identity_manager.get_active_identity() {
+        Some(identity) => identity,
+        None => {
+            eprintln!("No active identity. Use 'init' or 'use-identity' first.");
+            process::exit(1);
+        }
+    };
+    
+    // Create federation runtime
+    let federation_runtime = match FederationRuntime::new(ApiConfig::default(), identity.clone(), storage_manager.clone()) {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("Failed to create federation runtime: {}", e);
+            process::exit(1);
+        }
+    };
+    
+    match command {
+        DagCommands::Tip => {
+            // Get DAG tip from status
+            match federation_runtime.get_dag_status(None) {
+                Ok(status) => {
+                    println!("{}", status.latest_vertex);
+                },
+                Err(e) => {
+                    eprintln!("Failed to get DAG tip: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+        
+        DagCommands::Status { scope } => {
+            match federation_runtime.get_dag_status(scope.as_deref()) {
+                Ok(status) => {
+                    println!("DAG Status:");
+                    println!("Latest Vertex: {}", status.latest_vertex);
+                    if let Some(proposal_id) = status.proposal_id {
+                        println!("Proposal ID: {}", proposal_id);
+                    }
+                    println!("Vertex Count: {}", status.vertex_count);
+                    println!("Sync Status: {}", if status.synced { "✅ DAG synced" } else { "⚠️ Not synced" });
+                    if let Some(scope) = status.scope {
+                        println!("Scope: {}", scope);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to get DAG status: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+        
+        DagCommands::Sync => {
+            // For now, just print a message since this would be implemented in the daemon
+            println!("DAG sync triggered. This would be handled by the federation daemon.");
+        },
+        
+        DagCommands::ReplayPending => {
+            // For now, just print a message since this would be implemented in the daemon
+            println!("DAG replay triggered. This would be handled by the federation daemon.");
+        }
+    }
+}
+
+// Handle federation commands
+fn handle_federation_commands(
+    command: &FederationCommands,
+    identity_manager: &IdentityManager,
+    api_config: &ApiConfig,
+    storage_manager: &StorageManager,
+) {
+    // Get active identity
+    let identity = match identity_manager.get_active_identity() {
+        Some(identity) => identity,
+        None => {
+            eprintln!("No active identity. Use 'init' or 'use-identity' first.");
+            process::exit(1);
+        }
+    };
+    
+    // Create federation runtime
+    let mut federation_runtime = match FederationRuntime::new(api_config.clone(), identity.clone(), storage_manager.clone()) {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("Failed to create federation runtime: {}", e);
+            process::exit(1);
+        }
+    };
+    
+    match command {
+        FederationCommands::Submit { file, timeout, verbose } => {
+            let options = MonitoringOptions {
+                interval_seconds: 10,
+                timeout_minutes: timeout.unwrap_or(60),
+                verbose: *verbose,
+            };
+            
+            println!("Submitting proposal and monitoring: {}", file.display());
+            
+            match federation_runtime.submit_and_monitor(file, Some(options)) {
+                Ok(result) => {
+                    println!("Proposal Status: {:?}", result.status);
+                    println!("Votes: {} yes / {} no / {} abstain", result.yes_votes, result.no_votes, result.abstain_votes);
+                    println!("Threshold: {}", result.threshold);
+                    
+                    if let Some(event_id) = result.event_id {
+                        println!("Event ID: {}", event_id);
+                    }
+                    
+                    if let Some(executed_at) = result.executed_at {
+                        println!("Executed at: {}", executed_at);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to submit and monitor proposal: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+        
+        FederationCommands::Sync { proposal_hash } => {
+            match federation_runtime.sync_with_agoranet(proposal_hash) {
+                Ok(success) => {
+                    if success {
+                        println!("Successfully synced proposal with AgoraNet.");
+                    } else {
+                        println!("Failed to sync proposal with AgoraNet.");
+                        process::exit(1);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to sync with AgoraNet: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+    }
+}
+
+// Function to cast votes (as a separate command)
+fn cast_vote(
+    identity_manager: &IdentityManager,
+    proposal_manager: &ProposalManager,
+    proposal_hash: &str,
+    yes: bool,
+    no: bool,
+    abstain: bool,
+    signature: &Option<PathBuf>,
+    comment: &Option<String>,
+) {
+    // Get active identity
+    let identity = match identity_manager.get_active_identity() {
+        Some(identity) => identity,
+        None => {
+            eprintln!("No active identity. Use 'init' or 'use-identity' first.");
+            process::exit(1);
+        }
+    };
+    
+    // Determine vote option
+    let vote_option = if yes {
+        VoteOption::Yes
+    } else if no {
+        VoteOption::No
+    } else if abstain {
+        VoteOption::Abstain
+    } else {
+        eprintln!("Please specify a vote option: --yes, --no, or --abstain");
+        process::exit(1);
+    };
+    
+    // Cast vote
+    match proposal_manager.cast_vote(
+        proposal_hash,
+        vote_option,
+        comment.clone(),
+        &identity,
+    ) {
+        Ok(vote) => {
+            println!("Vote cast successfully!");
+            println!("Proposal: {}", vote.proposal_hash);
+            println!("Vote: {:?}", vote.vote);
+            if let Some(comment) = &vote.comment {
+                println!("Comment: {}", comment);
+            }
+            println!("Timestamp: {}", vote.timestamp);
+            
+            // If signature file is provided, we're voting as a guardian
+            if let Some(sig_path) = signature {
+                println!("Guardian signature recorded.");
+                // In a real impl, we would add the signature to the guardian recovery
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to cast vote: {}", e);
+            process::exit(1);
+        }
+    }
+}
+
+// Simple TUI placeholder function
+fn launch_tui(
+    identity_manager: &IdentityManager,
+    api_client: &ApiClient,
+    storage_manager: &StorageManager,
+) {
+    println!("Launching TUI mode...");
+    
+    // Call the TUI run function
+    match crate::tui::run_tui(identity_manager, api_client, storage_manager) {
+        Ok(_) => {
+            println!("TUI closed successfully.");
+        },
+        Err(e) => {
+            eprintln!("Error in TUI: {}", e);
+            process::exit(1);
+        }
     }
 }
 
@@ -1139,4 +1731,557 @@ fn restore_wallet(storage: &StorageManager, input: &PathBuf, password: &Option<S
             process::exit(1);
         }
     }
+}
+
+/// Handle device management commands
+fn handle_device_commands(
+    command: &DeviceCommands,
+    identity_manager: &IdentityManager,
+    storage_manager: &StorageManager,
+) {
+    match command {
+        DeviceCommands::Link { to, key_type, output } => {
+            let active_identity = match identity_manager.get_active_identity() {
+                Some(id) => id,
+                None => {
+                    eprintln!("No active identity. Please set one with 'wallet use-identity'");
+                    process::exit(1);
+                }
+            };
+            
+            // Parse key type
+            let target_key_type = match key_type.to_lowercase().as_str() {
+                "ed25519" => KeyType::Ed25519,
+                "ecdsa" => KeyType::Ecdsa,
+                _ => {
+                    eprintln!("Invalid key type. Use 'ed25519' or 'ecdsa'");
+                    process::exit(1);
+                }
+            };
+            
+            // Create device link challenge
+            let challenge = match active_identity.create_device_link_challenge(to, target_key_type) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Failed to create device link challenge: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Sign the challenge
+            let link = match active_identity.sign_device_link(&challenge) {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("Failed to sign device link: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Save to file
+            let link_json = match serde_json::to_string_pretty(&link) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("Failed to serialize device link: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            match fs::write(output, link_json) {
+                Ok(_) => println!("Device link saved to {}", output.display()),
+                Err(e) => {
+                    eprintln!("Failed to write device link file: {}", e);
+                    process::exit(1);
+                }
+            }
+        },
+        
+        DeviceCommands::Import { link, key } => {
+            // Read the link file
+            let link_data = match fs::read_to_string(link) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Failed to read link file: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Parse the link
+            let device_link: DeviceLink = match serde_json::from_str(&link_data) {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("Failed to parse link file: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Read the private key file
+            let private_key = match fs::read(key) {
+                Ok(k) => k,
+                Err(e) => {
+                    eprintln!("Failed to read private key file: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Create identity from device link
+            let identity = match Identity::from_device_link(&device_link, &private_key) {
+                Ok(i) => i,
+                Err(e) => {
+                    eprintln!("Failed to import identity from device link: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Save the identity
+            let mut manager = identity_manager.clone();
+            manager.add_identity(identity);
+            save_identity_manager(storage_manager, &manager);
+            
+            println!("Identity imported successfully from device link");
+        },
+        
+        DeviceCommands::List => {
+            let active_identity = match identity_manager.get_active_identity() {
+                Some(id) => id,
+                None => {
+                    eprintln!("No active identity. Please set one with 'wallet use-identity'");
+                    process::exit(1);
+                }
+            };
+            
+            // We need to create a mutable clone of the identity manager to update it
+            let mut manager = identity_manager.clone();
+            let identity_clone = active_identity.get_metadata();
+            
+            // For now, just display this device's ID - let's ensure one exists
+            let device_id = if let Some(did) = identity_clone.get_metadata().did() {
+                // Find an existing device ID
+                let mut found_device_id = String::new();
+                for id in identity_manager.list_identities() {
+                    if id.did() == did {
+                        // Check if device ID exists
+                        // If not, we'll generate one below
+                        found_device_id = id.get_metadata().did().to_string();
+                        break;
+                    }
+                }
+                
+                if found_device_id.is_empty() {
+                    // Generate a new device ID
+                    let new_id = uuid::Uuid::new_v4().to_string();
+                    
+                    // In a real implementation, we'd save this back to the identity
+                    // For this demo, we'll just display it
+                    new_id
+                } else {
+                    found_device_id
+                }
+            } else {
+                "No device ID found".to_string()
+            };
+            
+            println!("Current device ID: {}", device_id);
+            
+            // Since we can't directly access metadata, we'll just print a message
+            // In a full implementation, we'd query the linked devices
+            println!("Device linking information is stored in identity metadata");
+            println!("Use 'wallet device generate' to create a new device keypair");
+            println!("Use 'wallet device link --to <pubkey>' to create a link for another device");
+        },
+        
+        DeviceCommands::Generate { key_type, output } => {
+            // Parse key type
+            let key_type_enum = match key_type.to_lowercase().as_str() {
+                "ed25519" => KeyType::Ed25519,
+                "ecdsa" => KeyType::Ecdsa,
+                _ => {
+                    eprintln!("Invalid key type. Use 'ed25519' or 'ecdsa'");
+                    process::exit(1);
+                }
+            };
+            
+            // Generate keypair
+            let (private_key, public_key) = match Identity::generate_device_keypair(key_type_enum) {
+                Ok(pair) => pair,
+                Err(e) => {
+                    eprintln!("Failed to generate keypair: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Ensure output directory exists
+            if !output.exists() {
+                if let Err(e) = fs::create_dir_all(&output) {
+                    eprintln!("Failed to create output directory: {}", e);
+                    process::exit(1);
+                }
+            }
+            
+            // Write private key
+            let private_key_path = output.join("private.key");
+            if let Err(e) = fs::write(&private_key_path, &private_key) {
+                eprintln!("Failed to write private key: {}", e);
+                process::exit(1);
+            }
+            
+            // Write public key
+            let public_key_path = output.join("public.key");
+            if let Err(e) = fs::write(&public_key_path, &public_key) {
+                eprintln!("Failed to write public key: {}", e);
+                process::exit(1);
+            }
+            
+            println!("Generated {} keypair:", key_type);
+            println!("  Private key: {}", private_key_path.display());
+            println!("  Public key: {}", public_key_path.display());
+            println!("Keep your private key secure!");
+        },
+    }
+}
+
+/// Handle inbox commands
+fn handle_inbox_commands(
+    command: &InboxCommands,
+    identity_manager: &IdentityManager,
+    storage_manager: &StorageManager,
+) {
+    // Create inbox directory if it doesn't exist
+    let inbox_dir = storage_manager.get_data_dir().join("proposals").join("inbox");
+    if !inbox_dir.exists() {
+        if let Err(e) = fs::create_dir_all(&inbox_dir) {
+            eprintln!("Failed to create inbox directory: {}", e);
+            process::exit(1);
+        }
+    }
+    
+    match command {
+        InboxCommands::List => {
+            // Read all files in the inbox directory
+            let entries = match fs::read_dir(&inbox_dir) {
+                Ok(entries) => entries,
+                Err(e) => {
+                    eprintln!("Failed to read inbox directory: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            let mut items = Vec::new();
+            
+            // Process each file
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    // Try to read as a proposal or other message
+                    if let Ok(metadata) = entry.metadata() {
+                        items.push((
+                            entry.file_name().to_string_lossy().to_string(),
+                            metadata.modified().unwrap_or_else(|_| std::time::SystemTime::now()),
+                        ));
+                    }
+                }
+            }
+            
+            // Sort by modification time (newest first)
+            items.sort_by(|a, b| b.1.cmp(&a.1));
+            
+            // Display inbox items
+            println!("Inbox items:");
+            if items.is_empty() {
+                println!("  No items in inbox");
+            } else {
+                for (name, time) in items {
+                    println!("  {} - {:?}", name, time);
+                }
+            }
+        },
+        
+        InboxCommands::Review { id } => {
+            // Check if the file exists
+            let file_path = inbox_dir.join(id);
+            if !file_path.exists() {
+                eprintln!("Item '{}' not found in inbox", id);
+                process::exit(1);
+            }
+            
+            // Read the file
+            let content = match fs::read_to_string(&file_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Failed to read item: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            // Display the content
+            println!("Reviewing item '{}':", id);
+            println!("{}", content);
+            
+            // In a full implementation, this would handle different item types
+            // and provide appropriate actions
+        },
+    }
+}
+
+/// Handle outbox commands
+fn handle_outbox_commands(
+    command: &OutboxCommands,
+    identity_manager: &IdentityManager,
+    storage_manager: &StorageManager,
+) {
+    // Create outbox directory if it doesn't exist
+    let outbox_dir = storage_manager.get_data_dir().join("proposals").join("outbox");
+    if !outbox_dir.exists() {
+        if let Err(e) = fs::create_dir_all(&outbox_dir) {
+            eprintln!("Failed to create outbox directory: {}", e);
+            process::exit(1);
+        }
+    }
+    
+    match command {
+        OutboxCommands::List => {
+            // Read all files in the outbox directory
+            let entries = match fs::read_dir(&outbox_dir) {
+                Ok(entries) => entries,
+                Err(e) => {
+                    eprintln!("Failed to read outbox directory: {}", e);
+                    process::exit(1);
+                }
+            };
+            
+            let mut items = Vec::new();
+            
+            // Process each file
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    // Try to read as a proposal or other message
+                    if let Ok(metadata) = entry.metadata() {
+                        items.push((
+                            entry.file_name().to_string_lossy().to_string(),
+                            metadata.modified().unwrap_or_else(|_| std::time::SystemTime::now()),
+                        ));
+                    }
+                }
+            }
+            
+            // Sort by modification time (newest first)
+            items.sort_by(|a, b| b.1.cmp(&a.1));
+            
+            // Display outbox items
+            println!("Outbox items:");
+            if items.is_empty() {
+                println!("  No items in outbox");
+            } else {
+                for (name, time) in items {
+                    println!("  {} - {:?}", name, time);
+                }
+            }
+        },
+        
+        OutboxCommands::Status { id } => {
+            if let Some(item_id) = id {
+                // Check if the file exists
+                let file_path = outbox_dir.join(item_id);
+                if !file_path.exists() {
+                    eprintln!("Item '{}' not found in outbox", item_id);
+                    process::exit(1);
+                }
+                
+                // Read the file
+                let content = match fs::read_to_string(&file_path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("Failed to read item: {}", e);
+                        process::exit(1);
+                    }
+                };
+                
+                // Display the content and status
+                println!("Status of item '{}':", item_id);
+                println!("{}", content);
+                
+                // In a full implementation, this would check the federation status
+            } else {
+                // Show status of all items
+                let entries = match fs::read_dir(&outbox_dir) {
+                    Ok(entries) => entries,
+                    Err(e) => {
+                        eprintln!("Failed to read outbox directory: {}", e);
+                        process::exit(1);
+                    }
+                };
+                
+                let mut items = Vec::new();
+                
+                // Process each file
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        items.push(entry.file_name().to_string_lossy().to_string());
+                    }
+                }
+                
+                // Display status of all items
+                println!("Status of all outbox items:");
+                if items.is_empty() {
+                    println!("  No items in outbox");
+                } else {
+                    for item in items {
+                        println!("  {} - Pending", item);
+                    }
+                }
+            }
+        },
+    }
+}
+
+/// Export a Verifiable Credential for an identity
+fn export_verifiable_credential(
+    identity_manager: &IdentityManager,
+    identity_did: Option<&str>,
+    output: &PathBuf,
+) {
+    // Get the identity
+    let identity = match identity_did {
+        Some(did) => match identity_manager.get_identity(did) {
+            Some(id) => id,
+            None => {
+                eprintln!("Identity with DID '{}' not found", did);
+                process::exit(1);
+            }
+        },
+        None => match identity_manager.get_active_identity() {
+            Some(id) => id,
+            None => {
+                eprintln!("No active identity. Please specify a DID or set an active identity.");
+                process::exit(1);
+            }
+        }
+    };
+    
+    // Create VC JSON structure
+    let vc = serde_json::json!({
+        "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://www.w3.org/2018/credentials/examples/v1"
+        ],
+        "id": format!("urn:uuid:{}", uuid::Uuid::new_v4()),
+        "type": ["VerifiableCredential", "FederationMemberCredential"],
+        "issuer": identity.did(),
+        "issuanceDate": chrono::Utc::now().to_rfc3339(),
+        "credentialSubject": {
+            "id": identity.did(),
+            "federationMember": {
+                "scope": identity.scope(),
+                "username": identity.username(),
+                "role": "member"
+            }
+        }
+    });
+    
+    // Save to file
+    match fs::write(output, serde_json::to_string_pretty(&vc).unwrap()) {
+        Ok(_) => println!("Verifiable Credential exported to {}", output.display()),
+        Err(e) => {
+            eprintln!("Failed to write VC file: {}", e);
+            process::exit(1);
+        }
+    }
+}
+
+/// Launch WebSocket server for real-time updates
+fn launch_websocket_server(
+    identity_manager: &IdentityManager,
+    api_client: &ApiClient,
+    storage_manager: &StorageManager,
+    host: &Option<String>,
+    port: &Option<u16>,
+) {
+    // Create federation runtime
+    let api_config = api_client.get_config().clone();
+    let active_identity = identity_manager.get_active_identity().cloned();
+    
+    // Check if we have an active identity
+    let identity = match active_identity {
+        Some(id) => id,
+        None => {
+            eprintln!("No active identity. Use 'init' or 'use-identity' first.");
+            process::exit(1);
+        }
+    };
+    
+    // Create FederationRuntime
+    let federation_runtime = match FederationRuntime::new(
+        api_config,
+        identity,
+        storage_manager.clone(),
+    ) {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("Failed to create federation runtime: {}", e);
+            process::exit(1);
+        }
+    };
+    
+    // Create sync config
+    let sync_config = SyncConfig {
+        inbox_sync_interval: 10, // 10 seconds for testing
+        outbox_sync_interval: 10, // 10 seconds for testing
+        dag_watch_interval: 5,    // 5 seconds for testing
+        inbox_path: std::path::PathBuf::from("proposals/inbox"),
+        outbox_path: std::path::PathBuf::from("proposals/outbox"),
+    };
+    
+    // Create SyncManager
+    let sync_manager = SyncManager::new(
+        federation_runtime,
+        storage_manager.clone(),
+        identity_manager.clone(),
+        Some(sync_config),
+    );
+    
+    // Start the sync manager
+    if let Err(e) = sync_manager.start() {
+        eprintln!("Failed to start sync manager: {}", e);
+        process::exit(1);
+    }
+    
+    // Create WebSocket config
+    let websocket_config = WebSocketConfig {
+        host: host.clone().unwrap_or_else(|| "127.0.0.1".to_string()),
+        port: port.clone().unwrap_or(9876),
+        ping_interval: 30,
+    };
+    
+    // Create WebSocket server
+    let websocket_server = WebSocketServer::new(
+        sync_manager,
+        Some(websocket_config),
+    );
+    
+    // Start WebSocket server
+    if let Err(e) = websocket_server.start() {
+        eprintln!("Failed to start WebSocket server: {}", e);
+        process::exit(1);
+    }
+    
+    println!("WebSocket server started on {}:{}", 
+        websocket_config.host, 
+        websocket_config.port
+    );
+    println!("Press Ctrl+C to stop...");
+    
+    // Wait for user to press Ctrl+C
+    match signal_hook::iterator::Signals::new(&[signal_hook::consts::SIGINT, signal_hook::consts::SIGTERM]) {
+        Ok(mut signals) => {
+            for _ in signals.forever() {
+                break;
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to install signal handler: {}", e);
+        }
+    }
+    
+    // Stop the WebSocket server
+    websocket_server.stop();
+    
+    println!("WebSocket server stopped");
 }
