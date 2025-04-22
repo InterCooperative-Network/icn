@@ -4,3 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.4", features = ["derive"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+p256 = "0.13"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+directories = "5.0"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+env_logger = "0.10"
+base64 = "0.21"
+uuid = { version = "1.4", features = ["v4", "serde"] }
+tempfile = "3.8"
+sha2 = "0.10"
+flate2 = "1.0"
+tar = "0.4"
+ring = "0.17"
+
+[dev-dependencies]
+mockito = "1.2"
