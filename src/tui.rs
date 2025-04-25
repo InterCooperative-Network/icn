@@ -4,6 +4,8 @@ use crate::identity::{Identity, IdentityManager};
 use crate::storage::StorageManager;
 use crate::sync::{Notification, SyncManager, SyncConfig};
 use crate::websocket::{WebSocketServer, WebSocketConfig};
+use crate::dashboard::ComputeDashboard;
+use crate::ui::InputEvent;
 
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -50,6 +52,9 @@ struct App {
     command_history: Vec<String>,
     command_index: usize,
     status_message: String,
+    
+    // Dashboards
+    compute_dashboard: ComputeDashboard,
 }
 
 /// Input mode for the application
@@ -76,6 +81,9 @@ impl App {
         let mut notification_list_state = ListState::default();
         notification_list_state.select(Some(0));
         
+        // Create compute dashboard
+        let compute_dashboard = ComputeDashboard::new(storage_manager.get_wallet_db());
+        
         // Create application state
         Self {
             identity_manager: Arc::new(Mutex::new(identity_manager)),
@@ -84,7 +92,7 @@ impl App {
             sync_manager: None,
             websocket_server: None,
             tab_index: 0,
-            tab_titles: vec!["Identities", "Proposals", "Notifications", "Console"],
+            tab_titles: vec!["Identities", "Proposals", "Compute", "Notifications", "Console"],
             identity_list_state,
             proposal_list_state,
             notification_list_state,
@@ -96,6 +104,7 @@ impl App {
             command_history: Vec::new(),
             command_index: 0,
             status_message: "Welcome to ICN Wallet".to_string(),
+            compute_dashboard,
         }
     }
     
@@ -247,6 +256,10 @@ impl App {
                 }
             }
             2 => {
+                // Compute tab
+                // This tab is handled by the compute_dashboard
+            }
+            3 => {
                 // Notifications tab
                 if !self.notifications.is_empty() {
                     let i = match self.notification_list_state.selected() {
@@ -301,6 +314,10 @@ impl App {
                 }
             }
             2 => {
+                // Compute tab
+                // This tab is handled by the compute_dashboard
+            }
+            3 => {
                 // Notifications tab
                 if !self.notifications.is_empty() {
                     let i = match self.notification_list_state.selected() {
@@ -510,6 +527,47 @@ pub fn run_tui(
             
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
+                // Check if we're on the compute tab
+                if app.tab_index == 2 && app.input_mode == InputMode::Normal {
+                    // Convert crossterm key to our InputEvent
+                    let input_event = match key.code {
+                        KeyCode::Char('q') => {
+                            // Special case: q should still exit the app
+                            break;
+                        },
+                        KeyCode::Char('t') => {
+                            app.next_tab();
+                            continue;
+                        },
+                        KeyCode::Tab => {
+                            app.next_tab();
+                            continue;
+                        },
+                        KeyCode::BackTab => {
+                            app.previous_tab();
+                            continue;
+                        },
+                        KeyCode::Char('c') => {
+                            app.enter_command_mode();
+                            continue;
+                        },
+                        KeyCode::Char(c) => InputEvent::KeyChar(c),
+                        KeyCode::Up => InputEvent::KeyUp,
+                        KeyCode::Down => InputEvent::KeyDown,
+                        KeyCode::Left => InputEvent::KeyLeft,
+                        KeyCode::Right => InputEvent::KeyRight,
+                        KeyCode::Enter => InputEvent::KeyEnter,
+                        KeyCode::Esc => InputEvent::KeyEsc,
+                        KeyCode::Tab => InputEvent::KeyTab,
+                        KeyCode::BackTab => InputEvent::KeyBacktab,
+                        _ => continue,
+                    };
+                    
+                    // Pass the event to the dashboard
+                    app.compute_dashboard.handle_input(input_event);
+                    continue;
+                }
+                
                 match app.input_mode {
                     InputMode::Normal => match key.code {
                         KeyCode::Char('q') => break,
@@ -616,8 +674,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.tab_index {
         0 => draw_identities_tab(f, app, chunks[1]),
         1 => draw_proposals_tab(f, app, chunks[1]),
-        2 => draw_notifications_tab(f, app, chunks[1]),
-        3 => draw_console_tab(f, app, chunks[1]),
+        2 => draw_compute_tab(f, app, chunks[1]),
+        3 => draw_notifications_tab(f, app, chunks[1]),
+        4 => draw_console_tab(f, app, chunks[1]),
         _ => {}
     }
     
@@ -678,6 +737,12 @@ fn draw_proposals_tab<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
     };
     
     f.render_stateful_widget(proposals_list, area, &mut app.proposal_list_state);
+}
+
+/// Draw the compute tab
+fn draw_compute_tab<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
+    // Just delegate the rendering to the compute dashboard component
+    app.compute_dashboard.render(f, area);
 }
 
 /// Draw the notifications tab

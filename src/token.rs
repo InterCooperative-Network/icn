@@ -25,6 +25,9 @@ pub enum TokenType {
     CEC,
     // Typed tokens represent specific use cases
     Typed(String),
+    // Resource tokens represent computational or physical resources
+    // Format: resource_type/resource_name
+    ResourceToken(String, String),
 }
 
 impl TokenType {
@@ -32,13 +35,56 @@ impl TokenType {
         match self {
             TokenType::CEC => "CEC".to_string(),
             TokenType::Typed(name) => name.clone(),
+            TokenType::ResourceToken(resource_type, resource_name) => 
+                format!("icn:resource/{}/{}", resource_type, resource_name),
         }
     }
     
     pub fn from_string(s: &str) -> Result<Self, TokenError> {
+        // Check if it's a resource token (icn:resource/type/name)
+        if s.starts_with("icn:resource/") {
+            let parts: Vec<&str> = s.split('/').collect();
+            if parts.len() >= 3 {
+                let resource_type = parts[1].to_string();
+                let resource_name = parts[2].to_string();
+                return Ok(TokenType::ResourceToken(resource_type, resource_name));
+            } else {
+                return Err(TokenError::InvalidTokenType(format!("Invalid resource token format: {}", s)));
+            }
+        }
+        
         match s {
             "CEC" => Ok(TokenType::CEC),
             _ => Ok(TokenType::Typed(s.to_string())),
+        }
+    }
+    
+    // Create a compute resource token with the given name
+    pub fn compute_resource(name: &str) -> Self {
+        TokenType::ResourceToken("compute".to_string(), name.to_string())
+    }
+    
+    // Check if this is a compute resource token
+    pub fn is_compute_resource(&self) -> bool {
+        match self {
+            TokenType::ResourceToken(resource_type, _) if resource_type == "compute" => true,
+            _ => false,
+        }
+    }
+    
+    // Get the resource type if this is a resource token
+    pub fn resource_type(&self) -> Option<&str> {
+        match self {
+            TokenType::ResourceToken(resource_type, _) => Some(resource_type),
+            _ => None,
+        }
+    }
+    
+    // Get the resource name if this is a resource token
+    pub fn resource_name(&self) -> Option<&str> {
+        match self {
+            TokenType::ResourceToken(_, resource_name) => Some(resource_name),
+            _ => None,
         }
     }
 }
@@ -308,5 +354,53 @@ mod tests {
         // Check balances
         assert_eq!(store1.get_balance(&TokenType::CEC).unwrap().amount, 50.0);
         assert_eq!(store2.get_balance(&TokenType::CEC).unwrap().amount, 50.0);
+    }
+    
+    #[test]
+    fn test_resource_tokens() {
+        // Create a compute resource token
+        let compute_token = TokenType::compute_resource("gpu-shared");
+        assert_eq!(compute_token.to_string(), "icn:resource/compute/gpu-shared");
+        assert!(compute_token.is_compute_resource());
+        assert_eq!(compute_token.resource_type(), Some("compute"));
+        assert_eq!(compute_token.resource_name(), Some("gpu-shared"));
+        
+        // Create a storage resource token
+        let storage_token = TokenType::ResourceToken("storage".to_string(), "ssd-10gb".to_string());
+        assert_eq!(storage_token.to_string(), "icn:resource/storage/ssd-10gb");
+        assert!(!storage_token.is_compute_resource());
+        assert_eq!(storage_token.resource_type(), Some("storage"));
+        assert_eq!(storage_token.resource_name(), Some("ssd-10gb"));
+        
+        // Parse from string
+        let parsed = TokenType::from_string("icn:resource/compute/gpu-shared").unwrap();
+        assert_eq!(parsed, compute_token);
+        
+        // Test invalid format
+        let result = TokenType::from_string("icn:resource/invalid");
+        assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_resource_token_balance() {
+        let mut store = TokenStore::new("coop1");
+        
+        // Add some compute resource token
+        let compute_token = TokenType::compute_resource("gpu-shared");
+        store.add_amount(compute_token.clone(), 10.0);
+        
+        // Check balance
+        let balance = store.get_balance(&compute_token).unwrap();
+        assert_eq!(balance.amount, 10.0);
+        
+        // Add metadata for the compute token with expiry
+        if let Some(balance) = store.get_balance_mut(&compute_token) {
+            let expiry = Utc::now() + Duration::days(7);
+            balance.set_expiry(expiry);
+        }
+        
+        // Verify expiry is set
+        let balance = store.get_balance(&compute_token).unwrap();
+        assert!(balance.metadata.expires_at.is_some());
     }
 } 

@@ -11,7 +11,7 @@ mod services;
 use clap::{Parser, Subcommand};
 use identity::{Identity, IdentityManager, KeyType, DeviceLink, DeviceLinkChallenge};
 use storage::{StorageManager, StorageType};
-use token::{TokenStore, TokenType};
+use token::{TokenStore, TokenType, TokenBalance};
 use guardians::{GuardianManager, GuardianSet, GuardianStatus};
 use proposal::{ProposalManager, Proposal, VoteOption};
 use federation::{FederationRuntime, MonitoringOptions};
@@ -243,6 +243,12 @@ enum Commands {
     Invite {
         #[command(subcommand)]
         subcommand: InviteCommands,
+    },
+    
+    /// Resource token management
+    Resource {
+        #[command(subcommand)]
+        subcommand: ResourceCommands,
     },
 }
 
@@ -662,12 +668,72 @@ enum InviteCommands {
     },
 }
 
-fn main() {
+#[derive(Subcommand)]
+enum ResourceCommands {
+    /// Create a new resource token
+    Create {
+        /// Resource type (e.g., compute, storage, bandwidth)
+        #[arg(long)]
+        resource_type: String,
+        
+        /// Resource name (e.g., gpu-shared, storage-10gb)
+        #[arg(long)]
+        name: String,
+        
+        /// Initial amount to create
+        #[arg(long)]
+        amount: f64,
+        
+        /// Optional expiration in days
+        #[arg(long)]
+        expires_in_days: Option<u32>,
+        
+        /// Federation scope for the token
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    
+    /// List available resource tokens
+    List {
+        /// Filter by resource type
+        #[arg(long)]
+        resource_type: Option<String>,
+        
+        /// Federation scope for the token
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    
+    /// Transfer resource tokens to another identity
+    Transfer {
+        /// Resource type (e.g., compute, storage, bandwidth)
+        #[arg(long)]
+        resource_type: String,
+        
+        /// Resource name (e.g., gpu-shared, storage-10gb)
+        #[arg(long)]
+        name: String,
+        
+        /// Amount to transfer
+        #[arg(long)]
+        amount: f64,
+        
+        /// Recipient DID
+        #[arg(long)]
+        recipient: String,
+        
+        /// Federation scope for the token
+        #[arg(long)]
+        scope: Option<String>,
+    },
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     env_logger::init();
     
     // Parse command line arguments
-    let cli = Cli::parse();
+    let args = Cli::parse();
     
     // Initialize storage
     let storage_manager = match StorageManager::new(StorageType::File) {
@@ -698,10 +764,11 @@ fn main() {
     let proposal_manager = ProposalManager::new(api_client.clone());
     
     // Process commands
-    match &cli.command {
+    match args.command {
         Commands::Init { scope, username, key_type } => {
             init_identity(&mut identity_manager, &storage_manager, scope, username, key_type);
         },
+        
         
         Commands::Whoami => {
             whoami(&identity_manager);
@@ -871,6 +938,9 @@ fn main() {
                 eprintln!("No active identity. Please use 'identity use' to set an active identity first.");
                 process::exit(1);
             }
+        },
+        Commands::Resource { subcommand } => {
+            handle_resource_commands(subcommand, &identity_manager, &storage_manager);
         },
     }
     
@@ -3407,6 +3477,181 @@ fn handle_invite_commands(
                     eprintln!("Failed to decode invite from QR code: {}", e);
                 }
             }
+        },
+    }
+}
+
+fn handle_resource_commands(
+    command: &ResourceCommands,
+    identity_manager: &IdentityManager,
+    storage_manager: &StorageManager,
+) {
+    // Get active identity
+    let identity = match identity_manager.active_identity() {
+        Some(id) => id,
+        None => {
+            eprintln!("No active identity found. Please initialize or import an identity first.");
+            process::exit(1);
+        }
+    };
+    
+    match command {
+        ResourceCommands::Create { resource_type, name, amount, expires_in_days, scope } => {
+            let scope_str = scope.as_deref().unwrap_or(identity.scope());
+            
+            // Load or create the token store
+            let mut token_store = match storage_manager.load::<TokenStore>(scope_str, "tokens") {
+                Ok(store) => store,
+                Err(_) => TokenStore::new(scope_str),
+            };
+            
+            // Create the resource token
+            let token_type = TokenType::ResourceToken(resource_type.clone(), name.clone());
+            
+            // Create token with basic metadata
+            let mut token_balance = token::TokenBalance::new(token_type.clone(), *amount);
+            
+            // Add expiration if specified
+            if let Some(days) = expires_in_days {
+                use chrono::{Duration, Utc};
+                let expiry = Utc::now() + Duration::days(*days as i64);
+                token_balance.set_expiry(expiry);
+            }
+            
+            // Add the token to the store
+            token_store.add_balance(token_balance);
+            
+            // Save the token store
+            if let Err(e) = storage_manager.save(scope_str, "tokens", &token_store) {
+                eprintln!("Failed to save token store: {}", e);
+                process::exit(1);
+            }
+            
+            println!("Created resource token: icn:resource/{}/{}", resource_type, name);
+            println!("Amount: {}", amount);
+            if let Some(days) = expires_in_days {
+                println!("Expires in: {} days", days);
+            }
+        },
+        ResourceCommands::List { resource_type, scope } => {
+            let scope_str = scope.as_deref().unwrap_or(identity.scope());
+            
+            // Load token store
+            let token_store = match storage_manager.load::<TokenStore>(scope_str, "tokens") {
+                Ok(store) => store,
+                Err(_) => {
+                    println!("No resource tokens found for scope: {}", scope_str);
+                    return;
+                }
+            };
+            
+            // Get all balances
+            let balances = token_store.list_balances();
+            
+            // Filter for resource tokens
+            let resource_tokens: Vec<_> = balances.iter()
+                .filter(|balance| {
+                    match &balance.token_type {
+                        TokenType::ResourceToken(rtype, _) => {
+                            if let Some(filter_type) = resource_type {
+                                rtype == filter_type
+                            } else {
+                                true
+                            }
+                        },
+                        _ => false,
+                    }
+                })
+                .collect();
+            
+            if resource_tokens.is_empty() {
+                println!("No resource tokens found");
+                return;
+            }
+            
+            println!("Resource tokens for scope: {}", scope_str);
+            println!("{:<30} {:<15} {:<15}", "TOKEN", "AMOUNT", "EXPIRES");
+            println!("{:-<30} {:-<15} {:-<15}", "", "", "");
+            
+            for balance in resource_tokens {
+                let token_str = balance.token_type.to_string();
+                let amount_str = format!("{:.2}", balance.amount);
+                let expires_str = match balance.metadata.expires_at {
+                    Some(expiry) => {
+                        let now = chrono::Utc::now();
+                        let duration = expiry.signed_duration_since(now);
+                        if duration.num_seconds() <= 0 {
+                            "EXPIRED".to_string()
+                        } else {
+                            format!("{} days", duration.num_days())
+                        }
+                    },
+                    None => "Never".to_string(),
+                };
+                
+                println!("{:<30} {:<15} {:<15}", token_str, amount_str, expires_str);
+            }
+        },
+        ResourceCommands::Transfer { resource_type, name, amount, recipient, scope } => {
+            let scope_str = scope.as_deref().unwrap_or(identity.scope());
+            
+            // Load sender's token store
+            let mut sender_store = match storage_manager.load::<TokenStore>(scope_str, "tokens") {
+                Ok(store) => store,
+                Err(_) => {
+                    eprintln!("No token store found for scope: {}", scope_str);
+                    process::exit(1);
+                }
+            };
+            
+            // Create token type
+            let token_type = TokenType::ResourceToken(resource_type.clone(), name.clone());
+            
+            // Check if sender has enough balance
+            if let Some(balance) = sender_store.get_balance(&token_type) {
+                if balance.amount < *amount {
+                    eprintln!("Insufficient balance. You have {} but trying to transfer {}", 
+                              balance.amount, amount);
+                    process::exit(1);
+                }
+                
+                if balance.is_expired() {
+                    eprintln!("Cannot transfer expired tokens");
+                    process::exit(1);
+                }
+            } else {
+                eprintln!("No balance found for token: icn:resource/{}/{}", resource_type, name);
+                process::exit(1);
+            }
+            
+            // Load or create recipient's token store
+            let mut recipient_store = match storage_manager.load::<TokenStore>(scope_str, 
+                                                        &format!("tokens_{}", recipient)) {
+                Ok(store) => store,
+                Err(_) => TokenStore::new(scope_str),
+            };
+            
+            // Perform the transfer
+            if let Err(e) = sender_store.transfer(&mut recipient_store, &token_type, *amount) {
+                eprintln!("Transfer failed: {}", e);
+                process::exit(1);
+            }
+            
+            // Save both token stores
+            if let Err(e) = storage_manager.save(scope_str, "tokens", &sender_store) {
+                eprintln!("Failed to save sender's token store: {}", e);
+                process::exit(1);
+            }
+            
+            if let Err(e) = storage_manager.save(scope_str, 
+                                              &format!("tokens_{}", recipient), 
+                                              &recipient_store) {
+                eprintln!("Failed to save recipient's token store: {}", e);
+                process::exit(1);
+            }
+            
+            println!("Successfully transferred {} of icn:resource/{}/{} to {}",
+                    amount, resource_type, name, recipient);
         },
     }
 }
