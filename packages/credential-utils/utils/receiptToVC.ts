@@ -12,6 +12,7 @@ interface Receipt {
   verified_at?: string;
   verified?: boolean;
   execution_hash?: string;
+  thread_id?: string;
 }
 
 /**
@@ -47,6 +48,7 @@ export function receiptToVC(receipt: Receipt, userDid: string): any {
       executionHash: receipt.execution_hash,
       jobId: receipt.job_id,
       role: receipt.node_id === userDid ? 'finalizer' : 'voter',
+      ...(receipt.thread_id && { threadId: receipt.thread_id }),
     },
     proof: {
       type: 'Ed25519Signature2020',
@@ -54,7 +56,15 @@ export function receiptToVC(receipt: Receipt, userDid: string): any {
       verificationMethod: `${receipt.node_id}#keys-1`,
       proofPurpose: 'assertionMethod',
       proofValue: receipt.signature
-    }
+    },
+    ...(receipt.thread_id && { 
+      metadata: {
+        agoranet: {
+          threadId: receipt.thread_id,
+          threadUrl: `https://agoranet.icn.zone/threads/${receipt.thread_id}`
+        }
+      }
+    })
   };
 }
 
@@ -82,7 +92,12 @@ export function walletCredentialToVC(credential: WalletCredential): any {
       id: credential.subjectDid,
       ...credential.credentialSubject
     },
-    proof: credential.proof
+    proof: credential.proof,
+    ...(credential.metadata?.agoranet?.threadId && {
+      metadata: {
+        agoranet: credential.metadata.agoranet
+      }
+    })
   };
 }
 

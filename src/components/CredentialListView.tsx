@@ -183,6 +183,16 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
                 >
                   Export
                 </button>
+                {credential.metadata?.agoranet?.threadUrl && (
+                  <a 
+                    href={credential.metadata.agoranet.threadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="view-thread-btn"
+                  >
+                    View Discussion
+                  </a>
+                )}
               </div>
             </div>
           ))}
@@ -329,6 +339,19 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
         .export-btn {
           background-color: #f5f5f5;
           color: #424242;
+        }
+        
+        .view-thread-btn {
+          background-color: #e1f5fe;
+          color: #0277bd;
+          padding: 8px 16px;
+          border-radius: 4px;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+          text-decoration: none;
+          display: inline-block;
+          margin-left: auto;
         }
         
         .bulk-actions {

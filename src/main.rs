@@ -533,6 +533,10 @@ enum CredentialCommands {
         #[arg(long)]
         qr: bool,
         
+        /// Include thread ID in exported credential
+        #[arg(long)]
+        with_thread: bool,
+        
         /// Path to save the exported credential (if export is true)
         #[arg(long)]
         output: Option<PathBuf>,
@@ -2611,7 +2615,7 @@ fn handle_credential_commands(
             }
         },
         
-        CredentialCommands::Show { id, export, qr, output } => {
+        CredentialCommands::Show { id, export, qr, with_thread, output } => {
             let credential = match sync_service.get_credential(id) {
                 Some(cred) => cred,
                 None => {
@@ -2634,6 +2638,12 @@ fn handle_credential_commands(
             println!("Status: {:?}", credential.status);
             println!("Last Verified: {}", credential.last_verified);
             
+            // Display thread ID if available
+            if let Some(thread_id) = credential.receipt.metadata.get("thread_id") {
+                println!("Thread ID: {}", thread_id);
+                println!("Thread URL: https://agoranet.icn.zone/threads/{}", thread_id);
+            }
+            
             if let Some(score) = &credential.trust_score {
                 println!("\nTrust Information:");
                 println!("Score: {}/100 ({})", score.score, score.status);
@@ -2654,8 +2664,32 @@ fn handle_credential_commands(
             }
             
             if *export {
-                if let Some(vc) = &credential.verifiable_credential {
-                    let json = serde_json::to_string_pretty(vc).unwrap_or_else(|_| "Failed to serialize VC".to_string());
+                if let Some(mut vc) = credential.verifiable_credential.clone() {
+                    // Add thread ID to metadata if requested and available
+                    if *with_thread {
+                        if let Some(thread_id) = credential.receipt.metadata.get("thread_id") {
+                            // Ensure metadata field exists
+                            if !vc.metadata.is_object() {
+                                vc.metadata = serde_json::json!({});
+                            }
+                            
+                            // Add AgoraNet metadata
+                            let metadata = vc.metadata.as_object_mut().unwrap();
+                            metadata.insert(
+                                "agoranet".to_string(), 
+                                serde_json::json!({
+                                    "threadId": thread_id,
+                                    "threadUrl": format!("https://agoranet.icn.zone/threads/{}", thread_id)
+                                })
+                            );
+                            
+                            println!("\nIncluded thread ID in exported credential");
+                        } else {
+                            println!("\nWarning: No thread ID available for this credential");
+                        }
+                    }
+                    
+                    let json = serde_json::to_string_pretty(&vc).unwrap_or_else(|_| "Failed to serialize VC".to_string());
                     
                     if let Some(path) = output {
                         if let Err(e) = std::fs::write(path, json) {

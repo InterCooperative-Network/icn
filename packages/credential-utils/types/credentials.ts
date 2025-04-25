@@ -46,7 +46,12 @@ export interface WalletCredential {
     icon?: string;
     color?: string;
     description?: string;
+    agoranet?: {
+      threadId: string;
+      threadUrl: string;
+    };
   };
+  receiptHash?: string;
 }
 
 export interface VerificationResult {
