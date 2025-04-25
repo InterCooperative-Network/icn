@@ -12,6 +12,19 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 pub mod qr;
 pub use qr::{QrCodeError, QrFormat, encode_credential_for_qr, decode_credential_from_qr, generate_credential_qr};
 
+pub mod zkp_utils;
+
+// Re-export key types and functions
+pub use zkp_utils::{
+    ZkProofType, 
+    ZkSelectiveDisclosure, 
+    SelectiveDisclosureParams,
+    create_selective_disclosure,
+    verify_selective_disclosure,
+    ZkProofPresentation,
+    create_zkp_presentation,
+};
+
 /// Errors that can occur in verifiable credential operations
 #[derive(Debug, Error)]
 pub enum CredentialError {

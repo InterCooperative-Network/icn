@@ -9,7 +9,7 @@ import { tooltipStyles } from '../components/styles';
 // Node interface for D3 force graph
 interface Node extends d3.SimulationNodeDatum {
   id: string;
-  type: string;
+  type: string | string[];
   label: string;
   date: string;
   proposalId?: string;
@@ -24,17 +24,17 @@ interface Node extends d3.SimulationNodeDatum {
   quorumValidation?: {
     isSatisfied: boolean;
     policy: string;
-    signers: {
-      did: string;
-      role: string;
-      weight: number;
-    }[];
+    signers: any[];
     requiredApprovals: number;
     actualApprovals: number;
     requiredThreshold?: number;
     actualThreshold?: number;
     totalWeight?: number;
   };
+  isEpochAnchor?: boolean;
+  dagRoot?: string;
+  epochId?: string;
+  mandate?: string;
 }
 
 // Link interface for D3 force graph
@@ -45,6 +45,9 @@ interface Link extends d3.SimulationLinkDatum<Node> {
   // Quorum validation fields
   isSignerLink?: boolean;
   signerWeight?: number;
+  isEpochLink?: boolean;
+  isDashed?: boolean;
+  opacity?: number;
 }
 
 // Props for the CredentialDAGView component
@@ -64,6 +67,9 @@ interface CredentialDAGViewProps {
   // Display options for quorum visualization
   showSignerNodes?: boolean;
   showMissingSigners?: boolean;
+  // DAG visualization options
+  showEpochAnchors?: boolean;
+  dagRoots?: Record<string, string>; // Federation ID -> latest DAG root
 }
 
 /**
@@ -84,6 +90,8 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
   federationManifests = {},
   showSignerNodes = true,
   showMissingSigners = false,
+  showEpochAnchors = true,
+  dagRoots = {},
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -161,11 +169,23 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
       const proposalId = cred.credentialSubject.proposalId;
       const threadId = cred.metadata?.agoranet?.threadId;
       const federationId = cred.metadata?.federation?.id || 
-                         cred.metadata?.federationMetadata?.federation_id ||
-                         cred.metadata?.agoranet?.federation_id;
+                        cred.metadata?.federationMetadata?.federation_id ||
+                        cred.metadata?.agoranet?.federation_id;
       
       // Get a label for the node
       const label = getNodeLabel(cred);
+      
+      // Check if this is an epoch anchor credential
+      const isEpochAnchor = 
+        (Array.isArray(cred.type) && cred.type.includes('EpochAnchorCredential')) ||
+        cred.credentialSubject?.type === 'FederationEpochAnchor' ||
+        cred.metadata?.anchor_type === 'EpochAnchor';
+      
+      // Check for DAG root information in this credential
+      const dagRoot = isEpochAnchor ? 
+        cred.credentialSubject?.dagRoot || 
+        cred.metadata?.dag_root : 
+        undefined;
       
       // Determine if this is a federation report
       const isFederationReport = 
@@ -190,18 +210,22 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
       }
       
       // Get color based on credential type
-      const baseColor = getNodeColor(cred.type);
+      let baseColor = getNodeColor(cred.type);
       
-      // Adjust color based on quorum validation if it's a federation report
-      let color = baseColor;
+      // Special color for epoch anchors
+      let color = isEpochAnchor ? '#9C27B0' : baseColor; // Purple for epoch anchors
+      
+      // Adjust color for federation reports based on quorum validation
       if (isFederationReport && quorumValidation) {
         color = quorumValidation.isSatisfied ? '#4CAF50' : // Green for satisfied
                 quorumValidation.signers.length > 0 ? '#FFC107' : // Yellow for partial
                 '#F44336'; // Red for invalid
       }
       
-      // Adjust size based on importance
-      const radius = getNodeRadius(cred.type);
+      // Adjust size based on importance - larger for epoch anchors
+      const radius = isEpochAnchor ? 
+        18 : // Larger for epoch anchors
+        getNodeRadius(cred.type);
       
       return {
         id: cred.id,
@@ -214,6 +238,10 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         radius,
         color,
         isFederationReport,
+        isEpochAnchor,
+        dagRoot,
+        epochId: isEpochAnchor ? cred.credentialSubject?.epochId : undefined,
+        mandate: isEpochAnchor ? cred.credentialSubject?.mandate : undefined,
         quorumValidation,
         signerDid: cred.credentialSubject.signerDid,
       };
@@ -250,21 +278,23 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         if (node.isFederationReport && node.quorumValidation && node.quorumValidation.signers.length > 0) {
           // Add nodes for each signer
           node.quorumValidation.signers.forEach(signer => {
-            const signerNodeId = `signer-${node.id}-${signer.did}`;
+            const signerNodeId = `signer-${signer.did}-${node.id}`;
             
-            // Create signer node
+            // Add signer node
             signerNodes.push({
               id: signerNodeId,
               type: 'signer',
-              label: `${signer.role} (${signer.did.split(':').pop()})`,
-              date: '',
-              radius: 5 + (signer.weight * 2), // Size based on weight
-              color: '#64B5F6', // Blue for signers
+              label: signer.role || signer.did.split(':').pop() || 'Signer',
+              date: node.date,
+              radius: 5 + (signer.weight || 1), // Size based on weight
+              color: '#03A9F4', // Light blue for signers
               isSignerNode: true,
               signerDid: signer.did,
+              signerWeight: signer.weight,
+              federationId: node.federationId,
             });
             
-            // Create link from signer to report
+            // Add link from signer to report
             signerLinks.push({
               source: signerNodeId,
               target: node.id,
@@ -273,58 +303,76 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
               signerWeight: signer.weight,
             });
           });
-          
-          // Add missing signer nodes if enabled
-          if (showMissingSigners && !node.quorumValidation.isSatisfied && node.federationId) {
-            const manifest = federationManifests[node.federationId];
-            if (manifest) {
-              // Get all members from manifest
-              const allMembers = Object.entries(manifest.members);
-              
-              // Get DIDs of signers who already signed
-              const signerDids = node.quorumValidation.signers.map(s => s.did);
-              
-              // Find members who didn't sign
-              const missingMembers = allMembers.filter(([did]) => !signerDids.includes(did));
-              
-              // Add nodes for missing signers
-              missingMembers.forEach(([did, role]) => {
-                const missingSignerNodeId = `missing-signer-${did}-${node.id}`;
-                
-                // Create missing signer node
-                signerNodes.push({
-                  id: missingSignerNodeId,
-                  type: 'missing-signer',
-                  label: `Missing: ${role.role} (${did.split(':').pop()})`,
-                  date: '',
-                  radius: 5 + (role.weight * 2), // Size based on weight
-                  color: '#BDBDBD', // Gray for missing signers
-                  isSignerNode: true,
-                  signerDid: did,
-                });
-                
-                // Create dashed link from missing signer to report
-                signerLinks.push({
-                  source: missingSignerNodeId,
-                  target: node.id,
-                  type: 'missing-signature',
-                  isSignerLink: true,
-                  signerWeight: role.weight,
-                });
-              });
-            }
-          }
         }
       });
       
-      // Add signer nodes and links to the graph
+      // Add missing signers if enabled
+      if (showMissingSigners && Object.keys(federationManifests).length > 0) {
+        // TODO: Add missing signer nodes logic here
+      }
+      
+      // Add signer nodes and links to the main arrays
       newNodes = [...newNodes, ...signerNodes];
       newLinks = [...newLinks, ...signerLinks];
     }
     
+    // Add special links for epoch anchor credentials if showing epoch anchors
+    if (showEpochAnchors) {
+      // First collect all epoch anchor nodes by federation
+      const epochAnchors: Record<string, Node[]> = {};
+      
+      newNodes.forEach(node => {
+        if (node.isEpochAnchor && node.federationId) {
+          if (!epochAnchors[node.federationId]) {
+            epochAnchors[node.federationId] = [];
+          }
+          epochAnchors[node.federationId].push(node);
+        }
+      });
+      
+      // For each federation with anchors
+      Object.entries(epochAnchors).forEach(([federationId, anchors]) => {
+        // Sort anchors by date
+        anchors.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Connect anchors in sequence if multiple exist
+        for (let i = 1; i < anchors.length; i++) {
+          newLinks.push({
+            source: anchors[i-1].id,
+            target: anchors[i].id,
+            type: 'epoch-sequence',
+            isEpochLink: true,
+          });
+        }
+        
+        // For each epoch anchor, find credential nodes that have the same federation ID
+        // These are the credentials that were created in that federation
+        anchors.forEach(anchor => {
+          if (anchor.federationId) {
+            // Find credentials with matching federation ID
+            newNodes.forEach(node => {
+              if (node.id !== anchor.id && 
+                  node.federationId === anchor.federationId &&
+                  !node.isEpochAnchor) {
+                // Create a link from anchor to the node
+                newLinks.push({
+                  source: anchor.id,
+                  target: node.id,
+                  type: 'epoch-connection',
+                  isEpochLink: true,
+                  isDashed: true,
+                  opacity: 0.3,
+                });
+              }
+            });
+          }
+        });
+      });
+    }
+    
     setNodes(newNodes);
     setLinks(newLinks);
-  }, [credentials, quorumValidationResults, federationManifests, showSignerNodes, showMissingSigners]);
+  }, [credentials, showSignerNodes, showMissingSigners, federationManifests, showEpochAnchors, dagRoots, quorumValidationResults]);
 
   // Create D3 force graph when nodes or links change
   useEffect(() => {
@@ -572,20 +620,22 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
   }
   
   // Helper function to get node color based on type
-  function getNodeColor(type: string): string {
+  function getNodeColor(type: string | string[]): string {
     const colors: Record<string, string> = {
-      'proposal': '#4285F4',  // Blue
-      'vote': '#34A853',      // Green
-      'appeal': '#FBBC05',    // Yellow
-      'appeal_vote': '#7CBB00', // Lime
-      'finalization': '#00A1F1', // Light blue
-      'appeal_finalization': '#F25022', // Light red
-      'execution': '#8F00FF',  // Purple
-      'FederationReport': '#673AB7', // Deep purple for federation reports
-      'default': '#757575'    // Gray
+      'proposal': '#2196F3',        // Blue
+      'vote': '#FF9800',            // Orange
+      'appeal': '#E91E63',          // Pink
+      'appeal_vote': '#FF5722',     // Deep Orange
+      'finalization': '#4CAF50',    // Green
+      'appeal_finalization': '#8BC34A', // Light Green
+      'execution': '#3F51B5',       // Indigo
+      'FederationReport': '#673AB7', // Deep Purple
+      'EpochAnchorCredential': '#9C27B0', // Purple
+      'default': '#607D8B'          // Blue Grey
     };
     
     if (Array.isArray(type)) {
+      if (type.includes('EpochAnchorCredential')) return colors['EpochAnchorCredential'];
       if (type.includes('FederationReport')) return colors['FederationReport'];
       return type.map(t => colors[t] || colors.default)[0] || colors.default;
     }
@@ -638,11 +688,6 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
       'default': 8
     };
     
-    if (Array.isArray(type)) {
-      if (type.includes('FederationReport')) return sizes['FederationReport'];
-      return type.map(t => sizes[t] || sizes.default)[0] || sizes.default;
-    }
-    
     return sizes[type] || sizes.default;
   }
   
@@ -664,6 +709,26 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
   
   // Render tooltip content for different node types
   function renderTooltipContent(node: Node, credential?: WalletCredential): JSX.Element {
+    // For epoch anchor nodes
+    if (node.isEpochAnchor) {
+      return (
+        <div>
+          <h4>Epoch Anchor: {node.label}</h4>
+          {node.epochId && <p><strong>Epoch:</strong> {node.epochId}</p>}
+          {node.mandate && <p><strong>Mandate:</strong> {node.mandate}</p>}
+          {node.dagRoot && (
+            <p><strong>DAG Root:</strong> {node.dagRoot.substring(0, 10)}...</p>
+          )}
+          <p><strong>Federation:</strong> {
+            (federationManifests && node.federationId) ? 
+              federationManifests[node.federationId]?.name || node.federationId :
+              node.federationId || 'Unknown'
+          }</p>
+          <p><strong>Created:</strong> {new Date(node.date).toLocaleDateString()}</p>
+        </div>
+      );
+    }
+    
     // For signer nodes
     if (node.isSignerNode) {
       if (node.type === 'missing-signer') {
