@@ -5,8 +5,8 @@ impl Repository {
     pub fn record_token_burn(&self, burn: &TokenBurn) -> Result<(), Error> {
         let conn = self.pool.get()?;
         conn.execute(
-            "INSERT INTO token_burns (id, token_id, amount, token_type, federation_scope, owner_did, timestamp, job_id, receipt_id, reason) 
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO token_burns (id, token_id, amount, token_type, federation_scope, owner_did, timestamp, job_id, job_type, proposal_id, receipt_id, reason) 
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 burn.id,
                 burn.token_id,
@@ -16,6 +16,8 @@ impl Repository {
                 burn.owner_did,
                 burn.timestamp,
                 burn.job_id,
+                burn.job_type,
+                burn.proposal_id,
                 burn.receipt_id,
                 burn.reason,
             ],
@@ -27,7 +29,7 @@ impl Repository {
     pub fn get_token_burns_by_owner(&self, owner_did: &str) -> Result<Vec<TokenBurn>, Error> {
         let conn = self.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT id, token_id, amount, token_type, federation_scope, owner_did, timestamp, job_id, receipt_id, reason 
+            "SELECT id, token_id, amount, token_type, federation_scope, owner_did, timestamp, job_id, job_type, proposal_id, receipt_id, reason 
              FROM token_burns 
              WHERE owner_did = ?1 
              ORDER BY timestamp DESC"
@@ -43,8 +45,10 @@ impl Repository {
                 owner_did: row.get(5)?,
                 timestamp: row.get(6)?,
                 job_id: row.get(7)?,
-                receipt_id: row.get(8)?,
-                reason: row.get(9)?,
+                job_type: row.get(8)?,
+                proposal_id: row.get(9)?,
+                receipt_id: row.get(10)?,
+                reason: row.get(11)?,
             })
         })?;
 
@@ -63,13 +67,15 @@ impl Repository {
         token_type: Option<&str>,
         federation_scope: Option<&str>,
         job_id: Option<&str>,
+        job_type: Option<&str>,
+        proposal_id: Option<&str>,
         receipt_id: Option<&str>,
         limit: Option<u32>,
     ) -> Result<Vec<TokenBurn>, Error> {
         let conn = self.pool.get()?;
         
         let mut query = String::from(
-            "SELECT id, token_id, amount, token_type, federation_scope, owner_did, timestamp, job_id, receipt_id, reason 
+            "SELECT id, token_id, amount, token_type, federation_scope, owner_did, timestamp, job_id, job_type, proposal_id, receipt_id, reason 
              FROM token_burns WHERE 1=1"
         );
         let mut params: Vec<Box<dyn ToSql>> = Vec::new();
@@ -92,6 +98,16 @@ impl Repository {
         if let Some(job) = job_id {
             query.push_str(" AND job_id = ?");
             params.push(Box::new(job.to_string()));
+        }
+        
+        if let Some(j_type) = job_type {
+            query.push_str(" AND job_type = ?");
+            params.push(Box::new(j_type.to_string()));
+        }
+        
+        if let Some(proposal) = proposal_id {
+            query.push_str(" AND proposal_id = ?");
+            params.push(Box::new(proposal.to_string()));
         }
         
         if let Some(receipt) = receipt_id {
@@ -122,8 +138,10 @@ impl Repository {
                 owner_did: row.get(5)?,
                 timestamp: row.get(6)?,
                 job_id: row.get(7)?,
-                receipt_id: row.get(8)?,
-                reason: row.get(9)?,
+                job_type: row.get(8)?,
+                proposal_id: row.get(9)?,
+                receipt_id: row.get(10)?,
+                reason: row.get(11)?,
             })
         })?;
 

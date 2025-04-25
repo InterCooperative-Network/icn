@@ -16,5 +16,13 @@ fn get_migrations() -> Vec<&'static str> {
             reason TEXT,
             FOREIGN KEY (token_id) REFERENCES tokens(id)
         )",
+        
+        // Add job_type and proposal_id fields to token_burns table
+        "ALTER TABLE token_burns ADD COLUMN job_type TEXT;",
+        "ALTER TABLE token_burns ADD COLUMN proposal_id TEXT;",
+        
+        // Create indices for the new columns
+        "CREATE INDEX IF NOT EXISTS idx_token_burns_job_type ON token_burns(job_type);",
+        "CREATE INDEX IF NOT EXISTS idx_token_burns_proposal_id ON token_burns(proposal_id);",
     ]
 } 

@@ -20,6 +20,10 @@ pub struct TokenBurn {
     pub timestamp: DateTime<Utc>,
     /// Job ID associated with this burn (if applicable)
     pub job_id: Option<String>,
+    /// Type of job that consumed the token (if applicable)
+    pub job_type: Option<String>,
+    /// Proposal ID associated with this burn (if applicable)
+    pub proposal_id: Option<String>,
     /// Receipt ID to verify this burn operation
     pub receipt_id: Option<String>,
     /// Human-readable reason for the burn
@@ -35,6 +39,8 @@ impl TokenBurn {
         federation_scope: String,
         owner_did: String,
         job_id: Option<String>,
+        job_type: Option<String>,
+        proposal_id: Option<String>,
         receipt_id: Option<String>,
         reason: String,
     ) -> Self {
@@ -47,6 +53,8 @@ impl TokenBurn {
             owner_did,
             timestamp: Utc::now(),
             job_id,
+            job_type,
+            proposal_id,
             receipt_id,
             reason,
         }
@@ -55,16 +63,29 @@ impl TokenBurn {
     /// Returns a human-readable description of this burn
     pub fn description(&self) -> String {
         let job_info = if let Some(job_id) = &self.job_id {
-            format!(" for job {}", job_id)
+            let job_type_info = if let Some(job_type) = &self.job_type {
+                format!(" ({} job)", job_type)
+            } else {
+                String::new()
+            };
+            
+            format!(" for job {}{}", job_id, job_type_info)
+        } else {
+            String::new()
+        };
+        
+        let proposal_info = if let Some(proposal_id) = &self.proposal_id {
+            format!(" for proposal {}", proposal_id)
         } else {
             String::new()
         };
         
         format!(
-            "Burned {:.2} {} tokens{}{}",
+            "Burned {:.2} {} tokens{}{}{}",
             self.amount, 
             self.token_type,
             job_info,
+            proposal_info,
             if self.reason.is_empty() { "" } else { format!(": {}", self.reason).as_str() }
         )
     }

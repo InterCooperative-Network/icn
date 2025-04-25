@@ -3,13 +3,27 @@ use crate::types::TokenBurn;
 use crate::ui::{Component, InputEvent, RenderFrame};
 use chrono::{DateTime, Duration, Utc, TimeZone};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Instant;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{
     Axis, Block, Borders, Chart, Dataset, GraphType, Paragraph, 
-    Table, Row, Cell, Tabs, BarChart
+    Table, Row, Cell, Tabs, BarChart, Clear, List, ListItem
 };
+
+/// Loading state for async data operations
+enum LoadingState {
+    /// Not currently loading data
+    Idle,
+    /// Currently loading data with start time
+    Loading(Instant),
+    /// Failed to load data with error message
+    Error(String),
+}
 
 /// Filter options for the time range
 enum TimeFilter {
@@ -52,11 +66,39 @@ pub struct ComputeDashboard {
     federations: Vec<String>,
     token_types: Vec<String>,
     selected_token_type: Option<String>,
+    job_types: Vec<String>,
+    active_job_type: Option<String>,
+    active_proposal_id: Option<String>,
+    loading_state: Arc<Mutex<LoadingState>>,
+    show_help: bool,
+    federation_reports: HashMap<String, FederationReport>,
+}
+
+/// Federation usage report data
+struct FederationReport {
+    federation_id: String,
+    total_tokens_burned: f64,
+    avg_daily_usage: f64,
+    peak_daily_usage: f64,
+    quota_remaining_percent: Option<f64>,
+    projected_exhaustion_days: Option<i64>,
+}
+
+impl FederationReport {
+    fn status_color(&self) -> Color {
+        match self.projected_exhaustion_days {
+            Some(days) if days < 10 => Color::Red,
+            Some(days) if days < 30 => Color::Yellow,
+            _ => Color::Green,
+        }
+    }
 }
 
 impl ComputeDashboard {
     /// Create a new compute dashboard
     pub fn new(db: WalletDb) -> Self {
+        let loading_state = Arc::new(Mutex::new(LoadingState::Idle));
+        
         let mut dashboard = Self {
             db,
             burn_records: Vec::new(),
@@ -66,44 +108,172 @@ impl ComputeDashboard {
             federations: Vec::new(),
             token_types: Vec::new(),
             selected_token_type: None,
+            job_types: Vec::new(),
+            active_job_type: None,
+            active_proposal_id: None,
+            loading_state,
+            show_help: false,
+            federation_reports: HashMap::new(),
         };
         
         dashboard.load_data();
         dashboard
     }
     
-    /// Load data from the database
+    /// Load data from the database with loading indicator
     fn load_data(&mut self) {
-        // Get all token burns
-        self.burn_records = self.db.get_all_token_burns().unwrap_or_default();
+        let db_clone = self.db.clone();
+        let loading_state_clone = self.loading_state.clone();
         
-        // Extract unique federations and token types
-        let mut federations = std::collections::HashSet::new();
-        let mut token_types = std::collections::HashSet::new();
-        
-        for burn in &self.burn_records {
-            federations.insert(burn.federation_scope.clone());
-            token_types.insert(burn.token_type.clone());
+        // Update the loading state
+        {
+            let mut lock = loading_state_clone.lock().unwrap();
+            *lock = LoadingState::Loading(Instant::now());
         }
         
-        self.federations = federations.into_iter().collect();
-        self.federations.sort();
+        // Start loading data in background thread
+        thread::spawn(move || {
+            // Simulate a small delay to demonstrate loading UI (can be removed in production)
+            thread::sleep(std::time::Duration::from_millis(200));
+            
+            // Attempt to fetch the data
+            let burn_records_result = db_clone.get_all_token_burns();
+            
+            // Update the loading state with the result
+            let mut lock = loading_state_clone.lock().unwrap();
+            match burn_records_result {
+                Ok(records) => {
+                    // Store the burn records and reset loading state
+                    *lock = LoadingState::Idle;
+                    
+                    // Send the burn records back to the main thread through a channel
+                    // In a real implementation, we would need to update the ComputeDashboard
+                    // Here we're simulating completion for simplicity
+                }
+                Err(err) => {
+                    // Store the error
+                    *lock = LoadingState::Error(format!("Database error: {}", err));
+                }
+            }
+        });
         
-        self.token_types = token_types.into_iter().collect();
-        self.token_types.sort();
-        
-        // Set default selections if needed
-        if self.active_federation.is_none() && !self.federations.is_empty() {
-            self.active_federation = Some(self.federations[0].clone());
-        }
-        
-        if self.selected_token_type.is_none() && !self.token_types.is_empty() {
-            let compute_token = self.token_types.iter()
-                .find(|t| t.contains("compute"))
-                .cloned();
+        // Try to fetch the data synchronously for immediate use
+        match self.db.get_all_token_burns() {
+            Ok(records) => {
+                self.burn_records = records;
                 
-            self.selected_token_type = compute_token.or_else(|| Some(self.token_types[0].clone()));
+                // Extract unique federations, token types, and job types
+                let mut federations = std::collections::HashSet::new();
+                let mut token_types = std::collections::HashSet::new();
+                let mut job_types = std::collections::HashSet::new();
+                
+                for burn in &self.burn_records {
+                    federations.insert(burn.federation_scope.clone());
+                    token_types.insert(burn.token_type.clone());
+                    
+                    // Collect job types
+                    if let Some(job_type) = &burn.job_type {
+                        job_types.insert(job_type.clone());
+                    } else if let Some(job_id) = &burn.job_id {
+                        // Extract prefix as fallback job type
+                        if let Some(prefix) = job_id.split('.').next() {
+                            job_types.insert(prefix.to_string());
+                        }
+                    }
+                }
+                
+                self.federations = federations.into_iter().collect();
+                self.federations.sort();
+                
+                self.token_types = token_types.into_iter().collect();
+                self.token_types.sort();
+                
+                self.job_types = job_types.into_iter().collect();
+                self.job_types.sort();
+                
+                // Set default selections if needed
+                if self.active_federation.is_none() && !self.federations.is_empty() {
+                    self.active_federation = Some(self.federations[0].clone());
+                }
+                
+                if self.selected_token_type.is_none() && !self.token_types.is_empty() {
+                    let compute_token = self.token_types.iter()
+                        .find(|t| t.contains("compute"))
+                        .cloned();
+                        
+                    self.selected_token_type = compute_token.or_else(|| Some(self.token_types[0].clone()));
+                }
+                
+                // Update federation reports
+                self.update_federation_reports();
+            },
+            Err(err) => {
+                // Update loading state with error
+                let mut lock = self.loading_state.lock().unwrap();
+                *lock = LoadingState::Error(format!("Failed to load data: {}", err));
+            }
         }
+    }
+    
+    /// Update federation reports with usage data and predictions
+    fn update_federation_reports(&mut self) {
+        let mut reports = HashMap::new();
+        
+        for federation in &self.federations {
+            // Filter burns for this federation
+            let federation_burns: Vec<&TokenBurn> = self.burn_records.iter()
+                .filter(|burn| burn.federation_scope == *federation)
+                .collect();
+            
+            if federation_burns.is_empty() {
+                continue;
+            }
+            
+            // Calculate total tokens burned
+            let total_burned: f64 = federation_burns.iter()
+                .map(|burn| burn.amount)
+                .sum();
+            
+            // Group by day for average and peak calculations
+            let mut daily_totals = HashMap::new();
+            
+            for burn in &federation_burns {
+                let dt = DateTime::<Utc>::from_timestamp(burn.timestamp, 0).unwrap_or_default();
+                let day_key = dt.format("%Y-%m-%d").to_string();
+                *daily_totals.entry(day_key).or_insert(0.0) += burn.amount;
+            }
+            
+            let days_count = daily_totals.len().max(1) as f64;
+            let avg_daily = total_burned / days_count;
+            let peak_daily = daily_totals.values().fold(0.0, |max, &val| max.max(val));
+            
+            // Predictive analysis - projected exhaustion based on average daily usage
+            // Assuming each federation has a quota (for now using a placeholder value)
+            let federation_quota = 10000.0; // Placeholder value - in real app this would be fetched
+            let quota_remaining = federation_quota - total_burned;
+            let quota_remaining_percent = if federation_quota > 0.0 {
+                Some((quota_remaining / federation_quota) * 100.0)
+            } else {
+                None
+            };
+            
+            let projected_exhaustion_days = if avg_daily > 0.0 {
+                Some((quota_remaining / avg_daily) as i64)
+            } else {
+                None
+            };
+            
+            reports.insert(federation.clone(), FederationReport {
+                federation_id: federation.clone(),
+                total_tokens_burned: total_burned,
+                avg_daily_usage: avg_daily,
+                peak_daily_usage: peak_daily,
+                quota_remaining_percent,
+                projected_exhaustion_days,
+            });
+        }
+        
+        self.federation_reports = reports;
     }
     
     /// Filter burn records based on current settings
@@ -132,7 +302,19 @@ impl ComputeDashboard {
                     None => true,
                 };
                 
-                time_match && federation_match && type_match
+                // Job type filter
+                let job_type_match = match &self.active_job_type {
+                    Some(jt) => burn.job_type.as_ref().map_or(false, |t| t == jt),
+                    None => true,
+                };
+                
+                // Proposal ID filter
+                let proposal_match = match &self.active_proposal_id {
+                    Some(pid) => burn.proposal_id.as_ref().map_or(false, |p| p == pid),
+                    None => true,
+                };
+                
+                time_match && federation_match && type_match && job_type_match && proposal_match
             })
             .collect()
     }
@@ -197,11 +379,15 @@ impl ComputeDashboard {
         let mut job_type_totals: HashMap<String, f64> = HashMap::new();
         
         for burn in burns {
-            let job_type = burn.job_id
-                .split('.')
-                .next()
-                .unwrap_or("unknown")
-                .to_string();
+            // Use the explicit job_type field if available, otherwise derive from job_id
+            let job_type = match &burn.job_type {
+                Some(job_type) => job_type.clone(),
+                None => burn.job_id
+                    .as_ref()
+                    .and_then(|id| id.split('.').next())
+                    .unwrap_or("unknown")
+                    .to_string()
+            };
                 
             *job_type_totals.entry(job_type).or_insert(0.0) += burn.amount;
         }
@@ -324,10 +510,16 @@ impl ComputeDashboard {
             
         // Render filters
         let filter_text = format!(
-            "Federation: {:?} | Time: {} | Token: {:?}",
+            "Federation: {:?} | Time: {} | Token: {:?} | Job Type: {:?} | Proposal: {:?}",
             self.active_federation.as_deref().unwrap_or("All"),
             self.time_filter.as_label(),
-            self.selected_token_type.as_deref().unwrap_or("All")
+            self.selected_token_type.as_deref().unwrap_or("All"),
+            self.active_job_type.as_deref().unwrap_or("All"),
+            self.active_proposal_id.as_deref().map(|p| if p.len() > 8 { 
+                format!("{}...", &p[0..8]) 
+            } else { 
+                p.to_string() 
+            }).unwrap_or_else(|| "None".to_string())
         );
         
         let filter_para = Paragraph::new(filter_text)
@@ -434,6 +626,8 @@ impl ComputeDashboard {
                 
             let reason = burn.reason.as_deref().unwrap_or("-");
             let job_id = burn.job_id.as_deref().unwrap_or("-");
+            let job_type = burn.job_type.as_deref().unwrap_or("-");
+            let proposal_id = burn.proposal_id.as_deref().unwrap_or("-");
             
             Row::new(vec![
                 Cell::from(timestamp),
@@ -441,6 +635,8 @@ impl ComputeDashboard {
                 Cell::from(format!("{:.2}", burn.amount)),
                 Cell::from(burn.federation_scope.clone()),
                 Cell::from(job_id.to_string()),
+                Cell::from(job_type.to_string()),
+                Cell::from(proposal_id.to_string()),
                 Cell::from(reason.to_string()),
             ])
         }).collect::<Vec<_>>();
@@ -453,16 +649,20 @@ impl ComputeDashboard {
                     Cell::from("Amount").style(Style::default().add_modifier(Modifier::BOLD)),
                     Cell::from("Federation").style(Style::default().add_modifier(Modifier::BOLD)),
                     Cell::from("Job ID").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Job Type").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Proposal ID").style(Style::default().add_modifier(Modifier::BOLD)),
                     Cell::from("Reason").style(Style::default().add_modifier(Modifier::BOLD)),
                 ])
             )
             .widths(&[
-                Constraint::Percentage(20),
+                Constraint::Percentage(15),
+                Constraint::Percentage(10),
+                Constraint::Percentage(8),
+                Constraint::Percentage(12),
                 Constraint::Percentage(15),
                 Constraint::Percentage(10),
                 Constraint::Percentage(15),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
+                Constraint::Percentage(15),
             ])
             .block(Block::default().title("Burn History").borders(Borders::ALL));
             
@@ -513,12 +713,277 @@ impl ComputeDashboard {
             
         frame.render_widget(barchart, area);
     }
+
+    /// Render a help modal over the current view
+    fn render_help_modal(&self, frame: &mut RenderFrame, area: Rect) {
+        let modal_width = 60;
+        let modal_height = 20;
+        
+        // Calculate centered position
+        let modal_x = (area.width.saturating_sub(modal_width)) / 2;
+        let modal_y = (area.height.saturating_sub(modal_height)) / 2;
+        
+        let modal_area = Rect {
+            x: area.x + modal_x,
+            y: area.y + modal_y,
+            width: modal_width,
+            height: modal_height,
+        };
+        
+        // Clear the area behind the modal
+        frame.render_widget(Clear, modal_area);
+        
+        // Render the modal
+        let help_block = Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().bg(Color::DarkGray))
+            .title(Spans::from(vec![
+                Span::styled("Help ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled("(Press Esc to close)", Style::default().fg(Color::Gray)),
+            ]));
+        
+        frame.render_widget(help_block, modal_area);
+        
+        // Create help content
+        let help_items = vec![
+            Spans::from(Span::styled("Compute Dashboard Navigation", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Spans::from(""),
+            Spans::from(vec![
+                Span::styled("Tab", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Switch between dashboard tabs"),
+            ]),
+            Spans::from(vec![
+                Span::styled("←/→", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Navigate dashboard tabs"),
+            ]),
+            Spans::from(vec![
+                Span::styled("t", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Cycle through time filters (Day, Week, Month, Year, All)"),
+            ]),
+            Spans::from(vec![
+                Span::styled("f", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Cycle through federation filters"),
+            ]),
+            Spans::from(vec![
+                Span::styled("y", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Cycle through token types"),
+            ]),
+            Spans::from(vec![
+                Span::styled("r", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Reload data from database"),
+            ]),
+            Spans::from(vec![
+                Span::styled("d", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Switch to daily view"),
+            ]),
+            Spans::from(vec![
+                Span::styled("w", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Switch to weekly view"),
+            ]),
+            Spans::from(vec![
+                Span::styled("m", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Switch to monthly view"),
+            ]),
+            Spans::from(vec![
+                Span::styled("y", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Switch to yearly view"),
+            ]),
+            Spans::from(vec![
+                Span::styled("a", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Switch to all-time view"),
+            ]),
+            Spans::from(vec![
+                Span::styled("?", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Show/hide this help menu"),
+            ]),
+            Spans::from(vec![
+                Span::styled("Esc", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(": Close help or return to normal mode"),
+            ]),
+            Spans::from(""),
+            Spans::from(Span::styled("Federation Report Colors:", Style::default().fg(Color::Yellow))),
+            Spans::from(vec![
+                Span::styled("Green", Style::default().fg(Color::Green)),
+                Span::raw(": >30 days remaining"),
+            ]),
+            Spans::from(vec![
+                Span::styled("Yellow", Style::default().fg(Color::Yellow)),
+                Span::raw(": 10-30 days remaining"),
+            ]),
+            Spans::from(vec![
+                Span::styled("Red", Style::default().fg(Color::Red)),
+                Span::raw(": <10 days remaining"),
+            ]),
+        ];
+        
+        let help_paragraph = Paragraph::new(help_items)
+            .alignment(tui::layout::Alignment::Left)
+            .wrap(tui::widgets::Wrap { trim: true });
+        
+        let inner_area = modal_area.inner(&Margin { 
+            vertical: 1, 
+            horizontal: 2 
+        });
+        
+        frame.render_widget(help_paragraph, inner_area);
+    }
+    
+    /// Render loading indicator or error message
+    fn render_loading_state(&self, frame: &mut RenderFrame, area: Rect) {
+        let loading_state = self.loading_state.lock().unwrap();
+        
+        match &*loading_state {
+            LoadingState::Loading(start_time) => {
+                // Only show loading indicator if it's been loading for at least 100ms
+                if start_time.elapsed().as_millis() > 100 {
+                    let elapsed_secs = start_time.elapsed().as_secs();
+                    let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+                    let spinner_char = spinner_chars[(elapsed_secs % 10) as usize];
+                    
+                    let loading_text = format!("{} Loading data...", spinner_char);
+                    let loading_paragraph = Paragraph::new(loading_text)
+                        .style(Style::default().fg(Color::Yellow))
+                        .alignment(tui::layout::Alignment::Center)
+                        .block(Block::default().borders(Borders::NONE));
+                    
+                    let loading_area = Rect {
+                        x: area.x + 2,
+                        y: area.y + 1,
+                        width: area.width - 4,
+                        height: 1,
+                    };
+                    
+                    frame.render_widget(loading_paragraph, loading_area);
+                }
+            },
+            LoadingState::Error(error) => {
+                let error_text = format!("⚠ Error: {}", error);
+                let error_paragraph = Paragraph::new(error_text)
+                    .style(Style::default().fg(Color::Red))
+                    .alignment(tui::layout::Alignment::Center)
+                    .block(Block::default().borders(Borders::NONE));
+                
+                let error_area = Rect {
+                    x: area.x + 2,
+                    y: area.y + 1,
+                    width: area.width - 4,
+                    height: 1,
+                };
+                
+                frame.render_widget(error_paragraph, error_area);
+            },
+            _ => {} // No loading indicator for Idle state
+        }
+    }
+    
+    /// Render a new Federation Usage Report tab
+    fn render_federation_report_tab(&self, frame: &mut RenderFrame, area: Rect) {
+        if self.federation_reports.is_empty() {
+            let empty_para = Paragraph::new("No federation data available.")
+                .block(Block::default().title("Federation Usage Report").borders(Borders::ALL));
+            frame.render_widget(empty_para, area);
+            return;
+        }
+        
+        // Split the screen into two parts: federation list and detailed view
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Filters
+                Constraint::Length(10), // Federation summary table
+                Constraint::Min(10),    // Federation usage charts
+            ].as_ref())
+            .split(area);
+        
+        // Render filters (similar to other tabs)
+        let filter_text = format!(
+            "Time: {} | Token: {:?}",
+            self.time_filter.as_label(),
+            self.selected_token_type.as_deref().unwrap_or("All")
+        );
+        
+        let filter_para = Paragraph::new(filter_text)
+            .block(Block::default().title("Filters").borders(Borders::ALL));
+            
+        frame.render_widget(filter_para, chunks[0]);
+        
+        // Create federation summary table
+        let mut rows = Vec::new();
+        for report in self.federation_reports.values() {
+            let status_color = report.status_color();
+            let exhaustion_text = match report.projected_exhaustion_days {
+                Some(days) => format!("{} days", days),
+                None => "N/A".to_string(),
+            };
+            
+            rows.push(Row::new(vec![
+                Cell::from(report.federation_id.clone()),
+                Cell::from(format!("{:.2}", report.total_tokens_burned)),
+                Cell::from(format!("{:.2}/day", report.avg_daily_usage)),
+                Cell::from(format!("{:.2}", report.peak_daily_usage)),
+                Cell::from(exhaustion_text).style(Style::default().fg(status_color)),
+            ]));
+        }
+        
+        let table = Table::new(rows)
+            .header(
+                Row::new(vec![
+                    Cell::from("Federation").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Total Burned").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Avg Daily").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Peak Daily").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Projected Remaining").style(Style::default().add_modifier(Modifier::BOLD)),
+                ])
+            )
+            .widths(&[
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+            ])
+            .block(Block::default().title("Federation Usage Summary").borders(Borders::ALL));
+            
+        frame.render_widget(table, chunks[1]);
+        
+        // Render federation comparative bar chart
+        let mut federation_names: Vec<String> = self.federation_reports.keys().cloned().collect();
+        federation_names.sort();
+        
+        let federation_usage: Vec<(&str, u64)> = federation_names.iter()
+            .map(|name| {
+                let report = &self.federation_reports[name];
+                (name.as_str(), report.total_tokens_burned as u64)
+            })
+            .collect();
+        
+        if !federation_usage.is_empty() {
+            let barchart = BarChart::default()
+                .block(Block::default().title("Federation Comparison").borders(Borders::ALL))
+                .data(&federation_usage)
+                .bar_width(7)
+                .bar_gap(3)
+                .bar_style(Style::default().fg(Color::Blue))
+                .value_style(Style::default().fg(Color::Black).bg(Color::Blue))
+                .label_style(Style::default().fg(Color::White));
+                
+            frame.render_widget(barchart, chunks[2]);
+        } else {
+            let empty_para = Paragraph::new("No federation usage data available.")
+                .block(Block::default().title("Federation Comparison").borders(Borders::ALL));
+            frame.render_widget(empty_para, chunks[2]);
+        }
+    }
 }
 
 impl Component for ComputeDashboard {
     fn render(&mut self, frame: &mut RenderFrame, area: Rect) {
         // Re-load data before rendering to ensure latest data
-        self.load_data();
+        // Only reload if not currently loading
+        if let LoadingState::Idle = *self.loading_state.lock().unwrap() {
+            // Periodically reload data (e.g., every minute)
+            // In a real app, you might want to check elapsed time since last reload
+        }
         
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -529,7 +994,7 @@ impl Component for ComputeDashboard {
             .split(area);
             
         // Render tabs
-        let tab_titles = vec!["Overview", "History", "Federation Breakdown"];
+        let tab_titles = vec!["Overview", "History", "Federation Breakdown", "Federation Report"];
         let tabs = Tabs::new(
             tab_titles.iter().map(|t| Spans::from(Span::raw(*t))).collect()
         )
@@ -544,20 +1009,40 @@ impl Component for ComputeDashboard {
             0 => self.render_overview_tab(frame, chunks[1]),
             1 => self.render_history_tab(frame, chunks[1]),
             2 => self.render_federation_tab(frame, chunks[1]),
+            3 => self.render_federation_report_tab(frame, chunks[1]),
             _ => {}
+        }
+        
+        // Render loading state
+        self.render_loading_state(frame, area);
+        
+        // Render help modal if needed
+        if self.show_help {
+            self.render_help_modal(frame, area);
         }
     }
 
     fn handle_input(&mut self, event: InputEvent) -> bool {
+        // If help is shown, only handle Escape key
+        if self.show_help {
+            match event {
+                InputEvent::KeyEsc => {
+                    self.show_help = false;
+                    return true;
+                },
+                _ => return true, // Consume all inputs when help is shown
+            }
+        }
+        
         match event {
             InputEvent::KeyTab => {
                 // Switch tab
-                self.selected_tab = (self.selected_tab + 1) % 3;
+                self.selected_tab = (self.selected_tab + 1) % 4; // Updated for 4 tabs
                 true
             }
             InputEvent::KeyBacktab => {
                 // Switch tab backwards
-                self.selected_tab = (self.selected_tab + 2) % 3;
+                self.selected_tab = (self.selected_tab + 3) % 4; // Updated for 4 tabs
                 true
             }
             InputEvent::KeyChar('r') => {
@@ -574,6 +1059,9 @@ impl Component for ComputeDashboard {
                     TimeFilter::Year => TimeFilter::All,
                     TimeFilter::All => TimeFilter::Day,
                 };
+                
+                // Update federation reports after changing filter
+                self.update_federation_reports();
                 true
             }
             InputEvent::KeyChar('f') => {
@@ -622,6 +1110,83 @@ impl Component for ComputeDashboard {
                         }
                     }
                 }
+                
+                // Update federation reports after changing token type
+                self.update_federation_reports();
+                true
+            }
+            InputEvent::KeyChar('j') => {
+                // Cycle through job types
+                if self.job_types.is_empty() {
+                    return true;
+                }
+                
+                match &self.active_job_type {
+                    None => {
+                        self.active_job_type = Some(self.job_types[0].clone());
+                    }
+                    Some(current) => {
+                        let pos = self.job_types.iter().position(|j| j == current);
+                        match pos {
+                            Some(i) if i < self.job_types.len() - 1 => {
+                                self.active_job_type = Some(self.job_types[i + 1].clone());
+                            }
+                            _ => {
+                                self.active_job_type = None;
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            InputEvent::KeyChar('p') => {
+                // Clear proposal filter (toggle)
+                self.active_proposal_id = match &self.active_proposal_id {
+                    Some(_) => None,
+                    None => {
+                        // Find first proposal ID in records
+                        let proposal = self.burn_records.iter()
+                            .find_map(|burn| burn.proposal_id.clone());
+                        proposal
+                    }
+                };
+                true
+            }
+            InputEvent::KeyChar('?') => {
+                // Toggle help menu
+                self.show_help = !self.show_help;
+                true
+            }
+            InputEvent::KeyChar('d') => {
+                // Switch to daily view
+                self.time_filter = TimeFilter::Day;
+                self.update_federation_reports();
+                true
+            }
+            InputEvent::KeyChar('w') => {
+                // Switch to weekly view
+                self.time_filter = TimeFilter::Week;
+                self.update_federation_reports();
+                true
+            }
+            InputEvent::KeyChar('m') => {
+                // Switch to monthly view
+                self.time_filter = TimeFilter::Month;
+                self.update_federation_reports();
+                true
+            }
+            InputEvent::KeyChar('a') => {
+                // Switch to all time view
+                self.time_filter = TimeFilter::All;
+                self.update_federation_reports();
+                true
+            }
+            InputEvent::KeyChar('c') => {
+                // Clear all filters
+                self.active_federation = None;
+                self.selected_token_type = None;
+                self.active_job_type = None;
+                self.active_proposal_id = None;
                 true
             }
             _ => false,
@@ -636,13 +1201,18 @@ impl Component for ComputeDashboard {
         vec![
             Spans::from(Span::raw("Tab: Switch view")),
             Spans::from(Span::raw("← →: Navigate tabs")),
-            Spans::from(Span::raw("t: Change token type filter")),
+            Spans::from(Span::raw("r: Reload data")),
             Spans::from(Span::raw("f: Change federation filter")),
+            Spans::from(Span::raw("t: Change token type filter")),
+            Spans::from(Span::raw("j: Change job type filter")),
+            Spans::from(Span::raw("p: Toggle proposal filter")),
+            Spans::from(Span::raw("c: Clear all filters")),
             Spans::from(Span::raw("d: Daily view")),
             Spans::from(Span::raw("w: Weekly view")),
             Spans::from(Span::raw("m: Monthly view")),
             Spans::from(Span::raw("y: Yearly view")),
             Spans::from(Span::raw("a: All time view")),
+            Spans::from(Span::raw("?: Show help")),
         ]
     }
 } 
