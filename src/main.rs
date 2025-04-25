@@ -542,6 +542,25 @@ enum CredentialCommands {
         output: Option<PathBuf>,
     },
     
+    /// View credential in the DAG viewer with anchor awareness
+    View {
+        /// ID of the credential to view
+        #[arg(long)]
+        id: Option<String>,
+        
+        /// Path to anchor credential JSON file to import and view
+        #[arg(long)]
+        anchor_file: Option<PathBuf>,
+        
+        /// Path to receipt credential JSON file to import and view
+        #[arg(long)]
+        receipt_file: Option<PathBuf>,
+        
+        /// View with anchor credentials (true by default)
+        #[arg(long)]
+        with_anchor: Option<bool>,
+    },
+    
     /// Verify a specific credential
     Verify {
         /// ID of the credential to verify
@@ -3189,7 +3208,120 @@ fn handle_credential_commands(
                     eprintln!("Error creating amendment credential: {}", e);
                 }
             }
-        }
+        },
+        
+        CredentialCommands::View { id, anchor_file, receipt_file, with_anchor } => {
+            // Import files if specified
+            if let Some(anchor_path) = anchor_file {
+                if !anchor_path.exists() {
+                    eprintln!("Anchor file not found: {:?}", anchor_path);
+                    return;
+                }
+                
+                println!("Importing anchor credential from {:?}", anchor_path);
+                let anchor_data = match std::fs::read_to_string(anchor_path) {
+                    Ok(data) => data,
+                    Err(e) => {
+                        eprintln!("Failed to read anchor file: {}", e);
+                        return;
+                    }
+                };
+                
+                // Import the anchor credential
+                match sync_service.import_credential_from_json(&anchor_data) {
+                    Ok(cred_id) => println!("Imported anchor credential: {}", cred_id),
+                    Err(e) => {
+                        eprintln!("Failed to import anchor credential: {}", e);
+                        return;
+                    }
+                }
+            }
+            
+            if let Some(receipt_path) = receipt_file {
+                if !receipt_path.exists() {
+                    eprintln!("Receipt file not found: {:?}", receipt_path);
+                    return;
+                }
+                
+                println!("Importing receipt credential from {:?}", receipt_path);
+                let receipt_data = match std::fs::read_to_string(receipt_path) {
+                    Ok(data) => data,
+                    Err(e) => {
+                        eprintln!("Failed to read receipt file: {}", e);
+                        return;
+                    }
+                };
+                
+                // Import the receipt credential
+                match sync_service.import_credential_from_json(&receipt_data) {
+                    Ok(cred_id) => println!("Imported receipt credential: {}", cred_id),
+                    Err(e) => {
+                        eprintln!("Failed to import receipt credential: {}", e);
+                        return;
+                    }
+                }
+            }
+            
+            // Get credentials to view
+            let mut credentials_to_view = Vec::new();
+            
+            // If a specific credential ID is provided, focus on that one
+            if let Some(cred_id) = id {
+                if let Some(cred) = sync_service.get_credential(&cred_id) {
+                    credentials_to_view.push(cred);
+                    
+                    // Check if it's an anchor - in that case, get related receipts
+                    if cred.receipt.receipt_type.contains("anchor") || 
+                       cred.receipt.receipt_type.contains("epoch") {
+                        // Find receipts with this anchor
+                        let dag_root = cred.receipt.metadata.get("dag_root_hash")
+                            .or_else(|| cred.receipt.metadata.get("dag_anchor"));
+                            
+                        if let Some(root) = dag_root {
+                            println!("Finding receipts for DAG root: {}", root);
+                            let related = sync_service.get_all_credentials()
+                                .into_iter()
+                                .filter(|c| {
+                                    c.receipt.metadata.get("dag_anchor")
+                                        .or_else(|| c.receipt.metadata.get("dag_root_hash"))
+                                        .map_or(false, |v| v == root)
+                                })
+                                .collect::<Vec<_>>();
+                                
+                            println!("Found {} related receipts", related.len());
+                            credentials_to_view.extend(related);
+                        }
+                    }
+                } else {
+                    eprintln!("Credential not found: {}", cred_id);
+                    return;
+                }
+            } else {
+                // No specific ID, show all credentials
+                credentials_to_view = sync_service.get_all_credentials();
+            }
+            
+            if credentials_to_view.is_empty() {
+                println!("No credentials found to view");
+                return;
+            }
+            
+            // Convert to WalletCredential format
+            let wallet_credentials: Vec<_> = credentials_to_view
+                .into_iter()
+                .filter_map(|cred| cred.verifiable_credential)
+                .collect();
+                
+            println!("Launching DAG viewer with {} credentials", wallet_credentials.len());
+            
+            // Launch the viewer (stub in CLI - would launch UI in real implementation)
+            println!("Anchor-aware DAG lineage viewer would launch here");
+            println!("This would typically open the UI with the AnchorDAGView component");
+            
+            // In a real implementation, this would launch the UI with something like:
+            // let show_anchors = with_anchor.unwrap_or(true);
+            // launch_ui_with_dag_view(&wallet_credentials, show_anchors);
+        },
     }
 }
 

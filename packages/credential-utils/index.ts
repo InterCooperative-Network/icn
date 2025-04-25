@@ -10,10 +10,12 @@ export * from './utils/receiptToVC';
 export * from './utils/credentialExport';
 export * from './utils/selectiveDisclosure';
 export * from './utils/proposalLinking';
+export * from './utils/groupByAnchor';
 
 // Export types
 export * from './types/credentials';
 export * from './types/federation';
+export * from './types/AnchorCredential';
 
 // Export utilities
 export * from './utils/anchorCredential';
