@@ -116,4 +116,28 @@ pub enum ResourceCommand {
     /// Burn resource tokens (consume tokens)
     #[clap(subcommand)]
     Burn(ResourceBurnCommand),
+    
+    /// Generate federation resource usage report
+    #[clap(alias = "report")]
+    FederationReport {
+        /// Federation ID to generate report for
+        #[clap(long)]
+        federation: Option<String>,
+        
+        /// Report format (json or vc)
+        #[clap(long, default_value = "json", value_parser = ["json", "vc"])]
+        format: String,
+        
+        /// Time period in days to include (default: all available data)
+        #[clap(long)]
+        period: Option<i64>,
+        
+        /// Output file path (if not specified, prints to stdout)
+        #[clap(long)]
+        output: Option<String>,
+        
+        /// Optional epoch ID to anchor the report to
+        #[clap(long)]
+        anchor_epoch: Option<String>,
+    },
 } 

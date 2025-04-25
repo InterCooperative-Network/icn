@@ -6,6 +6,7 @@ use thiserror::Error;
 use std::fs;
 use std::path::Path;
 use uuid::Uuid;
+use std::collections::HashMap;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 // Export the QR code module
@@ -77,9 +78,35 @@ pub struct FederationMember {
     pub role: String,
 }
 
-/// A verifiable credential for federation membership
+/// Subject of a federation report credential
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerifiableCredential {
+pub struct FederationReportCredential {
+    pub id: String,
+    pub federation_id: String,
+    pub report_type: String,
+    pub total_tokens_burned: f64,
+    pub avg_daily_burn: f64,
+    pub peak_daily_burn: f64,
+    pub period_days: i64,
+    pub quota_total: f64,
+    pub quota_remaining: f64,
+    pub generated_at: String,
+}
+
+/// Subject of a federation anchor credential
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnchorCredential {
+    pub id: String,
+    pub federation_id: String,
+    pub epoch_id: String,
+    pub dag_root_hash: String,
+    pub timestamp: String,
+    pub previous_epoch_id: Option<String>,
+}
+
+/// A generic verifiable credential
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifiableCredential<T = serde_json::Value> {
     #[serde(rename = "@context")]
     pub context: Vec<String>,
     pub id: String,
@@ -87,8 +114,55 @@ pub struct VerifiableCredential {
     pub types: Vec<String>,
     pub issuer: String,
     pub issuanceDate: DateTime<Utc>,
-    pub credentialSubject: FederationMemberSubject,
+    pub credentialSubject: T,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relatedResource: Option<HashMap<String, String>>,
     pub proof: Option<Proof>,
+}
+
+impl<T: Serialize> VerifiableCredential<T> {
+    /// Create a new verifiable credential
+    pub fn new(credential_type: &str, issuer_id: String, subject: T) -> Self {
+        Self {
+            context: vec![
+                "https://www.w3.org/2018/credentials/v1".to_string(),
+                "https://www.icn.coop/credentials/v1".to_string(),
+            ],
+            id: format!("urn:uuid:{}", Uuid::new_v4()),
+            types: vec![
+                "VerifiableCredential".to_string(),
+                format!("{}Credential", credential_type),
+            ],
+            issuer: issuer_id,
+            issuanceDate: Utc::now(),
+            credentialSubject: subject,
+            relatedResource: None,
+            proof: None,
+        }
+    }
+    
+    /// Add a related resource to the credential
+    pub fn add_related_resource(&mut self, relation_type: &str, resource_id: String) {
+        let mut resources = self.relatedResource.take().unwrap_or_default();
+        resources.insert(relation_type.to_string(), resource_id);
+        self.relatedResource = Some(resources);
+    }
+    
+    /// Sign the credential (placeholder implementation)
+    pub fn sign(&mut self) {
+        // In a real implementation, this would:
+        // 1. Use the wallet's DID key to sign
+        // 2. Create a proper cryptographic signature
+        
+        // For now, create a mock proof
+        self.proof = Some(Proof {
+            type_: "Ed25519Signature2020".to_string(),
+            created: Utc::now(),
+            verificationMethod: "did:icn:wallet#keys-1".to_string(),
+            proofPurpose: "assertionMethod".to_string(),
+            proofValue: "mock-signature-for-demo-purposes".to_string(),
+        });
+    }
 }
 
 /// Generator for verifiable credentials

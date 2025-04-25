@@ -1,4 +1,21 @@
 use crate::resources::{Resource, ResourceToken, TokenBurn};
+use chrono::{DateTime, Duration, Utc, NaiveDateTime};
+
+/// Federation usage statistics
+pub struct FederationStats {
+    /// Federation ID
+    pub federation_id: String,
+    /// Total tokens burned in this federation
+    pub total_tokens_burned: f64,
+    /// Average daily token burn
+    pub avg_daily_burn: f64,
+    /// Peak usage day
+    pub peak_daily_burn: f64,
+    /// Date of peak usage
+    pub peak_date: Option<DateTime<Utc>>,
+    /// How many days of data were analyzed
+    pub period_days: i64,
+}
 
 impl Repository {
     /// Records a token burn in the database
@@ -151,5 +168,108 @@ impl Repository {
         }
         
         Ok(burns)
+    }
+
+    /// Get aggregated token burn statistics for all federations
+    pub fn get_federation_burn_stats(&self, period_days: Option<i64>) -> Result<Vec<FederationStats>, Error> {
+        let conn = self.pool.get()?;
+        
+        // Calculate cutoff date if period is specified
+        let date_filter = if let Some(days) = period_days {
+            let cutoff = Utc::now() - Duration::days(days);
+            format!(" AND timestamp >= {}", cutoff.timestamp())
+        } else {
+            String::new()
+        };
+        
+        // Get unique federation IDs
+        let mut stmt = conn.prepare(
+            &format!("SELECT DISTINCT federation_scope FROM token_burns WHERE 1=1{}", date_filter)
+        )?;
+        
+        let federation_ids: Vec<String> = stmt.query_map([], |row| {
+            row.get::<_, String>(0)
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        let mut results = Vec::new();
+        
+        for federation_id in federation_ids {
+            // Calculate total burn for this federation
+            let mut stmt = conn.prepare(
+                &format!("SELECT SUM(amount) FROM token_burns WHERE federation_scope = ?{}", date_filter)
+            )?;
+            
+            let total_burn: f64 = stmt.query_row([&federation_id], |row| {
+                row.get::<_, f64>(0)
+            }).unwrap_or(0.0);
+            
+            // Get oldest timestamp to calculate duration
+            let mut stmt = conn.prepare(
+                &format!("SELECT MIN(timestamp) FROM token_burns WHERE federation_scope = ?{}", date_filter)
+            )?;
+            
+            let oldest_timestamp: i64 = stmt.query_row([&federation_id], |row| {
+                row.get::<_, i64>(0)
+            }).unwrap_or(Utc::now().timestamp());
+            
+            // Calculate duration in days
+            let start_date = DateTime::<Utc>::from_timestamp(oldest_timestamp, 0)
+                .unwrap_or_default();
+            let now = Utc::now();
+            let duration_days = (now - start_date).num_days().max(1); // At least 1 day
+            
+            // Calculate daily average
+            let avg_daily = total_burn / duration_days as f64;
+            
+            // Find peak day
+            let mut stmt = conn.prepare(
+                &format!("
+                    SELECT 
+                        DATE(datetime(timestamp, 'unixepoch')) as day,
+                        SUM(amount) as daily_total
+                    FROM token_burns 
+                    WHERE federation_scope = ?{}
+                    GROUP BY day
+                    ORDER BY daily_total DESC
+                    LIMIT 1
+                ", date_filter)
+            )?;
+            
+            let (peak_day, peak_amount): (String, f64) = stmt.query_row([&federation_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, f64>(1)?,
+                ))
+            }).unwrap_or(("unknown".to_string(), 0.0));
+            
+            // Parse peak date
+            let peak_date = if peak_day != "unknown" {
+                NaiveDateTime::parse_from_str(&format!("{} 00:00:00", peak_day), "%Y-%m-%d %H:%M:%S")
+                    .ok()
+                    .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+            } else {
+                None
+            };
+            
+            results.push(FederationStats {
+                federation_id,
+                total_tokens_burned: total_burn,
+                avg_daily_burn: avg_daily,
+                peak_daily_burn: peak_amount,
+                peak_date,
+                period_days: duration_days,
+            });
+        }
+        
+        Ok(results)
+    }
+    
+    /// Gets token burn statistics for a specific federation 
+    pub fn get_federation_burn_stats_by_id(&self, federation_id: &str, period_days: Option<i64>) -> Result<Option<FederationStats>, Error> {
+        self.get_federation_burn_stats(period_days)?
+            .into_iter()
+            .find(|stats| stats.federation_id == federation_id)
+            .map_or(Ok(None), |stats| Ok(Some(stats)))
     }
 } 

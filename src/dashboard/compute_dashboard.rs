@@ -1,4 +1,5 @@
 use crate::db::WalletDb;
+use crate::repository::{Repository, FederationStats};
 use crate::types::TokenBurn;
 use crate::ui::{Component, InputEvent, RenderFrame};
 use chrono::{DateTime, Duration, Utc, TimeZone};
@@ -75,11 +76,13 @@ pub struct ComputeDashboard {
 }
 
 /// Federation usage report data
+#[derive(Debug, Clone)]
 struct FederationReport {
     federation_id: String,
     total_tokens_burned: f64,
     avg_daily_usage: f64,
     peak_daily_usage: f64,
+    peak_date: Option<DateTime<Utc>>,
     quota_remaining_percent: Option<f64>,
     projected_exhaustion_days: Option<i64>,
 }
@@ -87,7 +90,7 @@ struct FederationReport {
 impl FederationReport {
     fn status_color(&self) -> Color {
         match self.projected_exhaustion_days {
-            Some(days) if days < 10 => Color::Red,
+            Some(days) if days < 7 => Color::Red,
             Some(days) if days < 30 => Color::Yellow,
             _ => Color::Green,
         }
@@ -215,65 +218,78 @@ impl ComputeDashboard {
         }
     }
     
-    /// Update federation reports with usage data and predictions
+    /// Update federation resource reports based on current data
     fn update_federation_reports(&mut self) {
-        let mut reports = HashMap::new();
+        // Start loading animation
+        *self.loading_state.lock().unwrap() = LoadingState::Loading(Instant::now());
         
-        for federation in &self.federations {
-            // Filter burns for this federation
-            let federation_burns: Vec<&TokenBurn> = self.burn_records.iter()
-                .filter(|burn| burn.federation_scope == *federation)
-                .collect();
-            
-            if federation_burns.is_empty() {
-                continue;
-            }
-            
-            // Calculate total tokens burned
-            let total_burned: f64 = federation_burns.iter()
-                .map(|burn| burn.amount)
-                .sum();
-            
-            // Group by day for average and peak calculations
-            let mut daily_totals = HashMap::new();
-            
-            for burn in &federation_burns {
-                let dt = DateTime::<Utc>::from_timestamp(burn.timestamp, 0).unwrap_or_default();
-                let day_key = dt.format("%Y-%m-%d").to_string();
-                *daily_totals.entry(day_key).or_insert(0.0) += burn.amount;
-            }
-            
-            let days_count = daily_totals.len().max(1) as f64;
-            let avg_daily = total_burned / days_count;
-            let peak_daily = daily_totals.values().fold(0.0, |max, &val| max.max(val));
-            
-            // Predictive analysis - projected exhaustion based on average daily usage
-            // Assuming each federation has a quota (for now using a placeholder value)
-            let federation_quota = 10000.0; // Placeholder value - in real app this would be fetched
-            let quota_remaining = federation_quota - total_burned;
-            let quota_remaining_percent = if federation_quota > 0.0 {
-                Some((quota_remaining / federation_quota) * 100.0)
-            } else {
-                None
+        // Clone necessary data for the thread
+        let time_filter = self.time_filter.clone();
+        let loading_state = self.loading_state.clone();
+        
+        // Get repository from db
+        let repository = Repository::new(self.db.clone());
+        let repo_clone = repository.clone();
+        
+        thread::spawn(move || {
+            // Convert time filter to days
+            let period_days = match time_filter {
+                TimeFilter::Day => Some(1),
+                TimeFilter::Week => Some(7),
+                TimeFilter::Month => Some(30),
+                TimeFilter::Year => Some(365),
+                TimeFilter::All => None,
             };
             
-            let projected_exhaustion_days = if avg_daily > 0.0 {
-                Some((quota_remaining / avg_daily) as i64)
-            } else {
-                None
+            // Fetch federation stats from repository
+            let federation_stats = match repo_clone.get_federation_burn_stats(period_days) {
+                Ok(stats) => stats,
+                Err(e) => {
+                    // Handle error
+                    *loading_state.lock().unwrap() = LoadingState::Error(format!("Failed to load federation stats: {}", e));
+                    return HashMap::new();
+                }
             };
             
-            reports.insert(federation.clone(), FederationReport {
-                federation_id: federation.clone(),
-                total_tokens_burned: total_burned,
-                avg_daily_usage: avg_daily,
-                peak_daily_usage: peak_daily,
-                quota_remaining_percent,
-                projected_exhaustion_days,
-            });
-        }
-        
-        self.federation_reports = reports;
+            // Convert to FederationReport format
+            let mut reports = HashMap::new();
+            for stats in federation_stats {
+                // For now, hardcode quota as 1000 tokens per federation
+                // In a real implementation, this would be fetched from federation contracts
+                let quota = 1000.0;
+                let remaining = quota - stats.total_tokens_burned;
+                
+                let quota_remaining_percent = if quota > 0.0 {
+                    Some(100.0 * remaining / quota)
+                } else {
+                    None
+                };
+                
+                let projected_exhaustion_days = if stats.avg_daily_burn > 0.0 && remaining > 0.0 {
+                    Some((remaining / stats.avg_daily_burn) as i64)
+                } else if remaining <= 0.0 {
+                    Some(0)
+                } else {
+                    None
+                };
+                
+                reports.insert(stats.federation_id.clone(), FederationReport {
+                    federation_id: stats.federation_id,
+                    total_tokens_burned: stats.total_tokens_burned,
+                    avg_daily_usage: stats.avg_daily_burn,
+                    peak_daily_usage: stats.peak_daily_burn,
+                    peak_date: stats.peak_date,
+                    quota_remaining_percent,
+                    projected_exhaustion_days,
+                });
+            }
+            
+            // Update loading state
+            *loading_state.lock().unwrap() = LoadingState::Idle;
+            
+            // Return the reports
+            reports
+        });
     }
     
     /// Filter burn records based on current settings
@@ -876,103 +892,113 @@ impl ComputeDashboard {
         }
     }
     
-    /// Render a new Federation Usage Report tab
-    fn render_federation_report_tab(&self, frame: &mut RenderFrame, area: Rect) {
+    /// Render the federation report tab
+    fn render_federation_report_tab(&mut self, frame: &mut RenderFrame, area: Rect) {
+        // Check if we need to fetch data
         if self.federation_reports.is_empty() {
-            let empty_para = Paragraph::new("No federation data available.")
-                .block(Block::default().title("Federation Usage Report").borders(Borders::ALL));
-            frame.render_widget(empty_para, area);
-            return;
+            self.update_federation_reports();
         }
         
-        // Split the screen into two parts: federation list and detailed view
+        // Create layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Filters
-                Constraint::Length(10), // Federation summary table
-                Constraint::Min(10),    // Federation usage charts
+                Constraint::Length(3),    // Time filter
+                Constraint::Length(5),    // Instructions
+                Constraint::Percentage(80), // Federation list
             ].as_ref())
             .split(area);
         
-        // Render filters (similar to other tabs)
-        let filter_text = format!(
-            "Time: {} | Token: {:?}",
-            self.time_filter.as_label(),
-            self.selected_token_type.as_deref().unwrap_or("All")
-        );
-        
-        let filter_para = Paragraph::new(filter_text)
-            .block(Block::default().title("Filters").borders(Borders::ALL));
-            
+        // Render time filter
+        let time_text = format!("Time Range: {}", self.time_filter.as_label());
+        let filter_para = Paragraph::new(time_text)
+            .block(Block::default().title("Filter").borders(Borders::ALL));
         frame.render_widget(filter_para, chunks[0]);
         
-        // Create federation summary table
+        // Render instructions
+        let instructions = vec![
+            Spans::from(vec![
+                Span::raw("Use "),
+                Span::styled("t", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(" to change time filter, "),
+                Span::styled("r", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(" to refresh data, "),
+                Span::styled("?", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::raw(" for help"),
+            ]),
+            Spans::from(vec![
+                Span::styled("Green", Style::default().fg(Color::Green)),
+                Span::raw(": >30 days remaining, "),
+                Span::styled("Yellow", Style::default().fg(Color::Yellow)),
+                Span::raw(": 7-30 days remaining, "),
+                Span::styled("Red", Style::default().fg(Color::Red)),
+                Span::raw(": <7 days remaining"),
+            ]),
+        ];
+        
+        let instructions_para = Paragraph::new(instructions)
+            .block(Block::default().title("Instructions").borders(Borders::ALL));
+        frame.render_widget(instructions_para, chunks[1]);
+        
+        // Render federation list table
         let mut rows = Vec::new();
+        
         for report in self.federation_reports.values() {
-            let status_color = report.status_color();
             let exhaustion_text = match report.projected_exhaustion_days {
-                Some(days) => format!("{} days", days),
+                Some(days) if days > 0 => format!("{} days", days),
+                Some(_) => "Exhausted!".to_string(),
                 None => "N/A".to_string(),
+            };
+            
+            let remaining_text = match report.quota_remaining_percent {
+                Some(pct) if pct > 0.0 => format!("{:.1}%", pct),
+                Some(_) => "0%".to_string(),
+                None => "N/A".to_string(),
+            };
+            
+            let peak_text = if let Some(date) = &report.peak_date {
+                format!("{:.2} on {}", 
+                    report.peak_daily_usage, 
+                    date.format("%Y-%m-%d"))
+            } else {
+                format!("{:.2}", report.peak_daily_usage)
             };
             
             rows.push(Row::new(vec![
                 Cell::from(report.federation_id.clone()),
                 Cell::from(format!("{:.2}", report.total_tokens_burned)),
-                Cell::from(format!("{:.2}/day", report.avg_daily_usage)),
-                Cell::from(format!("{:.2}", report.peak_daily_usage)),
-                Cell::from(exhaustion_text).style(Style::default().fg(status_color)),
+                Cell::from(format!("{:.2}", report.avg_daily_usage)),
+                Cell::from(peak_text),
+                Cell::from(remaining_text),
+                Cell::from(Span::styled(
+                    exhaustion_text,
+                    Style::default().fg(report.status_color())
+                )),
             ]));
         }
         
         let table = Table::new(rows)
             .header(
                 Row::new(vec![
-                    Cell::from("Federation").style(Style::default().add_modifier(Modifier::BOLD)),
-                    Cell::from("Total Burned").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Federation ID").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Total Burn").style(Style::default().add_modifier(Modifier::BOLD)),
                     Cell::from("Avg Daily").style(Style::default().add_modifier(Modifier::BOLD)),
-                    Cell::from("Peak Daily").style(Style::default().add_modifier(Modifier::BOLD)),
-                    Cell::from("Projected Remaining").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Peak Usage").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Quota Remaining").style(Style::default().add_modifier(Modifier::BOLD)),
+                    Cell::from("Projected Exhaustion").style(Style::default().add_modifier(Modifier::BOLD)),
                 ])
             )
             .widths(&[
                 Constraint::Percentage(20),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
                 Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
             ])
-            .block(Block::default().title("Federation Usage Summary").borders(Borders::ALL));
+            .block(Block::default().title("Federation Resource Usage Report").borders(Borders::ALL));
             
-        frame.render_widget(table, chunks[1]);
-        
-        // Render federation comparative bar chart
-        let mut federation_names: Vec<String> = self.federation_reports.keys().cloned().collect();
-        federation_names.sort();
-        
-        let federation_usage: Vec<(&str, u64)> = federation_names.iter()
-            .map(|name| {
-                let report = &self.federation_reports[name];
-                (name.as_str(), report.total_tokens_burned as u64)
-            })
-            .collect();
-        
-        if !federation_usage.is_empty() {
-            let barchart = BarChart::default()
-                .block(Block::default().title("Federation Comparison").borders(Borders::ALL))
-                .data(&federation_usage)
-                .bar_width(7)
-                .bar_gap(3)
-                .bar_style(Style::default().fg(Color::Blue))
-                .value_style(Style::default().fg(Color::Black).bg(Color::Blue))
-                .label_style(Style::default().fg(Color::White));
-                
-            frame.render_widget(barchart, chunks[2]);
-        } else {
-            let empty_para = Paragraph::new("No federation usage data available.")
-                .block(Block::default().title("Federation Comparison").borders(Borders::ALL));
-            frame.render_widget(empty_para, chunks[2]);
-        }
+        frame.render_widget(table, chunks[2]);
     }
 }
 
@@ -1048,6 +1074,11 @@ impl Component for ComputeDashboard {
             InputEvent::KeyChar('r') => {
                 // Reload data
                 self.load_data();
+                if self.selected_tab == 3 {
+                    // Clear and reload federation reports
+                    self.federation_reports.clear();
+                    self.update_federation_reports();
+                }
                 true
             }
             InputEvent::KeyChar('t') => {

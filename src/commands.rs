@@ -217,6 +217,159 @@ pub fn handle_resource_command(cmd: ResourceCommand, repo: &Repository) -> Resul
         },
         ResourceCommand::Burn(burn_cmd) => {
             handle_resource_burn_command(burn_cmd, repo)
+        },
+        ResourceCommand::FederationReport { 
+            federation, 
+            format, 
+            period, 
+            output, 
+            anchor_epoch 
+        } => {
+            // Get federation stats based on filters
+            let stats = if let Some(fed_id) = &federation {
+                // Get stats for a specific federation
+                let stat_result = repo.get_federation_burn_stats_by_id(fed_id, period)?;
+                match stat_result {
+                    Some(stat) => vec![stat],
+                    None => {
+                        return Err(Error::NotFound { 
+                            entity_type: "federation".to_string(),
+                            entity_id: fed_id.clone()
+                        });
+                    }
+                }
+            } else {
+                // Get stats for all federations
+                repo.get_federation_burn_stats(period)?
+            };
+            
+            if stats.is_empty() {
+                println!("No federation statistics found with the specified filters.");
+                return Ok(());
+            }
+            
+            // Convert database stats to report format
+            let reports: Vec<FederationResourceReport> = stats.into_iter()
+                .map(|stat| {
+                    // For now, hardcode quota as 1000 tokens per federation
+                    // In a real implementation, this would be fetched from federation contracts
+                    let quota = 1000.0;
+                    let remaining = quota - stat.total_tokens_burned;
+                    
+                    let quota_remaining_percent = if quota > 0.0 {
+                        Some(100.0 * remaining / quota)
+                    } else {
+                        None
+                    };
+                    
+                    let projected_exhaustion_days = if stat.avg_daily_burn > 0.0 && remaining > 0.0 {
+                        Some((remaining / stat.avg_daily_burn) as i64)
+                    } else if remaining <= 0.0 {
+                        Some(0)
+                    } else {
+                        None
+                    };
+                    
+                    let projected_exhaustion_date = projected_exhaustion_days.map(|days| {
+                        Utc::now() + chrono::Duration::days(days)
+                    });
+                    
+                    FederationResourceReport {
+                        federation_id: stat.federation_id,
+                        report_generated_at: Utc::now(),
+                        period_days: stat.period_days,
+                        total_tokens_burned: stat.total_tokens_burned,
+                        avg_daily_burn: stat.avg_daily_burn,
+                        peak_daily_burn: stat.peak_daily_burn,
+                        peak_date: stat.peak_date,
+                        quota_total: quota,
+                        quota_remaining: remaining,
+                        quota_remaining_percent,
+                        projected_exhaustion_days,
+                        projected_exhaustion_date,
+                    }
+                })
+                .collect();
+            
+            // Process according to requested format
+            match format.as_str() {
+                "json" => {
+                    // Serialize to JSON
+                    let json_output = serde_json::to_string_pretty(&reports)?;
+                    
+                    // Output to file or stdout based on the output parameter
+                    if let Some(output_path) = output {
+                        let mut file = File::create(output_path)?;
+                        file.write_all(json_output.as_bytes())?;
+                        println!("Federation report saved to {}", output_path);
+                    } else {
+                        println!("{}", json_output);
+                    }
+                },
+                "vc" => {
+                    let mut vcs = Vec::new();
+                    
+                    // Create a VC for each federation report
+                    for report in &reports {
+                        // Create credential subject with report data
+                        let credential_subject = FederationReportCredential {
+                            id: format!("did:icn:federation:{}", report.federation_id),
+                            federation_id: report.federation_id.clone(),
+                            report_type: "ComputeResourceUsage".to_string(),
+                            total_tokens_burned: report.total_tokens_burned,
+                            avg_daily_burn: report.avg_daily_burn,
+                            peak_daily_burn: report.peak_daily_burn,
+                            period_days: report.period_days,
+                            quota_total: report.quota_total,
+                            quota_remaining: report.quota_remaining,
+                            generated_at: report.report_generated_at.to_rfc3339(),
+                        };
+                        
+                        // Create the base VC
+                        let mut credential = VerifiableCredential::new(
+                            "FederationResourceReport", 
+                            report.federation_id.clone(), 
+                            credential_subject
+                        );
+                        
+                        // If anchor_epoch provided, add reference to it
+                        if let Some(epoch_id) = &anchor_epoch {
+                            // In a real implementation, we would fetch the actual AnchorCredential
+                            // from the wallet's VC store or the federation's DAG
+                            
+                            // For now, just include the reference
+                            credential.add_related_resource(
+                                "anchorEpoch", 
+                                format!("did:icn:epoch:{}", epoch_id)
+                            );
+                        }
+                        
+                        // Sign the credential (in real implementation this would use wallet's DID key)
+                        credential.sign();
+                        
+                        vcs.push(credential);
+                    }
+                    
+                    // Output to file or stdout based on the output parameter
+                    let json_output = serde_json::to_string_pretty(&vcs)?;
+                    
+                    if let Some(output_path) = output {
+                        let mut file = File::create(output_path)?;
+                        file.write_all(json_output.as_bytes())?;
+                        println!("Federation report VCs saved to {}", output_path);
+                    } else {
+                        println!("{}", json_output);
+                    }
+                },
+                _ => {
+                    return Err(Error::InvalidFormat {
+                        format,
+                        supported: vec!["json".to_string(), "vc".to_string()]
+                    });
+                }
+            }
+            
+            Ok(())
         }
     }
 } 
