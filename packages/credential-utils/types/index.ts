@@ -1,3 +1,8 @@
+// Import VerifiableCredential and AmendmentCredential types
+import { VerifiableCredential } from './credential';
+import { AmendmentCredential } from './amendment';
+// Remove duplicate FederationTrust export if needed
+
 // Export all types from the types directory
 export * from './credentials';
 export * from './federation';
@@ -69,4 +74,43 @@ export interface SelectiveDisclosure {
     reason?: string;
     expiresAt?: string;
   };
-} 
+}
+
+/**
+ * Restorative Action Credential
+ * Used to represent completion of harm accountability processes
+ */
+export interface RestorativeActionCredential extends Omit<VerifiableCredential, 'type'> {
+  type: ['VerifiableCredential', 'RestorativeActionCredential'];
+  credentialSubject: {
+    id: string;
+    incident_id?: string;
+    participant_did: string;
+    restorative_steps?: string[];
+    resolution_summary: string;
+    status: 'proposed' | 'in_progress' | 'complete' | 'incomplete';
+    guardian_circle?: {
+      id: string;
+      name: string;
+      members: string[];
+    };
+  };
+  metadata?: {
+    federation?: {
+      id: string;
+      name: string;
+    };
+    agoranet?: {
+      threadId: string;
+      threadUrl: string;
+    };
+  };
+}
+
+/**
+ * Union type for all credential types supported by the wallet
+ */
+export type WalletCredential = 
+  | VerifiableCredential 
+  | AmendmentCredential 
+  | RestorativeActionCredential; 

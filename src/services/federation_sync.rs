@@ -705,6 +705,94 @@ impl FederationSyncService {
         
         Ok(vc)
     }
+    
+    /// Get a reference to the federation runtime
+    pub fn get_federation_runtime(&self) -> Arc<FederationRuntime> {
+        self.federation_runtime.clone()
+    }
+    
+    /// Save a credential to the local wallet
+    pub fn save_credential(&self, credential: serde_json::Value) -> Result<CredentialSyncData, FederationSyncError> {
+        let mut sync_data = self.sync_data.lock().unwrap();
+        
+        // Extract necessary fields from the credential
+        let credential_id = credential["id"].as_str().ok_or_else(|| {
+            FederationSyncError::ServiceError("Credential missing id field".to_string())
+        })?.to_string();
+        
+        let federation_id = match credential["metadata"]["federation"]["id"].as_str() {
+            Some(id) => id.to_string(),
+            None => {
+                return Err(FederationSyncError::ServiceError(
+                    "Credential missing federation id".to_string()
+                ));
+            }
+        };
+        
+        // Create a simple receipt for the new credential
+        let receipt = CredentialReceipt {
+            receipt_id: format!("receipt:{}", uuid::Uuid::new_v4()),
+            receipt_type: "amendment".to_string(),
+            action_type: "restore".to_string(),
+            federation_id: federation_id.clone(),
+            issuer: credential["issuer"]["did"].as_str().unwrap_or("").to_string(),
+            issuer_name: credential["issuer"]["name"].as_str().map(|s| s.to_string()),
+            subject_did: credential["subjectDid"].as_str().unwrap_or("").to_string(),
+            signatures: vec![],
+            timestamp: chrono::Utc::now(),
+            metadata: {
+                let mut metadata = HashMap::new();
+                
+                // Add any amendment metadata
+                if let Some(amend_id) = credential["credentialSubject"]["amendment_id"].as_str() {
+                    metadata.insert("amendment_id".to_string(), amend_id.to_string());
+                }
+                
+                if let Some(text_hash) = credential["credentialSubject"]["text_hash"].as_str() {
+                    metadata.insert("text_hash".to_string(), text_hash.to_string());
+                }
+                
+                if let Some(referenced) = credential["credentialSubject"]["referenced_credentials"].as_array() {
+                    let refs_str: Vec<String> = referenced.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect();
+                    metadata.insert("referenced_credentials".to_string(), refs_str.join(","));
+                }
+                
+                metadata
+            },
+        };
+        
+        // Create new sync data entry
+        let new_cred = CredentialSyncData {
+            credential_id: credential_id.clone(),
+            receipt_id: receipt.receipt_id.clone(),
+            federation_id,
+            receipt,
+            status: CredentialStatus::Unverified,
+            last_sync: chrono::Utc::now(),
+            last_verified: chrono::Utc::now(),
+            trust_score: None,
+            credential_json: credential,
+        };
+        
+        // Store in sync data
+        sync_data.insert(credential_id.clone(), new_cred.clone());
+        
+        // Save to persistent storage
+        match &self.storage {
+            Some(storage) => {
+                if let Err(e) = storage.store_credential(&new_cred) {
+                    log::warn!("Failed to save credential to storage: {}", e);
+                }
+            }
+            None => {
+                log::warn!("No storage configured for federation sync service");
+            }
+        };
+        
+        Ok(new_cred)
+    }
 }
 
 #[cfg(test)]

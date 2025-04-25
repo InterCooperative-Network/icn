@@ -588,6 +588,33 @@ enum CredentialCommands {
         #[arg(short, long)]
         output: Option<String>,
     },
+    
+    /// Create a restoration or amendment credential
+    RestoreCredential {
+        /// ID of the credential to restore or amend
+        #[arg(long)]
+        credential_id: String,
+        
+        /// Reason for the amendment
+        #[arg(long)]
+        reason: String,
+        
+        /// Text hash of amendment documentation
+        #[arg(long)]
+        text_hash: Option<String>,
+        
+        /// Amendment ID (defaults to auto-generated)
+        #[arg(long)]
+        amendment_id: Option<String>,
+        
+        /// Federation ID (if not specified, will use federation ID from credential)
+        #[arg(long)]
+        federation_id: Option<String>,
+        
+        /// Output path to save the credential
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
 }
 
 // New commands for federation invites
@@ -2985,6 +3012,133 @@ fn handle_credential_commands(
                 },
                 Err(e) => {
                     println!("Error executing selective disclosure command: {}", e);
+                }
+            }
+        },
+        
+        CredentialCommands::RestoreCredential { 
+            credential_id, 
+            reason, 
+            text_hash, 
+            amendment_id, 
+            federation_id, 
+            output 
+        } => {
+            println!("Creating amendment credential to restore/amend credential {}...", credential_id);
+            
+            // Fetch the credential to be amended from storage
+            let credential = match sync_service.get_credential(&credential_id) {
+                Some(cred) => cred,
+                None => {
+                    eprintln!("Error: Credential with ID {} not found", credential_id);
+                    return;
+                }
+            };
+            
+            // Get the federation ID from the credential if not specified
+            let fed_id = match federation_id {
+                Some(id) => id,
+                None => {
+                    credential.federation_id.clone()
+                }
+            };
+            
+            // Get the federation runtime for this federation
+            let fed_runtime = sync_service.get_federation_runtime();
+            
+            // Get active identity DID for subject DID
+            let subject_did = identity.did().to_string();
+            
+            // Calculate text hash if not provided
+            let text_hash_value = match text_hash {
+                Some(hash) => hash,
+                None => {
+                    // Generate a hash from the reason text
+                    use sha2::{Sha256, Digest};
+                    let mut hasher = Sha256::new();
+                    hasher.update(reason.as_bytes());
+                    let hash_result = hasher.finalize();
+                    format!("sha256:{}", hex::encode(hash_result))
+                }
+            };
+            
+            // Get the federation manifest
+            let manifest = match fed_runtime.get_federation_manifest(&fed_id) {
+                Ok(manifest) => manifest,
+                Err(e) => {
+                    eprintln!("Error fetching federation manifest: {}", e);
+                    return;
+                }
+            };
+            
+            // Create the amendment ID if not provided
+            let amendment_id_value = match amendment_id {
+                Some(id) => id,
+                None => {
+                    // Generate a UUID-based amendment ID
+                    use uuid::Uuid;
+                    format!("amendment:{}", Uuid::new_v4())
+                }
+            };
+            
+            // Get current DAG root info
+            let dag_info = match fed_runtime.get_current_dag_root(&fed_id) {
+                Ok(info) => info,
+                Err(e) => {
+                    eprintln!("Error fetching current DAG root: {}", e);
+                    return;
+                }
+            };
+            
+            // Create the amendment anchor credential
+            let anchor_options = federation::AnchorCredentialOptions {
+                anchor_type: "amendment".to_string(),
+                federation: federation::FederationInfo {
+                    id: fed_id.clone(),
+                    name: manifest.name.clone(),
+                    did: fed_runtime.get_federation_did(&fed_id).unwrap_or_else(|_| 
+                        format!("did:icn:federation:{}", fed_id)),
+                },
+                subject_did: subject_did.clone(),
+                dag_root_hash: dag_info.root_hash.clone(),
+                effective_from: chrono::Utc::now().to_rfc3339(),
+                referenced_credentials: vec![credential_id.clone()],
+                amendment_id: Some(amendment_id_value.clone()),
+                text_hash: Some(text_hash_value.clone()),
+                description: Some(reason.clone()),
+                previous_amendment_id: None,
+                effective_until: None,
+                ratified_in_epoch: None,
+            };
+            
+            // Create the credential
+            match fed_runtime.create_anchor_credential(anchor_options) {
+                Ok(anchor_credential) => {
+                    println!("Successfully created amendment credential!");
+                    println!("Amendment ID: {}", amendment_id_value);
+                    println!("References credential: {}", credential_id);
+                    println!("Reason: {}", reason);
+                    
+                    // Save the credential to the sync service
+                    match sync_service.save_credential(anchor_credential.clone()) {
+                        Ok(saved_cred) => {
+                            println!("Amendment credential saved to wallet with ID: {}", saved_cred.credential_id);
+                        },
+                        Err(e) => {
+                            eprintln!("Warning: Could not save credential to wallet: {}", e);
+                        }
+                    }
+                    
+                    // Save to output file if requested
+                    if let Some(path) = output {
+                        match std::fs::write(&path, serde_json::to_string_pretty(&anchor_credential).unwrap()) {
+                            Ok(_) => println!("Saved amendment credential to {}", path.display()),
+                            Err(e) => eprintln!("Error saving to file: {}", e),
+                        }
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Error creating amendment credential: {}", e);
                 }
             }
         }
