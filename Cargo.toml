@@ -30,6 +30,8 @@ tokio-tungstenite = "0.20"
 futures-util = "0.3"
 async-trait = "0.1"
 signal-hook = "0.3"
+qrcode = "0.12"
+image = { version = "0.24", features = ["png"] }
 
 [dev-dependencies]
 mockito = "1.2"

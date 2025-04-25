@@ -5,6 +5,8 @@ mod token;
 mod guardians;
 mod proposal;
 mod federation;
+mod vc;
+mod services;
 
 use clap::{Parser, Subcommand};
 use identity::{Identity, IdentityManager, KeyType, DeviceLink, DeviceLinkChallenge};
@@ -14,6 +16,8 @@ use guardians::{GuardianManager, GuardianSet, GuardianStatus};
 use proposal::{ProposalManager, Proposal, VoteOption};
 use federation::{FederationRuntime, MonitoringOptions};
 use api::{ApiClient, ApiConfig};
+use vc::{VerifiableCredential, QrFormat};
+use services::{FederationSyncService, FederationSyncConfig, CredentialSyncData, CredentialStatus};
 use std::path::PathBuf;
 use std::process;
 use std::str::FromStr;
@@ -226,6 +230,12 @@ enum Commands {
         /// Port to listen on (default: 9876)
         #[arg(long)]
         port: Option<u16>,
+    },
+    
+    /// Manage credentials
+    Credentials {
+        #[command(subcommand)]
+        subcommand: CredentialCommands,
     },
 }
 
@@ -477,6 +487,84 @@ enum OutboxCommands {
     },
 }
 
+// Add the CredentialCommands enum after the other command enums
+#[derive(Subcommand)]
+enum CredentialCommands {
+    /// Sync credentials from federation nodes
+    Sync {
+        /// Federation ID to sync with (optional)
+        #[arg(long)]
+        federation: Option<String>,
+        
+        /// DID to sync credentials for (defaults to active identity)
+        #[arg(long)]
+        did: Option<String>,
+    },
+    
+    /// List synchronized credentials
+    List {
+        /// Filter by credential type
+        #[arg(long)]
+        type_filter: Option<String>,
+        
+        /// Show only credentials with this trust level or higher (high, medium, low)
+        #[arg(long)]
+        trust: Option<String>,
+    },
+    
+    /// Show details of a specific credential
+    Show {
+        /// ID of the credential to show
+        #[arg(long)]
+        id: String,
+        
+        /// Export the credential to VC format
+        #[arg(long)]
+        export: bool,
+        
+        /// Display the credential as a QR code in the terminal
+        #[arg(long)]
+        qr: bool,
+        
+        /// Path to save the exported credential (if export is true)
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    
+    /// Verify a specific credential
+    Verify {
+        /// ID of the credential to verify
+        #[arg(long)]
+        id: String,
+    },
+    
+    /// Export a credential as a QR code
+    ExportQR {
+        /// ID of the credential to export
+        #[arg(long)]
+        id: String,
+        
+        /// Output format (terminal, svg, png)
+        #[arg(long, default_value = "terminal")]
+        format: String,
+        
+        /// Path to save the QR code file (required for svg and png formats)
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    
+    /// Import a credential from a QR code
+    ImportQR {
+        /// QR code content string (usually from a scanner)
+        #[arg(long)]
+        content: String,
+        
+        /// Automatically verify the imported credential
+        #[arg(long)]
+        verify: bool,
+    },
+}
+
 fn main() {
     // Initialize logging
     env_logger::init();
@@ -616,6 +704,10 @@ fn main() {
         
         Commands::WebSocket { host, port } => {
             launch_websocket_server(&identity_manager, &api_client, &storage_manager, host, port);
+        },
+        
+        Commands::Credentials { subcommand } => {
+            handle_credential_commands(subcommand, &identity_manager, &storage_manager);
         },
     }
     
@@ -2284,4 +2376,363 @@ fn launch_websocket_server(
     websocket_server.stop();
     
     println!("WebSocket server stopped");
+}
+
+// Add the handler function near the other handler functions
+fn handle_credential_commands(
+    command: &CredentialCommands,
+    identity_manager: &IdentityManager,
+    storage_manager: &StorageManager,
+) {
+    // Get the active identity
+    let identity = match identity_manager.get_active_identity() {
+        Some(id) => id,
+        None => {
+            eprintln!("No active identity found. Please use an identity first.");
+            return;
+        }
+    };
+    
+    // Create federation runtime
+    let api_config = ApiConfig::default_local();
+    let federation_runtime = match federation::FederationRuntime::new(
+        api_config.clone(),
+        identity.clone(),
+        storage_manager.clone(),
+    ) {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("Failed to create federation runtime: {}", e);
+            return;
+        }
+    };
+    
+    // Create federation sync service
+    let sync_service = services::FederationSyncService::new(
+        federation_runtime,
+        storage_manager.clone(),
+        identity_manager.clone(),
+        None,
+    );
+    sync_service.initialize().unwrap_or_else(|e| {
+        eprintln!("Warning: Could not initialize sync service: {}", e);
+    });
+    
+    match command {
+        CredentialCommands::Sync { federation, did } => {
+            let target_did = did.as_ref().map(|s| s.as_str()).unwrap_or_else(|| identity.did());
+            
+            println!("Syncing credentials for DID: {}", target_did);
+            if let Some(fed) = federation {
+                println!("Filtering by federation: {}", fed);
+            }
+            
+            // Sync credentials
+            match sync_service.sync_did(target_did) {
+                Ok(new_creds) => {
+                    println!("Synced {} credentials", new_creds.len());
+                    for cred in new_creds {
+                        println!(" - {}: {} (from {})", 
+                                 cred.credential_id, 
+                                 cred.receipt.receipt_type,
+                                 cred.receipt.federation_id);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error syncing credentials: {}", e);
+                }
+            }
+        },
+        
+        CredentialCommands::List { type_filter, trust } => {
+            let all_credentials = sync_service.get_all_credentials();
+            
+            // Filter by type if specified
+            let filtered: Vec<_> = all_credentials.into_iter()
+                .filter(|cred| {
+                    if let Some(filter) = type_filter {
+                        cred.receipt.receipt_type.contains(filter)
+                    } else {
+                        true
+                    }
+                })
+                .filter(|cred| {
+                    if let Some(trust_level) = trust {
+                        if let Some(score) = &cred.trust_score {
+                            match trust_level.to_lowercase().as_str() {
+                                "high" => score.status.to_lowercase() == "high",
+                                "medium" => {
+                                    let status = score.status.to_lowercase();
+                                    status == "high" || status == "medium"
+                                }
+                                "low" => true, // All credentials pass low threshold
+                                _ => true,
+                            }
+                        } else {
+                            false // No trust score means it doesn't pass the filter
+                        }
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+            
+            if filtered.is_empty() {
+                println!("No credentials found matching your criteria");
+                return;
+            }
+            
+            println!("Found {} credentials:", filtered.len());
+            for cred in filtered {
+                let trust_info = if let Some(score) = cred.trust_score {
+                    format!("[{}] Score: {}", score.status, score.score)
+                } else {
+                    "[Unverified]".to_string()
+                };
+                
+                println!("{}: {} {} - {}", 
+                         cred.credential_id, 
+                         cred.receipt.receipt_type,
+                         trust_info,
+                         cred.receipt.issuer_name.unwrap_or_else(|| cred.receipt.issuer.clone()));
+            }
+        },
+        
+        CredentialCommands::Show { id, export, qr, output } => {
+            let credential = match sync_service.get_credential(id) {
+                Some(cred) => cred,
+                None => {
+                    eprintln!("Credential not found with ID: {}", id);
+                    return;
+                }
+            };
+            
+            println!("Credential Details:");
+            println!("ID: {}", credential.credential_id);
+            println!("Receipt ID: {}", credential.receipt_id);
+            println!("Federation: {}", credential.federation_id);
+            println!("Type: {}", credential.receipt.receipt_type);
+            println!("Action: {}", credential.receipt.action_type);
+            println!("Issuer: {}", credential.receipt.issuer);
+            if let Some(name) = &credential.receipt.issuer_name {
+                println!("Issuer Name: {}", name);
+            }
+            println!("Subject: {}", credential.receipt.subject_did);
+            println!("Status: {:?}", credential.status);
+            println!("Last Verified: {}", credential.last_verified);
+            
+            if let Some(score) = &credential.trust_score {
+                println!("\nTrust Information:");
+                println!("Score: {}/100 ({})", score.score, score.status);
+                println!("Issuer Verified: {}", score.issuer_verified);
+                println!("Signature Verified: {}", score.signature_verified);
+                println!("Federation Verified: {}", score.federation_verified);
+                println!("Quorum Met: {}", score.quorum_met);
+            }
+            
+            println!("\nMetadata:");
+            for (key, value) in &credential.receipt.metadata {
+                println!("  {}: {}", key, value);
+            }
+            
+            println!("\nSignatures: {}", credential.receipt.signatures.len());
+            for (i, sig) in credential.receipt.signatures.iter().enumerate() {
+                println!("  {}. {} ({}) - {}", i+1, sig.signer_did, sig.signer_role, sig.signature_type);
+            }
+            
+            if *export {
+                if let Some(vc) = &credential.verifiable_credential {
+                    let json = serde_json::to_string_pretty(vc).unwrap_or_else(|_| "Failed to serialize VC".to_string());
+                    
+                    if let Some(path) = output {
+                        if let Err(e) = std::fs::write(path, json) {
+                            eprintln!("Failed to save VC to file: {}", e);
+                        } else {
+                            println!("\nExported verifiable credential to {}", path.display());
+                        }
+                    } else {
+                        println!("\nVerifiable Credential:");
+                        println!("{}", json);
+                    }
+                } else {
+                    eprintln!("No verifiable credential available for this receipt");
+                }
+            }
+            
+            // Generate and display QR code if requested
+            if *qr {
+                if let Some(vc) = &credential.verifiable_credential {
+                    match crate::vc::generate_credential_qr(vc, crate::vc::QrFormat::Terminal, None) {
+                        Ok(qr_code) => {
+                            println!("\nQR Code:");
+                            println!("{}", qr_code);
+                        },
+                        Err(e) => {
+                            eprintln!("Failed to generate QR code: {}", e);
+                        }
+                    }
+                } else {
+                    eprintln!("No verifiable credential available for QR code generation");
+                }
+            }
+        },
+        
+        CredentialCommands::Verify { id } => {
+            println!("Verifying credential: {}", id);
+            
+            match sync_service.verify_credential(id) {
+                Ok(cred) => {
+                    println!("Verification successful!");
+                    println!("Status: {:?}", cred.status);
+                    
+                    if let Some(score) = cred.trust_score {
+                        println!("Trust Score: {}/100 ({})", score.score, score.status);
+                        println!("Issuer Verified: {}", score.issuer_verified);
+                        println!("Signature Verified: {}", score.signature_verified);
+                        println!("Federation Verified: {}", score.federation_verified);
+                        println!("Quorum Met: {}", score.quorum_met);
+                    } else {
+                        println!("No trust score available");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Verification failed: {}", e);
+                }
+            }
+        },
+        
+        CredentialCommands::ExportQR { id, format, output } => {
+            let credential = match sync_service.get_credential(id) {
+                Some(cred) => cred,
+                None => {
+                    eprintln!("Credential not found with ID: {}", id);
+                    return;
+                }
+            };
+            
+            if let Some(vc) = &credential.verifiable_credential {
+                // Parse format
+                let qr_format = match crate::vc::QrFormat::from_str(format) {
+                    Some(f) => f,
+                    None => {
+                        eprintln!("Invalid format: {}. Supported formats are terminal, svg, png", format);
+                        return;
+                    }
+                };
+                
+                // Validate output path for non-terminal formats
+                if qr_format != crate::vc::QrFormat::Terminal && output.is_none() {
+                    eprintln!("Output path is required for {} format", format);
+                    return;
+                }
+                
+                // Generate QR code
+                let output_path = output.as_ref().map(|p| p.as_path());
+                match crate::vc::generate_credential_qr(vc, qr_format, output_path) {
+                    Ok(result) => {
+                        match qr_format {
+                            crate::vc::QrFormat::Terminal => println!("{}", result),
+                            _ => println!("{}", result),
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to generate QR code: {}", e);
+                    }
+                }
+            } else {
+                eprintln!("No verifiable credential available for this receipt");
+            }
+        },
+        
+        CredentialCommands::ImportQR { content, verify } => {
+            println!("Importing credential from QR code...");
+            
+            // Decode QR content to a credential
+            match crate::vc::decode_credential_from_qr(content) {
+                Ok(vc) => {
+                    println!("Successfully decoded credential from QR code:");
+                    println!("ID: {}", vc.id);
+                    println!("Type: {:?}", vc.types);
+                    println!("Issuer: {}", vc.issuer);
+                    println!("Subject: {}", vc.credentialSubject.id);
+                    
+                    // Create a temporary receipt from the VC to store it
+                    // This is a simplified version - a real implementation would validate more thoroughly
+                    let receipt_id = uuid::Uuid::new_v4().to_string();
+                    let subject_did = vc.credentialSubject.id.clone();
+                    let federation_id = format!("fed:{}:qrimport", vc.credentialSubject.federationMember.scope);
+                    
+                    let receipt = federation::FinalizationReceipt {
+                        id: receipt_id.clone(),
+                        federation_id: federation_id.clone(),
+                        receipt_type: vc.types.get(1).cloned().unwrap_or_else(|| "unknown".to_string()),
+                        issuer: vc.issuer.clone(),
+                        issuer_name: None,
+                        subject_did: subject_did,
+                        action_type: "qr_import".to_string(),
+                        timestamp: vc.issuanceDate,
+                        dag_height: 0,
+                        dag_vertex: "qr_import".to_string(),
+                        metadata: std::collections::HashMap::new(),
+                        signatures: vc.proof.iter().map(|p| federation::ReceiptSignature {
+                            signer_did: vc.issuer.clone(),
+                            signer_role: "Issuer".to_string(),
+                            signature_value: p.proofValue.clone(),
+                            signature_type: p.type_.clone(),
+                            timestamp: p.created,
+                        }).collect(),
+                        content: serde_json::Value::Null,
+                    };
+                    
+                    // Create credential data
+                    let credential_id = format!("cred-qr-{}", uuid::Uuid::new_v4());
+                    let credential_data = services::CredentialSyncData {
+                        credential_id: credential_id.clone(),
+                        receipt_id,
+                        receipt,
+                        federation_id,
+                        status: services::CredentialStatus::Pending,
+                        trust_score: None,
+                        last_verified: chrono::Utc::now(),
+                        verifiable_credential: Some(vc),
+                    };
+                    
+                    // Process and save the credential
+                    // Simplification: In a real implementation, we would call an internal API
+                    // of the sync service rather than accessing its internals directly
+                    let mut sync_data = sync_service.sync_data.lock().unwrap();
+                    sync_data.insert(credential_id.clone(), credential_data.clone());
+                    drop(sync_data);
+                    
+                    println!("Credential imported with ID: {}", credential_id);
+                    
+                    // Verify the credential if requested
+                    if *verify {
+                        println!("Verifying imported credential...");
+                        match sync_service.verify_credential(&credential_id) {
+                            Ok(verified) => {
+                                println!("Verification successful!");
+                                if let Some(score) = verified.trust_score {
+                                    println!("Trust Score: {}/100 ({})", score.score, score.status);
+                                    println!("Issuer Verified: {}", score.issuer_verified);
+                                    println!("Signature Verified: {}", score.signature_verified);
+                                    println!("Federation Verified: {}", score.federation_verified);
+                                    println!("Quorum Met: {}", score.quorum_met);
+                                }
+                            },
+                            Err(e) => {
+                                println!("Verification failed: {}", e);
+                                println!("The credential was imported but could not be verified.");
+                            }
+                        }
+                    } else {
+                        println!("Verification skipped. Use 'credentials verify --id {}' to verify it later.", credential_id);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to decode credential from QR code: {}", e);
+                }
+            }
+        },
+    }
 }

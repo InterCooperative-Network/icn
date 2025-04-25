@@ -9,6 +9,20 @@ use std::thread;
 use std::time::Duration;
 use thiserror::Error;
 
+// Export RPC-related types and implementations
+pub mod rpc;
+pub use rpc::{
+    FederationRpcError, 
+    FinalizationReceipt, 
+    ReceiptSignature,
+    FederationManifest, 
+    FederationMemberRole,
+    QuorumConfig, 
+    FederationHealthMetrics,
+    IFederationSync, 
+    MockFederationSync
+};
+
 /// Errors that can occur in federation operations
 #[derive(Debug, Error)]
 pub enum FederationError {
@@ -23,6 +37,9 @@ pub enum FederationError {
     
     #[error("Storage error: {0}")]
     StorageError(#[from] StorageError),
+    
+    #[error("RPC error: {0}")]
+    RpcError(#[from] FederationRpcError),
     
     #[error("File error: {0}")]
     FileError(String),
@@ -76,6 +93,31 @@ impl Default for MonitoringOptions {
     }
 }
 
+/// DAG status information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DagStatus {
+    pub latest_vertex: String,
+    pub proposal_id: Option<String>,
+    pub vertex_count: u64,
+    pub synced: bool,
+    pub scope: Option<String>,
+}
+
+/// Audit information for a proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProposalAudit {
+    pub hash: String,
+    pub title: String,
+    pub status: String,
+    pub yes_votes: usize,
+    pub no_votes: usize,
+    pub abstain_votes: usize,
+    pub threshold: usize,
+    pub guardian_quorum_met: bool,
+    pub execution_status: String,
+    pub dag_receipt: Option<String>,
+}
+
 /// Federation runtime manager that integrates identity, API, and proposal functionality
 pub struct FederationRuntime {
     api_client: ApiClient,
@@ -84,6 +126,8 @@ pub struct FederationRuntime {
     storage_manager: StorageManager,
     drafts_dir: PathBuf,
     cancel_monitoring: bool,
+    // Add the federation sync for receipt management
+    federation_sync: Box<dyn IFederationSync + Send>,
 }
 
 impl FederationRuntime {
@@ -105,6 +149,9 @@ impl FederationRuntime {
                 .map_err(|e| FederationError::FileError(format!("Failed to create drafts directory: {}", e)))?;
         }
         
+        // Use the mock federation sync by default
+        let federation_sync: Box<dyn IFederationSync + Send> = Box::new(MockFederationSync::new());
+        
         Ok(Self {
             api_client,
             identity,
@@ -112,7 +159,26 @@ impl FederationRuntime {
             storage_manager,
             drafts_dir,
             cancel_monitoring: false,
+            federation_sync,
         })
+    }
+    
+    /// Set the federation sync implementation
+    pub fn with_federation_sync(mut self, sync_impl: Box<dyn IFederationSync + Send>) -> Self {
+        self.federation_sync = sync_impl;
+        self
+    }
+    
+    /// Get finalized receipts for a DID from the federation
+    pub fn get_finalized_receipts_by_did(&self, did: &str) -> Result<Vec<FinalizationReceipt>, FederationError> {
+        self.federation_sync.get_finalized_receipts_by_did(did)
+            .map_err(FederationError::RpcError)
+    }
+    
+    /// Get a federation manifest
+    pub fn get_federation_manifest(&self, federation_id: &str) -> Result<FederationManifest, FederationError> {
+        self.federation_sync.get_federation_manifest(federation_id)
+            .map_err(FederationError::RpcError)
     }
     
     /// Set the drafts directory
@@ -250,12 +316,8 @@ impl FederationRuntime {
                         crate::proposal::ProposalStatus::Draft => MonitoringStatus::Submitted,
                     };
                     
-                    // If the proposal has been executed or rejected, we're done
-                    if matches!(monitoring_status, 
-                        MonitoringStatus::Executed | 
-                        MonitoringStatus::Rejected | 
-                        MonitoringStatus::Failed
-                    ) {
+                    // If proposal is executed, return the result
+                    if monitoring_status == MonitoringStatus::Executed {
                         return Ok(MonitoringResult {
                             proposal_hash: proposal_hash.to_string(),
                             status: monitoring_status,
@@ -264,7 +326,21 @@ impl FederationRuntime {
                             abstain_votes,
                             threshold,
                             event_id: submitted_proposal.dag_receipt,
-                            executed_at: Some(submitted_proposal.updated_at),
+                            executed_at: Some(chrono::Utc::now()),
+                        });
+                    }
+                    
+                    // If proposal is rejected or failed, return the result
+                    if monitoring_status == MonitoringStatus::Rejected || monitoring_status == MonitoringStatus::Failed {
+                        return Ok(MonitoringResult {
+                            proposal_hash: proposal_hash.to_string(),
+                            status: monitoring_status,
+                            yes_votes,
+                            no_votes,
+                            abstain_votes,
+                            threshold,
+                            event_id: None,
+                            executed_at: None,
                         });
                     }
                 },
@@ -275,11 +351,11 @@ impl FederationRuntime {
                 }
             }
             
-            // Wait for the specified interval
+            // Sleep for the specified interval
             thread::sleep(Duration::from_secs(options.interval_seconds));
         }
         
-        // If we've reached here, we timed out without a definitive result
+        // If we reached here, we hit the timeout
         Ok(MonitoringResult {
             proposal_hash: proposal_hash.to_string(),
             status: MonitoringStatus::Unknown,
@@ -297,125 +373,124 @@ impl FederationRuntime {
         self.cancel_monitoring = true;
     }
     
-    /// Get the DAG status for a specific scope
+    /// Get DAG status
     pub fn get_dag_status(&self, scope: Option<&str>) -> Result<DagStatus, FederationError> {
-        // Query the DAG status from the API
-        let status_query = match scope {
-            Some(s) => format!("{{ \"type\": \"dag_status\", \"scope\": \"{}\" }}", s),
-            None => "{ \"type\": \"dag_status\" }".to_string(),
+        let url = match scope {
+            Some(s) => format!("{}/dag/status?scope={}", self.api_client.base_url(), s),
+            None => format!("{}/dag/status", self.api_client.base_url()),
         };
         
-        let status_response = self.api_client.query::<DagStatusResponse>(&status_query, &self.identity)
-            .map_err(FederationError::ApiError)?;
-        
-        if !status_response.success {
-            return Err(FederationError::RuntimeError(
-                status_response.error.unwrap_or_else(|| "Unknown error".to_string())
-            ));
-        }
-        
-        status_response.data.ok_or_else(|| FederationError::RuntimeError(
-            "No DAG status data returned".to_string()
-        ))
-    }
-    
-    /// Get all active proposals
-    pub fn list_active_proposals(&self) -> Result<Vec<Proposal>, FederationError> {
-        let query = "{ \"type\": \"list_proposals\", \"status\": \"voting\" }";
-        
-        let response = self.api_client.query::<ListProposalsResponse>(query, &self.identity)
+        let response: DagStatusResponse = self.api_client.get(&url, Some(&self.identity))
             .map_err(FederationError::ApiError)?;
         
         if !response.success {
             return Err(FederationError::RuntimeError(
-                response.error.unwrap_or_else(|| "Unknown error".to_string())
+                response.error.unwrap_or_else(|| "Unknown error getting DAG status".to_string())
             ));
         }
         
-        let proposals = response.data.ok_or_else(|| FederationError::RuntimeError(
-            "No proposal data returned".to_string()
-        ))?;
-        
-        Ok(proposals.proposals.into_iter().map(|sp| sp.proposal).collect())
+        response.data.ok_or_else(|| FederationError::RuntimeError("No DAG status data returned".to_string()))
     }
     
-    /// Audit a proposal by hash
+    /// List active proposals
+    pub fn list_active_proposals(&self) -> Result<Vec<Proposal>, FederationError> {
+        let url = format!("{}/proposals/list", self.api_client.base_url());
+        
+        let response: ListProposalsResponse = self.api_client.get(&url, Some(&self.identity))
+            .map_err(FederationError::ApiError)?;
+        
+        if !response.success {
+            return Err(FederationError::RuntimeError(
+                response.error.unwrap_or_else(|| "Unknown error listing proposals".to_string())
+            ));
+        }
+        
+        let proposals_data = response.data.ok_or_else(|| FederationError::RuntimeError("No proposals data returned".to_string()))?;
+        
+        Ok(proposals_data.proposals.into_iter().map(|p| p.proposal).collect())
+    }
+    
+    /// Audit a proposal
     pub fn audit_proposal(&self, hash: &str) -> Result<ProposalAudit, FederationError> {
-        let submitted = self.proposal_manager.query_proposal(hash, &self.identity)
+        // Query the proposal
+        let submitted_proposal = self.proposal_manager.query_proposal(hash, &self.identity)
             .map_err(FederationError::ProposalError)?;
         
         // Count votes
         let mut yes_votes = 0;
         let mut no_votes = 0;
         let mut abstain_votes = 0;
+        let mut guardian_votes = 0;
         
-        for vote in &submitted.votes {
+        for vote in &submitted_proposal.votes {
             match vote.vote {
                 crate::proposal::VoteOption::Yes => yes_votes += 1,
                 crate::proposal::VoteOption::No => no_votes += 1,
                 crate::proposal::VoteOption::Abstain => abstain_votes += 1,
             }
+            
+            // Check if vote is from a guardian
+            if vote.guardian_signature.is_some() {
+                guardian_votes += 1;
+            }
         }
         
-        // Default threshold (could be retrieved from proposal metadata)
-        let threshold = submitted.votes.len() / 2 + 1;
+        // Calculate threshold (simple majority for now)
+        let threshold = submitted_proposal.votes.len() / 2 + 1;
         
-        // Determine if guardian quorum is met
-        let guardian_quorum_met = yes_votes >= threshold;
-        
-        // Convert status to string
-        let status = format!("{:?}", submitted.proposal.status);
+        // Determine if guardian quorum is met (at least 1 guardian vote)
+        let guardian_quorum_met = guardian_votes > 0;
         
         // Determine execution status
-        let execution_status = if submitted.dag_receipt.is_some() {
-            "Executed"
-        } else if submitted.proposal.status == crate::proposal::ProposalStatus::Rejected {
+        let execution_status = if submitted_proposal.dag_receipt.is_some() {
+            "Executed on DAG"
+        } else if submitted_proposal.proposal.status == crate::proposal::ProposalStatus::Passed {
+            "Approved, awaiting execution"
+        } else if submitted_proposal.proposal.status == crate::proposal::ProposalStatus::Rejected {
             "Rejected"
-        } else if submitted.proposal.status == crate::proposal::ProposalStatus::Failed {
+        } else if submitted_proposal.proposal.status == crate::proposal::ProposalStatus::Failed {
             "Failed"
         } else {
             "Pending"
         };
         
         Ok(ProposalAudit {
-            hash: hash.to_string(),
-            title: submitted.proposal.title,
-            status,
+            hash: submitted_proposal.proposal.hash,
+            title: submitted_proposal.proposal.title,
+            status: format!("{:?}", submitted_proposal.proposal.status),
             yes_votes,
             no_votes,
             abstain_votes,
             threshold,
             guardian_quorum_met,
             execution_status: execution_status.to_string(),
-            dag_receipt: submitted.dag_receipt,
+            dag_receipt: submitted_proposal.dag_receipt,
         })
     }
     
-    /// Sync proposal with AgoraNet
+    /// Sync a proposal with AgoraNet
     pub fn sync_with_agoranet(&self, proposal_hash: &str) -> Result<bool, FederationError> {
-        let query = format!(
-            "{{ \"type\": \"agoranet_sync\", \"proposal_hash\": \"{}\" }}", 
-            proposal_hash
-        );
+        let url = format!("{}/dag/sync/{}", self.api_client.base_url(), proposal_hash);
         
-        let response = self.api_client.query::<SyncResponse>(&query, &self.identity)
+        let response: SyncResponse = self.api_client.post(&url, &serde_json::Value::Null, Some(&self.identity))
             .map_err(FederationError::ApiError)?;
         
         Ok(response.success)
     }
     
-    /// Get the API configuration
+    /// Get the API config
     pub fn get_api_config(&self) -> &ApiConfig {
-        &self.api_client.config
+        self.api_client.get_config()
     }
     
-    /// Get the identity used by this runtime
+    /// Get the identity
     pub fn get_identity(&self) -> &Identity {
         &self.identity
     }
 }
 
-/// Response from DAG status query
+// Response types for API calls
+
 #[derive(Debug, Deserialize)]
 struct DagStatusResponse {
     success: bool,
@@ -423,17 +498,6 @@ struct DagStatusResponse {
     error: Option<String>,
 }
 
-/// DAG status information
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DagStatus {
-    pub latest_vertex: String,
-    pub proposal_id: Option<String>,
-    pub vertex_count: u64,
-    pub synced: bool,
-    pub scope: Option<String>,
-}
-
-/// Response from list proposals query
 #[derive(Debug, Deserialize)]
 struct ListProposalsResponse {
     success: bool,
@@ -441,30 +505,13 @@ struct ListProposalsResponse {
     error: Option<String>,
 }
 
-/// Proposals data
 #[derive(Debug, Deserialize)]
 struct ProposalsData {
     proposals: Vec<crate::proposal::SubmittedProposal>,
 }
 
-/// Response from sync query
 #[derive(Debug, Deserialize)]
 struct SyncResponse {
     success: bool,
     message: String,
-}
-
-/// Proposal audit information
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProposalAudit {
-    pub hash: String,
-    pub title: String,
-    pub status: String,
-    pub yes_votes: usize,
-    pub no_votes: usize,
-    pub abstain_votes: usize,
-    pub threshold: usize,
-    pub guardian_quorum_met: bool,
-    pub execution_status: String,
-    pub dag_receipt: Option<String>,
 } 

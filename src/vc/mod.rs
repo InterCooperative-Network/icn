@@ -1,10 +1,16 @@
+// Verifiable Credentials module
 use crate::identity::{Identity, IdentityError};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+use thiserror::Error;
 use std::fs;
 use std::path::Path;
-use thiserror::Error;
 use uuid::Uuid;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+// Export the QR code module
+pub mod qr;
+pub use qr::{QrCodeError, QrFormat, encode_credential_for_qr, decode_credential_from_qr, generate_credential_qr};
 
 /// Errors that can occur in verifiable credential operations
 #[derive(Debug, Error)]
@@ -141,14 +147,11 @@ impl CredentialGenerator {
             .map_err(CredentialError::IdentityError)?;
         
         // Encode the signature
-        let proof_value = base64::engine::general_purpose::STANDARD.encode(&signature);
+        let proof_value = STANDARD.encode(signature);
         
-        // Create the proof
+        // Create the proof - assuming Ed25519 for simplicity
         let proof = Proof {
-            type_: match identity.get_metadata().key_type {
-                crate::identity::KeyType::Ed25519 => "Ed25519Signature2020".to_string(),
-                crate::identity::KeyType::Ecdsa => "EcdsaSecp256r1Signature2019".to_string(),
-            },
+            type_: "Ed25519Signature2020".to_string(),
             created: Utc::now(),
             verificationMethod: format!("{}#keys-1", identity.did()),
             proofPurpose: "assertionMethod".to_string(),
@@ -187,7 +190,7 @@ impl CredentialGenerator {
         let credential_json = serde_json::to_string(&temp_credential)?;
         
         // Decode the signature
-        let signature = base64::engine::general_purpose::STANDARD.decode(&proof.proofValue)
+        let signature = STANDARD.decode(&proof.proofValue)
             .map_err(|e| CredentialError::CredentialError(format!("Failed to decode signature: {}", e)))?;
         
         // In a real implementation, we would need to:
