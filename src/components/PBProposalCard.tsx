@@ -1,350 +1,324 @@
 import React from 'react';
 import {
-  Card,
-  CardContent,
-  CardActions,
-  Typography,
   Box,
   Button,
+  Card,
+  CardActions,
+  CardContent,
   Chip,
-  LinearProgress,
   Divider,
+  LinearProgress,
+  Typography,
+  useTheme,
   Tooltip,
   Grid,
-  Avatar,
+  Avatar
 } from '@mui/material';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import GroupIcon from '@mui/icons-material/Group';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { PBProposal, ProposalStatus } from './PBProposalList';
-import PBProposalTally from './PBProposalTally';
+import { CalendarToday, Person } from '@mui/icons-material';
+
+// Get status color based on proposal status
+const getStatusColor = (status: ProposalStatus): string => {
+  switch (status) {
+    case 'active':
+      return '#4CAF50'; // Green
+    case 'approved':
+      return '#2196F3'; // Blue
+    case 'rejected':
+      return '#F44336'; // Red
+    case 'draft':
+      return '#9E9E9E'; // Grey
+    case 'expired':
+      return '#FF9800'; // Orange
+    default:
+      return '#9E9E9E'; // Default grey
+  }
+};
 
 interface PBProposalCardProps {
   proposal: PBProposal;
-  userDid?: string;
-  onVoteClick?: (proposalId: string) => void;
+  onViewDetails: () => void;
+  onVote: () => void;
 }
 
 const PBProposalCard: React.FC<PBProposalCardProps> = ({
   proposal,
-  userDid,
-  onVoteClick,
+  onViewDetails,
+  onVote
 }) => {
-  // Format currency amount
-  const formatCurrency = (amount: number, currency: string): string => {
-    return `${amount.toLocaleString()} ${currency}`;
+  const theme = useTheme();
+  
+  // Format currency with proper symbol
+  const formatCurrency = (amount: number, currencyCode = 'USD'): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
   };
-
-  // Calculate remaining time until voting ends
-  const getRemainingTime = (): { text: string; percentage: number } => {
-    if (proposal.status === ProposalStatus.UPCOMING) {
-      const now = new Date();
-      const start = new Date(proposal.timeline.votingStart);
-      const diffMs = start.getTime() - now.getTime();
-      
-      if (diffMs <= 0) return { text: 'Starting soon', percentage: 100 };
-      
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      
-      if (diffDays > 0) {
-        return { text: `Starts in ${diffDays}d ${diffHours}h`, percentage: 0 };
-      } else {
-        return { text: `Starts in ${diffHours}h`, percentage: 0 };
-      }
-    }
-    
-    if (proposal.status === ProposalStatus.ACTIVE) {
-      const now = new Date();
-      const end = new Date(proposal.timeline.votingEnd);
-      const start = new Date(proposal.timeline.votingStart);
-      const totalDuration = end.getTime() - start.getTime();
-      const elapsed = now.getTime() - start.getTime();
-      
-      if (elapsed <= 0) return { text: 'Just started', percentage: 0 };
-      if (elapsed >= totalDuration) return { text: 'Ending soon', percentage: 100 };
-      
-      const diffMs = end.getTime() - now.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const percentage = Math.min(100, Math.floor((elapsed / totalDuration) * 100));
-      
-      if (diffDays > 0) {
-        return { text: `${diffDays}d ${diffHours}h remaining`, percentage };
-      } else if (diffHours > 0) {
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        return { text: `${diffHours}h ${diffMinutes}m remaining`, percentage };
-      } else {
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        return { text: `${diffMinutes}m remaining`, percentage };
-      }
-    }
-    
-    return { text: 'Voting closed', percentage: 100 };
-  };
-
-  // Format date for display
+  
+  // Format date to readable format
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
+      day: 'numeric'
     });
   };
-
-  // Get status chip color and label
-  const getStatusChip = () => {
+  
+  // Calculate days remaining until expiration
+  const getDaysRemaining = (expiresAt: string): number => {
+    const now = new Date();
+    const expiryDate = new Date(expiresAt);
+    const diffTime = expiryDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+  
+  // Calculate voting progress percentage
+  const getVotingProgressPercentage = (): number => {
+    if (!proposal.totalVoteWeight || !proposal.quorumRequired) return 0;
+    return Math.min(
+      100,
+      (proposal.totalVoteWeight / proposal.quorumRequired) * 100
+    );
+  };
+  
+  // Calculate approval percentage
+  const getApprovalPercentage = (): number => {
+    if (!proposal.totalVoteWeight) return 0;
+    return (proposal.votesApprove / proposal.totalVoteWeight) * 100;
+  };
+  
+  // Calculate participation percentage
+  const getParticipationPercentage = (): number => {
+    if (!proposal.totalVoteWeight) return 0;
+    const totalVotes = proposal.votesApprove + proposal.votesReject;
+    return Math.round((totalVotes / proposal.totalVoteWeight) * 100);
+  };
+  
+  // Get status color and icon
+  const getStatusInfo = () => {
     switch (proposal.status) {
-      case ProposalStatus.UPCOMING:
-        return { color: 'default', label: 'Upcoming' };
-      case ProposalStatus.ACTIVE:
-        return { color: 'success', label: 'Active' };
-      case ProposalStatus.CLOSED:
-        if (proposal.result === 'approved') {
-          return { color: 'success', label: 'Approved' };
-        } else if (proposal.result === 'rejected') {
-          return { color: 'error', label: 'Rejected' };
-        } else {
-          return { color: 'default', label: 'Closed' };
-        }
+      case 'active':
+        return {
+          color: theme.palette.primary.main,
+          icon: <HowToVoteIcon fontSize="small" />,
+          text: 'Active'
+        };
+      case 'approved':
+        return {
+          color: theme.palette.success.main,
+          icon: <CheckCircleIcon fontSize="small" />,
+          text: 'Approved'
+        };
+      case 'rejected':
+        return {
+          color: theme.palette.error.main,
+          icon: <CancelIcon fontSize="small" />,
+          text: 'Rejected'
+        };
+      case 'expired':
+        return {
+          color: theme.palette.warning.main,
+          icon: <AccessTimeIcon fontSize="small" />,
+          text: 'Expired'
+        };
+      case 'draft':
+        return {
+          color: theme.palette.text.secondary,
+          icon: <InfoOutlinedIcon fontSize="small" />,
+          text: 'Draft'
+        };
+      case 'canceled':
+        return {
+          color: theme.palette.text.disabled,
+          icon: <CancelIcon fontSize="small" />,
+          text: 'Canceled'
+        };
       default:
-        return { color: 'default', label: 'Unknown' };
+        return {
+          color: theme.palette.text.primary,
+          icon: <InfoOutlinedIcon fontSize="small" />,
+          text: proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)
+        };
     }
   };
-
-  // Get mechanism label
-  const getMechanismLabel = (mechanism: string): string => {
-    return mechanism.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  
+  const statusInfo = getStatusInfo();
+  const daysRemaining = getDaysRemaining(proposal.expiresAt);
+  const votingProgressPercentage = getVotingProgressPercentage();
+  const approvalPercentage = getApprovalPercentage();
+  const participationPercentage = getParticipationPercentage();
+  const isActive = proposal.status === 'active';
+  
+  // Calculate time remaining
+  const getTimeRemaining = (expiresAt: string) => {
+    const now = new Date();
+    const expiration = new Date(expiresAt);
+    const diffMs = expiration.getTime() - now.getTime();
+    
+    if (diffMs <= 0) return 'Expired';
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} left`;
+    }
+    return `${diffHours} hour${diffHours > 1 ? 's' : ''} left`;
   };
-
-  const remainingTime = getRemainingTime();
-  const statusChip = getStatusChip();
-  const canVote = proposal.status === ProposalStatus.ACTIVE && userDid;
-  const showTally = proposal.status !== ProposalStatus.UPCOMING;
-
+  
   return (
-    <Card 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        '&:hover': {
-          boxShadow: 4
-        },
-        borderLeft: proposal.status === ProposalStatus.ACTIVE 
-          ? '4px solid #4caf50' 
-          : proposal.result === 'approved' 
-            ? '4px solid #4caf50' 
-            : proposal.result === 'rejected'
-              ? '4px solid #f44336'
-              : undefined,
-      }}
-    >
+    <Card sx={{ 
+      height: '100%',
+      display: 'flex', 
+      flexDirection: 'column',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      '&:hover': {
+        transform: 'translateY(-4px)',
+        boxShadow: 4
+      }
+    }}>
       <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
           <Chip 
-            label={statusChip.label} 
-            color={statusChip.color as any} 
-            size="small" 
+            label={proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)} 
+            color={getStatusColor(proposal.status)}
+            size="small"
           />
           <Chip 
-            icon={<AccountBalanceIcon />}
-            label={formatCurrency(proposal.treasury.available, proposal.treasury.currency)}
-            size="small"
+            label={proposal.category} 
             variant="outlined"
+            size="small"
           />
         </Box>
         
-        <Typography variant="h6" component="h2" gutterBottom>
+        <Typography variant="h6" component="div" sx={{ mb: 1, fontWeight: 'bold' }}>
           {proposal.title}
         </Typography>
         
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, minHeight: '3em' }}>
-          {proposal.description.length > 120 
-            ? `${proposal.description.substring(0, 120)}...` 
-            : proposal.description}
+        <Typography variant="body2" color="text.secondary" sx={{ 
+          mb: 2,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical'
+        }}>
+          {proposal.description}
         </Typography>
         
-        <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Divider sx={{ my: 1.5 }} />
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <AccountBalanceWalletIcon fontSize="small" color="primary" sx={{ mr: 1 }} />
+          <Typography variant="body1" fontWeight="medium">
+            {formatCurrency(proposal.requestedAmount)}
+          </Typography>
+        </Box>
+        
+        <Grid container spacing={1} sx={{ mb: 2 }}>
           <Grid item xs={6}>
-            <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <GroupIcon fontSize="small" color="action" />
-              <Box component="span">
-                Federation:
-              </Box>
-            </Typography>
-            <Typography variant="body2" fontWeight="medium">
-              {proposal.federationName}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <CalendarToday fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+              <Typography variant="body2">
+                {isActive ? `${daysRemaining} days left` : formatDate(proposal.expiresAt)}
+              </Typography>
+            </Box>
           </Grid>
-          
           <Grid item xs={6}>
-            <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <HowToVoteIcon fontSize="small" color="action" />
-              <Box component="span">
-                Mechanism:
-              </Box>
-            </Typography>
-            <Typography variant="body2" fontWeight="medium">
-              {getMechanismLabel(proposal.votingMechanism)}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <AccountBalanceWalletIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+              <Typography variant="body2" noWrap>
+                {proposal.federation.name}
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Person fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+              <Typography variant="body2" noWrap>
+                {proposal.author.name}
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <HowToVoteIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+              <Typography variant="body2">
+                {participationPercentage}% voted
+              </Typography>
+            </Box>
           </Grid>
         </Grid>
         
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <AccountBalanceIcon fontSize="small" color="action" />
-            <Box component="span">
-              Requested Amount:
-            </Box>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Approval</span>
+            <span>{approvalPercentage.toFixed(1)}%</span>
           </Typography>
-          <Typography variant="body1" fontWeight="medium">
-            {formatCurrency(proposal.requestedAmount, proposal.treasury.currency)}
+          <LinearProgress 
+            variant="determinate" 
+            value={approvalPercentage}
+            sx={{ height: 8, borderRadius: 4, my: 0.5 }}
+          />
+          <Typography variant="body2" color="text.secondary">
+            Quorum: {((proposal.totalVoteWeight / proposal.quorumRequired) * 100).toFixed(1)}%
           </Typography>
         </Box>
         
-        <Divider sx={{ my: 2 }} />
-        
-        {/* Timeline section */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-            <AccessTimeIcon fontSize="small" color="action" />
-            <Box component="span">
-              Voting Period:
-            </Box>
-          </Typography>
-          
-          <Grid container spacing={1}>
-            <Grid item xs={6}>
-              <Typography variant="caption" color="text.secondary">
-                Starts:
-              </Typography>
-              <Typography variant="body2">
-                {formatDate(proposal.timeline.votingStart)}
-              </Typography>
-            </Grid>
-            <Grid item xs={6}>
-              <Typography variant="caption" color="text.secondary">
-                Ends:
-              </Typography>
-              <Typography variant="body2">
-                {formatDate(proposal.timeline.votingEnd)}
-              </Typography>
-            </Grid>
-          </Grid>
-          
-          {proposal.status === ProposalStatus.ACTIVE && (
-            <Box sx={{ mt: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2">
-                  <AccessTimeIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                  {remainingTime.text}
-                </Typography>
-                <Typography variant="body2">
-                  {remainingTime.percentage}%
-                </Typography>
-              </Box>
-              <LinearProgress 
-                variant="determinate" 
-                value={remainingTime.percentage} 
-                sx={{ height: 8, borderRadius: 1 }}
-              />
-            </Box>
-          )}
-        </Box>
-        
-        {/* Quorum indicator */}
-        {proposal.status !== ProposalStatus.UPCOMING && (
-          <Box sx={{ mb: 2 }}>
+        {isActive && (
+          <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2">
-                <GroupIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                Quorum Progress
-              </Typography>
-              <Typography variant="body2">
-                {proposal.quorum.percentage}%
-              </Typography>
+              <Typography variant="caption" color="text.secondary">Participation</Typography>
+              <Typography variant="caption" color="text.secondary">{participationPercentage}%</Typography>
             </Box>
             <LinearProgress 
               variant="determinate" 
-              value={proposal.quorum.percentage} 
-              color={proposal.quorum.percentage >= 100 ? "success" : "primary"}
-              sx={{ height: 8, borderRadius: 1 }}
+              value={participationPercentage} 
+              sx={{ 
+                height: 8, 
+                borderRadius: 4,
+              }}
             />
-            <Typography variant="caption" color="text.secondary">
-              {proposal.quorum.current} of {proposal.quorum.required} required votes
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Quorum: {proposal.quorumRequired}%
             </Typography>
-          </Box>
-        )}
-        
-        {/* Vote tally section */}
-        {showTally && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Vote Tally
-            </Typography>
-            <PBProposalTally proposal={proposal} />
           </Box>
         )}
       </CardContent>
       
       <CardActions sx={{ p: 2, pt: 0 }}>
-        {proposal.status === ProposalStatus.CLOSED ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-            {proposal.result === 'approved' ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CheckCircleIcon color="success" />
-                <Typography variant="body2" color="success.main">
-                  Proposal Approved
-                </Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CancelIcon color="error" />
-                <Typography variant="body2" color="error">
-                  Proposal Rejected
-                </Typography>
-              </Box>
-            )}
-            
-            <Box sx={{ flexGrow: 1 }} />
-            
-            <Button 
-              size="small" 
-              variant="outlined"
-              onClick={() => window.open(`/proposal/${proposal.id}`, '_blank')}
-            >
-              View Details
-            </Button>
-          </Box>
-        ) : (
-          <>
-            <Button 
-              size="small" 
-              variant="outlined"
-              onClick={() => window.open(`/proposal/${proposal.id}`, '_blank')}
-            >
-              View Details
-            </Button>
-            
-            <Box sx={{ flexGrow: 1 }} />
-            
-            {canVote && (
-              <Button 
-                size="small" 
-                variant="contained" 
-                color="primary"
-                startIcon={<HowToVoteIcon />}
-                onClick={() => onVoteClick && onVoteClick(proposal.id)}
-              >
-                Vote Now
-              </Button>
-            )}
-          </>
+        <Button 
+          size="small" 
+          color="primary"
+          onClick={onViewDetails}
+          endIcon={<ArrowForwardIcon />}
+        >
+          View Details
+        </Button>
+        
+        {isActive && (
+          <Button 
+            size="small" 
+            variant="contained" 
+            color="primary"
+            onClick={onVote}
+            startIcon={<HowToVoteIcon />}
+            sx={{ ml: 'auto' }}
+          >
+            Vote
+          </Button>
         )}
       </CardActions>
     </Card>

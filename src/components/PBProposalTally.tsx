@@ -1,120 +1,246 @@
 import React from 'react';
-import { Box, Typography, LinearProgress, Tooltip } from '@mui/material';
-import { PBProposal, ProposalStatus } from './PBProposalList';
+import {
+  Box,
+  Typography,
+  Paper,
+  Divider,
+  LinearProgress,
+  Tooltip,
+  Card,
+  CardContent,
+  Grid,
+  Chip
+} from '@mui/material';
+import {
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  HowToVote as HowToVoteIcon,
+  People as PeopleIcon
+} from '@mui/icons-material';
 
-interface PBProposalTallyProps {
-  proposal: PBProposal;
+export interface VoteOption {
+  id: string;
+  label: string;
+  count: number;
+  percentage: number;
 }
 
-const PBProposalTally: React.FC<PBProposalTallyProps> = ({ proposal }) => {
-  // If there are no votes yet, show a placeholder
-  if (!proposal.tally || Object.keys(proposal.tally).length === 0) {
-    return (
-      <Box sx={{ textAlign: 'center', my: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          No votes have been cast yet.
-        </Typography>
-      </Box>
-    );
-  }
+export interface VoteTally {
+  totalVotes: number;
+  totalVoters: number;
+  totalPossibleVotes: number;
+  quorum: number;
+  quorumReached: boolean;
+  approvalThreshold: number;
+  thresholdReached: boolean;
+  options: VoteOption[];
+  winningOption?: VoteOption;
+}
 
-  // Calculate total votes
-  const totalVotes = Object.values(proposal.tally).reduce((sum, count) => sum + count, 0);
+interface PBProposalTallyProps {
+  tally: VoteTally;
+  showDetails?: boolean;
+  compact?: boolean;
+}
+
+const PBProposalTally: React.FC<PBProposalTallyProps> = ({
+  tally,
+  showDetails = true,
+  compact = false
+}) => {
+  const participation = tally.totalVotes > 0 
+    ? (tally.totalVotes / tally.totalPossibleVotes) * 100 
+    : 0;
   
-  // If no votes yet
-  if (totalVotes === 0) {
-    return (
-      <Box sx={{ textAlign: 'center', my: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          No votes have been cast yet.
-        </Typography>
-      </Box>
-    );
-  }
-
-  // Function to get color based on vote option
-  const getVoteColor = (option: string): string => {
-    switch (option.toLowerCase()) {
-      case 'yes':
-      case 'approve':
-      case 'for':
-        return '#4caf50'; // Green
-      case 'no':
-      case 'reject':
-      case 'against':
-        return '#f44336'; // Red
-      case 'abstain':
-        return '#ff9800'; // Orange
-      default:
-        // For numeric options (1-5 ranking, etc)
-        if (!isNaN(Number(option))) {
-          // Create a gradient of blues based on the number
-          const value = Math.min(Number(option), 5); // Cap at 5 for the gradient
-          const intensity = 55 + (value * 30); // 55-205 range for the blue component
-          return `rgb(25, ${intensity}, 220)`;
-        }
-        return '#2196f3'; // Default blue
-    }
-  };
-
-  // Sort options by vote count in descending order
-  const sortedOptions = Object.entries(proposal.tally)
-    .sort(([, countA], [, countB]) => countB - countA);
-
-  // Check if it's a simple yes/no vote
-  const isYesNoVote = sortedOptions.length <= 3 && 
-    sortedOptions.every(([option]) => 
-      ['yes', 'no', 'abstain'].includes(option.toLowerCase()));
-
-  // Format vote count with percentage
-  const formatVoteCount = (count: number): string => {
-    const percentage = Math.round((count / totalVotes) * 100);
-    return `${count} (${percentage}%)`;
-  };
-
   return (
-    <Box>
-      {sortedOptions.map(([option, count]) => {
-        const percentage = (count / totalVotes) * 100;
-        const color = getVoteColor(option);
+    <Card elevation={compact ? 0 : 1} sx={{ borderRadius: compact ? 0 : 2 }}>
+      <CardContent sx={{ p: compact ? 1 : 2 }}>
+        {/* Title */}
+        {!compact && (
+          <Typography variant="h6" gutterBottom>
+            Voting Results
+          </Typography>
+        )}
         
-        // Format the option label
-        const formattedOption = option.charAt(0).toUpperCase() + option.slice(1);
+        {/* Main voting numbers */}
+        <Box sx={{ mb: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={compact ? 12 : 6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <HowToVoteIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant={compact ? 'body2' : 'body1'}>
+                  Total Votes: <strong>{tally.totalVotes}</strong>
+                </Typography>
+              </Box>
+              
+              {!compact && (
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PeopleIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
+                  <Typography variant="body1">
+                    Total Voters: <strong>{tally.totalVoters}</strong>
+                  </Typography>
+                </Box>
+              )}
+            </Grid>
+            
+            <Grid item xs={compact ? 12 : 6}>
+              <Box sx={{ mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Typography variant={compact ? 'caption' : 'body2'}>
+                    Participation
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant={compact ? 'caption' : 'body2'}>
+                      {participation.toFixed(1)}%
+                    </Typography>
+                    {tally.quorumReached && (
+                      <Tooltip title="Quorum reached">
+                        <CheckCircleIcon 
+                          fontSize="small" 
+                          color="success" 
+                          sx={{ ml: 0.5, fontSize: compact ? 14 : 16 }} 
+                        />
+                      </Tooltip>
+                    )}
+                  </Box>
+                </Box>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={Math.min(participation, 100)} 
+                  color={tally.quorumReached ? "success" : "primary"}
+                  sx={{ height: compact ? 4 : 6, borderRadius: 1 }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Quorum: {tally.quorum}%
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Vote options */}
+        <Divider sx={{ my: compact ? 1 : 2 }} />
         
-        return (
-          <Box key={option} sx={{ mb: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2" fontWeight={isYesNoVote ? 'medium' : 'normal'}>
-                {formattedOption}
-              </Typography>
-              <Typography variant="body2">
-                {formatVoteCount(count)}
-              </Typography>
-            </Box>
-            <Tooltip title={`${Math.round(percentage)}% of votes`}>
-              <LinearProgress
-                variant="determinate"
-                value={percentage}
-                sx={{
-                  height: isYesNoVote ? 10 : 8,
+        <Box>
+          <Typography variant={compact ? 'body2' : 'subtitle1'} gutterBottom>
+            Vote Distribution
+          </Typography>
+          
+          {tally.options.map((option) => (
+            <Box key={option.id} sx={{ mb: 1.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  {option.id === 'approve' ? (
+                    <CheckCircleIcon 
+                      fontSize="small" 
+                      color="success" 
+                      sx={{ mr: 0.5, fontSize: compact ? 14 : 16 }} 
+                    />
+                  ) : option.id === 'reject' ? (
+                    <CancelIcon 
+                      fontSize="small" 
+                      color="error" 
+                      sx={{ mr: 0.5, fontSize: compact ? 14 : 16 }} 
+                    />
+                  ) : null}
+                  <Typography variant={compact ? 'caption' : 'body2'}>
+                    {option.label}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant={compact ? 'caption' : 'body2'}>
+                    {option.percentage.toFixed(1)}% ({option.count})
+                  </Typography>
+                  {tally.winningOption?.id === option.id && (
+                    <Chip 
+                      label="Winning" 
+                      size="small" 
+                      color="success" 
+                      sx={{ 
+                        ml: 1, 
+                        height: compact ? 16 : 24, 
+                        fontSize: compact ? 10 : 12 
+                      }} 
+                    />
+                  )}
+                </Box>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={Math.min(option.percentage, 100)} 
+                color={tally.winningOption?.id === option.id ? "success" : "primary"}
+                sx={{ 
+                  height: compact ? 4 : 6, 
                   borderRadius: 1,
-                  backgroundColor: 'rgba(0,0,0,0.1)',
+                  bgcolor: option.id === 'reject' ? 'error.light' : undefined,
                   '& .MuiLinearProgress-bar': {
-                    backgroundColor: color,
+                    bgcolor: option.id === 'reject' ? 'error.main' : undefined
                   }
                 }}
               />
-            </Tooltip>
-          </Box>
-        );
-      })}
-      
-      <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
-        <Typography variant="caption" color="text.secondary">
-          Total votes: {totalVotes}
-        </Typography>
-      </Box>
-    </Box>
+              
+              {option.id === 'approve' && !compact && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Threshold: {tally.approvalThreshold}%
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </Box>
+        
+        {/* Details section */}
+        {showDetails && !compact && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle1" gutterBottom>
+              Vote Details
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Quorum Status
+                  </Typography>
+                  <Typography variant="body2">
+                    {tally.quorumReached ? 'Reached' : 'Not Reached'}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Threshold Status
+                  </Typography>
+                  <Typography variant="body2">
+                    {tally.thresholdReached ? 'Reached' : 'Not Reached'}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Total Possible Votes
+                  </Typography>
+                  <Typography variant="body2">
+                    {tally.totalPossibleVotes}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Threshold Required
+                  </Typography>
+                  <Typography variant="body2">
+                    {tally.approvalThreshold}%
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
