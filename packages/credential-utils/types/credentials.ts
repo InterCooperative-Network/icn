@@ -90,7 +90,7 @@ export enum CredentialType {
  */
 export interface AnchorCredential extends WalletCredential {
   type: CredentialType.AnchorCredential | 'anchor_credential';
-  anchorType: 'epoch' | 'mandate' | 'role_assignment' | 'membership';
+  anchorType: 'epoch' | 'mandate' | 'role_assignment' | 'membership' | 'amendment';
   
   credentialSubject: {
     id: string;
@@ -101,6 +101,10 @@ export interface AnchorCredential extends WalletCredential {
     effective_until?: string;
     dag_root_hash: string;
     referenced_credentials?: string[];
+    amendment_id?: string;
+    previous_amendment_id?: string;
+    text_hash?: string;
+    ratified_in_epoch?: string;
     [key: string]: any;
   };
   

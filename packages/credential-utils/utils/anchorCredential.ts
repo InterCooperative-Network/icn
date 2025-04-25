@@ -4,6 +4,7 @@ import { FederationManifest } from '../types/federation';
 // Use type-only import for Node.js Buffer
 // @ts-ignore
 import type { Buffer } from 'buffer';
+import * as crypto from 'crypto';
 
 // Add Node.js type declarations for require
 declare function require(moduleName: string): any;
@@ -13,7 +14,7 @@ declare function require(moduleName: string): any;
  */
 export interface AnchorCredentialOptions {
   /** Type of anchor credential */
-  anchorType: 'epoch' | 'mandate' | 'role_assignment' | 'membership';
+  anchorType: 'epoch' | 'mandate' | 'role_assignment' | 'membership' | 'amendment';
   
   /** Federation information */
   federation: {
@@ -60,6 +61,18 @@ export interface AnchorCredentialOptions {
   
   /** Federation manifest (optional) */
   federationManifest?: FederationManifest;
+  
+  /** Amendment ID (for amendment credentials) */
+  amendmentId?: string;
+  
+  /** Previous amendment ID (for amendment credentials) */
+  previousAmendmentId?: string;
+  
+  /** Text hash (for amendment credentials) */
+  textHash?: string;
+  
+  /** Ratified in epoch (for amendment credentials) */
+  ratifiedInEpoch?: string;
 }
 
 // Define the structure of metadata to avoid type errors
@@ -152,6 +165,25 @@ export async function createAnchorCredential(
   
   if (options.dagBlockHeight) {
     credential.metadata.dag.block_height = options.dagBlockHeight;
+  }
+  
+  // Add amendment-specific fields
+  if (options.anchorType === 'amendment') {
+    if (options.amendmentId) {
+      credential.credentialSubject.amendment_id = options.amendmentId;
+    }
+    
+    if (options.previousAmendmentId) {
+      credential.credentialSubject.previous_amendment_id = options.previousAmendmentId;
+    }
+    
+    if (options.textHash) {
+      credential.credentialSubject.text_hash = options.textHash;
+    }
+    
+    if (options.ratifiedInEpoch) {
+      credential.credentialSubject.ratified_in_epoch = options.ratifiedInEpoch;
+    }
   }
   
   // Create the signature
@@ -558,4 +590,86 @@ export function findAnchorsByDagRoot(
   return findAnchorCredentials(credentials).filter(anchor => 
     anchor.metadata?.dag?.root_hash === dagRootHash
   );
+}
+
+/**
+ * Create an amendment credential
+ * 
+ * @param federationId Federation ID
+ * @param amendmentId Amendment ID
+ * @param amendmentText Amendment text content
+ * @param ratifiedInEpoch Epoch ID in which the amendment was ratified
+ * @param previousAmendmentId Previous amendment ID (optional)
+ * @param options Additional options
+ * @returns An amendment anchor credential
+ */
+export async function createAmendmentCredential(
+  federationId: string,
+  federationDid: string,
+  amendmentId: string,
+  amendmentText: string,
+  ratifiedInEpoch: string,
+  previousAmendmentId?: string,
+  options: Partial<AnchorCredentialOptions> = {}
+): Promise<AnchorCredential> {
+  // Calculate hash of the amendment text
+  const textHash = crypto.createHash('sha256')
+    .update(amendmentText)
+    .digest('hex');
+  
+  const now = new Date().toISOString();
+  
+  return createAnchorCredential({
+    anchorType: 'amendment',
+    federation: {
+      id: federationId,
+      did: federationDid,
+      name: options.federation?.name || `Federation ${federationId}`,
+    },
+    subjectDid: federationDid,
+    privateKey: options.privateKey || '',
+    dagRootHash: options.dagRootHash || '',
+    effectiveFrom: now,
+    amendmentId,
+    textHash,
+    ratifiedInEpoch,
+    previousAmendmentId,
+    ...options
+  });
+}
+
+/**
+ * Find all amendment credentials in a collection
+ * 
+ * @param credentials Collection of credentials to search
+ * @returns All amendment credentials found
+ */
+export function findAmendmentCredentials(
+  credentials: WalletCredential[]
+): AnchorCredential[] {
+  return findAnchorCredentials(credentials).filter(anchor => 
+    (anchor as AnchorCredential).anchorType === 'amendment'
+  );
+}
+
+/**
+ * Get the complete amendment history for a federation
+ * 
+ * @param credentials Collection of credentials
+ * @param federationId ID of the federation
+ * @returns A sorted array of amendment credentials
+ */
+export function getAmendmentHistory(
+  credentials: WalletCredential[],
+  federationId: string
+): AnchorCredential[] {
+  const amendments = findAmendmentCredentials(credentials)
+    .filter(amendment => amendment.metadata?.federation?.id === federationId);
+  
+  // Sort by timestamp
+  return amendments.sort((a, b) => {
+    const timestampA = a.credentialSubject.effective_from;
+    const timestampB = b.credentialSubject.effective_from;
+    return timestampA.localeCompare(timestampB);
+  });
 } 

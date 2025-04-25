@@ -32,9 +32,14 @@ interface Node extends d3.SimulationNodeDatum {
     totalWeight?: number;
   };
   isEpochAnchor?: boolean;
+  isAmendment?: boolean; // Added for amendment credentials
   dagRoot?: string;
   epochId?: string;
   mandate?: string;
+  amendmentId?: string; // Added for amendment credentials
+  previousAmendmentId?: string; // Added for amendment credentials
+  ratifiedInEpoch?: string; // Added for amendment credentials
+  textHash?: string; // Added for amendment credentials
 }
 
 // Link interface for D3 force graph
@@ -46,6 +51,7 @@ interface Link extends d3.SimulationLinkDatum<Node> {
   isSignerLink?: boolean;
   signerWeight?: number;
   isEpochLink?: boolean;
+  isAmendmentLink?: boolean; // Added for amendment links
   isDashed?: boolean;
   opacity?: number;
 }
@@ -181,10 +187,30 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         cred.credentialSubject?.type === 'FederationEpochAnchor' ||
         cred.metadata?.anchor_type === 'EpochAnchor';
       
+      // Check if this is an amendment credential
+      const isAmendment = 
+        (Array.isArray(cred.type) && cred.type.includes('AmendmentCredential')) ||
+        (cred.anchorType === 'amendment') ||
+        cred.credentialSubject?.amendment_id !== undefined;
+      
+      // Extract amendment-specific fields if this is an amendment
+      const amendmentId = isAmendment ? 
+        cred.credentialSubject?.amendment_id : undefined;
+        
+      const previousAmendmentId = isAmendment ? 
+        cred.credentialSubject?.previous_amendment_id : undefined;
+        
+      const ratifiedInEpoch = isAmendment ? 
+        cred.credentialSubject?.ratified_in_epoch : undefined;
+        
+      const textHash = isAmendment ? 
+        cred.credentialSubject?.text_hash : undefined;
+      
       // Check for DAG root information in this credential
-      const dagRoot = isEpochAnchor ? 
+      const dagRoot = (isEpochAnchor || isAmendment) ? 
         cred.credentialSubject?.dagRoot || 
-        cred.metadata?.dag_root : 
+        cred.credentialSubject?.dag_root_hash ||
+        cred.metadata?.dag?.root_hash : 
         undefined;
       
       // Determine if this is a federation report
@@ -212,8 +238,15 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
       // Get color based on credential type
       let baseColor = getNodeColor(cred.type);
       
-      // Special color for epoch anchors
-      let color = isEpochAnchor ? '#9C27B0' : baseColor; // Purple for epoch anchors
+      // Special color for epoch anchors and amendments
+      let color;
+      if (isEpochAnchor) {
+        color = '#9C27B0'; // Purple for epoch anchors
+      } else if (isAmendment) {
+        color = '#00796B'; // Teal for amendments
+      } else {
+        color = baseColor;
+      }
       
       // Adjust color for federation reports based on quorum validation
       if (isFederationReport && quorumValidation) {
@@ -222,9 +255,11 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
                 '#F44336'; // Red for invalid
       }
       
-      // Adjust size based on importance - larger for epoch anchors
+      // Adjust size based on importance - larger for epoch anchors and amendments
       const radius = isEpochAnchor ? 
         18 : // Larger for epoch anchors
+        isAmendment ?
+        16 : // Large for amendments
         getNodeRadius(cred.type);
       
       return {
@@ -244,6 +279,11 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         mandate: isEpochAnchor ? cred.credentialSubject?.mandate : undefined,
         quorumValidation,
         signerDid: cred.credentialSubject.signerDid,
+        isAmendment: cred.type.includes('AmendmentCredential'),
+        amendmentId: cred.credentialSubject?.amendmentId,
+        previousAmendmentId: cred.credentialSubject?.previousAmendmentId,
+        ratifiedInEpoch: cred.credentialSubject?.ratifiedInEpoch,
+        textHash: cred.credentialSubject?.textHash,
       };
     });
     
@@ -292,6 +332,11 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
               signerDid: signer.did,
               signerWeight: signer.weight,
               federationId: node.federationId,
+              isAmendment: node.isAmendment,
+              amendmentId: node.amendmentId,
+              previousAmendmentId: node.previousAmendmentId,
+              ratifiedInEpoch: node.ratifiedInEpoch,
+              textHash: node.textHash,
             });
             
             // Add link from signer to report
@@ -301,6 +346,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
               type: 'signature',
               isSignerLink: true,
               signerWeight: signer.weight,
+              isAmendmentLink: node.isAmendment,
             });
           });
         }
@@ -369,6 +415,66 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         });
       });
     }
+    
+    // Add links for amendment chains
+    // First collect all amendment nodes by federation
+    const amendments: Record<string, Node[]> = {};
+    
+    newNodes.forEach(node => {
+      if (node.isAmendment && node.federationId) {
+        if (!amendments[node.federationId]) {
+          amendments[node.federationId] = [];
+        }
+        amendments[node.federationId].push(node);
+      }
+    });
+    
+    // For each federation with amendments
+    Object.entries(amendments).forEach(([federationId, federationAmendments]) => {
+      // Create a map of amendment ID to node to make lookups easier
+      const amendmentMap: Record<string, Node> = {};
+      federationAmendments.forEach(node => {
+        if (node.amendmentId) {
+          amendmentMap[node.amendmentId] = node;
+        }
+      });
+      
+      // For each amendment that has a previous amendment ID
+      federationAmendments.forEach(node => {
+        if (node.previousAmendmentId && amendmentMap[node.previousAmendmentId]) {
+          // Create a link from previous amendment to this one
+          newLinks.push({
+            source: amendmentMap[node.previousAmendmentId].id,
+            target: node.id,
+            type: 'amendment-chain',
+            isAmendmentLink: true,
+          });
+        }
+      });
+      
+      // Link amendments to their ratifying epochs if available
+      federationAmendments.forEach(amendment => {
+        if (amendment.ratifiedInEpoch) {
+          // Find epoch anchor nodes for this federation
+          newNodes.forEach(node => {
+            if (node.isEpochAnchor && 
+                node.federationId === amendment.federationId &&
+                node.epochId === amendment.ratifiedInEpoch) {
+              // Create a link from epoch to amendment
+              newLinks.push({
+                source: node.id,
+                target: amendment.id,
+                type: 'epoch-amendment',
+                isEpochLink: true,
+                isAmendmentLink: true,
+                isDashed: true,
+                opacity: 0.5,
+              });
+            }
+          });
+        }
+      });
+    });
     
     setNodes(newNodes);
     setLinks(newLinks);
@@ -645,20 +751,34 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
   
   // Helper function to get link color based on type
   function getLinkColor(type: string): string {
-    const colors: Record<string, string> = {
-      'proposal_vote': '#4CAF50',
-      'vote_finalization': '#2196F3',
-      'finalization_execution': '#9C27B0',
-      'proposal_appeal': '#FFC107',
-      'appeal_appeal_vote': '#FF9800',
-      'appeal_vote_appeal_finalization': '#F44336',
-      'appeal_finalization_execution': '#E91E63',
-      'signature': '#64B5F6', // Blue for signatures
-      'missing-signature': '#BDBDBD', // Gray for missing signatures
-      'default': '#999999'
-    };
-    
-    return colors[type] || colors.default;
+    switch (type) {
+      case 'proposal-vote':
+        return '#2196F3'; // Blue
+      case 'vote-finalization':
+        return '#00BCD4'; // Cyan
+      case 'proposal-finalization':
+        return '#009688'; // Teal
+      case 'appeal-appeal_vote':
+        return '#FF9800'; // Orange
+      case 'appeal_vote-appeal_finalization':
+        return '#FF5722'; // Deep Orange
+      case 'finalization-execution':
+        return '#4CAF50'; // Green
+      case 'signer':
+        return '#9E9E9E'; // Gray
+      case 'missing-signature':
+        return '#F44336'; // Red
+      case 'epoch-sequence':
+        return '#9C27B0'; // Purple
+      case 'epoch-connection':
+        return '#673AB7'; // Deep Purple
+      case 'amendment-chain':
+        return '#00796B'; // Teal (matching amendment nodes)
+      case 'epoch-amendment':
+        return '#607D8B'; // Blue Gray
+      default:
+        return '#9E9E9E'; // Gray for others
+    }
   }
   
   // Helper function to get link type based on connected node types
@@ -713,18 +833,54 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
     if (node.isEpochAnchor) {
       return (
         <div>
-          <h4>Epoch Anchor: {node.label}</h4>
-          {node.epochId && <p><strong>Epoch:</strong> {node.epochId}</p>}
-          {node.mandate && <p><strong>Mandate:</strong> {node.mandate}</p>}
-          {node.dagRoot && (
-            <p><strong>DAG Root:</strong> {node.dagRoot.substring(0, 10)}...</p>
-          )}
-          <p><strong>Federation:</strong> {
-            (federationManifests && node.federationId) ? 
-              federationManifests[node.federationId]?.name || node.federationId :
-              node.federationId || 'Unknown'
-          }</p>
+          <h4>Epoch Anchor: {node.epochId || 'Unknown Epoch'}</h4>
+          <p><strong>Mandate:</strong> {node.mandate || 'No mandate specified'}</p>
+          <p><strong>Federation:</strong> {credential?.metadata?.federation?.name || node.federationId || 'Unknown Federation'}</p>
           <p><strong>Created:</strong> {new Date(node.date).toLocaleDateString()}</p>
+          {node.dagRoot && <p><strong>DAG Root:</strong> {node.dagRoot.substring(0, 10)}...</p>}
+        </div>
+      );
+    }
+    
+    // For amendment nodes
+    if (node.isAmendment) {
+      return (
+        <div>
+          <h4>Constitutional Amendment</h4>
+          {node.amendmentId && <p><strong>ID:</strong> {node.amendmentId}</p>}
+          {node.previousAmendmentId && <p><strong>Previous Amendment:</strong> {node.previousAmendmentId}</p>}
+          {node.ratifiedInEpoch && <p><strong>Ratified in Epoch:</strong> {node.ratifiedInEpoch}</p>}
+          {node.textHash && <p><strong>Text Hash:</strong> {node.textHash.substring(0, 10)}...</p>}
+          <p><strong>Federation:</strong> {credential?.metadata?.federation?.name || node.federationId || 'Unknown Federation'}</p>
+          <p><strong>Date:</strong> {new Date(node.date).toLocaleDateString()}</p>
+          {node.dagRoot && <p><strong>DAG Root:</strong> {node.dagRoot.substring(0, 10)}...</p>}
+        </div>
+      );
+    }
+    
+    // For federation report nodes with quorum validation
+    if (node.isFederationReport && node.quorumValidation) {
+      return (
+        <div>
+          <h4>Federation Report</h4>
+          <p><strong>Federation:</strong> {credential?.metadata?.federation?.name || node.federationId || 'Unknown Federation'}</p>
+          <p><strong>Date:</strong> {new Date(node.date).toLocaleDateString()}</p>
+          <p>
+            <strong>Quorum Status:</strong>{' '}
+            {node.quorumValidation.isSatisfied ? 
+              <span style={{ color: '#4CAF50' }}>✓ Satisfied</span> : 
+              <span style={{ color: '#F44336' }}>✗ Not Satisfied</span>
+            }
+          </p>
+          <p><strong>Policy:</strong> {node.quorumValidation.policy}</p>
+          <p><strong>Approvals:</strong> {node.quorumValidation.actualApprovals}/{node.quorumValidation.requiredApprovals}</p>
+          {node.quorumValidation.actualThreshold && node.quorumValidation.requiredThreshold && (
+            <p><strong>Threshold:</strong> {node.quorumValidation.actualThreshold}/{node.quorumValidation.requiredThreshold}</p>
+          )}
+          {node.quorumValidation.totalWeight && (
+            <p><strong>Total Weight:</strong> {node.quorumValidation.totalWeight}</p>
+          )}
+          <p><strong>Signers:</strong> {node.quorumValidation.signers.length}</p>
         </div>
       );
     }
@@ -749,37 +905,6 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
             <p>Federation: {federationManifests[node.federationId]?.name || node.federationId}</p>
           )}
           <p>Click to view signer details</p>
-        </div>
-      );
-    }
-    
-    // For federation reports with quorum validation
-    if (node.isFederationReport && node.quorumValidation) {
-      return (
-        <div>
-          <h4>{node.label}</h4>
-          <p><strong>Policy:</strong> {node.quorumValidation.policy}</p>
-          <p><strong>Status:</strong> {node.quorumValidation.isSatisfied ? 
-            '✅ Quorum Satisfied' : 
-            '❌ Quorum Not Met'}</p>
-          <p><strong>Signatures:</strong> {node.quorumValidation.actualApprovals}/{node.quorumValidation.requiredApprovals} required</p>
-          
-          {node.quorumValidation.requiredThreshold && (
-            <p><strong>Threshold:</strong> {node.quorumValidation.actualThreshold}% / {node.quorumValidation.requiredThreshold}% required</p>
-          )}
-          
-          {node.quorumValidation.totalWeight && (
-            <p><strong>Total Weight:</strong> {node.quorumValidation.totalWeight}</p>
-          )}
-          
-          <div style={{ marginTop: '8px' }}>
-            <strong>Signers:</strong>
-            <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
-              {node.quorumValidation.signers.map((signer, i) => (
-                <li key={i}>{signer.role} ({signer.did.split(':').pop()}) - weight: {signer.weight}</li>
-              ))}
-            </ul>
-          </div>
         </div>
       );
     }
