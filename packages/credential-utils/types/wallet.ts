@@ -43,6 +43,12 @@ export interface WalletCredential {
     agoranet?: {
       threadId: string;
       threadUrl: string;
+      federation_id?: string;
+    };
+    federation?: {
+      id: string;
+      name?: string;
+      logo?: string;
     };
   };
   receiptHash?: string;
