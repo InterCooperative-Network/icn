@@ -570,6 +570,20 @@ enum CredentialCommands {
         #[arg(long)]
         verify: bool,
     },
+    // Add selective disclosure command
+    SelectiveDisclose {
+        id: String,
+        #[arg(short, long)]
+        include_fields: Option<String>,
+        #[arg(short, long)]
+        exclude_fields: Option<String>,
+        #[arg(short, long, default_value = "redaction")]
+        proof_type: String,
+        #[arg(short, long)]
+        reason: Option<String>,
+        #[arg(short, long)]
+        output: Option<String>,
+    },
 }
 
 // New commands for federation invites
@@ -2833,6 +2847,113 @@ fn handle_credential_commands(
                 }
             }
         },
+        
+        CredentialCommands::SelectiveDisclose { 
+            id, 
+            include_fields, 
+            exclude_fields, 
+            proof_type, 
+            reason, 
+            output 
+        } => {
+            println!("Creating selective disclosure from credential {}...", id);
+            
+            // Fetch the credential from storage
+            let credential = match sync_service.get_credential(&id) {
+                Some(cred) => cred,
+                None => {
+                    println!("Error: Credential with ID {} not found", id);
+                    return;
+                }
+            };
+            
+            // Convert fields to Vec<String> if specified
+            let include_fields_vec = include_fields
+                .map(|fields| fields.split(',').map(|s| s.trim().to_string()).collect::<Vec<String>>());
+            
+            let exclude_fields_vec = exclude_fields
+                .map(|fields| fields.split(',').map(|s| s.trim().to_string()).collect::<Vec<String>>());
+            
+            // Validate proof type
+            let proof_type = match proof_type.as_str() {
+                "redaction" => "redaction",
+                "zk" => {
+                    println!("Warning: Zero-knowledge proofs not yet implemented, using redaction instead");
+                    "redaction"
+                },
+                _ => {
+                    println!("Error: Invalid proof type {}, using redaction instead", proof_type);
+                    "redaction"
+                }
+            };
+            
+            // Convert credential to JSON Value for processing
+            let credential_value = match serde_json::to_value(&credential) {
+                Ok(val) => val,
+                Err(e) => {
+                    println!("Error serializing credential: {}", e);
+                    return;
+                }
+            };
+            
+            // Call the Node.js script to handle selective disclosure
+            let script_path = Path::new("packages/credential-utils/scripts/selective-disclosure.js");
+            
+            let mut command = Command::new("node");
+            command.arg(script_path);
+            command.arg("--credential");
+            command.arg(serde_json::to_string(&credential_value).unwrap());
+            
+            if let Some(fields) = &include_fields_vec {
+                command.arg("--include");
+                command.arg(fields.join(","));
+            }
+            
+            if let Some(fields) = &exclude_fields_vec {
+                command.arg("--exclude");
+                command.arg(fields.join(","));
+            }
+            
+            command.arg("--proof-type");
+            command.arg(proof_type);
+            
+            if let Some(reason_text) = &reason {
+                command.arg("--reason");
+                command.arg(reason_text);
+            }
+            
+            // Execute the command and get the output
+            match command.output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        let disclosure_json = String::from_utf8_lossy(&output.stdout);
+                        
+                        // Determine output path
+                        let output_path = match output {
+                            Some(path) => path,
+                            None => format!("{}-selective-disclosure.json", id),
+                        };
+                        
+                        // Write to file
+                        match fs::write(&output_path, disclosure_json.as_bytes()) {
+                            Ok(_) => {
+                                println!("Selective disclosure created successfully!");
+                                println!("Saved to: {}", output_path);
+                            },
+                            Err(e) => {
+                                println!("Error writing disclosure to file: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("Error creating selective disclosure: {}", 
+                            String::from_utf8_lossy(&output.stderr));
+                    }
+                },
+                Err(e) => {
+                    println!("Error executing selective disclosure command: {}", e);
+                }
+            }
+        }
     }
 }
 

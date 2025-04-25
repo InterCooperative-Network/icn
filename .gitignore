@@ -1,1 +1,50 @@
-[PASTE ABOVE INTO .gitignore]
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor configs
+.vscode/
+.idea/
+*.sw?
+
+# Env files
+.env
+.env.*
+
+# Lockfiles (optional, choose per your package manager)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Temporary files
+*.tmp
+*.bak
+
+# Rust build output
+/target
+
+# Dump files
+*.dump.txt
+icn-wallet_dump_*.txt
+
+# Wallet-specific untracked dirs/scripts
+packages/credential-utils/scripts/
+src/cli/
+
+# Coverage
+coverage/
