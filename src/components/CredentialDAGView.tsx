@@ -19,6 +19,7 @@ interface Node extends d3.SimulationNodeDatum {
   color: string;
   // Quorum validation fields
   isSignerNode?: boolean;
+  signerDid?: string;  // Add signerDid to identify the signer
   isFederationReport?: boolean;
   quorumValidation?: {
     isSatisfied: boolean;
@@ -52,6 +53,7 @@ interface CredentialDAGViewProps {
   selectedCredentialId?: string;
   onCredentialSelect?: (id: string) => void;
   onThreadSelect?: (threadId: string) => void;
+  onSignerSelect?: (signerDid: string, federationId: string) => void; // Add callback for signer selection
   width?: number;
   height?: number;
   showLabels?: boolean;
@@ -73,6 +75,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
   selectedCredentialId,
   onCredentialSelect,
   onThreadSelect,
+  onSignerSelect,
   width = 800,
   height = 600,
   showLabels = true,
@@ -212,6 +215,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         color,
         isFederationReport,
         quorumValidation,
+        signerDid: cred.credentialSubject.signerDid,
       };
     });
     
@@ -246,7 +250,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
         if (node.isFederationReport && node.quorumValidation && node.quorumValidation.signers.length > 0) {
           // Add nodes for each signer
           node.quorumValidation.signers.forEach(signer => {
-            const signerNodeId = `signer-${signer.did}-${node.id}`;
+            const signerNodeId = `signer-${node.id}-${signer.did}`;
             
             // Create signer node
             signerNodes.push({
@@ -257,6 +261,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
               radius: 5 + (signer.weight * 2), // Size based on weight
               color: '#64B5F6', // Blue for signers
               isSignerNode: true,
+              signerDid: signer.did,
             });
             
             // Create link from signer to report
@@ -295,6 +300,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
                   radius: 5 + (role.weight * 2), // Size based on weight
                   color: '#BDBDBD', // Gray for missing signers
                   isSignerNode: true,
+                  signerDid: did,
                 });
                 
                 // Create dashed link from missing signer to report
@@ -497,7 +503,11 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
     
     // Handle node click
     nodeElements.on('click', (event, d) => {
-      if (onCredentialSelect && !d.isSignerNode) {
+      if (d.isSignerNode && onSignerSelect && d.signerDid && d.federationId) {
+        onSignerSelect(d.signerDid, d.federationId);
+      } else if (d.threadId && onThreadSelect) {
+        onThreadSelect(d.threadId);
+      } else if (onCredentialSelect) {
         onCredentialSelect(d.id);
       }
     });
@@ -534,7 +544,7 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
     return () => {
       simulation.stop();
     };
-  }, [nodes, links, width, height, selectedCredentialId, showLabels, groupByThread, highlightSelected, onCredentialSelect]);
+  }, [nodes, links, width, height, selectedCredentialId, showLabels, groupByThread, highlightSelected, onCredentialSelect, onSignerSelect, onThreadSelect]);
   
   // Drag handler for nodes
   function drag(simulation: d3.Simulation<Node, Link>) {
@@ -668,9 +678,12 @@ export const CredentialDAGView: React.FC<CredentialDAGViewProps> = ({
       
       return (
         <div>
-          <h4>Federation Member</h4>
-          <p>{node.label}</p>
-          <p><strong>Weight:</strong> {node.radius / 2}</p>
+          <h4>Signer: {node.label}</h4>
+          <p>DID: {node.signerDid}</p>
+          {node.federationId && (
+            <p>Federation: {federationManifests[node.federationId]?.name || node.federationId}</p>
+          )}
+          <p>Click to view signer details</p>
         </div>
       );
     }
