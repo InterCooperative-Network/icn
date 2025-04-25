@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
-import { WalletCredential } from '../../packages/credential-utils/types/credentials';
+import { WalletCredential } from '../../packages/credential-utils/types';
 import { FederationManifest } from '../../packages/credential-utils/types/federation';
 import { CredentialDAGView } from './CredentialDAGView';
 import { validateFederationReport } from '../../packages/credential-utils/utils/quorumValidation';
@@ -73,7 +73,7 @@ export const FederationQuorumDashboard: React.FC<FederationQuorumDashboardProps>
     // Find credentials associated with this signer
     const signerCreds = credentials.filter(cred => {
       // Check if this credential was issued by the signer
-      if (cred.issuer === signerDid) return true;
+      if (cred.issuer.did === signerDid) return true;
       
       // Check if this credential has a signature from the signer
       if ((cred as any).multiSignatureProof?.signatures) {
