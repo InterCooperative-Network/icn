@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { WalletCredential } from '../../packages/credential-utils/types';
 import { CredentialService } from '../services/credential-service';
+import { PBVoteReceiptView } from './PBVoteReceiptView';
 
 interface CredentialListViewProps {
   credentialService: CredentialService;
   userDid: string;
 }
+
+// Define credential type constants for consistent filtering
+const CREDENTIAL_TYPE = {
+  ALL: 'all',
+  PARTICIPATORY_BUDGETING: 'ParticipatoryBudgetingVote'
+};
 
 /**
  * Component to display and manage credentials in the wallet
@@ -16,7 +23,7 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
 }) => {
   const [credentials, setCredentials] = useState<WalletCredential[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>(CREDENTIAL_TYPE.ALL);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [selectedCredential, setSelectedCredential] = useState<string | null>(null);
   
@@ -46,13 +53,66 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
     }
   };
   
-  // Filter credentials by type
-  const filteredCredentials = selectedType === 'all' 
-    ? credentials 
-    : credentials.filter(cred => cred.type === selectedType);
+  // Check if a credential is a Participatory Budgeting vote
+  const isPBVoteCredential = (credential: WalletCredential): boolean => {
+    // Check by type array
+    if (Array.isArray(credential.type) && 
+        credential.type.includes(CREDENTIAL_TYPE.PARTICIPATORY_BUDGETING)) {
+      return true;
+    }
+    
+    // Check by credentialSubject properties
+    if (credential.credentialSubject && 
+        (credential.credentialSubject.voteChoice || 
+         credential.credentialSubject.votingMechanism || 
+         credential.credentialSubject.proposalId)) {
+      return true;
+    }
+    
+    // Check by metadata
+    if (credential.metadata && credential.metadata.credentialType === 'pbVote') {
+      return true;
+    }
+    
+    return false;
+  };
   
-  // Get unique credential types
-  const credentialTypes = ['all', ...new Set(credentials.map(cred => cred.type))];
+  // Filter credentials based on selected type
+  const filteredCredentials = credentials.filter(cred => {
+    if (selectedType === CREDENTIAL_TYPE.ALL) {
+      return true;
+    } else if (selectedType === CREDENTIAL_TYPE.PARTICIPATORY_BUDGETING) {
+      return isPBVoteCredential(cred);
+    } else {
+      return cred.type === selectedType || 
+        (Array.isArray(cred.type) && cred.type.includes(selectedType));
+    }
+  });
+  
+  // Get unique credential types for the filter dropdown
+  const getCredentialTypes = () => {
+    const types = new Set<string>([CREDENTIAL_TYPE.ALL]);
+    
+    // Add Participatory Budgeting as a specific type option
+    types.add(CREDENTIAL_TYPE.PARTICIPATORY_BUDGETING);
+    
+    // Add all other credential types
+    credentials.forEach(cred => {
+      if (Array.isArray(cred.type)) {
+        cred.type.forEach(t => {
+          if (t !== CREDENTIAL_TYPE.PARTICIPATORY_BUDGETING) {
+            types.add(t);
+          }
+        });
+      } else if (cred.type) {
+        types.add(cred.type);
+      }
+    });
+    
+    return Array.from(types);
+  };
+  
+  const credentialTypes = getCredentialTypes();
   
   // Verify a credential
   const verifyCredential = async (id: string) => {
@@ -101,6 +161,78 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
     }
   };
   
+  // Render a credential based on its type
+  const renderCredential = (credential: WalletCredential) => {
+    // Render Participatory Budgeting Vote credentials using PBVoteReceiptView
+    if (isPBVoteCredential(credential)) {
+      return (
+        <PBVoteReceiptView 
+          key={credential.id}
+          credential={credential}
+          compact={true}
+        />
+      );
+    }
+    
+    // Render other credential types using the default card
+    return (
+      <div 
+        key={credential.id} 
+        className={`credential-card ${credential.trustLevel?.toLowerCase()}`}
+      >
+        <div className="card-header">
+          <h3>{credential.title}</h3>
+          <span className={`trust-badge ${credential.trustLevel?.toLowerCase()}`}>
+            {credential.trustLevel}
+          </span>
+        </div>
+        
+        <div className="card-body">
+          <p className="issuer">Issued by: {credential.issuer.name || credential.issuer.did}</p>
+          <p className="date">Date: {new Date(credential.issuanceDate).toLocaleDateString()}</p>
+          
+          {credential.credentialSubject.proposalId && (
+            <p className="proposal-id">
+              Proposal: {credential.credentialSubject.proposalId}
+            </p>
+          )}
+          
+          <div className="tags">
+            {credential.tags?.map(tag => (
+              <span key={tag} className="tag">{tag}</span>
+            ))}
+          </div>
+        </div>
+        
+        <div className="card-actions">
+          <button 
+            className="verify-btn"
+            onClick={() => verifyCredential(credential.id)}
+            disabled={isVerifying && selectedCredential === credential.id}
+          >
+            {isVerifying && selectedCredential === credential.id ? 'Verifying...' : 'Verify'}
+          </button>
+          <button 
+            className="export-btn"
+            onClick={() => exportCredential(credential.id)}
+          >
+            Export
+          </button>
+          {credential.metadata?.agoranet?.threadUrl && (
+            <a 
+              href={credential.metadata.agoranet.threadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="view-thread-btn"
+            >
+              View Discussion
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="credential-list-container">
       <div className="header">
@@ -125,7 +257,9 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
           >
             {credentialTypes.map(type => (
               <option key={type} value={type}>
-                {type === 'all' ? 'All Types' : type}
+                {type === CREDENTIAL_TYPE.ALL ? 'All Types' : 
+                 type === CREDENTIAL_TYPE.PARTICIPATORY_BUDGETING ? 'Participatory Budgeting' : 
+                 type}
               </option>
             ))}
           </select>
@@ -140,71 +274,17 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
         </div>
       ) : (
         <div className="credential-grid">
-          {filteredCredentials.map((credential) => (
-            <div 
-              key={credential.id} 
-              className={`credential-card ${credential.trustLevel?.toLowerCase()}`}
-            >
-              <div className="card-header">
-                <h3>{credential.title}</h3>
-                <span className={`trust-badge ${credential.trustLevel?.toLowerCase()}`}>
-                  {credential.trustLevel}
-                </span>
-              </div>
-              
-              <div className="card-body">
-                <p className="issuer">Issued by: {credential.issuer.name || credential.issuer.did}</p>
-                <p className="date">Date: {new Date(credential.issuanceDate).toLocaleDateString()}</p>
-                
-                {credential.credentialSubject.proposalId && (
-                  <p className="proposal-id">
-                    Proposal: {credential.credentialSubject.proposalId}
-                  </p>
-                )}
-                
-                <div className="tags">
-                  {credential.tags?.map(tag => (
-                    <span key={tag} className="tag">{tag}</span>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="card-actions">
-                <button 
-                  className="verify-btn"
-                  onClick={() => verifyCredential(credential.id)}
-                  disabled={isVerifying && selectedCredential === credential.id}
-                >
-                  {isVerifying && selectedCredential === credential.id ? 'Verifying...' : 'Verify'}
-                </button>
-                <button 
-                  className="export-btn"
-                  onClick={() => exportCredential(credential.id)}
-                >
-                  Export
-                </button>
-                {credential.metadata?.agoranet?.threadUrl && (
-                  <a 
-                    href={credential.metadata.agoranet.threadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="view-thread-btn"
-                  >
-                    View Discussion
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
+          {filteredCredentials.map(credential => renderCredential(credential))}
         </div>
       )}
-      
-      <div className="bulk-actions">
+
+      <div className="footer">
         <button 
+          className="export-all-btn"
           onClick={() => exportSelectedAsPresentation(filteredCredentials.map(c => c.id))}
           disabled={filteredCredentials.length === 0}
         >
-          Export All as Presentation
+          Export Selected as Presentation
         </button>
       </div>
       
@@ -354,7 +434,7 @@ export const CredentialListView: React.FC<CredentialListViewProps> = ({
           margin-left: auto;
         }
         
-        .bulk-actions {
+        .footer {
           margin-top: 20px;
           display: flex;
           justify-content: flex-end;
