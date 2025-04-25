@@ -5,4 +5,7 @@
 export * from './types';
 
 // Re-export utilities
-export * from './utils'; 
+export * from './utils';
+export * from './utils/receiptToVC';
+export * from './utils/credentialExport';
+export * from './utils/selectiveDisclosure'; 

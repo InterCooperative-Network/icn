@@ -1,3 +1,1 @@
-/target
-*.dump.txt
-icn-wallet_dump_*.txt
+[PASTE ABOVE INTO .gitignore]
