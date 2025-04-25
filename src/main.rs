@@ -3046,6 +3046,31 @@ fn handle_credential_commands(
             // Get the federation runtime for this federation
             let fed_runtime = sync_service.get_federation_runtime();
             
+            // Get active identity and ensure it's a federation member for this federation
+            let identity = match identity_manager.get_active_identity() {
+                Some(id) => id,
+                None => {
+                    eprintln!("Error: No active identity. Please use 'icn-wallet use-identity' to set an active identity.");
+                    return;
+                }
+            };
+            
+            // Verify that the active identity is authorized for this federation
+            if !sync_service.is_federation_member(&fed_id, identity.did()) {
+                eprintln!("Error: Active identity is not a member of federation {}.", fed_id);
+                eprintln!("Please use 'icn-wallet use-identity' to select an identity that is a member of this federation.");
+                return;
+            }
+            
+            // Get the identity's credentials for this federation
+            let member_credentials = sync_service.get_federation_member_credentials(identity.did(), &fed_id);
+            if member_credentials.is_empty() {
+                eprintln!("Warning: No federation membership credentials found for the active identity.");
+                eprintln!("The amendment credential will be created but may not be accepted by federation nodes.");
+            } else {
+                println!("Using federation member identity: {}", identity.did());
+            }
+            
             // Get active identity DID for subject DID
             let subject_did = identity.did().to_string();
             
@@ -3090,7 +3115,7 @@ fn handle_credential_commands(
                 }
             };
             
-            // Create the amendment anchor credential
+            // Create the amendment anchor credential with explicit signer DID
             let anchor_options = federation::AnchorCredentialOptions {
                 anchor_type: "amendment".to_string(),
                 federation: federation::FederationInfo {
@@ -3109,6 +3134,8 @@ fn handle_credential_commands(
                 previous_amendment_id: None,
                 effective_until: None,
                 ratified_in_epoch: None,
+                // Add the signer DID to the anchor options
+                signer_did: Some(identity.did().to_string()),
             };
             
             // Create the credential
@@ -3117,12 +3144,33 @@ fn handle_credential_commands(
                     println!("Successfully created amendment credential!");
                     println!("Amendment ID: {}", amendment_id_value);
                     println!("References credential: {}", credential_id);
+                    println!("Signed by: {}", identity.did());
                     println!("Reason: {}", reason);
                     
                     // Save the credential to the sync service
                     match sync_service.save_credential(anchor_credential.clone()) {
                         Ok(saved_cred) => {
                             println!("Amendment credential saved to wallet with ID: {}", saved_cred.credential_id);
+                            
+                            // Check if the credential should be immediately submitted to the federation
+                            println!("Would you like to submit this amendment to the federation now? (y/N)");
+                            let mut submit_input = String::new();
+                            std::io::stdin().read_line(&mut submit_input).expect("Failed to read input");
+                            if submit_input.trim().to_lowercase() == "y" {
+                                println!("Submitting amendment to federation...");
+                                
+                                // Create a temporary file with the credential
+                                let temp_dir = std::env::temp_dir();
+                                let temp_file_path = temp_dir.join(format!("amendment-{}.json", amendment_id_value));
+                                std::fs::write(&temp_file_path, serde_json::to_string_pretty(&anchor_credential).unwrap())
+                                    .expect("Failed to write temporary file");
+                                
+                                // Call submit_file function to send to federation
+                                submit_file(identity_manager, &temp_file_path, &None);
+                                
+                                // Clean up temp file
+                                let _ = std::fs::remove_file(&temp_file_path);
+                            }
                         },
                         Err(e) => {
                             eprintln!("Warning: Could not save credential to wallet: {}", e);

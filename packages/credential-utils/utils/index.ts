@@ -1,8 +1,17 @@
-// Export all utility functions
-export * from './credentialExport';
-export * from './trustScore';
+// Export all utilities from the utils directory
 export * from './did';
-export * from './receiptToVC';
-export * from './federation';
+export * from './identity';
+export * from './zkIdentity';
+export * from './crypto';
+export * from './zkDisclosure';
+export * from './anchorCredential';
+export * from './federationSignature';
+export * from './quorumValidation';
+export * from './federationReport';
 export * from './search';
-export * from './quorumValidation'; 
+export * from './credentialExport';
+export * from './federation';
+export * from './receiptToVC';
+export * from './proposalLinking';
+export * from './selectiveDisclosure';
+export * from './trustScore'; 
