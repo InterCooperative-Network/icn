@@ -10,3 +10,12 @@ pub use federation_sync::{
     CredentialStatus,
     CredentialTrustScore,
 }; 
+
+// Export onboarding service
+pub mod onboarding;
+pub use onboarding::{
+    OnboardingService,
+    OnboardingError,
+    FederationInvitePayload,
+    QrFormat,
+}; 

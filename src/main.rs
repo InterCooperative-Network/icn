@@ -16,13 +16,14 @@ use guardians::{GuardianManager, GuardianSet, GuardianStatus};
 use proposal::{ProposalManager, Proposal, VoteOption};
 use federation::{FederationRuntime, MonitoringOptions};
 use api::{ApiClient, ApiConfig};
-use vc::{VerifiableCredential, QrFormat};
-use services::{FederationSyncService, FederationSyncConfig, CredentialSyncData, CredentialStatus};
+use vc::VerifiableCredential;
+use services::{FederationSyncService, FederationSyncConfig, CredentialSyncData, CredentialStatus, OnboardingService, QrFormat};
 use std::path::PathBuf;
 use std::process;
 use std::str::FromStr;
 use std::fs;
 use base64::{Engine as _};
+use std::collections::HashMap;
 
 #[derive(Parser)]
 #[command(author, version, about = "ICN Wallet - A governance and coordination tool for the Intercooperative Network")]
@@ -236,6 +237,12 @@ enum Commands {
     Credentials {
         #[command(subcommand)]
         subcommand: CredentialCommands,
+    },
+    
+    /// Federation invite management
+    Invite {
+        #[command(subcommand)]
+        subcommand: InviteCommands,
     },
 }
 
@@ -565,6 +572,32 @@ enum CredentialCommands {
     },
 }
 
+// New commands for federation invites
+#[derive(Subcommand)]
+enum InviteCommands {
+    /// Export a federation invite as a QR code
+    ExportQR {
+        /// Federation ID to generate invite for
+        #[arg(long)]
+        federation: String,
+        
+        /// Output format (terminal, svg, png)
+        #[arg(long, default_value = "terminal")]
+        format: String,
+        
+        /// Path to save the QR code file (required for svg and png formats)
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    
+    /// Import a federation invite from a QR code
+    ImportQR {
+        /// QR code content string (usually from a scanner)
+        #[arg(long)]
+        content: String,
+    },
+}
+
 fn main() {
     // Initialize logging
     env_logger::init();
@@ -707,7 +740,73 @@ fn main() {
         },
         
         Commands::Credentials { subcommand } => {
-            handle_credential_commands(subcommand, &identity_manager, &storage_manager);
+            // Create federation runtime for the sync service
+            if let Some(identity) = identity_manager.get_active_identity() {
+                let federation_runtime = match FederationRuntime::new(api_config.clone(), identity.clone(), storage_manager.clone()) {
+                    Ok(runtime) => runtime,
+                    Err(e) => {
+                        eprintln!("Failed to initialize federation runtime: {}", e);
+                        process::exit(1);
+                    }
+                };
+                
+                // Create federation sync service
+                let sync_service = FederationSyncService::new(
+                    federation_runtime, 
+                    storage_manager.clone(), 
+                    identity_manager.clone(),
+                    None
+                );
+                
+                if let Err(e) = sync_service.initialize() {
+                    eprintln!("Failed to initialize federation sync service: {}", e);
+                    process::exit(1);
+                }
+                
+                handle_credential_commands(subcommand, &identity_manager, &storage_manager);
+            } else {
+                eprintln!("No active identity. Please use 'identity use' to set an active identity first.");
+                process::exit(1);
+            }
+        },
+        
+        Commands::Invite { subcommand } => {
+            // Create federation runtime for the onboarding service
+            if let Some(identity) = identity_manager.get_active_identity() {
+                let federation_runtime = match FederationRuntime::new(api_config.clone(), identity.clone(), storage_manager.clone()) {
+                    Ok(runtime) => runtime,
+                    Err(e) => {
+                        eprintln!("Failed to initialize federation runtime: {}", e);
+                        process::exit(1);
+                    }
+                };
+                
+                // Create federation sync service
+                let sync_service = FederationSyncService::new(
+                    federation_runtime.clone(), 
+                    storage_manager.clone(), 
+                    identity_manager.clone(),
+                    None
+                );
+                
+                if let Err(e) = sync_service.initialize() {
+                    eprintln!("Failed to initialize federation sync service: {}", e);
+                    process::exit(1);
+                }
+                
+                // Create onboarding service
+                let onboarding_service = OnboardingService::new(
+                    federation_runtime,
+                    identity_manager.clone(),
+                    storage_manager.clone(),
+                    sync_service,
+                );
+                
+                handle_invite_commands(subcommand, &onboarding_service);
+            } else {
+                eprintln!("No active identity. Please use 'identity use' to set an active identity first.");
+                process::exit(1);
+            }
         },
     }
     
@@ -2731,6 +2830,92 @@ fn handle_credential_commands(
                 },
                 Err(e) => {
                     eprintln!("Failed to decode credential from QR code: {}", e);
+                }
+            }
+        },
+    }
+}
+
+/// Handle federation invite commands
+fn handle_invite_commands(
+    command: &InviteCommands,
+    onboarding_service: &OnboardingService,
+) {
+    match command {
+        InviteCommands::ExportQR { federation, format, output } => {
+            println!("Generating invite QR code for federation: {}", federation);
+            
+            // Create the invite
+            match onboarding_service.create_invite(federation) {
+                Ok(invite) => {
+                    // Parse format
+                    let qr_format = match services::QrFormat::from_str(format) {
+                        Some(f) => f,
+                        None => {
+                            eprintln!("Invalid format: {}. Supported formats are terminal, svg, png", format);
+                            return;
+                        }
+                    };
+                    
+                    // Validate output path for non-terminal formats
+                    if qr_format != services::QrFormat::Terminal && output.is_none() {
+                        eprintln!("Output path is required for {} format", format);
+                        return;
+                    }
+                    
+                    // Generate QR code
+                    let output_path = output.as_ref().map(|p| p.as_path());
+                    match onboarding_service.generate_invite_qr(&invite, qr_format, output_path) {
+                        Ok(result) => {
+                            match qr_format {
+                                services::QrFormat::Terminal => {
+                                    println!("Federation: {} ({})", invite.name.unwrap_or_else(|| federation.to_string()), federation);
+                                    println!("Created by: {}", invite.creator_did);
+                                    println!("Expires: {}", invite.expires.map(|e| e.to_string()).unwrap_or_else(|| "Never".to_string()));
+                                    println!("\nQR Code:\n");
+                                    println!("{}", result);
+                                },
+                                _ => println!("{}", result),
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("Failed to generate QR code: {}", e);
+                        }
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to create federation invite: {}", e);
+                }
+            }
+        },
+        
+        InviteCommands::ImportQR { content } => {
+            println!("Importing federation invite from QR code...");
+            
+            // Decode QR content to an invite
+            match onboarding_service.decode_invite_from_qr(content) {
+                Ok(invite) => {
+                    println!("Successfully decoded invite from QR code:");
+                    println!("Federation: {} ({})", invite.name.unwrap_or_else(|| invite.federation_id.clone()), invite.federation_id);
+                    println!("Created by: {}", invite.creator_did);
+                    if let Some(expires) = invite.expires {
+                        println!("Expires: {}", expires);
+                    }
+                    
+                    // Process the invite
+                    match onboarding_service.process_invite(invite) {
+                        Ok(()) => {
+                            println!("Federation invite processed successfully!");
+                            println!("You can now sync credentials with this federation using:");
+                            println!("  icn-wallet credentials sync --federation <federation-id>");
+                        },
+                        Err(e) => {
+                            eprintln!("Failed to process federation invite: {}", e);
+                        }
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to decode invite from QR code: {}", e);
                 }
             }
         },

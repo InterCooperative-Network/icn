@@ -1,4 +1,5 @@
 // Export all utility functions
-export * from './did';
+export * from './credentialExport';
 export * from './trustScore';
-export * from './credentialExport'; 
+export * from './did';
+export * from './receiptToVC'; 
