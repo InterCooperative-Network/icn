@@ -217,7 +217,7 @@ pub fn format_validation_error(err: &ValidationError, instance: &JsonValue) -> S
     let path_display = if path.is_empty() { "root" } else { &path };
     
     // Extract the property name from the path
-    let property = path.split('/')
+    let _property = path.split('/')
         .last()
         .unwrap_or("unknown");
     
@@ -227,12 +227,12 @@ pub fn format_validation_error(err: &ValidationError, instance: &JsonValue) -> S
             format!("Missing required property: '{}'", property)
         }
         ValidationErrorKind::Type { .. } => {
-            let value = instance.pointer(err.instance_path.to_string().as_str());
+            let _value = instance.pointer(err.instance_path.to_string().as_str());
             format!("Invalid type for '{}': expected {}, got {}",
-                    path_display, err.schema_path, value.map_or("null".to_string(), |v| format!("{:?}", v)))
+                    path_display, err.schema_path, _value.map_or("null".to_string(), |v| format!("{:?}", v)))
         }
         ValidationErrorKind::Enum { .. } => {
-            let value = instance.pointer(err.instance_path.to_string().as_str());
+            let _value = instance.pointer(err.instance_path.to_string().as_str());
             format!("Invalid value for '{}': must be one of the allowed values",
                     path_display)
         }

@@ -10,15 +10,50 @@ It serves as a bridge between the core runtime and the CLI tools.
 - Common utilities for interacting with the runtime
 */
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use icn_dag::DagNode;
 use icn_identity::{IdentityId, IdentityScope, VerifiableCredential};
 use thiserror::Error;
 use std::fs;
 use std::path::Path;
 use icn_core_vm::{ResourceType, ResourceAuthorization};
-use icn_governance_kernel::config::ProposalTemplate;
 use std::collections::HashMap;
+
+/// Custom proposal template implementation since this type is no longer in the governance kernel
+#[derive(Debug, Clone)]
+pub struct ProposalTemplate {
+    /// Name of the proposal template
+    pub name: String,
+    
+    /// Description of the proposal template
+    pub description: String,
+    
+    /// Whether this template uses DAG operations
+    pub uses_dag: bool,
+    
+    /// Whether this template uses economics operations
+    pub uses_economics: bool,
+    
+    /// Whether this template uses identity operations
+    pub uses_identity: bool,
+    
+    /// Custom resource authorizations
+    pub resource_authorizations: HashMap<ResourceType, u64>,
+}
+
+impl ProposalTemplate {
+    /// Create a new proposal template
+    pub fn new(name: String, description: String) -> Self {
+        Self {
+            name,
+            description,
+            uses_dag: false,
+            uses_economics: false,
+            uses_identity: false,
+            resource_authorizations: HashMap::new(),
+        }
+    }
+}
 
 /// Errors that can occur during execution
 #[derive(Debug, Error)]
@@ -115,9 +150,9 @@ pub mod cli_helpers {
     
     /// Helper for propose command
     pub fn propose_command(
-        template_path: &str,
-        input_path: &str,
-        identity: &IdentityId,
+        _template_path: &str,
+        _input_path: &str,
+        _identity: &IdentityId,
     ) -> Result<DagNode> {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
@@ -125,10 +160,10 @@ pub mod cli_helpers {
     
     /// Helper for vote command
     pub fn vote_command(
-        proposal_id: &str,
-        vote: bool,
-        reason: &str,
-        identity: &IdentityId,
+        _proposal_id: &str,
+        _vote: bool,
+        _reason: &str,
+        _identity: &IdentityId,
     ) -> Result<DagNode> {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
@@ -136,8 +171,8 @@ pub mod cli_helpers {
     
     /// Helper for execute command
     pub fn execute_command(
-        proposal_id: &str,
-        identity: &IdentityId,
+        _proposal_id: &str,
+        _identity: &IdentityId,
     ) -> Result<DagNode> {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
@@ -145,8 +180,8 @@ pub mod cli_helpers {
     
     /// Helper for anchor command
     pub fn anchor_command(
-        dag_root: &[u8],
-        identity: &IdentityId,
+        _dag_root: &[u8],
+        _identity: &IdentityId,
     ) -> Result<DagNode> {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
@@ -154,8 +189,8 @@ pub mod cli_helpers {
     
     /// Helper for identity register command
     pub fn identity_register_command(
-        scope: IdentityScope,
-        name: &str,
+        _scope: IdentityScope,
+        _name: &str,
     ) -> Result<IdentityId> {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
@@ -181,34 +216,43 @@ pub fn derive_authorizations(template: &ProposalTemplate) -> Vec<ResourceAuthori
         "Base storage allowance for proposal execution".to_string()
     ));
     
-    // If the template indicates it works with the DAG, add DAG authorization
+    // If the template indicates it works with the DAG, add Network authorization
     if template.uses_dag {
         authorizations.push(ResourceAuthorization::new(
-            ResourceType::DAG, 
-            10,     // Number of DAG operations
+            ResourceType::Network, 
+            10,     // Number of network operations
             None,   // No specific context
-            "DAG operations allowance for proposal execution".to_string()
+            "Network operations allowance for proposal execution".to_string()
         ));
     }
     
     // If the template indicates it needs to perform economic operations
     if template.uses_economics {
         authorizations.push(ResourceAuthorization::new(
-            ResourceType::Budget, 
-            5,      // Number of budget operations
+            ResourceType::Token, 
+            5,      // Number of token operations
             None,   // No specific context
-            "Budget operations allowance for proposal execution".to_string()
+            "Token operations allowance for proposal execution".to_string()
         ));
     }
     
     // If the template indicates identity operations
     if template.uses_identity {
-        authorizations.push(ResourceAuthorization::new(
-            ResourceType::Identity, 
-            10,     // Number of identity operations
-            None,   // No specific context
-            "Identity operations allowance for proposal execution".to_string()
-        ));
+        // Identity operations generally involve both compute and storage
+        // We'll increase those limits rather than having a separate type
+        let existing_compute = authorizations.iter_mut()
+            .find(|auth| auth.resource_type == ResourceType::Compute);
+        
+        if let Some(auth) = existing_compute {
+            auth.limit += 50_000; // Additional compute for identity operations
+        }
+        
+        let existing_storage = authorizations.iter_mut()
+            .find(|auth| auth.resource_type == ResourceType::Storage);
+            
+        if let Some(auth) = existing_storage {
+            auth.limit += 100_000; // Additional storage for identity operations
+        }
     }
     
     // Add custom authorizations from the template
@@ -218,13 +262,13 @@ pub fn derive_authorizations(template: &ProposalTemplate) -> Vec<ResourceAuthori
         
         if let Some(index) = existing_index {
             // Update existing authorization if the new amount is higher
-            if authorizations[index].amount < *amount {
-                authorizations[index].amount = *amount;
+            if authorizations[index].limit < *amount {
+                authorizations[index].limit = *amount;
             }
         } else {
             // Add a new authorization
             authorizations.push(ResourceAuthorization::new(
-                resource.clone(),
+                *resource,
                 *amount,
                 None,
                 format!("Custom {} authorization from template", resource)
@@ -241,24 +285,18 @@ pub fn prepare_execution_context(
     template: &ProposalTemplate,
     caller_did: String,
     caller_scope: icn_identity::IdentityScope
-) -> icn_core_vm::VmContext {
+) -> icn_core_vm::VMContext {
     // Derive authorizations from the template
     let authorizations = derive_authorizations(template);
     
-    // Get all resource types from the authorizations
-    let resource_types = authorizations.iter()
-        .map(|auth| auth.resource_type.clone())
-        .collect();
-    
+    // Create a new identity context - using a generated keypair from identity module
+    let (_, keypair) = icn_identity::generate_did_keypair().unwrap();
+    let identity_context = std::sync::Arc::new(icn_core_vm::IdentityContext::new(keypair, &caller_did));
+
     // Create a VM context with the appropriate authorizations
-    icn_core_vm::VmContext::with_authorizations(
-        caller_did,
-        caller_scope,
-        resource_types,
-        authorizations,
-        uuid::Uuid::new_v4().to_string(), // Generate a unique execution ID
-        chrono::Utc::now().timestamp(),   // Current timestamp
-        Some(proposal_cid.to_string())    // Associated proposal CID
+    icn_core_vm::VMContext::new(
+        identity_context,
+        authorizations
     )
 }
 

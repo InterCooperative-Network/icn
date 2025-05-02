@@ -13,14 +13,13 @@ between the declarative governance rules and their executable representation.
 */
 
 use icn_governance_kernel::config::GovernanceConfig;
-use icn_governance_kernel::CclError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use wasm_encoder::{
-    CodeSection, CustomSection, EntityType, ExportSection, Function, FunctionSection, ImportSection, Module, TypeSection,
+    CodeSection, EntityType, ExportSection, FunctionSection, ImportSection, Module, TypeSection,
     ValType,
 };
 
@@ -86,12 +85,6 @@ pub enum CompilerError {
     /// General compilation error
     #[error("Compilation error: {0}")]
     General(String),
-}
-
-impl From<CclError> for CompilerError {
-    fn from(error: CclError) -> Self {
-        CompilerError::ValidationError(error.to_string())
-    }
 }
 
 impl From<serde_json::Error> for CompilerError {
@@ -247,7 +240,7 @@ impl CclCompiler {
     ) -> CompilerResult<()> {
         // If we have a custom schema path, load and validate directly
         if let Some(schema_path) = custom_schema_path {
-            if let Some(schema_manager) = &mut self.schema_manager {
+            if let Some(_schema_manager) = &mut self.schema_manager {
                 // Load and compile the schema
                 let schema_content = std::fs::read_to_string(schema_path)
                     .map_err(|e| CompilerError::SchemaError(format!(
