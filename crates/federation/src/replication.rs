@@ -5,7 +5,7 @@
  */
 
 use cid::Cid;
-use libp2p::PeerId;
+use libp2p::{PeerId, swarm::Swarm};
 use std::fmt;
 use std::sync::Arc;
 use futures::lock::Mutex;
@@ -14,6 +14,7 @@ use tracing::{debug, info, error};
 
 use crate::FederationError;
 use crate::FederationResult;
+use crate::network::{IcnFederationBehaviour, ReplicateBlobRequest};
 
 /// Get a list of target peers for replication based on policy and known peers
 pub async fn identify_target_peers(
@@ -62,21 +63,28 @@ pub async fn identify_target_peers(
 pub async fn replicate_to_peers(
     cid: &Cid, 
     target_peers: &[PeerId],
+    swarm: &mut Swarm<IcnFederationBehaviour>,
 ) -> FederationResult<()> {
-    // For now, just log the intent to replicate
-    // In a future implementation, we would initiate the actual replication request
-    
+    // Check if we have any target peers
     if target_peers.is_empty() {
         debug!(%cid, "No replication targets identified");
         return Ok(());
     }
     
-    for peer in target_peers {
-        info!(%cid, %peer, "Planning to replicate blob to peer");
-        // TODO: Implement actual replication protocol
-        // 1. Establish connection to peer if not already connected
-        // 2. Send replication request message
-        // 3. Track replication status
+    // Create the replication request
+    let request = ReplicateBlobRequest {
+        cid: *cid,
+    };
+    
+    // Send replication request to each target peer
+    for peer_id in target_peers {
+        info!(%cid, %peer_id, "Initiating blob replication to peer");
+        
+        // Send the request using the blob_replication behavior
+        swarm.behaviour_mut().blob_replication.send_request(peer_id, request.clone());
+        
+        // Log a success message for the request being sent
+        debug!(%cid, %peer_id, "Sent ReplicateBlobRequest");
     }
     
     Ok(())

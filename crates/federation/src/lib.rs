@@ -664,8 +664,8 @@ async fn handle_behavior_event(
                     let _ = tx.send(Ok(target_peers.clone()));
                 }
                 
-                // Initiate replication (for now just logs intent)
-                if let Err(e) = replication::replicate_to_peers(&cid, &target_peers).await {
+                // Initiate replication to the target peers
+                if let Err(e) = replication::replicate_to_peers(&cid, &target_peers, swarm).await {
                     error!(%cid, "Failed to replicate blob: {}", e);
                 }
             } else {
@@ -833,6 +833,100 @@ async fn handle_behavior_event(
                 debug!("Received empty TrustBundle response (None)");
             }
         },
+        
+        // Handle blob replication requests
+        network::IcnFederationBehaviourEvent::BlobReplication(request_response::Event::Message { 
+            peer, 
+            message: request_response::Message::Request { request, channel, .. },
+            ..
+        }) => {
+            info!(peer = %peer, cid = %request.cid, "Received ReplicateBlobRequest");
+            
+            // Check if the blob exists locally
+            let storage_lock = storage.lock().await;
+            let blob_exists = storage_lock.blob_exists(&request.cid).await;
+            drop(storage_lock); // Release the lock as soon as possible
+            
+            match blob_exists {
+                // The blob exists
+                Ok(true) => {
+                    debug!(cid = %request.cid, "Blob already exists locally, attempting to pin");
+                    
+                    // Pin the blob
+                    let storage_lock = storage.lock().await;
+                    match storage_lock.pin_blob(&request.cid).await {
+                        Ok(_) => {
+                            info!(cid = %request.cid, "Successfully pinned blob for replication");
+                            
+                            // Send successful response
+                            let response = network::ReplicateBlobResponse {
+                                success: true,
+                                error_msg: None,
+                            };
+                            if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                                error!(cid = %request.cid, "Failed to send replication response: {:?}", e);
+                            }
+                        },
+                        Err(e) => {
+                            error!(cid = %request.cid, "Failed to pin existing blob: {}", e);
+                            
+                            // Send error response
+                            let response = network::ReplicateBlobResponse {
+                                success: false,
+                                error_msg: Some(format!("Failed to pin existing blob: {}", e)),
+                            };
+                            if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                                error!(cid = %request.cid, "Failed to send replication response: {:?}", e);
+                            }
+                        }
+                    }
+                },
+                // The blob doesn't exist
+                Ok(false) => {
+                    warn!(cid = %request.cid, "Blob not found locally, cannot fulfill replication request (P2P fetch not implemented)");
+                    
+                    // Send error response
+                    let response = network::ReplicateBlobResponse {
+                        success: false,
+                        error_msg: Some("Blob not available locally".to_string()),
+                    };
+                    if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                        error!(cid = %request.cid, "Failed to send replication response: {:?}", e);
+                    }
+                    
+                    // TODO(V3-MVP): Implement P2P blob fetch logic here if blob doesn't exist locally.
+                },
+                // Error checking if the blob exists
+                Err(e) => {
+                    error!(cid = %request.cid, "Error checking if blob exists: {}", e);
+                    
+                    // Send error response
+                    let response = network::ReplicateBlobResponse {
+                        success: false,
+                        error_msg: Some(format!("Error checking blob existence: {}", e)),
+                    };
+                    if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                        error!(cid = %request.cid, "Failed to send replication response: {:?}", e);
+                    }
+                }
+            }
+        },
+        
+        // Handle blob replication responses
+        network::IcnFederationBehaviourEvent::BlobReplication(request_response::Event::Message { 
+            peer, 
+            message: request_response::Message::Response { response, .. },
+            ..
+        }) => {
+            info!(
+                peer = %peer, 
+                success = response.success, 
+                error = ?response.error_msg, 
+                "Received ReplicateBlobResponse"
+            );
+            
+            // TODO(V3-MVP): Update replication tracking state based on response.
+        },
         _ => {}
     }
 }
@@ -910,6 +1004,88 @@ mod tests {
         // Test TrustBundleResponse with None
         let response_none = network::TrustBundleResponse { bundle: None };
         assert!(response_none.bundle.is_none());
+        
+        // Test ReplicateBlobRequest
+        let cid = cid::Cid::new_v0(multihash::Code::Sha2_256.digest(b"test_blob")).unwrap();
+        let replicate_request = network::ReplicateBlobRequest { cid };
+        assert_eq!(replicate_request.cid, cid);
+        
+        // Test ReplicateBlobResponse success
+        let success_response = network::ReplicateBlobResponse { 
+            success: true, 
+            error_msg: None 
+        };
+        assert!(success_response.success);
+        assert!(success_response.error_msg.is_none());
+        
+        // Test ReplicateBlobResponse failure
+        let error_response = network::ReplicateBlobResponse { 
+            success: false, 
+            error_msg: Some("Blob not found".to_string()) 
+        };
+        assert!(!error_response.success);
+        assert_eq!(error_response.error_msg.unwrap(), "Blob not found");
+    }
+    
+    #[tokio::test]
+    async fn test_blob_replication_protocol() {
+        use std::time::Duration;
+        use cid::Cid;
+        use icn_storage::{InMemoryBlobStore, DistributedStorage};
+        use multihash::{Code, MultihashDigest};
+        
+        // Create test data
+        let test_content = b"This is test content for blob replication protocol".to_vec();
+        let mh = Code::Sha2_256.digest(&test_content);
+        let cid = Cid::new_v0(mh).unwrap();
+        
+        // Create mock storage with the test blob
+        let mut storage = icn_storage::AsyncInMemoryStorage::new();
+        
+        // Create blob store with the test blob
+        let blob_store = InMemoryBlobStore::new();
+        
+        // Put and pin the test blob
+        blob_store.put_blob(&test_content).await.unwrap();
+        blob_store.pin_blob(&cid).await.unwrap();
+        
+        // Create replication request
+        let request = network::ReplicateBlobRequest { cid };
+        
+        // Verify the request serialization/deserialization
+        let serialized = serde_cbor::to_vec(&request).unwrap();
+        let deserialized: network::ReplicateBlobRequest = serde_cbor::from_slice(&serialized).unwrap();
+        assert_eq!(deserialized.cid, cid);
+        
+        // Create response
+        let response = network::ReplicateBlobResponse {
+            success: true,
+            error_msg: None,
+        };
+        
+        // Verify the response serialization/deserialization
+        let serialized = serde_cbor::to_vec(&response).unwrap();
+        let deserialized: network::ReplicateBlobResponse = serde_cbor::from_slice(&serialized).unwrap();
+        assert_eq!(deserialized.success, response.success);
+        assert_eq!(deserialized.error_msg, response.error_msg);
+        
+        // Create a mock peer ID for testing
+        let mock_peer_id = PeerId::random();
+        
+        // Test target peer identification
+        let peers = vec![mock_peer_id];
+        let policy = ReplicationPolicy::Factor(1);
+        let local_peer_id = PeerId::random();
+        
+        let targets = replication::identify_target_peers(
+            &cid, 
+            &policy, 
+            peers.clone(), 
+            &local_peer_id
+        ).await;
+        
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0], mock_peer_id);
     }
     
     #[tokio::test]

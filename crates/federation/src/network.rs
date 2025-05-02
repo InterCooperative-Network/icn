@@ -6,6 +6,7 @@ use libp2p::{
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use icn_identity::TrustBundle;
+use cid::Cid;
 
 /// Request for a TrustBundle by epoch
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,8 +25,30 @@ pub struct TrustBundleResponse {
 /// Protocol name for TrustBundle sync
 pub const TRUST_BUNDLE_PROTOCOL_ID: StreamProtocol = StreamProtocol::new("/icn/trustbundle/1.0.0");
 
+/// Protocol name for Blob Replication
+pub const BLOB_REPLICATION_PROTOCOL_ID: StreamProtocol = StreamProtocol::new("/icn/blob-replicate/1.0.0");
+
 /// Timeout for TrustBundle request/response
 pub const TRUST_BUNDLE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Timeout for Blob Replication request/response
+pub const BLOB_REPLICATION_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Request to replicate a blob
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicateBlobRequest {
+    /// The CID of the blob to replicate
+    pub cid: Cid,
+}
+
+/// Response to a blob replication request
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicateBlobResponse {
+    /// Whether the replication was successful
+    pub success: bool,
+    /// Error message if the replication failed
+    pub error_msg: Option<String>,
+}
 
 /// Represents all networking behaviors for the ICN federation
 #[derive(NetworkBehaviour)]
@@ -44,6 +67,10 @@ pub struct IcnFederationBehaviour {
     
     /// TrustBundle sync request/response protocol
     pub trust_bundle_sync: request_response::json::Behaviour<TrustBundleRequest, TrustBundleResponse>,
+    
+    /// Blob replication request/response protocol
+    #[behaviour(event_process = false)]
+    pub blob_replication: request_response::cbor::Behaviour<ReplicateBlobRequest, ReplicateBlobResponse>,
 }
 
 /// Creates a new instance of IcnFederationBehaviour
@@ -86,11 +113,18 @@ pub fn create_behaviour(
         request_response::Config::default().with_request_timeout(TRUST_BUNDLE_TIMEOUT),
     );
     
+    // Create Blob Replication request/response behavior
+    let blob_replication = request_response::cbor::Behaviour::<ReplicateBlobRequest, ReplicateBlobResponse>::new(
+        [(BLOB_REPLICATION_PROTOCOL_ID, request_response::ProtocolSupport::Full)],
+        request_response::Config::default().with_request_timeout(BLOB_REPLICATION_TIMEOUT),
+    );
+    
     Ok(IcnFederationBehaviour {
         gossipsub,
         kademlia,
         mdns,
         identify,
         trust_bundle_sync,
+        blob_replication,
     })
 } 
