@@ -82,31 +82,29 @@ impl IdentityWallet {
     }
     
     pub fn to_document(&self) -> Value {
-        let mut doc = serde_json::json!({
-            "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": self.did,
+        let did_str = self.did.to_string();
+        let verification_key_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(self.keypair.public_key_bytes());
+
+        serde_json::json!({
+            "@context": [
+                "https://www.w3.org/ns/did/v1",
+                "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": did_str,
             "verificationMethod": [{
-                "id": format!("{}#keys-1", self.did),
+                "id": format!("{}#keys-1", did_str),
                 "type": "Ed25519VerificationKey2020",
-                "controller": self.did,
-                "publicKeyBase64": general_purpose::STANDARD.encode(self.keypair.public_key_bytes())
+                "controller": did_str,
+                "publicKeyBase64": verification_key_b64
             }],
-            "authentication": [format!("{}#keys-1", self.did)],
-            "assertionMethod": [format!("{}#keys-1", self.did)]
-        });
-        
-        if let Some(metadata) = &self.metadata {
-            doc["metadata"] = metadata.clone();
-        }
-        
-        match self.scope {
-            IdentityScope::Personal => { doc["scope"] = serde_json::json!("personal"); }
-            IdentityScope::Organization => { doc["scope"] = serde_json::json!("organization"); }
-            IdentityScope::Device => { doc["scope"] = serde_json::json!("device"); }
-            IdentityScope::Service => { doc["scope"] = serde_json::json!("service"); }
-            IdentityScope::Custom(ref s) => { doc["scope"] = serde_json::json!(s); }
-        }
-        
-        doc
+            "authentication": [
+                format!("{}#keys-1", did_str)
+            ],
+            "assertionMethod": [
+                format!("{}#keys-1", did_str)
+            ],
+            "scope": format!("{:?}", self.scope),
+            "metadata": self.metadata
+        })
     }
 } 

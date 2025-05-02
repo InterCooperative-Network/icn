@@ -19,6 +19,12 @@ impl WalletAPI {
         Self { state }
     }
     
+    pub fn with_agoranet_url(mut self, url: &str) -> Self {
+        let state = Arc::new(AppState::new(&self.state.data_dir).with_agoranet_url(url));
+        self.state = state;
+        self
+    }
+    
     pub async fn run(&self, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
         let cors = CorsLayer::new()
             .allow_origin(Any)
@@ -41,9 +47,22 @@ impl WalletAPI {
             
             // Sync routes
             .route("/api/sync/dag", post(handlers::sync_dag))
+            .route("/api/sync/trust-bundles", post(handlers::sync_trust_bundles))
+            
+            // Trust Bundle routes
+            .route("/api/bundles", get(handlers::list_trust_bundles))
+            .route("/api/guardian/status", get(handlers::check_guardian_status))
+            .route("/api/proposals/:proposal_id/receipt", post(handlers::create_execution_receipt))
             
             // Governance routes
             .route("/api/governance/appeal/:mandate_id", post(handlers::appeal_mandate))
+            
+            // AgoraNet integration routes
+            .route("/api/agoranet/threads", get(handlers::get_threads))
+            .route("/api/agoranet/threads/:thread_id", get(handlers::get_thread))
+            .route("/api/agoranet/threads/:thread_id/credential-links", get(handlers::get_credential_links))
+            .route("/api/agoranet/credential-link", post(handlers::link_credential))
+            .route("/api/agoranet/proposals/:proposal_id/notify", post(handlers::notify_proposal_event))
             
             .layer(cors)
             .with_state(self.state.clone());

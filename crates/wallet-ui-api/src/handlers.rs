@@ -1,14 +1,17 @@
 use axum::{
-    extract::{State, Path, Json},
+    extract::{State, Path, Json, Query},
     http::StatusCode,
 };
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use wallet_core::identity::{IdentityWallet, IdentityScope};
+use wallet_core::credential::{VerifiableCredential, CredentialSigner};
 use wallet_agent::queue::ActionType;
+use wallet_agent::agoranet::{ThreadSummary, ThreadDetail, CredentialLink};
 use crate::error::{ApiResult, ApiError};
 use crate::state::SharedState;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 // Request/Response types
 #[derive(Debug, Deserialize)]
@@ -46,6 +49,18 @@ pub struct CreateCredentialRequest {
 #[derive(Debug, Serialize)]
 pub struct CredentialResponse {
     pub credential: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetThreadsQuery {
+    pub proposal_id: Option<String>,
+    pub topic: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LinkCredentialRequest {
+    pub thread_id: String,
+    pub credential_id: String,
 }
 
 // Handler implementations
@@ -211,6 +226,167 @@ pub async fn list_actions(
     
     let response = serde_json::json!({
         "actions": actions,
+    });
+    
+    Ok(Json(response))
+}
+
+// AgoraNet API handlers
+pub async fn get_threads(
+    State(state): State<SharedState>,
+    Query(query): Query<GetThreadsQuery>,
+) -> ApiResult<Json<Vec<ThreadSummary>>> {
+    let client = state.create_agoranet_client().await?;
+    
+    let threads = client.get_threads(
+        query.proposal_id.as_deref(),
+        query.topic.as_deref()
+    ).await?;
+    
+    Ok(Json(threads))
+}
+
+pub async fn get_thread(
+    State(state): State<SharedState>,
+    Path(thread_id): Path<String>,
+) -> ApiResult<Json<ThreadDetail>> {
+    let client = state.create_agoranet_client().await?;
+    
+    let thread = client.get_thread(&thread_id).await?;
+    
+    Ok(Json(thread))
+}
+
+pub async fn get_credential_links(
+    State(state): State<SharedState>,
+    Path(thread_id): Path<String>,
+) -> ApiResult<Json<Vec<CredentialLink>>> {
+    let client = state.create_agoranet_client().await?;
+    
+    let links = client.get_credential_links(&thread_id).await?;
+    
+    Ok(Json(links))
+}
+
+pub async fn link_credential(
+    State(state): State<SharedState>,
+    Json(request): Json<LinkCredentialRequest>,
+) -> ApiResult<Json<CredentialLink>> {
+    let client = state.create_agoranet_client().await?;
+    let identity = state.get_active_identity().await?;
+    
+    // Retrieve the credential from storage
+    // In a real implementation, this would fetch from a credential store
+    // For now, we'll create a dummy credential
+    let signer = CredentialSigner::new(identity);
+    let credential = signer.issue_credential(
+        serde_json::json!({
+            "id": request.credential_id,
+            "name": "Sample Credential",
+            "type": "MembershipCredential"
+        }),
+        vec!["MembershipCredential".to_string()]
+    ).map_err(|e| ApiError::InternalError(format!("Failed to create credential: {}", e)))?;
+    
+    // Link the credential to the thread
+    let link = client.link_credential(&request.thread_id, &credential).await?;
+    
+    Ok(Json(link))
+}
+
+pub async fn notify_proposal_event(
+    State(state): State<SharedState>,
+    Path(proposal_id): Path<String>,
+    Json(details): Json<Value>,
+) -> ApiResult<StatusCode> {
+    let client = state.create_agoranet_client().await?;
+    
+    client.notify_proposal_event(&proposal_id, "status_update", details).await?;
+    
+    Ok(StatusCode::OK)
+}
+
+// Trust Bundle handlers
+pub async fn list_trust_bundles(
+    State(state): State<SharedState>,
+) -> ApiResult<Json<Vec<wallet_agent::governance::TrustBundle>>> {
+    let guardian = state.create_guardian().await?;
+    
+    let bundles = guardian.list_trust_bundles().await?;
+    
+    Ok(Json(bundles))
+}
+
+pub async fn check_guardian_status(
+    State(state): State<SharedState>,
+) -> ApiResult<Json<Value>> {
+    let guardian = state.create_guardian().await?;
+    
+    let is_guardian = guardian.is_active_guardian().await?;
+    
+    let response = serde_json::json!({
+        "is_active_guardian": is_guardian,
+    });
+    
+    Ok(Json(response))
+}
+
+pub async fn create_execution_receipt(
+    State(state): State<SharedState>,
+    Path(proposal_id): Path<String>,
+    Json(result): Json<Value>,
+) -> ApiResult<Json<wallet_agent::governance::ExecutionReceipt>> {
+    let guardian = state.create_guardian().await?;
+    
+    let receipt = guardian.create_execution_receipt(&proposal_id, result)?;
+    
+    // Optionally notify AgoraNet
+    let agoranet = state.create_agoranet_client().await?;
+    
+    // This is intentionally not using ? to avoid failing if AgoraNet notification fails
+    let _ = guardian.notify_agoranet(
+        &agoranet, 
+        &proposal_id, 
+        "executed", 
+        serde_json::json!({
+            "receipt_id": receipt.proposal_id,
+            "executor": receipt.executed_by,
+        })
+    ).await;
+    
+    Ok(Json(receipt))
+}
+
+// Enhanced sync endpoint that loads from disk and syncs from network
+pub async fn sync_trust_bundles(
+    State(state): State<SharedState>,
+) -> ApiResult<Json<Value>> {
+    // 1. First load any local bundles from disk
+    let guardian = state.create_guardian().await?;
+    let local_count = guardian.load_trust_bundles_from_disk().await?;
+    
+    // 2. Then sync from the network
+    let client = state.create_sync_client().await?;
+    let network_bundles = client.sync_trust_bundles().await
+        .map_err(ApiError::SyncError)?;
+    
+    // Store the length before we start consuming bundles
+    let network_bundles_count = network_bundles.len();
+    
+    // 3. Store the network bundles
+    let mut stored_count = 0;
+    for bundle in network_bundles {
+        // Store returns an error for invalid bundles, which we'll ignore
+        if guardian.store_trust_bundle(bundle).await.is_ok() {
+            stored_count += 1;
+        }
+    }
+    
+    let response = serde_json::json!({
+        "local_bundles_loaded": local_count,
+        "network_bundles_synced": network_bundles_count,
+        "network_bundles_stored": stored_count,
+        "status": "success",
     });
     
     Ok(Json(response))
