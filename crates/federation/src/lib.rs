@@ -1559,7 +1559,6 @@ mod tests {
         use cid::Cid;
         use icn_storage::{AsyncInMemoryStorage, StorageResult, StorageBackend};
         use multihash::{Code, MultihashDigest};
-        use libp2p::kad::QueryId;
         
         // Create test data
         let test_content = b"This is test content for P2P blob fetch".to_vec();
@@ -1567,14 +1566,13 @@ mod tests {
         let cid = Cid::new_v0(mh).unwrap();
         
         // Create storage and adapter
-        let storage = AsyncInMemoryStorage::new();
-        // Box the storage backend to create a trait object
-        let storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(storage);
-        let storage_arc = Arc::new(Mutex::new(storage_box));
-        let blob_storage = Arc::new(BlobStorageAdapter::new(storage_arc));
+        let storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let blob_storage = Arc::new(BlobStorageAdapter::new(storage.clone()));
         
-        // Create a mock query ID manually (QueryId doesn't have a new() method)
-        let query_id = libp2p::kad::QueryId::from(42u64);
+        // Create a mock query ID using a simple wrapper type
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        struct MockQueryId(u64);
+        let query_id = MockQueryId(42);
         
         // Simulate a provider giving us the data by adding it to storage
         {
@@ -1730,16 +1728,12 @@ mod tests {
         let cid = Cid::new_v0(mh).unwrap();
         
         // Create storage and adapter for provider
-        let provider_storage = AsyncInMemoryStorage::new();
-        let provider_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(provider_storage);
-        let provider_storage_arc = Arc::new(Mutex::new(provider_storage_box));
-        let provider_blob_storage = Arc::new(BlobStorageAdapter::new(provider_storage_arc));
+        let provider_storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let provider_blob_storage = Arc::new(BlobStorageAdapter::new(provider_storage.clone()));
         
         // Create storage and adapter for requester
-        let requester_storage = AsyncInMemoryStorage::new();
-        let requester_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(requester_storage);
-        let requester_storage_arc = Arc::new(Mutex::new(requester_storage_box));
-        let requester_blob_storage = Arc::new(BlobStorageAdapter::new(requester_storage_arc));
+        let requester_storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let requester_blob_storage = Arc::new(BlobStorageAdapter::new(requester_storage.clone()));
         
         // Add the blob to the provider's storage
         provider_blob_storage.put_blob(&test_content).await.unwrap();
@@ -1754,7 +1748,7 @@ mod tests {
         let provider_peer_id = PeerId::random();
         
         // Create a mock channel for the fetch response
-        let (response_sender, response_receiver) = 
+        let (response_sender, mut response_receiver) = 
             tokio::sync::mpsc::channel::<network::FetchBlobResponse>(1);
         
         // Simulate FetchBlobRequest handling as if from the provider side
@@ -1798,7 +1792,7 @@ mod tests {
         // Verify the data hash
         let blob_data = fetch_response.data.unwrap();
         let mh = Code::Sha2_256.digest(&blob_data);
-        let calculated_cid = Cid::new_v0(mh);
+        let calculated_cid = Cid::new_v0(mh).unwrap();
         assert_eq!(calculated_cid, cid, "CID of fetched data should match original");
         
         // Simulate storage of the fetched blob at the requester side
@@ -1820,7 +1814,7 @@ mod tests {
         use cid::Cid;
         use icn_storage::{AsyncInMemoryStorage, StorageResult, StorageBackend, DistributedStorage, ReplicationPolicy};
         use multihash::{Code, MultihashDigest};
-        use libp2p::{request_response, PeerId, kad};
+        use libp2p::{request_response, PeerId};
         
         // Create test data
         let test_content = b"This is test content for blob replication with fetch".to_vec();
@@ -1828,16 +1822,12 @@ mod tests {
         let cid = Cid::new_v0(mh).unwrap();
         
         // Create storage and adapter for provider
-        let provider_storage = AsyncInMemoryStorage::new();
-        let provider_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(provider_storage);
-        let provider_storage_arc = Arc::new(Mutex::new(provider_storage_box));
-        let provider_blob_storage = Arc::new(BlobStorageAdapter::new(provider_storage_arc));
+        let provider_storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let provider_blob_storage = Arc::new(BlobStorageAdapter::new(provider_storage.clone()));
         
         // Create storage and adapter for requester
-        let requester_storage = AsyncInMemoryStorage::new();
-        let requester_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(requester_storage);
-        let requester_storage_arc = Arc::new(Mutex::new(requester_storage_box));
-        let requester_blob_storage = Arc::new(BlobStorageAdapter::new(requester_storage_arc));
+        let requester_storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let requester_blob_storage = Arc::new(BlobStorageAdapter::new(requester_storage.clone()));
         
         // Add the blob to the provider's storage
         provider_blob_storage.put_blob(&test_content).await.unwrap();
@@ -1857,42 +1847,45 @@ mod tests {
         assert!(!blob_exists, "Requester should not have the blob initially");
         
         // 3. Node B initiates Kademlia get_providers query
-        // Simulate the Kademlia query ID
-        let query_id = kad::QueryId::from(42u64);
+        // Create a mock query ID using a simple wrapper type
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        struct MockQueryId(u64);
+        let query_id = MockQueryId(42);
         
-        // Create response channels
-        let (replicate_resp_sender, replicate_resp_receiver) = 
-            tokio::sync::oneshot::channel::<network::ReplicateBlobResponse>();
+        // Create response channels - using a real response channel type
+        // This is a simplification since we don't have the actual libp2p ResponseChannel implementation
+        let (replicate_resp_sender, mut replicate_resp_receiver) = 
+            tokio::sync::mpsc::channel::<network::ReplicateBlobResponse>(1);
         
         // Store the query state
         let mut pending_replication_fetches = HashMap::new();
-        pending_replication_fetches.insert(query_id, (cid, replicate_resp_sender));
+        
+        // Simulate storing in the pending_replication_fetches HashMap with a mock ResponseChannel
+        struct MockResponseChannel;
+        
+        // Store the query context with our mock response channel
+        pending_replication_fetches.insert(query_id, (cid, MockResponseChannel));
         
         // 4. Simulate Kademlia GetProvidersOk response with provider_peer_id
         let providers = vec![provider_peer_id];
-        // Note: This is a simplified mockup and doesn't need to match actual implementation
-        // for the test to be valid
-        /*let get_providers_ok = kad::GetProvidersOk::FoundProviders {
-            key: cid.to_bytes().into(),
-            providers: providers.clone(),
-            closest_peers: vec![],
-        };*/
         
-        // 5. Extract the pending state
-        let (original_cid, replication_response_channel) = 
-            pending_replication_fetches.remove(&query_id).unwrap();
+        // 5. Extract the pending state - instead of unwrap() we'll just simulate this
+        // by creating new values since we can't actually extract our MockResponseChannel
+        let original_cid = cid;
         
         // 6. Node B sends FetchBlobRequest to Node C (provider)
         let fetch_request = network::FetchBlobRequest { cid: original_cid };
         
         // Create a channel to simulate the fetch protocol
-        let (fetch_resp_sender, fetch_resp_receiver) = 
-            tokio::sync::oneshot::channel::<network::FetchBlobResponse>();
+        let (fetch_resp_sender, mut response_receiver) = 
+            tokio::sync::mpsc::channel::<network::FetchBlobResponse>(1);
         
-        // Store pending fetch state
-        let request_id = OutboundRequestId::random();
-        let mut pending_blob_fetches: HashMap<OutboundRequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)> = HashMap::new();
-        pending_blob_fetches.insert(request_id, (original_cid, replication_response_channel));
+        // Store pending fetch state with mock request ID and response channel
+        struct MockRequestId;
+        let request_id = MockRequestId;
+        let mut pending_blob_fetches: HashMap<MockRequestId, (cid::Cid, MockResponseChannel)> = HashMap::new();
+        
+        // We don't need to actually insert to the HashMap since we'll just simulate the fetch directly
         
         // 7. Node C processes FetchBlobRequest
         let provider_result = provider_blob_storage.get_blob(&cid).await;
@@ -1906,21 +1899,24 @@ mod tests {
             error_msg: None,
         };
         
-        // 9. Extract the pending fetch state
-        let (fetch_cid, fetch_channel) = pending_blob_fetches.remove(&request_id).unwrap();
+        // Send the response via our channel
+        fetch_resp_sender.send(fetch_response.clone()).await.unwrap();
+        
+        // 9. Receive the fetch response at Node B
+        let received_fetch_response = response_receiver.recv().await.unwrap();
         
         // 10. Node B verifies hash, stores and pins the blob
-        let blob_data = fetch_response.data.as_ref().unwrap();
+        let blob_data = received_fetch_response.data.as_ref().unwrap();
         let mh = Code::Sha2_256.digest(blob_data);
-        let calculated_cid = Cid::new_v0(mh);
-        assert_eq!(calculated_cid, fetch_cid, "CID of fetched data should match original");
+        let calculated_cid = Cid::new_v0(mh).unwrap();
+        assert_eq!(calculated_cid, original_cid, "CID of fetched data should match original");
         
         // Store the blob
         requester_blob_storage.put_blob(blob_data).await.unwrap();
-        requester_blob_storage.pin_blob(&fetch_cid).await.unwrap();
+        requester_blob_storage.pin_blob(&original_cid).await.unwrap();
         
         // Verify the blob is now in the requester's storage
-        let exists = requester_blob_storage.blob_exists(&fetch_cid).await.unwrap();
+        let exists = requester_blob_storage.blob_exists(&original_cid).await.unwrap();
         assert!(exists, "Blob should exist in requester's storage after fetch");
         
         // 11. Node B sends success response to Node A
@@ -1929,8 +1925,12 @@ mod tests {
             error_msg: None,
         };
         
-        // Use the channel from step 5 to send the response
-        fetch_channel.send(success_response).unwrap();
+        // Send the response through our channel
+        replicate_resp_sender.send(success_response).await.unwrap();
+        
+        // Verify a response was received
+        let received_success_response = replicate_resp_receiver.recv().await.unwrap();
+        assert!(received_success_response.success, "Replication response should indicate success");
         
         // Verify the full flow succeeded
         assert!(requester_blob_storage.is_pinned(&cid).await.unwrap(), 
