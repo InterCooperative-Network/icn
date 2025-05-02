@@ -1,14 +1,14 @@
-use anyhow;
+use anyhow::Error as AnyhowError;
 use wasmtime::Linker;
 use crate::{StoreData, HostEnvironment};
 use crate::mem_helpers::{read_memory_bytes, write_memory_bytes, write_memory_u32};
 use crate::cid_utils;
 
 /// Register storage-related host functions
-pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
+pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), AnyhowError> {
     // storage_get: Get a value from storage by CID
     linker.func_wrap("env", "host_storage_get", |mut caller: wasmtime::Caller<'_, StoreData>, 
-                     cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| -> Result<i32, anyhow::Error> {
+                     cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| -> Result<i32, AnyhowError> {
         // Read CID from WASM memory using utility function
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, cid_ptr, cid_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;
@@ -50,7 +50,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
     
     // storage_put: Store a key-value pair in storage
     linker.func_wrap("env", "host_storage_put", |mut caller: wasmtime::Caller<'_, StoreData>,
-                     key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| -> Result<i32, anyhow::Error> {
+                     key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| -> Result<i32, AnyhowError> {
         // Read CID from WASM memory using utility function
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, key_ptr, key_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;
@@ -73,7 +73,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
     
     // blob_put: Store a blob in IPFS
     linker.func_wrap("env", "host_blob_put", |mut caller: wasmtime::Caller<'_, StoreData>,
-                     content_ptr: i32, content_len: i32, out_ptr: i32, out_len: i32| -> Result<i32, anyhow::Error> {
+                     content_ptr: i32, content_len: i32, out_ptr: i32, out_len: i32| -> Result<i32, AnyhowError> {
         // Read content from guest memory
         let content = read_memory_bytes(&mut caller, content_ptr, content_len)?;
         
@@ -96,7 +96,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
     
     // blob_get: Retrieve a blob by CID
     linker.func_wrap("env", "host_blob_get", |mut caller: wasmtime::Caller<'_, StoreData>,
-                     cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| -> Result<i32, anyhow::Error> {
+                     cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| -> Result<i32, AnyhowError> {
         // Read CID from WASM memory using utility function
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, cid_ptr, cid_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;

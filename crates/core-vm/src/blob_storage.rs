@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use cid::Cid;
@@ -125,7 +124,7 @@ impl DistributedStorage for InMemoryBlobStore {
         let cid = Cid::new_v0(mh)
             .map_err(|e| StorageError::InvalidCid(e.to_string()))?;
         
-        // Store the blob - use proper async mutex
+        // Store the blob with proper async mutex
         {
             let mut blobs = self.blobs.lock().await;
             let mut current_size = self.current_size.lock().await;

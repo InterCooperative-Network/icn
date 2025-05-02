@@ -1,4 +1,4 @@
-use anyhow;
+use anyhow::Error as AnyhowError;
 use wasmtime::Linker;
 use crate::{StoreData, HostEnvironment, LogLevel};
 use crate::cid_utils;
@@ -6,11 +6,11 @@ use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_byt
 use icn_identity::IdentityScope;
 
 /// Register identity-related host functions
-pub fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
+pub fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), AnyhowError> {
     // get_caller_did: Returns the DID of the caller
     linker.func_wrap("env", "host_get_caller_did",
                      |mut caller: wasmtime::Caller<'_, StoreData>,
-                      out_ptr: i32, _out_len: i32| -> Result<i32, anyhow::Error> {
+                      out_ptr: i32, _out_len: i32| -> Result<i32, AnyhowError> {
         let store_data = caller.data();
         // Get caller DID from the context
         let caller_did = store_data.ctx.caller_did.clone();
@@ -25,7 +25,7 @@ pub fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(),
     })?;
     
     // get_caller_scope: Returns the scope of the caller
-    linker.func_wrap("env", "host_get_caller_scope", |caller: wasmtime::Caller<'_, StoreData>| -> Result<i32, anyhow::Error> {
+    linker.func_wrap("env", "host_get_caller_scope", |caller: wasmtime::Caller<'_, StoreData>| -> Result<i32, AnyhowError> {
         let store_data = caller.data();
         
         // Get caller scope from the context, convert to i32
@@ -46,7 +46,7 @@ pub fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(),
                      |mut caller: wasmtime::Caller<'_, StoreData>,
                       did_ptr: i32, did_len: i32,
                       msg_ptr: i32, msg_len: i32,
-                      sig_ptr: i32, sig_len: i32| -> Result<i32, anyhow::Error> {
+                      sig_ptr: i32, sig_len: i32| -> Result<i32, AnyhowError> {
         // Read did, message, and signature from guest memory
         let did = read_memory_string(&mut caller, did_ptr, did_len)?;
         let message = read_memory_bytes(&mut caller, msg_ptr, msg_len)?;

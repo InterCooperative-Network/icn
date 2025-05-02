@@ -12,7 +12,8 @@ use std::collections::HashMap;
 // Third-party crates
 use anyhow::Error as AnyhowError;
 use async_trait::async_trait;
-use cid::{Cid, multihash::{Code, MultihashDigest}};
+use cid::Cid;
+use cid::multihash::{Code, MultihashDigest};
 use log::{debug, error, info, warn};
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
@@ -21,8 +22,8 @@ use uuid::Uuid;
 
 // ICN crates
 use icn_identity::{IdentityId, KeyPair, IdentityScope, Signature, verify_signature as identity_verify_signature};
-use icn_storage::{StorageBackend, DistributedStorage, StorageError, StorageResult};
-use icn_economics::{ResourceType, ResourceAuthorization, consume_authorization, validate_authorization_usage};
+use icn_storage::{StorageBackend, DistributedStorage, StorageError};
+use icn_economics::{ResourceType, ResourceAuthorization};
 
 // Internal modules
 mod mem_helpers;
@@ -36,7 +37,6 @@ mod cid_utils;
 // Add this after imports, before existing modules
 mod blob_storage;
 use blob_storage::InMemoryBlobStore;
-use cid_utils::{convert_to_storage_cid, convert_from_storage_cid};
 
 /// Log level for VM execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -400,7 +400,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
                 // Log the DAG operation
                 debug!(
                     "DAG anchor operation: content_len={}, parents_count={}, cid={}",
-                    content.len(), parents.len(), cid.to_string()
+                    content.len(), parents.len(), cid
                 );
                 Ok(cid)
             },
@@ -518,8 +518,6 @@ impl HostEnvironment for ConcreteHostEnvironment {
         
         // Clone necessary data for the async boundary
         let budget_id = budget_id.to_string();
-        let proposal_id = proposal_id;
-        let vote = vote;
         
         // Create the adapter with cloned storage
         let mut adapter = StorageBudgetAdapter {
@@ -541,7 +539,6 @@ impl HostEnvironment for ConcreteHostEnvironment {
     async fn tally_budget_votes(&self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus> {
         // Clone necessary data for the async boundary
         let budget_id = budget_id.to_string();
-        let proposal_id = proposal_id;
         
         // Create the adapter with cloned storage
         let adapter = StorageBudgetAdapterRef {
@@ -564,7 +561,6 @@ impl HostEnvironment for ConcreteHostEnvironment {
         
         // Clone necessary data for the async boundary
         let budget_id = budget_id.to_string();
-        let proposal_id = proposal_id;
         
         // Create the adapter with cloned storage
         let mut adapter = StorageBudgetAdapter {
@@ -981,16 +977,15 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, cid_ptr, cid_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;
         
-        // Call the host function to get the value
-        let result = {
-            let cid = cid.clone();
-            let mut host_env = caller.data().host.clone();
-            
-            // Execute the async function in a blocking context
-            block_on(async {
+        // Clone the host environment for use in async context
+        let mut host_env = caller.data().host.clone();
+        
+        // Safe async execution pattern with tokio
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
                 host_env.storage_get(cid).await
-            }).map_err(|e| anyhow::anyhow!("Storage get failed: {}", e))?
-        };
+            })
+        }).map_err(|e| anyhow::anyhow!("Storage get failed: {}", e))?;
         
         // If value is found, write it to guest memory
         match result {
@@ -1073,16 +1068,15 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, cid_ptr, cid_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;
         
-        // Call the host function
-        let result = {
-            let cid = cid.clone();
-            let mut host_env = caller.data().host.clone();
-            
-            // Execute the async function in a blocking context
-            futures::executor::block_on(async {
+        // Clone the host environment for use in async context
+        let mut host_env = caller.data().host.clone();
+        
+        // Safe async execution pattern with tokio
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
                 host_env.blob_get(cid).await
-            }).map_err(|e| anyhow::anyhow!("Blob get failed: {}", e))?
-        };
+            })
+        }).map_err(|e| anyhow::anyhow!("Blob get failed: {}", e))?;
         
         // If blob is found, write it to guest memory
         match result {
@@ -1148,14 +1142,11 @@ fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<(), an
             _ => return Err(anyhow::anyhow!("Invalid resource type: {}", resource_type)),
         };
         
-        // Call the host function
-        let result = {
-            let res_type = res_type.clone();
-            let mut host_env = caller.data_mut().host.clone();
-            
-            host_env.record_resource_usage(res_type, amount as u64)
-                .map_err(|e| anyhow::anyhow!("Resource usage recording failed: {}", e))?
-        };
+        // Get host environment and record usage
+        let mut host_env = caller.data_mut().host.clone();
+        
+        host_env.record_resource_usage(res_type, amount as u64)
+            .map_err(|e| anyhow::anyhow!("Resource usage recording failed: {}", e))?;
         
         Ok(())
     })?;
