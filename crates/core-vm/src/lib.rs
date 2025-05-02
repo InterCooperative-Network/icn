@@ -28,6 +28,7 @@ use std::string::FromUtf8Error;
 use thiserror::Error;
 use tracing::{debug, info, warn, error};
 use wasmtime::{Engine, Linker, Module, Store, Trap, TypedFunc, Memory, AsContextMut};
+use std::clone::Clone;
 
 /// Log level for VM execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -301,6 +302,7 @@ impl IdentityContext {
 }
 
 /// Concrete implementation of the Host Environment
+#[derive(Clone)]
 pub struct ConcreteHostEnvironment {
     /// Storage backend
     storage: Arc<Mutex<dyn StorageBackend + Send + Sync>>,
@@ -770,7 +772,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         
         // Parse the CID
         let cid = Cid::try_from(cid_str)
-            .map_err(|e| Trap::new(format!("Invalid CID: {}", e)))?;
+            .map_err(|e| Trap::throw(format!("Invalid CID: {}", e)))?;
             
         // Call the host function - we have to do this in multiple steps to deal with borrowing
         let storage_result = {
@@ -781,7 +783,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
             // We'd use a future with the async variant, but for simplicity we'll use a sync approach here
             // In an async implementation, you would use func_wrap_async with proper async/await handling
             host_env.storage_get(cid)
-                .map_err(|e| Trap::new(format!("Storage get failed: {}", e)))?
+                .map_err(|e| Trap::throw(format!("Storage get failed: {}", e)))?
         };
         
         match storage_result {
@@ -811,7 +813,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         
         // Parse the CID
         let cid = Cid::try_from(key_str)
-            .map_err(|e| Trap::new(format!("Invalid CID: {}", e)))?;
+            .map_err(|e| Trap::throw(format!("Invalid CID: {}", e)))?;
             
         // Read the value bytes from guest memory
         let value = read_memory_bytes(&caller, value_ptr, value_len)?;
@@ -823,7 +825,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
             let mut host_env = caller.data_mut().host.clone();
             
             host_env.storage_put(cid, value)
-                .map_err(|e| Trap::new(format!("Storage put failed: {}", e)))?
+                .map_err(|e| Trap::throw(format!("Storage put failed: {}", e)))?
         };
         
         Ok(1) // Success
@@ -841,7 +843,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
             let mut host_env = caller.data_mut().host.clone();
             
             host_env.blob_put(content)
-                .map_err(|e| Trap::new(format!("Blob put failed: {}", e)))?
+                .map_err(|e| Trap::throw(format!("Blob put failed: {}", e)))?
         };
         
         // Write CID string to output buffer
@@ -863,7 +865,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         
         // Parse the CID
         let cid = Cid::try_from(cid_str)
-            .map_err(|e| Trap::new(format!("Invalid CID: {}", e)))?;
+            .map_err(|e| Trap::throw(format!("Invalid CID: {}", e)))?;
             
         // Call the host function
         let blob_result = {
@@ -871,7 +873,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
             let mut host_env = caller.data_mut().host.clone();
             
             host_env.blob_get(cid)
-                .map_err(|e| Trap::new(format!("Blob get failed: {}", e)))?
+                .map_err(|e| Trap::throw(format!("Blob get failed: {}", e)))?
         };
         
         match blob_result {
@@ -903,7 +905,7 @@ fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), any
                      out_ptr: i32, out_len: i32| -> Result<i32, Trap> {
         // Call the host function
         let did = caller.data().host.get_caller_did()
-            .map_err(|e| Trap::new(format!("Failed to get caller DID: {}", e)))?;
+            .map_err(|e| Trap::throw(format!("Failed to get caller DID: {}", e)))?;
         
         // Write the DID to the output buffer if provided and large enough
         if out_ptr >= 0 && out_len >= 0 {
@@ -922,7 +924,7 @@ fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), any
     linker.func_wrap("env", "host_get_caller_scope", |caller: wasmtime::Caller<'_, StoreData>| -> Result<i32, Trap> {
         // Call the host function
         let scope = caller.data().host.get_caller_scope()
-            .map_err(|e| Trap::new(format!("Failed to get caller scope: {}", e)))?;
+            .map_err(|e| Trap::throw(format!("Failed to get caller scope: {}", e)))?;
         
         // Convert scope to integer
         let scope_int = match scope {
@@ -953,6 +955,8 @@ fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), any
             let mut host_env = caller.data().host.clone();
             
             host_env.verify_signature(&did_str, &message, &signature)
+                .map_err(|e| Trap::throw(format!("Signature verification failed: {}", e)))?
+        };
                 .map_err(|e| Trap::new(format!("Signature verification failed: {}", e)))?
         };
         

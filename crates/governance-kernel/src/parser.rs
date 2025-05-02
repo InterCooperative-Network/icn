@@ -23,7 +23,12 @@ pub fn parse_ccl(ccl_content: &str) -> Result<CclRoot, Error<Rule>> {
     
     // Extract template_type and content object from template_declaration
     let mut decl_pairs = template_declaration.into_inner();
-    let template_type = decl_pairs.next().unwrap().as_str().to_string();
+    
+    // Get the full template type string (which may include version)
+    let template_type_pair = decl_pairs.next().unwrap();
+    let template_type = template_type_pair.as_str().to_string();
+    
+    // Get the content object
     let content_object = parse_value(decl_pairs.next().unwrap())?;
     
     // Construct and return the CclRoot

@@ -5,9 +5,9 @@ edition = "2021"
 description = "CCL interpretation and Core Law Modules for the ICN Runtime"
 
 [dependencies]
-# Comment this out temporarily when running tests until core-vm issues are fixed
-icn-core-vm = { path = "../core-vm" }
 icn-identity = { path = "../identity" }
+# Temporarily comment out core-vm dependency
+# icn-core-vm = { path = "../core-vm" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
