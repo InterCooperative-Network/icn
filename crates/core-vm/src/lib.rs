@@ -385,27 +385,24 @@ impl HostEnvironment for ConcreteHostEnvironment {
         let storage_cid = cid_utils::convert_to_storage_cid(&key)
             .map_err(|e| HostError::StorageError(e))?;
         
-        // Clone the storage to avoid holding the lock across await points
+        // Clone the storage reference to use in async context
         let storage_clone = Arc::clone(&self.storage);
+        let storage_cid_clone = storage_cid.clone();
         
-        // Get the data, making sure to drop the MutexGuard before awaiting
-        let data = {
-            // Acquire lock in a block scope
-            let guard = storage_clone.lock()
-                .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Using futures::executor::block_on for synchronous operations
+        futures::executor::block_on(async move {
+            // Acquire lock
+            let guard = match storage_clone.lock() {
+                Ok(guard) => guard,
+                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
+            };
             
-            // Clone the data out while we still have the lock
-            let result = guard.get(&storage_cid);
-            
-            // Explicitly drop the guard before awaiting
-            drop(guard);
-            
-            // Now we can safely await
-            result.await
-                .map_err(|e| HostError::StorageError(e.to_string()))?
-        };
-        
-        Ok(data)
+            // Call get() which returns a future
+            match guard.get(&storage_cid_clone).await {
+                Ok(value) => Ok(value),
+                Err(e) => Err(HostError::StorageError(e.to_string())),
+            }
+        })
     }
     
     async fn storage_put(&mut self, _key: Cid, value: Vec<u8>) -> HostResult<()> {
@@ -2094,14 +2091,3 @@ impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapterRef {
     }
 }
 
-/// Helper function to convert between core-vm CID and storage CID format
-fn convert_to_storage_cid(cid: &cid::Cid) -> Result<cid::Cid, String> {
-    // The CID format is the same, just return a clone
-    Ok(cid.clone())
-}
-
-/// Helper function to convert from storage CID to core-vm CID
-fn convert_from_storage_cid(storage_cid: &cid::Cid) -> Result<cid::Cid, String> {
-    // The CID format is the same, just return a clone
-    Ok(storage_cid.clone())
-}
