@@ -133,11 +133,12 @@ async fn handle_execute_command(
     verbose: bool,
 ) -> anyhow::Result<()> {
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
     use cid::Cid;
-    use icn_governance_kernel::CclInterpreter;
-    use icn_core_vm::{execute_wasm, VmContext};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use icn_core_vm::{VmContext};
+    use icn_economics::ResourceType;
     use icn_identity::IdentityScope;
+    use icn_governance_kernel::CclInterpreter;
     
     // Read the WASM proposal payload
     let wasm_bytes = fs::read(&proposal_payload)
@@ -206,7 +207,7 @@ async fn handle_execute_command(
         active_authorizations,
         execution_id,
         timestamp,
-        proposal_cid,
+        proposal_cid.map(|cid| cid.to_string()),
     );
     
     // Create a simple identity context for execution
@@ -216,7 +217,7 @@ async fn handle_execute_command(
     let storage = create_in_memory_storage();
     
     // Execute the WASM with the prepared context
-    let result = execute_wasm(&wasm_bytes, vm_context, storage, identity_ctx).await
+    let result = icn_core_vm::execute_wasm(&wasm_bytes, vm_context, storage, identity_ctx).await
         .map_err(|e| anyhow::anyhow!("WASM execution failed: {}", e))?;
     
     // Print the execution result
@@ -562,9 +563,8 @@ fn create_identity_context(did: &str) -> std::sync::Arc<icn_core_vm::IdentityCon
 }
 
 // Helper function to create an in-memory storage backend
-fn create_in_memory_storage() -> std::sync::Arc<futures::lock::Mutex<dyn icn_storage::StorageBackend + Send + Sync>> {
-    use std::sync::Arc;
-    use futures::lock::Mutex;
+fn create_in_memory_storage() -> std::sync::Arc<std::sync::Mutex<dyn icn_storage::StorageBackend + Send + Sync>> {
+    use std::sync::{Arc, Mutex};
     use icn_storage::AsyncInMemoryStorage;
     
     // Create and return the storage backend
@@ -585,8 +585,7 @@ async fn handle_export_vc_command(
     use icn_identity::sign_credential;
     use icn_execution_tools::CredentialHelper;
     use icn_storage::{AsyncInMemoryStorage, StorageBackend};
-    use futures::lock::Mutex;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::fs;
     
     // Check if credential ID is a valid CID
@@ -597,7 +596,7 @@ async fn handle_export_vc_command(
     let storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new() as AsyncInMemoryStorage));
     
     // Load subject data from storage
-    let storage_lock = storage.lock().await;
+    let storage_lock = storage.lock().unwrap();
     let content_result = StorageBackend::get(&*storage_lock, &cid).await;
     drop(storage_lock);
     
@@ -616,7 +615,7 @@ async fn handle_export_vc_command(
     }
     
     // Load or generate signing keypair
-    let (signer_did, keypair) = if signing_key.starts_with("did:") {
+    let (_signer_did, keypair) = if signing_key.starts_with("did:") {
         // Assume the signing key is a DID that's already been registered
         // In a real implementation, we'd look up the keypair from a secure store
         // For now, let's just generate a new one as a placeholder

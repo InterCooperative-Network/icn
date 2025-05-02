@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Root structure for a CCL document
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -131,4 +132,67 @@ impl From<Vec<CclPair>> for CclValue {
     fn from(v: Vec<CclPair>) -> Self {
         CclValue::Object(v)
     }
+}
+
+/// AST node for CCL parsing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Node {
+    /// A block with a name and properties
+    Block {
+        /// Name of the block
+        name: String,
+        
+        /// Properties of the block
+        properties: HashMap<String, Box<Node>>,
+        
+        /// Content of the block
+        content: Vec<Box<Node>>,
+    },
+    
+    /// A property with a name and value
+    Property {
+        /// Name of the property
+        name: String,
+        
+        /// Value of the property
+        value: Value,
+    },
+    
+    /// An object with fields
+    Object {
+        /// Properties of the object
+        properties: HashMap<String, Value>,
+    },
+}
+
+impl Node {
+    /// Get a property from this node
+    pub fn get_property(&self, name: &str) -> Option<&Node> {
+        match self {
+            Node::Block { properties, .. } => properties.get(name).map(|boxed| boxed.as_ref()),
+            _ => None,
+        }
+    }
+}
+
+/// Value type for property values
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Value {
+    /// String value
+    String(String),
+    
+    /// Number value
+    Number(String),
+    
+    /// Boolean value
+    Boolean(bool),
+    
+    /// Identifier reference
+    Identifier(String),
+    
+    /// Array of values
+    Array(Vec<Box<Node>>),
+    
+    /// Object with properties
+    Object(HashMap<String, Value>),
 } 

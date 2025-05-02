@@ -7,10 +7,12 @@ description = "CCL interpretation and Core Law Modules for the ICN Runtime"
 [dependencies]
 icn-identity = { path = "../identity" }
 icn-core-vm = { path = "../core-vm" }
+icn-economics = { path = "../economics" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 pest = "2.7"
-pest_derive = "2.7" 
+pest_derive = "2.7"
+chrono = "0.4" 

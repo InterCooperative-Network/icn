@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use icn_identity::IdentityScope;
 use crate::ast::{Node, Value};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use icn_economics::{ResourceType, BudgetRulesConfig, CategoryRule};
+use chrono;
 
 /// A governance configuration parsed from CCL
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -223,7 +224,7 @@ pub struct CompensationPolicy {
 }
 
 /// Configuration for participatory budgeting
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetConfig {
     /// Name of the budget
     pub name: String,
@@ -290,7 +291,7 @@ impl BudgetConfig {
                 let mut allocations = HashMap::new();
                 
                 for resource in resources {
-                    if let Node::Object { properties, .. } = resource {
+                    if let Node::Object { properties, .. } = &**resource {
                         let resource_type = match properties.get("type") {
                             Some(Value::String(s)) => {
                                 match s.as_str() {
@@ -332,7 +333,7 @@ impl BudgetConfig {
                         Some(Value::String(s)) => {
                             // Parse date string to timestamp
                             chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                                .map(|date| date.and_hms_opt(0, 0, 0).unwrap().timestamp())
+                                .map(|date| date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp())
                                 .unwrap_or_else(|_| chrono::Utc::now().timestamp())
                         },
                         _ => chrono::Utc::now().timestamp(),
@@ -342,7 +343,7 @@ impl BudgetConfig {
                         Some(Value::String(s)) => {
                             // Parse date string to timestamp
                             chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                                .map(|date| date.and_hms_opt(23, 59, 59).unwrap().timestamp())
+                                .map(|date| date.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp())
                                 .unwrap_or_else(|_| start_date + 31536000) // Default: 1 year
                         },
                         _ => start_date + 31536000, // Default: 1 year
@@ -362,7 +363,12 @@ impl BudgetConfig {
                 let voting_method = governance.get_property("decision_method")
                     .and_then(|node| {
                         if let Node::Property { value: Value::String(s), .. } = node {
-                            Some(s.clone())
+                            match s.as_str() {
+                                "simple_majority" => Some(icn_economics::VotingMethod::SimpleMajority),
+                                "quadratic_voting" => Some(icn_economics::VotingMethod::Quadratic),
+                                "threshold" => Some(icn_economics::VotingMethod::Threshold),
+                                _ => None, // Unknown voting method
+                            }
                         } else {
                             None
                         }
@@ -387,6 +393,26 @@ impl BudgetConfig {
                                         None
                                     }
                                 })
+                        } else {
+                            None
+                        }
+                    });
+                
+                // Extract quorum percentage
+                let quorum_percentage = governance.get_property("quorum_percentage")
+                    .and_then(|node| {
+                        if let Node::Property { value: Value::Number(n), .. } = node {
+                            n.parse::<u8>().ok().filter(|&v| v <= 100)
+                        } else {
+                            None
+                        }
+                    });
+                    
+                // Extract threshold percentage
+                let threshold_percentage = governance.get_property("threshold_percentage")
+                    .and_then(|node| {
+                        if let Node::Property { value: Value::Number(n), .. } = node {
+                            n.parse::<u8>().ok().filter(|&v| v <= 100)
                         } else {
                             None
                         }
@@ -453,8 +479,9 @@ impl BudgetConfig {
                 // Extract custom rules
                 let custom_rules = governance.get_property("custom_rules")
                     .and_then(|node| {
-                        if let Node::Property { value, .. } = node {
-                            serde_json::to_value(value).ok()
+                        if let Node::Property { value: Value::Object(obj), .. } = node {
+                            // Convert to JSON
+                            serde_json::to_value(obj).ok()
                         } else {
                             None
                         }
@@ -464,6 +491,8 @@ impl BudgetConfig {
                     voting_method,
                     categories,
                     min_participants,
+                    quorum_percentage,
+                    threshold_percentage,
                     custom_rules,
                 }
             } else {
@@ -472,6 +501,8 @@ impl BudgetConfig {
                     voting_method: None,
                     categories: None,
                     min_participants: None,
+                    quorum_percentage: Some(50), // Default 50%
+                    threshold_percentage: Some(50), // Default 50%
                     custom_rules: None,
                 }
             };

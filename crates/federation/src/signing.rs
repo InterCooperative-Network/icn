@@ -172,7 +172,7 @@ pub async fn create_signed_mandate(
         guardian,
         quorum_proof,
         dag_node,
-    );
+    ).await;
     
     Ok(mandate)
 }
