@@ -13,8 +13,10 @@ sync, quorum, guardian mandates, and blob replication policies.
 use std::collections::HashMap;
 use std::time::Duration;
 use futures::StreamExt;
+use futures::lock::Mutex;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
+use std::sync::Arc;
 
 use libp2p::{
     core::transport::upgrade,
@@ -25,7 +27,8 @@ use libp2p::{
 use icn_dag::DagNode;
 use icn_identity::{IdentityId, IdentityScope, Signature, TrustBundle};
 use icn_storage::ReplicationFactor;
-use tracing::{debug, info, error};
+use multihash::{self, Code, MultihashDigest};
+use tracing::{debug, info, error, warn};
 use thiserror::Error;
 
 // Export network module
@@ -248,11 +251,16 @@ pub struct FederationManager {
     known_peers: HashMap<PeerId, Multiaddr>,
     /// Configuration
     config: FederationManagerConfig,
+    /// Storage backend for storing TrustBundles
+    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
 }
 
 impl FederationManager {
     /// Start a new federation node
-    pub async fn start_node(config: FederationManagerConfig) -> FederationResult<Self> {
+    pub async fn start_node(
+        config: FederationManagerConfig, 
+        storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+    ) -> FederationResult<Self> {
         // Generate a new local keypair
         let keypair = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(keypair.public());
@@ -294,8 +302,34 @@ impl FederationManager {
         // Prepare channels for communication with the event loop
         let (sender, receiver) = mpsc::channel(100);
         
+        // Clone storage for event loop
+        let event_loop_storage = storage.clone();
+        
         // Spawn the event loop
-        let event_loop_handle = tokio::spawn(run_event_loop(swarm, receiver));
+        let event_loop_handle = tokio::spawn(run_event_loop(swarm, receiver, event_loop_storage));
+        
+        // Create sync command sender clone
+        let sync_sender = sender.clone();
+        
+        // Spawn the periodic sync task
+        tokio::spawn(async move {
+            let sync_interval = Duration::from_secs(60); // Sync every 60 seconds
+            
+            loop {
+                tokio::time::sleep(sync_interval).await;
+                debug!("Running periodic TrustBundle sync task");
+                
+                // Request latest TrustBundle
+                // For now, we just request the latest epoch we know of + 1
+                // TODO(V3-MVP): Add a more sophisticated way to track latest epochs
+                let latest_known_epoch = get_latest_known_epoch().await;
+                let next_epoch = latest_known_epoch + 1;
+                
+                if let Err(e) = request_trust_bundle_from_network(sync_sender.clone(), next_epoch).await {
+                    error!("Periodic TrustBundle sync failed: {}", e);
+                }
+            }
+        });
         
         let manager = Self {
             local_peer_id,
@@ -304,6 +338,7 @@ impl FederationManager {
             _event_loop_handle: event_loop_handle,
             known_peers: HashMap::new(),
             config,
+            storage,
         };
         
         Ok(manager)
@@ -351,27 +386,71 @@ impl FederationManager {
         
         Ok(())
     }
+    
+    /// Get the latest known epoch from storage
+    pub async fn get_latest_known_epoch(&self) -> FederationResult<u64> {
+        // For MVP, just return 0 as a placeholder
+        // TODO(V3-MVP): Implement proper epoch tracking
+        Ok(0)
+    }
 }
 
 /// Run the event loop for the federation network
 async fn run_event_loop(
     mut swarm: Swarm<network::IcnFederationBehaviour>,
     mut command_receiver: mpsc::Receiver<FederationManagerMessage>,
+    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
 ) {
     info!("Starting federation network event loop");
     
     loop {
         tokio::select! {
             event = swarm.select_next_some() => {
-                handle_swarm_event(&mut swarm, event).await;
+                handle_swarm_event(&mut swarm, event, storage.clone()).await;
             },
             command = command_receiver.recv() => {
                 match command {
                     Some(FederationManagerMessage::RequestTrustBundle { epoch, respond_to }) => {
                         debug!("Received request to fetch trust bundle for epoch {}", epoch);
-                        // For now, we'll just return None as we don't have actual implementation yet
-                        // TODO(V3-MVP): Implement actual trust bundle request via Kademlia or direct peers
-                        let _ = respond_to.send(Ok(None));
+                        
+                        // Generate the storage key for this epoch
+                        let key_str = format!("trustbundle::epoch::{}", epoch);
+                        let key_hash = Code::Sha2_256.digest(key_str.as_bytes());
+                        let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+                        
+                        // First check if we have it locally
+                        let storage_lock = storage.lock().await;
+                        let local_result = storage_lock.get(&key_cid).await;
+                        drop(storage_lock);
+                        
+                        match local_result {
+                            Ok(Some(bundle_bytes)) => {
+                                // We have it locally, deserialize and return
+                                match serde_json::from_slice::<TrustBundle>(&bundle_bytes) {
+                                    Ok(bundle) => {
+                                        debug!("Found TrustBundle for epoch {} locally", epoch);
+                                        let _ = respond_to.send(Ok(Some(bundle)));
+                                    },
+                                    Err(e) => {
+                                        error!("Failed to deserialize local TrustBundle: {}", e);
+                                        let _ = respond_to.send(Err(FederationError::SyncFailed(
+                                            format!("Failed to deserialize local TrustBundle: {}", e)
+                                        )));
+                                    }
+                                }
+                            },
+                            Ok(None) | Err(_) => {
+                                // We don't have it locally, request from peers
+                                debug!("TrustBundle for epoch {} not found locally, requesting from peers", epoch);
+                                
+                                // For MVP, just return None as we haven't properly implemented
+                                // peer discovery or request/response handling yet
+                                debug!("Peer request not fully implemented - returning None for now");
+                                let _ = respond_to.send(Ok(None));
+                                
+                                // TODO(V3-MVP): Implement peer selection and await response properly
+                            }
+                        }
                     },
                     Some(FederationManagerMessage::PublishTrustBundle { bundle, respond_to }) => {
                         debug!("Received request to publish trust bundle for epoch {}", bundle.epoch_id);
@@ -399,6 +478,7 @@ async fn run_event_loop(
 async fn handle_swarm_event(
     swarm: &mut Swarm<network::IcnFederationBehaviour>,
     event: SwarmEvent<network::IcnFederationBehaviourEvent>,
+    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
 ) {
     match event {
         SwarmEvent::NewListenAddr { address, .. } => {
@@ -414,7 +494,7 @@ async fn handle_swarm_event(
             debug!("Incoming connection on local address: {}", local_addr);
         },
         SwarmEvent::Behaviour(behavior_event) => {
-            handle_behavior_event(swarm, behavior_event).await;
+            handle_behavior_event(swarm, behavior_event, storage).await;
         },
         _ => {}
     }
@@ -424,6 +504,7 @@ async fn handle_swarm_event(
 async fn handle_behavior_event(
     swarm: &mut Swarm<network::IcnFederationBehaviour>,
     event: network::IcnFederationBehaviourEvent,
+    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
 ) {
     match event {
         network::IcnFederationBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
@@ -464,9 +545,39 @@ async fn handle_behavior_event(
                     } => {
                         debug!("Received TrustBundle request from {} for epoch {}", peer, request.epoch);
                         
-                        // Placeholder: Create a dummy TrustBundle or return None
-                        // TODO(V3-MVP): Implement actual TrustBundle retrieval from storage based on epoch
-                        let response = network::TrustBundleResponse { bundle: None };
+                        // Generate a key for the requested TrustBundle based on epoch
+                        let key_str = format!("trustbundle::epoch::{}", request.epoch);
+                        let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+                        let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+                        
+                        // Attempt to retrieve the TrustBundle from storage
+                        let storage_lock = storage.lock().await;
+                        let bundle_result = storage_lock.get(&key_cid).await;
+                        drop(storage_lock); // Release lock as soon as possible
+                        
+                        let response = match bundle_result {
+                            Ok(Some(bundle_bytes)) => {
+                                // Try to deserialize the TrustBundle
+                                match serde_json::from_slice::<TrustBundle>(&bundle_bytes) {
+                                    Ok(bundle) => {
+                                        info!("Found TrustBundle for epoch {} in storage", request.epoch);
+                                        network::TrustBundleResponse { bundle: Some(bundle) }
+                                    },
+                                    Err(e) => {
+                                        error!("Failed to deserialize TrustBundle: {}", e);
+                                        network::TrustBundleResponse { bundle: None }
+                                    }
+                                }
+                            },
+                            Ok(None) => {
+                                debug!("TrustBundle for epoch {} not found in storage", request.epoch);
+                                network::TrustBundleResponse { bundle: None }
+                            },
+                            Err(e) => {
+                                error!("Storage error when retrieving TrustBundle: {}", e);
+                                network::TrustBundleResponse { bundle: None }
+                            }
+                        };
                         
                         if let Err(e) = swarm.behaviour_mut().trust_bundle_sync.send_response(channel, response) {
                             error!("Failed to send TrustBundle response: {:?}", e);
@@ -478,7 +589,45 @@ async fn handle_behavior_event(
                         debug!("Received TrustBundle response for request {}", request_id);
                         if let Some(bundle) = &response.bundle {
                             info!("Received TrustBundle for epoch {}", bundle.epoch_id);
-                            // TODO(V3-MVP): Implement logic to process/validate/store received TrustBundles
+                            
+                            // Perform basic validation on the received bundle
+                            match bundle.verify() {
+                                Ok(true) => {
+                                    info!("TrustBundle validation passed for epoch {}", bundle.epoch_id);
+                                    
+                                    // Serialize the bundle for storage
+                                    match serde_json::to_vec(bundle) {
+                                        Ok(bundle_bytes) => {
+                                            // Generate the storage key based on epoch_id
+                                            let key_str = format!("trustbundle::epoch::{}", bundle.epoch_id);
+                                            let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+                                            let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+                                            
+                                            // Store the bundle
+                                            let storage_lock = storage.lock().await;
+                                            match storage_lock.put(&bundle_bytes).await {
+                                                Ok(_) => {
+                                                    info!("Successfully stored TrustBundle for epoch {}", bundle.epoch_id);
+                                                },
+                                                Err(e) => {
+                                                    error!("Failed to store TrustBundle: {}", e);
+                                                }
+                                            }
+                                        },
+                                        Err(e) => {
+                                            error!("Failed to serialize TrustBundle: {}", e);
+                                        }
+                                    }
+                                },
+                                Ok(false) => {
+                                    warn!("TrustBundle validation failed for epoch {}", bundle.epoch_id);
+                                },
+                                Err(e) => {
+                                    error!("TrustBundle validation error: {}", e);
+                                }
+                            }
+                            
+                            // TODO(V3-MVP): Implement full TrustBundle validation and state update based on received bundles.
                         } else {
                             debug!("Received empty TrustBundle response (None)");
                         }
@@ -515,6 +664,50 @@ pub mod sync {
     }
 }
 
+/// Gets the latest known epoch from local state
+/// This is a temporary placeholder implementation that will be replaced with FederationManager::get_latest_known_epoch
+async fn get_latest_known_epoch() -> u64 {
+    // TODO(V3-MVP): Implement actual latest epoch tracking using FederationManager::get_latest_known_epoch
+    // For now, just return a hardcoded value for testing
+    0
+}
+
+/// Sends a request to the network to fetch a TrustBundle for the specified epoch
+async fn request_trust_bundle_from_network(
+    sender: mpsc::Sender<FederationManagerMessage>,
+    epoch: u64,
+) -> FederationResult<()> {
+    debug!("Requesting TrustBundle for epoch {} from network", epoch);
+    
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    
+    sender.send(FederationManagerMessage::RequestTrustBundle {
+        epoch,
+        respond_to: tx,
+    }).await
+    .map_err(|e| FederationError::NetworkError(format!("Failed to send request: {}", e)))?;
+    
+    match rx.await {
+        Ok(result) => {
+            match result {
+                Ok(Some(_)) => {
+                    debug!("Successfully received TrustBundle for epoch {}", epoch);
+                },
+                Ok(None) => {
+                    debug!("No TrustBundle available for epoch {}", epoch);
+                },
+                Err(e) => {
+                    debug!("Failed to get TrustBundle for epoch {}: {}", epoch, e);
+                }
+            }
+            Ok(())
+        },
+        Err(e) => {
+            Err(FederationError::NetworkError(format!("Failed to receive response: {}", e)))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -536,7 +729,7 @@ mod tests {
         let config = FederationManagerConfig::default();
         
         // Attempt to start a federation node
-        let result = FederationManager::start_node(config).await;
+        let result = FederationManager::start_node(config, Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()))).await;
         
         // Check that we can create a federation manager without panicking
         assert!(result.is_ok(), "Failed to start federation node: {:?}", result.err());
