@@ -2755,6 +2755,7 @@ dependencies = [
  "cid",
  "futures",
  "icn-dag",
+ "icn-governance-kernel",
  "icn-identity",
  "icn-storage",
  "libp2p",

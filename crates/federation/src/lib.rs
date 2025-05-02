@@ -69,6 +69,15 @@ pub enum FederationError {
     
     #[error("Protocol error: {0}")]
     ProtocolError(String),
+    
+    #[error("Storage error: {0}")]
+    StorageError(String),
+    
+    #[error("Configuration not found: {0}")]
+    ConfigNotFound(String),
+    
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 /// Result type for federation operations
@@ -122,7 +131,7 @@ impl GuardianMandate {
     }
     
     /// Verify this mandate
-    pub async fn verify(&self, storage: &Mutex<dyn icn_storage::StorageBackend + Send + Sync>) -> FederationResult<bool> {
+    pub async fn verify(&self, storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>) -> FederationResult<bool> {
         // Recalculate the mandate content hash
         let mandate_hash = signing::calculate_mandate_hash(
             &self.action, 
@@ -135,7 +144,7 @@ impl GuardianMandate {
         // Look up authorized guardians for this mandate's scope
         let authorized_guardians = roles::get_authorized_guardians(
             self.scope_id.0.as_str(), 
-            storage
+            Arc::clone(&storage)
         ).await?;
         
         if authorized_guardians.is_empty() {
@@ -601,7 +610,7 @@ async fn handle_behavior_event(
                 // Look up authorized guardians for this federation
                 let authorized_guardians = match roles::get_authorized_guardians(
                     &received_bundle.federation_id, 
-                    &storage
+                    Arc::clone(&storage)
                 ).await {
                     Ok(guardians) => guardians,
                     Err(e) => {
