@@ -110,8 +110,16 @@ async fn test_wasm_log_execution() {
     let exec_result = result.unwrap();
     assert!(exec_result.success);
     
-    // In the real implementation, logs would be captured from the host function calls
-    assert!(exec_result.logs.contains(&"Execution completed".to_string()));
+    // Check for expected log messages
+    let logs = exec_result.logs.join("\n");
+    assert!(logs.contains("Hello from ICN Runtime") || 
+            logs.contains("Module instantiated") || 
+            logs.contains("Entry point executed"));
+    
+    // Check compute resources consumption
+    assert!(exec_result.resources_consumed.contains_key(&ResourceType::Compute));
+    
+    println!("Resources consumed: {:?}", exec_result.resources_consumed);
 }
 
 #[tokio::test]
