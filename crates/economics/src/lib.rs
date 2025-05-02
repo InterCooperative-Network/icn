@@ -414,6 +414,22 @@ pub enum ProposalStatus {
     Cancelled,
 }
 
+/// Type of vote that can be cast on a budget proposal
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VoteChoice {
+    /// Vote to approve the proposal
+    Approve,
+    
+    /// Vote to reject the proposal
+    Reject,
+    
+    /// Abstain from voting (counts for quorum but not for approval/rejection)
+    Abstain,
+    
+    /// Quadratic vote with specific weight (for quadratic voting method)
+    Quadratic(u32),
+}
+
 /// Represents a budget proposal
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetProposal {
@@ -438,8 +454,8 @@ pub struct BudgetProposal {
     /// Optional category from budget rules
     pub category: Option<String>,
     
-    /// Votes for this proposal (DID -> vote value)
-    pub votes: HashMap<String, i32>,
+    /// Votes for this proposal (voter DID -> vote choice)
+    pub votes: HashMap<String, VoteChoice>,
     
     /// Unix timestamp when this proposal was created
     pub creation_timestamp: i64,

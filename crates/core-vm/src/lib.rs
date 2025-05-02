@@ -105,6 +105,9 @@ pub trait HostEnvironment: Send + Sync {
                                  requested_resources: HashMap<ResourceType, u64>, 
                                  category: Option<String>) -> HostResult<Uuid>;
     async fn query_budget_balance(&self, budget_id: &str, resource: ResourceType) -> HostResult<u64>;
+    async fn record_budget_vote(&mut self, budget_id: &str, proposal_id: Uuid, vote: icn_economics::VoteChoice) -> HostResult<()>;
+    async fn tally_budget_votes(&self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus>;
+    async fn finalize_budget_proposal(&mut self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus>;
     
     // DAG operations
     async fn anchor_to_dag(&mut self, content: Vec<u8>, parents: Vec<Cid>) -> HostResult<Cid>;
@@ -598,6 +601,62 @@ impl HostEnvironment for ConcreteHostEnvironment {
         ).await.map_err(Self::economics_error_to_host_error)?;
         
         Ok(balance)
+    }
+    
+    async fn record_budget_vote(&mut self, budget_id: &str, proposal_id: Uuid, vote: icn_economics::VoteChoice) -> HostResult<()> {
+        // Track resource usage
+        self.record_resource_usage(ResourceType::Compute, 1000)?;
+        
+        // Get caller DID for the voter
+        let voter_did = self.vm_context.caller_did.to_string();
+        
+        // Acquire a lock on storage
+        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        
+        // Call the budget_ops function
+        icn_economics::budget_ops::record_budget_vote(
+            budget_id, 
+            proposal_id, 
+            &voter_did, 
+            vote, 
+            &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
+        ).await.map_err(Self::economics_error_to_host_error)?;
+        
+        Ok(())
+    }
+    
+    async fn tally_budget_votes(&self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus> {
+        // Track resource usage
+        self.record_resource_usage(ResourceType::Compute, 1000)?;
+        
+        // Acquire a lock on storage
+        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        
+        // Call the budget_ops function
+        let status = icn_economics::budget_ops::tally_budget_votes(
+            budget_id, 
+            proposal_id, 
+            &&*storage as &dyn icn_economics::budget_ops::BudgetStorage
+        ).await.map_err(Self::economics_error_to_host_error)?;
+        
+        Ok(status)
+    }
+    
+    async fn finalize_budget_proposal(&mut self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus> {
+        // Track resource usage
+        self.record_resource_usage(ResourceType::Compute, 1000)?;
+        
+        // Acquire a lock on storage
+        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        
+        // Call the budget_ops function
+        let status = icn_economics::budget_ops::finalize_budget_proposal(
+            budget_id, 
+            proposal_id, 
+            &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
+        ).await.map_err(Self::economics_error_to_host_error)?;
+        
+        Ok(status)
     }
     
     // DAG operations
@@ -1796,91 +1855,80 @@ pub mod tests {
 
     #[tokio::test]
     async fn test_budget_operations() {
-        use icn_economics::ResourceType;
-        use icn_economics::budget_ops::MockBudgetStorage;
-        use std::collections::HashMap;
+        let host = create_test_host_environment().await;
+        let budget_id = "test_budget_123".to_string();
+        let compute_resource = ResourceType::Compute;
         
-        // Create test host environment
-        let mut host_env = create_test_host_environment_with_authorizations().await;
-        
-        // Create a mock budget storage
-        let mut budget_storage = MockBudgetStorage::new();
-        
-        // Create a budget
-        let budget_id = {
-            let now = chrono::Utc::now().timestamp();
-            let end = now + 3600 * 24 * 30; // 30 days
-            
-            // Create the budget directly using the economics module
-            icn_economics::budget_ops::create_budget(
-                "Test Budget",
-                "did:icn:test-community",
-                icn_identity::IdentityScope::Community,
-                now,
-                end,
-                None,
-                &mut budget_storage
-            ).await.unwrap()
-        };
-        
-        // Test budget_allocate by allocating directly to the mock storage
-        icn_economics::budget_ops::allocate_to_budget(
-            &budget_id, 
-            ResourceType::Compute, 
-            1000, 
-            &mut budget_storage
-        ).await.unwrap();
-        
-        icn_economics::budget_ops::allocate_to_budget(
-            &budget_id, 
-            ResourceType::Storage, 
-            2000, 
-            &mut budget_storage
-        ).await.unwrap();
-        
-        // Verify allocation via query_budget_balance
-        let compute_balance = icn_economics::budget_ops::query_budget_balance(
-            &budget_id,
-            &ResourceType::Compute,
-            &budget_storage
-        ).await.unwrap();
-        
-        let storage_balance = icn_economics::budget_ops::query_budget_balance(
-            &budget_id,
-            &ResourceType::Storage,
-            &budget_storage
-        ).await.unwrap();
-        
-        assert_eq!(compute_balance, 1000);
-        assert_eq!(storage_balance, 2000);
+        // Test budget_allocate
+        {
+            let mut host_clone = host.clone();
+            let result = host_clone.budget_allocate(&budget_id, 1000, compute_resource.clone()).await;
+            assert!(result.is_ok(), "Budget allocation failed: {:?}", result.err());
+        }
         
         // Test propose_budget_spend
         let mut requested_resources = HashMap::new();
         requested_resources.insert(ResourceType::Compute, 500);
-        requested_resources.insert(ResourceType::Storage, 800);
         
-        let proposal_id = icn_economics::budget_ops::propose_budget_spend(
-            &budget_id,
-            "Test Proposal",
-            "Testing budget proposal creation via HostEnvironment",
-            requested_resources,
-            "did:icn:test-user",
-            Some("test-category".to_string()),
-            None,
-            &mut budget_storage
-        ).await.unwrap();
+        let proposal_id = {
+            let mut host_clone = host.clone();
+            let result = host_clone.propose_budget_spend(
+                &budget_id,
+                "Test Proposal",
+                "A proposal to test budget spending",
+                requested_resources,
+                None,
+            ).await;
+            
+            assert!(result.is_ok(), "Budget proposal creation failed: {:?}", result.err());
+            result.unwrap()
+        };
         
-        // Verify proposal was created by fetching the budget directly
-        let budget = icn_economics::budget_ops::load_budget(&budget_id, &budget_storage).await.unwrap();
+        // Test query_budget_balance
+        {
+            let host_clone = host.clone();
+            let result = host_clone.query_budget_balance(&budget_id, compute_resource.clone()).await;
+            assert!(result.is_ok(), "Budget balance query failed: {:?}", result.err());
+            
+            let balance = result.unwrap();
+            assert_eq!(balance, 1000, "Expected balance to be 1000, got {}", balance);
+        }
         
-        // Proposal should exist
-        assert!(budget.proposals.contains_key(&proposal_id));
-        
-        // Proposal should have our requested resources
-        let proposal = budget.proposals.get(&proposal_id).unwrap();
-        assert_eq!(proposal.title, "Test Proposal");
-        assert_eq!(proposal.requested_resources.get(&ResourceType::Compute).cloned().unwrap_or(0), 500);
-        assert_eq!(proposal.requested_resources.get(&ResourceType::Storage).cloned().unwrap_or(0), 800);
+        // Test budget voting functions
+        {
+            // Test record_budget_vote
+            let mut host_clone = host.clone();
+            let result = host_clone.record_budget_vote(
+                &budget_id,
+                proposal_id,
+                icn_economics::VoteChoice::Approve,
+            ).await;
+            assert!(result.is_ok(), "Budget vote recording failed: {:?}", result.err());
+            
+            // Test tally_budget_votes
+            let host_clone = host.clone();
+            let result = host_clone.tally_budget_votes(&budget_id, proposal_id).await;
+            assert!(result.is_ok(), "Budget vote tallying failed: {:?}", result.err());
+            
+            let status = result.unwrap();
+            assert_eq!(status, icn_economics::ProposalStatus::Approved, "Expected proposal to be approved");
+            
+            // Test finalize_budget_proposal
+            let mut host_clone = host.clone();
+            let result = host_clone.finalize_budget_proposal(&budget_id, proposal_id).await;
+            assert!(result.is_ok(), "Budget proposal finalization failed: {:?}", result.err());
+            
+            let status = result.unwrap();
+            assert_eq!(status, icn_economics::ProposalStatus::Approved, "Expected proposal to be approved after finalization");
+            
+            // Verify that the budget balance has been updated
+            let host_clone = host.clone();
+            let result = host_clone.query_budget_balance(&budget_id, compute_resource.clone()).await;
+            assert!(result.is_ok(), "Budget balance query failed: {:?}", result.err());
+            
+            let balance = result.unwrap();
+            assert_eq!(balance, 500, "Expected balance to be 500 after approved proposal, got {}", balance);
+        }
     }
 }
 

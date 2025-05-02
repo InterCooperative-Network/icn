@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use uuid::Uuid;
-use crate::{EconomicsError, EconomicsResult, ParticipatoryBudget, BudgetProposal, ProposalStatus, ResourceType, BudgetRulesConfig};
+use crate::{EconomicsError, EconomicsResult, ParticipatoryBudget, BudgetProposal, ProposalStatus, ResourceType, BudgetRulesConfig, VoteChoice};
 use icn_identity::IdentityScope;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
+use std::sync::{Arc, Mutex};
 
 /// Storage key prefix for budget state
 const BUDGET_KEY_PREFIX: &str = "budget::";
@@ -242,16 +243,261 @@ pub async fn query_budget_balance(
     Ok(available)
 }
 
+/// Record a vote on a budget proposal
+pub async fn record_budget_vote(
+    budget_id: &str,
+    proposal_id: Uuid,
+    voter_did: &str,
+    vote: VoteChoice,
+    storage: &mut impl BudgetStorage,
+) -> EconomicsResult<()> {
+    // Load the budget
+    let mut budget = load_budget(budget_id, storage).await?;
+    
+    // Find the proposal
+    let proposal = budget.proposals.get_mut(&proposal_id)
+        .ok_or_else(|| EconomicsError::InvalidBudget(format!("Proposal not found with id: {}", proposal_id)))?;
+    
+    // Check if the proposal is still in a votable state
+    if proposal.status != ProposalStatus::Proposed {
+        return Err(EconomicsError::InvalidBudget(
+            format!("Cannot vote on proposal in {:?} state", proposal.status)
+        ));
+    }
+    
+    // TODO(V3-MVP): Check if voter is eligible based on budget scope rules
+    // For MVP, we'll allow any vote
+    
+    // Record the vote
+    proposal.votes.insert(voter_did.to_string(), vote);
+    
+    // Save the updated budget
+    save_budget(&budget, storage).await?;
+    
+    Ok(())
+}
+
+/// Tally votes on a budget proposal and determine the result based on the governing rules
+pub async fn tally_budget_votes(
+    budget_id: &str, 
+    proposal_id: Uuid,
+    storage: &impl BudgetStorage,
+) -> EconomicsResult<ProposalStatus> {
+    // Load the budget
+    let budget = load_budget(budget_id, storage).await?;
+    
+    // Find the proposal
+    let proposal = budget.proposals.get(&proposal_id)
+        .ok_or_else(|| EconomicsError::InvalidBudget(format!("Proposal not found with id: {}", proposal_id)))?;
+    
+    // If the proposal is not in proposed state, return its current status
+    if proposal.status != ProposalStatus::Proposed {
+        return Ok(proposal.status.clone());
+    }
+    
+    // Create a default rules config if none exists in the budget
+    let default_rules = BudgetRulesConfig {
+        voting_method: Some("simple_majority".to_string()),
+        min_participants: Some(1),
+        categories: None,
+        custom_rules: None,
+    };
+    
+    // Get the budget rules, using default if none specified
+    let rules = budget.rules.as_ref().unwrap_or(&default_rules);
+    
+    // Get voting method
+    let voting_method = rules.voting_method.as_ref()
+        .unwrap_or(&"simple_majority".to_string())
+        .to_lowercase();
+    
+    // Get minimum participants required (quorum)
+    let min_participants = rules.min_participants.unwrap_or(1); // Default to 1
+    
+    // Check quorum
+    if proposal.votes.len() < min_participants as usize {
+        // Not enough votes yet, keep in proposed state
+        return Ok(ProposalStatus::Proposed);
+    }
+    
+    // Tally the votes according to the voting method
+    match voting_method.as_str() {
+        "quadratic" => tally_quadratic_votes(proposal),
+        "consensus" => tally_consensus_votes(proposal),
+        _ => tally_simple_majority_votes(proposal), // Default to simple majority
+    }
+}
+
+/// Tally votes using simple majority method
+fn tally_simple_majority_votes(proposal: &BudgetProposal) -> EconomicsResult<ProposalStatus> {
+    let mut approve_count = 0;
+    let mut reject_count = 0;
+    
+    // Count approve and reject votes
+    for vote in proposal.votes.values() {
+        match vote {
+            VoteChoice::Approve => approve_count += 1,
+            VoteChoice::Reject => reject_count += 1,
+            VoteChoice::Abstain => {}, // Abstentions count for quorum but not for the tally
+            VoteChoice::Quadratic(_weight) => {
+                // In simple majority, treat quadratic votes as approve with weight 1
+                approve_count += 1;
+            }
+        }
+    }
+    
+    // Determine the outcome
+    if approve_count > reject_count {
+        Ok(ProposalStatus::Approved)
+    } else if reject_count > approve_count {
+        Ok(ProposalStatus::Rejected)
+    } else {
+        // Tie votes - the proposal remains in proposed state
+        Ok(ProposalStatus::Proposed)
+    }
+}
+
+/// Tally votes using quadratic voting method
+fn tally_quadratic_votes(proposal: &BudgetProposal) -> EconomicsResult<ProposalStatus> {
+    let mut approve_score = 0;
+    let mut reject_score = 0;
+    
+    // Calculate scores using quadratic voting formula
+    for vote in proposal.votes.values() {
+        match vote {
+            VoteChoice::Approve => approve_score += 1, // Regular approve counts as 1
+            VoteChoice::Reject => reject_score += 1, // Regular reject counts as 1
+            VoteChoice::Abstain => {}, // Abstentions don't count in the tally
+            VoteChoice::Quadratic(weight) => {
+                if *weight > 0 {
+                    // In quadratic voting, cost scales with square of votes but impact is linear
+                    // We use the weight directly as the score contribution
+                    approve_score += *weight as i32;
+                } else {
+                    // Negative weights are used for rejections in this implementation
+                    reject_score += 1; // Default to 1 for now
+                }
+            }
+        }
+    }
+    
+    // Determine the outcome
+    if approve_score > reject_score {
+        Ok(ProposalStatus::Approved)
+    } else if reject_score > approve_score {
+        Ok(ProposalStatus::Rejected)
+    } else {
+        // Tie votes - the proposal remains in proposed state
+        Ok(ProposalStatus::Proposed)
+    }
+}
+
+/// Tally votes using consensus method (requires near-unanimous approval)
+fn tally_consensus_votes(proposal: &BudgetProposal) -> EconomicsResult<ProposalStatus> {
+    let mut approve_count = 0;
+    let mut reject_count = 0;
+    let mut _abstain_count = 0;
+    
+    // Count approve, reject, and abstain votes
+    for vote in proposal.votes.values() {
+        match vote {
+            VoteChoice::Approve => approve_count += 1,
+            VoteChoice::Reject => reject_count += 1,
+            VoteChoice::Abstain => _abstain_count += 1,
+            VoteChoice::Quadratic(_) => {
+                // In consensus voting, quadratic votes aren't supported
+                // Treat as a regular approve
+                approve_count += 1;
+            }
+        }
+    }
+    
+    // Calculate total non-abstain votes
+    let total_votes = approve_count + reject_count;
+    
+    // For consensus, we require at least 90% approval of non-abstaining voters
+    if total_votes > 0 {
+        let approval_percentage = (approve_count as f64 / total_votes as f64) * 100.0;
+        
+        if approval_percentage >= 90.0 {
+            Ok(ProposalStatus::Approved)
+        } else if reject_count > 0 {
+            // Any rejection in consensus typically blocks the proposal
+            Ok(ProposalStatus::Rejected)
+        } else {
+            // Not enough consensus yet
+            Ok(ProposalStatus::Proposed)
+        }
+    } else {
+        // No non-abstain votes - remain in proposed state
+        Ok(ProposalStatus::Proposed)
+    }
+}
+
+/// Finalize a budget proposal based on vote tally
+pub async fn finalize_budget_proposal(
+    budget_id: &str,
+    proposal_id: Uuid,
+    storage: &mut impl BudgetStorage,
+) -> EconomicsResult<ProposalStatus> {
+    // Tally the votes to determine the new status
+    let new_status = tally_budget_votes(budget_id, proposal_id, storage).await?;
+    
+    // If the status is still Proposed, don't update anything
+    if new_status == ProposalStatus::Proposed {
+        return Ok(new_status);
+    }
+    
+    // Load the budget for updating
+    let mut budget = load_budget(budget_id, storage).await?;
+    
+    // Find the proposal
+    let proposal = budget.proposals.get_mut(&proposal_id)
+        .ok_or_else(|| EconomicsError::InvalidBudget(format!("Proposal not found with id: {}", proposal_id)))?;
+    
+    // Update the proposal status
+    proposal.status = new_status.clone();
+    
+    // If the proposal is approved, create resource authorizations
+    if new_status == ProposalStatus::Approved {
+        // Record the spending in the budget
+        let mut resources_map = HashMap::new();
+        for (resource_type, amount) in &proposal.requested_resources {
+            resources_map.insert(resource_type.clone(), *amount);
+        }
+        budget.spent_by_proposal.insert(proposal_id, resources_map);
+        
+        // TODO(V3-MVP): Store generated ResourceAuthorizations for the proposer
+        // This would involve creating ResourceAuthorization objects and storing them
+    }
+    
+    // Save the updated budget
+    save_budget(&budget, storage).await?;
+    
+    Ok(new_status)
+}
+
 /// TODO(V3-MVP): Implement proposal approval logic and update proposal status
 pub async fn approve_budget_proposal(
-    _budget_id: &str,
-    _proposal_id: Uuid,
-    _approver_did: &str,
-    _storage: &mut impl BudgetStorage,
+    budget_id: &str,
+    proposal_id: Uuid,
+    approver_did: &str,
+    storage: &mut impl BudgetStorage,
 ) -> EconomicsResult<()> {
-    // TODO(V3-MVP): Implement proposal approval logic (voting based on rules)
-    // and update proposal status / potentially create ResourceAuthorizations.
-    Err(EconomicsError::InvalidBudget("Not implemented".to_string()))
+    // Record an approval vote from the approver
+    record_budget_vote(budget_id, proposal_id, approver_did, VoteChoice::Approve, storage).await?;
+    
+    // Finalize the proposal to see if it's now approved
+    let status = finalize_budget_proposal(budget_id, proposal_id, storage).await?;
+    
+    // If the proposal is now approved, it will have been updated in storage
+    if status == ProposalStatus::Approved {
+        Ok(())
+    } else {
+        Err(EconomicsError::InvalidBudget(
+            format!("Proposal not approved after vote. Current status: {:?}", status)
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -276,6 +522,37 @@ mod tests {
         ).await.unwrap();
         
         (budget_id, storage)
+    }
+    
+    /// Create a test budget with a proposal for testing
+    async fn create_test_budget_with_proposal() -> (String, Uuid, MockBudgetStorage) {
+        let (budget_id, mut storage) = create_test_budget().await;
+        
+        // Allocate some resources first
+        allocate_to_budget(
+            &budget_id,
+            ResourceType::Compute,
+            1000,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Create resource request
+        let mut requested_resources = HashMap::new();
+        requested_resources.insert(ResourceType::Compute, 500);
+        
+        // Create a proposal
+        let proposal_id = propose_budget_spend(
+            &budget_id,
+            "Test Proposal",
+            "A proposal to test budget spending",
+            requested_resources,
+            "did:icn:proposer",
+            None,
+            None,
+            &mut storage,
+        ).await.unwrap();
+        
+        (budget_id, proposal_id, storage)
     }
     
     #[tokio::test]
@@ -429,5 +706,297 @@ mod tests {
         ).await.unwrap();
         
         assert_eq!(balance, 700);
+    }
+    
+    #[tokio::test]
+    async fn test_record_vote() {
+        let (budget_id, proposal_id, mut storage) = create_test_budget_with_proposal().await;
+        
+        // Record an approval vote
+        record_budget_vote(
+            &budget_id,
+            proposal_id,
+            "did:icn:voter1",
+            VoteChoice::Approve,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Check that the vote was recorded
+        let budget = load_budget(&budget_id, &storage).await.unwrap();
+        let proposal = budget.proposals.get(&proposal_id).unwrap();
+        
+        assert_eq!(proposal.votes.len(), 1);
+        assert_eq!(proposal.votes.get("did:icn:voter1").unwrap(), &VoteChoice::Approve);
+        
+        // Record a rejection vote from another voter
+        record_budget_vote(
+            &budget_id,
+            proposal_id,
+            "did:icn:voter2",
+            VoteChoice::Reject,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Check that both votes were recorded
+        let budget = load_budget(&budget_id, &storage).await.unwrap();
+        let proposal = budget.proposals.get(&proposal_id).unwrap();
+        
+        assert_eq!(proposal.votes.len(), 2);
+        assert_eq!(proposal.votes.get("did:icn:voter2").unwrap(), &VoteChoice::Reject);
+        
+        // Try to vote on a non-existent proposal
+        let non_existent_id = Uuid::new_v4();
+        let result = record_budget_vote(
+            &budget_id,
+            non_existent_id,
+            "did:icn:voter1",
+            VoteChoice::Approve,
+            &mut storage,
+        ).await;
+        
+        assert!(result.is_err());
+    }
+    
+    #[tokio::test]
+    async fn test_tally_simple_majority() {
+        let (budget_id, proposal_id, mut storage) = create_test_budget_with_proposal().await;
+        
+        // Initially no votes, should remain proposed
+        let status = tally_budget_votes(&budget_id, proposal_id, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Proposed);
+        
+        // Record votes
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter1", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter2", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter3", VoteChoice::Reject, &mut storage).await.unwrap();
+        
+        // Tally votes - should be approved with 2/3 approval
+        let status = tally_budget_votes(&budget_id, proposal_id, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Approved);
+        
+        // Create a new proposal for testing rejection
+        let mut requested_resources = HashMap::new();
+        requested_resources.insert(ResourceType::Compute, 300);
+        
+        let proposal_id2 = propose_budget_spend(
+            &budget_id,
+            "Another Proposal",
+            "A proposal that will be rejected",
+            requested_resources,
+            "did:icn:proposer",
+            None,
+            None,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Record votes that will lead to rejection
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter1", VoteChoice::Reject, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter2", VoteChoice::Reject, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter3", VoteChoice::Approve, &mut storage).await.unwrap();
+        
+        // Tally votes - should be rejected with 2/3 rejection
+        let status = tally_budget_votes(&budget_id, proposal_id2, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+    
+    #[tokio::test]
+    async fn test_finalize_proposal() {
+        let (budget_id, proposal_id, mut storage) = create_test_budget_with_proposal().await;
+        
+        // Record votes for approval
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter1", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter2", VoteChoice::Approve, &mut storage).await.unwrap();
+        
+        // Finalize the proposal
+        let status = finalize_budget_proposal(&budget_id, proposal_id, &mut storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Approved);
+        
+        // Check that the status was updated in storage
+        let budget = load_budget(&budget_id, &storage).await.unwrap();
+        let proposal = budget.proposals.get(&proposal_id).unwrap();
+        assert_eq!(proposal.status, ProposalStatus::Approved);
+        
+        // Check that the resources were recorded as spent
+        assert!(budget.spent_by_proposal.contains_key(&proposal_id));
+        let spent = budget.spent_by_proposal.get(&proposal_id).unwrap();
+        assert_eq!(spent.get(&ResourceType::Compute).unwrap(), &500);
+        
+        // Try to vote on the proposal after it's approved
+        let result = record_budget_vote(
+            &budget_id,
+            proposal_id,
+            "did:icn:voter3",
+            VoteChoice::Approve,
+            &mut storage,
+        ).await;
+        
+        assert!(result.is_err());
+    }
+    
+    #[tokio::test]
+    async fn test_consensus_voting() {
+        let mut storage = MockBudgetStorage::new();
+        
+        let now = chrono::Utc::now().timestamp();
+        let end = now + 3600 * 24 * 30; // 30 days from now
+        
+        // Create budget with consensus voting rules
+        let rules = BudgetRulesConfig {
+            voting_method: Some("consensus".to_string()),
+            min_participants: Some(3),
+            categories: None,
+            custom_rules: None,
+        };
+        
+        let budget_id = create_budget(
+            "Consensus Budget",
+            "did:icn:test-coop",
+            IdentityScope::Cooperative,
+            now,
+            end,
+            Some(rules),
+            &mut storage,
+        ).await.unwrap();
+        
+        // Allocate resources
+        allocate_to_budget(
+            &budget_id,
+            ResourceType::Compute,
+            1000,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Create a proposal
+        let mut requested_resources = HashMap::new();
+        requested_resources.insert(ResourceType::Compute, 500);
+        
+        let proposal_id = propose_budget_spend(
+            &budget_id,
+            "Consensus Proposal",
+            "A proposal using consensus voting",
+            requested_resources.clone(), // Clone here to keep ownership
+            "did:icn:proposer",
+            None,
+            None,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Add votes but not meeting quorum yet
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter1", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter2", VoteChoice::Approve, &mut storage).await.unwrap();
+        
+        // Tally votes - should still be proposed due to not meeting quorum
+        let status = tally_budget_votes(&budget_id, proposal_id, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Proposed);
+        
+        // Add more votes to meet quorum and achieve consensus
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter3", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter4", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter5", VoteChoice::Approve, &mut storage).await.unwrap();
+        
+        // Tally votes - should be approved with unanimous consensus
+        let status = tally_budget_votes(&budget_id, proposal_id, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Approved);
+        
+        // Create another proposal to test rejection
+        let proposal_id2 = propose_budget_spend(
+            &budget_id,
+            "Another Consensus Proposal",
+            "A proposal that will be rejected",
+            requested_resources.clone(), // Clone again for the new proposal
+            "did:icn:proposer",
+            None,
+            None,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Add votes with one rejection (should block consensus)
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter1", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter2", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter3", VoteChoice::Approve, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id2, "did:icn:voter4", VoteChoice::Reject, &mut storage).await.unwrap();
+        
+        // Tally votes - should be rejected with one rejection in consensus voting
+        let status = tally_budget_votes(&budget_id, proposal_id2, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Rejected);
+    }
+    
+    #[tokio::test]
+    async fn test_quadratic_voting() {
+        let mut storage = MockBudgetStorage::new();
+        
+        let now = chrono::Utc::now().timestamp();
+        let end = now + 3600 * 24 * 30; // 30 days from now
+        
+        // Create budget with quadratic voting rules
+        let rules = BudgetRulesConfig {
+            voting_method: Some("quadratic".to_string()),
+            min_participants: Some(2),
+            categories: None,
+            custom_rules: None,
+        };
+        
+        let budget_id = create_budget(
+            "Quadratic Budget",
+            "did:icn:test-coop",
+            IdentityScope::Cooperative,
+            now,
+            end,
+            Some(rules),
+            &mut storage,
+        ).await.unwrap();
+        
+        // Allocate resources
+        allocate_to_budget(
+            &budget_id,
+            ResourceType::Compute,
+            1000,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Create a proposal
+        let mut requested_resources = HashMap::new();
+        requested_resources.insert(ResourceType::Compute, 500);
+        
+        let proposal_id = propose_budget_spend(
+            &budget_id,
+            "Quadratic Proposal",
+            "A proposal using quadratic voting",
+            requested_resources,
+            "did:icn:proposer",
+            None,
+            None,
+            &mut storage,
+        ).await.unwrap();
+        
+        // Add quadratic votes
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter1", VoteChoice::Quadratic(4), &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter2", VoteChoice::Reject, &mut storage).await.unwrap();
+        record_budget_vote(&budget_id, proposal_id, "did:icn:voter3", VoteChoice::Approve, &mut storage).await.unwrap();
+        
+        // Tally votes - should be approved because of quadratic weight (4 + 1 = 5 approvals vs 1 rejection)
+        let status = tally_budget_votes(&budget_id, proposal_id, &storage).await.unwrap();
+        assert_eq!(status, ProposalStatus::Approved);
+    }
+    
+    #[tokio::test]
+    async fn test_approve_budget_proposal() {
+        let (budget_id, proposal_id, mut storage) = create_test_budget_with_proposal().await;
+        
+        // This should add an approval vote and attempt to finalize
+        // Since there's only one vote, it will be approved (default quorum is 1)
+        let result = approve_budget_proposal(
+            &budget_id,
+            proposal_id,
+            "did:icn:approver",
+            &mut storage,
+        ).await;
+        
+        assert!(result.is_ok());
+        
+        // Check that the proposal was approved
+        let budget = load_budget(&budget_id, &storage).await.unwrap();
+        let proposal = budget.proposals.get(&proposal_id).unwrap();
+        assert_eq!(proposal.status, ProposalStatus::Approved);
     }
 } 

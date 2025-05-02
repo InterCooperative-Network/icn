@@ -5,6 +5,7 @@ use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_u64
 use icn_economics::ResourceType;
 use futures::executor::block_on;
 use std::collections::HashMap;
+use uuid;
 
 /// Write a string to guest memory
 pub fn write_memory_string(caller: &mut wasmtime::Caller<'_, StoreData>, ptr: i32, value: &str) -> Result<(), anyhow::Error> {
@@ -201,6 +202,134 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
         // Write the balance back to guest memory
         if balance_ptr >= 0 {
             write_memory_u64(&mut caller, balance_ptr, balance)?;
+        }
+        
+        Ok(1) // Success
+    })?;
+    
+    // record_budget_vote: Record a vote on a budget proposal
+    linker.func_wrap("env", "host_record_budget_vote", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     budget_id_ptr: i32, budget_id_len: i32,
+                     proposal_id_ptr: i32, proposal_id_len: i32,
+                     vote_type: i32,
+                     vote_weight_ptr: i32, vote_weight_len: i32| -> Result<i32, anyhow::Error> {
+        
+        // Read parameters from guest memory
+        let budget_id = read_memory_string(&mut caller, budget_id_ptr, budget_id_len)?;
+        
+        // Read proposal ID as string and parse it to UUID
+        let proposal_id_str = read_memory_string(&mut caller, proposal_id_ptr, proposal_id_len)?;
+        let proposal_id = uuid::Uuid::parse_str(&proposal_id_str)
+            .map_err(|e| anyhow::anyhow!("Invalid proposal ID format: {}", e))?;
+        
+        // Convert vote_type integer to VoteChoice
+        let vote = match vote_type {
+            0 => icn_economics::VoteChoice::Approve,
+            1 => icn_economics::VoteChoice::Reject,
+            2 => icn_economics::VoteChoice::Abstain,
+            3 => {
+                // For quadratic voting, we need to read the weight
+                if vote_weight_ptr >= 0 && vote_weight_len > 0 {
+                    let weight_str = read_memory_string(&mut caller, vote_weight_ptr, vote_weight_len)?;
+                    let weight = weight_str.parse::<u32>()
+                        .map_err(|e| anyhow::anyhow!("Invalid vote weight: {}", e))?;
+                    icn_economics::VoteChoice::Quadratic(weight)
+                } else {
+                    icn_economics::VoteChoice::Quadratic(1) // Default weight
+                }
+            },
+            _ => return Err(anyhow::anyhow!("Invalid vote type: {}", vote_type)),
+        };
+        
+        // Call the host function
+        {
+            let budget_id = budget_id.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            // Execute the async function in a blocking context
+            block_on(async {
+                host_env.record_budget_vote(&budget_id, proposal_id, vote).await
+            }).map_err(|e| anyhow::anyhow!("Budget vote recording failed: {}", e))?;
+        }
+        
+        Ok(1) // Success
+    })?;
+    
+    // tally_budget_votes: Tally votes on a budget proposal
+    linker.func_wrap("env", "host_tally_budget_votes", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     budget_id_ptr: i32, budget_id_len: i32,
+                     proposal_id_ptr: i32, proposal_id_len: i32,
+                     status_ptr: i32| -> Result<i32, anyhow::Error> {
+        
+        // Read parameters from guest memory
+        let budget_id = read_memory_string(&mut caller, budget_id_ptr, budget_id_len)?;
+        
+        // Read proposal ID as string and parse it to UUID
+        let proposal_id_str = read_memory_string(&mut caller, proposal_id_ptr, proposal_id_len)?;
+        let proposal_id = uuid::Uuid::parse_str(&proposal_id_str)
+            .map_err(|e| anyhow::anyhow!("Invalid proposal ID format: {}", e))?;
+        
+        // Call the host function
+        let status = {
+            let budget_id = budget_id.clone();
+            let host_env = caller.data().host.clone();
+            
+            // Execute the async function in a blocking context
+            block_on(async {
+                host_env.tally_budget_votes(&budget_id, proposal_id).await
+            }).map_err(|e| anyhow::anyhow!("Budget vote tallying failed: {}", e))?
+        };
+        
+        // Convert ProposalStatus to integer and write to guest memory
+        if status_ptr >= 0 {
+            let status_int = match status {
+                icn_economics::ProposalStatus::Proposed => 0,
+                icn_economics::ProposalStatus::Approved => 1,
+                icn_economics::ProposalStatus::Rejected => 2,
+                icn_economics::ProposalStatus::Completed => 3,
+                icn_economics::ProposalStatus::Cancelled => 4,
+            };
+            crate::mem_helpers::write_memory_u32(&mut caller, status_ptr, status_int)?;
+        }
+        
+        Ok(1) // Success
+    })?;
+    
+    // finalize_budget_proposal: Finalize a budget proposal based on votes
+    linker.func_wrap("env", "host_finalize_budget_proposal", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     budget_id_ptr: i32, budget_id_len: i32,
+                     proposal_id_ptr: i32, proposal_id_len: i32,
+                     status_ptr: i32| -> Result<i32, anyhow::Error> {
+        
+        // Read parameters from guest memory
+        let budget_id = read_memory_string(&mut caller, budget_id_ptr, budget_id_len)?;
+        
+        // Read proposal ID as string and parse it to UUID
+        let proposal_id_str = read_memory_string(&mut caller, proposal_id_ptr, proposal_id_len)?;
+        let proposal_id = uuid::Uuid::parse_str(&proposal_id_str)
+            .map_err(|e| anyhow::anyhow!("Invalid proposal ID format: {}", e))?;
+        
+        // Call the host function
+        let status = {
+            let budget_id = budget_id.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            // Execute the async function in a blocking context
+            block_on(async {
+                host_env.finalize_budget_proposal(&budget_id, proposal_id).await
+            }).map_err(|e| anyhow::anyhow!("Budget proposal finalization failed: {}", e))?
+        };
+        
+        // Convert ProposalStatus to integer and write to guest memory
+        if status_ptr >= 0 {
+            let status_int = match status {
+                icn_economics::ProposalStatus::Proposed => 0,
+                icn_economics::ProposalStatus::Approved => 1,
+                icn_economics::ProposalStatus::Rejected => 2,
+                icn_economics::ProposalStatus::Completed => 3,
+                icn_economics::ProposalStatus::Cancelled => 4,
+            };
+            crate::mem_helpers::write_memory_u32(&mut caller, status_ptr, status_int)?;
         }
         
         Ok(1) // Success
