@@ -17,18 +17,48 @@ use icn_governance_kernel::CclError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use wasm_encoder::{
-    CodeSection, EntityType, ExportSection, Function, FunctionSection, ImportSection, Module, TypeSection,
+    CodeSection, CustomSection, EntityType, ExportSection, Function, FunctionSection, ImportSection, Module, TypeSection,
     ValType,
 };
 
 // Re-export related types
 pub use icn_governance_kernel::config;
 
+// Schema validation
+mod schema;
+pub use schema::SchemaManager;
+
 // Integration tests
 #[cfg(test)]
 mod tests;
+
+/// Metadata information to embed in the compiled WASM module
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetadataInfo {
+    /// Template type (e.g., coop_bylaws, community_charter)
+    pub template_type: String,
+    
+    /// Template version
+    pub template_version: String,
+    
+    /// The action being performed
+    pub action: String,
+    
+    /// The DID of the caller who initiated the action
+    pub caller_did: Option<String>,
+    
+    /// Timestamp of compilation
+    pub compilation_timestamp: i64,
+    
+    /// Execution ID (if known at compile time)
+    pub execution_id: Option<String>,
+    
+    /// Additional metadata fields
+    pub additional_data: HashMap<String, String>,
+}
 
 /// Errors that can occur during CCL compilation
 #[derive(Debug, Error)]
@@ -48,6 +78,10 @@ pub enum CompilerError {
     /// Error during template processing
     #[error("Template processing error: {0}")]
     TemplateError(String),
+
+    /// Schema validation error
+    #[error("Schema validation error: {0}")]
+    SchemaError(String),
 
     /// General compilation error
     #[error("Compilation error: {0}")]
@@ -86,6 +120,21 @@ pub struct CompilationOptions {
     
     /// Memory limits in pages (64KB per page)
     pub memory_limits: Option<MemoryLimits>,
+    
+    /// Additional metadata to include in the WASM module
+    pub additional_metadata: Option<HashMap<String, String>>,
+    
+    /// Caller DID (if known at compile time)
+    pub caller_did: Option<String>,
+    
+    /// Execution ID (if known at compile time)
+    pub execution_id: Option<String>,
+    
+    /// Path to the schema file to use for validation (if different from default)
+    pub schema_path: Option<PathBuf>,
+    
+    /// Whether to validate DSL input against schema
+    pub validate_schema: bool,
 }
 
 impl Default for CompilationOptions {
@@ -94,6 +143,11 @@ impl Default for CompilationOptions {
             include_debug_info: false,
             optimize: true,
             memory_limits: Some(MemoryLimits::default()),
+            additional_metadata: None,
+            caller_did: None,
+            execution_id: None,
+            schema_path: None,
+            validate_schema: true,
         }
     }
 }
@@ -119,12 +173,24 @@ impl Default for MemoryLimits {
 
 /// Main compiler interface
 #[derive(Default)]
-pub struct CclCompiler;
+pub struct CclCompiler {
+    /// Schema manager for validating DSL inputs
+    schema_manager: Option<SchemaManager>,
+}
 
 impl CclCompiler {
     /// Create a new compiler
     pub fn new() -> Self {
-        Self
+        Self {
+            schema_manager: Some(SchemaManager::new()),
+        }
+    }
+    
+    /// Create a new compiler with a specific schema directory
+    pub fn with_schema_dir<P: AsRef<Path>>(schema_dir: P) -> Self {
+        Self {
+            schema_manager: Some(SchemaManager::with_schema_dir(schema_dir)),
+        }
     }
 
     /// Compile a CCL configuration and DSL input into a WASM module
@@ -137,21 +203,105 @@ impl CclCompiler {
     /// # Returns
     /// The compiled WASM module as a byte vector
     pub fn compile_to_wasm(
-        &self,
+        &mut self,
         ccl_config: &GovernanceConfig,
         dsl_input: &JsonValue,
         options: Option<CompilationOptions>,
     ) -> CompilerResult<Vec<u8>> {
         // Use default options if none provided
         let options = options.unwrap_or_default();
+        
+        // Extract template type and action
+        let template_type = &ccl_config.template_type;
+        let action = match self.extract_action_from_dsl(dsl_input) {
+            Ok(action) => action,
+            Err(_) => {
+                // If we can't extract action, we'll do basic validation
+                self.validate_dsl_for_template(ccl_config, dsl_input)?;
+                // Default action for metadata
+                "unknown".to_string()
+            }
+        };
 
-        // Validate that the DSL input matches the expected schema for the CCL template
-        self.validate_dsl_for_template(ccl_config, dsl_input)?;
+        // Validate the DSL input against JSON schema if enabled
+        if options.validate_schema {
+            self.validate_against_schema(template_type, &action, dsl_input, options.schema_path.as_deref())?;
+        } else {
+            // Still do basic structural validation
+            self.validate_dsl_for_template(ccl_config, dsl_input)?;
+        }
 
         // Generate WASM using the appropriate backend
         let wasm_bytes = self.generate_wasm_module(ccl_config, dsl_input, &options)?;
 
         Ok(wasm_bytes)
+    }
+    
+    /// Validate DSL input against a JSON schema
+    fn validate_against_schema(
+        &mut self, 
+        template_type: &str, 
+        action: &str, 
+        dsl_input: &JsonValue,
+        custom_schema_path: Option<&Path>
+    ) -> CompilerResult<()> {
+        // If we have a custom schema path, load and validate directly
+        if let Some(schema_path) = custom_schema_path {
+            if let Some(schema_manager) = &mut self.schema_manager {
+                // Load and compile the schema
+                let schema_content = std::fs::read_to_string(schema_path)
+                    .map_err(|e| CompilerError::SchemaError(format!(
+                        "Failed to read schema file {}: {}", schema_path.display(), e
+                    )))?;
+                
+                // Parse the schema
+                let schema_value: JsonValue = serde_json::from_str(&schema_content)
+                    .map_err(|e| CompilerError::SchemaError(format!(
+                        "Failed to parse schema file {}: {}", schema_path.display(), e
+                    )))?;
+                
+                // Compile the schema
+                let schema = jsonschema::JSONSchema::compile(&schema_value)
+                    .map_err(|e| CompilerError::SchemaError(format!(
+                        "Failed to compile schema from {}: {}", schema_path.display(), e
+                    )))?;
+                
+                // Validate the DSL input
+                let validation_result = schema.validate(dsl_input);
+                if let Err(errors) = validation_result {
+                    // Format validation errors
+                    let error_messages: Vec<String> = errors
+                        .iter()
+                        .map(|err| schema::format_validation_error(err, dsl_input))
+                        .collect();
+                    
+                    return Err(CompilerError::SchemaError(format!(
+                        "DSL validation failed: {}",
+                        error_messages.join("; ")
+                    )));
+                }
+                
+                return Ok(());
+            }
+        }
+        
+        // Otherwise use the schema manager
+        if let Some(schema_manager) = &mut self.schema_manager {
+            match schema_manager.validate_dsl_for_action(action, dsl_input) {
+                Ok(()) => return Ok(()),
+                Err(CompilerError::ValidationError(msg)) if msg.contains("No schema registered") || msg.contains("Schema file not found") => {
+                    // Fall back to template validation
+                    schema_manager.validate_dsl_for_template(template_type, dsl_input)
+                        .map_err(|e| CompilerError::SchemaError(e.to_string()))?;
+                }
+                Err(e) => return Err(CompilerError::SchemaError(e.to_string())),
+            }
+        } else {
+            // Fall back to basic validation if schema manager is not available
+            tracing::warn!("Schema manager not available, falling back to basic validation");
+        }
+        
+        Ok(())
     }
 
     /// Validate that the DSL input is compatible with the CCL template
@@ -269,6 +419,62 @@ impl CclCompiler {
         Ok(())
     }
 
+    /// Extract action from DSL input
+    fn extract_action_from_dsl(&self, dsl_input: &JsonValue) -> CompilerResult<String> {
+        if let Some(action) = dsl_input.get("action") {
+            if let Some(action_str) = action.as_str() {
+                return Ok(action_str.to_string());
+            }
+        }
+        
+        Err(CompilerError::DslError("Cannot extract action from DSL input".to_string()))
+    }
+    
+    /// Create metadata information for the WASM module
+    fn create_metadata(
+        &self,
+        ccl_config: &GovernanceConfig,
+        dsl_input: &JsonValue,
+        options: &CompilationOptions,
+    ) -> CompilerResult<MetadataInfo> {
+        // Extract the action from DSL input
+        let action = self.extract_action_from_dsl(dsl_input).unwrap_or_else(|_| "unknown".to_string());
+        
+        // Get current timestamp
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| CompilerError::General(format!("Failed to get system time: {}", e)))?
+            .as_secs() as i64;
+        
+        // Create additional data hashmap
+        let mut additional_data = options.additional_metadata.clone().unwrap_or_default();
+        
+        // Add some info from DSL to additional data
+        if let Some(obj) = dsl_input.as_object() {
+            for (key, value) in obj {
+                // Only add string values to metadata
+                if let Some(value_str) = value.as_str() {
+                    if key != "action" {  // Skip action since it's already included
+                        additional_data.insert(format!("dsl_{}", key), value_str.to_string());
+                    }
+                }
+            }
+        }
+        
+        // Create metadata
+        let metadata = MetadataInfo {
+            template_type: ccl_config.template_type.clone(),
+            template_version: ccl_config.template_version.clone(),
+            action,
+            caller_did: options.caller_did.clone(),
+            compilation_timestamp: timestamp,
+            execution_id: options.execution_id.clone(),
+            additional_data,
+        };
+        
+        Ok(metadata)
+    }
+
     /// Generate a WASM module with embedded CCL config and DSL input
     fn generate_wasm_module(
         &self,
@@ -281,6 +487,11 @@ impl CclCompiler {
             .map_err(|e| CompilerError::General(format!("Failed to serialize CCL config: {}", e)))?;
         let dsl_json = serde_json::to_string(dsl_input)
             .map_err(|e| CompilerError::General(format!("Failed to serialize DSL input: {}", e)))?;
+
+        // Create metadata
+        let metadata = self.create_metadata(ccl_config, dsl_input, options)?;
+        let metadata_json = serde_json::to_string(&metadata)
+            .map_err(|e| CompilerError::General(format!("Failed to serialize metadata: {}", e)))?;
 
         // Create a new WASM module
         let mut module = Module::new();
@@ -352,6 +563,29 @@ impl CclCompiler {
         code.function(&invoke_func);
 
         module.section(&code);
+
+        // Add a custom section with metadata
+        let custom_section = wasm_encoder::CustomSection {
+            name: "icn-metadata",
+            data: metadata_json.as_bytes(),
+        };
+        module.section(&custom_section);
+
+        // Add CCL config in a custom section for reference
+        if options.include_debug_info {
+            let ccl_section = wasm_encoder::CustomSection {
+                name: "icn-ccl-config",
+                data: ccl_json.as_bytes(),
+            };
+            module.section(&ccl_section);
+            
+            // Add DSL input in a custom section for reference
+            let dsl_section = wasm_encoder::CustomSection {
+                name: "icn-dsl-input",
+                data: dsl_json.as_bytes(),
+            };
+            module.section(&dsl_section);
+        }
 
         // Finalize and return the WASM module bytes
         Ok(module.finish())

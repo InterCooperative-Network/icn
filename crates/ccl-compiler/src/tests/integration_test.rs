@@ -112,10 +112,22 @@ mod integration_tests {
             include_debug_info: true, // Include debug info for testing
             optimize: true,
             memory_limits: None, // Use default limits
+            additional_metadata: Some({
+                let mut map = std::collections::HashMap::new();
+                map.insert("test_integration".to_string(), "true".to_string());
+                map
+            }),
+            caller_did: Some("did:icn:test:integration-caller".to_string()),
+            execution_id: Some(format!("test-exec-{}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs())),
+            schema_path: None,
+            validate_schema: false, // Skip schema validation for integration test
         };
         
-        // Compile to WASM
-        let compiler = CclCompiler::new();
+        // Create compiler and compile to WASM
+        let mut compiler = CclCompiler::new();
         let wasm_bytes = compiler
             .compile_to_wasm(&governance_config, &dsl_input, Some(options))
             .expect("Failed to compile to WASM");

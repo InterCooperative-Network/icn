@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Budget Proposal DSL",
+  "description": "Schema for proposing budget allocations",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["propose_budget"],
+      "description": "The action type for budget proposals"
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "The amount requested in the budget"
+    },
+    "category": {
+      "type": "string",
+      "description": "The budget category (e.g., development, marketing)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Short title of the budget proposal"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Purpose of the budget allocation"
+    },
+    "timeline": {
+      "type": "string",
+      "description": "Expected timeline for the project or work"
+    },
+    "deliverables": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of deliverables expected from the budget"
+    },
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the milestone"
+          },
+          "target_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Target date for the milestone (YYYY-MM-DD)"
+          },
+          "payment_percentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Percentage of payment allocated to this milestone"
+          }
+        },
+        "required": ["name", "target_date", "payment_percentage"]
+      },
+      "description": "Milestones for the budget with payment allocations"
+    },
+    "team_members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "did": {
+            "type": "string",
+            "pattern": "^did:icn:",
+            "description": "DID of the team member"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role of the team member in the project"
+          }
+        },
+        "required": ["did", "role"]
+      },
+      "description": "Team members involved in the project"
+    },
+    "success_criteria": {
+      "type": "string",
+      "description": "Criteria for determining if the budget was successfully used"
+    }
+  },
+  "required": [
+    "action",
+    "amount",
+    "category",
+    "title",
+    "purpose"
+  ],
+  "additionalProperties": true
+} 

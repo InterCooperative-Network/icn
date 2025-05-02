@@ -159,6 +159,22 @@ enum Commands {
         /// Whether to optimize the WASM
         #[clap(long, default_value = "true")]
         optimize: bool,
+        
+        /// DID of the caller who will execute this WASM (optional)
+        #[clap(long)]
+        caller_did: Option<String>,
+        
+        /// Execution ID to embed in the WASM metadata (optional)
+        #[clap(long)]
+        execution_id: Option<String>,
+        
+        /// Custom schema file path to use for DSL validation
+        #[clap(long)]
+        schema: Option<String>,
+        
+        /// Skip schema validation
+        #[clap(long)]
+        skip_schema_validation: bool,
     },
 }
 
@@ -170,6 +186,10 @@ async fn handle_compile_command(
     scope: String,
     debug: bool,
     optimize: bool,
+    caller_did: Option<String>,
+    execution_id: Option<String>,
+    schema: Option<String>,
+    skip_schema_validation: bool,
     verbose: bool,
 ) -> anyhow::Result<()> {
     use icn_ccl_compiler::{CclCompiler, CompilationOptions};
@@ -177,6 +197,7 @@ async fn handle_compile_command(
     use icn_identity::IdentityScope;
     use std::fs::File;
     use std::io::Write;
+    use std::path::PathBuf;
     
     // Parse the identity scope
     let identity_scope = match scope.to_lowercase().as_str() {
@@ -222,19 +243,41 @@ async fn handle_compile_command(
             governance_config.template_type, governance_config.template_version);
     }
     
-    // Create compilation options
+    // Convert schema path if provided
+    let schema_path = schema.map(PathBuf::from);
+    
+    // Create compilation options with metadata
     let options = CompilationOptions {
         include_debug_info: debug,
         optimize,
         memory_limits: None, // Use default memory limits
+        additional_metadata: None,
+        caller_did: caller_did.clone(), 
+        execution_id: execution_id.clone(),
+        schema_path,
+        validate_schema: !skip_schema_validation,
     };
     
     if verbose {
         println!("Compiling CCL template with DSL input to WASM...");
+        if let Some(did) = &caller_did {
+            println!("Using caller DID: {}", did);
+        }
+        if let Some(exec_id) = &execution_id {
+            println!("Using execution ID: {}", exec_id);
+        }
+        if let Some(s) = &schema {
+            println!("Using schema: {}", s);
+        }
+        if skip_schema_validation {
+            println!("Schema validation: disabled");
+        } else {
+            println!("Schema validation: enabled");
+        }
     }
     
     // Create compiler and compile to WASM
-    let compiler = CclCompiler::new();
+    let mut compiler = CclCompiler::new();
     let wasm_bytes = compiler.compile_to_wasm(&governance_config, &dsl_json, Some(options))
         .map_err(|e| anyhow::anyhow!("Compilation failed: {}", e))?;
     
@@ -884,14 +927,18 @@ async fn main() -> anyhow::Result<()> {
                 cli.verbose
             ).await
         },
-        Commands::Compile { ccl_template, dsl_input, output, scope, debug, optimize } => {
+        Commands::Compile { ccl_template, dsl_input, output, scope, debug, optimize, caller_did, execution_id, schema, skip_schema_validation } => {
             handle_compile_command(
                 ccl_template.clone(),
                 dsl_input.clone(),
                 output.clone(),
                 scope.clone(),
-                debug,
-                optimize,
+                *debug,
+                *optimize,
+                caller_did.clone(),
+                execution_id.clone(),
+                schema.clone(),
+                *skip_schema_validation,
                 cli.verbose
             ).await
         },
