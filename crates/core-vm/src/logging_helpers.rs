@@ -1,6 +1,6 @@
 use anyhow;
 use wasmtime::Linker;
-use crate::{StoreData, HostEnvironment, LogLevel};
+use crate::{StoreData, LogLevel, HostEnvironment};
 use crate::mem_helpers::read_memory_string;
 
 /// Register logging-related host functions
@@ -20,11 +20,17 @@ pub fn register_logging_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Read message from guest memory
         let message = read_memory_string(&mut caller, msg_ptr, msg_len)?;
         
-        // Call the host function
-        caller.data().host.log_message(log_level, &message)
-            .map_err(|e| anyhow::anyhow!("Logging failed: {}", e))?;
+        // Create a clone of the message to avoid lifetime issues with the original string
+        let message_owned = message.to_string();
         
-        Ok(())
+        // Get mutable access to the store data and call log_message
+        let mut store_data = caller.data_mut();
+        
+        // Call the host function with the cloned message
+        match store_data.host.log_message(log_level, &message_owned) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow::anyhow!("Logging failed: {}", e))
+        }
     })?;
     
     Ok(())
