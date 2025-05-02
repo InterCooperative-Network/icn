@@ -927,6 +927,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cid"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd94671561e36e4e7de75f753f577edafb0e7c05d6e4547229fdf7938fbcd2c3"
+dependencies = [
+ "core2",
+ "multibase 0.9.1",
+ "multihash 0.18.1",
+ "serde",
+ "unsigned-varint 0.7.2",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2948,7 +2961,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "cid",
+ "cid 0.8.6",
  "icn-dag",
  "icn-governance-kernel",
  "icn-identity",
@@ -2991,7 +3004,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "cid",
+ "cid 0.8.6",
  "futures",
  "icn-dag",
  "icn-economics",
@@ -3017,7 +3030,7 @@ dependencies = [
  "base64 0.21.7",
  "bs58 0.5.1",
  "chrono",
- "cid",
+ "cid 0.8.6",
  "clap",
  "futures",
  "icn-ccl-compiler",
@@ -3045,7 +3058,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "cid",
+ "cid 0.8.6",
  "icn-identity",
  "icn-storage",
  "libipld-core 0.13.1",
@@ -3065,7 +3078,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "cid",
+ "cid 0.8.6",
  "icn-dag",
  "icn-identity",
  "icn-storage",
@@ -3084,7 +3097,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "cid",
+ "cid 0.8.6",
  "clap",
  "icn-core-vm",
  "icn-dag",
@@ -3107,7 +3120,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "cid",
+ "cid 0.8.6",
  "futures",
  "icn-dag",
  "icn-governance-kernel",
@@ -3132,7 +3145,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "cid",
+ "cid 0.10.1",
  "icn-core-vm",
  "icn-economics",
  "icn-identity",
@@ -3140,9 +3153,14 @@ dependencies = [
  "multihash 0.16.3",
  "pest",
  "pest_derive",
+ "proc-macro2",
+ "quote",
+ "regex",
  "serde",
  "serde_json",
+ "syn 1.0.109",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "uuid",
 ]
@@ -3156,7 +3174,7 @@ dependencies = [
  "base64 0.21.7",
  "bs58 0.4.0",
  "chrono",
- "cid",
+ "cid 0.8.6",
  "did-method-key 0.2.2",
  "multihash 0.16.3",
  "rand 0.8.5",
@@ -3176,7 +3194,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "cid",
+ "cid 0.8.6",
  "futures",
  "hashbrown 0.14.5",
  "icn-identity",
@@ -4187,7 +4205,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbdd758764f9680a818af33c31db733eb7c45224715d8816b9dcf0548c75f7c5"
 dependencies = [
  "anyhow",
- "cid",
+ "cid 0.8.6",
  "core2",
  "multibase 0.9.1",
  "multihash 0.16.3",
@@ -4201,7 +4219,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d44790246ec6b7314cba745992c23d479d018073e66d49ae40ae1b64e5dd8eb5"
 dependencies = [
  "anyhow",
- "cid",
+ "cid 0.8.6",
  "core2",
  "multibase 0.9.1",
  "multihash 0.16.3",
@@ -4969,6 +4987,23 @@ dependencies = [
  "multihash-derive",
  "serde",
  "serde-big-array",
+ "sha2 0.10.9",
+ "sha3",
+ "unsigned-varint 0.7.2",
+]
+
+[[package]]
+name = "multihash"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfd8a792c1694c6da4f68db0a9d707c72bd260994da179e6030a5dcee00bb815"
+dependencies = [
+ "blake2b_simd 1.0.3",
+ "blake2s_simd",
+ "blake3",
+ "core2",
+ "digest 0.10.7",
+ "multihash-derive",
  "sha2 0.10.9",
  "sha3",
  "unsigned-varint 0.7.2",

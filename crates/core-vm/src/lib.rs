@@ -21,7 +21,7 @@ use icn_identity::{KeyPair, IdentityScope};
 /// Identity context for the VM execution
 #[derive(Clone)]
 pub struct IdentityContext {
-    keypair: KeyPair,
+    keypair: Arc<KeyPair>, // Wrap KeyPair in Arc to make it clonable
     did: String,
 }
 
@@ -29,7 +29,7 @@ impl IdentityContext {
     /// Create a new identity context
     pub fn new(keypair: KeyPair, did: &str) -> Self {
         Self {
-            keypair,
+            keypair: Arc::new(keypair),
             did: did.to_string(),
         }
     }
@@ -239,7 +239,7 @@ impl ConcreteHostEnvironment {
     /// Get the caller's scope
     pub fn caller_scope(&self) -> IdentityScope {
         // Default to Personal scope if not specified
-        IdentityScope::Personal
+        IdentityScope::Individual
     }
 }
 
@@ -277,7 +277,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
 pub fn execute_wasm(
     wasm_bytes: &[u8],
     function_name: &str,
-    params: &[u8],
+    _params: &[u8],
     vm_context: VMContext,
 ) -> Result<ExecutionResult, VmError> {
     use wasmtime::{Config, Engine, Module, Store, Linker};

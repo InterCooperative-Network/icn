@@ -18,6 +18,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use std::sync::{Arc, Mutex};
 use icn_storage::StorageBackend;
+use serde::{Serialize, Deserialize};
 use serde_json;
 
 /// Errors that can occur during DAG operations
@@ -52,7 +53,7 @@ pub enum DagError {
 pub type DagResult<T> = Result<T, DagError>;
 
 /// Metadata for a DAG node
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagNodeMetadata {
     /// Timestamp of when this node was created (unix timestamp in seconds)
     pub timestamp: u64,
@@ -106,7 +107,7 @@ impl Default for DagNodeMetadata {
 }
 
 /// Represents a node in the DAG
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagNode {
     /// Content identifier of this node
     pub cid: Option<Cid>,
@@ -186,7 +187,7 @@ impl DagNode {
 }
 
 /// Represents a lineage attestation for a DAG node
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineageAttestation {
     /// Root CID of the DAG
     pub root_cid: Cid,
@@ -352,9 +353,10 @@ impl DagStore {
         let node_bytes = self.serialize_node(node)?;
         
         // Store in backend
-        let key = cid_to_key(&cid);
-        let mut storage = self.storage.lock().await;
-        storage.put(&key, node_bytes).await.map_err(|e| DagError::StorageError(e.to_string()))?;
+        let storage = self.storage.lock().unwrap();
+        
+        // Use the non-deprecated method
+        storage.put_blob(&node_bytes).await.map_err(|e| DagError::StorageError(e.to_string()))?;
         
         // Store in cache if enabled
         if !self.config.disable_cache {
@@ -374,22 +376,25 @@ impl DagStore {
         }
         
         // Not in cache, check storage
-        let key = cid_to_key(cid);
-        let mut storage = self.storage.lock().await;
-        let node_bytes = match storage.get(&key).await.map_err(|e| DagError::StorageError(e.to_string()))? {
-            Some(bytes) => bytes,
-            None => return Ok(None),
-        };
+        let storage = self.storage.lock().unwrap();
         
-        // Deserialize the node
-        let node = self.deserialize_node(&node_bytes)?;
+        // Use the non-deprecated method
+        let node_bytes_opt = storage.get_blob(cid).await.map_err(|e| DagError::StorageError(e.to_string()))?;
         
-        // Store in cache if enabled
-        if !self.config.disable_cache {
-            self.cache.insert(cid.clone(), Arc::new(node.clone()));
+        match node_bytes_opt {
+            Some(node_bytes) => {
+                // Deserialize the node
+                let node = self.deserialize_node(&node_bytes)?;
+                
+                // Store in cache if enabled
+                if !self.config.disable_cache {
+                    self.cache.insert(cid.clone(), Arc::new(node.clone()));
+                }
+                
+                Ok(Some(node))
+            },
+            None => Ok(None),
         }
-        
-        Ok(Some(node))
     }
     
     /// Get cache statistics
@@ -423,11 +428,6 @@ impl DagStore {
     fn deserialize_node(&self, bytes: &[u8]) -> Result<DagNode, DagError> {
         serde_json::from_slice(bytes).map_err(|e| DagError::DeserializationError(e.to_string()))
     }
-}
-
-// Utility function to convert CID to storage key
-fn cid_to_key(cid: &Cid) -> String {
-    format!("dag:{}", cid.to_string())
 }
 
 #[cfg(test)]

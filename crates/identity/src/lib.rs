@@ -11,7 +11,7 @@ Verifiable Credentials, TrustBundles, and ZK disclosure.
 - TrustBundles for federation anchoring
 */
 
-use std::str::FromStr;
+use std::collections::HashSet;
 use std::fmt;
 use rand::{rngs::OsRng, rngs::StdRng, SeedableRng, RngCore};
 use sha2::{Sha256, Digest};
@@ -22,6 +22,7 @@ use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use uuid::Uuid;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,6 +37,12 @@ impl IdentityId {
     /// Get the DID as a string
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl fmt::Display for IdentityId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

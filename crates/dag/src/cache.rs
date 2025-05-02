@@ -101,19 +101,30 @@ impl DagNodeCache {
 mod tests {
     use super::*;
     use cid::Version;
-    use crate::DagBuilder;
+    use crate::{DagNode, DagNodeMetadata, IdentityId, Signature};
+    use multihash::{Code, MultihashDigest};
+    
+    // Helper function to create a test DagNode
+    fn create_test_node(data: &[u8]) -> DagNode {
+        DagNode {
+            cid: None,
+            content: data.to_vec(),
+            parents: vec![],
+            signer: IdentityId("did:icn:test".to_string()),
+            signature: Signature(vec![1, 2, 3, 4]),
+            metadata: DagNodeMetadata::new(),
+        }
+    }
     
     #[test]
     fn test_cache_basic_operations() {
         let cache = DagNodeCache::new(100);
         
         // Create a test node
-        let mut builder = DagBuilder::new();
-        builder.set_data(b"test data".to_vec());
-        let node = Arc::new(builder.build().unwrap());
+        let node = Arc::new(create_test_node(b"test data"));
         
         // Create a test CID
-        let cid = Cid::new_v1(0x71, multihash::Code::Sha2_256.digest(b"test"));
+        let cid = Cid::new_v1(0x71, Code::Sha2_256.digest(b"test"));
         
         // Initially the node should not be in the cache
         assert!(cache.get(&cid).is_none());
@@ -124,7 +135,7 @@ mod tests {
         // Now it should be in the cache
         let cached_node = cache.get(&cid);
         assert!(cached_node.is_some());
-        assert_eq!(cached_node.unwrap().data(), node.data());
+        assert_eq!(cached_node.unwrap().content, node.content);
         
         // Remove it from the cache
         cache.remove(&cid);
@@ -145,19 +156,14 @@ mod tests {
         let cache = DagNodeCache::new(2);
         
         // Create three test nodes
-        let mut builder = DagBuilder::new();
+        let node1 = Arc::new(create_test_node(b"node1"));
+        let cid1 = Cid::new_v1(0x71, Code::Sha2_256.digest(b"node1"));
         
-        builder.set_data(b"node1".to_vec());
-        let node1 = Arc::new(builder.build().unwrap());
-        let cid1 = Cid::new_v1(0x71, multihash::Code::Sha2_256.digest(b"node1"));
+        let node2 = Arc::new(create_test_node(b"node2"));
+        let cid2 = Cid::new_v1(0x71, Code::Sha2_256.digest(b"node2"));
         
-        builder.set_data(b"node2".to_vec());
-        let node2 = Arc::new(builder.build().unwrap());
-        let cid2 = Cid::new_v1(0x71, multihash::Code::Sha2_256.digest(b"node2"));
-        
-        builder.set_data(b"node3".to_vec());
-        let node3 = Arc::new(builder.build().unwrap());
-        let cid3 = Cid::new_v1(0x71, multihash::Code::Sha2_256.digest(b"node3"));
+        let node3 = Arc::new(create_test_node(b"node3"));
+        let cid3 = Cid::new_v1(0x71, Code::Sha2_256.digest(b"node3"));
         
         // Insert first two nodes
         cache.insert(cid1, node1.clone());

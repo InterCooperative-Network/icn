@@ -1,16 +1,16 @@
 use anyhow;
 use wasmtime::{Memory, AsContextMut, Caller};
-use crate::StoreData;
+use crate::ConcreteHostEnvironment;
 
 /// Get the memory export from a WASM module
-pub fn get_memory(caller: &mut Caller<'_, StoreData>) -> Result<Memory, anyhow::Error> {
+pub fn get_memory(caller: &mut Caller<'_, ConcreteHostEnvironment>) -> Result<Memory, anyhow::Error> {
     caller.get_export("memory")
         .and_then(|export| export.into_memory())
         .ok_or_else(|| anyhow::anyhow!("Failed to find memory export"))
 }
 
 /// Read a string from WASM memory
-pub fn read_memory_string<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, len: i32) -> Result<String, anyhow::Error> {
+pub fn read_memory_string<'a>(caller: &mut Caller<'a, ConcreteHostEnvironment>, ptr: i32, len: i32) -> Result<String, anyhow::Error> {
     if ptr < 0 || len < 0 {
         return Err(anyhow::anyhow!("Invalid memory parameters"));
     }
@@ -34,7 +34,7 @@ pub fn read_memory_string<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, len:
 }
 
 /// Read raw bytes from WASM memory
-pub fn read_memory_bytes<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, len: i32) -> Result<Vec<u8>, anyhow::Error> {
+pub fn read_memory_bytes<'a>(caller: &mut Caller<'a, ConcreteHostEnvironment>, ptr: i32, len: i32) -> Result<Vec<u8>, anyhow::Error> {
     if ptr < 0 || len < 0 {
         return Err(anyhow::anyhow!("Invalid memory parameters"));
     }
@@ -56,7 +56,7 @@ pub fn read_memory_bytes<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, len: 
 }
 
 /// Write bytes to WASM memory
-pub fn write_memory_bytes<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, bytes: &[u8]) -> Result<(), anyhow::Error> {
+pub fn write_memory_bytes<'a>(caller: &mut Caller<'a, ConcreteHostEnvironment>, ptr: i32, bytes: &[u8]) -> Result<(), anyhow::Error> {
     if ptr < 0 {
         return Err(anyhow::anyhow!("Invalid memory parameters"));
     }
@@ -77,7 +77,7 @@ pub fn write_memory_bytes<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, byte
 }
 
 /// Write a u32 value to WASM memory
-pub fn write_memory_u32<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, value: u32) -> Result<(), anyhow::Error> {
+pub fn write_memory_u32<'a>(caller: &mut Caller<'a, ConcreteHostEnvironment>, ptr: i32, value: u32) -> Result<(), anyhow::Error> {
     if ptr < 0 {
         return Err(anyhow::anyhow!("Invalid memory parameters"));
     }
@@ -87,7 +87,7 @@ pub fn write_memory_u32<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, value:
 }
 
 /// Write a u64 value to the guest memory
-pub fn write_memory_u64(caller: &mut wasmtime::Caller<'_, crate::StoreData>, ptr: i32, value: u64) -> Result<(), anyhow::Error> {
+pub fn write_memory_u64(caller: &mut wasmtime::Caller<'_, ConcreteHostEnvironment>, ptr: i32, value: u64) -> Result<(), anyhow::Error> {
     if ptr < 0 {
         return Err(anyhow::anyhow!("Invalid memory pointer"));
     }
@@ -105,7 +105,7 @@ pub fn write_memory_u64(caller: &mut wasmtime::Caller<'_, crate::StoreData>, ptr
 }
 
 /// Try to allocate memory in the WASM guest
-pub fn try_allocate_guest_memory<'a>(caller: &mut Caller<'a, StoreData>, size: i32) -> Result<i32, anyhow::Error> {
+pub fn try_allocate_guest_memory<'a>(caller: &mut Caller<'a, ConcreteHostEnvironment>, size: i32) -> Result<i32, anyhow::Error> {
     if size < 0 {
         return Err(anyhow::anyhow!("Cannot allocate negative memory size"));
     }
@@ -120,4 +120,25 @@ pub fn try_allocate_guest_memory<'a>(caller: &mut Caller<'a, StoreData>, size: i
     }
     
     Ok(1024)
+}
+
+/// Write a string to WASM memory
+pub fn write_memory_string<'a>(
+    caller: &mut Caller<'a, ConcreteHostEnvironment>,
+    memory: Memory,
+    value: &str,
+    ptr: u32,
+    max_len: u32,
+) -> Result<u32, anyhow::Error> {
+    let bytes = value.as_bytes();
+    let write_len = std::cmp::min(bytes.len(), max_len as usize) as u32;
+    
+    // Write the string data
+    memory.write(
+        caller.as_context_mut(),
+        ptr as usize,
+        &bytes[0..write_len as usize],
+    )?;
+    
+    Ok(write_len)
 } 
