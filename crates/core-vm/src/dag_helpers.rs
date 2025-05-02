@@ -4,6 +4,7 @@ use crate::{StoreData, HostEnvironment};
 use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_bytes, try_allocate_guest_memory};
 use cid::Cid;
 use futures::executor::block_on;
+use crate::cid_utils;
 
 /// Register DAG-related host functions
 pub fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
@@ -19,10 +20,9 @@ pub fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
             for i in 0..parents_count {
                 // Assuming parent CIDs are stored as fixed-size strings
                 let parent_ptr = parents_ptr + (i * 46); // Assume CID strings are 46 bytes each
-                let parent_str = read_memory_string(&mut caller, parent_ptr, 46)?;
                 
-                // Parse CID
-                let parent_cid = Cid::try_from(parent_str)
+                // Read CID from WASM memory using utility function
+                let parent_cid = cid_utils::read_cid_from_wasm_memory(&mut caller, parent_ptr, 46)
                     .map_err(|e| anyhow::anyhow!("Invalid parent CID: {}", e))?;
                     
                 parents.push(parent_cid);
@@ -42,7 +42,7 @@ pub fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         };
         
         // Allocate memory for the result CID string
-        let cid_str = result.to_string();
+        let cid_str = cid_utils::cid_to_wasm_string(&result);
         let allocated_ptr = try_allocate_guest_memory(&mut caller, cid_str.len() as i32)?;
         
         // Write the CID string to the allocated memory
