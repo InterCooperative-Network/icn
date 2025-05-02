@@ -24,3 +24,4 @@
 # Environment variables
 .env
 .env.local 
+llm_context_dump.txt
