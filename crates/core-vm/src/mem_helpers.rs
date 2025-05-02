@@ -86,6 +86,24 @@ pub fn write_memory_u32<'a>(caller: &mut Caller<'a, StoreData>, ptr: i32, value:
     write_memory_bytes(caller, ptr, &bytes)
 }
 
+/// Write a u64 value to the guest memory
+pub fn write_memory_u64(caller: &mut wasmtime::Caller<'_, crate::StoreData>, ptr: i32, value: u64) -> Result<(), anyhow::Error> {
+    if ptr < 0 {
+        return Err(anyhow::anyhow!("Invalid memory pointer"));
+    }
+    
+    let memory = get_memory(caller)?;
+    
+    // Write the u64 value as 8 bytes in little-endian order
+    memory.write(
+        caller, 
+        ptr as usize, 
+        &value.to_le_bytes(),
+    ).map_err(|_| anyhow::anyhow!("Failed to write to guest memory"))?;
+    
+    Ok(())
+}
+
 /// Try to allocate memory in the WASM guest
 pub fn try_allocate_guest_memory<'a>(caller: &mut Caller<'a, StoreData>, size: i32) -> Result<i32, anyhow::Error> {
     if size < 0 {

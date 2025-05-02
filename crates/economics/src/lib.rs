@@ -15,6 +15,10 @@ use icn_identity::IdentityScope;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+use std::collections::HashMap;
+
+// New budget operations module
+pub mod budget_ops;
 
 /// Errors that can occur during economic operations
 #[derive(Debug, Error)]
@@ -329,35 +333,91 @@ pub mod token_ops {
 }
 
 /// Represents a participatory budget
-// TODO(V3-MVP): Implement Participatory Budgeting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticipatoryBudget {
-    /// The id of this budget
+    /// Unique ID for this budget instance (e.g., derived from scope_id + timeframe)
     pub id: String,
     
     /// The name of this budget
     pub name: String,
     
-    /// The description of this budget
-    pub description: String,
-    
-    /// The scope of this budget
-    pub scope: IdentityScope,
-    
-    /// The identifier of the scope (e.g., a DID)
+    /// The DID of the governing Coop/Community
     pub scope_id: String,
     
-    /// The available resources in this budget
-    pub resources: Vec<(ResourceType, u64)>,
+    /// The scope of this budget
+    pub scope_type: IdentityScope,
+    
+    /// The total allocated resources for each resource type
+    pub total_allocated: HashMap<ResourceType, u64>,
+    
+    /// Amount spent by proposal for each resource type
+    pub spent_by_proposal: HashMap<Uuid, HashMap<ResourceType, u64>>,
     
     /// The proposals in this budget
-    pub proposals: Vec<BudgetProposal>,
+    pub proposals: HashMap<Uuid, BudgetProposal>,
+    
+    /// Rules from the CCL configuration
+    pub rules: Option<BudgetRulesConfig>,
+    
+    /// Start timestamp (Unix timestamp)
+    pub start_timestamp: i64,
+    
+    /// End timestamp (Unix timestamp)
+    pub end_timestamp: i64,
+}
+
+/// Configuration rules for budget governance derived from CCL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetRulesConfig {
+    /// Voting method (e.g., "quadratic_voting", "simple_majority")
+    pub voting_method: Option<String>,
+    
+    /// Resource categories with allocation constraints
+    pub categories: Option<HashMap<String, CategoryRule>>,
+    
+    /// Minimum participants needed for decisions
+    pub min_participants: Option<u32>,
+    
+    /// Other custom rules specific to this budget
+    pub custom_rules: Option<serde_json::Value>,
+}
+
+/// Rules for a specific budget category
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoryRule {
+    /// Minimum allocation percentage (0-100)
+    pub min_allocation: Option<u8>,
+    
+    /// Maximum allocation percentage (0-100)
+    pub max_allocation: Option<u8>,
+    
+    /// Description of this category
+    pub description: Option<String>,
+}
+
+/// Status of a budget proposal
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProposalStatus {
+    /// Proposal has been submitted but not yet approved
+    Proposed,
+    
+    /// Proposal has been approved for implementation
+    Approved,
+    
+    /// Proposal has been rejected
+    Rejected,
+    
+    /// Proposal has been implemented and completed
+    Completed,
+    
+    /// Proposal has been cancelled
+    Cancelled,
 }
 
 /// Represents a budget proposal
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetProposal {
-    /// The id of this proposal
+    /// Unique identifier for this proposal
     pub id: Uuid,
     
     /// The title of this proposal
@@ -366,53 +426,26 @@ pub struct BudgetProposal {
     /// The description of this proposal
     pub description: String,
     
-    /// The requested resources in this proposal
-    pub requested_resources: Vec<(ResourceType, u64)>,
-    
-    /// The proposer of this proposal
+    /// The DID of the proposer
     pub proposer_did: String,
     
-    /// The votes for this proposal
-    pub votes: Vec<(String, bool)>, // (DID, vote)
+    /// Resources requested per resource type
+    pub requested_resources: HashMap<ResourceType, u64>,
     
-    /// Creation timestamp
-    pub created_at: i64,
-}
-
-/// Host ABI functions for budget operations
-pub mod budget_ops {
-    use super::*;
+    /// Current status of the proposal
+    pub status: ProposalStatus,
     
-    /// Create a new budget
-    pub fn create_budget(
-        name: &str,
-        description: &str,
-        scope: IdentityScope,
-        scope_id: &str,
-    ) -> EconomicsResult<ParticipatoryBudget> {
-        // TODO(V3-MVP): Implement proper budget creation and storage
-        let budget = ParticipatoryBudget {
-            id: Uuid::new_v4().to_string(),
-            name: name.to_string(),
-            description: description.to_string(),
-            scope,
-            scope_id: scope_id.to_string(),
-            resources: Vec::new(),
-            proposals: Vec::new(),
-        };
-        
-        Ok(budget)
-    }
+    /// Optional category from budget rules
+    pub category: Option<String>,
     
-    /// Allocate resources to a budget
-    pub fn allocate_to_budget(
-        _budget_id: &str,
-        _resource_type: ResourceType,
-        _amount: u64,
-    ) -> EconomicsResult<()> {
-        // TODO(V3-MVP): Implement budget allocation with state/storage
-        Err(EconomicsError::InvalidBudget("Not implemented".to_string()))
-    }
+    /// Votes for this proposal (DID -> vote value)
+    pub votes: HashMap<String, i32>,
+    
+    /// Unix timestamp when this proposal was created
+    pub creation_timestamp: i64,
+    
+    /// Additional metadata for this proposal
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[cfg(test)]

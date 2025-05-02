@@ -1,51 +1,37 @@
 /*!
-# ICN Core VM
+# ICN Core VM Runtime
 
-This crate implements the WASM execution engine for the ICN Runtime (CoVM V3).
-It provides a sandboxed environment for executing compiled CCL programs (.dsl files)
-and defines the Host ABI trait that exposes system functionality to WASM modules.
-
-## Architectural Tenets
-- WASM as the compilation target for CCL templates
-- Host ABI for exposing runtime capabilities to WASM
-- Metering for resource usage tracking and limiting
-- Secure sandboxing of user-provided code
+This crate provides a virtual machine runtime for executing WebAssembly modules in the ICN Runtime.
+It provides a secure sandbox with a host environment that exposes key ICN functionality.
 */
 
-use anyhow::{Error as AnyhowError, Result};
-use async_trait::async_trait;
-use cid::Cid;
-use cid::multihash::{MultihashDigest, Code};
-use chrono;
-use icn_economics::{ResourceType, ResourceAuthorization, consume_authorization, validate_authorization_usage};
-use icn_identity::{IdentityId, IdentityScope, KeyPair, Signature, verify_signature as identity_verify_signature};
-use icn_storage::StorageBackend;
-use serde::{Deserialize, Serialize};
+// Standard library imports
+use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use std::sync::Arc;
-use futures::lock::Mutex;
-use std::string::FromUtf8Error;
-use thiserror::Error;
-use tracing::{debug, info, warn, error};
-use wasmtime::{Engine, Linker, Module, Store, Trap, TypedFunc, Memory, AsContextMut, Caller};
-use std::clone::Clone;
-use std::fmt;
-use std::marker::Send;
-use std::marker::Sync;
-use std::future::Future;
-use std::pin::Pin;
-use futures::TryFutureExt;
-use std::time::Duration;
-use icn_storage::DistributedStorage;
-use icn_storage::InMemoryBlobStore;
 
-// Declare the modules
-pub mod mem_helpers;
-pub mod identity_helpers;
-pub mod storage_helpers;
-pub mod economics_helpers;
-pub mod logging_helpers;
-pub mod dag_helpers;
+// Third-party crates
+use anyhow::Error as AnyhowError;
+use async_trait::async_trait;
+use cid::{Cid, multihash::{Code, MultihashDigest}};
+use log::{debug, error, info, warn};
+use serde::{Serialize, Deserialize};
+use thiserror::Error;
+use wasmtime::{Engine, Linker, Module, Store, Memory, AsContextMut, Caller, Trap, TypedFunc};
+use uuid::Uuid;
+
+// ICN crates
+use icn_identity::{IdentityId, KeyPair, IdentityScope, Signature, verify_signature as identity_verify_signature};
+use icn_storage::{StorageBackend, DistributedStorage};
+use icn_storage::InMemoryBlobStore;
+use icn_economics::{ResourceType, ResourceAuthorization, consume_authorization, validate_authorization_usage};
+
+// Internal modules
+mod mem_helpers;
+mod identity_helpers;
+mod storage_helpers;
+mod economics_helpers;
+mod logging_helpers;
+mod dag_helpers;
 
 /// Log level for VM execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,6 +101,10 @@ pub trait HostEnvironment: Send + Sync {
     
     // Budgeting operations
     async fn budget_allocate(&mut self, budget_id: &str, amount: u64, resource: ResourceType) -> HostResult<()>;
+    async fn propose_budget_spend(&mut self, budget_id: &str, title: &str, description: &str, 
+                                 requested_resources: HashMap<ResourceType, u64>, 
+                                 category: Option<String>) -> HostResult<Uuid>;
+    async fn query_budget_balance(&self, budget_id: &str, resource: ResourceType) -> HostResult<u64>;
     
     // DAG operations
     async fn anchor_to_dag(&mut self, content: Vec<u8>, parents: Vec<Cid>) -> HostResult<Cid>;
@@ -380,8 +370,11 @@ impl ConcreteHostEnvironment {
 impl HostEnvironment for ConcreteHostEnvironment {
     // Storage operations
     async fn storage_get(&self, key: Cid) -> HostResult<Option<Vec<u8>>> {
+        // Track resource usage
+        self.record_resource_usage(ResourceType::Storage, 1000)?;
+        
         // Acquire a lock on storage
-        let storage = self.storage.lock().await;
+        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
         
         // Call the storage backend
         storage.get(&key)
@@ -390,17 +383,15 @@ impl HostEnvironment for ConcreteHostEnvironment {
     }
     
     async fn storage_put(&mut self, _key: Cid, value: Vec<u8>) -> HostResult<()> {
-        // Get the value size for resource tracking
-        let value_size = value.len() as u64;
-        
-        // Track storage usage first
-        self.record_resource_usage(ResourceType::Storage, value_size)?;
+        // Track resource usage (cost proportional to the size of the data)
+        let storage_cost = (value.len() as u64).max(1000);
+        self.record_resource_usage(ResourceType::Storage, storage_cost)?;
         
         // Acquire a lock on storage
-        let storage = self.storage.lock().await;
+        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
         
-        // Call the storage backend - discard the returned CID since we're using the provided key
-        let _ = storage.put(&value)
+        // Call the storage backend
+        storage.put(&value)
             .await
             .map_err(Self::storage_error_to_host_error)?;
             
@@ -409,13 +400,11 @@ impl HostEnvironment for ConcreteHostEnvironment {
     
     // Blob storage operations
     async fn blob_put(&mut self, content: Vec<u8>) -> HostResult<Cid> {
-        // Get the content size for resource tracking
-        let content_size = content.len() as u64;
+        // Track resource usage (cost proportional to the size of the data)
+        let storage_cost = (content.len() as u64).max(1000);
+        self.record_resource_usage(ResourceType::Storage, storage_cost)?;
         
-        // Track storage usage first
-        self.record_resource_usage(ResourceType::Storage, content_size)?;
-        
-        // Use the distributed blob storage
+        // Store the blob and get the CID
         self.blob_storage.put_blob(&content)
             .await
             .map_err(Self::storage_error_to_host_error)
@@ -537,14 +526,78 @@ impl HostEnvironment for ConcreteHostEnvironment {
     
     // Budgeting operations
     async fn budget_allocate(&mut self, budget_id: &str, amount: u64, resource: ResourceType) -> HostResult<()> {
-        // TODO(V3-MVP): Implement actual economic logic using icn-economics state.
-        // For now, just log and return success
+        // Track storage resource usage for loading/saving budget state
+        self.record_resource_usage(ResourceType::Storage, 1000)?; // Approximate cost
+        
+        // Get a lock on the storage backend
+        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        
+        // Call the economics budget_ops function using the BudgetStorage trait
+        // which is implemented for StorageBackend
+        icn_economics::budget_ops::allocate_to_budget(
+            budget_id, 
+            resource.clone(), 
+            amount, 
+            &mut &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
+        ).await.map_err(Self::economics_error_to_host_error)?;
+        
+        // Log the operation
         debug!(
             "Budget allocation: budget_id={}, amount={}, resource={:?}",
             budget_id, amount, resource
         );
         
         Ok(())
+    }
+    
+    async fn propose_budget_spend(&mut self, budget_id: &str, title: &str, description: &str, 
+                                  requested_resources: HashMap<ResourceType, u64>, 
+                                  category: Option<String>) -> HostResult<Uuid> {
+        // Track storage resource usage for loading/saving budget state
+        self.record_resource_usage(ResourceType::Storage, 2000)?; // Approximate cost
+        
+        // Get caller DID for proposer identity
+        let proposer_did = self.get_caller_did()?;
+        
+        // Get a lock on the storage backend
+        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        
+        // Call the economics budget_ops function
+        let proposal_id = icn_economics::budget_ops::propose_budget_spend(
+            budget_id,
+            title,
+            description,
+            requested_resources.clone(),
+            &proposer_did,
+            category.clone(),
+            None, // No additional metadata for now
+            &mut &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
+        ).await.map_err(Self::economics_error_to_host_error)?;
+        
+        // Log the operation
+        debug!(
+            "Budget proposal created: budget_id={}, proposer={}, proposal_id={}",
+            budget_id, proposer_did, proposal_id
+        );
+        
+        Ok(proposal_id)
+    }
+    
+    async fn query_budget_balance(&self, budget_id: &str, resource: ResourceType) -> HostResult<u64> {
+        // Track storage resource usage for loading budget state
+        self.record_resource_usage(ResourceType::Storage, 500)?; // Approximate cost
+        
+        // Get a lock on the storage backend
+        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        
+        // Call the economics budget_ops function
+        let balance = icn_economics::budget_ops::query_budget_balance(
+            budget_id,
+            &resource,
+            &&*storage as &dyn icn_economics::budget_ops::BudgetStorage
+        ).await.map_err(Self::economics_error_to_host_error)?;
+        
+        Ok(balance)
     }
     
     // DAG operations
@@ -562,7 +615,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         self.record_resource_usage(ResourceType::Storage, content_size)?;
         
         // Acquire a lock on storage
-        let storage = self.storage.lock().await;
+        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
         
         // Call the storage backend
         storage.put(&content)
@@ -629,6 +682,8 @@ pub async fn execute_wasm(
     config.async_support(true);
     config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+    
+    // Set up fuel for metering
     config.consume_fuel(true);
     
     let engine = Engine::new(&config)
@@ -1737,6 +1792,95 @@ pub mod tests {
         // Check resource consumption
         let compute_usage = exec_result.resources_consumed.get(&ResourceType::Compute);
         assert!(compute_usage.is_some(), "Compute usage not tracked");
+    }
+
+    #[tokio::test]
+    async fn test_budget_operations() {
+        use icn_economics::ResourceType;
+        use icn_economics::budget_ops::MockBudgetStorage;
+        use std::collections::HashMap;
+        
+        // Create test host environment
+        let mut host_env = create_test_host_environment_with_authorizations().await;
+        
+        // Create a mock budget storage
+        let mut budget_storage = MockBudgetStorage::new();
+        
+        // Create a budget
+        let budget_id = {
+            let now = chrono::Utc::now().timestamp();
+            let end = now + 3600 * 24 * 30; // 30 days
+            
+            // Create the budget directly using the economics module
+            icn_economics::budget_ops::create_budget(
+                "Test Budget",
+                "did:icn:test-community",
+                icn_identity::IdentityScope::Community,
+                now,
+                end,
+                None,
+                &mut budget_storage
+            ).await.unwrap()
+        };
+        
+        // Test budget_allocate by allocating directly to the mock storage
+        icn_economics::budget_ops::allocate_to_budget(
+            &budget_id, 
+            ResourceType::Compute, 
+            1000, 
+            &mut budget_storage
+        ).await.unwrap();
+        
+        icn_economics::budget_ops::allocate_to_budget(
+            &budget_id, 
+            ResourceType::Storage, 
+            2000, 
+            &mut budget_storage
+        ).await.unwrap();
+        
+        // Verify allocation via query_budget_balance
+        let compute_balance = icn_economics::budget_ops::query_budget_balance(
+            &budget_id,
+            &ResourceType::Compute,
+            &budget_storage
+        ).await.unwrap();
+        
+        let storage_balance = icn_economics::budget_ops::query_budget_balance(
+            &budget_id,
+            &ResourceType::Storage,
+            &budget_storage
+        ).await.unwrap();
+        
+        assert_eq!(compute_balance, 1000);
+        assert_eq!(storage_balance, 2000);
+        
+        // Test propose_budget_spend
+        let mut requested_resources = HashMap::new();
+        requested_resources.insert(ResourceType::Compute, 500);
+        requested_resources.insert(ResourceType::Storage, 800);
+        
+        let proposal_id = icn_economics::budget_ops::propose_budget_spend(
+            &budget_id,
+            "Test Proposal",
+            "Testing budget proposal creation via HostEnvironment",
+            requested_resources,
+            "did:icn:test-user",
+            Some("test-category".to_string()),
+            None,
+            &mut budget_storage
+        ).await.unwrap();
+        
+        // Verify proposal was created by fetching the budget directly
+        let budget = icn_economics::budget_ops::load_budget(&budget_id, &budget_storage).await.unwrap();
+        
+        // Proposal should exist
+        assert!(budget.proposals.contains_key(&proposal_id));
+        
+        // Proposal should have our requested resources
+        let proposal = budget.proposals.get(&proposal_id).unwrap();
+        assert_eq!(proposal.title, "Test Proposal");
+        assert_eq!(proposal.requested_resources.get(&ResourceType::Compute).cloned().unwrap_or(0), 500);
+        assert_eq!(proposal.requested_resources.get(&ResourceType::Storage).cloned().unwrap_or(0), 800);
     }
 }
 
