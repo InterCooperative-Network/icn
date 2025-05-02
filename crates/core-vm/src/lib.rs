@@ -86,7 +86,7 @@ pub type HostResult<T> = Result<T, HostError>;
 
 /// Host environment trait that defines the interface between WASM modules and the ICN Runtime
 #[async_trait]
-pub trait HostEnvironment: Send + Sync {
+pub trait HostEnvironment: Send + Sync + Clone {
     // Storage operations
     async fn storage_get(&mut self, key: Cid) -> HostResult<Option<Vec<u8>>>;
     async fn storage_put(&mut self, key: Cid, value: Vec<u8>) -> HostResult<()>;
@@ -118,7 +118,7 @@ pub trait HostEnvironment: Send + Sync {
     async fn anchor_to_dag(&mut self, content: Vec<u8>, parents: Vec<Cid>) -> HostResult<Cid>;
     
     // Logging operations
-    fn log_message(&self, level: LogLevel, message: &str) -> HostResult<()>;
+    fn log_message(&mut self, level: LogLevel, message: &str) -> HostResult<()>;
 }
 
 /// VM context for execution environment
@@ -393,11 +393,8 @@ impl HostEnvironment for ConcreteHostEnvironment {
             let guard = storage.lock()
                 .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
                 
-            // We need to clone or get what we need from the guard, then drop it
-            // In this case, we need the entire backend to make async calls on it
-            // For this implementation, we'll just use the storage operation directly
-            // This means we are not holding the guard across the await point
-            futures::executor::block_on(guard.get(&key))
+            // Use get_kv to retrieve key-value data
+            futures::executor::block_on(guard.get_kv(&key))
         };
         
         // Now process the result (no longer holding the guard)
@@ -416,7 +413,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         result
     }
     
-    async fn storage_put(&mut self, _key: Cid, value: Vec<u8>) -> HostResult<()> {
+    async fn storage_put(&mut self, key: Cid, value: Vec<u8>) -> HostResult<()> {
         // Calculate resource usage
         let value_size = value.len() as u64;
         
@@ -430,11 +427,11 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // We need to drop the MutexGuard before we hit an await point
         // First get the storage backend, then drop the guard
         let storage_result = {
-            let guard = storage.lock()
+            let mut guard = storage.lock()
                 .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
                 
-            // Execute the operation directly without holding the guard across await
-            futures::executor::block_on(guard.put(&value))
+            // Use put_kv to store key-value data
+            futures::executor::block_on(guard.put_kv(key, value))
         };
         
         // Now process the result (no longer holding the guard)
@@ -514,9 +511,9 @@ impl HostEnvironment for ConcreteHostEnvironment {
         Ok(self.vm_context.caller_scope)
     }
     
-    async fn verify_signature(&self, did_str: &str, message: &[u8], signature: &[u8]) -> HostResult<bool> {
+    fn verify_signature(&self, message: &[u8], signature: &[u8], did: &str) -> HostResult<bool> {
         // Create identity ID from string
-        let identity_id = IdentityId::new(did_str);
+        let identity_id = IdentityId::new(did);
         
         // Create signature from bytes
         let sig = Signature::new(signature.to_vec());
@@ -527,34 +524,6 @@ impl HostEnvironment for ConcreteHostEnvironment {
     }
     
     // Economics operations
-    fn check_resource_authorization(&self, resource: ResourceType, amount: u64) -> HostResult<bool> {
-        // First check if we have an active authorization for this resource type
-        if let Some(auth) = self.vm_context.find_authorization(&resource) {
-            // Check if there's enough remaining amount
-            match validate_authorization_usage(auth, amount, self.vm_context.timestamp) {
-                Ok(_) => return Ok(true),
-                Err(e) => {
-                    debug!(
-                        "Resource authorization validation failed: {:?}",
-                        e
-                    );
-                    return Ok(false);
-                }
-            }
-        }
-        
-        // Fallback to checking if the resource type is in the allowed list
-        let authorized = self.vm_context.resource_authorizations.contains(&resource);
-        
-        // Log the authorization check
-        debug!(
-            "Resource authorization check: resource={:?}, amount={}, authorized={}",
-            resource, amount, authorized
-        );
-        
-        Ok(authorized)
-    }
-    
     fn record_resource_usage(&mut self, resource: ResourceType, amount: u64) -> HostResult<()> {
         // First check if we have an active authorization for this resource type
         let timestamp = self.vm_context.timestamp;
