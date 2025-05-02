@@ -476,7 +476,9 @@ pub enum QuorumConfig {
 
 impl QuorumProof {
     /// Verify that the quorum proof contains sufficient valid signatures according to the config
-    pub async fn verify(&self, content_hash: &[u8]) -> IdentityResult<bool> {
+    /// 
+    /// Only signatures from authorized guardians are counted towards meeting the quorum requirements.
+    pub async fn verify(&self, content_hash: &[u8], authorized_guardians: &[IdentityId]) -> IdentityResult<bool> {
         let mut valid_signatures = 0u32;
         let mut weighted_sum = 0u32;
         let total_votes = self.votes.len() as u32;
@@ -496,11 +498,15 @@ impl QuorumProof {
         for (signer_did, signature) in &self.votes {
             // Prevent duplicate signatures from the same DID
             if verified_dids.contains(&signer_did.0) {
+                tracing::warn!("Duplicate signature from DID {} detected and ignored", signer_did.0);
                 continue;
             }
             
-            // TODO: Add check: Is signer_did actually an authorized Guardian for this scope?
-            // This requires identity/role lookup
+            // Check if the signer is an authorized guardian
+            if !authorized_guardians.contains(signer_did) {
+                tracing::warn!("Signature from unauthorized DID ({}) ignored in quorum proof", signer_did.0);
+                continue;
+            }
             
             match verify_signature(content_hash, signature, signer_did) {
                 Ok(true) => {
@@ -627,7 +633,10 @@ impl TrustBundle {
     }
     
     /// Verify the trust bundle
-    pub async fn verify(&self) -> IdentityResult<bool> {
+    /// 
+    /// Validates the bundle's contents and verifies the quorum proof against the provided
+    /// list of authorized guardians for the federation.
+    pub async fn verify(&self, authorized_guardians: &[IdentityId]) -> IdentityResult<bool> {
         // Check basic validity
         if self.federation_id.is_empty() {
             return Err(IdentityError::InvalidCredential("Federation ID is empty".to_string()));
@@ -657,12 +666,11 @@ impl TrustBundle {
             // Calculate the hash of the bundle
             let bundle_hash = self.calculate_hash();
             
-            // Verify the quorum proof
-            proof.verify(&bundle_hash).await
+            // Verify the quorum proof with the provided authorized guardians
+            proof.verify(&bundle_hash, authorized_guardians).await
         } else {
-            // If we don't have a proof, return true for backward compatibility
-            // but in a production system we would require a proof
-            Ok(true)
+            // For full validation, a proof is required
+            Err(IdentityError::VerificationError("Missing proof in TrustBundle".to_string()))
         }
     }
 }

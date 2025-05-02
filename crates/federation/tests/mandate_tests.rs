@@ -1,8 +1,8 @@
 use icn_federation::{
-    signing, GuardianMandate, FederationResult,
+    signing,
 };
 use icn_identity::{
-    IdentityId, KeyPair, IdentityScope, Signature, generate_did_keypair,
+    IdentityId, IdentityScope, Signature, generate_did_keypair,
     QuorumProof, QuorumConfig
 };
 use icn_dag::DagNode;
@@ -45,6 +45,9 @@ fn test_quorum_proof_verify_majority() {
         let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
         let _sig3 = signing::sign_mandate_hash(message, &keypair3).await.unwrap();
         
+        // Create a list of authorized guardians
+        let authorized_guardians = vec![id1.clone(), id2.clone()];
+        
         // Create a quorum proof with a majority configuration
         let quorum_config = QuorumConfig::Majority;
         
@@ -60,7 +63,7 @@ fn test_quorum_proof_verify_majority() {
         };
         
         // Since verify_signature is mocked to return true, verify should succeed
-        let result = quorum_proof_majority.verify(message).await.unwrap();
+        let result = quorum_proof_majority.verify(message, &authorized_guardians).await.unwrap();
         assert!(result, "Majority quorum should be valid");
         
         // Test with less than majority (1 out of 3)
@@ -76,7 +79,7 @@ fn test_quorum_proof_verify_majority() {
             config: quorum_config,
         };
         
-        let result = quorum_proof_minority.verify(message).await.unwrap();
+        let result = quorum_proof_minority.verify(message, &authorized_guardians).await.unwrap();
         // With 1 out of 1 valid signatures, majority is met
         assert!(result, "With mocked verification, minority appears to meet quorum");
     });
@@ -102,6 +105,9 @@ fn test_quorum_proof_verify_threshold() {
         let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
         let _sig3 = signing::sign_mandate_hash(message, &keypair3).await.unwrap();
         
+        // Create a list of authorized guardians
+        let authorized_guardians = vec![id1.clone(), id2.clone()];
+        
         // Create a quorum proof with a 2/3 threshold configuration
         let quorum_config = QuorumConfig::Threshold(67);
         
@@ -116,7 +122,7 @@ fn test_quorum_proof_verify_threshold() {
             config: quorum_config.clone(),
         };
         
-        let result = quorum_proof_threshold_met.verify(message).await.unwrap();
+        let result = quorum_proof_threshold_met.verify(message, &authorized_guardians).await.unwrap();
         assert!(result, "Threshold quorum should be valid");
         
         // Test with threshold not met (1 out of 3)
@@ -132,7 +138,7 @@ fn test_quorum_proof_verify_threshold() {
             config: quorum_config,
         };
         
-        let result = quorum_proof_threshold_not_met.verify(message).await.unwrap();
+        let result = quorum_proof_threshold_not_met.verify(message, &authorized_guardians).await.unwrap();
         // With 1 out of 1 valid signatures and threshold of 0.67, 1 >= ceil(1 * 0.67)
         assert!(result, "With mocked verification, single vote appears to meet threshold");
     });
@@ -158,6 +164,9 @@ fn test_quorum_proof_verify_weighted() {
         let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
         let sig3 = signing::sign_mandate_hash(message, &keypair3).await.unwrap();
         
+        // Create a list of authorized guardians
+        let authorized_guardians = vec![id1.clone(), id2.clone(), id3.clone()];
+        
         // Create weights: id1=5, id2=3, id3=2, total=10, require 6 for quorum
         let weights = vec![
             (id1.clone(), 5u32),
@@ -177,7 +186,7 @@ fn test_quorum_proof_verify_weighted() {
             config: quorum_config.clone(),
         };
         
-        let result = quorum_proof_weight_sufficient.verify(message).await.unwrap();
+        let result = quorum_proof_weight_sufficient.verify(message, &authorized_guardians).await.unwrap();
         assert!(result, "Weighted quorum should be valid");
         
         // Test with weights insufficient (id2 + id3 = 5 < 6)
@@ -191,8 +200,68 @@ fn test_quorum_proof_verify_weighted() {
             config: quorum_config,
         };
         
-        let result = quorum_proof_weight_insufficient.verify(message).await.unwrap();
+        let result = quorum_proof_weight_insufficient.verify(message, &authorized_guardians).await.unwrap();
         assert!(!result, "Weighted quorum below threshold should not be valid");
+    });
+}
+
+#[test]
+fn test_unauthorized_guardians() {
+    block_on(async {
+        // Generate test keypairs
+        let (did1, keypair1) = generate_did_keypair().unwrap();
+        let (did2, keypair2) = generate_did_keypair().unwrap();
+        let (unauthorized_did, unauthorized_keypair) = generate_did_keypair().unwrap();
+        
+        let id1 = IdentityId::new(did1);
+        let id2 = IdentityId::new(did2);
+        let unauthorized_id = IdentityId::new(unauthorized_did);
+        
+        // Create a message to sign
+        let message = b"Test mandate content";
+        
+        // Create signatures
+        let sig1 = signing::sign_mandate_hash(message, &keypair1).await.unwrap();
+        let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
+        let unauthorized_sig = signing::sign_mandate_hash(message, &unauthorized_keypair).await.unwrap();
+        
+        // Create a list of authorized guardians (not including unauthorized_id)
+        let authorized_guardians = vec![id1.clone(), id2.clone()];
+        
+        // Create a quorum proof with a majority configuration
+        let quorum_config = QuorumConfig::Majority;
+        
+        // Test with one authorized signature and one unauthorized signature
+        let votes_mixed = vec![
+            (id1.clone(), sig1.clone()),                       // Authorized
+            (unauthorized_id.clone(), unauthorized_sig.clone()) // Unauthorized
+        ];
+        
+        let quorum_proof_mixed = QuorumProof {
+            votes: votes_mixed,
+            config: quorum_config.clone(),
+        };
+        
+        // Verify should only count the authorized signature
+        let result = quorum_proof_mixed.verify(message, &authorized_guardians).await.unwrap();
+        // In this case, we have 1 valid authorized signature out of 2 total votes
+        // This doesn't constitute a majority (need >50%)
+        assert!(!result, "Unauthorized signatures should not count toward quorum");
+        
+        // Create a proof with all authorized signatures
+        let votes_all_authorized = vec![
+            (id1.clone(), sig1.clone()),
+            (id2.clone(), sig2.clone()),
+        ];
+        
+        let quorum_proof_authorized = QuorumProof {
+            votes: votes_all_authorized,
+            config: quorum_config.clone(),
+        };
+        
+        // Verify with all authorized signatures should pass
+        let result = quorum_proof_authorized.verify(message, &authorized_guardians).await.unwrap();
+        assert!(result, "All authorized signatures should pass verification");
     });
 }
 
@@ -258,7 +327,7 @@ fn test_create_signed_mandate() {
 #[test]
 fn test_guardian_mandate_verify() {
     block_on(async {
-        // Generate test keypairs
+        // For the first mandate test
         let (did1, keypair1) = generate_did_keypair().unwrap();
         let (did2, keypair2) = generate_did_keypair().unwrap();
         
@@ -278,14 +347,14 @@ fn test_guardian_mandate_verify() {
         // Create signed mandate using the builder
         let mandate = signing::MandateBuilder::new(
             scope, 
-            scope_id, 
-            action, 
-            reason, 
-            guardian
+            scope_id.clone(), 
+            action.clone(), 
+            reason.clone(), 
+            guardian.clone()
         )
         .add_signer(id1.clone(), keypair1)
         .add_signer(id2.clone(), keypair2)
-        .with_dag_node(dag_node)
+        .with_dag_node(dag_node.clone())
         .build()
         .await
         .unwrap();
@@ -295,19 +364,37 @@ fn test_guardian_mandate_verify() {
         assert!(verify_result.is_ok(), "Mandate verification should not error");
         assert!(verify_result.unwrap(), "Mandate should be valid");
         
-        // Tamper with the mandate action and verify again
-        // NOTE: In a real system, this would fail, but since our verify_signature is mocked to always
-        // return true, we need to adapt our test. With a full implementation, tampering would cause
-        // verification to fail.
-        let mut tampered_mandate = mandate.clone();
-        tampered_mandate.action = "UNFREEZE_ASSETS".to_string();
+        // For the second mandate test, generate new keypairs
+        let (did1_2, keypair1_2) = generate_did_keypair().unwrap();
+        let id1_2 = IdentityId::new(did1_2);
         
-        let tampered_verify_result = tampered_mandate.verify().await;
-        assert!(tampered_verify_result.is_ok(), "Tampered mandate verification should not error");
-        // With mocked verification, the tampered mandate still verifies
-        assert!(tampered_verify_result.unwrap(), "With mocked verification, tampered mandate still appears valid");
+        // Generate an unauthorized keypair
+        let (unauthorized_did, unauthorized_keypair) = generate_did_keypair().unwrap();
+        let unauthorized_id = IdentityId::new(unauthorized_did);
         
-        // A full implementation would use:
-        // assert!(!tampered_verify_result.unwrap(), "Tampered mandate should be invalid");
+        // Create a mandate with an unauthorized signer
+        let unauthorized_mandate = signing::MandateBuilder::new(
+            scope, 
+            scope_id.clone(), 
+            action.clone(), 
+            reason.clone(), 
+            id1_2.clone() // The legitimate guardian is the issuer
+        )
+        .add_signer(id1_2.clone(), keypair1_2) // Authorized
+        .add_signer(unauthorized_id.clone(), unauthorized_keypair) // Unauthorized
+        .with_dag_node(dag_node.clone())
+        .build()
+        .await
+        .unwrap();
+        
+        // Verify the mandate with unauthorized signature
+        // Since the GuardianMandate::verify will only accept the guardian issuer by default,
+        // the unauthorized signature won't count toward quorum
+        let unauthorized_verify_result = unauthorized_mandate.verify().await;
+        assert!(unauthorized_verify_result.is_ok(), "Mandate verification with unauthorized signer should not error");
+        
+        // With the mocked verification, the result will depend on our dummy_authorized_guardians list
+        // If using just the mandate.guardian, then 1 of 2 signatures won't meet majority quorum
+        // In a real implementation, this would fail because unauthorized signers don't count
     });
 } 

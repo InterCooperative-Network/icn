@@ -187,7 +187,7 @@ pub async fn create_signed_trust_bundle(
     // Quorum configuration
     quorum_config: QuorumConfig,
     // Signing guardians - each tuple represents a guardian's DID and their keypair
-    signing_guardians: &[(IdentityId, KeyPair)],
+    signing_guardians: &[(IdentityId, &KeyPair)],
 ) -> FederationResult<()> {
     // Calculate the bundle hash for signatures
     let bundle_hash = bundle.calculate_hash();
