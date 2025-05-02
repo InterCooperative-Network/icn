@@ -6,7 +6,18 @@ use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
 use cid::Cid;
-use multihash::{Code, MultihashDigest};
+use sha2::{Sha256, Digest};
+
+/// Helper function to create a multihash using SHA-256
+fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
+    // Create a new SHA-256 multihash
+    let mut buf = [0u8; 32];
+    let digest = Sha256::digest(data);
+    buf.copy_from_slice(digest.as_slice());
+    
+    // Create the multihash (code 0x12 is SHA256)
+    cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
+}
 
 /// Storage key prefix for budget state
 const BUDGET_KEY_PREFIX: &str = "budget::";
@@ -33,7 +44,7 @@ impl<T: icn_storage::StorageBackend + Send + Sync> BudgetStorage for T {
     async fn store_budget(&mut self, key: &str, data: Vec<u8>) -> EconomicsResult<()> {
         // Generate a key CID from the string key
         let key_str = format!("budget::{}", key);
-        let hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+        let hash = create_sha256_multihash(key_str.as_bytes());
         let key_cid = cid::Cid::new_v1(0x71, hash);
         
         // Store the data directly using key-value operations
@@ -47,7 +58,7 @@ impl<T: icn_storage::StorageBackend + Send + Sync> BudgetStorage for T {
     async fn get_budget(&self, key: &str) -> EconomicsResult<Option<Vec<u8>>> {
         // Generate the same key CID from the string key
         let key_str = format!("budget::{}", key);
-        let hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+        let hash = create_sha256_multihash(key_str.as_bytes());
         let key_cid = cid::Cid::new_v1(0x71, hash);
         
         // Retrieve the data using key-value operations
@@ -524,7 +535,7 @@ pub async fn finalize_budget_proposal(
             // Store the auth using CID-based key
             let auth_id = auth.auth_id;
             let auth_key_str = format!("auth::{}", auth_id);
-            let auth_key_hash = Code::Sha2_256.digest(auth_key_str.as_bytes());
+            let auth_key_hash = create_sha256_multihash(auth_key_str.as_bytes());
             let auth_key_cid = Cid::new_v1(0x71, auth_key_hash); // dag-cbor likely suitable for structured data key mapping
             
             // Serialize the authorization

@@ -11,15 +11,26 @@ storage backend trait and distributed blob storage primitives.
 */
 
 use async_trait::async_trait;
-use cid::Cid;
+use cid::{Cid, multihash};
 use futures::lock::Mutex;
 use hashbrown::{HashMap, HashSet};
 use icn_identity::{IdentityId, IdentityScope};
-use multihash::{self, Code, MultihashDigest};
+use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing;
+
+/// Helper function to create a multihash using SHA-256
+fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
+    // Create a new SHA-256 multihash
+    let mut buf = [0u8; 32];
+    let digest = Sha256::digest(data);
+    buf.copy_from_slice(digest.as_slice());
+    
+    // Create the multihash (code 0x12 is SHA256)
+    cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
+}
 
 /// Errors that can occur during storage operations
 #[derive(Debug, Error)]
@@ -168,8 +179,8 @@ impl StorageBackend for AsyncInMemoryStorage {
     
     #[allow(deprecated)]
     async fn put(&self, value: &[u8]) -> StorageResult<Cid> {
-        // Hash the content with SHA-256
-        let mh = Code::Sha2_256.digest(value);
+        // Create a multihash using SHA-256
+        let mh = create_sha256_multihash(value);
         
         // Create CID v0 with the digest
         let cid = Cid::new_v0(mh)
@@ -526,16 +537,13 @@ impl Default for InMemoryBlobStore {
 #[async_trait]
 impl DistributedStorage for InMemoryBlobStore {
     async fn put_blob(&self, content: &[u8]) -> StorageResult<Cid> {
-        // Check blob size if there's a limit
+        // Check size limit if configured
         if self.max_blob_size > 0 && content.len() as u64 > self.max_blob_size {
-            return Err(StorageError::BlobTooLarge(
-                content.len() as u64,
-                self.max_blob_size,
-            ));
+            return Err(StorageError::BlobTooLarge(content.len() as u64, self.max_blob_size));
         }
         
         // Hash the content with SHA-256
-        let mh = Code::Sha2_256.digest(content);
+        let mh = create_sha256_multihash(content);
         
         // Create CID v0 with the digest
         let cid = Cid::new_v0(mh)
@@ -545,17 +553,13 @@ impl DistributedStorage for InMemoryBlobStore {
         let mut blobs = self.blobs.lock().await;
         blobs.insert(cid, content.to_vec());
         
-        // Announce the blob via Kademlia if announcer is available
-        if let Some(sender) = &self.kad_announcer {
-            match sender.send(cid).await {
-                Ok(_) => {
-                    tracing::debug!(%cid, "Sent CID for Kademlia announcement");
-                },
-                Err(e) => {
-                    tracing::error!(%cid, "Failed to send CID for Kademlia announcement: {}", e);
-                    // Continue anyway since the blob was stored successfully
+        // If we have a Kad announcer, let's announce the CID
+        if let Some(mut announcer) = self.kad_announcer.clone() {
+            tokio::spawn(async move {
+                if let Err(e) = announcer.send(cid).await {
+                    tracing::warn!("Failed to send CID to announcer: {:?}", e);
                 }
-            }
+            });
         }
         
         Ok(cid)
@@ -640,38 +644,40 @@ mod tests {
     
     #[tokio::test]
     async fn test_async_storage_blob_ops() -> Result<(), Box<dyn Error>> {
-        // Create a new in-memory storage
         let storage = AsyncInMemoryStorage::new();
         
-        // Test blob operations
-        let test_data = b"Test data for blob operations".to_vec();
-        let cid = storage.put_blob(&test_data).await?;
+        // Create a test blob
+        let content = b"test content";
         
-        // Verify the blob can be retrieved
-        let retrieved = storage.get_blob(&cid).await?.unwrap();
-        assert_eq!(retrieved, test_data);
+        // Compute the expected CID
+        let mh = create_sha256_multihash(content);
+        let expected_cid = Cid::new_v0(mh)?;
         
-        // Verify contains operation
+        // Test put_blob
+        let cid = storage.put_blob(content).await?;
+        assert_eq!(cid, expected_cid);
+        
+        // Test get_blob
+        let retrieved = storage.get_blob(&cid).await?;
+        assert_eq!(retrieved, Some(content.to_vec()));
+        
+        // Test contains_blob
         assert!(storage.contains_blob(&cid).await?);
         
-        // Delete the blob
+        // Test delete_blob
         storage.delete_blob(&cid).await?;
-        
-        // Verify it's gone
-        assert!(!storage.contains_blob(&cid).await?);
-        assert!(storage.get_blob(&cid).await?.is_none());
+        assert_eq!(storage.get_blob(&cid).await?, None);
         
         Ok(())
     }
     
     #[tokio::test]
     async fn test_async_storage_kv_ops() -> Result<(), Box<dyn Error>> {
-        // Create a new in-memory storage
         let storage = AsyncInMemoryStorage::new();
         
         // Create a key CID
         let key_str = "test_key";
-        let key_hash = Code::Sha2_256.digest(key_str.as_bytes());
+        let key_hash = create_sha256_multihash(key_str.as_bytes());
         let key_cid = Cid::new_v1(0x71, key_hash);
         
         // Test KV operations

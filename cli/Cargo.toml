@@ -21,7 +21,8 @@ chrono = { version = "0.4", features = ["serde"] }
 base64 = { version = "0.21", features = ["std"] }
 rand = "0.8"
 bs58 = "0.5"
-multihash = { version = "0.16.3", features = ["sha2"] }
+wasmer-wasi = { workspace = true }
+multihash = { workspace = true }
 serde = { workspace = true }
 
 # ICN crates

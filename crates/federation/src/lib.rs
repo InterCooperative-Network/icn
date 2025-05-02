@@ -29,12 +29,13 @@ use libp2p::{
 use icn_dag::DagNode;
 use icn_identity::{
     IdentityId, IdentityScope, TrustBundle, 
-    QuorumProof, QuorumConfig
+    QuorumProof, QuorumConfig, Signature
 };
 use icn_storage::{FederationCommand, ReplicationPolicy, DistributedStorage};
 use multihash::{self, MultihashDigest};
 use tracing::{debug, info, error, warn};
 use thiserror::Error;
+use sha2::{Sha256, Digest};
 
 // Export network module
 pub mod network;
@@ -133,7 +134,7 @@ impl GuardianMandate {
         
         // Verify the quorum proof against the authorized guardians
         self.quorum_proof.verify(&mandate_hash, &authorized_guardians).await
-            .map_err(|e| FederationError::InvalidMandate(e.to_string()))
+            .map_err(|e| FederationError::AuthenticationError(e.to_string()))
     }
 }
 
@@ -244,7 +245,7 @@ impl FederationManager {
         
         // Create the network behavior
         let behavior = network::create_behaviour(local_peer_id, keypair.clone())
-            .map_err(|e| FederationError::ProtocolError(format!("Failed to create behavior: {}", e)))?;
+            .map_err(|e| FederationError::NetworkError(format!("Failed to create behavior: {}", e)))?;
         
         // Create the libp2p swarm
         let mut swarm = Swarm::new(
@@ -264,7 +265,7 @@ impl FederationManager {
         for peer_addr in &config.bootstrap_peers {
             info!("Dialing bootstrap peer: {}", peer_addr);
             swarm.dial(peer_addr.clone())
-                .map_err(|e| FederationError::ConnectionError(format!("Failed to dial {}: {}", peer_addr, e)))?;
+                .map_err(|e| FederationError::NetworkError(format!("Failed to dial {}: {}", peer_addr, e)))?;
         }
         
         // Prepare channels for communication with the event loop
@@ -375,7 +376,7 @@ impl FederationManager {
         
         // Define the key for the latest epoch metadata
         let meta_key = "federation::latest_epoch";
-        let meta_hash = multihash::Code::Sha2_256.digest(meta_key.as_bytes());
+        let meta_hash = create_sha256_multihash(meta_key.as_bytes());
         let meta_cid = cid::Cid::new_v1(0x71, meta_hash); // Raw codec
         
         // Try to get the latest epoch value from storage
@@ -414,7 +415,7 @@ impl FederationManager {
         
         // Define the key for the latest epoch metadata
         let meta_key = "federation::latest_epoch";
-        let meta_hash = multihash::Code::Sha2_256.digest(meta_key.as_bytes());
+        let meta_hash = create_sha256_multihash(meta_key.as_bytes());
         let meta_cid = cid::Cid::new_v1(0x71, meta_hash); // Raw codec
         
         // Store the new epoch value
@@ -493,7 +494,7 @@ async fn run_event_loop(
                         
                         // Generate a key for the requested TrustBundle based on epoch
                         let key_str = format!("trustbundle::epoch::{}", epoch);
-                        let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+                        let key_hash = create_sha256_multihash(key_str.as_bytes());
                         let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
                         
                         // First check if we have it locally
@@ -854,7 +855,7 @@ async fn handle_behavior_event(
             
             // Generate a key for the requested TrustBundle based on epoch
             let key_str = format!("trustbundle::epoch::{}", request.epoch);
-            let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+            let key_hash = create_sha256_multihash(key_str.as_bytes());
             let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
             
             // Attempt to retrieve the TrustBundle from storage
@@ -1536,7 +1537,17 @@ impl icn_storage::DistributedStorage for BlobStorageAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+    use cid::Cid;
+    use futures::lock::Mutex;
+    use icn_storage::{AsyncInMemoryStorage, StorageResult, StorageBackend, DistributedStorage, InMemoryBlobStore, FederationCommand, ReplicationPolicy};
+    use libp2p::{request_response, PeerId};
+    use std::collections::HashMap;
+    use std::error::Error;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    // No more direct multihash imports, use our create_sha256_multihash function instead
+
     #[test]
     fn test_request_response_types() {
         // Test TrustBundleRequest
@@ -1548,21 +1559,21 @@ mod tests {
         assert!(response_none.bundle.is_none());
         
         // Test ReplicateBlobRequest
-        let cid = cid::Cid::new_v0(multihash::Code::Sha2_256.digest(b"test_blob")).unwrap();
+        let cid = cid::Cid::new_v0(create_sha256_multihash(b"test_blob")).unwrap();
         let replicate_request = network::ReplicateBlobRequest { cid };
         assert_eq!(replicate_request.cid, cid);
         
         // Test ReplicateBlobResponse success
-        let success_response = network::ReplicateBlobResponse { 
-            success: true, 
+        let success_response = network::ReplicateBlobResponse {
+            success: true,
             error_msg: None 
         };
         assert!(success_response.success);
         assert!(success_response.error_msg.is_none());
         
         // Test ReplicateBlobResponse failure
-        let error_response = network::ReplicateBlobResponse { 
-            success: false, 
+        let error_response = network::ReplicateBlobResponse {
+            success: false,
             error_msg: Some("Blob not found".to_string()) 
         };
         assert!(!error_response.success);
@@ -1574,11 +1585,10 @@ mod tests {
         use std::time::Duration;
         use cid::Cid;
         use icn_storage::{InMemoryBlobStore, DistributedStorage};
-        use multihash::{Code, MultihashDigest};
         
         // Create test data
         let test_content = b"This is test content for blob replication protocol".to_vec();
-        let mh = Code::Sha2_256.digest(&test_content);
+        let mh = create_sha256_multihash(&test_content);
         let cid = Cid::new_v0(mh).unwrap();
         
         // Create mock storage with the test blob
@@ -2093,4 +2103,15 @@ mod tests {
         assert!(retrieved_blob.is_some(), "Blob should be retrievable from local storage");
         assert_eq!(retrieved_blob.unwrap(), test_content, "Retrieved blob should match original content");
     }
+} 
+
+/// Helper function to create a multihash using SHA-256
+fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
+    // Create a new SHA-256 multihash
+    let mut buf = [0u8; 32];
+    let digest = Sha256::digest(data);
+    buf.copy_from_slice(digest.as_slice());
+    
+    // Create the multihash (code 0x12 is SHA256)
+    cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
 } 

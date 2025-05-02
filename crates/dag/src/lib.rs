@@ -13,13 +13,24 @@ verifying lineage attestations.
 
 use cid::Cid;
 use icn_identity::{IdentityId, Signature};
-use multihash::{self, Code, MultihashDigest};
+use sha2::{Sha256, Digest};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use std::sync::{Arc, Mutex};
 use icn_storage::StorageBackend;
 use serde::{Serialize, Deserialize};
 use serde_json;
+
+/// Helper function to create a multihash using SHA-256
+fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
+    // Create a new SHA-256 multihash
+    let mut buf = [0u8; 32];
+    let digest = Sha256::digest(data);
+    buf.copy_from_slice(digest.as_slice());
+    
+    // Create the multihash (code 0x12 is SHA256)
+    cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
+}
 
 /// Errors that can occur during DAG operations
 #[derive(Debug, Error)]
@@ -157,7 +168,7 @@ impl DagNode {
     /// Calculate the CID of this node based on its content
     pub fn calculate_cid(&mut self) -> DagResult<Cid> {
         // For simplicity, just use the content hash with SHA-256
-        let mh = Code::Sha2_256.digest(&self.content);
+        let mh = create_sha256_multihash(&self.content);
         
         // Create CID with the digest
         let cid = Cid::new_v0(mh)
@@ -272,7 +283,7 @@ pub fn calculate_merkle_root(nodes: &[DagNode]) -> DagResult<Cid> {
         combined.extend_from_slice(&cid_bytes);
     }
     
-    let mh = Code::Sha2_256.digest(&combined);
+    let mh = create_sha256_multihash(&combined);
     
     let cid = Cid::new_v0(mh)
         .map_err(|e| DagError::InvalidCid(e.to_string()))?;
@@ -413,7 +424,7 @@ impl DagStore {
         let node_bytes = self.serialize_node(node)?;
         
         // Calculate hash using SHA-256
-        let hash = multihash::Code::Sha2_256.digest(&node_bytes);
+        let hash = create_sha256_multihash(&node_bytes);
         
         // Create CID with raw codec (0x71)
         Ok(Cid::new_v1(0x71, hash))
@@ -463,7 +474,7 @@ mod tests {
         let node = DagNode::new(content, parents, signer.clone(), signature.clone(), None).unwrap();
         
         // Create a fake root CID
-        let mh = Code::Sha2_256.digest(b"root");
+        let mh = create_sha256_multihash(b"root");
         let root_cid = Cid::new_v0(mh).unwrap();
         
         // Create a lineage attestation

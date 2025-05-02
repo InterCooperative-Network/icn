@@ -7,7 +7,7 @@ description = "DAG objects, Merkle anchoring, and Lineage for the ICN Runtime"
 [dependencies]
 icn-identity = { path = "../identity" }
 merkle-cbt = { workspace = true }
-multihash = { version = "0.16.3", features = ["sha2"] }
+multihash = { workspace = true }
 cid = { workspace = true }
 libipld-core = { workspace = true }
 thiserror = { workspace = true }
@@ -18,3 +18,4 @@ serde_json = { workspace = true }
 icn-storage = { path = "../storage" }
 async-trait = { workspace = true }
 lru = "0.11" 
+sha2 = "0.10.9"
