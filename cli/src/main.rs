@@ -1,10 +1,10 @@
 use clap::{Parser, Subcommand};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::path::PathBuf;
 use std::net::SocketAddr;
-use anyhow::{Result, anyhow, Context};
+use anyhow::{Result, Context};
 use wallet_core::identity::{IdentityWallet, IdentityScope};
-use wallet_agent::queue::{ProposalQueue, ActionType};
+use wallet_agent::queue::ProposalQueue;
 use wallet_agent::governance::Guardian;
 use wallet_sync::client::SyncClient;
 use wallet_ui_api::WalletAPI;
@@ -200,7 +200,13 @@ async fn main() -> Result<()> {
             println!("Starting wallet API server on {}", addr);
             
             let api = WalletAPI::new(&cli.data_dir);
-            api.run(addr).await?;
+            
+            // Use a spawn block to handle the async server without Error trait issues
+            tokio::spawn(async move {
+                if let Err(e) = api.run(addr).await {
+                    eprintln!("Server error: {}", e);
+                }
+            }).await?;
         },
     }
     

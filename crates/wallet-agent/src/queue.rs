@@ -6,6 +6,7 @@ use std::io::{Read, Write};
 use uuid::Uuid;
 use wallet_core::identity::IdentityWallet;
 use crate::error::{AgentResult, AgentError};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ActionType {
@@ -77,7 +78,7 @@ impl ProposalQueue {
             .map_err(|e| AgentError::SerializationError(format!("Failed to serialize action: {}", e)))?;
             
         let signature = self.identity.sign_message(action_json.as_bytes());
-        let signature_b64 = base64::engine::general_purpose::STANDARD.encode(&signature);
+        let signature_b64 = BASE64.encode(&signature);
         
         action.signed = true;
         action.signature = Some(signature_b64);

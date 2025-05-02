@@ -1,8 +1,7 @@
 use wallet_core::identity::IdentityWallet;
 use wallet_agent::governance::TrustBundle;
-use crate::error::{SyncResult, SyncError};
+use crate::error::SyncResult;
 
-#[derive(Debug)]
 pub struct TrustBundleValidator {
     identity: IdentityWallet,
 }

@@ -1,8 +1,8 @@
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use sha2::{Sha256, Digest};
-use multihash::{Multihash, MultihashDigest};
-use cid::{Cid, Version};
+use multihash::Multihash;
+use cid::Cid;
 use std::collections::HashMap;
 use crate::error::{SyncResult, SyncError};
 
@@ -13,14 +13,14 @@ pub struct DagObject {
     pub signatures: HashMap<String, String>, // SignerDID -> Signature
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DagVerifier {
     // In a real implementation, this might store crypto keys, trusted CIDs, etc.
 }
 
 impl DagVerifier {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
     
     pub fn verify_object(&self, object: &DagObject, expected_cid: &str) -> SyncResult<bool> {

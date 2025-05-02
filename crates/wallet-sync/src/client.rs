@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use tokio::sync::Mutex;
@@ -36,9 +36,9 @@ impl Default for SyncConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct SyncClient {
     config: SyncConfig,
+    #[allow(dead_code)]
     identity: IdentityWallet,
     http_client: HttpClient,
     trust_validator: TrustBundleValidator,
@@ -98,7 +98,8 @@ impl SyncClient {
     }
     
     pub async fn fetch_dag_object(&self, cid: &str) -> SyncResult<DagObject> {
-        let cid_obj = Cid::try_from(cid)
+        // We don't need to keep the Cid object, just validate it's correct
+        Cid::try_from(cid)
             .map_err(|e| SyncError::CidError(format!("Invalid CID format: {}", e)))?;
             
         // Check if we have it cached locally
@@ -131,7 +132,7 @@ impl SyncClient {
                         }
                     }
                 }
-                Err(e) => {
+                Err(_) => {
                     // Try next server
                     continue;
                 }

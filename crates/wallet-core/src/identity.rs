@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use uuid::Uuid;
 use base64::{Engine, engine::general_purpose};
 use crate::crypto::KeyPair;
 use crate::error::{WalletResult, WalletError};
+use std::fmt;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IdentityId {
@@ -29,9 +29,12 @@ impl IdentityId {
         
         Ok(Self { did: did.to_string() })
     }
-    
-    pub fn to_string(&self) -> String {
-        self.did.clone()
+}
+
+// Implement Display trait instead of to_string method
+impl fmt::Display for IdentityId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.did)
     }
 }
 
@@ -81,15 +84,15 @@ impl IdentityWallet {
     pub fn to_document(&self) -> Value {
         let mut doc = serde_json::json!({
             "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": self.did.to_string(),
+            "id": self.did,
             "verificationMethod": [{
-                "id": format!("{}#keys-1", self.did.to_string()),
+                "id": format!("{}#keys-1", self.did),
                 "type": "Ed25519VerificationKey2020",
-                "controller": self.did.to_string(),
+                "controller": self.did,
                 "publicKeyBase64": general_purpose::STANDARD.encode(self.keypair.public_key_bytes())
             }],
-            "authentication": [format!("{}#keys-1", self.did.to_string())],
-            "assertionMethod": [format!("{}#keys-1", self.did.to_string())]
+            "authentication": [format!("{}#keys-1", self.did)],
+            "assertionMethod": [format!("{}#keys-1", self.did)]
         });
         
         if let Some(metadata) = &self.metadata {

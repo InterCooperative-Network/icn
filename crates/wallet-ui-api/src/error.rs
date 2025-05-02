@@ -2,7 +2,6 @@ use thiserror::Error;
 use wallet_core::error::WalletError as CoreError;
 use wallet_agent::error::AgentError;
 use wallet_sync::error::SyncError;
-use serde_json::Value;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;

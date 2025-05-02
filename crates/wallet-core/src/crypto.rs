@@ -1,8 +1,7 @@
 use ed25519_dalek::{Signer, Verifier, SigningKey, VerifyingKey, Signature};
 use rand::rngs::OsRng;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{self, Visitor};
-use std::fmt;
+use serde::de;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use crate::error::{WalletResult, WalletError};
 
@@ -50,6 +49,9 @@ impl<'de> Deserialize<'de> for KeyPair {
         #[derive(Deserialize)]
         struct DeserializeHelper {
             secret: String,
+            // Public key is calculated from secret key, but we need to keep this field
+            // for proper deserialization from the JSON structure
+            #[allow(dead_code)]
             public: String,
         }
         

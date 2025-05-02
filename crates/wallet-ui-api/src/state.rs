@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
-use uuid::Uuid;
 use std::path::{Path, PathBuf};
 use wallet_core::identity::IdentityWallet;
 use wallet_agent::queue::ProposalQueue;

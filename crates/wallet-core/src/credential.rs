@@ -3,27 +3,30 @@ use serde_json::Value;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use crate::error::{WalletResult, WalletError};
 use crate::identity::IdentityWallet;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifiableCredential {
     #[serde(rename = "@context")]
     context: Vec<String>,
     #[serde(rename = "type")]
     credential_type: Vec<String>,
     issuer: String,
-    issuanceDate: String,
-    credentialSubject: Value,
+    #[serde(rename = "issuanceDate")]
+    issuance_date: String,
+    #[serde(rename = "credentialSubject")]
+    credential_subject: Value,
     proof: Option<CredentialProof>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredentialProof {
     #[serde(rename = "type")]
     proof_type: String,
     created: String,
-    verificationMethod: String,
-    proofPurpose: String,
+    #[serde(rename = "verificationMethod")]
+    verification_method: String,
+    #[serde(rename = "proofPurpose")]
+    proof_purpose: String,
     jws: String,
 }
 
@@ -37,11 +40,6 @@ impl CredentialSigner {
     }
     
     pub fn issue_credential(&self, subject_data: Value, credential_types: Vec<String>) -> WalletResult<VerifiableCredential> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-            
         let issuance_date = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         
         let mut credential = VerifiableCredential {
@@ -51,8 +49,8 @@ impl CredentialSigner {
             ],
             credential_type: vec!["VerifiableCredential".to_string()],
             issuer: self.wallet.did.to_string(),
-            issuanceDate: issuance_date,
-            credentialSubject: subject_data,
+            issuance_date: issuance_date.clone(),
+            credential_subject: subject_data,
             proof: None,
         };
         
@@ -73,8 +71,8 @@ impl CredentialSigner {
         credential.proof = Some(CredentialProof {
             proof_type: "Ed25519Signature2020".to_string(),
             created: issuance_date,
-            verificationMethod: format!("{}#keys-1", self.wallet.did.to_string()),
-            proofPurpose: "assertionMethod".to_string(),
+            verification_method: format!("{}#keys-1", self.wallet.did),
+            proof_purpose: "assertionMethod".to_string(),
             jws,
         });
         
@@ -89,8 +87,14 @@ impl CredentialSigner {
         };
         
         // Create a copy without the proof for verification
-        let mut credential_copy = credential.clone();
-        credential_copy.proof = None;
+        let credential_copy = VerifiableCredential {
+            context: credential.context.clone(),
+            credential_type: credential.credential_type.clone(),
+            issuer: credential.issuer.clone(),
+            issuance_date: credential.issuance_date.clone(),
+            credential_subject: credential.credential_subject.clone(),
+            proof: None,
+        };
         
         let unsigned_json = serde_json::to_string(&credential_copy)
             .map_err(|e| WalletError::SerializationError(format!("Failed to serialize credential: {}", e)))?;
@@ -111,7 +115,7 @@ impl CredentialSigner {
     
     pub fn create_selective_disclosure(&self, credential: &VerifiableCredential, fields_to_disclose: Vec<String>) -> WalletResult<VerifiableCredential> {
         // Create a copy of the credential
-        let mut subject_data = credential.credentialSubject.clone();
+        let mut subject_data = credential.credential_subject.clone();
         
         // Filter out fields not in the disclosure list
         if let Value::Object(ref mut map) = subject_data {
