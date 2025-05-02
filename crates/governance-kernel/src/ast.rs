@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Root structure for a CCL document
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

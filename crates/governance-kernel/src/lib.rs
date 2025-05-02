@@ -11,8 +11,8 @@ enabling declarative rules to be compiled into executable WASM modules.
 - Governance is expressed through declarative rules, compiled to .dsl (WASM) for execution
 */
 
-// Temporarily commented out due to compile issues in core-vm
-// use icn_core_vm::HostResult;
+// Comment this out temporarily when running tests until core-vm issues are fixed
+use icn_core_vm::HostResult;
 use icn_identity::IdentityScope;
 use thiserror::Error;
 use tracing;
@@ -20,8 +20,6 @@ use tracing;
 // Declare the modules
 pub mod ast;
 pub mod parser;
-
-use ast::CclRoot;
 
 /// Errors that can occur during CCL interpretation
 #[derive(Debug, Error)]
@@ -53,6 +51,7 @@ pub enum CclTemplate {
 }
 
 /// Representation of a WASM module or configuration resulting from CCL compilation
+#[derive(Debug)]
 pub enum WasmModuleOrConfig {
     Module(Vec<u8>), // WASM binary
     Config(String),  // Configuration JSON
@@ -197,9 +196,10 @@ mod tests {
         let result = interpreter.interpret_ccl(invalid_ccl, IdentityScope::Cooperative);
         
         assert!(result.is_err(), "Expected error for invalid syntax");
-        match result.unwrap_err() {
-            CclError::SyntaxError(_) => (), // Expected
-            other => panic!("Expected SyntaxError, got {:?}", other),
+        if let CclError::SyntaxError(_) = result.unwrap_err() {
+            // Expected error type
+        } else {
+            panic!("Expected SyntaxError");
         }
     }
 } 

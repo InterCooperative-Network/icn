@@ -1,5 +1,5 @@
 use pest::Parser;
-use pest::iterators::{Pair, Pairs};
+use pest::iterators::Pair;
 use pest::error::Error;
 use pest_derive::Parser;
 
@@ -35,7 +35,8 @@ pub fn parse_ccl(ccl_content: &str) -> Result<CclRoot, Error<Rule>> {
 
 /// Parse a CCL value
 fn parse_value(pair: Pair<Rule>) -> Result<CclValue, Error<Rule>> {
-    match pair.as_rule() {
+    let rule = pair.as_rule();
+    match rule {
         Rule::object => parse_object(pair),
         Rule::array => parse_array(pair),
         Rule::string_literal => {
@@ -69,20 +70,30 @@ fn parse_value(pair: Pair<Rule>) -> Result<CclValue, Error<Rule>> {
             // Return identifier as is
             Ok(CclValue::Identifier(pair.as_str().to_string()))
         },
-        _ => {
-            // Handle value rule directly
-            if pair.as_rule() == Rule::value {
-                if let Some(inner) = pair.into_inner().next() {
-                    return parse_value(inner);
-                }
+        Rule::value => {
+            // Handle value rule directly - get the span before moving the pair
+            let span = pair.as_span();
+            let inner_pair = pair.into_inner().next();
+            if let Some(inner) = inner_pair {
+                return parse_value(inner);
             }
             
-            // Unexpected rule
+            // If we get here, it's an empty value, which shouldn't happen
             Err(Error::new_from_span(
                 pest::error::ErrorVariant::CustomError {
-                    message: format!("Unexpected rule: {:?}", pair.as_rule())
+                    message: "Empty value".to_string()
                 },
-                pair.as_span(),
+                span,
+            ))
+        },
+        _ => {
+            // Unexpected rule - get the span before moving the pair
+            let span = pair.as_span();
+            Err(Error::new_from_span(
+                pest::error::ErrorVariant::CustomError {
+                    message: format!("Unexpected rule: {:?}", rule)
+                },
+                span,
             ))
         }
     }
@@ -109,12 +120,13 @@ fn parse_object(pair: Pair<Rule>) -> Result<CclValue, Error<Rule>> {
                     key_pair.as_str().to_string()
                 },
                 _ => {
+                    let span = key_pair.as_span();
                     return Err(Error::new_from_span(
                         pest::error::ErrorVariant::CustomError {
                             message: format!("Expected string or identifier as key, got: {:?}", key_pair.as_rule())
                         },
-                        key_pair.as_span(),
-                    ))
+                        span,
+                    ));
                 }
             };
             
