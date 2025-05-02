@@ -1581,9 +1581,18 @@ name = "icn-covm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid",
  "clap",
+ "futures",
+ "icn-core-vm",
+ "icn-economics",
+ "icn-governance-kernel",
+ "icn-identity",
+ "icn-storage",
+ "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

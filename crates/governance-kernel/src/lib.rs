@@ -11,7 +11,6 @@ enabling declarative rules to be compiled into executable WASM modules.
 - Governance is expressed through declarative rules, compiled to .dsl (WASM) for execution
 */
 
-use icn_core_vm::HostResult;
 use icn_identity::IdentityScope;
 use thiserror::Error;
 use tracing;
@@ -25,26 +24,37 @@ pub mod config;
 /// Errors that can occur during CCL processing
 #[derive(Debug, Error)]
 pub enum CclError {
+    /// Error during parsing of CCL syntax
     #[error("Invalid CCL syntax: {0}")]
     SyntaxError(String),
     
+    /// Error during semantic validation of CCL content
     #[error("CCL semantic error: {0}")]
     SemanticError(String),
     
+    /// Error during compilation to executable WASM
     #[error("Compilation error: {0}")]
     CompilationError(String),
     
+    /// Error when an operation violates the identity scope constraints
     #[error("Scope violation: {0}")]
     ScopeViolation(String),
     
+    /// Error when a required field or section is missing from CCL
     #[error("Missing required field/section: {0}")]
     MissingRequiredField(String),
     
+    /// Error when a field has the wrong type
     #[error("Type mismatch for field '{field}': expected {expected}, found {found}")]
     TypeMismatch { field: String, expected: String, found: String },
     
+    /// Error when using a template that's not valid for the given scope
     #[error("Invalid template '{template}' for scope {scope:?}")]
     InvalidTemplateForScope { template: String, scope: IdentityScope },
+    
+    /// Error when using an unsupported template version
+    #[error("Unsupported template version '{version}' for template '{template}'")]
+    UnsupportedTemplateVersion { template: String, version: String },
 }
 
 /// Result type for CCL operations
@@ -118,6 +128,20 @@ impl CclInterpreter {
     }
     
     /// Interpret CCL content and produce a governance configuration
+    ///
+    /// This function performs the entire CCL interpretation process:
+    /// 1. Parse the CCL text into an AST
+    /// 2. Extract and validate the template type and version
+    /// 3. Traverse the AST and validate semantics
+    /// 4. Populate a GovernanceConfig struct with the validated data
+    ///
+    /// # Arguments
+    /// * `ccl_content` - The raw CCL text to interpret
+    /// * `scope` - The identity scope (Cooperative, Community, etc.) this CCL applies to
+    ///
+    /// # Returns
+    /// * `Ok(GovernanceConfig)` - A fully populated config struct
+    /// * `Err(CclError)` - An error describing what went wrong
     pub fn interpret_ccl(
         &self,
         ccl_content: &str,
@@ -127,7 +151,7 @@ impl CclInterpreter {
         let ast_root = parser::parse_ccl(ccl_content)
             .map_err(|e| CclError::SyntaxError(format!("CCL Parsing Failed:\n{}", e)))?;
 
-        // 2. Extract template type and version
+        // 2. Extract template type and version from the template declaration
         let template_parts: Vec<&str> = ast_root.template_type.split(':').collect();
         let template_type = template_parts[0].to_string();
         let template_version = if template_parts.len() > 1 {
@@ -136,51 +160,10 @@ impl CclInterpreter {
             "v1".to_string() // default version if not specified
         };
         
-        // 3. Validate template type against scope (ignoring version)
-        self.validate_template_for_scope(&template_type, scope)?;
+        // 3. Validate template type and version against scope
+        self.validate_template_for_scope(&template_type, &template_version, scope)?;
         
-        // 4. Validate and extract config from AST
-        let config = self.process_ast_to_config(
-            &ast_root, 
-            template_type,
-            template_version,
-            scope
-        )?;
-        
-        Ok(config)
-    }
-    
-    /// Validate that the template type is appropriate for the scope
-    fn validate_template_for_scope(
-        &self, 
-        template_type: &str, 
-        scope: IdentityScope
-    ) -> CclResult<()> {
-        // Template validation should ignore the version part, focus on the base template type only
-        let base_template = template_type.split(':').next().unwrap_or(template_type);
-        
-        match (base_template, scope) {
-            ("coop_bylaws", IdentityScope::Cooperative) => Ok(()),
-            ("community_charter", IdentityScope::Community) => Ok(()),
-            ("budget_proposal", _) => Ok(()), // Can be used in any scope
-            ("resolution", _) => Ok(()), // Can be used in any scope
-            ("participation_rules", _) => Ok(()), // Can be used in any scope
-            _ => Err(CclError::InvalidTemplateForScope { 
-                template: template_type.to_string(), 
-                scope 
-            }),
-        }
-    }
-    
-    /// Process the AST into a GovernanceConfig
-    fn process_ast_to_config(
-        &self,
-        ast_root: &ast::CclRoot,
-        template_type: String,
-        template_version: String,
-        scope: IdentityScope,
-    ) -> CclResult<config::GovernanceConfig> {
-        // Ensure the root is an object
+        // 4. Extract the object pairs from the AST content
         let root_pairs = match &ast_root.content {
             ast::CclValue::Object(pairs) => pairs,
             _ => return Err(CclError::SemanticError(
@@ -188,10 +171,10 @@ impl CclInterpreter {
             )),
         };
         
-        // Create a base config with required fields
+        // 5. Create a base config with required fields
         let mut config = config::GovernanceConfig {
-            template_type,
-            template_version,
+            template_type: template_type.clone(),
+            template_version: template_version.clone(),
             governing_scope: scope,
             identity: None,
             governance: None,
@@ -202,7 +185,7 @@ impl CclInterpreter {
             economic_model: None,
         };
         
-        // Process each section of the CCL document
+        // 6. Process each section of the CCL document
         for pair in root_pairs {
             match pair.key.as_str() {
                 // Basic identity fields
@@ -274,13 +257,63 @@ impl CclInterpreter {
             }
         }
         
-        // Validate required sections based on template type
+        // 7. Validate required sections based on template type
         self.validate_required_sections(&config)?;
         
         Ok(config)
     }
     
+    /// Validate that the template type and version is appropriate for the scope
+    ///
+    /// # Arguments
+    /// * `template_type` - The template type (e.g., "coop_bylaws", "community_charter")
+    /// * `template_version` - The template version (e.g., "v1", "v2")
+    /// * `scope` - The identity scope this template is being used with
+    ///
+    /// # Returns
+    /// * `Ok(())` - The template is valid for the given scope
+    /// * `Err(CclError)` - The template is not valid for the given scope
+    fn validate_template_for_scope(
+        &self, 
+        template_type: &str, 
+        template_version: &str,
+        scope: IdentityScope
+    ) -> CclResult<()> {
+        // Check if template version is supported
+        // Currently, only v1 and v2 are supported
+        if template_version != "v1" && template_version != "v2" {
+            return Err(CclError::UnsupportedTemplateVersion { 
+                template: format!("{}:{}", template_type, template_version),
+                version: template_version.to_string(),
+            });
+        }
+        
+        // Check if template is valid for scope
+        // Some templates are specific to certain scopes, while others can be used in any scope
+        match (template_type, scope) {
+            ("coop_bylaws", IdentityScope::Cooperative) => Ok(()),
+            ("community_charter", IdentityScope::Community) => Ok(()),
+            ("budget_proposal", _) => Ok(()), // Can be used in any scope
+            ("resolution", _) => Ok(()), // Can be used in any scope
+            ("participation_rules", _) => Ok(()), // Can be used in any scope
+            _ => Err(CclError::InvalidTemplateForScope { 
+                template: template_type.to_string(), 
+                scope 
+            }),
+        }
+    }
+    
     /// Validate that required sections are present based on template type
+    ///
+    /// Different templates have different required sections. This function checks
+    /// that all required sections for a given template are present.
+    ///
+    /// # Arguments
+    /// * `config` - The governance configuration being validated
+    ///
+    /// # Returns
+    /// * `Ok(())` - All required sections are present
+    /// * `Err(CclError)` - A required section is missing
     fn validate_required_sections(&self, config: &config::GovernanceConfig) -> CclResult<()> {
         match config.template_type.as_str() {
             "coop_bylaws" => {
@@ -343,6 +376,7 @@ impl CclInterpreter {
             },
             _ => {
                 // Unknown template type - no specific validation
+                tracing::warn!("Unknown template type: {}", config.template_type);
             }
         }
         
@@ -350,6 +384,14 @@ impl CclInterpreter {
     }
     
     /// Process the governance section of the CCL document
+    ///
+    /// # Arguments
+    /// * `value` - The governance section value from the AST
+    ///
+    /// # Returns
+    /// * `Ok(Some(GovernanceStructure))` - The parsed governance structure
+    /// * `Ok(None)` - The governance section was empty
+    /// * `Err(CclError)` - An error occurred during parsing
     fn process_governance_section(&self, value: &ast::CclValue) -> CclResult<Option<config::GovernanceStructure>> {
         let pairs = self.extract_object(value, "governance")?;
         if pairs.is_empty() {

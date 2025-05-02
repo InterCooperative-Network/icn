@@ -9,6 +9,17 @@ clap = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+tokio = { version = "1.28", features = ["full"] }
+cid = { workspace = true }
+futures = { workspace = true }
+uuid = { version = "1.4", features = ["v4", "serde"] }
+
+# ICN crates
+icn-core-vm = { path = "../crates/core-vm" }
+icn-governance-kernel = { path = "../crates/governance-kernel" }
+icn-identity = { path = "../crates/identity" }
+icn-storage = { path = "../crates/storage" }
+icn-economics = { path = "../crates/economics" }
 
 [[bin]]
 name = "covm"
