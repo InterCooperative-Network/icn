@@ -1,53 +1,49 @@
 # Multi-stage Dockerfile for ICN Runtime (icn-covm-v3)
 
 # ================ BUILD STAGE ================
-FROM rust:1.75-slim AS builder
+FROM rust:1.81-slim-bullseye as builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /usr/src/covm
 
-# Set working directory
-WORKDIR /usr/src/app
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y pkg-config libssl-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy the entire project
+# Copy manifests and source code
 COPY . .
 
-# Build the release binary for the CLI target
-RUN cargo build --release --bin covm
+# Build the application with release profile
+RUN cargo build --release
 
 # ================ RUNTIME STAGE ================
 FROM debian:bullseye-slim
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    openssl \
-    && rm -rf /var/lib/apt/lists/*
+ARG APP=/usr/local/bin/icn-covm-v3
 
-# Create app directories
-RUN mkdir -p /app/logs /app/data /app/scripts
+RUN apt-get update && \
+    apt-get install -y ca-certificates tzdata libssl1.1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# Copy the binary from builder
+COPY --from=builder /usr/src/covm/target/release/icn-covm-v3 ${APP}
 
-# Copy binary from build stage
-COPY --from=builder /usr/src/app/target/release/covm /usr/local/bin/
+# Set the working directory
+WORKDIR /usr/local/bin
 
-# Copy scripts and make them executable
-COPY run_integration_node.sh monitor_integration.sh /app/scripts/
-RUN chmod +x /app/scripts/*.sh
+# Create a non-root user and switch to it
+RUN groupadd -r covm && useradd -r -g covm covm
+RUN chown -R covm:covm ${APP}
+USER covm
 
-# Copy config directory
-COPY config/ /app/config/
+# Set environment variables
+ENV TZ=Etc/UTC \
+    RUST_LOG=info
 
-# Expose necessary ports
-# 8080 - HTTP API
-# 8090 - WebSocket
-# 4001 - libp2p
-EXPOSE 8080 8090 4001
+# Expose the API port
+EXPOSE 3000
 
-# Set entrypoint to run the integration node script
-ENTRYPOINT ["/app/scripts/run_integration_node.sh"] 
+# Command to run the application
+CMD ["icn-covm-v3"] 
