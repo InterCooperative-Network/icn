@@ -1,0 +1,43 @@
+FROM rust:1.75-slim AS builder
+
+WORKDIR /usr/src/app
+
+# Copy the entire project
+COPY . .
+
+# Build the release binary for icn-wallet-cli
+RUN cargo build --release --bin icn-wallet-cli
+
+# Runtime stage
+FROM debian:bullseye-slim
+
+# Install necessary dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the compiled binary from the build stage
+COPY --from=builder /usr/src/app/target/release/icn-wallet-cli /usr/local/bin/
+
+# Create wallet data directory with appropriate permissions
+RUN mkdir -p /app/wallet-data && chmod 755 /app/wallet-data
+
+# Set working directory
+WORKDIR /app
+
+# Expose the API and WebSocket ports
+EXPOSE 3000 9876
+
+# Set the default command to run the serve command
+# The host is set to 0.0.0.0 to listen on all interfaces
+# Other parameters can be overridden via environment variables
+ENV AGORANET_URL=""
+ENV PORT=3000
+
+# Run with environment variables or defaults
+CMD icn-wallet-cli --data-dir /app/wallet-data serve --host 0.0.0.0 --port ${PORT} ${AGORANET_URL:+--agoranet-url ${AGORANET_URL}}
+
+# Add a health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1 
