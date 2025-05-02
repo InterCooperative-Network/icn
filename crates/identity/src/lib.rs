@@ -11,18 +11,17 @@ Verifiable Credentials, TrustBundles, and ZK disclosure.
 - TrustBundles for federation anchoring
 */
 
-use std::collections::HashSet;
-use std::fmt;
-use rand::{rngs::OsRng, rngs::StdRng, SeedableRng, RngCore};
-use sha2::{Sha256, Digest};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use chrono::{DateTime, Utc};
 use cid::Cid;
-use multihash::{Code, MultihashDigest};
-use serde::{Serialize, Deserialize};
+use rand::{rngs::OsRng, rngs::StdRng, SeedableRng, RngCore};
+use serde::{Deserialize, Serialize};
+use serde_json;
+use sha2::{Sha256, Digest};
+use std::fmt;
 use thiserror::Error;
 use uuid::Uuid;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -888,8 +887,14 @@ mod tests {
         let (issuer_did, _) = generate_did_keypair().unwrap();
         let issuer_id = IdentityId(issuer_did);
         
-        // Create a sample CID
-        let mh = Code::Sha2_256.digest(b"test");
+        // Create a sample CID using cid::multihash
+        let data = b"test";
+        let digest = Sha256::digest(data);
+        let mut hash_bytes = [0u8; 32];
+        hash_bytes.copy_from_slice(digest.as_slice());
+        
+        // Create multihash using cid::multihash functionality
+        let mh = cid::multihash::Multihash::wrap(0x12, &hash_bytes).unwrap();  // 0x12 is sha256 code
         let cid = Cid::new_v1(0x55, mh);
         
         // Create anchor credential
