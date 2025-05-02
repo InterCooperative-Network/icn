@@ -1,9 +1,8 @@
 use anyhow;
 use wasmtime::Linker;
 use crate::{StoreData, HostEnvironment};
-use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_bytes, try_allocate_guest_memory};
+use crate::mem_helpers::{read_memory_bytes, write_memory_bytes, try_allocate_guest_memory};
 use cid::Cid;
-use futures::executor::block_on;
 use crate::cid_utils;
 
 /// Register DAG-related host functions
@@ -29,20 +28,15 @@ pub fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
             }
         }
         
-        // Call the host function
-        let cid_result = {
-            let content = content.clone();
-            let parents = parents.clone();
-            let mut host_env = caller.data_mut().host.clone();
-            
-            // Execute the async function without using block_on
-            // Instead, we'll rely on the host's implementation to handle this properly
-            let cid_future = host_env.anchor_to_dag(content, parents);
-            
-            // We need to block_on here since we're in a sync context
-            block_on(cid_future)
-                .map_err(|e| anyhow::anyhow!("DAG anchoring failed: {}", e))?
-        };
+        // Clone data for async context
+        let mut host_env = caller.data_mut().host.clone();
+        
+        // Execute the async function in a blocking context
+        let cid_result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                host_env.anchor_to_dag(content, parents).await
+            })
+        }).map_err(|e| anyhow::anyhow!("DAG anchoring failed: {}", e))?;
         
         // Allocate memory for the result CID string
         let cid_str = cid_utils::cid_to_wasm_string(&cid_result);

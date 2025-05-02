@@ -2,7 +2,6 @@ use anyhow;
 use wasmtime::Linker;
 use crate::{StoreData, HostEnvironment};
 use crate::mem_helpers::{read_memory_bytes, write_memory_bytes, write_memory_u32};
-use futures::executor::block_on;
 use crate::cid_utils;
 
 /// Register storage-related host functions
@@ -14,16 +13,15 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, cid_ptr, cid_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;
         
-        // Call the host function to get the value
-        let result = {
-            // Clone the host environment for use in async context
-            let mut host_env = caller.data().host.clone();
-            
-            // Execute the async function in a blocking context
-            block_on(async {
+        // Clone the host environment for use in async context
+        let mut host_env = caller.data().host.clone();
+        
+        // Execute the async function in a blocking context
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
                 host_env.storage_get(cid).await
-            }).map_err(|e| anyhow::anyhow!("Storage get failed: {}", e))?
-        };
+            })
+        }).map_err(|e| anyhow::anyhow!("Storage get failed: {}", e))?;
         
         // If value is found, write it to guest memory
         match result {
@@ -60,16 +58,15 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Read value from guest memory
         let value = read_memory_bytes(&mut caller, value_ptr, value_len)?;
         
-        // Call the host function
-        {
-            let value = value.clone();
-            let mut host_env = caller.data().host.clone();
-            
-            // Execute the async function in a blocking context
-            block_on(async {
+        // Clone the host environment and value for use in async context
+        let mut host_env = caller.data().host.clone();
+        
+        // Execute the async function in a blocking context
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
                 host_env.storage_put(cid, value).await
-            }).map_err(|e| anyhow::anyhow!("Storage put failed: {}", e))?;
-        }
+            })
+        }).map_err(|e| anyhow::anyhow!("Storage put failed: {}", e))?;
         
         Ok(1) // Success
     })?;
@@ -80,16 +77,15 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Read content from guest memory
         let content = read_memory_bytes(&mut caller, content_ptr, content_len)?;
         
-        // Call the host function
-        let cid_result = {
-            let content = content.clone();
-            let mut host_env = caller.data().host.clone();
-            
-            // Execute the async function in a blocking context
-            block_on(async {
+        // Clone the host environment for use in async context
+        let mut host_env = caller.data().host.clone();
+        
+        // Execute the async function in a blocking context
+        let cid_result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
                 host_env.blob_put(content).await
-            }).map_err(|e| anyhow::anyhow!("Blob put failed: {}", e))?
-        };
+            })
+        }).map_err(|e| anyhow::anyhow!("Blob put failed: {}", e))?;
         
         // Write the CID to guest memory using utility function
         cid_utils::write_cid_to_wasm_memory(&mut caller, &cid_result, out_ptr, out_len)
@@ -105,15 +101,15 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         let cid = cid_utils::read_cid_from_wasm_memory(&mut caller, cid_ptr, cid_len)
             .map_err(|e| anyhow::anyhow!("Invalid CID: {}", e))?;
         
-        // Call the host function
-        let result = {
-            let mut host_env = caller.data().host.clone();
-            
-            // Execute the async function in a blocking context
-            block_on(async {
+        // Clone the host environment for use in async context
+        let mut host_env = caller.data().host.clone();
+        
+        // Execute the async function in a blocking context
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
                 host_env.blob_get(cid).await
-            }).map_err(|e| anyhow::anyhow!("Blob get failed: {}", e))?
-        };
+            })
+        }).map_err(|e| anyhow::anyhow!("Blob get failed: {}", e))?;
         
         // If blob is found, write it to guest memory
         match result {

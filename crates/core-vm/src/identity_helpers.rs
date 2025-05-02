@@ -57,9 +57,13 @@ pub fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(),
         let mut host_env = caller.data_mut().host.clone();
         
         // Call the host function to verify the signature
-        match block_on(async move {
-            host_env.verify_signature(&did, &message, &signature).await
-        }) {
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                host_env.verify_signature(&did, &message, &signature).await
+            })
+        });
+        
+        match result {
             Ok(is_valid) => Ok(if is_valid { 1 } else { 0 }),
             Err(e) => {
                 // This requires a mutable reference, so we need to re-borrow caller.data_mut()

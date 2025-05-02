@@ -186,18 +186,16 @@ impl ConcreteHostEnvironment {
 impl HostEnvironment for ConcreteHostEnvironment {
     // Storage operations
     async fn storage_get(&mut self, key: Cid) -> HostResult<Option<Vec<u8>>> {
-        // Calculate the size of the key as a crude approximation of operation cost
+        // Track compute resource usage for key lookup
         let key_size = key.to_string().len() as u64;
-        
-        // Track minimum compute costs for accessing storage
         self.record_resource_usage(ResourceType::Compute, key_size)?;
         
-        // Clone the Arc to allow moving it into the async block
+        // Clone the storage reference to use in async context
         let storage = self.storage.clone();
         
-        // Get the key-value data - acquire lock, perform operation, then release lock
+        // Get a lock on storage, perform the operation, then release the lock
         let result = {
-            let mut storage_guard = storage.lock().await;
+            let storage_guard = storage.lock().await;
             storage_guard.get_kv(&key).await
         };
         
@@ -230,7 +228,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         
         // Get a lock on storage, perform the operation, then release the lock
         let result = {
-            let mut storage_guard = storage.lock().await;
+            let storage_guard = storage.lock().await;
             storage_guard.put_kv(key, value).await
         };
         
@@ -251,7 +249,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         
         // Get a lock, perform operation, then release the lock
         let result = {
-            let mut blob_guard = blob_storage.lock().await;
+            let blob_guard = blob_storage.lock().await;
             blob_guard.put_blob(&content).await
         };
         
@@ -269,7 +267,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         
         // Get a lock, perform operation, then release the lock
         let result = {
-            let mut blob_guard = blob_storage.lock().await;
+            let blob_guard = blob_storage.lock().await;
             blob_guard.get_blob(&cid).await
         };
         
@@ -393,7 +391,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         
         // Get a lock, perform operation, then release the lock
         let result = {
-            let mut storage_guard = storage.lock().await;
+            let storage_guard = storage.lock().await;
             storage_guard.put_blob(&content).await
         };
         
@@ -1964,7 +1962,7 @@ impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapter {
         
         // Get a lock, perform operation, then release lock
         let result = {
-            let mut storage_guard = storage_clone.lock().await;
+            let storage_guard = storage_clone.lock().await;
             storage_guard.put_blob(&data_clone).await
         };
         
@@ -2011,7 +2009,7 @@ impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapter {
         
         // Get a lock, perform operation, then release lock
         let result = {
-            let mut storage_guard = storage_clone.lock().await;
+            let storage_guard = storage_clone.lock().await;
             storage_guard.put_kv(key_cid, data).await
         };
         
@@ -2029,7 +2027,7 @@ impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapter {
         
         // Get a lock, perform operation, then release lock
         let result = {
-            let mut storage_guard = storage_clone.lock().await;
+            let storage_guard = storage_clone.lock().await;
             storage_guard.get_kv(key_cid).await
         };
         
@@ -2066,7 +2064,7 @@ impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapterRef {
         
         // Get a lock, perform operation, then release lock
         let result = {
-            let mut storage_guard = storage_clone.lock().await;
+            let storage_guard = storage_clone.lock().await;
             storage_guard.get_kv(key_cid).await
         };
         
