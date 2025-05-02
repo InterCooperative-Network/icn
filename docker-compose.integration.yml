@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: icn-runtime
     volumes:
-      - ./config:/etc/icn-runtime
+      - ./config:/etc/icn-runtime:ro
       - ./data:/var/lib/icn-runtime
       - ./logs:/var/log/icn-runtime
     ports:
@@ -19,14 +19,17 @@ services:
     environment:
       - RUST_LOG=debug
       - ICN_CONFIG_FILE=/etc/icn-runtime/runtime-config-integration.toml
+      - ICN_LOG_FORMAT=json  # Ensure structured logging for easier parsing
     networks:
       - icn-network
+    restart: unless-stopped  # Ensure service restarts on failure
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       retries: 3
       start_period: 10s
+    stop_grace_period: 10s  # Allow graceful shutdown
 
   # AgoraNet service (mock or actual)
   # Uncomment and adjust if you have AgoraNet running in Docker
@@ -42,7 +45,14 @@ services:
     networks:
       - icn-network
     depends_on:
-      - icn-runtime
+      icn-runtime:
+        condition: service_healthy  # Wait for healthy ICN Runtime
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # Wallet service (mock or actual)
   # Uncomment and adjust if you have the Wallet running in Docker
@@ -57,27 +67,35 @@ services:
     networks:
       - icn-network
     depends_on:
-      - icn-runtime
+      icn-runtime:
+        condition: service_healthy  # Wait for healthy ICN Runtime
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # Prometheus for metrics collection
   prometheus:
     image: prom/prometheus
     container_name: prometheus
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9091:9090"
     networks:
       - icn-network
     depends_on:
       - icn-runtime
+    restart: unless-stopped
 
   # Grafana for metrics visualization
   grafana:
     image: grafana/grafana
     container_name: grafana
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -87,7 +105,14 @@ services:
       - icn-network
     depends_on:
       - prometheus
+    restart: unless-stopped
 
 networks:
   icn-network:
-    driver: bridge 
+    driver: bridge
+
+volumes:
+  # Define named volumes for better test data management
+  icn-runtime-data:
+    # This can be used for persistent storage during testing
+    # To reset all data between tests, omit this volume and use the mounted dir instead 

@@ -140,4 +140,18 @@ The ICN Runtime builds on years of research and development in cooperative techn
 - Commons-based resource management
 - Distributed systems and content-addressed storage
 - Self-sovereign identity frameworks
-- Cooperative economic models 
+- Cooperative economic models
+
+## Integration Testing
+
+The ICN Runtime now supports automated integration testing with improved stability, state verification mechanisms, and predictable interaction patterns.
+
+### Key Features
+
+- **Stabilized Docker Configuration**: Reliable container setup with health checks, fixed ports, and predictable volumes
+- **Debug API**: Read-only API endpoints under `/api/v1/debug` for state inspection and verification
+- **Structured Logging**: JSON-formatted logs for easier parsing and analysis
+- **Event Monitoring**: WebSocket monitoring tools to verify event emission
+- **State Reset**: Utilities to reset runtime state between test runs
+
+See the [integration testing documentation](tests/README.md) for detailed information on how to use these features for automated testing. 

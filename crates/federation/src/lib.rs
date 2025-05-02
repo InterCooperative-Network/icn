@@ -57,6 +57,12 @@ pub mod errors;
 // Re-export error types from the errors module
 pub use errors::{FederationError, FederationResult, FederationResultExt, TrustBundleErrorKind};
 
+// Add the debug_api module
+pub mod debug_api;
+
+// Re-export debug API types for integration testing
+pub use debug_api::{DebugApi, BasicDebugApi, ProposalStatusResponse, DagNodeResponse, FederationStatusResponse};
+
 /// Represents a guardian mandate
 #[derive(Debug, Clone)]
 pub struct GuardianMandate {
