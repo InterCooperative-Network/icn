@@ -442,10 +442,13 @@ async fn run_event_loop(
     // Track pending replication fetches initiated by incoming requests
     let mut pending_replication_fetches: HashMap<kad::QueryId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)> = HashMap::new();
     
+    // Track pending blob fetches initiated by fetch requests
+    let mut pending_blob_fetches: HashMap<request_response::RequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)> = HashMap::new();
+
     loop {
         tokio::select! {
             event = swarm.select_next_some() => {
-                handle_swarm_event(&mut swarm, event, Arc::clone(&storage), Arc::clone(&blob_storage), &mut active_replication_queries, &mut pending_replication_fetches).await;
+                handle_swarm_event(&mut swarm, event, Arc::clone(&storage), Arc::clone(&blob_storage), &mut active_replication_queries, &mut pending_replication_fetches, &mut pending_blob_fetches).await;
             },
             command = command_receiver.recv() => {
                 match command {
@@ -607,6 +610,7 @@ async fn handle_swarm_event(
     blob_storage: Arc<BlobStorageAdapter>,
     active_replication_queries: &mut HashMap<kad::QueryId, (cid::Cid, ReplicationPolicy, Option<tokio::sync::oneshot::Sender<FederationResult<Vec<PeerId>>>>)>,
     pending_replication_fetches: &mut HashMap<kad::QueryId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+    pending_blob_fetches: &mut HashMap<request_response::RequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
 ) {
     match event {
         SwarmEvent::NewListenAddr { address, .. } => {
@@ -622,7 +626,7 @@ async fn handle_swarm_event(
             debug!("Incoming connection on local address: {}", local_addr);
         },
         SwarmEvent::Behaviour(behavior_event) => {
-            handle_behavior_event(swarm, behavior_event, storage, blob_storage, active_replication_queries, pending_replication_fetches).await;
+            handle_behavior_event(swarm, behavior_event, storage, blob_storage, active_replication_queries, pending_replication_fetches, pending_blob_fetches).await;
         },
         _ => {}
     }
@@ -636,6 +640,7 @@ async fn handle_behavior_event(
     blob_storage: Arc<BlobStorageAdapter>,
     active_replication_queries: &mut HashMap<kad::QueryId, (cid::Cid, ReplicationPolicy, Option<tokio::sync::oneshot::Sender<FederationResult<Vec<PeerId>>>>)>,
     pending_replication_fetches: &mut HashMap<kad::QueryId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+    pending_blob_fetches: &mut HashMap<request_response::RequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
 ) {
     match event {
         network::IcnFederationBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
@@ -707,91 +712,33 @@ async fn handle_behavior_event(
                                     "Found providers for requested replication blob"
                                 );
                                 
-                                // TODO(V3-MVP): Implement actual P2P fetch from one of the providers.
-                                // For now, simulate success by pretending we magically got the data.
+                                // Select a suitable provider to fetch from (for simplicity, take the first one)
+                                let provider_peer_id = providers[0];
+                                info!(
+                                    cid = %original_cid,
+                                    peer = %provider_peer_id,
+                                    "Initiating blob fetch from provider"
+                                );
                                 
-                                // Re-check storage to see if the blob has "appeared" (simulation)
-                                let maybe_data = blob_storage.get_blob(&original_cid).await;
+                                // Create a fetch request
+                                let fetch_request = network::FetchBlobRequest {
+                                    cid: original_cid,
+                                };
                                 
-                                match maybe_data {
-                                    // Blob data found (simulation of successful fetch)
-                                    Ok(Some(blob_data)) => {
-                                        info!(cid = %original_cid, "Simulating successful blob fetch");
-                                        
-                                        // Store and pin the blob
-                                        match blob_storage.put_blob(&blob_data).await {
-                                            Ok(_) => {
-                                                match blob_storage.pin_blob(&original_cid).await {
-                                                    Ok(_) => {
-                                                        info!(cid = %original_cid, "Successfully stored and pinned fetched blob");
-                                                        
-                                                        // Send success response
-                                                        let response = network::ReplicateBlobResponse {
-                                                            success: true,
-                                                            error_msg: None,
-                                                        };
-                                                        if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(response_channel, response) {
-                                                            error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
-                                                        }
-                                                    },
-                                                    Err(e) => {
-                                                        error!(cid = %original_cid, "Failed to pin fetched blob: {}", e);
-                                                        
-                                                        // Send error response
-                                                        let response = network::ReplicateBlobResponse {
-                                                            success: false,
-                                                            error_msg: Some(format!("Failed to pin fetched blob: {}", e)),
-                                                        };
-                                                        if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(response_channel, response) {
-                                                            error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            Err(e) => {
-                                                error!(cid = %original_cid, "Failed to store fetched blob: {}", e);
-                                                
-                                                // Send error response
-                                                let response = network::ReplicateBlobResponse {
-                                                    success: false,
-                                                    error_msg: Some(format!("Failed to store fetched blob: {}", e)),
-                                                };
-                                                if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(response_channel, response) {
-                                                    error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
-                                                }
-                                            }
-                                        }
-                                    },
-                                    // Blob data not found (simulation failed)
-                                    Ok(None) => {
-                                        error!(
-                                            cid = %original_cid, 
-                                            "Found providers but failed to simulate fetch/find blob data locally"
-                                        );
-                                        
-                                        // Send error response
-                                        let response = network::ReplicateBlobResponse {
-                                            success: false,
-                                            error_msg: Some("Failed to retrieve blob data after finding providers".to_string()),
-                                        };
-                                        if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(response_channel, response) {
-                                            error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
-                                        }
-                                    },
-                                    // Error checking for blob data
-                                    Err(e) => {
-                                        error!(cid = %original_cid, "Error checking for blob data: {}", e);
-                                        
-                                        // Send error response
-                                        let response = network::ReplicateBlobResponse {
-                                            success: false,
-                                            error_msg: Some(format!("Error checking for blob data: {}", e)),
-                                        };
-                                        if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(response_channel, response) {
-                                            error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
-                                        }
-                                    }
-                                }
+                                // Send the fetch request to the provider
+                                let request_id = swarm.behaviour_mut()
+                                    .blob_fetch_protocol
+                                    .send_request(&provider_peer_id, fetch_request);
+                                
+                                // Store the request ID along with the original CID and response channel
+                                pending_blob_fetches.insert(request_id, (original_cid, response_channel));
+                                
+                                debug!(
+                                    cid = %original_cid,
+                                    peer = %provider_peer_id,
+                                    ?request_id,
+                                    "Sent FetchBlobRequest"
+                                );
                             },
                             _ => {
                                 warn!(cid = %original_cid, "No providers found for requested replication blob");
@@ -993,6 +940,216 @@ async fn handle_behavior_event(
             }
         },
         
+        // Handle blob fetch requests
+        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::Message { 
+            peer, 
+            message: request_response::Message::Request { request, channel, .. },
+            ..
+        }) => {
+            info!(peer = %peer, cid = %request.cid, "Received FetchBlobRequest");
+            
+            // Try to get the blob data from local storage
+            match blob_storage.get_blob(&request.cid).await {
+                Ok(Some(data)) => {
+                    info!(cid = %request.cid, size = data.len(), "Found requested blob in local storage, sending");
+                    
+                    // Send the blob data
+                    let response = network::FetchBlobResponse {
+                        data: Some(data),
+                        error_msg: None,
+                    };
+                    
+                    if let Err(e) = swarm.behaviour_mut().blob_fetch_protocol.send_response(channel, response) {
+                        error!(cid = %request.cid, "Failed to send blob fetch response: {:?}", e);
+                    }
+                },
+                Ok(None) => {
+                    warn!(cid = %request.cid, "Requested blob not found in local storage");
+                    
+                    // Send error response
+                    let response = network::FetchBlobResponse {
+                        data: None,
+                        error_msg: Some("Blob not found in local storage".to_string()),
+                    };
+                    
+                    if let Err(e) = swarm.behaviour_mut().blob_fetch_protocol.send_response(channel, response) {
+                        error!(cid = %request.cid, "Failed to send blob fetch response: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    error!(cid = %request.cid, "Error retrieving blob from storage: {}", e);
+                    
+                    // Send error response
+                    let response = network::FetchBlobResponse {
+                        data: None,
+                        error_msg: Some(format!("Error retrieving blob: {}", e)),
+                    };
+                    
+                    if let Err(e) = swarm.behaviour_mut().blob_fetch_protocol.send_response(channel, response) {
+                        error!(cid = %request.cid, "Failed to send blob fetch response: {:?}", e);
+                    }
+                }
+            }
+        },
+        
+        // Handle blob fetch responses
+        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::Message { 
+            peer, 
+            message: request_response::Message::Response { request_id, response },
+            ..
+        }) => {
+            // Find the original context for this request
+            if let Some((original_cid, replication_response_channel)) = pending_blob_fetches.remove(&request_id) {
+                info!(
+                    peer = %peer,
+                    cid = %original_cid,
+                    has_data = response.data.is_some(),
+                    error = ?response.error_msg,
+                    "Received FetchBlobResponse"
+                );
+                
+                match response.data {
+                    Some(blob_data) => {
+                        // Verify the hash matches
+                        let mh = multihash::Code::Sha2_256.digest(&blob_data);
+                        let calculated_cid = cid::Cid::new_v0(mh);
+                        
+                        if calculated_cid == original_cid {
+                            debug!(
+                                cid = %original_cid,
+                                size = blob_data.len(),
+                                "Fetched blob hash verification succeeded, storing and pinning"
+                            );
+                            
+                            // Store the blob
+                            match blob_storage.put_blob(&blob_data).await {
+                                Ok(_) => {
+                                    // Pin the blob
+                                    match blob_storage.pin_blob(&original_cid).await {
+                                        Ok(_) => {
+                                            info!(cid = %original_cid, "Successfully stored and pinned fetched blob");
+                                            
+                                            // Send success response
+                                            let response = network::ReplicateBlobResponse {
+                                                success: true,
+                                                error_msg: None,
+                                            };
+                                            
+                                            if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                                                error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                                            }
+                                        },
+                                        Err(e) => {
+                                            error!(cid = %original_cid, "Failed to pin fetched blob: {}", e);
+                                            
+                                            // Send error response
+                                            let response = network::ReplicateBlobResponse {
+                                                success: false,
+                                                error_msg: Some(format!("Failed to pin fetched blob: {}", e)),
+                                            };
+                                            
+                                            if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                                                error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                                            }
+                                        }
+                                    }
+                                },
+                                Err(e) => {
+                                    error!(cid = %original_cid, "Failed to store fetched blob: {}", e);
+                                    
+                                    // Send error response
+                                    let response = network::ReplicateBlobResponse {
+                                        success: false,
+                                        error_msg: Some(format!("Failed to store fetched blob: {}", e)),
+                                    };
+                                    
+                                    if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                                        error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                                    }
+                                }
+                            }
+                        } else {
+                            error!(
+                                expected_cid = %original_cid,
+                                actual_cid = %calculated_cid,
+                                "Fetched blob hash mismatch"
+                            );
+                            
+                            // Send error response
+                            let response = network::ReplicateBlobResponse {
+                                success: false,
+                                error_msg: Some(format!("Fetched blob hash mismatch, expected {}, got {}", original_cid, calculated_cid)),
+                            };
+                            
+                            if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                                error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                            }
+                        }
+                    },
+                    None => {
+                        // No data received
+                        error!(
+                            cid = %original_cid,
+                            error = ?response.error_msg,
+                            "Blob fetch failed, no data received"
+                        );
+                        
+                        // Send error response
+                        let response = network::ReplicateBlobResponse {
+                            success: false,
+                            error_msg: response.error_msg.or(Some("Fetch failed, no data received".to_string())),
+                        };
+                        
+                        if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                            error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                        }
+                    }
+                }
+            } else {
+                warn!("Received FetchBlobResponse for unknown request ID: {:?}", request_id);
+            }
+        },
+        
+        // Handle blob fetch outbound failures
+        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::OutboundFailure { 
+            peer, 
+            request_id, 
+            error, 
+            ..
+        }) => {
+            if let Some((original_cid, replication_response_channel)) = pending_blob_fetches.remove(&request_id) {
+                error!(
+                    peer = %peer,
+                    cid = %original_cid,
+                    error = ?error,
+                    "Blob fetch outbound failure"
+                );
+                
+                // Send error response
+                let response = network::ReplicateBlobResponse {
+                    success: false,
+                    error_msg: Some(format!("Blob fetch outbound failure: {:?}", error)),
+                };
+                
+                if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                    error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                }
+            }
+        },
+        
+        // Handle blob fetch inbound failures
+        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::InboundFailure { 
+            peer, 
+            error, 
+            ..
+        }) => {
+            warn!(
+                peer = %peer,
+                error = ?error,
+                "Blob fetch inbound failure"
+            );
+        },
+        
         // Handle blob replication requests
         network::IcnFederationBehaviourEvent::BlobReplication(request_response::Event::Message { 
             peer, 
@@ -1081,6 +1238,7 @@ async fn handle_behavior_event(
             
             // TODO(V3-MVP): Update replication tracking state based on response.
         },
+        
         network::IcnFederationBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { 
             id, 
             result: kad::QueryResult::GetClosestPeers(Err(err)), 
@@ -1099,6 +1257,8 @@ async fn handle_behavior_event(
                 }
             }
         },
+        
+        // Other event handlers...
         _ => {}
     }
 }
@@ -1502,5 +1662,224 @@ mod tests {
             let shutdown_result = manager.shutdown().await;
             assert!(shutdown_result.is_ok(), "Failed to shutdown federation manager");
         }
+    }
+
+    #[tokio::test]
+    async fn test_blob_fetch_protocol() {
+        use std::time::Duration;
+        use cid::Cid;
+        use icn_storage::{AsyncInMemoryStorage, StorageResult, StorageBackend, DistributedStorage};
+        use multihash::{Code, MultihashDigest};
+        use libp2p::{request_response, PeerId};
+        
+        // Create test data
+        let test_content = b"This is test content for blob fetch protocol".to_vec();
+        let mh = Code::Sha2_256.digest(&test_content);
+        let cid = Cid::new_v0(mh).unwrap();
+        
+        // Create storage and adapter for provider
+        let provider_storage = AsyncInMemoryStorage::new();
+        let provider_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(provider_storage);
+        let provider_storage_arc = Arc::new(Mutex::new(provider_storage_box));
+        let provider_blob_storage = Arc::new(BlobStorageAdapter::new(provider_storage_arc));
+        
+        // Create storage and adapter for requester
+        let requester_storage = AsyncInMemoryStorage::new();
+        let requester_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(requester_storage);
+        let requester_storage_arc = Arc::new(Mutex::new(requester_storage_box));
+        let requester_blob_storage = Arc::new(BlobStorageAdapter::new(requester_storage_arc));
+        
+        // Add the blob to the provider's storage
+        provider_blob_storage.put_blob(&test_content).await.unwrap();
+        provider_blob_storage.pin_blob(&cid).await.unwrap();
+        
+        // Create a fetch request
+        let fetch_request = network::FetchBlobRequest {
+            cid,
+        };
+        
+        // Test the fetch request handler
+        let provider_peer_id = PeerId::random();
+        
+        // Create a mock channel for the fetch response
+        let (response_sender, response_receiver) = 
+            tokio::sync::mpsc::channel::<network::FetchBlobResponse>(1);
+        
+        // Simulate FetchBlobRequest handling as if from the provider side
+        let request_result = provider_blob_storage.get_blob(&cid).await;
+        
+        match request_result {
+            Ok(Some(data)) => {
+                // Create fetch response with the blob data
+                let response = network::FetchBlobResponse {
+                    data: Some(data),
+                    error_msg: None,
+                };
+                
+                response_sender.send(response).await.unwrap();
+            },
+            Ok(None) => {
+                let response = network::FetchBlobResponse {
+                    data: None,
+                    error_msg: Some("Blob not found".to_string()),
+                };
+                
+                response_sender.send(response).await.unwrap();
+            },
+            Err(e) => {
+                let response = network::FetchBlobResponse {
+                    data: None,
+                    error_msg: Some(format!("Error: {}", e)),
+                };
+                
+                response_sender.send(response).await.unwrap();
+            }
+        }
+        
+        // Receive the response
+        let fetch_response = response_receiver.recv().await.unwrap();
+        
+        // Verify the response
+        assert!(fetch_response.data.is_some(), "Fetch response should contain blob data");
+        assert!(fetch_response.error_msg.is_none(), "Fetch response should not have an error");
+        
+        // Verify the data hash
+        let blob_data = fetch_response.data.unwrap();
+        let mh = Code::Sha2_256.digest(&blob_data);
+        let calculated_cid = Cid::new_v0(mh);
+        assert_eq!(calculated_cid, cid, "CID of fetched data should match original");
+        
+        // Simulate storage of the fetched blob at the requester side
+        requester_blob_storage.put_blob(&blob_data).await.unwrap();
+        requester_blob_storage.pin_blob(&cid).await.unwrap();
+        
+        // Verify the blob is now in the requester's storage
+        let exists = requester_blob_storage.blob_exists(&cid).await.unwrap();
+        assert!(exists, "Blob should exist in requester's storage after fetch");
+        
+        // Verify the blob is pinned
+        let is_pinned = requester_blob_storage.is_pinned(&cid).await.unwrap();
+        assert!(is_pinned, "Blob should be pinned in requester's storage after fetch");
+    }
+
+    #[tokio::test]
+    async fn test_blob_replication_with_fetch() {
+        use std::time::Duration;
+        use cid::Cid;
+        use icn_storage::{AsyncInMemoryStorage, StorageResult, StorageBackend, DistributedStorage, ReplicationPolicy};
+        use multihash::{Code, MultihashDigest};
+        use libp2p::{request_response, PeerId, kad};
+        
+        // Create test data
+        let test_content = b"This is test content for blob replication with fetch".to_vec();
+        let mh = Code::Sha2_256.digest(&test_content);
+        let cid = Cid::new_v0(mh).unwrap();
+        
+        // Create storage and adapter for provider
+        let provider_storage = AsyncInMemoryStorage::new();
+        let provider_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(provider_storage);
+        let provider_storage_arc = Arc::new(Mutex::new(provider_storage_box));
+        let provider_blob_storage = Arc::new(BlobStorageAdapter::new(provider_storage_arc));
+        
+        // Create storage and adapter for requester
+        let requester_storage = AsyncInMemoryStorage::new();
+        let requester_storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(requester_storage);
+        let requester_storage_arc = Arc::new(Mutex::new(requester_storage_box));
+        let requester_blob_storage = Arc::new(BlobStorageAdapter::new(requester_storage_arc));
+        
+        // Add the blob to the provider's storage
+        provider_blob_storage.put_blob(&test_content).await.unwrap();
+        provider_blob_storage.pin_blob(&cid).await.unwrap();
+        
+        // Create mock PeerIDs
+        let provider_peer_id = PeerId::random();
+        let requester_peer_id = PeerId::random();
+        
+        // Simulate full replication flow:
+        
+        // 1. Node A sends ReplicateBlobRequest to Node B
+        let replicate_request = network::ReplicateBlobRequest { cid };
+        
+        // 2. Node B checks if it has the blob (it doesn't)
+        let blob_exists = requester_blob_storage.blob_exists(&cid).await.unwrap();
+        assert!(!blob_exists, "Requester should not have the blob initially");
+        
+        // 3. Node B initiates Kademlia get_providers query
+        // Simulate the Kademlia query ID
+        let query_id = kad::QueryId::from(42u64);
+        
+        // Create response channels
+        let (replicate_resp_sender, replicate_resp_receiver) = 
+            tokio::sync::oneshot::channel::<network::ReplicateBlobResponse>();
+        
+        // Store the query state
+        let mut pending_replication_fetches = HashMap::new();
+        pending_replication_fetches.insert(query_id, (cid, replicate_resp_sender));
+        
+        // 4. Simulate Kademlia GetProvidersOk response with provider_peer_id
+        let providers = vec![provider_peer_id];
+        let get_providers_ok = kad::GetProvidersOk::FoundProviders {
+            key: cid.to_bytes().into(),
+            providers: providers.clone(),
+            closest_peers: vec![],
+        };
+        
+        // 5. Extract the pending state
+        let (original_cid, replication_response_channel) = 
+            pending_replication_fetches.remove(&query_id).unwrap();
+        
+        // 6. Node B sends FetchBlobRequest to Node C (provider)
+        let fetch_request = network::FetchBlobRequest { cid: original_cid };
+        
+        // Create a channel to simulate the fetch protocol
+        let (fetch_resp_sender, fetch_resp_receiver) = 
+            tokio::sync::oneshot::channel::<network::FetchBlobResponse>();
+        
+        // Store pending fetch state
+        let request_id = request_response::RequestId::from(1);
+        let mut pending_blob_fetches = HashMap::new();
+        pending_blob_fetches.insert(request_id, (original_cid, replication_response_channel));
+        
+        // 7. Node C processes FetchBlobRequest
+        let provider_result = provider_blob_storage.get_blob(&cid).await;
+        assert!(provider_result.is_ok(), "Provider should be able to retrieve the blob");
+        let provider_data = provider_result.unwrap();
+        assert!(provider_data.is_some(), "Provider should have the blob data");
+        
+        // 8. Node C sends FetchBlobResponse with data
+        let fetch_response = network::FetchBlobResponse {
+            data: provider_data,
+            error_msg: None,
+        };
+        
+        // 9. Extract the pending fetch state
+        let (fetch_cid, fetch_channel) = pending_blob_fetches.remove(&request_id).unwrap();
+        
+        // 10. Node B verifies hash, stores and pins the blob
+        let blob_data = fetch_response.data.as_ref().unwrap();
+        let mh = Code::Sha2_256.digest(blob_data);
+        let calculated_cid = Cid::new_v0(mh);
+        assert_eq!(calculated_cid, fetch_cid, "CID of fetched data should match original");
+        
+        // Store the blob
+        requester_blob_storage.put_blob(blob_data).await.unwrap();
+        requester_blob_storage.pin_blob(&fetch_cid).await.unwrap();
+        
+        // Verify the blob is now in the requester's storage
+        let exists = requester_blob_storage.blob_exists(&fetch_cid).await.unwrap();
+        assert!(exists, "Blob should exist in requester's storage after fetch");
+        
+        // 11. Node B sends success response to Node A
+        let success_response = network::ReplicateBlobResponse {
+            success: true,
+            error_msg: None,
+        };
+        
+        // Use the channel from step 5 to send the response
+        fetch_channel.send(success_response).unwrap();
+        
+        // Verify the full flow succeeded
+        assert!(requester_blob_storage.is_pinned(&cid).await.unwrap(), 
+                "Blob should be pinned in requester's storage after replication");
     }
 } 

@@ -28,11 +28,17 @@ pub const TRUST_BUNDLE_PROTOCOL_ID: StreamProtocol = StreamProtocol::new("/icn/t
 /// Protocol name for Blob Replication
 pub const BLOB_REPLICATION_PROTOCOL_ID: StreamProtocol = StreamProtocol::new("/icn/blob-replicate/1.0.0");
 
+/// Protocol name for Blob Fetch
+pub const BLOB_FETCH_PROTOCOL_ID: StreamProtocol = StreamProtocol::new("/icn/blob-fetch/1.0.0");
+
 /// Timeout for TrustBundle request/response
 pub const TRUST_BUNDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Timeout for Blob Replication request/response
 pub const BLOB_REPLICATION_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Timeout for Blob Fetch request/response
+pub const BLOB_FETCH_TIMEOUT: Duration = Duration::from_secs(180);
 
 /// Request to replicate a blob
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,6 +53,22 @@ pub struct ReplicateBlobResponse {
     /// Whether the replication was successful
     pub success: bool,
     /// Error message if the replication failed
+    pub error_msg: Option<String>,
+}
+
+/// Request to fetch a blob by CID
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FetchBlobRequest {
+    /// The CID of the blob to fetch
+    pub cid: Cid,
+}
+
+/// Response containing the requested blob data
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FetchBlobResponse {
+    /// The blob data, if found
+    pub data: Option<Vec<u8>>,
+    /// Error message if the fetch failed
     pub error_msg: Option<String>,
 }
 
@@ -71,6 +93,10 @@ pub struct IcnFederationBehaviour {
     /// Blob replication request/response protocol
     #[behaviour(event_process = false)]
     pub blob_replication: request_response::cbor::Behaviour<ReplicateBlobRequest, ReplicateBlobResponse>,
+    
+    /// Blob fetch request/response protocol
+    #[behaviour(event_process = false)]
+    pub blob_fetch_protocol: request_response::cbor::Behaviour<FetchBlobRequest, FetchBlobResponse>,
 }
 
 /// Creates a new instance of IcnFederationBehaviour
@@ -119,6 +145,12 @@ pub fn create_behaviour(
         request_response::Config::default().with_request_timeout(BLOB_REPLICATION_TIMEOUT),
     );
     
+    // Create Blob Fetch request/response behavior
+    let blob_fetch_protocol = request_response::cbor::Behaviour::<FetchBlobRequest, FetchBlobResponse>::new(
+        [(BLOB_FETCH_PROTOCOL_ID, request_response::ProtocolSupport::Full)],
+        request_response::Config::default().with_request_timeout(BLOB_FETCH_TIMEOUT),
+    );
+    
     Ok(IcnFederationBehaviour {
         gossipsub,
         kademlia,
@@ -126,5 +158,6 @@ pub fn create_behaviour(
         identify,
         trust_bundle_sync,
         blob_replication,
+        blob_fetch_protocol,
     })
 } 
