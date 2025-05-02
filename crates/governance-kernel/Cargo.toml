@@ -5,10 +5,13 @@ edition = "2021"
 description = "CCL interpretation and Core Law Modules for the ICN Runtime"
 
 [dependencies]
-icn-core-vm = { path = "../core-vm" }
+# Temporarily commented out due to compile issues
+# icn-core-vm = { path = "../core-vm" }
 icn-identity = { path = "../identity" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true } 
+serde_json = { workspace = true }
+pest = "2.7"
+pest_derive = "2.7" 

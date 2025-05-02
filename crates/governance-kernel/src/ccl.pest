@@ -1,0 +1,52 @@
+// CCL (Constitutional Cooperative Language) Grammar
+
+// Top-level document
+ccl_document = { SOI ~ WHITESPACE* ~ template_declaration ~ WHITESPACE* ~ EOI }
+
+// Template declaration
+template_declaration = { template_type ~ WHITESPACE* ~ object }
+
+// Template type
+template_type = @{ identifier }
+
+// Identifiers
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Objects and pairs
+object = { "{" ~ WHITESPACE* ~ (pair ~ (WHITESPACE* ~ "," ~ WHITESPACE* ~ pair)* ~ WHITESPACE* ~ ","?)? ~ WHITESPACE* ~ "}" }
+pair = { (string_literal | identifier) ~ WHITESPACE* ~ ":" ~ WHITESPACE* ~ value }
+
+// Arrays
+array = { "[" ~ WHITESPACE* ~ (value ~ (WHITESPACE* ~ "," ~ WHITESPACE* ~ value)* ~ WHITESPACE* ~ ","?)? ~ WHITESPACE* ~ "]" }
+
+// Values
+value = { 
+    string_literal |
+    number_literal |
+    boolean_literal |
+    null_literal |
+    object |
+    array |
+    identifier
+}
+
+// Literals
+string_literal = ${ "\"" ~ inner_string ~ "\"" }
+inner_string = @{ (!"\"" ~ ANY)* }
+
+number_literal = @{ 
+    "-"? ~ 
+    ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ 
+    ("." ~ ASCII_DIGIT+)? ~ 
+    (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? 
+}
+
+boolean_literal = @{ "true" | "false" }
+null_literal = @{ "null" }
+
+// Whitespace handling
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | comment }
+comment = _{ 
+    "//" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) |
+    "/*" ~ (!"*/" ~ ANY)* ~ "*/"
+} 

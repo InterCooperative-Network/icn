@@ -11,9 +11,17 @@ enabling declarative rules to be compiled into executable WASM modules.
 - Governance is expressed through declarative rules, compiled to .dsl (WASM) for execution
 */
 
-use icn_core_vm::HostResult;
+// Temporarily commented out due to compile issues in core-vm
+// use icn_core_vm::HostResult;
 use icn_identity::IdentityScope;
 use thiserror::Error;
+use tracing;
+
+// Declare the modules
+pub mod ast;
+pub mod parser;
+
+use ast::CclRoot;
 
 /// Errors that can occur during CCL interpretation
 #[derive(Debug, Error)]
@@ -106,7 +114,6 @@ pub mod restorative_justice {
 }
 
 /// CCL interpretation engine
-// TODO(V3-MVP): Implement CCL parsing/interpretation engine
 pub struct CclInterpreter;
 
 impl CclInterpreter {
@@ -121,21 +128,78 @@ impl CclInterpreter {
         ccl_content: &str,
         scope: IdentityScope,
     ) -> CclResult<Vec<WasmModuleOrConfig>> {
-        // Placeholder implementation
-        Err(CclError::SyntaxError("Not implemented".to_string()))
+        // 1. Parse CCL -> AST
+        let ast_root = parser::parse_ccl(ccl_content)
+            .map_err(|e| CclError::SyntaxError(format!("CCL Parsing Failed:\n{}", e)))?;
+
+        // 2. Basic Semantic Validation (Placeholder)
+        tracing::debug!("Parsed CCL AST for scope {:?}: {:#?}", scope, ast_root);
+        // TODO(V3-MVP): Implement semantic validation based on template type and scope.
+        // Example check:
+        // if scope == IdentityScope::Cooperative && ast_root.template_type != "coop_bylaws" {
+        //     return Err(CclError::SemanticError("Mismatched template type for Cooperative scope".to_string()));
+        // }
+
+        // 3. Interpretation/Compilation (Placeholder)
+        // TODO(V3-MVP): Implement logic to traverse AST and generate WASM or configuration.
+        tracing::info!("CCL Interpretation/Compilation not yet implemented. Parsed AST available.");
+
+        Ok(vec![]) // Return empty Vec for now
     }
     
     /// Get a template by type
     pub fn get_template(&self, template_type: CclTemplate) -> CclResult<&str> {
-        // Placeholder implementation
-        Err(CclError::SyntaxError("Not implemented".to_string()))
+        match template_type {
+            CclTemplate::CooperativeBylawsV1 => Ok(include_str!("../templates/cooperative_bylaws_v1.ccl")),
+            CclTemplate::CommunityCharterV1 => Ok(include_str!("../templates/community_charter_v1.ccl")),
+            CclTemplate::BudgetProposalV1 => Ok(include_str!("../templates/budget_proposal_v1.ccl")),
+            CclTemplate::ResolutionV1 => Ok(include_str!("../templates/resolution_v1.ccl")),
+            CclTemplate::ParticipationRulesV1 => Ok(include_str!("../templates/participation_rules_v1.ccl")),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use icn_identity::IdentityScope;
+    
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_interpreter_parsing() {
+        let interpreter = CclInterpreter::new();
+        
+        let test_ccl = r#"coop_bylaws {
+            "name": "Test Cooperative",
+            "description": "A test cooperative for CCL interpretation",
+            "founding_date": "2023-01-01",
+            "governance": {
+                "decision_making": "consent",
+                "quorum": 0.75
+            },
+            "members": ["Alice", "Bob", "Charlie"]
+        }"#;
+        
+        let result = interpreter.interpret_ccl(test_ccl, IdentityScope::Cooperative);
+        
+        // For now, we just check that parsing succeeded
+        assert!(result.is_ok(), "CCL interpretation failed: {:?}", result.err());
+    }
+    
+    #[test]
+    fn test_interpreter_with_invalid_syntax() {
+        let interpreter = CclInterpreter::new();
+        
+        let invalid_ccl = r#"coop_bylaws {
+            name: "Missing quotes around key",
+            "unclosed_string: "test
+        }"#;
+        
+        let result = interpreter.interpret_ccl(invalid_ccl, IdentityScope::Cooperative);
+        
+        assert!(result.is_err(), "Expected error for invalid syntax");
+        match result.unwrap_err() {
+            CclError::SyntaxError(_) => (), // Expected
+            other => panic!("Expected SyntaxError, got {:?}", other),
+        }
     }
 } 
