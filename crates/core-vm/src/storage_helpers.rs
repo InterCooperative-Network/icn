@@ -16,7 +16,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Clone the host environment for use in async context
         let mut host_env = caller.data().host.clone();
         
-        // Execute the async function in a blocking context
+        // Safe async execution pattern with tokio
         let result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 host_env.storage_get(cid).await
@@ -61,7 +61,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Clone the host environment and value for use in async context
         let mut host_env = caller.data().host.clone();
         
-        // Execute the async function in a blocking context
+        // Safe async execution pattern with tokio
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 host_env.storage_put(cid, value).await
@@ -80,7 +80,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Clone the host environment for use in async context
         let mut host_env = caller.data().host.clone();
         
-        // Execute the async function in a blocking context
+        // Safe async execution pattern with tokio
         let cid_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 host_env.blob_put(content).await
@@ -104,7 +104,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Clone the host environment for use in async context
         let mut host_env = caller.data().host.clone();
         
-        // Execute the async function in a blocking context
+        // Safe async execution pattern with tokio
         let result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 host_env.blob_get(cid).await

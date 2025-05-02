@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use cid::Cid;
 use multihash::{Code, MultihashDigest};
@@ -42,13 +43,13 @@ impl InMemoryBlobStore {
         let cid = Cid::new_v0(hash).map_err(|e| format!("Failed to create CID: {}", e))?;
         
         // Check if we already have this blob
-        if self.blobs.lock().unwrap().contains_key(&cid) {
+        if self.blobs.blocking_lock().contains_key(&cid) {
             return Ok(cid);
         }
         
         // Check size limit if applicable
         if let Some(max_size) = self.max_size {
-            let mut current_size = self.current_size.lock().unwrap();
+            let mut current_size = self.current_size.blocking_lock();
             let new_size = *current_size + data.len();
             
             if new_size > max_size {
@@ -60,35 +61,35 @@ impl InMemoryBlobStore {
         }
         
         // Store the blob
-        self.blobs.lock().unwrap().insert(cid, data.to_vec());
+        self.blobs.blocking_lock().insert(cid, data.to_vec());
         
         Ok(cid)
     }
 
     /// Retrieve a blob by its CID
     pub fn get(&self, cid: &Cid) -> Option<Vec<u8>> {
-        self.blobs.lock().unwrap().get(cid).cloned()
+        self.blobs.blocking_lock().get(cid).cloned()
     }
 
     /// Check if a blob exists
     pub fn contains(&self, cid: &Cid) -> bool {
-        self.blobs.lock().unwrap().contains_key(cid)
+        self.blobs.blocking_lock().contains_key(cid)
     }
 
     /// Get the current size of all blobs in bytes
     pub fn size(&self) -> usize {
-        *self.current_size.lock().unwrap()
+        *self.current_size.blocking_lock()
     }
 
     /// Remove a blob by its CID and return its size
     pub fn remove(&self, cid: &Cid) -> Option<usize> {
-        let mut blobs = self.blobs.lock().unwrap();
+        let mut blobs = self.blobs.blocking_lock();
         
         if let Some(data) = blobs.remove(cid) {
             let size = data.len();
             
             // Update current size
-            let mut current_size = self.current_size.lock().unwrap();
+            let mut current_size = self.current_size.blocking_lock();
             *current_size = current_size.saturating_sub(size);
             
             Some(size)
@@ -99,8 +100,8 @@ impl InMemoryBlobStore {
 
     /// Clear all blobs
     pub fn clear(&self) {
-        self.blobs.lock().unwrap().clear();
-        *self.current_size.lock().unwrap() = 0;
+        self.blobs.blocking_lock().clear();
+        *self.current_size.blocking_lock() = 0;
     }
 }
 
@@ -124,42 +125,44 @@ impl DistributedStorage for InMemoryBlobStore {
         let cid = Cid::new_v0(mh)
             .map_err(|e| StorageError::InvalidCid(e.to_string()))?;
         
-        // Store the blob
-        let mut blobs = self.blobs.lock().unwrap();
-        let mut current_size = self.current_size.lock().unwrap();
-        
-        if !blobs.contains_key(&cid) {
-            *current_size += content.len();
-            blobs.insert(cid, content.to_vec());
+        // Store the blob - use proper async mutex
+        {
+            let mut blobs = self.blobs.lock().await;
+            let mut current_size = self.current_size.lock().await;
+            
+            if !blobs.contains_key(&cid) {
+                *current_size += content.len();
+                blobs.insert(cid, content.to_vec());
+            }
         }
         
         Ok(cid)
     }
     
     async fn get_blob(&self, cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
-        let blobs = self.blobs.lock().unwrap();
+        let blobs = self.blobs.lock().await;
         Ok(blobs.get(cid).cloned())
     }
     
     async fn blob_exists(&self, cid: &Cid) -> StorageResult<bool> {
-        let blobs = self.blobs.lock().unwrap();
+        let blobs = self.blobs.lock().await;
         Ok(blobs.contains_key(cid))
     }
     
     async fn blob_size(&self, cid: &Cid) -> StorageResult<Option<u64>> {
-        let blobs = self.blobs.lock().unwrap();
+        let blobs = self.blobs.lock().await;
         Ok(blobs.get(cid).map(|blob| blob.len() as u64))
     }
     
     async fn is_pinned(&self, cid: &Cid) -> StorageResult<bool> {
         // In this simple implementation, all blobs are considered "pinned"
-        let blobs = self.blobs.lock().unwrap();
+        let blobs = self.blobs.lock().await;
         Ok(blobs.contains_key(cid))
     }
     
     async fn pin_blob(&self, cid: &Cid) -> StorageResult<()> {
         // Check if it exists
-        let blobs = self.blobs.lock().unwrap();
+        let blobs = self.blobs.lock().await;
         if !blobs.contains_key(cid) {
             return Err(StorageError::BlobNotFound(cid.to_string()));
         }

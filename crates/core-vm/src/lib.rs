@@ -16,7 +16,7 @@ use cid::{Cid, multihash::{Code, MultihashDigest}};
 use log::{debug, error, info, warn};
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
-use wasmtime::{Engine, Linker, Module, Store, Memory, AsContextMut, Caller, Trap, TypedFunc};
+use wasmtime::{Engine, Linker, Module, Store, Memory, AsContextMut, Caller};
 use uuid::Uuid;
 
 // ICN crates
@@ -193,19 +193,18 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // Clone the storage reference to use in async context
         let storage = self.storage.clone();
         
-        // Get a lock on storage, perform the operation, then release the lock
-        let result = {
+        // Get the value from storage, ensuring the lock is dropped before processing
+        let value = {
             let storage_guard = storage.lock().await;
             storage_guard.get_kv(&key).await
         };
         
-        // Handle the result after the lock is dropped
-        let value = match result {
+        // Process the result after the lock is dropped
+        let value = match value {
             Ok(val) => val,
             Err(e) => return Err(Self::storage_error_to_host_error(e)),
         };
         
-        // Process the result
         // If value exists, record storage read resource usage
         if let Some(ref data) = value {
             // Track storage read costs proportional to data size 
@@ -223,10 +222,10 @@ impl HostEnvironment for ConcreteHostEnvironment {
         self.record_resource_usage(ResourceType::Compute, value_size / 10)?; // Compute cost is a fraction of data size
         self.record_resource_usage(ResourceType::Storage, value_size)?;      // Storage cost is full data size
         
-        // Clone the storage reference and data to use in async context
+        // Clone the storage reference to use in async context
         let storage = self.storage.clone();
         
-        // Get a lock on storage, perform the operation, then release the lock
+        // Perform storage put, ensuring lock is released before handling result
         let result = {
             let storage_guard = storage.lock().await;
             storage_guard.put_kv(key, value).await
@@ -247,7 +246,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // Clone the blob storage reference to use in async context
         let blob_storage = self.blob_storage.clone();
         
-        // Get a lock, perform operation, then release the lock
+        // Perform the operation within a scope to ensure lock is released
         let result = {
             let blob_guard = blob_storage.lock().await;
             blob_guard.put_blob(&content).await
@@ -265,7 +264,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // Clone the blob storage to use in async context
         let blob_storage = self.blob_storage.clone();
         
-        // Get a lock, perform operation, then release the lock
+        // Perform the operation within a scope to ensure lock is released
         let result = {
             let blob_guard = blob_storage.lock().await;
             blob_guard.get_blob(&cid).await
@@ -387,7 +386,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         self.record_resource_usage(ResourceType::Storage, content_size)?;
         
         // Clone necessary data to avoid holding references across await points
-        let storage = self.storage.clone();
+        let storage = self.blob_storage.clone();
         
         // Get a lock, perform operation, then release the lock
         let result = {
@@ -825,12 +824,12 @@ pub async fn execute_wasm(
     );
     
     // Set fuel consumption limit based on compute authorization or default
-    let compute_limit = ctx.find_authorization(&ResourceType::Compute)
+    let compute_auth = ctx.find_authorization(&ResourceType::Compute)
         .map(|auth| auth.remaining_amount())
         .unwrap_or(1_000_000);
     
     // Add fuel to the store before executing WASM
-    store.add_fuel(compute_limit)
+    store.add_fuel(compute_auth)
         .map_err(|e| VmError::InternalError(format!("Failed to add fuel: {}", e)))?;
     
     // Create a new linker and register host functions

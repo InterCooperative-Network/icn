@@ -4,7 +4,6 @@ use crate::{StoreData, HostEnvironment, LogLevel};
 use crate::cid_utils;
 use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_bytes, write_memory_u32};
 use icn_identity::IdentityScope;
-use futures::executor::block_on;
 
 /// Register identity-related host functions
 pub fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
