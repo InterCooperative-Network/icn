@@ -5,14 +5,15 @@ FROM rust:1.81-slim-bullseye as builder
 
 WORKDIR /usr/src/app
 
-# Install necessary build dependencies (e.g., openssl, pkg-config)
+# Install necessary build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev build-essential
 
-# Copy the entire project context
+# Copy the entire project context (respecting .dockerignore)
 COPY . .
 
 # Build the release binary for the CLI
+# Ensure the binary target name 'covm' matches your cli/Cargo.toml
 RUN cargo build --release --bin covm
 
 # Runtime Stage
@@ -29,10 +30,10 @@ RUN mkdir -p /app/logs /app/data /app/scripts /app/config
 # Copy the compiled binary
 COPY --from=builder /usr/src/app/target/release/covm /usr/local/bin/covm
 
-# Copy scripts and make executable
-COPY ./bin/run_integration_node.sh /app/scripts/
-COPY ./bin/monitor_integration.sh /app/scripts/
-COPY ./tests/reset_icn_state.sh /app/scripts/ # Assuming reset script is in tests
+# Copy scripts and make executable (Corrected Paths based on ls output)
+COPY ./run_integration_node.sh /app/scripts/    # Script is in the root
+COPY ./monitor_integration.sh /app/scripts/    # Script is in the root
+COPY ./tests/reset_icn_state.sh /app/scripts/ # Script is in tests/
 RUN chmod +x /app/scripts/*.sh
 
 # Copy config directory
@@ -42,10 +43,9 @@ COPY ./config /app/config
 WORKDIR /app
 
 # Expose necessary ports
-EXPOSE 8080 # HTTP API
-EXPOSE 8090 # WebSocket Events
-EXPOSE 4001 # libp2p TCP
+EXPOSE 8080
+EXPOSE 8090
+EXPOSE 4001
 
-# Define the default command to run the integration script
-# It expects the integration config file to exist
+# Define the default command
 CMD ["/app/scripts/run_integration_node.sh"]

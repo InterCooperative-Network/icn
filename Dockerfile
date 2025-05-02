@@ -30,10 +30,10 @@ RUN mkdir -p /app/logs /app/data /app/scripts /app/config
 # Copy the compiled binary
 COPY --from=builder /usr/src/app/target/release/covm /usr/local/bin/covm
 
-# Copy scripts and make executable (Corrected Paths)
-COPY ./bin/run_integration_node.sh /app/scripts/
-COPY ./monitor_integration.sh /app/scripts/       # This script is in the root
-COPY ./tests/reset_icn_state.sh /app/scripts/    # This script is in tests/
+# Copy scripts and make executable (Corrected Paths based on ls output)
+COPY ./run_integration_node.sh /app/scripts/    # Script is in the root
+COPY ./monitor_integration.sh /app/scripts/    # Script is in the root
+COPY ./tests/reset_icn_state.sh /app/scripts/
 RUN chmod +x /app/scripts/*.sh
 
 # Copy config directory
@@ -43,11 +43,8 @@ COPY ./config /app/config
 WORKDIR /app
 
 # Expose necessary ports
-# HTTP API
 EXPOSE 8080
-# WebSocket Events
 EXPOSE 8090
-# libp2p TCP
 EXPOSE 4001
 
 # Define the default command
