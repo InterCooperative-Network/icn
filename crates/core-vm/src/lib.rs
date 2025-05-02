@@ -79,6 +79,9 @@ pub enum HostError {
     
     #[error("System error: {0}")]
     SystemError(String),
+    
+    #[error("Resource error: {0}")]
+    ResourceError(String),
 }
 
 /// Result type for host operations
@@ -470,33 +473,26 @@ impl HostEnvironment for ConcreteHostEnvironment {
     }
     
     async fn blob_get(&mut self, cid: Cid) -> HostResult<Option<Vec<u8>>> {
-        // Track base compute cost for operation
-        self.record_resource_usage(ResourceType::Compute, 100)?;
+        // Track compute resource usage
+        let key_size = cid.to_string().len() as u64;
+        self.record_resource_usage(ResourceType::Compute, key_size)?;
         
-        // Clone the blob storage reference
+        // Get the blob
         let blob_storage = self.blob_storage.clone();
         
-        // We need to drop the MutexGuard before we hit an await point
-        // Execute the operation and drop the guard before any awaits
-        let blob_result = {
-            let guard = blob_storage.lock()
-                .map_err(|e| HostError::StorageError(format!("Failed to lock blob storage: {}", e)))?;
-                
-            // Execute the operation directly without holding the guard across await
-            futures::executor::block_on(guard.get_blob(&cid))
-        };
-        
-        // Now process the result (no longer holding the guard)
-        match blob_result {
-            Ok(data) => {
-                // Track storage read costs if data was found
-                if let Some(ref content) = data {
-                    let content_len = content.len() as u64;
-                    self.record_resource_usage(ResourceType::Storage, content_len)?;
+        match blob_storage.lock() {
+            Ok(guard) => {
+                match guard.get_blob(&cid).await {
+                    Ok(Some(content)) => {
+                        // Track storage read costs proportional to data size
+                        self.record_resource_usage(ResourceType::Storage, content.len() as u64)?;
+                        Ok(Some(content))
+                    },
+                    Ok(None) => Ok(None),
+                    Err(e) => Err(Self::storage_error_to_host_error(e)),
                 }
-                Ok(data)
             },
-            Err(e) => Err(Self::storage_error_to_host_error(e)),
+            Err(e) => Err(HostError::StorageError(format!("Failed to lock blob storage: {}", e))),
         }
     }
     
@@ -512,69 +508,49 @@ impl HostEnvironment for ConcreteHostEnvironment {
     }
     
     fn verify_signature(&self, message: &[u8], signature: &[u8], did: &str) -> HostResult<bool> {
-        // Create identity ID from string
-        let identity_id = IdentityId::new(did);
+        if !self.vm_context.resource_authorizations.contains(&ResourceType::Identity) {
+            return Err(HostError::ResourceError("Not authorized to use identity functions".to_string()));
+        }
         
-        // Create signature from bytes
-        let sig = Signature::new(signature.to_vec());
+        // Track a fixed compute cost
+        let compute_cost = 50u64 + message.len() as u64 / 10;
+        self.vm_context.consumed_resources.entry(ResourceType::Compute)
+            .and_modify(|v| *v += compute_cost)
+            .or_insert(compute_cost);
         
-        // Use the identity verification function
-        identity_verify_signature(message, &sig, &identity_id)
-            .map_err(Self::identity_error_to_host_error)
+        match identity_verify_signature(did, message, signature) {
+            Ok(is_valid) => Ok(is_valid),
+            Err(e) => Err(Self::identity_error_to_host_error(e)),
+        }
     }
     
     // Economics operations
     fn record_resource_usage(&mut self, resource: ResourceType, amount: u64) -> HostResult<()> {
-        // First check if we have an active authorization for this resource type
-        let timestamp = self.vm_context.timestamp;
-        
-        // Check if we have an authorization
-        if let Some(auth) = self.vm_context.find_authorization_mut(&resource) {
-            // Try to consume from the authorization
-            match consume_authorization(auth, amount, timestamp) {
-                Ok(_) => {
-                    // Track consumption in VM context
-                    self.vm_context.record_consumption(resource.clone(), amount);
-                    
-                    // Log the resource usage
-                    debug!(
-                        "Resource usage recorded: resource={:?}, amount={}",
-                        resource, amount
-                    );
-                    
-                    return Ok(());
-                }
-                Err(e) => {
-                    // If we've reached the authorization limit, reject the request
-                    debug!(
-                        "Failed to consume from authorization: {:?}",
-                        e
-                    );
-                    
-                    return Err(HostError::ResourceLimitExceeded(
-                        format!("Resource limit exceeded for {:?}: requested {}, available {}", 
-                                resource, amount, auth.authorized_amount - auth.consumed_amount)
-                    ));
-                }
-            }
-        }
-        
-        // If we don't have an active authorization, check the allowed list
-        let authorized = self.vm_context.resource_authorizations.contains(&resource);
-        if !authorized {
-            return Err(HostError::UnauthorizedAccess(
-                format!("No authorization found for resource type {:?}", resource)
+        // First check if we have authorization for this resource
+        if !self.vm_context.resource_authorizations.contains(&resource) {
+            return Err(HostError::ResourceError(
+                format!("Not authorized to use resource: {:?}", resource)
             ));
         }
         
-        // For backward compatibility, just track the consumption without limits
-        self.vm_context.record_consumption(resource.clone(), amount);
+        // Next check if we have enough remaining allocation
+        let auth = self.vm_context.find_authorization(&resource).ok_or_else(|| 
+            HostError::ResourceError(format!("Authorization for {:?} not found", resource)))?;
         
-        // Log the resource usage
-        debug!(
-            "Resource usage recorded (no limit): resource={:?}, amount={}",
-            resource, amount
-        );
+        let current_usage = self.vm_context.consumed_resources.get(&resource).unwrap_or(&0);
+        let remaining = auth.remaining_amount();
+        
+        if *current_usage + amount > remaining {
+            return Err(HostError::ResourceError(
+                format!("Insufficient resource: {:?} (need {}, have {})", 
+                        resource, amount, remaining - current_usage)
+            ));
+        }
+        
+        // Record the usage
+        self.vm_context.consumed_resources.entry(resource)
+            .and_modify(|v| *v += amount)
+            .or_insert(amount);
         
         Ok(())
     }
@@ -774,19 +750,19 @@ impl HostEnvironment for ConcreteHostEnvironment {
     
     // Logging operations
     fn log_message(&self, level: LogLevel, message: &str) -> HostResult<()> {
-        // Format the log message with execution context
-        let formatted_message = format!(
-            "[Exec:{}] {}",
-            self.vm_context.execution_id, message
-        );
+        // Track a small compute cost based on message length
+        let compute_cost = 10u64 + message.len() as u64 / 100;
+        self.vm_context.consumed_resources.entry(ResourceType::Compute)
+            .and_modify(|v| *v += compute_cost)
+            .or_insert(compute_cost);
         
-        // Log using the appropriate level
+        // Log the message with appropriate level
         match level {
-            LogLevel::Debug => debug!("{}", formatted_message),
-            LogLevel::Info => info!("{}", formatted_message),
-            LogLevel::Warn => warn!("{}", formatted_message),
-            LogLevel::Error => error!("{}", formatted_message),
-        }
+            LogLevel::Debug => debug!("[WASM] {}", message),
+            LogLevel::Info => info!("[WASM] {}", message),
+            LogLevel::Warn => warn!("[WASM] {}", message),
+            LogLevel::Error => error!("[WASM] {}", message),
+        };
         
         Ok(())
     }

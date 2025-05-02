@@ -106,7 +106,7 @@ pub async fn get_authorized_guardians(
     tracing::debug!(context_id, key = %key_cid, "Looking up config for guardian roles");
     
     let store_lock = storage.lock().await;
-    match store_lock.get(&key_cid).await {
+    match store_lock.get_kv(&key_cid).await {
         Ok(Some(bytes)) => {
             // Drop the lock before parsing
             drop(store_lock);
@@ -142,7 +142,7 @@ pub async fn get_authorized_guardians(
     for cid in all_cids {
         let bytes = {
             let store_lock = storage.lock().await;
-            match store_lock.get(&cid).await {
+            match store_lock.get_kv(&cid).await {
                 Ok(Some(bytes)) => {
                     drop(store_lock);
                     bytes
@@ -251,7 +251,7 @@ where
     
     // Store the configuration
     let storage_lock = storage.lock().await;
-    let result = storage_lock.put(&config_bytes).await
+    let result = storage_lock.put_blob(&config_bytes).await
         .map_err(|e| FederationError::SyncFailed(
             format!("Failed to store governance config: {}", e)
         ))?;
@@ -289,7 +289,7 @@ pub async fn get_replication_policy(
     tracing::debug!(context_id, key = %key_cid, "Looking up config for replication policy");
     
     let store_lock = storage.lock().await;
-    match store_lock.get(&key_cid).await {
+    match store_lock.get_kv(&key_cid).await {
         Ok(Some(bytes)) => {
             // Drop the lock before parsing
             drop(store_lock);
@@ -326,7 +326,7 @@ pub async fn get_replication_policy(
     for cid in all_cids {
         let bytes = {
             let store_lock = storage.lock().await;
-            match store_lock.get(&cid).await {
+            match store_lock.get_kv(&cid).await {
                 Ok(Some(bytes)) => {
                     drop(store_lock);
                     bytes
@@ -413,13 +413,13 @@ mod tests {
         
         // Store the config using put
         let store_lock = storage.lock().await;
-        let _content_cid = store_lock.put(&config_bytes).await.unwrap();
+        let _content_cid = store_lock.put_blob(&config_bytes).await.unwrap();
         drop(store_lock);
         
         // Let's also directly create a mapping for quick testing
         let _encoded_key = config_key_for_scope("test-federation");
         let store_lock = storage.lock().await;
-        let _content_cid = store_lock.put(&config_bytes).await.unwrap();
+        let _content_cid = store_lock.put_blob(&config_bytes).await.unwrap();
         drop(store_lock);
         
         // Retrieve the guardians
@@ -471,13 +471,13 @@ mod tests {
         
         // Store the config in storage
         let store_lock = storage.lock().await;
-        let _content_cid = store_lock.put(&config_bytes).await.unwrap();
+        let _content_cid = store_lock.put_blob(&config_bytes).await.unwrap();
         drop(store_lock);
         
         // Let's also directly create a mapping for quick testing
         let _encoded_key = config_key_for_scope("test-federation");
         let store_lock = storage.lock().await;
-        let _content_cid = store_lock.put(&config_bytes).await.unwrap();
+        let _content_cid = store_lock.put_blob(&config_bytes).await.unwrap();
         drop(store_lock);
         
         // Retrieve the guardians
