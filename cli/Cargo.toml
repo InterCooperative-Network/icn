@@ -17,6 +17,12 @@ cid = { workspace = true }
 futures = { workspace = true }
 uuid = { version = "1.4", features = ["v4", "serde"] }
 serde_json = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = { version = "0.21", features = ["std"] }
+rand = "0.8"
+bs58 = "0.5"
+multihash = { version = "0.16.3", features = ["sha2"] }
+serde = { workspace = true }
 
 # ICN crates
 icn-core-vm = { path = "../crates/core-vm" }
@@ -26,6 +32,8 @@ icn-storage = { path = "../crates/storage" }
 icn-economics = { path = "../crates/economics" }
 icn-execution-tools = { path = "../crates/execution-tools" }
 icn-ccl-compiler = { path = "../crates/ccl-compiler" }
+icn-federation = { path = "../crates/federation" }
+icn-dag = { path = "../crates/dag" }
 
 [[bin]]
 name = "covm"

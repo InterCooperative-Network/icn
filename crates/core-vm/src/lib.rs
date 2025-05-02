@@ -861,38 +861,21 @@ pub async fn execute_wasm(
     
     // If we found an entry point, call it
     let execution_success = if let Some((name, func)) = entry_point {
-        logs.push(format!("Executing entry point: {}", name));
-        
-        // Try different type signatures based on common conventions
+        // Attempt to execute the function
         let result = if name == "invoke" {
-            // invoke might take parameters (e.g., for CCL templates)
-            match func.typed::<(i32, i32), i32>(&mut store) {
+            // invoke has a specific signature for cloud functions
+            match func.typed::<i32, i32>(&mut store) {
                 Ok(typed_func) => {
-                    // For invoke, we'd normally pass input parameters
-                    // For now just pass 0,0 for testing
-                    match typed_func.call_async(&mut store, (0, 0)).await {
-                        Ok(result) => {
-                            logs.push(format!("Entry point returned: {}", result));
+                    // Call with a dummy parameter (could be improved to pass real context)
+                    match typed_func.call_async(&mut store, 0).await {
+                        Ok(_) => {
+                            logs.push("Entry point executed successfully".to_string());
                             Ok(())
                         },
                         Err(e) => Err(VmError::HostFunctionError(format!("Entry point execution failed: {}", e)))
                     }
                 },
-                Err(_) => {
-                    // Try without parameters
-                    match func.typed::<(), i32>(&mut store) {
-                        Ok(typed_func) => {
-                            match typed_func.call_async(&mut store, ()).await {
-                                Ok(result) => {
-                                    logs.push(format!("Entry point returned: {}", result));
-                                    Ok(())
-                                },
-                                Err(e) => Err(VmError::HostFunctionError(format!("Entry point execution failed: {}", e)))
-                            }
-                        },
-                        Err(e) => Err(VmError::HostFunctionError(format!("Failed to type entry point function: {}", e)))
-                    }
-                }
+                Err(e) => Err(VmError::HostFunctionError(format!("Failed to type entry point function: {}", e)))
             }
         } else {
             // _start, main, run typically take no parameters and return nothing
@@ -935,13 +918,122 @@ pub async fn execute_wasm(
     // Add compute resource from fuel consumption
     resources_consumed.insert(ResourceType::Compute, consumed_fuel);
     
+    // If execution was successful, anchor the execution result to the DAG
+    let (output_data, anchor_credential) = if execution_success {
+        // Use the existing execution ID or generate a new one
+        let execution_id = store_data.ctx.execution_id.clone();
+        
+        // Create metadata to anchor to the DAG
+        let metadata = serde_json::json!({
+            "execution_id": execution_id,
+            "timestamp": store_data.ctx.timestamp,
+            "caller_did": store_data.ctx.caller_did,
+            "caller_scope": format!("{:?}", store_data.ctx.caller_scope),
+            "success": execution_success,
+            "resources_consumed": resources_consumed,
+            "proposal_cid": store_data.ctx.proposal_cid
+        });
+        
+        // Serialize the metadata
+        let metadata_bytes = match serde_json::to_vec(&metadata) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                logs.push(format!("Warning: Failed to serialize execution metadata: {}", e));
+                Vec::new()
+            }
+        };
+        
+        // Create a clone of host environment we can use for the DAG anchor
+        let mut host_env = store_data.host.clone();
+        
+        // Attempt to anchor to DAG
+        let anchor_result = if !metadata_bytes.is_empty() {
+            match host_env.anchor_to_dag(metadata_bytes, Vec::new()).await {
+                Ok(cid) => {
+                    logs.push(format!("Execution result anchored to DAG with CID: {}", cid));
+                    
+                    // Create an anchor credential
+                    match create_anchor_credential(
+                        &identity_ctx,
+                        store_data.ctx.timestamp as u64,
+                        cid,
+                        &store_data.ctx.caller_did,
+                    ).await {
+                        Ok(credential) => {
+                            logs.push("Generated anchor credential for execution result".to_string());
+                            Some(credential)
+                        },
+                        Err(e) => {
+                            logs.push(format!("Warning: Failed to create anchor credential: {}", e));
+                            None
+                        }
+                    }
+                },
+                Err(e) => {
+                    logs.push(format!("Warning: Failed to anchor execution result to DAG: {}", e));
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        
+        // Return the output data (if any) and the anchor credential
+        (None, anchor_result)
+    } else {
+        (None, None)
+    };
+    
+    // If we have an anchor credential, prepare it for the output
+    let final_output = match anchor_credential {
+        Some(credential) => {
+            match serde_json::to_vec(&credential) {
+                Ok(credential_bytes) => {
+                    logs.push("Included anchor credential in execution result".to_string());
+                    Some(credential_bytes)
+                },
+                Err(e) => {
+                    logs.push(format!("Warning: Failed to serialize anchor credential: {}", e));
+                    output_data
+                }
+            }
+        },
+        None => output_data
+    };
+    
     // Return the execution result
     Ok(ExecutionResult::with_resources(
         execution_success,           // success
-        None,                        // output_data
+        final_output,                // output_data (anchor credential or original output)
         logs,                        // logs
         resources_consumed,          // resources_consumed
     ))
+}
+
+/// Create an anchor credential for the execution result
+async fn create_anchor_credential(
+    identity_ctx: &Arc<IdentityContext>,
+    epoch_id: u64,
+    trust_bundle_cid: Cid,
+    caller_did: &str,
+) -> Result<icn_identity::AnchorCredential, VmError> {
+    use icn_identity::{AnchorCredential, IdentityId};
+    
+    // Create an anchor credential for this DAG anchor
+    let issuer_id = identity_ctx.clone_did();
+    
+    // Create the anchor credential
+    let anchor_credential = AnchorCredential::new(
+        &issuer_id,
+        epoch_id,
+        trust_bundle_cid,
+        Some(format!("Execution by {}", caller_did)),
+    );
+    
+    // Note: In a production implementation, we would sign the credential here
+    // For the MVP, we're returning it unsigned
+    
+    Ok(anchor_credential)
 }
 
 /// Register host functions in the linker
