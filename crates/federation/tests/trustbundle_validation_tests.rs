@@ -3,8 +3,19 @@ use icn_identity::{
     IdentityId, QuorumConfig, TrustBundle,
     generate_did_keypair, IdentityError
 };
-use multihash::{Code, MultihashDigest};
 use cid::Cid;
+use sha2::{Sha256, Digest};
+
+/// Helper function to create a multihash using SHA-256 (copied from dag crate)
+fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
+    // Create a new SHA-256 multihash
+    let mut buf = [0u8; 32];
+    let digest = Sha256::digest(data);
+    buf.copy_from_slice(digest.as_slice());
+    
+    // Create the multihash (code 0x12 is SHA256)
+    cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
+}
 
 /// Tests full TrustBundle validation including cryptographic signature verification
 #[tokio::test]
@@ -18,8 +29,8 @@ async fn test_trustbundle_full_validation() {
     let guardian2_id = IdentityId(guardian2_did);
     let guardian3_id = IdentityId(guardian3_did);
     
-    // Create a sample CID for the DAG root
-    let mh = Code::Sha2_256.digest(b"test_dag_root");
+    // Create a sample CID for the DAG root using our helper function
+    let mh = create_sha256_multihash(b"test_dag_root");
     let cid = Cid::new_v1(0x55, mh);
     
     // Create a TrustBundle without a proof
