@@ -1,0 +1,14 @@
+.git/
+.vscode/
+.idea/
+*.log
+logs/
+wallet-data/
+*.bak
+*.tmp
+node_modules/
+dist/
+build/
+out/
+*.dump.txt
+icn-wallet_dump_*.txt

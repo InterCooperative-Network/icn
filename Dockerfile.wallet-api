@@ -1,48 +1,41 @@
 # Build stage
-FROM rust:1.81-slim-bullseye as builder
+FROM rust:1.81-slim-bullseye AS builder
 
-WORKDIR /usr/src/wallet-api
+WORKDIR /usr/src/app
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y pkg-config libssl-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install build dependencies if needed (e.g., for native libraries)
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev
 
-# Copy manifests and source code
 COPY . .
 
-# Build the API server with release profile
-WORKDIR /usr/src/wallet-api/crates/api-server
-RUN cargo build --release
+# Build the release binary for the CLI (which includes the server)
+RUN cargo build --release --bin icn-wallet-cli
 
 # Runtime stage
-FROM debian:bullseye-slim
+FROM debian:bullseye-slim as runtime
 
-ARG APP=/usr/local/bin/wallet-api
-
+# Install runtime dependencies
 RUN apt-get update && \
-    apt-get install -y ca-certificates tzdata libssl1.1 && \
-    apt-get clean && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the binary from builder
-COPY --from=builder /usr/src/wallet-api/target/release/api-server ${APP}
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/app/target/release/icn-wallet-cli /usr/local/bin/icn-wallet-cli
 
-# Set the working directory
-WORKDIR /usr/local/bin
+# Create default wallet data directory
+RUN mkdir -p /app/wallet-data && chown nobody:nogroup /app/wallet-data
+USER nobody:nogroup
 
-# Create a non-root user and switch to it
-RUN groupadd -r wallet && useradd -r -g wallet wallet
-RUN chown -R wallet:wallet ${APP}
-USER wallet
+WORKDIR /app
 
-# Set environment variables
-ENV TZ=Etc/UTC \
-    RUST_LOG=info
+# Expose API and WebSocket ports (adjust if different)
+EXPOSE 3000
+EXPOSE 9876
 
-# Expose the API port
-EXPOSE 3002
+# Default command to run the API server
+ENV PORT=3000
+ENV AGORANET_URL=""
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD curl --fail http://localhost:${PORT}/health || exit 1
 
-# Command to run the application
-CMD ["wallet-api"] 
+CMD icn-wallet-cli serve --host 0.0.0.0 --port ${PORT} --agoranet-url "${AGORANET_URL}" --data-dir /app/wallet-data

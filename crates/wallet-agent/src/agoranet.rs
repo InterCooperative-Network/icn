@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
 use std::time::{Duration, Instant};
-use backoff::{ExponentialBackoff, Error as BackoffError};
+use backoff::ExponentialBackoff;
 use async_trait::async_trait;
 use tracing::{info, warn, error, debug};
 
@@ -247,31 +247,39 @@ impl AgoraNetClient {
                     let context = format!("fetching threads (proposal_id={:?}, topic={:?})", proposal_id, topic);
                     match self.handle_api_response::<Vec<ThreadSummary>>(response, &context).await {
                         Ok(threads) => Ok(threads),
-                        Err(e) => match e {
+                        Err(e) => {
                             // These errors shouldn't be retried
-                            AgentError::AuthenticationError(_) |
-                            AgentError::PermissionError(_) |
-                            AgentError::ResourceNotFound(_) => Err(BackoffError::Permanent(e)),
-                            
+                            if matches!(e, 
+                                AgentError::AuthenticationError(_) | 
+                                AgentError::PermissionError(_) | 
+                                AgentError::ResourceNotFound(_)
+                            ) {
+                                Err(backoff::Error::Permanent(e))
+                            }
                             // These might be temporary and should be retried
-                            AgentError::ServerError(_) |
-                            AgentError::RateLimitExceeded(_) |
-                            AgentError::GovernanceError(_) => Err(BackoffError::Transient(e)),
-                            
+                            else if matches!(e,
+                                AgentError::ServerError(_) |
+                                AgentError::RateLimitExceeded(_) |
+                                AgentError::GovernanceError(_)
+                            ) {
+                                Err(backoff::Error::Transient(e))
+                            }
                             // Others we'll consider permanent for now
-                            _ => Err(BackoffError::Permanent(e)),
+                            else {
+                                Err(backoff::Error::Permanent(e))
+                            }
                         }
                     }
                 },
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
                         warn!("Network error fetching threads, will retry: {}", e);
-                        Err(BackoffError::Transient(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
                             "Network error fetching threads: {}", e
                         ))))
                     } else {
                         error!("Request error fetching threads: {}", e);
-                        Err(BackoffError::Permanent(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
                             "Request error fetching threads: {}", e
                         ))))
                     }
@@ -290,9 +298,7 @@ impl AgoraNetClient {
                 
                 Ok(threads)
             },
-            Err(e) => match e {
-                BackoffError::Permanent(e) | BackoffError::Transient(e) => Err(e),
-            }
+            Err(e) => Err(e)
         }
     }
     
@@ -331,31 +337,39 @@ impl AgoraNetClient {
                     let context = format!("fetching thread details for ID {}", thread_id);
                     match self.handle_api_response::<ThreadDetail>(response, &context).await {
                         Ok(thread) => Ok(thread),
-                        Err(e) => match e {
+                        Err(e) => {
                             // These errors shouldn't be retried
-                            AgentError::AuthenticationError(_) |
-                            AgentError::PermissionError(_) |
-                            AgentError::ResourceNotFound(_) => Err(BackoffError::Permanent(e)),
-                            
+                            if matches!(e, 
+                                AgentError::AuthenticationError(_) | 
+                                AgentError::PermissionError(_) | 
+                                AgentError::ResourceNotFound(_)
+                            ) {
+                                Err(backoff::Error::Permanent(e))
+                            }
                             // These might be temporary and should be retried
-                            AgentError::ServerError(_) |
-                            AgentError::RateLimitExceeded(_) |
-                            AgentError::GovernanceError(_) => Err(BackoffError::Transient(e)),
-                            
+                            else if matches!(e,
+                                AgentError::ServerError(_) |
+                                AgentError::RateLimitExceeded(_) |
+                                AgentError::GovernanceError(_)
+                            ) {
+                                Err(backoff::Error::Transient(e))
+                            }
                             // Others we'll consider permanent for now
-                            _ => Err(BackoffError::Permanent(e)),
+                            else {
+                                Err(backoff::Error::Permanent(e))
+                            }
                         }
                     }
                 },
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
                         warn!("Network error fetching thread details, will retry: {}", e);
-                        Err(BackoffError::Transient(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
                             "Network error fetching thread details: {}", e
                         ))))
                     } else {
                         error!("Request error fetching thread details: {}", e);
-                        Err(BackoffError::Permanent(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
                             "Request error fetching thread details: {}", e
                         ))))
                     }
@@ -381,9 +395,7 @@ impl AgoraNetClient {
                 
                 Ok(thread)
             },
-            Err(e) => match e {
-                BackoffError::Permanent(e) | BackoffError::Transient(e) => Err(e),
-            }
+            Err(e) => Err(e)
         }
     }
     
@@ -426,31 +438,39 @@ impl AgoraNetClient {
                     let context = format!("linking credential to thread {}", thread_id);
                     match self.handle_api_response::<CredentialLink>(response, &context).await {
                         Ok(link) => Ok(link),
-                        Err(e) => match e {
+                        Err(e) => {
                             // These errors shouldn't be retried
-                            AgentError::AuthenticationError(_) |
-                            AgentError::PermissionError(_) |
-                            AgentError::ResourceNotFound(_) => Err(BackoffError::Permanent(e)),
-                            
+                            if matches!(e, 
+                                AgentError::AuthenticationError(_) | 
+                                AgentError::PermissionError(_) | 
+                                AgentError::ResourceNotFound(_)
+                            ) {
+                                Err(backoff::Error::Permanent(e))
+                            }
                             // These might be temporary and should be retried
-                            AgentError::ServerError(_) |
-                            AgentError::RateLimitExceeded(_) |
-                            AgentError::GovernanceError(_) => Err(BackoffError::Transient(e)),
-                            
+                            else if matches!(e,
+                                AgentError::ServerError(_) |
+                                AgentError::RateLimitExceeded(_) |
+                                AgentError::GovernanceError(_)
+                            ) {
+                                Err(backoff::Error::Transient(e))
+                            }
                             // Others we'll consider permanent for now
-                            _ => Err(BackoffError::Permanent(e)),
+                            else {
+                                Err(backoff::Error::Permanent(e))
+                            }
                         }
                     }
                 },
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
                         warn!("Network error linking credential, will retry: {}", e);
-                        Err(BackoffError::Transient(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
                             "Network error linking credential: {}", e
                         ))))
                     } else {
                         error!("Request error linking credential: {}", e);
-                        Err(BackoffError::Permanent(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
                             "Request error linking credential: {}", e
                         ))))
                     }
@@ -465,9 +485,7 @@ impl AgoraNetClient {
                 
                 Ok(link)
             },
-            Err(e) => match e {
-                BackoffError::Permanent(e) | BackoffError::Transient(e) => Err(e),
-            }
+            Err(e) => Err(e)
         }
     }
     
@@ -506,31 +524,39 @@ impl AgoraNetClient {
                     let context = format!("fetching credential links for thread {}", thread_id);
                     match self.handle_api_response::<Vec<CredentialLink>>(response, &context).await {
                         Ok(links) => Ok(links),
-                        Err(e) => match e {
+                        Err(e) => {
                             // These errors shouldn't be retried
-                            AgentError::AuthenticationError(_) |
-                            AgentError::PermissionError(_) |
-                            AgentError::ResourceNotFound(_) => Err(BackoffError::Permanent(e)),
-                            
+                            if matches!(e, 
+                                AgentError::AuthenticationError(_) | 
+                                AgentError::PermissionError(_) | 
+                                AgentError::ResourceNotFound(_)
+                            ) {
+                                Err(backoff::Error::Permanent(e))
+                            }
                             // These might be temporary and should be retried
-                            AgentError::ServerError(_) |
-                            AgentError::RateLimitExceeded(_) |
-                            AgentError::GovernanceError(_) => Err(BackoffError::Transient(e)),
-                            
+                            else if matches!(e,
+                                AgentError::ServerError(_) |
+                                AgentError::RateLimitExceeded(_) |
+                                AgentError::GovernanceError(_)
+                            ) {
+                                Err(backoff::Error::Transient(e))
+                            }
                             // Others we'll consider permanent for now
-                            _ => Err(BackoffError::Permanent(e)),
+                            else {
+                                Err(backoff::Error::Permanent(e))
+                            }
                         }
                     }
                 },
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
                         warn!("Network error fetching credential links, will retry: {}", e);
-                        Err(BackoffError::Transient(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
                             "Network error fetching credential links: {}", e
                         ))))
                     } else {
                         error!("Request error fetching credential links: {}", e);
-                        Err(BackoffError::Permanent(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
                             "Request error fetching credential links: {}", e
                         ))))
                     }
@@ -549,9 +575,7 @@ impl AgoraNetClient {
                 
                 Ok(links)
             },
-            Err(e) => match e {
-                BackoffError::Permanent(e) | BackoffError::Transient(e) => Err(e),
-            }
+            Err(e) => Err(e)
         }
     }
     
@@ -595,22 +619,22 @@ impl AgoraNetClient {
                         
                         if response.status() == StatusCode::TOO_MANY_REQUESTS || response.status().as_u16() >= 500 {
                             warn!("Retryable error when notifying AgoraNet: {}", error);
-                            Err(BackoffError::Transient(error))
+                            Err(backoff::Error::Transient(error))
                         } else {
                             error!("Non-retryable error when notifying AgoraNet: {}", error);
-                            Err(BackoffError::Permanent(error))
+                            Err(backoff::Error::Permanent(error))
                         }
                     }
                 },
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
                         warn!("Network error notifying AgoraNet, will retry: {}", e);
-                        Err(BackoffError::Transient(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
                             "Network error notifying AgoraNet: {}", e
                         ))))
                     } else {
                         error!("Request error notifying AgoraNet: {}", e);
-                        Err(BackoffError::Permanent(AgentError::ConnectionError(format!(
+                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
                             "Request error notifying AgoraNet: {}", e
                         ))))
                     }
@@ -624,9 +648,7 @@ impl AgoraNetClient {
                 self.invalidate_proposal_caches(proposal_id).await;
                 Ok(())
             },
-            Err(e) => match e {
-                BackoffError::Permanent(e) | BackoffError::Transient(e) => Err(e),
-            }
+            Err(e) => Err(e)
         }
     }
     
