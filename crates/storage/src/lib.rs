@@ -18,6 +18,8 @@ use icn_identity::{IdentityId, IdentityScope};
 use multihash::{self, Code, MultihashDigest};
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::mpsc;
+use tracing;
 
 /// Errors that can occur during storage operations
 #[derive(Debug, Error)]
@@ -293,6 +295,8 @@ pub struct InMemoryBlobStore {
     pins: Arc<Mutex<HashSet<Cid>>>,
     /// Maximum allowed blob size in bytes (0 means unlimited)
     max_blob_size: u64,
+    /// Optional channel for sending CIDs to be announced via Kademlia
+    kad_announcer: Option<mpsc::Sender<Cid>>,
 }
 
 impl InMemoryBlobStore {
@@ -302,6 +306,7 @@ impl InMemoryBlobStore {
             blobs: Arc::new(Mutex::new(HashMap::new())),
             pins: Arc::new(Mutex::new(HashSet::new())),
             max_blob_size: 0, // No limit by default
+            kad_announcer: None,
         }
     }
     
@@ -311,7 +316,33 @@ impl InMemoryBlobStore {
             blobs: Arc::new(Mutex::new(HashMap::new())),
             pins: Arc::new(Mutex::new(HashSet::new())),
             max_blob_size,
+            kad_announcer: None,
         }
+    }
+    
+    /// Create a new in-memory blob store with an announcement channel
+    pub fn with_announcer(kad_announcer: mpsc::Sender<Cid>) -> Self {
+        Self {
+            blobs: Arc::new(Mutex::new(HashMap::new())),
+            pins: Arc::new(Mutex::new(HashSet::new())),
+            max_blob_size: 0,
+            kad_announcer: Some(kad_announcer),
+        }
+    }
+    
+    /// Create a new in-memory blob store with both a size limit and an announcement channel
+    pub fn with_max_size_and_announcer(max_blob_size: u64, kad_announcer: mpsc::Sender<Cid>) -> Self {
+        Self {
+            blobs: Arc::new(Mutex::new(HashMap::new())),
+            pins: Arc::new(Mutex::new(HashSet::new())),
+            max_blob_size,
+            kad_announcer: Some(kad_announcer),
+        }
+    }
+    
+    /// Set the Kademlia announcer channel
+    pub fn set_announcer(&mut self, kad_announcer: mpsc::Sender<Cid>) {
+        self.kad_announcer = Some(kad_announcer);
     }
     
     /// Get the number of blobs in storage
@@ -354,6 +385,19 @@ impl DistributedStorage for InMemoryBlobStore {
         // Store the blob
         let mut blobs = self.blobs.lock().await;
         blobs.insert(cid, content.to_vec());
+        
+        // Announce the blob via Kademlia if announcer is available
+        if let Some(sender) = &self.kad_announcer {
+            match sender.send(cid).await {
+                Ok(_) => {
+                    tracing::debug!(%cid, "Sent CID for Kademlia announcement");
+                },
+                Err(e) => {
+                    tracing::error!(%cid, "Failed to send CID for Kademlia announcement: {}", e);
+                    // Continue anyway since the blob was stored successfully
+                }
+            }
+        }
         
         Ok(cid)
     }

@@ -213,6 +213,11 @@ pub enum FederationManagerMessage {
         bundle: TrustBundle,
         respond_to: tokio::sync::oneshot::Sender<FederationResult<()>>,
     },
+    /// Announce a blob (by CID) as a provider on the Kademlia DHT
+    AnnounceBlob {
+        cid: cid::Cid,
+        respond_to: Option<tokio::sync::oneshot::Sender<FederationResult<()>>>,
+    },
     /// Stop the federation manager
     Shutdown {
         respond_to: tokio::sync::oneshot::Sender<()>,
@@ -267,7 +272,7 @@ impl FederationManager {
     pub async fn start_node(
         config: FederationManagerConfig, 
         storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
-    ) -> FederationResult<Self> {
+    ) -> FederationResult<(Self, mpsc::Sender<cid::Cid>)> {
         // Generate a new local keypair
         let keypair = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(keypair.public());
@@ -309,11 +314,14 @@ impl FederationManager {
         // Prepare channels for communication with the event loop
         let (sender, receiver) = mpsc::channel(100);
         
+        // Create a channel for Kademlia blob announcements
+        let (blob_sender, blob_receiver) = mpsc::channel::<cid::Cid>(100);
+        
         // Clone storage for event loop
         let event_loop_storage = storage.clone();
         
         // Spawn the event loop
-        let event_loop_handle = tokio::spawn(run_event_loop(swarm, receiver, event_loop_storage));
+        let event_loop_handle = tokio::spawn(run_event_loop(swarm, receiver, event_loop_storage, blob_receiver));
         
         // Create sync command sender clone
         let sync_sender = sender.clone();
@@ -348,7 +356,7 @@ impl FederationManager {
             storage,
         };
         
-        Ok(manager)
+        Ok((manager, blob_sender))
     }
     
     /// Request a trust bundle from the network
@@ -400,6 +408,20 @@ impl FederationManager {
         // TODO(V3-MVP): Implement proper epoch tracking
         Ok(0)
     }
+    
+    /// Announce blob as a provider on the Kademlia DHT
+    pub async fn announce_blob(&self, cid: cid::Cid) -> FederationResult<()> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        
+        self.sender.send(FederationManagerMessage::AnnounceBlob {
+            cid,
+            respond_to: Some(tx),
+        }).await
+        .map_err(|e| FederationError::NetworkError(format!("Failed to send announcement request: {}", e)))?;
+        
+        rx.await
+            .map_err(|e| FederationError::NetworkError(format!("Failed to receive announcement confirmation: {}", e)))?
+    }
 }
 
 /// Run the event loop for the federation network
@@ -407,6 +429,7 @@ async fn run_event_loop(
     mut swarm: Swarm<network::IcnFederationBehaviour>,
     mut command_receiver: mpsc::Receiver<FederationManagerMessage>,
     storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+    mut blob_receiver: mpsc::Receiver<cid::Cid>,
 ) {
     info!("Starting federation network event loop");
     
@@ -464,6 +487,23 @@ async fn run_event_loop(
                         // TODO(V3-MVP): Implement actual trust bundle publication via gossipsub
                         let _ = respond_to.send(Ok(()));
                     },
+                    Some(FederationManagerMessage::AnnounceBlob { cid, respond_to }) => {
+                        debug!(%cid, "Announcing as provider for blob via Kademlia");
+                        match announce_as_provider(&mut swarm, cid).await {
+                            Ok(_) => {
+                                debug!(%cid, "Successfully started Kademlia provider announcement");
+                                if let Some(tx) = respond_to {
+                                    let _ = tx.send(Ok(()));
+                                }
+                            },
+                            Err(e) => {
+                                error!(%cid, "Failed to announce as provider: {}", e);
+                                if let Some(tx) = respond_to {
+                                    let _ = tx.send(Err(e));
+                                }
+                            }
+                        }
+                    },
                     Some(FederationManagerMessage::Shutdown { respond_to }) => {
                         info!("Shutting down federation network event loop");
                         let _ = respond_to.send(());
@@ -472,6 +512,15 @@ async fn run_event_loop(
                     None => {
                         info!("Command channel closed, shutting down event loop");
                         break;
+                    }
+                }
+            },
+            maybe_cid = blob_receiver.recv() => {
+                if let Some(cid) = maybe_cid {
+                    debug!(%cid, "Received blob announcement from storage layer");
+                    match announce_as_provider(&mut swarm, cid).await {
+                        Ok(_) => debug!(%cid, "Successfully started Kademlia provider announcement from direct channel"),
+                        Err(e) => error!(%cid, "Failed to announce as provider from direct channel: {}", e)
                     }
                 }
             }
@@ -749,6 +798,22 @@ async fn request_trust_bundle_from_network(
     }
 }
 
+/// Helper function to announce the local node as a provider for a CID
+async fn announce_as_provider(
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    cid: cid::Cid
+) -> FederationResult<()> {
+    // Use the CID bytes directly as the Kademlia key
+    // This method doesn't need to access the private kad::record module
+    let cid_bytes = cid.to_bytes();
+    
+    // Announce ourselves as a provider for this key
+    swarm.behaviour_mut().kademlia.start_providing(cid_bytes.into())
+        .map_err(|e| FederationError::NetworkError(format!("Failed to start Kademlia provider record: {}", e)))?;
+    
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -776,7 +841,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to start federation node: {:?}", result.err());
         
         // Clean up by shutting down
-        if let Ok(manager) = result {
+        if let Ok((manager, _blob_sender)) = result {
             let shutdown_result = manager.shutdown().await;
             assert!(shutdown_result.is_ok(), "Failed to shutdown federation manager: {:?}", shutdown_result.err());
         }
@@ -996,5 +1061,50 @@ mod tests {
         // Our validator in the federation crate should reject it
         let message = "Received TrustBundle has no proof, rejecting: epoch 1";
         assert!(message.contains("no proof"), "Validator should check for missing proof");
+    }
+    
+    #[tokio::test]
+    async fn test_blob_announcement() {
+        use cid::Cid;
+        use std::time::Duration;
+        use icn_storage::{InMemoryBlobStore, DistributedStorage};
+        use multihash::{Code, MultihashDigest};
+        
+        // Use a default configuration for testing
+        let config = FederationManagerConfig::default();
+        
+        // Attempt to start a federation node
+        let result = FederationManager::start_node(
+            config, 
+            Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()))
+        ).await;
+        
+        // Check that we can create a federation manager without panicking
+        assert!(result.is_ok(), "Failed to start federation node: {:?}", result.err());
+        
+        if let Ok((manager, blob_sender)) = result {
+            // Create an in-memory blob store with the announcer channel
+            let blob_store = InMemoryBlobStore::with_announcer(blob_sender);
+            
+            // Create a test blob to store
+            let test_content = b"This is a test blob for Kademlia announcement".to_vec();
+            
+            // Store the blob, which should trigger an announcement
+            let cid = blob_store.put_blob(&test_content).await.unwrap();
+            
+            // Allow some time for the announcement to be processed
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            
+            // We don't have a great way to verify the announcement was processed
+            // in a unit test without mocking the swarm, but we can at least
+            // verify the proper CID was generated
+            let expected_mh = Code::Sha2_256.digest(&test_content);
+            let expected_cid = Cid::new_v0(expected_mh).unwrap();
+            assert_eq!(cid, expected_cid, "CID should match expected value");
+            
+            // Clean up
+            let shutdown_result = manager.shutdown().await;
+            assert!(shutdown_result.is_ok(), "Failed to shutdown federation manager");
+        }
     }
 } 

@@ -445,7 +445,7 @@ fn test_guardian_mandate_verify() {
             guardian.clone()
         )
         .with_quorum_config(QuorumConfig::Majority)
-        .add_signer(id1.clone(), keypair1.clone()) // Same guardian is the signer
+        .add_signer(id1.clone(), keypair1) // Same guardian is the signer
         .with_dag_node(dag_node.clone())
         .build()
         .await
