@@ -113,9 +113,7 @@ async fn handle_execute_command(
     use cid::Cid;
     use icn_governance_kernel::CclInterpreter;
     use icn_core_vm::{execute_wasm, VmContext};
-    use icn_economics::{ResourceType, ResourceAuthorization};
     use icn_identity::IdentityScope;
-    use uuid::Uuid;
     
     // Read the WASM proposal payload
     let wasm_bytes = fs::read(&proposal_payload)
@@ -162,30 +160,19 @@ async fn handle_execute_command(
         None
     };
     
-    // Create resource authorizations based on the governance config
-    // This is where you would implement the logic to derive authorizations from the config
-    // For now, we'll create some basic authorizations for common resource types
-    let authorized_resources = vec![
-        ResourceType::Compute,
-        ResourceType::Storage,
-        ResourceType::NetworkBandwidth,
-        ResourceType::Custom { identifier: "Memory".to_string() },
-    ];
+    // Generate resource authorizations based on the governance config
+    let (authorized_resources, active_authorizations) = derive_authorizations(
+        &governance_config,
+        &identity,
+        identity_scope,
+        timestamp,
+        verbose
+    );
     
-    // Create active authorizations with high limits for now
-    let active_authorizations = authorized_resources.iter().map(|rt| {
-        ResourceAuthorization {
-            auth_id: uuid::Uuid::new_v4(),
-            grantor_did: "system".to_string(),
-            grantee_did: identity.clone(),
-            resource_type: rt.clone(),
-            authorized_amount: 1_000_000,  // High limit for testing
-            consumed_amount: 0,
-            scope: identity_scope,
-            expiry_timestamp: Some(timestamp + 3600),  // 1 hour from now
-            metadata: None,
-        }
-    }).collect::<Vec<_>>();
+    if verbose {
+        println!("Generated {} resource authorizations from governance config", 
+                 active_authorizations.len());
+    }
     
     // Create the VM context
     let vm_context = VmContext::with_authorizations(
@@ -229,6 +216,308 @@ async fn handle_execute_command(
     }
     
     Ok(())
+}
+
+/// Derive resource authorizations from the governance config
+/// 
+/// This function analyzes the governance config to determine what resource authorizations
+/// should be granted for the execution.
+/// 
+/// # Arguments
+/// * `config` - The governance config
+/// * `caller_did` - The DID of the caller
+/// * `scope` - The identity scope
+/// * `timestamp` - The current timestamp
+/// * `verbose` - Whether to print verbose output
+/// 
+/// # Returns
+/// A tuple of (resource_types, authorizations)
+pub fn derive_authorizations(
+    config: &icn_governance_kernel::config::GovernanceConfig,
+    caller_did: &str,
+    scope: icn_identity::IdentityScope,
+    timestamp: i64,
+    verbose: bool
+) -> (Vec<icn_economics::ResourceType>, Vec<icn_economics::ResourceAuthorization>) {
+    use icn_economics::{ResourceType, ResourceAuthorization};
+    use uuid::Uuid;
+    
+    let mut resource_types = Vec::new();
+    let mut authorizations = Vec::new();
+    
+    // Default expiry time (1 hour from now)
+    let expiry = Some(timestamp + 3600);
+    
+    // System DID for authorizations
+    let system_did = "did:icn:system:governance".to_string();
+    
+    // Default resource amounts
+    let default_compute = 1_000_000;
+    let default_storage = 500_000;
+    let default_network = 200_000;
+    let default_memory = 100_000;
+    
+    // Base resource types granted to all executions
+    resource_types.push(ResourceType::Compute);
+    
+    // Grant compute authorization
+    authorizations.push(ResourceAuthorization {
+        auth_id: Uuid::new_v4(),
+        grantor_did: system_did.clone(),
+        grantee_did: caller_did.to_string(),
+        resource_type: ResourceType::Compute,
+        authorized_amount: default_compute,
+        consumed_amount: 0,
+        scope,
+        expiry_timestamp: expiry,
+        metadata: None,
+    });
+    
+    // Analyze config sections to determine additional authorizations
+    
+    // If governance section exists, grant additional compute
+    if let Some(governance) = &config.governance {
+        // Add additional compute authorization for governance operations
+        let governance_compute = match config.template_type.as_str() {
+            "coop_bylaws" | "community_charter" => 500_000, // More compute for full governance templates
+            "resolution" => 300_000,                         // Medium for resolutions
+            _ => 200_000,                                   // Base level for other templates
+        };
+        
+        if verbose {
+            println!("  Granting additional compute ({}) for governance section", governance_compute);
+        }
+        
+        // Add extra amounts to existing authorizations
+        for auth in &mut authorizations {
+            if matches!(auth.resource_type, ResourceType::Compute) {
+                auth.authorized_amount += governance_compute;
+            }
+        }
+        
+        // If roles are defined, grant permissions based on roles
+        if let Some(roles) = &governance.roles {
+            // Look for specific permissions in roles that would grant additional resource types
+            for role in roles {
+                for permission in &role.permissions {
+                    match permission.as_str() {
+                        "manage_working_groups" | "create_proposals" | "administrate" => {
+                            // Administrative roles get more resources
+                            if !resource_types.contains(&ResourceType::Storage) {
+                                resource_types.push(ResourceType::Storage.clone());
+                                authorizations.push(ResourceAuthorization {
+                                    auth_id: Uuid::new_v4(),
+                                    grantor_did: system_did.clone(),
+                                    grantee_did: caller_did.to_string(),
+                                    resource_type: ResourceType::Storage,
+                                    authorized_amount: default_storage,
+                                    consumed_amount: 0,
+                                    scope,
+                                    expiry_timestamp: expiry,
+                                    metadata: None,
+                                });
+                                
+                                if verbose {
+                                    println!("  Granting storage authorization for administrative role: {}", role.name);
+                                }
+                            }
+                        },
+                        "moderate_content" | "facilitate_meetings" => {
+                            // Moderation roles get network bandwidth
+                            if !resource_types.contains(&ResourceType::NetworkBandwidth) {
+                                resource_types.push(ResourceType::NetworkBandwidth.clone());
+                                authorizations.push(ResourceAuthorization {
+                                    auth_id: Uuid::new_v4(),
+                                    grantor_did: system_did.clone(),
+                                    grantee_did: caller_did.to_string(),
+                                    resource_type: ResourceType::NetworkBandwidth,
+                                    authorized_amount: default_network,
+                                    consumed_amount: 0,
+                                    scope,
+                                    expiry_timestamp: expiry,
+                                    metadata: None,
+                                });
+                                
+                                if verbose {
+                                    println!("  Granting network bandwidth for moderation role: {}", role.name);
+                                }
+                            }
+                        },
+                        _ => {
+                            // Default roles get basic permissions already granted
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // If economic model exists, grant storage permission
+    if let Some(economic_model) = &config.economic_model {
+        if !resource_types.contains(&ResourceType::Storage) {
+            resource_types.push(ResourceType::Storage.clone());
+            authorizations.push(ResourceAuthorization {
+                auth_id: Uuid::new_v4(),
+                grantor_did: system_did.clone(),
+                grantee_did: caller_did.to_string(),
+                resource_type: ResourceType::Storage,
+                authorized_amount: default_storage,
+                consumed_amount: 0,
+                scope,
+                expiry_timestamp: expiry,
+                metadata: None,
+            });
+            
+            if verbose {
+                println!("  Granting storage authorization for economic model");
+            }
+        }
+        
+        // If compensation policy exists, add labor hours resource
+        if let Some(compensation) = &economic_model.compensation_policy {
+            if let Some(hourly_rates) = &compensation.hourly_rates {
+                for (skill, _rate) in hourly_rates {
+                    let labor_resource = ResourceType::LaborHours { 
+                        skill: skill.clone() 
+                    };
+                    resource_types.push(labor_resource.clone());
+                    authorizations.push(ResourceAuthorization {
+                        auth_id: Uuid::new_v4(),
+                        grantor_did: system_did.clone(),
+                        grantee_did: caller_did.to_string(),
+                        resource_type: labor_resource,
+                        authorized_amount: 40,  // 40 hours default
+                        consumed_amount: 0,
+                        scope,
+                        expiry_timestamp: expiry,
+                        metadata: None,
+                    });
+                    
+                    if verbose {
+                        println!("  Granting labor hours authorization for skill: {}", skill);
+                    }
+                }
+            }
+        }
+    }
+    
+    // If working groups exist, grant additional resources
+    if let Some(working_groups) = &config.working_groups {
+        if let Some(resource_allocation) = &working_groups.resource_allocation {
+            // Grant memory resources for working groups
+            let custom_memory = ResourceType::Custom { 
+                identifier: "Memory".to_string() 
+            };
+            resource_types.push(custom_memory.clone());
+            authorizations.push(ResourceAuthorization {
+                auth_id: Uuid::new_v4(),
+                grantor_did: system_did.clone(),
+                grantee_did: caller_did.to_string(),
+                resource_type: custom_memory,
+                authorized_amount: default_memory,
+                consumed_amount: 0,
+                scope,
+                expiry_timestamp: expiry,
+                metadata: None,
+            });
+            
+            // If there's a default budget, use it to inform authorization amounts
+            if let Some(budget) = resource_allocation.default_budget {
+                // Grant community credit resources based on budget
+                if budget > 0 {
+                    let community_credit = ResourceType::CommunityCredit { 
+                        community_did: caller_did.to_string() 
+                    };
+                    resource_types.push(community_credit.clone());
+                    authorizations.push(ResourceAuthorization {
+                        auth_id: Uuid::new_v4(),
+                        grantor_did: system_did.clone(),
+                        grantee_did: caller_did.to_string(),
+                        resource_type: community_credit,
+                        authorized_amount: budget,
+                        consumed_amount: 0,
+                        scope,
+                        expiry_timestamp: expiry,
+                        metadata: None,
+                    });
+                    
+                    if verbose {
+                        println!("  Granting community credit authorization with budget: {}", budget);
+                    }
+                }
+            }
+        }
+    }
+    
+    // If dispute resolution exists, grant network bandwidth
+    if let Some(_dispute) = &config.dispute_resolution {
+        if !resource_types.contains(&ResourceType::NetworkBandwidth) {
+            resource_types.push(ResourceType::NetworkBandwidth.clone());
+            authorizations.push(ResourceAuthorization {
+                auth_id: Uuid::new_v4(),
+                grantor_did: system_did.clone(),
+                grantee_did: caller_did.to_string(),
+                resource_type: ResourceType::NetworkBandwidth,
+                authorized_amount: default_network,
+                consumed_amount: 0,
+                scope,
+                expiry_timestamp: expiry,
+                metadata: None,
+            });
+            
+            if verbose {
+                println!("  Granting network bandwidth for dispute resolution");
+            }
+        }
+    }
+    
+    // Ensure any template gets minimal resources
+    if resource_types.len() <= 1 {
+        // Add minimal storage and network for any template
+        resource_types.push(ResourceType::Storage.clone());
+        authorizations.push(ResourceAuthorization {
+            auth_id: Uuid::new_v4(),
+            grantor_did: system_did.clone(),
+            grantee_did: caller_did.to_string(),
+            resource_type: ResourceType::Storage,
+            authorized_amount: default_storage / 2,  // Half the default
+            consumed_amount: 0,
+            scope,
+            expiry_timestamp: expiry,
+            metadata: None,
+        });
+        
+        if verbose {
+            println!("  Granting minimal storage for basic template");
+        }
+    }
+    
+    // Always ensure Storage is included regardless of template
+    // This is crucial for all operations
+    if !resource_types.contains(&ResourceType::Storage) {
+        resource_types.push(ResourceType::Storage.clone());
+        authorizations.push(ResourceAuthorization {
+            auth_id: Uuid::new_v4(),
+            grantor_did: system_did.clone(),
+            grantee_did: caller_did.to_string(),
+            resource_type: ResourceType::Storage,
+            authorized_amount: default_storage / 2,  // Half the default for minimal templates
+            consumed_amount: 0,
+            scope,
+            expiry_timestamp: expiry,
+            metadata: None,
+        });
+        
+        if verbose {
+            println!("  Granting required basic storage");
+        }
+    }
+    
+    // TODO(V3-MVP): Implement more sophisticated authorization derivation logic based on detailed config rules
+    // (e.g., roles defined in membership), potentially requiring storage lookups for token balances
+    // or existing credentials.
+    
+    (resource_types, authorizations)
 }
 
 // Helper function to create an identity context

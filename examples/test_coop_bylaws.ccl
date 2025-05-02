@@ -1,0 +1,62 @@
+coop_bylaws {
+    "name": "Test Cooperative",
+    "description": "A cooperative for testing CCL interpretation",
+    "founding_date": "2023-01-01",
+    "mission_statement": "To build a better world through shared ownership",
+    
+    "governance": {
+        "decision_making": "consent",
+        "quorum": 0.75,
+        "majority": 0.66,
+        "roles": [
+            {
+                "name": "coordinator",
+                "permissions": ["administrate", "create_proposals"]
+            },
+            {
+                "name": "facilitator",
+                "permissions": ["moderate_content", "facilitate_meetings"]
+            }
+        ]
+    },
+    
+    "membership": {
+        "onboarding": {
+            "requires_sponsor": true,
+            "trial_period_days": 90
+        },
+        "dues": {
+            "amount": 50,
+            "frequency": "monthly"
+        }
+    },
+    
+    "economic_model": {
+        "surplus_distribution": "patronage",
+        "compensation_policy": {
+            "hourly_rates": {
+                "programming": 50,
+                "design": 45,
+                "documentation": 40
+            },
+            "track_hours": true
+        }
+    },
+    
+    "working_groups": {
+        "formation_threshold": 3,
+        "resource_allocation": {
+            "default_budget": 5000,
+            "requires_approval": true
+        }
+    },
+    
+    "dispute_resolution": {
+        "process": [
+            "direct_conversation",
+            "facilitated_mediation",
+            "binding_arbitration"
+        ],
+        "committee_size": 3
+    }
+} 

@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Command-line interface for the ICN Runtime (CoVM V3)"
 
+[lib]
+path = "lib.rs"
+
 [dependencies]
 clap = { workspace = true }
 anyhow = { workspace = true }
