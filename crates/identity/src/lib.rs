@@ -451,6 +451,106 @@ pub async fn sign_credential(vc_data: VerifiableCredential, keypair: &KeyPair) -
     Ok(vc_to_sign)
 }
 
+/// Quorum proof that can be verified
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QuorumProof {
+    /// Signatures collected (Signer DID, Signature over content hash)
+    pub votes: Vec<(IdentityId, Signature)>,
+    
+    /// The quorum configuration that must be met
+    pub config: QuorumConfig,
+}
+
+/// Quorum configuration types
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum QuorumConfig {
+    /// Simple majority
+    Majority,
+    
+    /// Threshold-based (percentage 0-100)
+    Threshold(u8),
+    
+    /// Weighted votes with total required weight
+    Weighted(Vec<(IdentityId, u32)>, u32),
+}
+
+impl QuorumProof {
+    /// Verify that the quorum proof contains sufficient valid signatures according to the config
+    pub async fn verify(&self, content_hash: &[u8]) -> IdentityResult<bool> {
+        let mut valid_signatures = 0u32;
+        let mut weighted_sum = 0u32;
+        let total_votes = self.votes.len() as u32;
+        
+        // Keep track of which DIDs have already provided a valid signature
+        // This helps prevent duplicate signatures from the same DID
+        let mut verified_dids = std::collections::HashSet::new();
+        
+        // Calculate total possible weight for Weighted quorum
+        let _total_possible_weight = match &self.config {
+            QuorumConfig::Weighted(weights, _) => {
+                weights.iter().map(|(_, weight)| *weight).sum()
+            },
+            _ => 0u32
+        };
+        
+        for (signer_did, signature) in &self.votes {
+            // Prevent duplicate signatures from the same DID
+            if verified_dids.contains(&signer_did.0) {
+                continue;
+            }
+            
+            // TODO: Add check: Is signer_did actually an authorized Guardian for this scope?
+            // This requires identity/role lookup
+            
+            match verify_signature(content_hash, signature, signer_did) {
+                Ok(true) => {
+                    valid_signatures += 1;
+                    verified_dids.insert(signer_did.0.clone());
+                    
+                    // Handle weighted logic if applicable
+                    if let QuorumConfig::Weighted(weights, _) = &self.config {
+                        if let Some((_, weight)) = weights.iter().find(|(id, _)| id == signer_did) {
+                            weighted_sum += *weight;
+                        }
+                    }
+                }
+                Ok(false) => {
+                    tracing::warn!("Invalid signature found in quorum proof for DID: {}", signer_did.0);
+                }
+                Err(e) => {
+                    tracing::error!("Error verifying signature for DID {}: {}", signer_did.0, e);
+                    return Err(IdentityError::VerificationError(format!("Signature verification error: {}", e)));
+                }
+            }
+        }
+        
+        // Check against quorum config
+        let result = match &self.config {
+            QuorumConfig::Majority => {
+                // Simple majority of provided votes - must have more than half of valid signatures
+                valid_signatures * 2 > total_votes
+            },
+            QuorumConfig::Threshold(threshold_percentage) => {
+                // Ensure threshold is in valid range (0-100)
+                let percentage = (*threshold_percentage).min(100) as f32 / 100.0;
+                // Calculate the threshold count as a percentage of total votes
+                let threshold_count = (total_votes as f32 * percentage).ceil() as u32;
+                valid_signatures >= threshold_count
+            },
+            QuorumConfig::Weighted(_, required_weight) => {
+                weighted_sum >= *required_weight
+            },
+        };
+        
+        tracing::debug!(
+            "Quorum verification result: {} (valid: {}, total: {}, config: {:?})",
+            result, valid_signatures, total_votes, self.config
+        );
+        
+        Ok(result)
+    }
+}
+
 /// Represents a trust bundle
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TrustBundle {
@@ -466,9 +566,9 @@ pub struct TrustBundle {
     /// The attestations in this trust bundle
     pub attestations: Vec<VerifiableCredential>,
     
-    /// The signature of this trust bundle (optional - for future multi-sig from Guardians)
+    /// The proof of this trust bundle (optional - for quorum validation and signature verification)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature: Option<String>,
+    pub proof: Option<QuorumProof>,
 }
 
 impl TrustBundle {
@@ -484,17 +584,51 @@ impl TrustBundle {
             federation_id,
             dag_roots,
             attestations,
-            signature: None,
+            proof: None,
         }
     }
     
-    /// Verify the trust bundle (stub for future implementation)
-    pub fn verify(&self) -> IdentityResult<bool> {
-        // This is a stub - the actual implementation would:
-        // 1. Verify each attestation
-        // 2. Verify the signature if present
+    /// Calculate a consistent hash for the trust bundle content
+    /// 
+    /// This provides a standardized way to create a hash over the trust bundle content
+    /// for signing and verification purposes.
+    pub fn calculate_hash(&self) -> [u8; 32] {
+        let mut hasher = sha2::Sha256::new();
         
-        // For now, just check basic validity
+        // Ensure we hash all elements in a consistent order
+        // Note: We don't include the proof field in the hash calculation since the proof
+        // is created after the hash and would create a circular dependency
+        
+        // Hash the epoch_id
+        let epoch_bytes = self.epoch_id.to_be_bytes();
+        hasher.update(&epoch_bytes);
+        
+        // Hash the federation_id
+        hasher.update(self.federation_id.as_bytes());
+        
+        // Hash each DAG root CID in order
+        for cid in &self.dag_roots {
+            hasher.update(cid.to_bytes());
+        }
+        
+        // Hash each attestation in order
+        for attestation in &self.attestations {
+            // Serialize the attestation to JSON and hash the resulting bytes
+            if let Ok(att_bytes) = serde_json::to_vec(attestation) {
+                hasher.update(&att_bytes);
+            }
+        }
+        
+        let result = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result);
+        
+        hash
+    }
+    
+    /// Verify the trust bundle
+    pub async fn verify(&self) -> IdentityResult<bool> {
+        // Check basic validity
         if self.federation_id.is_empty() {
             return Err(IdentityError::InvalidCredential("Federation ID is empty".to_string()));
         }
@@ -503,7 +637,33 @@ impl TrustBundle {
             return Err(IdentityError::InvalidCredential("DAG roots are empty".to_string()));
         }
         
-        Ok(true)
+        // Verify each attestation
+        for attestation in &self.attestations {
+            // Skip verification for attestations without proofs for now
+            // In a production system, we might want to require proofs on all attestations
+            if attestation.proof.is_none() {
+                continue;
+            }
+            
+            if !attestation.verify().await? {
+                return Err(IdentityError::InvalidCredential(
+                    format!("Invalid attestation in trust bundle: {}", attestation.id)
+                ));
+            }
+        }
+        
+        // Verify the proof if present
+        if let Some(proof) = &self.proof {
+            // Calculate the hash of the bundle
+            let bundle_hash = self.calculate_hash();
+            
+            // Verify the quorum proof
+            proof.verify(&bundle_hash).await
+        } else {
+            // If we don't have a proof, return true for backward compatibility
+            // but in a production system we would require a proof
+            Ok(true)
+        }
     }
 }
 

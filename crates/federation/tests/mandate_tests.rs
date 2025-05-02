@@ -1,8 +1,10 @@
 use icn_federation::{
-    QuorumProof, QuorumConfig,
-    signing::{self, sign_mandate_hash},
+    signing, GuardianMandate, FederationResult,
 };
-use icn_identity::{IdentityId, IdentityScope, Signature, generate_did_keypair};
+use icn_identity::{
+    IdentityId, KeyPair, IdentityScope, Signature, generate_did_keypair,
+    QuorumProof, QuorumConfig
+};
 use icn_dag::DagNode;
 
 use futures::executor::block_on;
@@ -39,9 +41,9 @@ fn test_quorum_proof_verify_majority() {
         let message = b"Test mandate content";
         
         // Create signatures
-        let sig1 = sign_mandate_hash(message, &keypair1).await.unwrap();
-        let sig2 = sign_mandate_hash(message, &keypair2).await.unwrap();
-        let _sig3 = sign_mandate_hash(message, &keypair3).await.unwrap();
+        let sig1 = signing::sign_mandate_hash(message, &keypair1).await.unwrap();
+        let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
+        let _sig3 = signing::sign_mandate_hash(message, &keypair3).await.unwrap();
         
         // Create a quorum proof with a majority configuration
         let quorum_config = QuorumConfig::Majority;
@@ -96,12 +98,12 @@ fn test_quorum_proof_verify_threshold() {
         let message = b"Test mandate content";
         
         // Create signatures
-        let sig1 = sign_mandate_hash(message, &keypair1).await.unwrap();
-        let sig2 = sign_mandate_hash(message, &keypair2).await.unwrap();
-        let _sig3 = sign_mandate_hash(message, &keypair3).await.unwrap();
+        let sig1 = signing::sign_mandate_hash(message, &keypair1).await.unwrap();
+        let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
+        let _sig3 = signing::sign_mandate_hash(message, &keypair3).await.unwrap();
         
         // Create a quorum proof with a 2/3 threshold configuration
-        let quorum_config = QuorumConfig::Threshold(0.67);
+        let quorum_config = QuorumConfig::Threshold(67);
         
         // Test with threshold met (2 out of 3)
         let votes_threshold_met = vec![
@@ -152,9 +154,9 @@ fn test_quorum_proof_verify_weighted() {
         let message = b"Test mandate content";
         
         // Create signatures
-        let sig1 = sign_mandate_hash(message, &keypair1).await.unwrap();
-        let sig2 = sign_mandate_hash(message, &keypair2).await.unwrap();
-        let sig3 = sign_mandate_hash(message, &keypair3).await.unwrap();
+        let sig1 = signing::sign_mandate_hash(message, &keypair1).await.unwrap();
+        let sig2 = signing::sign_mandate_hash(message, &keypair2).await.unwrap();
+        let sig3 = signing::sign_mandate_hash(message, &keypair3).await.unwrap();
         
         // Create weights: id1=5, id2=3, id3=2, total=10, require 6 for quorum
         let weights = vec![

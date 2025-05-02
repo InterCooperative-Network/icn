@@ -1,9 +1,12 @@
 //! Guardian Mandate signing helpers
 
 use sha2::{Sha256, Digest};
-use icn_identity::{IdentityId, IdentityScope, KeyPair, Signature, IdentityError};
+use icn_identity::{
+    IdentityId, IdentityScope, KeyPair, Signature, IdentityError,
+    QuorumProof, QuorumConfig, TrustBundle
+};
 use icn_dag::DagNode;
-use crate::{GuardianMandate, QuorumProof, QuorumConfig, FederationResult, FederationError};
+use crate::{GuardianMandate, FederationResult, FederationError};
 
 /// Calculate a consistent hash for mandate content.
 ///
@@ -172,4 +175,47 @@ pub async fn create_signed_mandate(
     );
     
     Ok(mandate)
+}
+
+/// Create a signed TrustBundle with a valid QuorumProof.
+///
+/// This function helps create a TrustBundle with a proper QuorumProof for testing
+/// and future logic.
+pub async fn create_signed_trust_bundle(
+    // TrustBundle content
+    bundle: &mut TrustBundle,
+    // Quorum configuration
+    quorum_config: QuorumConfig,
+    // Signing guardians - each tuple represents a guardian's DID and their keypair
+    signing_guardians: &[(IdentityId, KeyPair)],
+) -> FederationResult<()> {
+    // Calculate the bundle hash for signatures
+    let bundle_hash = bundle.calculate_hash();
+    
+    // Collect signatures from guardians
+    let mut votes = Vec::with_capacity(signing_guardians.len());
+    
+    for (guardian_id, keypair) in signing_guardians {
+        match icn_identity::sign_message(&bundle_hash, keypair) {
+            Ok(signature) => {
+                votes.push((guardian_id.clone(), signature));
+            },
+            Err(e) => {
+                return Err(FederationError::InvalidMandate(
+                    format!("Failed to collect signature from guardian {}: {}", guardian_id.0, e)
+                ));
+            }
+        }
+    }
+    
+    // Create the quorum proof
+    let quorum_proof = QuorumProof {
+        votes,
+        config: quorum_config,
+    };
+    
+    // Set the proof on the bundle
+    bundle.proof = Some(quorum_proof);
+    
+    Ok(())
 } 
