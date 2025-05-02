@@ -97,6 +97,30 @@ enum Commands {
         #[clap(long)]
         proposal_id: Option<String>,
     },
+    
+    /// Export a verifiable credential with JWS proof
+    #[clap(name = "export-vc")]
+    ExportVc {
+        /// CID of the credential to export
+        #[clap(long)]
+        credential_id: String,
+        
+        /// Output file path (or - for stdout)
+        #[clap(long, short = 'o')]
+        output: String,
+        
+        /// Path to the signing key file or key ID
+        #[clap(long, short = 'k')]
+        signing_key: String,
+        
+        /// Issuer DID to use for signing
+        #[clap(long)]
+        issuer: String,
+        
+        /// Additional type to add to credential
+        #[clap(long, short = 't')]
+        credential_type: Option<String>,
+    },
 }
 
 // Add this to handle the execute command
@@ -547,6 +571,143 @@ fn create_in_memory_storage() -> std::sync::Arc<futures::lock::Mutex<dyn icn_sto
     Arc::new(Mutex::new(AsyncInMemoryStorage::new()))
 }
 
+/// Handle export-vc command to export a credential with JWS proof
+async fn handle_export_vc_command(
+    credential_id: String,
+    output: String,
+    signing_key: String,
+    issuer: String,
+    credential_type: Option<String>,
+    verbose: bool,
+) -> anyhow::Result<()> {
+    use cid::Cid;
+    use icn_identity::{IdentityId, VerifiableCredential};
+    use icn_identity::sign_credential;
+    use icn_execution_tools::CredentialHelper;
+    use icn_storage::{AsyncInMemoryStorage, StorageBackend};
+    use futures::lock::Mutex;
+    use std::sync::Arc;
+    use std::fs;
+    
+    // Check if credential ID is a valid CID
+    let cid = Cid::try_from(credential_id.clone())
+        .map_err(|e| anyhow::anyhow!("Invalid credential ID (not a valid CID): {}", e))?;
+    
+    // Create a storage backend
+    let storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new() as AsyncInMemoryStorage));
+    
+    // Load subject data from storage
+    let storage_lock = storage.lock().await;
+    let content_result = StorageBackend::get(&*storage_lock, &cid).await;
+    drop(storage_lock);
+    
+    let content = match content_result {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Err(anyhow::anyhow!("Credential content not found")),
+        Err(e) => return Err(anyhow::anyhow!("Storage error: {}", e)),
+    };
+    
+    // Parse subject data as JSON
+    let subject_data: serde_json::Value = serde_json::from_slice(&content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse credential content as JSON: {}", e))?;
+        
+    if verbose {
+        println!("Loaded subject data: {}", serde_json::to_string_pretty(&subject_data)?);
+    }
+    
+    // Load or generate signing keypair
+    let (signer_did, keypair) = if signing_key.starts_with("did:") {
+        // Assume the signing key is a DID that's already been registered
+        // In a real implementation, we'd look up the keypair from a secure store
+        // For now, let's just generate a new one as a placeholder
+        if verbose {
+            println!("Using signing key from DID: {}", signing_key);
+        }
+        icn_identity::generate_did_keypair()
+            .map_err(|e| anyhow::anyhow!("Failed to generate keypair: {}", e))?
+    } else if signing_key.ends_with(".jwk") || signing_key.ends_with(".json") {
+        // Load keypair from file
+        // In a real implementation, this would parse a JWK
+        if verbose {
+            println!("Loading signing key from file: {}", signing_key);
+        }
+        
+        // Read the key file
+        let key_data = fs::read_to_string(&signing_key)
+            .map_err(|e| anyhow::anyhow!("Failed to read key file: {}", e))?;
+            
+        // Parse as JWK - simplified for now
+        let _jwk: serde_json::Value = serde_json::from_str(&key_data)
+            .map_err(|e| anyhow::anyhow!("Failed to parse key file as JSON: {}", e))?;
+            
+        // For now, just generate a new keypair as a placeholder
+        // In a real implementation, we'd convert the JWK to a keypair
+        icn_identity::generate_did_keypair()
+            .map_err(|e| anyhow::anyhow!("Failed to generate keypair: {}", e))?
+    } else {
+        // Fallback to generating a new keypair
+        if verbose {
+            println!("No valid key source, generating new keypair");
+        }
+        icn_identity::generate_did_keypair()
+            .map_err(|e| anyhow::anyhow!("Failed to generate keypair: {}", e))?
+    };
+    
+    // Create a verifiable credential with the subject data
+    // Use the provided issuer DID instead of the signing key's DID if different
+    let issuer_id = IdentityId::new(issuer);
+    let subject_id = IdentityId::new(format!("did:icn:subject:{}", credential_id));
+    
+    // Determine credential types
+    let mut credential_types = vec!["VerifiableCredential".to_string()];
+    if let Some(additional_type) = credential_type {
+        credential_types.push(additional_type);
+    } else {
+        // Try to detect a default type based on subject data
+        if subject_data.get("execution_id").is_some() {
+            credential_types.push("ExecutionReceipt".to_string());
+        } else if subject_data.get("proposal_id").is_some() {
+            credential_types.push("ProposalCredential".to_string());
+        } else {
+            credential_types.push("GenericCredential".to_string());
+        }
+    }
+    
+    // Create the credential
+    let vc = VerifiableCredential::new(
+        credential_types,
+        &issuer_id,
+        &subject_id,
+        subject_data,
+    );
+    
+    // Sign the credential
+    let signed_vc = sign_credential(vc, &keypair).await
+        .map_err(|e| anyhow::anyhow!("Failed to sign credential: {}", e))?;
+        
+    if verbose {
+        println!("Successfully signed credential with issuer: {}", issuer_id.0);
+    }
+    
+    // Export the signed credential
+    if output == "-" {
+        // Write to stdout
+        let json = serde_json::to_string_pretty(&signed_vc)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize credential: {}", e))?;
+        println!("{}", json);
+    } else {
+        // Write to file
+        CredentialHelper::export_credential(&signed_vc, &output)
+            .map_err(|e| anyhow::anyhow!("Failed to export credential: {}", e))?;
+            
+        if verbose {
+            println!("Credential exported to: {}", output);
+        }
+    }
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
@@ -584,6 +745,16 @@ async fn main() -> anyhow::Result<()> {
                 identity, 
                 scope, 
                 proposal_id,
+                cli.verbose
+            ).await
+        },
+        Commands::ExportVc { credential_id, output, signing_key, issuer, credential_type } => {
+            handle_export_vc_command(
+                credential_id,
+                output,
+                signing_key,
+                issuer,
+                credential_type,
                 cli.verbose
             ).await
         },

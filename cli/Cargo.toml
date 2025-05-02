@@ -16,6 +16,7 @@ tokio = { version = "1.28", features = ["full"] }
 cid = { workspace = true }
 futures = { workspace = true }
 uuid = { version = "1.4", features = ["v4", "serde"] }
+serde_json = { workspace = true }
 
 # ICN crates
 icn-core-vm = { path = "../crates/core-vm" }
@@ -23,6 +24,7 @@ icn-governance-kernel = { path = "../crates/governance-kernel" }
 icn-identity = { path = "../crates/identity" }
 icn-storage = { path = "../crates/storage" }
 icn-economics = { path = "../crates/economics" }
+icn-execution-tools = { path = "../crates/execution-tools" }
 
 [[bin]]
 name = "covm"
