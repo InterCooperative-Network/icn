@@ -4,3 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+wallet-core = { path = "../wallet-core" }
+wallet-agent = { path = "../wallet-agent" }
+wallet-sync = { path = "../wallet-sync" }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+thiserror = "1.0"
+axum = "0.6"
+tower-http = { version = "0.4", features = ["cors"] }
+chrono = "0.4"
