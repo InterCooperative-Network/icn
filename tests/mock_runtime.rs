@@ -3,6 +3,15 @@ use std::collections::{HashMap, HashSet};
 use serde_json::{Value, json};
 use uuid::Uuid;
 use anyhow::{Result, anyhow};
+use serde::{Serialize, Deserialize};
+use axum::{
+    routing::{get, post},
+    Router, Json, extract::{Path, State},
+    http::StatusCode,
+};
+use std::net::SocketAddr;
+use chrono::{DateTime, Utc};
+use tower_http::cors::{CorsLayer, Any};
 
 /// Mock implementation of the ICN Runtime for testing
 pub struct MockRuntime {
@@ -185,4 +194,446 @@ impl MockRuntime {
 /// Create a shared instance for testing
 pub fn create_test_runtime() -> Arc<MockRuntime> {
     Arc::new(MockRuntime::new())
+}
+
+// Types for proposal handling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Proposal {
+    pub id: String,
+    pub proposal_type: String,
+    pub content: serde_json::Value,
+    pub status: ProposalStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub votes: HashMap<String, Vote>,
+    pub execution_receipt: Option<ExecutionReceipt>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ProposalStatus {
+    Pending,
+    Voting,
+    Approved,
+    Rejected,
+    Executed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Vote {
+    pub guardian: String,
+    pub decision: VoteDecision,
+    pub reason: Option<String>,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VoteDecision {
+    Approve,
+    Reject,
+    Abstain,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionReceipt {
+    pub success: bool,
+    pub timestamp: DateTime<Utc>,
+    pub executor: String,
+    pub votes: VoteSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoteSummary {
+    pub approve: usize,
+    pub reject: usize,
+    pub abstain: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProposalRequest {
+    pub proposal_type: String,
+    pub content: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoteRequest {
+    pub guardian: String,
+    pub decision: VoteDecision,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionReceiptRequest {
+    pub success: bool,
+    pub executor: String,
+}
+
+// State for our mock runtime
+#[derive(Clone)]
+pub struct AppState {
+    proposals: Arc<Mutex<HashMap<String, Proposal>>>,
+    guardians: Arc<Mutex<Vec<String>>>,
+}
+
+impl AppState {
+    pub fn new() -> Self {
+        let guardians = vec![
+            "did:icn:guardian1".to_string(),
+            "did:icn:guardian2".to_string(),
+            "did:icn:guardian3".to_string(),
+        ];
+        
+        Self {
+            proposals: Arc::new(Mutex::new(HashMap::new())),
+            guardians: Arc::new(Mutex::new(guardians)),
+        }
+    }
+    
+    pub fn add_guardian(&self, did: String) {
+        let mut guardians = self.guardians.lock().unwrap();
+        if !guardians.contains(&did) {
+            guardians.push(did);
+        }
+    }
+}
+
+// API Handlers
+async fn health_check() -> StatusCode {
+    StatusCode::OK
+}
+
+async fn get_proposals(
+    State(state): State<AppState>,
+) -> Json<Vec<Proposal>> {
+    let proposals = state.proposals.lock().unwrap();
+    let result: Vec<Proposal> = proposals.values().cloned().collect();
+    Json(result)
+}
+
+async fn get_proposal(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Proposal>, StatusCode> {
+    let proposals = state.proposals.lock().unwrap();
+    
+    match proposals.get(&id) {
+        Some(proposal) => Ok(Json(proposal.clone())),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+async fn create_proposal(
+    State(state): State<AppState>,
+    Json(request): Json<CreateProposalRequest>,
+) -> Json<Proposal> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now();
+    
+    let proposal = Proposal {
+        id: id.clone(),
+        proposal_type: request.proposal_type,
+        content: request.content,
+        status: ProposalStatus::Pending,
+        created_at: now,
+        updated_at: now,
+        votes: HashMap::new(),
+        execution_receipt: None,
+    };
+    
+    let mut proposals = state.proposals.lock().unwrap();
+    proposals.insert(id, proposal.clone());
+    
+    Json(proposal)
+}
+
+async fn vote_on_proposal(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<VoteRequest>,
+) -> Result<Json<Proposal>, StatusCode> {
+    let mut proposals = state.proposals.lock().unwrap();
+    
+    if let Some(proposal) = proposals.get_mut(&id) {
+        if matches!(proposal.status, ProposalStatus::Pending | ProposalStatus::Voting) {
+            // Update proposal status
+            proposal.status = ProposalStatus::Voting;
+            proposal.updated_at = Utc::now();
+            
+            // Add the vote
+            let vote = Vote {
+                guardian: request.guardian.clone(),
+                decision: request.decision,
+                reason: request.reason,
+                timestamp: Utc::now(),
+            };
+            
+            proposal.votes.insert(request.guardian, vote);
+            
+            // Check if we have all votes
+            let guardians = state.guardians.lock().unwrap();
+            let remaining = guardians.iter()
+                .filter(|g| !proposal.votes.contains_key(g.as_str()))
+                .count();
+                
+            if remaining == 0 {
+                // Count votes
+                let mut approve = 0;
+                let mut reject = 0;
+                let mut abstain = 0;
+                
+                for vote in proposal.votes.values() {
+                    match vote.decision {
+                        VoteDecision::Approve => approve += 1,
+                        VoteDecision::Reject => reject += 1,
+                        VoteDecision::Abstain => abstain += 1,
+                    }
+                }
+                
+                // Decide outcome
+                if approve > reject {
+                    proposal.status = ProposalStatus::Approved;
+                } else {
+                    proposal.status = ProposalStatus::Rejected;
+                }
+            }
+            
+            return Ok(Json(proposal.clone()));
+        } else {
+            return Err(StatusCode::CONFLICT);
+        }
+    }
+    
+    Err(StatusCode::NOT_FOUND)
+}
+
+async fn execute_proposal(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<ExecutionReceiptRequest>,
+) -> Result<Json<Proposal>, StatusCode> {
+    let mut proposals = state.proposals.lock().unwrap();
+    
+    if let Some(proposal) = proposals.get_mut(&id) {
+        if matches!(proposal.status, ProposalStatus::Approved) {
+            proposal.updated_at = Utc::now();
+            
+            // Process votes for receipt
+            let mut approve = 0;
+            let mut reject = 0;
+            let mut abstain = 0;
+            
+            for vote in proposal.votes.values() {
+                match vote.decision {
+                    VoteDecision::Approve => approve += 1,
+                    VoteDecision::Reject => reject += 1,
+                    VoteDecision::Abstain => abstain += 1,
+                }
+            }
+            
+            // Create receipt
+            let receipt = ExecutionReceipt {
+                success: request.success,
+                timestamp: Utc::now(),
+                executor: request.executor,
+                votes: VoteSummary {
+                    approve,
+                    reject,
+                    abstain,
+                },
+            };
+            
+            proposal.execution_receipt = Some(receipt);
+            
+            if request.success {
+                proposal.status = ProposalStatus::Executed;
+            } else {
+                proposal.status = ProposalStatus::Failed;
+            }
+            
+            return Ok(Json(proposal.clone()));
+        } else {
+            return Err(StatusCode::CONFLICT);
+        }
+    }
+    
+    Err(StatusCode::NOT_FOUND)
+}
+
+async fn get_guardians(
+    State(state): State<AppState>,
+) -> Json<Vec<String>> {
+    let guardians = state.guardians.lock().unwrap();
+    Json(guardians.clone())
+}
+
+async fn add_guardian(
+    State(state): State<AppState>,
+    Json(guardian): Json<String>,
+) -> StatusCode {
+    state.add_guardian(guardian);
+    StatusCode::CREATED
+}
+
+// Main function to run the server
+#[tokio::main]
+async fn main() {
+    let state = AppState::new();
+    
+    // Create a test proposal
+    let mut proposals = state.proposals.lock().unwrap();
+    let test_proposal = Proposal {
+        id: "test-proposal-1".to_string(),
+        proposal_type: "ConfigChange".to_string(),
+        content: serde_json::json!({
+            "title": "Increase Voting Period",
+            "description": "Increase the voting period to 14 days",
+            "parameter": "voting_period",
+            "value": "14d"
+        }),
+        status: ProposalStatus::Pending,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        votes: HashMap::new(),
+        execution_receipt: None,
+    };
+    proposals.insert(test_proposal.id.clone(), test_proposal);
+    drop(proposals);
+    
+    // Build our application with routes
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+        
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .route("/api/proposals", get(get_proposals))
+        .route("/api/proposals", post(create_proposal))
+        .route("/api/proposals/:id", get(get_proposal))
+        .route("/api/proposals/:id/vote", post(vote_on_proposal))
+        .route("/api/proposals/:id/execute", post(execute_proposal))
+        .route("/api/guardians", get(get_guardians))
+        .route("/api/guardians", post(add_guardian))
+        .layer(cors)
+        .with_state(state);
+    
+    // Run the server
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8081));
+    println!("Mock Runtime server listening on {}", addr);
+    
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+// For use as a library in tests that don't need the HTTP server
+pub mod mock {
+    use super::*;
+    
+    pub struct MockRuntime {
+        state: AppState,
+    }
+    
+    impl MockRuntime {
+        pub fn new() -> Self {
+            Self {
+                state: AppState::new(),
+            }
+        }
+        
+        pub fn create_proposal(&self, request: CreateProposalRequest) -> Proposal {
+            let id = Uuid::new_v4().to_string();
+            let now = Utc::now();
+            
+            let proposal = Proposal {
+                id: id.clone(),
+                proposal_type: request.proposal_type,
+                content: request.content,
+                status: ProposalStatus::Pending,
+                created_at: now,
+                updated_at: now,
+                votes: HashMap::new(),
+                execution_receipt: None,
+            };
+            
+            let mut proposals = self.state.proposals.lock().unwrap();
+            proposals.insert(id, proposal.clone());
+            
+            proposal
+        }
+        
+        pub fn vote_on_proposal(&self, id: &str, request: VoteRequest) -> Option<Proposal> {
+            let mut proposals = self.state.proposals.lock().unwrap();
+            
+            if let Some(proposal) = proposals.get_mut(id) {
+                if matches!(proposal.status, ProposalStatus::Pending | ProposalStatus::Voting) {
+                    // Update proposal status
+                    proposal.status = ProposalStatus::Voting;
+                    proposal.updated_at = Utc::now();
+                    
+                    // Add the vote
+                    let vote = Vote {
+                        guardian: request.guardian.clone(),
+                        decision: request.decision,
+                        reason: request.reason,
+                        timestamp: Utc::now(),
+                    };
+                    
+                    proposal.votes.insert(request.guardian, vote);
+                    
+                    return Some(proposal.clone());
+                }
+            }
+            
+            None
+        }
+        
+        pub fn execute_proposal(&self, id: &str, request: ExecutionReceiptRequest) -> Option<Proposal> {
+            let mut proposals = self.state.proposals.lock().unwrap();
+            
+            if let Some(proposal) = proposals.get_mut(id) {
+                if matches!(proposal.status, ProposalStatus::Approved) {
+                    proposal.updated_at = Utc::now();
+                    
+                    // Process votes for receipt
+                    let mut approve = 0;
+                    let mut reject = 0;
+                    let mut abstain = 0;
+                    
+                    for vote in proposal.votes.values() {
+                        match vote.decision {
+                            VoteDecision::Approve => approve += 1,
+                            VoteDecision::Reject => reject += 1,
+                            VoteDecision::Abstain => abstain += 1,
+                        }
+                    }
+                    
+                    // Create receipt
+                    let receipt = ExecutionReceipt {
+                        success: request.success,
+                        timestamp: Utc::now(),
+                        executor: request.executor,
+                        votes: VoteSummary {
+                            approve,
+                            reject,
+                            abstain,
+                        },
+                    };
+                    
+                    proposal.execution_receipt = Some(receipt);
+                    
+                    if request.success {
+                        proposal.status = ProposalStatus::Executed;
+                    } else {
+                        proposal.status = ProposalStatus::Failed;
+                    }
+                    
+                    return Some(proposal.clone());
+                }
+            }
+            
+            None
+        }
+    }
 } 

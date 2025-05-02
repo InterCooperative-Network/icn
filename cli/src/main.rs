@@ -16,6 +16,10 @@ struct Cli {
     #[arg(short, long, default_value = "./wallet-data")]
     data_dir: PathBuf,
     
+    /// Output format (plain, json)
+    #[arg(short, long, default_value = "plain")]
+    format: String,
+    
     #[command(subcommand)]
     command: Commands,
 }
@@ -97,6 +101,9 @@ enum Commands {
         #[command(subcommand)]
         command: BundleCommands,
     },
+    
+    /// List all identities
+    List,
 }
 
 #[derive(Subcommand)]
@@ -189,6 +196,8 @@ async fn main() -> Result<()> {
             .context("Failed to create data directory")?;
     }
     
+    let output_json = cli.format.to_lowercase() == "json";
+    
     match &cli.command {
         Commands::Create { scope, metadata } => {
             let scope_enum = match scope.to_lowercase().as_str() {
@@ -223,16 +232,78 @@ async fn main() -> Result<()> {
                 
             std::fs::write(&file_path, serialized)
                 .context("Failed to write identity file")?;
-                
-            println!("Created new identity:");
-            println!("ID: {}", id);
-            println!("DID: {}", did);
-            println!("Scope: {:?}", wallet.scope);
-            println!("Saved to: {}", file_path.display());
             
-            // Pretty print the DID document
-            println!("\nDID Document:");
-            println!("{}", serde_json::to_string_pretty(&document)?);
+            if output_json {
+                // Output as JSON
+                let response = serde_json::json!({
+                    "id": id,
+                    "did": did,
+                    "scope": scope,
+                    "document": document,
+                    "file_path": file_path.to_string_lossy(),
+                });
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            } else {
+                // Output as plain text
+                println!("Created new identity:");
+                println!("ID: {}", id);
+                println!("DID: {}", did);
+                println!("Scope: {:?}", wallet.scope);
+                println!("Saved to: {}", file_path.display());
+                
+                // Pretty print the DID document
+                println!("\nDID Document:");
+                println!("{}", serde_json::to_string_pretty(&document)?);
+            }
+        },
+        
+        Commands::List => {
+            // List all identities in the data_dir/identities folder
+            let identity_dir = cli.data_dir.join("identities");
+            if !identity_dir.exists() {
+                if output_json {
+                    println!("[]");
+                } else {
+                    println!("No identities found.");
+                }
+                return Ok(());
+            }
+            
+            let mut identities = Vec::new();
+            
+            for entry in std::fs::read_dir(&identity_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                    let data = std::fs::read_to_string(&path)?;
+                    let wallet: IdentityWallet = serde_json::from_str(&data)?;
+                    
+                    let file_name = path.file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("unknown");
+                    
+                    let id = file_name.trim_end_matches(".json").to_string();
+                    
+                    if output_json {
+                        identities.push(serde_json::json!({
+                            "id": id,
+                            "did": wallet.did,
+                            "scope": format!("{:?}", wallet.scope),
+                            "metadata": wallet.metadata,
+                        }));
+                    } else {
+                        println!("ID: {}", id);
+                        println!("DID: {}", wallet.did);
+                        println!("Scope: {:?}", wallet.scope);
+                        println!();
+                    }
+                }
+            }
+            
+            if output_json {
+                println!("{}", serde_json::to_string_pretty(&identities)?);
+            }
         },
         
         Commands::Sign { identity, proposal_type, content } => {
@@ -259,9 +330,18 @@ async fn main() -> Result<()> {
             let action_id = guardian.create_proposal(proposal_type, content_value)
                 .context("Failed to create proposal")?;
                 
-            println!("Proposal signed successfully:");
-            println!("Action ID: {}", action_id);
-            println!("Type: {}", proposal_type);
+            if output_json {
+                let response = serde_json::json!({
+                    "action_id": action_id,
+                    "proposal_type": proposal_type,
+                    "signed": true
+                });
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            } else {
+                println!("Proposal signed successfully:");
+                println!("Action ID: {}", action_id);
+                println!("Type: {}", proposal_type);
+            }
         },
         
         Commands::Sync { identity, verbose } => {
@@ -343,17 +423,21 @@ async fn main() -> Result<()> {
                     ).await
                         .context("Failed to fetch threads")?;
                     
-                    println!("Found {} threads:", threads.len());
-                    for (i, thread) in threads.iter().enumerate() {
-                        println!("{}. {} (by {})", i + 1, thread.title, thread.author);
-                        println!("   ID: {}", thread.id);
-                        if let Some(pid) = &thread.proposal_id {
-                            println!("   Proposal: {}", pid);
+                    if output_json {
+                        println!("{}", serde_json::to_string_pretty(&threads)?);
+                    } else {
+                        println!("Found {} threads:", threads.len());
+                        for (i, thread) in threads.iter().enumerate() {
+                            println!("{}. {} (by {})", i + 1, thread.title, thread.author);
+                            println!("   ID: {}", thread.id);
+                            if let Some(pid) = &thread.proposal_id {
+                                println!("   Proposal: {}", pid);
+                            }
+                            println!("   Topic: {}", thread.topic);
+                            println!("   Posts: {}", thread.post_count);
+                            println!("   Created: {}", thread.created_at);
+                            println!();
                         }
-                        println!("   Topic: {}", thread.topic);
-                        println!("   Posts: {}", thread.post_count);
-                        println!("   Created: {}", thread.created_at);
-                        println!();
                     }
                 },
                 
@@ -449,7 +533,7 @@ async fn main() -> Result<()> {
                     let bundles = guardian.list_trust_bundles().await
                         .context("Failed to list bundles")?;
                     
-                    if format == "json" {
+                    if output_json || format == "json" {
                         println!("{}", serde_json::to_string_pretty(&bundles)
                             .context("Failed to serialize bundles")?);
                     } else {

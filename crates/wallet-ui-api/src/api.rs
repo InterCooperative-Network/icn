@@ -32,6 +32,9 @@ impl WalletAPI {
             .allow_headers(Any);
             
         let app = Router::new()
+            // Health check endpoint
+            .route("/api/health", get(handlers::health_check))
+            
             // Identity routes
             .route("/api/did/list", get(handlers::list_identities))
             .route("/api/did/:id", get(handlers::get_identity))
