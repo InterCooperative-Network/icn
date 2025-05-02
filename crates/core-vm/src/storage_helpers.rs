@@ -20,7 +20,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Call the host function to get the value
         let result = {
             // Clone the host environment for use in async context
-            let host_env = caller.data().host.clone();
+            let mut host_env = caller.data_mut().host.clone();
             let cid = cid.clone();
             
             // Execute the async function in a blocking context
@@ -127,7 +127,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Call the host function
         let result = {
             let cid = cid.clone();
-            let host_env = caller.data().host.clone();
+            let mut host_env = caller.data_mut().host.clone();
             
             // Execute the async function in a blocking context
             block_on(async {

@@ -21,8 +21,7 @@ use uuid::Uuid;
 
 // ICN crates
 use icn_identity::{IdentityId, KeyPair, IdentityScope, Signature, verify_signature as identity_verify_signature};
-use icn_storage::{StorageBackend, DistributedStorage};
-use icn_storage::InMemoryBlobStore;
+use icn_storage::{StorageBackend, DistributedStorage, StorageError, StorageResult};
 use icn_economics::{ResourceType, ResourceAuthorization, consume_authorization, validate_authorization_usage};
 
 // Internal modules
@@ -32,6 +31,10 @@ mod storage_helpers;
 mod economics_helpers;
 mod logging_helpers;
 mod dag_helpers;
+
+// Add this after imports, before existing modules
+mod blob_storage;
+use blob_storage::InMemoryBlobStore;
 
 /// Log level for VM execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,7 +86,7 @@ pub type HostResult<T> = Result<T, HostError>;
 #[async_trait]
 pub trait HostEnvironment: Send + Sync {
     // Storage operations
-    async fn storage_get(&self, key: Cid) -> HostResult<Option<Vec<u8>>>;
+    async fn storage_get(&mut self, key: Cid) -> HostResult<Option<Vec<u8>>>;
     async fn storage_put(&mut self, key: Cid, value: Vec<u8>) -> HostResult<()>;
     
     // Blob storage operations
@@ -140,8 +143,8 @@ pub struct VmContext {
     /// Timestamp of this execution
     pub timestamp: i64,
     
-    /// Optional CID of the proposal triggering this execution
-    pub proposal_cid: Option<Cid>,
+    /// Optional CID of the proposal triggering this execution (stored as string)
+    pub proposal_cid: Option<String>,
 }
 
 impl VmContext {
@@ -152,7 +155,7 @@ impl VmContext {
         resource_authorizations: Vec<ResourceType>,
         execution_id: String,
         timestamp: i64,
-        proposal_cid: Option<Cid>,
+        proposal_cid: Option<String>,
     ) -> Self {
         Self {
             caller_did,
@@ -174,7 +177,7 @@ impl VmContext {
         active_authorizations: Vec<ResourceAuthorization>,
         execution_id: String,
         timestamp: i64,
-        proposal_cid: Option<Cid>,
+        proposal_cid: Option<String>,
     ) -> Self {
         Self {
             caller_did,
@@ -344,7 +347,7 @@ impl ConcreteHostEnvironment {
     }
     
     /// Helper to convert storage errors to host errors
-    fn storage_error_to_host_error(e: icn_storage::StorageError) -> HostError {
+    fn storage_error_to_host_error(e: StorageError) -> HostError {
         HostError::StorageError(e.to_string())
     }
     
@@ -372,17 +375,39 @@ impl ConcreteHostEnvironment {
 #[async_trait]
 impl HostEnvironment for ConcreteHostEnvironment {
     // Storage operations
-    async fn storage_get(&self, key: Cid) -> HostResult<Option<Vec<u8>>> {
+    async fn storage_get(&mut self, key: Cid) -> HostResult<Option<Vec<u8>>> {
         // Track resource usage
         self.record_resource_usage(ResourceType::Storage, 1000)?;
         
-        // Acquire a lock on storage
-        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Convert to storage CID type
+        let storage_cid = convert_to_storage_cid(&key)
+            .map_err(|e| HostError::StorageError(e))?;
         
-        // Call the storage backend
-        storage.get(&key)
-            .await
-            .map_err(Self::storage_error_to_host_error)
+        // Clone the storage to avoid holding the lock across await points
+        let storage_clone = self.storage.clone();
+        
+        // Using futures::executor::block_on for synchronous operations
+        let maybe_data = futures::executor::block_on(async move {
+            // Acquire lock
+            let guard = match storage_clone.lock() {
+                Ok(guard) => guard,
+                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
+            };
+            
+            // Call get() which returns a future
+            let data_result = match guard.get(&storage_cid).await {
+                Ok(data) => data,
+                Err(e) => return Err(HostError::StorageError(e.to_string())),
+            };
+            
+            // Clone the data while we still have the lock
+            let cloned_data = data_result.map(|data| data.clone());
+            
+            // Return result
+            Ok::<Option<Vec<u8>>, HostError>(cloned_data)
+        })?;
+        
+        Ok(maybe_data)
     }
     
     async fn storage_put(&mut self, _key: Cid, value: Vec<u8>) -> HostResult<()> {
@@ -390,15 +415,24 @@ impl HostEnvironment for ConcreteHostEnvironment {
         let storage_cost = (value.len() as u64).max(1000);
         self.record_resource_usage(ResourceType::Storage, storage_cost)?;
         
-        // Acquire a lock on storage
-        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Clone necessary data to avoid holding references across await points
+        let storage_clone = self.storage.clone();
+        let value_clone = value.clone();
         
-        // Call the storage backend
-        storage.put(&value)
-            .await
-            .map_err(Self::storage_error_to_host_error)?;
+        // Using futures::executor::block_on for synchronous operations
+        futures::executor::block_on(async move {
+            // Acquire lock
+            let guard = match storage_clone.lock() {
+                Ok(guard) => guard,
+                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
+            };
             
-        Ok(())
+            // Call put() which returns a future
+            match guard.put(&value_clone).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(HostError::StorageError(e.to_string())),
+            }
+        })
     }
     
     // Blob storage operations
@@ -407,17 +441,44 @@ impl HostEnvironment for ConcreteHostEnvironment {
         let storage_cost = (content.len() as u64).max(1000);
         self.record_resource_usage(ResourceType::Storage, storage_cost)?;
         
-        // Store the blob and get the CID
-        self.blob_storage.put_blob(&content)
-            .await
-            .map_err(Self::storage_error_to_host_error)
+        // Clone necessary data
+        let blob_storage = self.blob_storage.clone();
+        let content_clone = content.clone();
+        
+        // Use try-catch pattern to handle errors
+        let result = async move {
+            // Call the storage's put_blob method
+            let storage_cid = blob_storage.put_blob(&content_clone)
+                .await
+                .map_err(|e| HostError::StorageError(e.to_string()))?;
+            
+            // Convert the storage CID to our CID type
+            convert_from_storage_cid(&storage_cid)
+                .map_err(|e| HostError::StorageError(e))
+        };
+        
+        // Wait for the async block to complete
+        result.await
     }
     
     async fn blob_get(&self, cid: Cid) -> HostResult<Option<Vec<u8>>> {
-        // Use the distributed blob storage
-        self.blob_storage.get_blob(&cid)
-            .await
-            .map_err(Self::storage_error_to_host_error)
+        // Convert to storage CID type
+        let storage_cid = convert_to_storage_cid(&cid)
+            .map_err(|e| HostError::StorageError(e))?;
+        
+        // Clone necessary data
+        let blob_storage = self.blob_storage.clone();
+        
+        // Use try-catch pattern to handle errors
+        let result = async move {
+            // Call the storage's get_blob method
+            blob_storage.get_blob(&storage_cid)
+                .await
+                .map_err(|e| HostError::StorageError(e.to_string()))
+        };
+        
+        // Wait for the async block to complete
+        result.await
     }
     
     // Identity operations
@@ -530,77 +591,83 @@ impl HostEnvironment for ConcreteHostEnvironment {
     // Budgeting operations
     async fn budget_allocate(&mut self, budget_id: &str, amount: u64, resource: ResourceType) -> HostResult<()> {
         // Track storage resource usage for loading/saving budget state
-        self.record_resource_usage(ResourceType::Storage, 1000)?; // Approximate cost
+        self.record_resource_usage(ResourceType::Storage, 1000)?;
         
-        // Get a lock on the storage backend
-        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Clone necessary data
+        let budget_id = budget_id.to_string();
+        let resource_clone = resource.clone();
         
-        // Call the economics budget_ops function using the BudgetStorage trait
-        // which is implemented for StorageBackend
+        // Create the adapter with cloned storage
+        let mut adapter = StorageBudgetAdapter {
+            storage_backend: self.storage.clone()
+        };
+        
+        // Call the economics function
         icn_economics::budget_ops::allocate_to_budget(
-            budget_id, 
-            resource.clone(), 
-            amount, 
-            &mut &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
-        ).await.map_err(Self::economics_error_to_host_error)?;
-        
-        // Log the operation
-        debug!(
-            "Budget allocation: budget_id={}, amount={}, resource={:?}",
-            budget_id, amount, resource
-        );
-        
-        Ok(())
+            &budget_id,
+            resource_clone,
+            amount,
+            &mut adapter
+        )
+        .await
+        .map_err(|e| HostError::EconomicsError(e.to_string()))
     }
     
     async fn propose_budget_spend(&mut self, budget_id: &str, title: &str, description: &str, 
                                   requested_resources: HashMap<ResourceType, u64>, 
                                   category: Option<String>) -> HostResult<Uuid> {
         // Track storage resource usage for loading/saving budget state
-        self.record_resource_usage(ResourceType::Storage, 2000)?; // Approximate cost
+        self.record_resource_usage(ResourceType::Storage, 2000)?;
         
         // Get caller DID for proposer identity
         let proposer_did = self.get_caller_did()?;
         
-        // Get a lock on the storage backend
-        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Clone necessary data for the async boundary
+        let budget_id = budget_id.to_string();
+        let title = title.to_string();
+        let description = description.to_string();
+        let requested_resources = requested_resources.clone();
+        let category = category.clone();
+        let proposer_did = proposer_did.clone();
         
-        // Call the economics budget_ops function
-        let proposal_id = icn_economics::budget_ops::propose_budget_spend(
-            budget_id,
-            title,
-            description,
-            requested_resources.clone(),
+        // Create the adapter with cloned storage
+        let mut adapter = StorageBudgetAdapter {
+            storage_backend: self.storage.clone()
+        };
+        
+        // Call the economics function
+        icn_economics::budget_ops::propose_budget_spend(
+            &budget_id,
+            &title,
+            &description,
+            requested_resources,
             &proposer_did,
-            category.clone(),
+            category,
             None, // No additional metadata for now
-            &mut &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
-        ).await.map_err(Self::economics_error_to_host_error)?;
-        
-        // Log the operation
-        debug!(
-            "Budget proposal created: budget_id={}, proposer={}, proposal_id={}",
-            budget_id, proposer_did, proposal_id
-        );
-        
-        Ok(proposal_id)
+            &mut adapter
+        )
+        .await
+        .map_err(|e| HostError::EconomicsError(e.to_string()))
     }
     
     async fn query_budget_balance(&self, budget_id: &str, resource: ResourceType) -> HostResult<u64> {
-        // Track storage resource usage for loading budget state
-        self.record_resource_usage(ResourceType::Storage, 500)?; // Approximate cost
+        // Clone necessary data for the async boundary
+        let budget_id = budget_id.to_string();
+        let resource_clone = resource.clone();
         
-        // Get a lock on the storage backend
-        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Create the adapter with cloned storage
+        let adapter = StorageBudgetAdapterRef {
+            storage_backend: self.storage.clone()
+        };
         
-        // Call the economics budget_ops function
-        let balance = icn_economics::budget_ops::query_budget_balance(
-            budget_id,
-            &resource,
-            &&*storage as &dyn icn_economics::budget_ops::BudgetStorage
-        ).await.map_err(Self::economics_error_to_host_error)?;
-        
-        Ok(balance)
+        // Call the economics function
+        icn_economics::budget_ops::query_budget_balance(
+            &budget_id,
+            &resource_clone,
+            &adapter
+        )
+        .await
+        .map_err(|e| HostError::EconomicsError(e.to_string()))
     }
     
     async fn record_budget_vote(&mut self, budget_id: &str, proposal_id: Uuid, vote: icn_economics::VoteChoice) -> HostResult<()> {
@@ -610,53 +677,69 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // Get caller DID for the voter
         let voter_did = self.vm_context.caller_did.to_string();
         
-        // Acquire a lock on storage
-        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Clone necessary data for the async boundary
+        let budget_id = budget_id.to_string();
+        let proposal_id = proposal_id;
+        let vote = vote;
         
-        // Call the budget_ops function
+        // Create the adapter with cloned storage
+        let mut adapter = StorageBudgetAdapter {
+            storage_backend: self.storage.clone()
+        };
+        
+        // Call the economics function
         icn_economics::budget_ops::record_budget_vote(
-            budget_id, 
+            &budget_id, 
             proposal_id, 
             &voter_did, 
             vote, 
-            &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
-        ).await.map_err(Self::economics_error_to_host_error)?;
-        
-        Ok(())
+            &mut adapter
+        )
+        .await
+        .map_err(|e| HostError::EconomicsError(e.to_string()))
     }
     
     async fn tally_budget_votes(&self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus> {
-        // Track resource usage
-        self.record_resource_usage(ResourceType::Compute, 1000)?;
+        // Clone necessary data for the async boundary
+        let budget_id = budget_id.to_string();
+        let proposal_id = proposal_id;
         
-        // Acquire a lock on storage
-        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Create the adapter with cloned storage
+        let adapter = StorageBudgetAdapterRef {
+            storage_backend: self.storage.clone()
+        };
         
-        // Call the budget_ops function
-        let status = icn_economics::budget_ops::tally_budget_votes(
-            budget_id, 
+        // Call the economics function
+        icn_economics::budget_ops::tally_budget_votes(
+            &budget_id, 
             proposal_id, 
-            &&*storage as &dyn icn_economics::budget_ops::BudgetStorage
-        ).await.map_err(Self::economics_error_to_host_error)?;
-        
-        Ok(status)
+            &adapter
+        )
+        .await
+        .map_err(|e| HostError::EconomicsError(e.to_string()))
     }
     
     async fn finalize_budget_proposal(&mut self, budget_id: &str, proposal_id: Uuid) -> HostResult<icn_economics::ProposalStatus> {
         // Track resource usage
         self.record_resource_usage(ResourceType::Compute, 1000)?;
         
-        // Acquire a lock on storage
-        let mut storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Clone necessary data for the async boundary
+        let budget_id = budget_id.to_string();
+        let proposal_id = proposal_id;
         
-        // Call the budget_ops function
-        let status = icn_economics::budget_ops::finalize_budget_proposal(
-            budget_id, 
+        // Create the adapter with cloned storage
+        let mut adapter = StorageBudgetAdapter {
+            storage_backend: self.storage.clone()
+        };
+        
+        // Call the economics function
+        icn_economics::budget_ops::finalize_budget_proposal(
+            &budget_id, 
             proposal_id, 
-            &mut *storage as &mut dyn icn_economics::budget_ops::BudgetStorage
-        ).await.map_err(Self::economics_error_to_host_error)?;
-        
-        Ok(status)
+            &mut adapter
+        )
+        .await
+        .map_err(|e| HostError::EconomicsError(e.to_string()))
     }
     
     // DAG operations
@@ -673,14 +756,25 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // Track the storage resource usage
         self.record_resource_usage(ResourceType::Storage, content_size)?;
         
-        // Acquire a lock on storage
-        let storage = self.storage.lock().map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+        // Clone necessary data to avoid holding references across await points
+        let storage_clone = self.storage.clone();
+        let content_clone = content.clone();
         
-        // Call the storage backend
-        storage.put(&content)
-            .await
-            .map_err(Self::storage_error_to_host_error)?;
+        // Using futures::executor::block_on for synchronous operations
+        let result = futures::executor::block_on(async move {
+            // Acquire lock
+            let guard = match storage_clone.lock() {
+                Ok(guard) => guard,
+                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
+            };
             
+            // Call put() which returns a future
+            match guard.put(&content_clone).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(HostError::StorageError(e.to_string())),
+            }
+        })?;
+        
         // Log the DAG operation
         debug!(
             "DAG anchor operation: content_len={}, parents_count={}, cid={}",
@@ -742,9 +836,8 @@ pub async fn execute_wasm(
     config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
     
-    // Set up fuel for metering
+    // Enable fuel consumption for metering
     config.consume_fuel(true);
-    
     let engine = Engine::new(&config)
         .map_err(|e| VmError::InternalError(format!("Failed to create engine: {}", e)))?;
     
@@ -757,10 +850,12 @@ pub async fn execute_wasm(
         }
     );
     
-    // Allocate fuel for execution based on compute authorization or default
+    // Set fuel consumption limit based on compute authorization or default
     let compute_limit = ctx.find_authorization(&ResourceType::Compute)
         .map(|auth| auth.remaining_amount())
         .unwrap_or(1_000_000);
+    
+    // Add fuel to the store - for wasmtime 12.0
     store.add_fuel(compute_limit)
         .map_err(|e| VmError::InternalError(format!("Failed to add fuel: {}", e)))?;
     
@@ -859,6 +954,7 @@ pub async fn execute_wasm(
     };
     
     // Calculate resources consumed from fuel usage
+    // In wasmtime 12.0, fuel_consumed() returns Option<u64>
     let consumed_fuel = store.fuel_consumed().unwrap_or(0);
     
     // Get the data from the store
@@ -1935,3 +2031,79 @@ pub mod tests {
 // WASM integration tests
 #[cfg(test)]
 mod wasm_tests; 
+
+/// Wrapper to adapt StorageBackend to BudgetStorage (mutable variant)
+#[derive(Clone)]
+struct StorageBudgetAdapter {
+    storage_backend: Arc<Mutex<dyn StorageBackend + Send + Sync>>
+}
+
+/// Wrapper to adapt StorageBackend to BudgetStorage (immutable variant)
+#[derive(Clone)]
+struct StorageBudgetAdapterRef {
+    storage_backend: Arc<Mutex<dyn StorageBackend + Send + Sync>>
+}
+
+#[async_trait]
+impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapter {
+    async fn store_budget(&mut self, _key: &str, data: Vec<u8>) -> icn_economics::EconomicsResult<()> {
+        // Clone the data to avoid holding references across await points
+        let storage_clone = self.storage_backend.clone();
+        let data_clone = data.clone();
+        
+        // Using futures::executor::block_on for synchronous operations
+        futures::executor::block_on(async move {
+            // Acquire lock
+            let guard = match storage_clone.lock() {
+                Ok(guard) => guard,
+                Err(e) => return Err(icn_economics::EconomicsError::InvalidBudget(
+                    format!("Failed to lock storage: {}", e)
+                )),
+            };
+            
+            // Call put() which returns a future
+            match guard.put(&data_clone).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(icn_economics::EconomicsError::InvalidBudget(
+                    format!("Storage error: {}", e)
+                )),
+            }
+        })
+    }
+    
+    async fn get_budget(&self, _key: &str) -> icn_economics::EconomicsResult<Option<Vec<u8>>> {
+        // This is a simplification - in a real implementation, we would:
+        // 1. Look up a mapping from key -> CID 
+        // 2. Then use that CID to get the actual data
+
+        // For now, just return None as per the original implementation
+        // In actual production code, we'd need to implement the key->CID mapping
+        Ok(None)
+    }
+}
+
+#[async_trait]
+impl icn_economics::budget_ops::BudgetStorage for StorageBudgetAdapterRef {
+    async fn store_budget(&mut self, _key: &str, _data: Vec<u8>) -> icn_economics::EconomicsResult<()> {
+        // Immutable adapter can't store anything - should never be called
+        Err(icn_economics::EconomicsError::Unauthorized("Cannot store in immutable storage".to_string()))
+    }
+    
+    async fn get_budget(&self, _key: &str) -> icn_economics::EconomicsResult<Option<Vec<u8>>> {
+        // This is a simplification similar to the one in BudgetStorage impl for StorageBackend
+        // Just returning None as in the original code - mock implementations will handle this differently
+        Ok(None)
+    }
+}
+
+/// Helper function to convert between core-vm CID and storage CID format
+fn convert_to_storage_cid(cid: &cid::Cid) -> Result<cid::Cid, String> {
+    // The CID format is the same, just return a clone
+    Ok(cid.clone())
+}
+
+/// Helper function to convert from storage CID to core-vm CID
+fn convert_from_storage_cid(storage_cid: &cid::Cid) -> Result<cid::Cid, String> {
+    // The CID format is the same, just return a clone
+    Ok(storage_cid.clone())
+}
