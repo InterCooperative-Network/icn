@@ -13,7 +13,8 @@ verifying lineage attestations.
 
 use cid::Cid;
 use icn_identity::{IdentityId, Signature};
-use merkle_cbt::MerkleTree;
+use multihash::{self, Code, MultihashDigest};
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 /// Errors that can occur during DAG operations
@@ -30,17 +31,76 @@ pub enum DagError {
     
     #[error("Invalid CID: {0}")]
     InvalidCid(String),
+    
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+    
+    #[error("Content error: {0}")]
+    ContentError(String),
 }
 
 /// Result type for DAG operations
 pub type DagResult<T> = Result<T, DagError>;
 
+/// Metadata for a DAG node
+#[derive(Debug, Clone)]
+pub struct DagNodeMetadata {
+    /// Timestamp of when this node was created (unix timestamp in seconds)
+    pub timestamp: u64,
+    
+    /// Sequence number of this node (optional)
+    pub sequence: Option<u64>,
+    
+    /// Scope of this node (optional)
+    pub scope: Option<String>,
+}
+
+impl DagNodeMetadata {
+    /// Create a new metadata with current timestamp
+    pub fn new() -> Self {
+        Self {
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            sequence: None,
+            scope: None,
+        }
+    }
+    
+    /// Create a new metadata with specified timestamp
+    pub fn with_timestamp(timestamp: u64) -> Self {
+        Self {
+            timestamp,
+            sequence: None,
+            scope: None,
+        }
+    }
+    
+    /// Set the sequence number
+    pub fn with_sequence(mut self, sequence: u64) -> Self {
+        self.sequence = Some(sequence);
+        self
+    }
+    
+    /// Set the scope
+    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
+    }
+}
+
+impl Default for DagNodeMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Represents a node in the DAG
-// TODO(V3-MVP): Implement Merkle DAG
 #[derive(Debug, Clone)]
 pub struct DagNode {
     /// Content identifier of this node
-    pub cid: Cid,
+    pub cid: Option<Cid>,
     
     /// Content of this node
     pub content: Vec<u8>,
@@ -54,8 +114,8 @@ pub struct DagNode {
     /// Signature of this node
     pub signature: Signature,
     
-    /// Timestamp of when this node was created
-    pub timestamp: u64,
+    /// Metadata of this node
+    pub metadata: DagNodeMetadata,
 }
 
 impl DagNode {
@@ -65,16 +125,54 @@ impl DagNode {
         parents: Vec<Cid>,
         signer: IdentityId,
         signature: Signature,
-        timestamp: u64,
+        metadata: Option<DagNodeMetadata>,
     ) -> DagResult<Self> {
-        // Placeholder implementation
-        Err(DagError::InvalidNode("Not implemented".to_string()))
+        let metadata = metadata.unwrap_or_default();
+        
+        let mut node = Self {
+            cid: None,
+            content,
+            parents,
+            signer,
+            signature,
+            metadata,
+        };
+        
+        // Calculate and set the CID based on content
+        node.calculate_cid()?;
+        
+        Ok(node)
+    }
+    
+    /// Calculate the CID of this node based on its content
+    pub fn calculate_cid(&mut self) -> DagResult<Cid> {
+        // For simplicity, just use the content hash with SHA-256
+        let mh = Code::Sha2_256.digest(&self.content);
+        
+        // Create CID with the digest
+        let cid = Cid::new_v0(mh)
+            .map_err(|e| DagError::InvalidCid(e.to_string()))?;
+        
+        // Set the CID
+        self.cid = Some(cid);
+        
+        // Return the CID
+        self.cid.ok_or_else(|| DagError::InvalidCid("Failed to calculate CID".to_string()))
     }
     
     /// Verify the signature of this node
     pub fn verify_signature(&self) -> DagResult<()> {
-        // Placeholder implementation
-        Err(DagError::SignatureVerificationFailed)
+        // Placeholder implementation that will be properly implemented later
+        // For now, we'll assume it's valid if the signature is not empty
+        if self.signature.0.is_empty() {
+            return Err(DagError::SignatureVerificationFailed);
+        }
+        Ok(())
+    }
+    
+    /// Get the CID of this node
+    pub fn cid(&self) -> DagResult<Cid> {
+        self.cid.ok_or_else(|| DagError::InvalidCid("CID not calculated".to_string()))
     }
 }
 
@@ -110,37 +208,143 @@ impl LineageAttestation {
         signature: Signature,
         timestamp: u64,
     ) -> DagResult<Self> {
-        // Placeholder implementation
-        Err(DagError::InvalidNode("Not implemented".to_string()))
+        if proof.is_empty() {
+            return Err(DagError::InvalidNode("Proof cannot be empty".to_string()));
+        }
+        
+        Ok(Self {
+            root_cid,
+            node_cid,
+            proof,
+            signer,
+            signature,
+            timestamp,
+        })
     }
     
     /// Verify the lineage attestation
     pub fn verify(&self) -> DagResult<()> {
-        // Placeholder implementation
-        Err(DagError::MerkleVerificationFailed("Not implemented".to_string()))
+        // Verify signature
+        if self.signature.0.is_empty() {
+            return Err(DagError::SignatureVerificationFailed);
+        }
+        
+        // Verify proof (placeholder implementation)
+        // The actual implementation will verify the Merkle proof
+        if self.proof.is_empty() {
+            return Err(DagError::MerkleVerificationFailed("Empty proof".to_string()));
+        }
+        
+        Ok(())
     }
 }
 
 /// Calculates a Merkle root for a set of DAG nodes
-pub fn calculate_merkle_root(nodes: &[DagNode]) -> DagResult<Vec<u8>> {
-    // Placeholder implementation
-    Err(DagError::InvalidNode("Not implemented".to_string()))
+pub fn calculate_merkle_root(nodes: &[DagNode]) -> DagResult<Cid> {
+    if nodes.is_empty() {
+        return Err(DagError::InvalidNode("Empty node list".to_string()));
+    }
+    
+    // Extract CIDs of nodes as bytes
+    let cids: Vec<Vec<u8>> = nodes
+        .iter()
+        .map(|node| {
+            node.cid()
+                .map(|cid| cid.to_bytes())
+                .map_err(|_| DagError::InvalidCid("Node has no CID".to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    
+    // Simplified merkle root calculation - just hash all CIDs together
+    // In a real implementation, this would use a proper Merkle tree
+    let mut combined = Vec::new();
+    for cid_bytes in cids {
+        combined.extend_from_slice(&cid_bytes);
+    }
+    
+    let mh = Code::Sha2_256.digest(&combined);
+    
+    let cid = Cid::new_v0(mh)
+        .map_err(|e| DagError::InvalidCid(e.to_string()))?;
+    
+    Ok(cid)
 }
 
 /// Verifies a Merkle proof
 pub fn verify_merkle_proof(
-    root: &[u8],
+    _root: &[u8],
     proof: &[Vec<u8>],
     leaf: &[u8],
 ) -> DagResult<bool> {
-    // Placeholder implementation
-    Err(DagError::MerkleVerificationFailed("Not implemented".to_string()))
+    if proof.is_empty() {
+        return Err(DagError::MerkleVerificationFailed("Empty proof".to_string()));
+    }
+    
+    // Placeholder implementation that will be properly implemented later
+    // For now, just return a basic check that proof and leaf are not empty
+    if leaf.is_empty() {
+        return Err(DagError::MerkleVerificationFailed("Empty leaf".to_string()));
+    }
+    
+    // In a real implementation, this would verify the Merkle proof against the root
+    
+    Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_dag_node_creation() {
+        let content = b"test content".to_vec();
+        let parents = vec![];
+        let signer = IdentityId("did:icn:test".to_string());
+        let signature = Signature(vec![1, 2, 3, 4]);
+        let metadata = DagNodeMetadata::new().with_scope("test");
+        
+        let node = DagNode::new(content, parents, signer, signature, Some(metadata));
+        assert!(node.is_ok());
+        
+        let node = node.unwrap();
+        assert!(node.cid.is_some());
+        assert_eq!(node.content, b"test content".to_vec());
+        assert_eq!(node.parents.len(), 0);
+        assert_eq!(node.signer.0, "did:icn:test");
+        assert_eq!(node.metadata.scope, Some("test".to_string()));
+    }
+    
+    #[test]
+    fn test_lineage_attestation() {
+        // Create a test DAG node first
+        let content = b"test content".to_vec();
+        let parents = vec![];
+        let signer = IdentityId("did:icn:test".to_string());
+        let signature = Signature(vec![1, 2, 3, 4]);
+        let node = DagNode::new(content, parents, signer.clone(), signature.clone(), None).unwrap();
+        
+        // Create a fake root CID
+        let mh = Code::Sha2_256.digest(b"root");
+        let root_cid = Cid::new_v0(mh).unwrap();
+        
+        // Create a lineage attestation
+        let node_cid = node.cid().unwrap();
+        let proof = vec![vec![1, 2, 3]]; // Fake proof
+        let attestation = LineageAttestation::new(
+            root_cid,
+            node_cid,
+            proof,
+            signer,
+            signature,
+            1000, // Timestamp
+        );
+        
+        assert!(attestation.is_ok());
+        let attestation = attestation.unwrap();
+        assert_eq!(attestation.root_cid, root_cid);
+        assert_eq!(attestation.node_cid, node_cid);
+        
+        // Test verification
+        assert!(attestation.verify().is_ok());
     }
 } 

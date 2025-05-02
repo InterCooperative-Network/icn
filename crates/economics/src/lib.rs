@@ -13,6 +13,7 @@ metering logic, treasury operations, and budgeting primitives.
 
 use icn_dag::DagNode;
 use icn_identity::{IdentityId, IdentityScope, Signature};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors that can occur during economic operations
@@ -35,7 +36,7 @@ pub enum EconomicsError {
 pub type EconomicsResult<T> = Result<T, EconomicsError>;
 
 /// Types of resources
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceType {
     Compute,
     Storage,

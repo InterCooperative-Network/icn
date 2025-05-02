@@ -11,7 +11,7 @@ enabling declarative rules to be compiled into executable WASM modules.
 - Governance is expressed through declarative rules, compiled to .dsl (WASM) for execution
 */
 
-use icn_core_vm::VmResult;
+use icn_core_vm::HostResult;
 use icn_identity::IdentityScope;
 use thiserror::Error;
 

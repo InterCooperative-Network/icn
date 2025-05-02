@@ -7,8 +7,9 @@ description = "DAG objects, Merkle anchoring, and Lineage for the ICN Runtime"
 [dependencies]
 icn-identity = { path = "../identity" }
 merkle-cbt = { workspace = true }
-multihash = { workspace = true }
+multihash = { version = "0.16.3", features = ["sha2"] }
 cid = { workspace = true }
+libipld-core = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }

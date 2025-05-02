@@ -5,9 +5,23 @@ edition = "2021"
 description = "DIDs, VCs, TrustBundles, Anchors, and ZK for the ICN Runtime"
 
 [dependencies]
-did-method-key = { workspace = true }
+# Use workspace dependencies where available
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true } 
+async-trait = { workspace = true }
+cid = { workspace = true, features = ["serde-codec"] }
+multihash = { workspace = true }
+
+# Other required dependencies
+did-method-key = "0.2"
+rand = "0.8"
+sha2 = "0.10"
+uuid = { version = "1.4", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+bs58 = "0.4"
+
+# W3C DID/VC standards - simplify for now as we're implementing our own
+# ssi = { version = "0.6", features = ["vc", "jwk", "did"] } 

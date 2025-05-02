@@ -5,10 +5,21 @@ edition = "2021"
 description = "WASM execution engine for the ICN Runtime (CoVM V3)"
 
 [dependencies]
-wasmer = { workspace = true }
-wasmer-wasi = { workspace = true }
+wasmtime = { version = "12.0.1", features = ["async"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true } 
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true }
+tokio = { version = "1.28", features = ["rt", "macros"] }
+
+# ICN crates
+icn-identity = { path = "../identity" }
+icn-storage = { path = "../storage" }
+icn-economics = { path = "../economics" }
+icn-dag = { path = "../dag" }
+
+[dev-dependencies]
+tokio = { version = "1.28", features = ["rt", "macros", "rt-multi-thread"] } 
