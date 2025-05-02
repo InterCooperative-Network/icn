@@ -96,7 +96,7 @@ pub struct IcnFederationBehaviour {
     
     /// Blob fetch request/response protocol
     #[behaviour(event_process = false)]
-    pub blob_fetch_protocol: request_response::cbor::Behaviour<FetchBlobRequest, FetchBlobResponse>,
+    pub blob_fetch: request_response::cbor::Behaviour<FetchBlobRequest, FetchBlobResponse>,
 }
 
 /// Creates a new instance of IcnFederationBehaviour
@@ -146,7 +146,7 @@ pub fn create_behaviour(
     );
     
     // Create Blob Fetch request/response behavior
-    let blob_fetch_protocol = request_response::cbor::Behaviour::<FetchBlobRequest, FetchBlobResponse>::new(
+    let blob_fetch = request_response::cbor::Behaviour::<FetchBlobRequest, FetchBlobResponse>::new(
         [(BLOB_FETCH_PROTOCOL_ID, request_response::ProtocolSupport::Full)],
         request_response::Config::default().with_request_timeout(BLOB_FETCH_TIMEOUT),
     );
@@ -158,6 +158,6 @@ pub fn create_behaviour(
         identify,
         trust_bundle_sync,
         blob_replication,
-        blob_fetch_protocol,
+        blob_fetch,
     })
 } 

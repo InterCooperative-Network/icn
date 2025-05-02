@@ -732,7 +732,7 @@ async fn handle_behavior_event(
                                 
                                 // Send the fetch request to the provider
                                 let request_id = swarm.behaviour_mut()
-                                    .blob_fetch_protocol
+                                    .blob_fetch
                                     .send_request(&provider_peer_id, fetch_request);
                                 
                                 // Store the request ID along with the original CID and response channel
@@ -953,7 +953,7 @@ async fn handle_behavior_event(
         },
         
         // Handle blob fetch requests
-        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::Message { 
+        network::IcnFederationBehaviourEvent::BlobFetch(request_response::Event::Message { 
             peer, 
             message: request_response::Message::Request { request, channel, .. },
             ..
@@ -971,7 +971,7 @@ async fn handle_behavior_event(
                         error_msg: None,
                     };
                     
-                    if let Err(e) = swarm.behaviour_mut().blob_fetch_protocol.send_response(channel, response) {
+                    if let Err(e) = swarm.behaviour_mut().blob_fetch.send_response(channel, response) {
                         error!(cid = %request.cid, "Failed to send blob fetch response: {:?}", e);
                     }
                 },
@@ -984,7 +984,7 @@ async fn handle_behavior_event(
                         error_msg: Some("Blob not found in local storage".to_string()),
                     };
                     
-                    if let Err(e) = swarm.behaviour_mut().blob_fetch_protocol.send_response(channel, response) {
+                    if let Err(e) = swarm.behaviour_mut().blob_fetch.send_response(channel, response) {
                         error!(cid = %request.cid, "Failed to send blob fetch response: {:?}", e);
                     }
                 },
@@ -997,7 +997,7 @@ async fn handle_behavior_event(
                         error_msg: Some(format!("Error retrieving blob: {}", e)),
                     };
                     
-                    if let Err(e) = swarm.behaviour_mut().blob_fetch_protocol.send_response(channel, response) {
+                    if let Err(e) = swarm.behaviour_mut().blob_fetch.send_response(channel, response) {
                         error!(cid = %request.cid, "Failed to send blob fetch response: {:?}", e);
                     }
                 }
@@ -1005,7 +1005,7 @@ async fn handle_behavior_event(
         },
         
         // Handle blob fetch responses
-        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::Message { 
+        network::IcnFederationBehaviourEvent::BlobFetch(request_response::Event::Message { 
             peer, 
             message: request_response::Message::Response { request_id, response },
             ..
@@ -1139,7 +1139,7 @@ async fn handle_behavior_event(
         },
         
         // Handle blob fetch outbound failures
-        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::OutboundFailure { 
+        network::IcnFederationBehaviourEvent::BlobFetch(request_response::Event::OutboundFailure { 
             peer, 
             error,
             request_id,
@@ -1167,7 +1167,7 @@ async fn handle_behavior_event(
         },
         
         // Handle blob fetch inbound failures
-        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::InboundFailure { 
+        network::IcnFederationBehaviourEvent::BlobFetch(request_response::Event::InboundFailure { 
             peer, 
             error, 
             ..
@@ -1935,5 +1935,96 @@ mod tests {
         // Verify the full flow succeeded
         assert!(requester_blob_storage.is_pinned(&cid).await.unwrap(), 
                 "Blob should be pinned in requester's storage after replication");
+    }
+
+    #[tokio::test]
+    async fn test_p2p_blob_fetch_for_replication() {
+        use cid::Cid;
+        use icn_storage::{AsyncInMemoryStorage, DistributedStorage};
+        use multihash::{Code, MultihashDigest};
+        use std::collections::HashMap;
+        use std::sync::Arc;
+        use futures::lock::Mutex;
+        use libp2p::PeerId;
+        
+        // Create test data
+        let test_content = b"This is test content for P2P blob fetch via replication handler".to_vec();
+        let mh = Code::Sha2_256.digest(&test_content);
+        let cid = Cid::new_v0(mh).unwrap();
+        
+        // Create storage and adapter for "local node"
+        let local_storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let local_blob_storage = Arc::new(BlobStorageAdapter::new(local_storage.clone()));
+        
+        // Create another storage to simulate a remote peer that has the blob
+        let remote_storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+        let remote_blob_storage = Arc::new(BlobStorageAdapter::new(remote_storage.clone()));
+        
+        // Put the blob in the remote storage
+        remote_blob_storage.put_blob(&test_content).await.unwrap();
+        remote_blob_storage.pin_blob(&cid).await.unwrap();
+        
+        // Verify the remote storage has the blob
+        assert!(remote_blob_storage.blob_exists(&cid).await.unwrap());
+        
+        // Create simple identifiers for our mock network components
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        struct QueryId(u64);
+        
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        struct RequestId(u64);
+        
+        // Create state tracking maps like in the real implementation
+        let mut pending_replication_fetches = HashMap::<QueryId, (Cid, ())>::new();
+        let mut pending_blob_fetches = HashMap::<RequestId, (Cid, ())>::new();
+        
+        // First, simulate storing the request in pending_replication_fetches
+        let query_id = QueryId(1);
+        pending_replication_fetches.insert(query_id, (cid, ()));
+        
+        // Now simulate receiving a Kademlia GetProviders result with a provider
+        let provider_peer_id = PeerId::random();
+        
+        // Simulate sending the fetch request and storing it
+        let fetch_request = network::FetchBlobRequest { cid };
+        let fetch_request_id = RequestId(2);
+        pending_blob_fetches.insert(fetch_request_id, (cid, ()));
+        
+        // Now simulate receiving a successful fetch response with the blob data
+        let fetch_response = network::FetchBlobResponse {
+            data: Some(test_content.clone()),
+            error_msg: None,
+        };
+        
+        // Simulate processing the response and storing it in the local storage
+        if let Some((original_cid, _)) = pending_blob_fetches.remove(&fetch_request_id) {
+            match &fetch_response.data {
+                Some(blob_data) => {
+                    // Verify the hash matches
+                    let mh = Code::Sha2_256.digest(blob_data);
+                    let calculated_cid = Cid::new_v0(mh).unwrap();
+                    
+                    assert_eq!(calculated_cid, original_cid, "Fetched blob hash should match original CID");
+                    
+                    // Store the blob
+                    local_blob_storage.put_blob(blob_data).await.unwrap();
+                    local_blob_storage.pin_blob(&original_cid).await.unwrap();
+                    
+                    // Verify the blob was stored and pinned
+                    assert!(local_blob_storage.blob_exists(&original_cid).await.unwrap());
+                    assert!(local_blob_storage.is_pinned(&original_cid).await.unwrap());
+                },
+                None => {
+                    panic!("Fetch response should have data");
+                }
+            }
+        } else {
+            panic!("Could not find pending blob fetch for request ID");
+        }
+        
+        // Final verification: the blob should be retrievable from local storage
+        let retrieved_blob = local_blob_storage.get_blob(&cid).await.unwrap();
+        assert!(retrieved_blob.is_some(), "Blob should be retrievable from local storage");
+        assert_eq!(retrieved_blob.unwrap(), test_content, "Retrieved blob should match original content");
     }
 } 
