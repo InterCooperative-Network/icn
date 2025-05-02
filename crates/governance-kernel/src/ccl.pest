@@ -6,8 +6,9 @@ ccl_document = { SOI ~ WHITESPACE* ~ template_declaration ~ WHITESPACE* ~ EOI }
 // Template declaration
 template_declaration = { template_type ~ WHITESPACE* ~ object }
 
-// Template type
-template_type = @{ identifier }
+// Template type with optional version
+template_type = @{ identifier ~ (":" ~ version_identifier)? }
+version_identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
 
 // Identifiers
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
