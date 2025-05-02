@@ -1656,6 +1656,7 @@ name = "icn-governance-kernel"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "icn-core-vm",
  "icn-identity",
  "pest",
  "pest_derive",

@@ -6,8 +6,7 @@ description = "CCL interpretation and Core Law Modules for the ICN Runtime"
 
 [dependencies]
 icn-identity = { path = "../identity" }
-# Temporarily comment out core-vm dependency
-# icn-core-vm = { path = "../core-vm" }
+icn-core-vm = { path = "../core-vm" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
