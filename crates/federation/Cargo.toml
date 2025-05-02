@@ -18,6 +18,9 @@ futures = { version = "0.3", features = ["thread-pool"] }
 cid = { workspace = true }
 multihash = { workspace = true, features = ["sha2"] }
 
+# Hashing
+sha2 = "0.10"
+
 # Randomization
 rand = "0.8"
 

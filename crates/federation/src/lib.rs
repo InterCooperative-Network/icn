@@ -17,6 +17,7 @@ use futures::lock::Mutex;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use std::sync::Arc;
+use serde::{Serialize, Deserialize};
 
 use libp2p::{
     core::transport::upgrade,
@@ -27,12 +28,15 @@ use libp2p::{
 use icn_dag::DagNode;
 use icn_identity::{IdentityId, IdentityScope, Signature, TrustBundle};
 use icn_storage::ReplicationFactor;
-use multihash::{self, Code, MultihashDigest};
+use multihash::{self, MultihashDigest};
 use tracing::{debug, info, error, warn};
 use thiserror::Error;
 
 // Export network module
 pub mod network;
+
+// Export signing module
+pub mod signing;
 
 /// Errors that can occur during federation operations
 #[derive(Debug, Error)]
@@ -66,16 +70,16 @@ pub enum FederationError {
 pub type FederationResult<T> = Result<T, FederationError>;
 
 /// Types of quorum configurations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum QuorumConfig {
     /// Simple majority
     Majority,
     
     /// Threshold-based (e.g., 2/3)
-    Threshold(u32, u32),
+    Threshold(f32),
     
-    /// Weighted votes
-    Weighted(Vec<(IdentityId, u32)>),
+    /// Weighted votes with total required weight
+    Weighted(Vec<(IdentityId, u32)>, u32),
 }
 
 impl QuorumConfig {
@@ -113,13 +117,72 @@ pub struct GuardianMandate {
 }
 
 /// Represents a quorum proof
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuorumProof {
-    /// The votes that make up this quorum
-    pub votes: Vec<(IdentityId, bool, Signature)>,
+    /// Signatures collected (Signer DID, Signature over mandate hash)
+    pub votes: Vec<(IdentityId, Signature)>,
     
-    /// The quorum configuration
+    /// The quorum configuration that must be met
     pub config: QuorumConfig,
+}
+
+impl QuorumProof {
+    /// Verify that the quorum proof contains sufficient valid signatures according to the config
+    pub async fn verify(&self, mandate_content_hash: &[u8]) -> FederationResult<bool> {
+        let mut valid_signatures = 0u32;
+        let mut weighted_sum = 0u32;
+        
+        // Calculate total possible weight for Weighted quorum
+        let _total_possible_weight = match &self.config {
+            QuorumConfig::Weighted(weights, _) => {
+                weights.iter().map(|(_, weight)| *weight).sum()
+            },
+            _ => 0u32
+        };
+        
+        for (signer_did, signature) in &self.votes {
+            // TODO: Add check: Is signer_did actually an authorized Guardian for this scope/mandate?
+            // This requires identity/role lookup from the federation state
+            
+            match icn_identity::verify_signature(mandate_content_hash, signature, signer_did) {
+                Ok(true) => {
+                    valid_signatures += 1;
+                    // Handle weighted logic if applicable
+                    if let QuorumConfig::Weighted(weights, _) = &self.config {
+                        if let Some((_, weight)) = weights.iter().find(|(id, _)| id == signer_did) {
+                            weighted_sum += *weight;
+                        }
+                    }
+                }
+                Ok(false) => {
+                    tracing::warn!("Invalid signature found in quorum proof for DID: {}", signer_did.0);
+                }
+                Err(e) => {
+                    tracing::error!("Error verifying signature for DID {}: {}", signer_did.0, e);
+                    return Err(FederationError::InvalidMandate(format!("Signature verification error: {}", e)));
+                }
+            }
+        }
+        
+        // Check against quorum config
+        let result = match &self.config {
+            QuorumConfig::Majority => {
+                // Simple majority of provided votes
+                valid_signatures * 2 > self.votes.len() as u32
+            },
+            QuorumConfig::Threshold(threshold) => {
+                // TODO: In a full implementation, we would need the total number of possible voters/guardians
+                // For now, use the threshold as a fraction of the provided votes
+                let threshold_count = (self.votes.len() as f32 * threshold).ceil() as u32;
+                valid_signatures >= threshold_count
+            },
+            QuorumConfig::Weighted(_, required_weight) => {
+                weighted_sum >= *required_weight
+            },
+        };
+        
+        Ok(result)
+    }
 }
 
 impl GuardianMandate {
@@ -145,9 +208,18 @@ impl GuardianMandate {
     }
     
     /// Verify this mandate
-    pub fn verify(&self) -> FederationResult<bool> {
-        // Placeholder implementation
-        Err(FederationError::InvalidMandate("Not implemented".to_string()))
+    pub async fn verify(&self) -> FederationResult<bool> {
+        // Recalculate the mandate content hash
+        let mandate_hash = signing::calculate_mandate_hash(
+            &self.action, 
+            &self.reason, 
+            &self.scope, 
+            &self.scope_id, 
+            &self.guardian
+        );
+        
+        // Verify the quorum proof
+        self.quorum_proof.verify(&mandate_hash).await
     }
 }
 
@@ -238,6 +310,7 @@ impl Default for FederationManagerConfig {
 }
 
 /// Manages federation network operations
+#[allow(dead_code)]
 pub struct FederationManager {
     /// Local peer ID
     pub local_peer_id: PeerId,
@@ -413,14 +486,14 @@ async fn run_event_loop(
                     Some(FederationManagerMessage::RequestTrustBundle { epoch, respond_to }) => {
                         debug!("Received request to fetch trust bundle for epoch {}", epoch);
                         
-                        // Generate the storage key for this epoch
+                        // Generate a key for the requested TrustBundle based on epoch
                         let key_str = format!("trustbundle::epoch::{}", epoch);
-                        let key_hash = Code::Sha2_256.digest(key_str.as_bytes());
-                        let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+                        let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+                        let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
                         
                         // First check if we have it locally
                         let storage_lock = storage.lock().await;
-                        let local_result = storage_lock.get(&key_cid).await;
+                        let local_result = storage_lock.get(&_key_cid).await;
                         drop(storage_lock);
                         
                         match local_result {
@@ -446,7 +519,7 @@ async fn run_event_loop(
                                 // For MVP, just return None as we haven't properly implemented
                                 // peer discovery or request/response handling yet
                                 debug!("Peer request not fully implemented - returning None for now");
-                                let _ = respond_to.send(Ok(None));
+                        let _ = respond_to.send(Ok(None));
                                 
                                 // TODO(V3-MVP): Implement peer selection and await response properly
                             }
@@ -513,127 +586,124 @@ async fn handle_behavior_event(
                 swarm.behaviour_mut().kademlia.add_address(&peer, addr.clone());
             }
         },
-        network::IcnFederationBehaviourEvent::Identify(identify_event) => {
-            if let libp2p::identify::Event::Received { peer_id, info, .. } = identify_event {
-                info!("Identified peer {}: {} with addresses: {:?}", peer_id, info.agent_version, info.listen_addrs);
-                
-                // Add the peer's addresses to Kademlia
-                for addr in info.listen_addrs {
-                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
-                }
+        network::IcnFederationBehaviourEvent::Identify(libp2p::identify::Event::Received { peer_id, info, .. }) => {
+            info!("Identified peer {}: {} with addresses: {:?}", peer_id, info.agent_version, info.listen_addrs);
+            
+            // Add the peer's addresses to Kademlia
+            for addr in info.listen_addrs {
+                swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
             }
         },
-        network::IcnFederationBehaviourEvent::Kademlia(kad_event) => {
-            if let kad::Event::OutboundQueryProgressed { result: kad::QueryResult::GetClosestPeers(Ok(closest_peers)), .. } = kad_event {
-                info!("Found {} closest peers", closest_peers.peers.len());
-                for peer in closest_peers.peers {
-                    debug!("Found closest peer: {}", peer);
-                }
+        network::IcnFederationBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { 
+            result: kad::QueryResult::GetClosestPeers(Ok(closest_peers)), 
+            .. 
+        }) => {
+            info!("Found {} closest peers", closest_peers.peers.len());
+            for peer in closest_peers.peers {
+                debug!("Found closest peer: {}", peer);
             }
         },
-        network::IcnFederationBehaviourEvent::Gossipsub(gossipsub::Event::Message { propagation_source, message_id, message }) => {
+        network::IcnFederationBehaviourEvent::Gossipsub(gossipsub::Event::Message { 
+            propagation_source, 
+            message_id, 
+            message: _ 
+        }) => {
             debug!("Received gossipsub message from {} with id: {}", propagation_source, message_id);
             // TODO(V3-MVP): Parse message and take appropriate action based on topic/content
         },
-        network::IcnFederationBehaviourEvent::TrustBundleSync(request_response_event) => {
-            match request_response_event {
-                request_response::Event::Message { 
-                    peer, message, ..
-                } => match message {
-                    request_response::Message::Request { 
-                        request, channel, .. 
-                    } => {
-                        debug!("Received TrustBundle request from {} for epoch {}", peer, request.epoch);
-                        
-                        // Generate a key for the requested TrustBundle based on epoch
-                        let key_str = format!("trustbundle::epoch::{}", request.epoch);
-                        let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
-                        let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
-                        
-                        // Attempt to retrieve the TrustBundle from storage
-                        let storage_lock = storage.lock().await;
-                        let bundle_result = storage_lock.get(&key_cid).await;
-                        drop(storage_lock); // Release lock as soon as possible
-                        
-                        let response = match bundle_result {
-                            Ok(Some(bundle_bytes)) => {
-                                // Try to deserialize the TrustBundle
-                                match serde_json::from_slice::<TrustBundle>(&bundle_bytes) {
-                                    Ok(bundle) => {
-                                        info!("Found TrustBundle for epoch {} in storage", request.epoch);
-                                        network::TrustBundleResponse { bundle: Some(bundle) }
-                                    },
-                                    Err(e) => {
-                                        error!("Failed to deserialize TrustBundle: {}", e);
-                                        network::TrustBundleResponse { bundle: None }
-                                    }
-                                }
-                            },
-                            Ok(None) => {
-                                debug!("TrustBundle for epoch {} not found in storage", request.epoch);
-                                network::TrustBundleResponse { bundle: None }
-                            },
-                            Err(e) => {
-                                error!("Storage error when retrieving TrustBundle: {}", e);
-                                network::TrustBundleResponse { bundle: None }
-                            }
-                        };
-                        
-                        if let Err(e) = swarm.behaviour_mut().trust_bundle_sync.send_response(channel, response) {
-                            error!("Failed to send TrustBundle response: {:?}", e);
-                        }
-                    },
-                    request_response::Message::Response { 
-                        request_id, response, .. 
-                    } => {
-                        debug!("Received TrustBundle response for request {}", request_id);
-                        if let Some(bundle) = &response.bundle {
-                            info!("Received TrustBundle for epoch {}", bundle.epoch_id);
-                            
-                            // Perform basic validation on the received bundle
-                            match bundle.verify() {
-                                Ok(true) => {
-                                    info!("TrustBundle validation passed for epoch {}", bundle.epoch_id);
-                                    
-                                    // Serialize the bundle for storage
-                                    match serde_json::to_vec(bundle) {
-                                        Ok(bundle_bytes) => {
-                                            // Generate the storage key based on epoch_id
-                                            let key_str = format!("trustbundle::epoch::{}", bundle.epoch_id);
-                                            let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
-                                            let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
-                                            
-                                            // Store the bundle
-                                            let storage_lock = storage.lock().await;
-                                            match storage_lock.put(&bundle_bytes).await {
-                                                Ok(_) => {
-                                                    info!("Successfully stored TrustBundle for epoch {}", bundle.epoch_id);
-                                                },
-                                                Err(e) => {
-                                                    error!("Failed to store TrustBundle: {}", e);
-                                                }
-                                            }
-                                        },
-                                        Err(e) => {
-                                            error!("Failed to serialize TrustBundle: {}", e);
-                                        }
-                                    }
-                                },
-                                Ok(false) => {
-                                    warn!("TrustBundle validation failed for epoch {}", bundle.epoch_id);
-                                },
-                                Err(e) => {
-                                    error!("TrustBundle validation error: {}", e);
-                                }
-                            }
-                            
-                            // TODO(V3-MVP): Implement full TrustBundle validation and state update based on received bundles.
-                        } else {
-                            debug!("Received empty TrustBundle response (None)");
+        network::IcnFederationBehaviourEvent::TrustBundleSync(request_response::Event::Message { 
+            peer, 
+            message: request_response::Message::Request { request, channel, .. },
+            ..
+        }) => {
+            debug!("Received TrustBundle request from {} for epoch {}", peer, request.epoch);
+            
+            // Generate a key for the requested TrustBundle based on epoch
+            let key_str = format!("trustbundle::epoch::{}", request.epoch);
+            let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+            let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+            
+            // Attempt to retrieve the TrustBundle from storage
+            let storage_lock = storage.lock().await;
+            let bundle_result = storage_lock.get(&_key_cid).await;
+            drop(storage_lock); // Release lock as soon as possible
+            
+            let response = match bundle_result {
+                Ok(Some(bundle_bytes)) => {
+                    // Try to deserialize the TrustBundle
+                    match serde_json::from_slice::<TrustBundle>(&bundle_bytes) {
+                        Ok(bundle) => {
+                            info!("Found TrustBundle for epoch {} in storage", request.epoch);
+                            network::TrustBundleResponse { bundle: Some(bundle) }
+                        },
+                        Err(e) => {
+                            error!("Failed to deserialize TrustBundle: {}", e);
+                            network::TrustBundleResponse { bundle: None }
                         }
                     }
                 },
-                _ => {}
+                Ok(None) => {
+                    debug!("TrustBundle for epoch {} not found in storage", request.epoch);
+                    network::TrustBundleResponse { bundle: None }
+                },
+                Err(e) => {
+                    error!("Storage error when retrieving TrustBundle: {}", e);
+                    network::TrustBundleResponse { bundle: None }
+                }
+            };
+            
+            if let Err(e) = swarm.behaviour_mut().trust_bundle_sync.send_response(channel, response) {
+                error!("Failed to send TrustBundle response: {:?}", e);
+            }
+        },
+        network::IcnFederationBehaviourEvent::TrustBundleSync(request_response::Event::Message { 
+            message: request_response::Message::Response { request_id, response, .. },
+            ..
+        }) => {
+            debug!("Received TrustBundle response for request {}", request_id);
+            if let Some(bundle) = &response.bundle {
+                info!("Received TrustBundle for epoch {}", bundle.epoch_id);
+                
+                // Perform basic validation on the received bundle
+                match bundle.verify() {
+                    Ok(true) => {
+                        info!("TrustBundle validation passed for epoch {}", bundle.epoch_id);
+                        
+                        // Serialize the bundle for storage
+                        match serde_json::to_vec(bundle) {
+                            Ok(bundle_bytes) => {
+                                // Generate the storage key based on epoch_id
+                                let key_str = format!("trustbundle::epoch::{}", bundle.epoch_id);
+                                let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+                                let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+                                
+                                // Store the bundle
+                                let storage_lock = storage.lock().await;
+                                match storage_lock.put(&bundle_bytes).await {
+                                    Ok(_) => {
+                                        info!("Successfully stored TrustBundle for epoch {}", bundle.epoch_id);
+                                    },
+                                    Err(e) => {
+                                        error!("Failed to store TrustBundle: {}", e);
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                error!("Failed to serialize TrustBundle: {}", e);
+                            }
+                        }
+                    },
+                    Ok(false) => {
+                        warn!("TrustBundle validation failed for epoch {}", bundle.epoch_id);
+                    },
+                    Err(e) => {
+                        error!("TrustBundle validation error: {}", e);
+                    }
+                }
+                
+                // TODO(V3-MVP): Implement full TrustBundle validation and state update based on received bundles.
+            } else {
+                debug!("Received empty TrustBundle response (None)");
             }
         },
         _ => {}
