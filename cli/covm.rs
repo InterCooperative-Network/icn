@@ -243,8 +243,11 @@ async fn handle_compile_command(
             governance_config.template_type, governance_config.template_version);
     }
     
+    // Clone schema once if needed for multiple uses
+    let schema_clone = schema.clone();
+    
     // Convert schema path if provided
-    let schema_path = schema.map(PathBuf::from);
+    let schema_path = schema_clone.as_ref().map(PathBuf::from);
     
     // Create compilation options with metadata
     let options = CompilationOptions {

@@ -87,7 +87,13 @@ fn test_compile_to_wasm() {
     let ccl_config = create_test_ccl_config();
     let dsl_input = create_test_dsl_input();
 
-    let result = compiler.compile_to_wasm(&ccl_config, &dsl_input, None);
+    // Disable schema validation for this test since we don't have actual schema files
+    let options = CompilationOptions {
+        validate_schema: false,
+        ..CompilationOptions::default()
+    };
+
+    let result = compiler.compile_to_wasm(&ccl_config, &dsl_input, Some(options));
     assert!(result.is_ok(), "Compilation should succeed");
 
     let wasm_bytes = result.unwrap();
@@ -185,7 +191,29 @@ fn test_create_metadata() {
 
 #[test]
 fn test_schema_validation_valid_input() {
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::tempdir;
+    
+    // Create a temporary directory for test schema
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let schema_path = temp_dir.path().join("propose_membership.schema.json");
+    
+    // Create a simple test schema for propose_membership
+    let schema_content = r#"{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "action": { "type": "string", "enum": ["propose_membership"] },
+            "applicant_did": { "type": "string" },
+            "name": { "type": "string" },
+            "reason": { "type": "string" }
+        },
+        "required": ["action", "applicant_did", "name", "reason"]
+    }"#;
+    
+    // Write the schema to a temporary file
+    fs::write(&schema_path, schema_content).expect("Failed to write schema file");
     
     let mut compiler = CclCompiler::new();
     let ccl_config = create_test_ccl_config();
@@ -206,7 +234,7 @@ fn test_schema_validation_valid_input() {
         additional_metadata: None,
         caller_did: None,
         execution_id: None,
-        schema_path: None,
+        schema_path: Some(schema_path),
         validate_schema: true,
     };
     
@@ -217,7 +245,29 @@ fn test_schema_validation_valid_input() {
 
 #[test]
 fn test_schema_validation_invalid_input() {
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::tempdir;
+    
+    // Create a temporary directory for test schema
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let schema_path = temp_dir.path().join("propose_membership.schema.json");
+    
+    // Create a simple test schema for propose_membership
+    let schema_content = r#"{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "action": { "type": "string", "enum": ["propose_membership"] },
+            "applicant_did": { "type": "string" },
+            "name": { "type": "string" },
+            "reason": { "type": "string" }
+        },
+        "required": ["action", "applicant_did", "name", "reason"]
+    }"#;
+    
+    // Write the schema to a temporary file
+    fs::write(&schema_path, schema_content).expect("Failed to write schema file");
     
     let mut compiler = CclCompiler::new();
     let ccl_config = create_test_ccl_config();
@@ -238,7 +288,7 @@ fn test_schema_validation_invalid_input() {
         additional_metadata: None,
         caller_did: None,
         execution_id: None,
-        schema_path: None,
+        schema_path: Some(schema_path),
         validate_schema: true,
     };
     
@@ -251,7 +301,7 @@ fn test_schema_validation_invalid_input() {
         let err_string = err.to_string();
         println!("Validation error: {}", err_string);
         // The error should explain that a field is missing
-        assert!(err_string.contains("name") || err_string.contains("validation failed"), 
+        assert!(err_string.contains("name") || err_string.contains("Missing required property"), 
                 "Error message should mention the missing field: {}", err_string);
     }
 }
@@ -308,7 +358,7 @@ fn test_schema_validation_with_custom_schema() {
     };
     
     // Test with valid input
-    let result = compiler.compile_to_wasm(&ccl_config, &valid_dsl, Some(valid_options));
+    let result = compiler.compile_to_wasm(&ccl_config, &valid_dsl, Some(valid_options.clone()));
     assert!(result.is_ok(), "Compilation with valid DSL against custom schema should succeed");
     
     // Test with invalid input

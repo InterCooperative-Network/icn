@@ -1,4 +1,5 @@
 use jsonschema::{JSONSchema, ValidationError};
+use jsonschema::error::ValidationErrorKind;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fs;
@@ -136,8 +137,8 @@ impl SchemaManager {
         if let Err(errors) = validation_result {
             // Format validation errors
             let error_messages: Vec<String> = errors
-                .iter()
-                .map(|err| format_validation_error(err, dsl_input))
+                .into_iter()
+                .map(|err| format_validation_error(&err, dsl_input))
                 .collect();
             
             return Err(CompilerError::ValidationError(format!(
@@ -188,8 +189,8 @@ impl SchemaManager {
         if let Err(errors) = validation_result {
             // Format validation errors
             let error_messages: Vec<String> = errors
-                .iter()
-                .map(|err| format_validation_error(err, dsl_input))
+                .into_iter()
+                .map(|err| format_validation_error(&err, dsl_input))
                 .collect();
             
             return Err(CompilerError::ValidationError(format!(
@@ -211,7 +212,7 @@ fn extract_action(dsl_input: &JsonValue) -> Option<String> {
 }
 
 /// Format a validation error in a user-friendly way
-fn format_validation_error(err: &ValidationError, instance: &JsonValue) -> String {
+pub fn format_validation_error(err: &ValidationError, instance: &JsonValue) -> String {
     let path = err.instance_path.to_string();
     let path_display = if path.is_empty() { "root" } else { &path };
     
@@ -221,27 +222,27 @@ fn format_validation_error(err: &ValidationError, instance: &JsonValue) -> Strin
         .unwrap_or("unknown");
     
     // Format based on error type
-    match err.kind {
-        jsonschema::error::ErrorKind::Required { ref property } => {
+    match &err.kind {
+        ValidationErrorKind::Required { property } => {
             format!("Missing required property: '{}'", property)
         }
-        jsonschema::error::ErrorKind::Type { .. } => {
+        ValidationErrorKind::Type { .. } => {
             let value = instance.pointer(err.instance_path.to_string().as_str());
             format!("Invalid type for '{}': expected {}, got {}",
                     path_display, err.schema_path, value.map_or("null".to_string(), |v| format!("{:?}", v)))
         }
-        jsonschema::error::ErrorKind::Enum { .. } => {
+        ValidationErrorKind::Enum { .. } => {
             let value = instance.pointer(err.instance_path.to_string().as_str());
             format!("Invalid value for '{}': must be one of the allowed values",
                     path_display)
         }
-        jsonschema::error::ErrorKind::MinLength { min_length, .. } => {
-            format!("'{}' is too short: minimum length is {}", path_display, min_length)
+        ValidationErrorKind::MinLength { limit, .. } => {
+            format!("'{}' is too short: minimum length is {}", path_display, limit)
         }
-        jsonschema::error::ErrorKind::MaxLength { max_length, .. } => {
-            format!("'{}' is too long: maximum length is {}", path_display, max_length)
+        ValidationErrorKind::MaxLength { limit, .. } => {
+            format!("'{}' is too long: maximum length is {}", path_display, limit)
         }
-        jsonschema::error::ErrorKind::Pattern { .. } => {
+        ValidationErrorKind::Pattern { .. } => {
             format!("'{}' does not match the required pattern", path_display)
         }
         _ => {

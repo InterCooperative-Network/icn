@@ -271,8 +271,8 @@ impl CclCompiler {
                 if let Err(errors) = validation_result {
                     // Format validation errors
                     let error_messages: Vec<String> = errors
-                        .iter()
-                        .map(|err| schema::format_validation_error(err, dsl_input))
+                        .into_iter()
+                        .map(|err| schema::format_validation_error(&err, dsl_input))
                         .collect();
                     
                     return Err(CompilerError::SchemaError(format!(
