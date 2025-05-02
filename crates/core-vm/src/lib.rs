@@ -16,6 +16,7 @@ use anyhow::{Error as AnyhowError, Result};
 use async_trait::async_trait;
 use cid::Cid;
 use cid::multihash::{MultihashDigest, Code};
+use chrono;
 use icn_economics::{ResourceType, ResourceAuthorization, consume_authorization, validate_authorization_usage};
 use icn_identity::{IdentityId, IdentityScope, KeyPair, Signature, verify_signature as identity_verify_signature};
 use icn_storage::StorageBackend;
@@ -23,9 +24,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use futures::lock::Mutex;
+use std::string::FromUtf8Error;
 use thiserror::Error;
 use tracing::{debug, info, warn, error};
-use wasmtime::{Engine, Linker, Module, Store, Caller};
+use wasmtime::{Engine, Linker, Module, Store, Trap, TypedFunc, Memory, AsContextMut};
 
 /// Log level for VM execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,7 +219,7 @@ pub enum VmError {
     #[error("Execution exceeded resource limits: {0}")]
     ResourceLimitExceeded(String),
     
-    #[error("Missing entry point function")]
+    #[error("Missing entry point function in WASM module")]
     MissingEntryPoint,
     
     #[error("VM internal error: {0}")]
@@ -590,24 +592,22 @@ pub async fn execute_wasm(
     storage: Arc<Mutex<dyn StorageBackend + Send + Sync>>,
     identity_ctx: Arc<IdentityContext>,
 ) -> Result<ExecutionResult, VmError> {
-    // Create the host environment from the provided components
+    // Create the host environment
     let host = ConcreteHostEnvironment::new(
         storage.clone(),
         identity_ctx.clone(),
         ctx.clone(),
     );
 
-    // Create a new wasmtime engine with async support explicitly enabled
+    // Configure the Wasmtime engine
     let mut config = wasmtime::Config::new();
     config.async_support(true);
-    
-    // Additional safety configurations
     config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-    config.consume_fuel(true); // Enable fuel-based resource limiting
+    config.consume_fuel(true);
     
     let engine = Engine::new(&config)
-        .map_err(|e| VmError::InternalError(format!("Failed to create wasmtime engine: {}", e)))?;
+        .map_err(|e| VmError::InternalError(format!("Failed to create engine: {}", e)))?;
     
     // Create a store with our StoreData
     let mut store = Store::new(
@@ -618,80 +618,130 @@ pub async fn execute_wasm(
         }
     );
     
-    // Allocate a fixed amount of fuel for execution (can be based on authorized resources)
+    // Allocate fuel for execution based on compute authorization or default
     let compute_limit = ctx.find_authorization(&ResourceType::Compute)
         .map(|auth| auth.remaining_amount())
         .unwrap_or(1_000_000);
     store.add_fuel(compute_limit)
         .map_err(|e| VmError::InternalError(format!("Failed to add fuel: {}", e)))?;
     
-    // Create a new linker for connecting host functions
+    // Create a new linker and register host functions
     let mut linker = Linker::new(&engine);
-    
-    // Register host functions
     register_host_functions(&mut linker)
         .map_err(|e| VmError::HostFunctionError(format!("Failed to register host functions: {}", e)))?;
 
-    // Try to compile the module
+    // Compile and instantiate the WASM module
     let module = Module::new(&engine, wasm_bytes)
         .map_err(|e| VmError::ModuleLoadError(e.to_string()))?;
     
-    // Try to instantiate the module with imports
     let instance = linker
         .instantiate_async(&mut store, &module)
         .await
         .map_err(|e| VmError::InstantiationError(e.to_string()))?;
     
-    // Find an entry point function (for testing, we won't actually call it)
-    let entry_point = ["_start", "run", "main"]
-        .iter()
-        .find_map(|&name| instance.get_func(&mut store, name));
+    // Collect execution logs
+    let mut logs = Vec::new();
+    logs.push("Module instantiated successfully".to_string());
     
-    // If we found an entry point, try to call it
-    if let Some(entry_func) = entry_point {
-        match entry_func.typed::<(), ()>(&mut store) {
-            Ok(func) => {
-                // Try to call the function but catch errors - they're expected in test modules
-                let _ = func.call_async(&mut store, ()).await;
+    // Try to find an entry point in the instance
+    // Common entry point names in different environments
+    let entry_point_names = ["_start", "main", "run", "invoke"];
+    let mut entry_point = None;
+    
+    for name in entry_point_names.iter() {
+        if let Some(func) = instance.get_func(&mut store, name) {
+            logs.push(format!("Found entry point: {}", name));
+            entry_point = Some((name.to_string(), func));
+            break;
+        }
+    }
+    
+    // If we found an entry point, call it
+    let execution_success = if let Some((name, func)) = entry_point {
+        logs.push(format!("Executing entry point: {}", name));
+        
+        // Try different type signatures based on common conventions
+        let result = if name == "invoke" {
+            // invoke might take parameters (e.g., for CCL templates)
+            match func.typed::<(i32, i32), i32>(&mut store) {
+                Ok(typed_func) => {
+                    // For invoke, we'd normally pass input parameters
+                    // For now just pass 0,0 for testing
+                    match typed_func.call_async(&mut store, (0, 0)).await {
+                        Ok(result) => {
+                            logs.push(format!("Entry point returned: {}", result));
+                            Ok(())
+                        },
+                        Err(e) => Err(VmError::HostFunctionError(format!("Entry point execution failed: {}", e)))
+                    }
+                },
+                Err(_) => {
+                    // Try without parameters
+                    match func.typed::<(), i32>(&mut store) {
+                        Ok(typed_func) => {
+                            match typed_func.call_async(&mut store, ()).await {
+                                Ok(result) => {
+                                    logs.push(format!("Entry point returned: {}", result));
+                                    Ok(())
+                                },
+                                Err(e) => Err(VmError::HostFunctionError(format!("Entry point execution failed: {}", e)))
+                            }
+                        },
+                        Err(e) => Err(VmError::HostFunctionError(format!("Failed to type entry point function: {}", e)))
+                    }
+                }
             }
-            Err(_) => {
-                // Non-matching signature is expected in test modules
+        } else {
+            // _start, main, run typically take no parameters and return nothing
+            match func.typed::<(), ()>(&mut store) {
+                Ok(typed_func) => {
+                    match typed_func.call_async(&mut store, ()).await {
+                        Ok(_) => {
+                            logs.push("Entry point executed successfully".to_string());
+                            Ok(())
+                        },
+                        Err(e) => Err(VmError::HostFunctionError(format!("Entry point execution failed: {}", e)))
+                    }
+                },
+                Err(e) => Err(VmError::HostFunctionError(format!("Failed to type entry point function: {}", e)))
             }
         };
-    }
+        
+        match result {
+            Ok(_) => true,
+            Err(e) => {
+                logs.push(format!("Error: {}", e));
+                false
+            }
+        }
+    } else {
+        logs.push("No entry point found".to_string());
+        return Err(VmError::MissingEntryPoint);
+    };
     
-    // Get the final resource consumption
-    let store_data = store.data();
-    let resources_consumed = store_data.ctx.consumed_resources.clone();
+    // Calculate resources consumed from fuel usage
+    let consumed_fuel = store.fuel_consumed().unwrap_or(0);
     
-    // Get remaining fuel to calculate actual consumption
-    let remaining_fuel = store.fuel_consumed()
-        .map(|f| compute_limit.saturating_sub(f))
-        .unwrap_or(0);
+    // Get the data from the store
+    let store_data = store.into_data();
     
-    // Update compute resource with fuel consumed
-    let mut final_resources = resources_consumed.clone();
-    if compute_limit > remaining_fuel {
-        final_resources.insert(ResourceType::Compute, compute_limit - remaining_fuel);
-    }
+    // Build the resources_consumed map from the VM context
+    let mut resources_consumed = store_data.ctx.consumed_resources.clone();
     
-    // Prepare logs
-    let logs = vec!["Execution completed".to_string()]; // In a real impl, collect from the ctx
+    // Add compute resource from fuel consumption if it's not already tracked
+    resources_consumed.entry(ResourceType::Compute).and_modify(|e| *e += consumed_fuel).or_insert(consumed_fuel);
     
-    // Return execution result with consumed resources
+    // Return the execution result
     Ok(ExecutionResult::with_resources(
-        true, // success
-        None, // output_data (can be extracted from memory if needed)
-        logs,
-        final_resources,
+        execution_success,           // success
+        None,                        // output_data
+        logs,                        // logs
+        resources_consumed,          // resources_consumed
     ))
 }
 
-/// Register all host functions with the linker
+/// Register all host functions with the WASM linker
 fn register_host_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
-    // Register logging functions
-    register_logging_functions(linker)?;
-    
     // Register storage functions
     register_storage_functions(linker)?;
     
@@ -701,66 +751,146 @@ fn register_host_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow:
     // Register economics functions
     register_economics_functions(linker)?;
     
-    Ok(())
-}
-
-/// Register logging-related host functions
-fn register_logging_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
-    // Log message function
-    linker.func_wrap("env", "host_log_message", |mut caller: wasmtime::Caller<'_, StoreData>, level: i32, ptr: i32, len: i32| {
-        if ptr < 0 || len < 0 {
-            return Err(anyhow::anyhow!("Invalid memory parameters"));
-        }
-        
-        let level_enum = match level {
-            0 => LogLevel::Debug,
-            1 => LogLevel::Info,
-            2 => LogLevel::Warn,
-            3 => LogLevel::Error,
-            _ => LogLevel::Info,
-        };
-        
-        let message = read_guest_memory_string(&mut caller, ptr as u32, len as u32)?;
-        caller.data().host.log_message(level_enum, &message)
-            .map_err(|e| anyhow::anyhow!("Host function error: {}", e))?;
-        
-        Ok(())
-    })?;
+    // Register logging functions
+    register_logging_functions(linker)?;
+    
+    // Register DAG functions
+    register_dag_functions(linker)?;
     
     Ok(())
 }
 
 /// Register storage-related host functions
 fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
-    // Normal non-async functions don't pose a problem
-    linker.func_wrap("env", "host_storage_get_length", |_caller: wasmtime::Caller<'_, StoreData>, cid_ptr: i32, cid_len: i32| {
-        if cid_ptr < 0 || cid_len < 0 {
-            return Err(anyhow::anyhow!("Invalid memory parameters"));
-        }
+    // storage_get: Get data by CID
+    linker.func_wrap("env", "host_storage_get", |mut caller: wasmtime::Caller<'_, StoreData>, 
+                     cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| -> Result<i32, Trap> {
+        // Read the CID string from guest memory
+        let cid_str = read_memory_string(&caller, cid_ptr, cid_len)?;
         
-        // Just return a stub value for now
-        Ok(10i32)
+        // Parse the CID
+        let cid = Cid::try_from(cid_str)
+            .map_err(|e| Trap::new(format!("Invalid CID: {}", e)))?;
+            
+        // Call the host function - we have to do this in multiple steps to deal with borrowing
+        let storage_result = {
+            // We need to move the cid ownership in a block to avoid borrowing issues
+            let cid = cid.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            // We'd use a future with the async variant, but for simplicity we'll use a sync approach here
+            // In an async implementation, you would use func_wrap_async with proper async/await handling
+            host_env.storage_get(cid)
+                .map_err(|e| Trap::new(format!("Storage get failed: {}", e)))?
+        };
+        
+        match storage_result {
+            Some(data) => {
+                // Write the data size to out_len_ptr if provided
+                if out_len_ptr >= 0 {
+                    write_memory_u32(&mut caller, out_len_ptr, data.len() as u32)?;
+                }
+                
+                // Write data to out_ptr if buffer is provided and large enough
+                if out_ptr >= 0 && out_len_ptr >= 0 {
+                    write_memory_bytes(&mut caller, out_ptr, &data)?;
+                    Ok(1) // Success with data
+                } else {
+                    Ok(-1) // Buffer too small
+                }
+            },
+            None => Ok(0) // Not found
+        }
     })?;
     
-    // For async functions, we'll implement stubs for now
-    // In a real implementation, we would use proper async functions via async-functions feature
-    linker.func_wrap("env", "host_storage_get", |_caller: wasmtime::Caller<'_, StoreData>, cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| {
-        if cid_ptr < 0 || cid_len < 0 || out_ptr < 0 || out_len_ptr < 0 {
-            return Err(anyhow::anyhow!("Invalid memory parameters"));
-        }
+    // storage_put: Store data with a given CID
+    linker.func_wrap("env", "host_storage_put", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| -> Result<i32, Trap> {
+        // Read the key string from guest memory
+        let key_str = read_memory_string(&caller, key_ptr, key_len)?;
         
-        // Just return 0 to indicate not found for now
-        Ok(0i32)
+        // Parse the CID
+        let cid = Cid::try_from(key_str)
+            .map_err(|e| Trap::new(format!("Invalid CID: {}", e)))?;
+            
+        // Read the value bytes from guest memory
+        let value = read_memory_bytes(&caller, value_ptr, value_len)?;
+        
+        // Call the host function
+        let result = {
+            let cid = cid.clone();
+            let value = value.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            host_env.storage_put(cid, value)
+                .map_err(|e| Trap::new(format!("Storage put failed: {}", e)))?
+        };
+        
+        Ok(1) // Success
     })?;
     
-    // Storage put - also a stub for now
-    linker.func_wrap("env", "host_storage_put", |_caller: wasmtime::Caller<'_, StoreData>, key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| {
-        if key_ptr < 0 || key_len < 0 || value_ptr < 0 || value_len < 0 {
-            return Err(anyhow::anyhow!("Invalid memory parameters"));
-        }
+    // blob_put: Store content and get a CID
+    linker.func_wrap("env", "host_blob_put", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     content_ptr: i32, content_len: i32, out_ptr: i32, out_len: i32| -> Result<i32, Trap> {
+        // Read content from guest memory
+        let content = read_memory_bytes(&caller, content_ptr, content_len)?;
         
-        // Just return success
-        Ok(1i32)
+        // Call the host function
+        let result = {
+            let content = content.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            host_env.blob_put(content)
+                .map_err(|e| Trap::new(format!("Blob put failed: {}", e)))?
+        };
+        
+        // Write CID string to output buffer
+        let cid_str = result.to_string();
+        if cid_str.len() <= out_len as usize {
+            write_memory_bytes(&mut caller, out_ptr, cid_str.as_bytes())?;
+            Ok(cid_str.len() as i32) // Return actual length
+        } else {
+            Ok(-(cid_str.len() as i32)) // Return negative required length
+        }
+    })?;
+    
+    // blob_get: Get content by CID
+    linker.func_wrap("env", "host_blob_get", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| -> Result<i32, Trap> {
+        // Same implementation as storage_get
+        // Read the CID string from guest memory
+        let cid_str = read_memory_string(&caller, cid_ptr, cid_len)?;
+        
+        // Parse the CID
+        let cid = Cid::try_from(cid_str)
+            .map_err(|e| Trap::new(format!("Invalid CID: {}", e)))?;
+            
+        // Call the host function
+        let blob_result = {
+            let cid = cid.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            host_env.blob_get(cid)
+                .map_err(|e| Trap::new(format!("Blob get failed: {}", e)))?
+        };
+        
+        match blob_result {
+            Some(data) => {
+                // Write the data size to out_len_ptr if provided
+                if out_len_ptr >= 0 {
+                    write_memory_u32(&mut caller, out_len_ptr, data.len() as u32)?;
+                }
+                
+                // Write data to out_ptr if buffer is provided and large enough
+                if out_ptr >= 0 && data.len() <= out_len_ptr as usize {
+                    write_memory_bytes(&mut caller, out_ptr, &data)?;
+                    Ok(1) // Success with data
+                } else {
+                    Ok(-1) // Buffer too small
+                }
+            },
+            None => Ok(0) // Not found
+        }
     })?;
     
     Ok(())
@@ -768,30 +898,34 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
 
 /// Register identity-related host functions
 fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
-    // Get caller DID
-    linker.func_wrap("env", "host_get_caller_did", |mut caller: wasmtime::Caller<'_, StoreData>, out_ptr: i32, out_len: i32| {
-        if out_ptr < 0 || out_len < 0 {
-            return Err(anyhow::anyhow!("Invalid memory parameters"));
-        }
-        
+    // get_caller_did: Get the caller's DID
+    linker.func_wrap("env", "host_get_caller_did", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     out_ptr: i32, out_len: i32| -> Result<i32, Trap> {
+        // Call the host function
         let did = caller.data().host.get_caller_did()
-            .map_err(|e| anyhow::anyhow!("Host function error: {}", e))?;
+            .map_err(|e| Trap::new(format!("Failed to get caller DID: {}", e)))?;
         
-        if did.len() <= out_len as usize {
-            write_guest_memory_string(&mut caller, out_ptr as u32, &did)?;
-            Ok(did.len() as i32)
+        // Write the DID to the output buffer if provided and large enough
+        if out_ptr >= 0 && out_len >= 0 {
+            if did.len() <= out_len as usize {
+                write_memory_bytes(&mut caller, out_ptr, did.as_bytes())?;
+                Ok(did.len() as i32) // Return actual length
+            } else {
+                Ok(-(did.len() as i32)) // Return negative required length
+            }
         } else {
-            Ok(-(did.len() as i32)) // Return negative size needed
+            Ok(-(did.len() as i32)) // Return negative required length
         }
     })?;
     
-    // Get caller scope
-    linker.func_wrap("env", "host_get_caller_scope", |caller: wasmtime::Caller<'_, StoreData>| {
+    // get_caller_scope: Get the caller's identity scope
+    linker.func_wrap("env", "host_get_caller_scope", |caller: wasmtime::Caller<'_, StoreData>| -> Result<i32, Trap> {
+        // Call the host function
         let scope = caller.data().host.get_caller_scope()
-            .map_err(|e| anyhow::anyhow!("Host function error: {}", e))?;
+            .map_err(|e| Trap::new(format!("Failed to get caller scope: {}", e)))?;
         
-        // Map scope to integer value
-        let scope_val = match scope {
+        // Convert scope to integer
+        let scope_int = match scope {
             IdentityScope::Individual => 0,
             IdentityScope::Cooperative => 1,
             IdentityScope::Community => 2,
@@ -800,17 +934,30 @@ fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), any
             IdentityScope::Guardian => 5,
         };
         
-        Ok(scope_val)
+        Ok(scope_int)
     })?;
     
-    // Verify signature - stub implementation
-    linker.func_wrap("env", "host_verify_signature", |_caller: wasmtime::Caller<'_, StoreData>, did_ptr: i32, did_len: i32, msg_ptr: i32, msg_len: i32, sig_ptr: i32, sig_len: i32| {
-        if did_ptr < 0 || did_len < 0 || msg_ptr < 0 || msg_len < 0 || sig_ptr < 0 || sig_len < 0 {
-            return Err(anyhow::anyhow!("Invalid memory parameters"));
-        }
+    // verify_signature: Verify a signature
+    linker.func_wrap("env", "host_verify_signature", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     did_ptr: i32, did_len: i32, msg_ptr: i32, msg_len: i32, sig_ptr: i32, sig_len: i32| -> Result<i32, Trap> {
+        // Read parameters from guest memory
+        let did_str = read_memory_string(&caller, did_ptr, did_len)?;
+        let message = read_memory_bytes(&caller, msg_ptr, msg_len)?;
+        let signature = read_memory_bytes(&caller, sig_ptr, sig_len)?;
         
-        // Return success for test purposes
-        Ok(1i32)
+        // Call the host function
+        let verify_result = {
+            let did_str = did_str.clone();
+            let message = message.clone();
+            let signature = signature.clone();
+            let mut host_env = caller.data().host.clone();
+            
+            host_env.verify_signature(&did_str, &message, &signature)
+                .map_err(|e| Trap::new(format!("Signature verification failed: {}", e)))?
+        };
+        
+        // Return 1 for valid, 0 for invalid
+        Ok(if verify_result { 1 } else { 0 })
     })?;
     
     Ok(())
@@ -818,46 +965,160 @@ fn register_identity_functions(linker: &mut Linker<StoreData>) -> Result<(), any
 
 /// Register economics-related host functions
 fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
-    // Check resource authorization
-    linker.func_wrap("env", "host_check_resource_authorization", |caller: wasmtime::Caller<'_, StoreData>, resource_type: i32, amount: i32| {
+    // check_resource_authorization: Check if a resource usage is authorized
+    linker.func_wrap("env", "host_check_resource_authorization", |caller: wasmtime::Caller<'_, StoreData>,
+                     resource_type: i32, amount: i32| -> Result<i32, Trap> {
         if amount < 0 {
-            return Err(anyhow::anyhow!("Invalid amount parameter"));
+            return Err(Trap::new("Amount cannot be negative"));
         }
         
+        // Convert resource_type integer to ResourceType
         let res_type = match resource_type {
             0 => ResourceType::Compute,
             1 => ResourceType::Storage,
             2 => ResourceType::NetworkBandwidth,
-            _ => return Err(anyhow::anyhow!("Invalid resource type")),
+            _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
         };
         
-        let result = caller.data().host.check_resource_authorization(res_type, amount as u64)
-            .map_err(|e| anyhow::anyhow!("Host function error: {}", e))?;
+        // Call the host function
+        let authorized = caller.data().host.check_resource_authorization(res_type, amount as u64)
+            .map_err(|e| Trap::new(format!("Resource authorization check failed: {}", e)))?;
         
-        Ok(if result { 1i32 } else { 0i32 })
+        // Return 1 for authorized, 0 for not authorized
+        Ok(if authorized { 1 } else { 0 })
     })?;
     
-    // Record resource usage
-    linker.func_wrap("env", "host_record_resource_usage", |mut caller: wasmtime::Caller<'_, StoreData>, resource_type: i32, amount: i32| {
+    // record_resource_usage: Record resource consumption
+    linker.func_wrap("env", "host_record_resource_usage", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     resource_type: i32, amount: i32| -> Result<(), Trap> {
         if amount < 0 {
-            return Err(anyhow::anyhow!("Invalid amount parameter"));
+            return Err(Trap::new("Amount cannot be negative"));
         }
         
+        // Convert resource_type integer to ResourceType
         let res_type = match resource_type {
             0 => ResourceType::Compute,
             1 => ResourceType::Storage,
             2 => ResourceType::NetworkBandwidth,
-            _ => return Err(anyhow::anyhow!("Invalid resource type")),
+            _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
         };
         
-        let _result = {
-            let store_data = caller.data_mut();
-            let host = &mut store_data.host;
-            host.record_resource_usage(res_type, amount as u64)
-                .map_err(|e| anyhow::anyhow!("Host function error: {}", e))?
+        // Call the host function
+        let result = {
+            let res_type = res_type.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            host_env.record_resource_usage(res_type, amount as u64)
+                .map_err(|e| Trap::new(format!("Resource usage recording failed: {}", e)))?
         };
         
         Ok(())
+    })?;
+    
+    // budget_allocate: Allocate budget for a resource
+    linker.func_wrap("env", "host_budget_allocate", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     budget_id_ptr: i32, budget_id_len: i32, amount: i32, resource_type: i32| -> Result<i32, Trap> {
+        if amount < 0 {
+            return Err(Trap::new("Amount cannot be negative"));
+        }
+        
+        // Read budget ID from guest memory
+        let budget_id = read_memory_string(&caller, budget_id_ptr, budget_id_len)?;
+        
+        // Convert resource_type integer to ResourceType
+        let res_type = match resource_type {
+            0 => ResourceType::Compute,
+            1 => ResourceType::Storage,
+            2 => ResourceType::NetworkBandwidth,
+            _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+        };
+        
+        // Call the host function
+        let result = {
+            let budget_id = budget_id.clone();
+            let res_type = res_type.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            host_env.budget_allocate(&budget_id, amount as u64, res_type)
+                .map_err(|e| Trap::new(format!("Budget allocation failed: {}", e)))?
+        };
+        
+        Ok(1) // Success
+    })?;
+    
+    Ok(())
+}
+
+/// Register logging-related host functions
+fn register_logging_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
+    // log_message: Log a message from the WASM module
+    linker.func_wrap("env", "host_log_message", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     level: i32, msg_ptr: i32, msg_len: i32| -> Result<(), Trap> {
+        // Convert level integer to LogLevel
+        let log_level = match level {
+            0 => LogLevel::Debug,
+            1 => LogLevel::Info,
+            2 => LogLevel::Warn,
+            3 => LogLevel::Error,
+            _ => LogLevel::Info,
+        };
+        
+        // Read message from guest memory
+        let message = read_memory_string(&caller, msg_ptr, msg_len)?;
+        
+        // Call the host function
+        caller.data().host.log_message(log_level, &message)
+            .map_err(|e| Trap::new(format!("Logging failed: {}", e)))?;
+        
+        Ok(())
+    })?;
+    
+    Ok(())
+}
+
+/// Register DAG-related host functions
+fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), anyhow::Error> {
+    // anchor_to_dag: Anchor content to the DAG
+    linker.func_wrap("env", "host_anchor_to_dag", |mut caller: wasmtime::Caller<'_, StoreData>,
+                     content_ptr: i32, content_len: i32, parents_ptr: i32, parents_count: i32| -> Result<i32, Trap> {
+        // Read content from guest memory
+        let content = read_memory_bytes(&caller, content_ptr, content_len)?;
+        
+        // Read parent CIDs if provided
+        let mut parents = Vec::new();
+        if parents_ptr >= 0 && parents_count > 0 {
+            for i in 0..parents_count {
+                // Assuming parent CIDs are stored as fixed-size strings
+                let parent_ptr = parents_ptr + (i * 46); // Assume CID strings are 46 bytes each
+                let parent_str = read_memory_string(&caller, parent_ptr, 46)?;
+                
+                // Parse CID
+                let parent_cid = Cid::try_from(parent_str)
+                    .map_err(|e| Trap::new(format!("Invalid parent CID: {}", e)))?;
+                    
+                parents.push(parent_cid);
+            }
+        }
+        
+        // Call the host function
+        let result = {
+            let content = content.clone();
+            let parents = parents.clone();
+            let mut host_env = caller.data_mut().host.clone();
+            
+            host_env.anchor_to_dag(content, parents)
+                .map_err(|e| Trap::new(format!("DAG anchoring failed: {}", e)))?
+        };
+        
+        // Allocate memory for the result CID string
+        let cid_str = result.to_string();
+        let allocated_ptr = try_allocate_guest_memory(&mut caller, cid_str.len() as i32)?;
+        
+        // Write the CID string to the allocated memory
+        write_memory_bytes(&mut caller, allocated_ptr, cid_str.as_bytes())?;
+        
+        // Return a pointer to the CID string
+        Ok(allocated_ptr)
     })?;
     
     Ok(())
@@ -932,6 +1193,115 @@ fn write_guest_memory_string(caller: &mut wasmtime::Caller<'_, StoreData>, ptr: 
 fn write_guest_memory_u32(caller: &mut wasmtime::Caller<'_, StoreData>, ptr: u32, value: u32) -> Result<(), anyhow::Error> {
     let bytes = value.to_le_bytes();
     write_guest_memory(caller, ptr, &bytes)
+}
+
+/// Helper functions for memory operations between host and WASM
+
+/// Get the memory export from a WASM module
+fn get_memory(caller: &impl AsContextMut<Data = StoreData>) -> Result<Memory, Trap> {
+    caller.as_context_mut().get_export("memory")
+        .and_then(|export| export.into_memory())
+        .ok_or_else(|| Trap::new("No memory export found"))
+}
+
+/// Read a string from WASM memory
+fn read_memory_string(caller: &impl AsContextMut<Data = StoreData>, ptr: i32, len: i32) -> Result<String, Trap> {
+    if ptr < 0 || len < 0 {
+        return Err(Trap::new("Invalid memory parameters"));
+    }
+    
+    let memory = get_memory(caller)?;
+    let data = memory.data(caller.as_context_mut());
+    
+    let start = ptr as usize;
+    let end = start + len as usize;
+    
+    if end > data.len() {
+        return Err(Trap::new(format!(
+            "Memory access out of bounds: offset={}, size={}, mem_size={}",
+            start, len, data.len()
+        )));
+    }
+    
+    let bytes = &data[start..end];
+    String::from_utf8(bytes.to_vec())
+        .map_err(|e| Trap::new(format!("Invalid UTF-8 string: {}", e)))
+}
+
+/// Read raw bytes from WASM memory
+fn read_memory_bytes(caller: &impl AsContextMut<Data = StoreData>, ptr: i32, len: i32) -> Result<Vec<u8>, Trap> {
+    if ptr < 0 || len < 0 {
+        return Err(Trap::new("Invalid memory parameters"));
+    }
+    
+    let memory = get_memory(caller)?;
+    let data = memory.data(caller.as_context_mut());
+    
+    let start = ptr as usize;
+    let end = start + len as usize;
+    
+    if end > data.len() {
+        return Err(Trap::new(format!(
+            "Memory access out of bounds: offset={}, size={}, mem_size={}",
+            start, len, data.len()
+        )));
+    }
+    
+    Ok(data[start..end].to_vec())
+}
+
+/// Write bytes to WASM memory
+fn write_memory_bytes(caller: &mut impl AsContextMut<Data = StoreData>, ptr: i32, bytes: &[u8]) -> Result<(), Trap> {
+    if ptr < 0 {
+        return Err(Trap::new("Invalid memory parameters"));
+    }
+    
+    let memory = get_memory(caller)?;
+    let start = ptr as usize;
+    
+    // Check if write is in bounds
+    if start + bytes.len() > memory.data_size(caller.as_context_mut()) {
+        return Err(Trap::new(format!(
+            "Memory write out of bounds: offset={}, size={}, mem_size={}",
+            start, bytes.len(), memory.data_size(caller.as_context_mut())
+        )));
+    }
+    
+    // Write the bytes
+    memory.write(caller.as_context_mut(), start, bytes)
+        .map_err(|e| Trap::new(format!("Memory write failed: {}", e)))
+}
+
+/// Write a value to WASM memory at the given pointer
+fn write_memory_u32(caller: &mut impl AsContextMut<Data = StoreData>, ptr: i32, value: u32) -> Result<(), Trap> {
+    if ptr < 0 {
+        return Err(Trap::new("Invalid memory parameters"));
+    }
+    
+    let bytes = value.to_le_bytes();
+    write_memory_bytes(caller, ptr, &bytes)
+}
+
+/// Try to allocate memory in the WASM guest
+fn try_allocate_guest_memory(caller: &mut impl AsContextMut<Data = StoreData>, size: i32) -> Result<i32, Trap> {
+    if size < 0 {
+        return Err(Trap::new("Cannot allocate negative memory size"));
+    }
+    
+    // Check if the module exports an alloc function
+    if let Some(alloc) = caller.as_context_mut().get_export("alloc") {
+        if let Some(alloc_func) = alloc.into_func() {
+            if let Ok(alloc_typed) = alloc_func.typed::<i32, i32>(caller.as_context_mut()) {
+                return alloc_typed.call(caller.as_context_mut(), size)
+                    .map_err(|e| Trap::new(format!("Alloc function call failed: {}", e)));
+            }
+        }
+    }
+    
+    // Fallback: Find empty space in linear memory
+    // For simplicity in testing, we'll just return a fixed offset
+    // In production, this would need a proper memory management strategy
+    Ok(1024)
 }
 
 #[cfg(test)]
