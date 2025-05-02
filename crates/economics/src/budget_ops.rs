@@ -31,15 +31,13 @@ pub trait BudgetStorage: Send + Sync {
 #[async_trait]
 impl<T: icn_storage::StorageBackend + Send + Sync> BudgetStorage for T {
     async fn store_budget(&mut self, key: &str, data: Vec<u8>) -> EconomicsResult<()> {
-        let cid = self.put(&data)
-            .await
-            .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))?;
+        // Generate a key CID from the string key
+        let key_str = format!("budget::{}", key);
+        let hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+        let key_cid = cid::Cid::new_v1(0x71, hash);
         
-        // Use a special key to remember the mapping from string key to CID
-        let map_key = format!("key_to_cid::{}", key);
-        let cid_bytes = cid.to_bytes();
-        
-        self.put(&cid_bytes)
+        // Store the data directly using key-value operations
+        self.put_kv(key_cid, data)
             .await
             .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))?;
         
@@ -47,49 +45,38 @@ impl<T: icn_storage::StorageBackend + Send + Sync> BudgetStorage for T {
     }
     
     async fn get_budget(&self, key: &str) -> EconomicsResult<Option<Vec<u8>>> {
-        // Use a special key to find the CID
-        let map_key = format!("key_to_cid::{}", key);
+        // Generate the same key CID from the string key
+        let key_str = format!("budget::{}", key);
+        let hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+        let key_cid = cid::Cid::new_v1(0x71, hash);
         
-        // This is a simplification - in a real implementation we'd need to handle key->CID mapping
-        // For our implementation tests, we'll use a mock that handles this differently
-        
-        // Just return None for now, the mock implementation for tests will work directly
-        Ok(None)
+        // Retrieve the data using key-value operations
+        self.get_kv(&key_cid)
+            .await
+            .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))
     }
     
     async fn put_with_key(&mut self, key_cid: Cid, data: Vec<u8>) -> EconomicsResult<()> {
-        // First, store the actual data
-        let content_cid = self.put(&data)
+        // Use the key-value operations directly
+        self.put_kv(key_cid, data)
             .await
-            .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))?;
-        
-        // Then, store a mapping from the key CID to the content CID
-        // In a real implementation, we would need a way to store this mapping
-        // For now, let's just log it and assume the storage backend can handle CID-based keys
-        tracing::debug!("Mapping key CID {} to content CID {}", key_cid, content_cid);
-        
-        // Note: In a real implementation, we would add a specialized method to the 
-        // StorageBackend trait to handle CID-based keys directly. For testing purposes,
-        // the mock implementation can handle this differently.
-        
-        Ok(())
+            .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))
     }
     
     async fn get_by_cid(&self, key_cid: &Cid) -> EconomicsResult<Option<Vec<u8>>> {
-        // In a real implementation, we would:
-        // 1. Use the key_cid to look up the content CID
-        // 2. Use the content CID to retrieve the actual data
-        
-        // For now, this is a stub - the mock implementation will handle testing
-        tracing::debug!("Attempted to get data by CID {}", key_cid);
-        Ok(None)
+        // Use the key-value operations directly
+        self.get_kv(key_cid)
+            .await
+            .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))
     }
 }
 
 /// Mock implementation of BudgetStorage for testing
 #[derive(Default, Debug, Clone)]
 pub struct MockBudgetStorage {
+    /// Standard key-value storage for budgets (uses string keys)
     pub data: HashMap<String, Vec<u8>>,
+    /// CID-based key-value storage for authorizations and other structured data
     pub cid_data: HashMap<String, Vec<u8>>, // Store CID keys as strings for simplicity in tests
 }
 
@@ -100,6 +87,13 @@ impl MockBudgetStorage {
             data: HashMap::new(),
             cid_data: HashMap::new(),
         }
+    }
+    
+    /// Helper to get authorization data from the mock
+    pub fn get_stored_authorizations(&self) -> Vec<crate::ResourceAuthorization> {
+        self.cid_data.values()
+            .filter_map(|data| serde_json::from_slice(data).ok())
+            .collect()
     }
 }
 
@@ -539,8 +533,7 @@ pub async fn finalize_budget_proposal(
                     format!("Failed to serialize authorization: {}", e)
                 ))?;
             
-            // Store the authorization with CID key
-            // TODO: Add put_with_key to StorageBackend trait and impls if missing.
+            // Store the authorization with CID key using the put_with_key method
             storage.put_with_key(auth_key_cid, auth_data)
                 .await
                 .map_err(|e| EconomicsError::InvalidBudget(

@@ -69,6 +69,39 @@ pub type StorageResult<T> = Result<T, StorageError>;
 /// storage technologies (in-memory, local file system, distributed storage, etc.)
 #[async_trait]
 pub trait StorageBackend: Send + Sync {
+    /// Get a value by CID (deprecated, use get_blob or get_kv)
+    #[deprecated(since = "0.2.0", note = "use get_blob or get_kv instead")]
+    async fn get(&self, key: &Cid) -> StorageResult<Option<Vec<u8>>>;
+    
+    /// Put a value and return its CID (deprecated, use put_blob or put_kv)
+    #[deprecated(since = "0.2.0", note = "use put_blob or put_kv instead")]
+    async fn put(&self, value: &[u8]) -> StorageResult<Cid>;
+    
+    /// Check if a CID exists in storage (deprecated, use contains_blob or contains_kv)
+    #[deprecated(since = "0.2.0", note = "use contains_blob or contains_kv instead")]
+    async fn contains(&self, key: &Cid) -> StorageResult<bool>;
+    
+    /// Delete a value by CID (deprecated, use delete_blob or delete_kv)
+    #[deprecated(since = "0.2.0", note = "use delete_blob or delete_kv instead")]
+    async fn delete(&self, key: &Cid) -> StorageResult<()>;
+    
+    /// Start a transaction
+    async fn begin_transaction(&self) -> StorageResult<()>;
+    
+    /// Commit a transaction
+    async fn commit_transaction(&self) -> StorageResult<()>;
+    
+    /// Rollback a transaction
+    async fn rollback_transaction(&self) -> StorageResult<()>;
+    
+    /// Flush changes to persistent storage
+    async fn flush(&self) -> StorageResult<()>;
+    
+    /// List all CIDs in storage
+    async fn list_all(&self) -> StorageResult<Vec<Cid>> {
+        Err(StorageError::NotSupported("list_all operation not implemented for this backend".to_string()))
+    }
+    
     /// --- Blob Methods (Content-Addressed) ---
     
     /// Store a blob and return its content CID
@@ -98,51 +131,6 @@ pub trait StorageBackend: Send + Sync {
     
     /// Delete a value by its key CID
     async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()>;
-    
-    /// --- Transaction Methods ---
-    
-    /// Start a transaction
-    async fn begin_transaction(&self) -> StorageResult<()>;
-    
-    /// Commit a transaction
-    async fn commit_transaction(&self) -> StorageResult<()>;
-    
-    /// Rollback a transaction
-    async fn rollback_transaction(&self) -> StorageResult<()>;
-    
-    /// Flush changes to persistent storage
-    async fn flush(&self) -> StorageResult<()>;
-    
-    /// List all CIDs in storage (both content and key CIDs)
-    async fn list_all(&self) -> StorageResult<Vec<Cid>> {
-        Err(StorageError::NotSupported("list_all operation not implemented for this backend".to_string()))
-    }
-    
-    /// --- Legacy Methods (Deprecated) ---
-    
-    /// Get a value by CID (deprecated, use get_blob or get_kv)
-    #[deprecated(since = "0.2.0", note = "use get_blob or get_kv instead")]
-    async fn get(&self, key: &Cid) -> StorageResult<Option<Vec<u8>>> {
-        self.get_blob(key).await
-    }
-    
-    /// Put a value and return its CID (deprecated, use put_blob or put_kv)
-    #[deprecated(since = "0.2.0", note = "use put_blob or put_kv instead")]
-    async fn put(&self, value: &[u8]) -> StorageResult<Cid> {
-        self.put_blob(value).await
-    }
-    
-    /// Check if a CID exists in storage (deprecated, use contains_blob or contains_kv)
-    #[deprecated(since = "0.2.0", note = "use contains_blob or contains_kv instead")]
-    async fn contains(&self, key: &Cid) -> StorageResult<bool> {
-        self.contains_blob(key).await
-    }
-    
-    /// Delete a value by CID (deprecated, use delete_blob or delete_kv)
-    #[deprecated(since = "0.2.0", note = "use delete_blob or delete_kv instead")]
-    async fn delete(&self, key: &Cid) -> StorageResult<()> {
-        self.delete_blob(key).await
-    }
 }
 
 /// Thread-safe, async in-memory implementation of StorageBackend
@@ -163,52 +151,81 @@ impl AsyncInMemoryStorage {
 
 #[async_trait]
 impl StorageBackend for AsyncInMemoryStorage {
-    async fn get_blob(&self, content_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+    // Legacy methods (deprecated)
+    #[allow(deprecated)]
+    async fn get(&self, key: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            if let Some(value) = tx.get(key) {
+                return Ok(value.clone());
+            }
+        }
+        
         let data_lock = self.data.lock().await;
-        Ok(data_lock.get(content_cid).cloned())
+        Ok(data_lock.get(key).cloned())
     }
     
-    async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool> {
-        let data_lock = self.data.lock().await;
-        Ok(data_lock.contains_key(content_cid))
-    }
-    
-    async fn delete_blob(&self, content_cid: &Cid) -> StorageResult<()> {
-        let mut data_lock = self.data.lock().await;
-        data_lock.remove(content_cid);
-        Ok(())
-    }
-    
-    async fn put_blob(&self, value_bytes: &[u8]) -> StorageResult<Cid> {
+    #[allow(deprecated)]
+    async fn put(&self, value: &[u8]) -> StorageResult<Cid> {
         // Hash the content with SHA-256
-        let mh = Code::Sha2_256.digest(value_bytes);
+        let mh = Code::Sha2_256.digest(value);
         
         // Create CID v0 with the digest
         let cid = Cid::new_v0(mh)
             .map_err(|e| StorageError::InvalidCid(e.to_string()))?;
         
-        let mut data_lock = self.data.lock().await;
-        data_lock.insert(cid, value_bytes.to_vec());
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            let mut tx_clone = tx.clone();
+            tx_clone.insert(cid, Some(value.to_vec()));
+            drop(tx_lock);
+            
+            let mut tx_lock = self.transaction.lock().await;
+            *tx_lock = Some(tx_clone);
+        } else {
+            let mut data_lock = self.data.lock().await;
+            data_lock.insert(cid, value.to_vec());
+        }
         
         Ok(cid)
     }
     
-    async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+    #[allow(deprecated)]
+    async fn contains(&self, key: &Cid) -> StorageResult<bool> {
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            if let Some(value) = tx.get(key) {
+                return Ok(value.is_some());
+            }
+        }
+        
         let data_lock = self.data.lock().await;
-        Ok(data_lock.get(key_cid).cloned())
+        Ok(data_lock.contains_key(key))
     }
     
-    async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool> {
-        let data_lock = self.data.lock().await;
-        Ok(data_lock.contains_key(key_cid))
-    }
-    
-    async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()> {
-        let mut data_lock = self.data.lock().await;
-        data_lock.remove(key_cid);
+    #[allow(deprecated)]
+    async fn delete(&self, key: &Cid) -> StorageResult<()> {
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            let mut tx_clone = tx.clone();
+            tx_clone.insert(*key, None);
+            drop(tx_lock);
+            
+            let mut tx_lock = self.transaction.lock().await;
+            *tx_lock = Some(tx_clone);
+        } else {
+            let mut data_lock = self.data.lock().await;
+            data_lock.remove(key);
+        }
+        
         Ok(())
     }
     
+    // Transaction methods
     async fn begin_transaction(&self) -> StorageResult<()> {
         let mut tx_lock = self.transaction.lock().await;
         
@@ -262,6 +279,64 @@ impl StorageBackend for AsyncInMemoryStorage {
     async fn list_all(&self) -> StorageResult<Vec<Cid>> {
         let data_lock = self.data.lock().await;
         Ok(data_lock.keys().cloned().collect())
+    }
+    
+    // New blob methods
+    async fn put_blob(&self, value_bytes: &[u8]) -> StorageResult<Cid> {
+        // Since our old put method works the same as put_blob for this implementation,
+        // we can just call it directly
+        self.put(value_bytes).await
+    }
+    
+    async fn get_blob(&self, content_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // Since our old get method works the same as get_blob for this implementation,
+        // we can just call it directly
+        self.get(content_cid).await
+    }
+    
+    async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool> {
+        // Call the legacy method
+        self.contains(content_cid).await
+    }
+    
+    async fn delete_blob(&self, content_cid: &Cid) -> StorageResult<()> {
+        // Call the legacy method
+        self.delete(content_cid).await
+    }
+    
+    // New key-value methods
+    async fn put_kv(&self, key_cid: Cid, value_bytes: Vec<u8>) -> StorageResult<()> {
+        // For this implementation, put_kv is simply a direct insert into the map with the provided key
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            let mut tx_clone = tx.clone();
+            tx_clone.insert(key_cid, Some(value_bytes));
+            drop(tx_lock);
+            
+            let mut tx_lock = self.transaction.lock().await;
+            *tx_lock = Some(tx_clone);
+        } else {
+            let mut data_lock = self.data.lock().await;
+            data_lock.insert(key_cid, value_bytes);
+        }
+        
+        Ok(())
+    }
+    
+    async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // For this implementation, get_kv is the same as get_blob
+        self.get(key_cid).await
+    }
+    
+    async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool> {
+        // For this implementation, contains_kv is the same as contains_blob
+        self.contains(key_cid).await
+    }
+    
+    async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()> {
+        // For this implementation, delete_kv is the same as delete_blob
+        self.delete(key_cid).await
     }
 }
 
@@ -562,6 +637,97 @@ impl DistributedStorage for InMemoryBlobStore {
 mod tests {
     use super::*;
     use std::error::Error;
+    
+    #[tokio::test]
+    async fn test_async_storage_blob_ops() -> Result<(), Box<dyn Error>> {
+        // Create a new in-memory storage
+        let storage = AsyncInMemoryStorage::new();
+        
+        // Test blob operations
+        let test_data = b"Test data for blob operations".to_vec();
+        let cid = storage.put_blob(&test_data).await?;
+        
+        // Verify the blob can be retrieved
+        let retrieved = storage.get_blob(&cid).await?.unwrap();
+        assert_eq!(retrieved, test_data);
+        
+        // Verify contains operation
+        assert!(storage.contains_blob(&cid).await?);
+        
+        // Delete the blob
+        storage.delete_blob(&cid).await?;
+        
+        // Verify it's gone
+        assert!(!storage.contains_blob(&cid).await?);
+        assert!(storage.get_blob(&cid).await?.is_none());
+        
+        Ok(())
+    }
+    
+    #[tokio::test]
+    async fn test_async_storage_kv_ops() -> Result<(), Box<dyn Error>> {
+        // Create a new in-memory storage
+        let storage = AsyncInMemoryStorage::new();
+        
+        // Create a key CID
+        let key_str = "test_key";
+        let key_hash = Code::Sha2_256.digest(key_str.as_bytes());
+        let key_cid = Cid::new_v1(0x71, key_hash);
+        
+        // Test KV operations
+        let test_value = b"Test value for KV operations".to_vec();
+        storage.put_kv(key_cid, test_value.clone()).await?;
+        
+        // Verify the value can be retrieved
+        let retrieved = storage.get_kv(&key_cid).await?.unwrap();
+        assert_eq!(retrieved, test_value);
+        
+        // Verify contains operation
+        assert!(storage.contains_kv(&key_cid).await?);
+        
+        // Delete the value
+        storage.delete_kv(&key_cid).await?;
+        
+        // Verify it's gone
+        assert!(!storage.contains_kv(&key_cid).await?);
+        assert!(storage.get_kv(&key_cid).await?.is_none());
+        
+        Ok(())
+    }
+    
+    #[tokio::test]
+    async fn test_async_storage_transactions() -> Result<(), Box<dyn Error>> {
+        // Create a new in-memory storage
+        let storage = AsyncInMemoryStorage::new();
+        
+        // Create test data
+        let test_data = b"Test data for transactions".to_vec();
+        
+        // Begin a transaction
+        storage.begin_transaction().await?;
+        
+        // Perform operations inside the transaction
+        let cid = storage.put_blob(&test_data).await?;
+        
+        // The data should be accessible within the transaction
+        assert!(storage.contains_blob(&cid).await?);
+        
+        // But not yet committed to the main storage
+        storage.rollback_transaction().await?;
+        
+        // After rollback, the data should not be accessible
+        assert!(!storage.contains_blob(&cid).await?);
+        
+        // Try again with a commit
+        storage.begin_transaction().await?;
+        let cid = storage.put_blob(&test_data).await?;
+        storage.commit_transaction().await?;
+        
+        // Now the data should be accessible
+        assert!(storage.contains_blob(&cid).await?);
+        
+        Ok(())
+    }
     
     #[tokio::test]
     async fn test_in_memory_blob_store() -> Result<(), Box<dyn Error>> {
