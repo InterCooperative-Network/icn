@@ -27,7 +27,7 @@ use libp2p::{
 use icn_dag::DagNode;
 use icn_identity::{
     IdentityId, IdentityScope, TrustBundle, 
-    QuorumProof
+    QuorumProof, QuorumConfig
 };
 use icn_storage::ReplicationFactor;
 use multihash::{self, MultihashDigest};
@@ -39,6 +39,9 @@ pub mod network;
 
 // Export signing module
 pub mod signing;
+
+// Export roles module
+pub mod roles;
 
 /// Errors that can occur during federation operations
 #[derive(Debug, Error)]
@@ -119,7 +122,7 @@ impl GuardianMandate {
     }
     
     /// Verify this mandate
-    pub async fn verify(&self) -> FederationResult<bool> {
+    pub async fn verify(&self, storage: &Mutex<dyn icn_storage::StorageBackend + Send + Sync>) -> FederationResult<bool> {
         // Recalculate the mandate content hash
         let mandate_hash = signing::calculate_mandate_hash(
             &self.action, 
@@ -129,22 +132,18 @@ impl GuardianMandate {
             &self.guardian
         );
         
-        // TODO(V3): Replace with actual lookup of guardians for the mandate scope from storage/config
-        // For now, use a placeholder list that includes the guardians in our tests
-        // In a real implementation, this would query an authoritative source based on self.scope and self.scope_id
-        let dummy_authorized_guardians = match &self.quorum_proof.votes {
-            votes if !votes.is_empty() => {
-                // For testing purposes only: Include all signers as authorized guardians
-                // This is only for tests to pass - in production we'd have a proper authority lookup
-                votes.iter()
-                    .map(|(signer_did, _)| signer_did.clone())
-                    .collect::<Vec<_>>()
-            },
-            _ => vec![self.guardian.clone()], // Default to just the issuer as authorized
-        };
+        // Look up authorized guardians for this mandate's scope
+        let authorized_guardians = roles::get_authorized_guardians(
+            self.scope_id.0.as_str(), 
+            storage
+        ).await?;
+        
+        if authorized_guardians.is_empty() {
+            warn!("No authorized guardians found for scope: {}", self.scope_id.0);
+        }
         
         // Verify the quorum proof against the authorized guardians
-        self.quorum_proof.verify(&mandate_hash, &dummy_authorized_guardians).await
+        self.quorum_proof.verify(&mandate_hash, &authorized_guardians).await
             .map_err(|e| FederationError::InvalidMandate(e.to_string()))
     }
 }
@@ -599,19 +598,25 @@ async fn handle_behavior_event(
                 // Calculate the hash of the received bundle for later verification
                 let bundle_hash = received_bundle.calculate_hash();
                 
-                // TODO(V3): Replace with actual lookup of guardians for federation_id from storage/config
-                // For tests, use a placeholder list that includes the guardians in our test federation
-                // In a real implementation, this would query an authoritative source based on received_bundle.federation_id
-                let dummy_authorized_guardians = if let Some(proof) = &received_bundle.proof {
-                    // For testing purposes, accept any guardian DIDs that signed the bundle
-                    // This essentially allows the test to pass while preserving the authorization check mechanism
-                    proof.votes.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>()
-                } else {
-                    vec![]
+                // Look up authorized guardians for this federation
+                let authorized_guardians = match roles::get_authorized_guardians(
+                    &received_bundle.federation_id, 
+                    &storage
+                ).await {
+                    Ok(guardians) => guardians,
+                    Err(e) => {
+                        error!("Failed to look up authorized guardians for federation {}: {}", 
+                               received_bundle.federation_id, e);
+                        return;
+                    }
                 };
                 
+                if authorized_guardians.is_empty() {
+                    warn!("No authorized guardians found for federation: {}", received_bundle.federation_id);
+                }
+                
                 // Verify the bundle with full cryptographic validation
-                match received_bundle.verify(&dummy_authorized_guardians).await {
+                match received_bundle.verify(&authorized_guardians).await {
                     Ok(true) => {
                         info!("TrustBundle validation passed for epoch {} (hash prefix: {:02x}{:02x}{:02x}{:02x})", 
                             received_bundle.epoch_id, 
