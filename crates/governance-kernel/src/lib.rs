@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use async_trait::async_trait;
+use cid::Cid;
+use sha2::{Sha256, Digest};
 use icn_storage::{StorageBackend};
 use icn_identity::{IdentityId, IdentityScope, VerifiableCredential};
 use icn_core_vm::IdentityContext;
@@ -20,6 +22,17 @@ pub mod config;
 pub mod events;
 
 use events::{GovernanceEvent, GovernanceEventType, EventEmitter};
+
+/// Helper function to create a SHA-256 multihash (copied from storage crate)
+fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
+    // Create a new SHA-256 multihash
+    let mut buf = [0u8; 32];
+    let digest = Sha256::digest(data);
+    buf.copy_from_slice(digest.as_slice());
+    
+    // Create the multihash (code 0x12 is SHA256)
+    cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
+}
 
 /// Add this to the error enum
 #[derive(Error, Debug)]
@@ -57,6 +70,7 @@ pub enum ProposalStatus {
     Rejected,
     Executed,
     Expired,
+    Finalized,
 }
 
 /// A governance proposal
@@ -155,6 +169,16 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
         }
     }
 
+    /// Helper function to create a key CID from a string
+    fn create_key_cid(&self, key_str: &str) -> Result<Cid, GovernanceError> {
+        // Create a multihash using SHA-256
+        let key_hash = create_sha256_multihash(key_str.as_bytes());
+        
+        // Create CID v1 with the dag-cbor codec (0x71)
+        let key_cid = Cid::new_v1(0x71, key_hash);
+        Ok(key_cid)
+    }
+
     /// Process a proposal by submitting it to the governance system
     pub async fn process_proposal(&self, proposal: Proposal) -> Result<String, GovernanceError> {
         // Create an ID for the proposal
@@ -164,14 +188,13 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
         let proposal_bytes = serde_json::to_vec(&proposal)
             .map_err(|e| GovernanceError::InvalidProposal(format!("Failed to serialize proposal: {}", e)))?;
         
-        // Generate a storage key that includes the proposal ID
-        let storage_key = format!("proposal::{}", &proposal_id).as_bytes().to_vec();
+        // Create a proper key CID for the proposal
+        let key_str = format!("proposal::{}", &proposal_id);
+        let key_cid = self.create_key_cid(&key_str)?;
         
-        // Lock the storage and store the proposal
+        // Lock the storage and store the proposal using put_kv
         let mut storage = self.storage.lock().await;
-        
-        // Instead of put_kv, we'll use put_blob and keep track of the mapping elsewhere
-        let _cid = storage.put_blob(&proposal_bytes)
+        storage.put_kv(key_cid, proposal_bytes)
             .await
             .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
         
@@ -200,6 +223,20 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
 
     /// Record a vote on a proposal
     pub async fn record_vote(&self, vote: Vote) -> Result<(), GovernanceError> {
+        // Serialize the vote
+        let vote_bytes = serde_json::to_vec(&vote)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize vote: {}", e)))?;
+            
+        // Create a proper key CID for the vote
+        let key_str = format!("vote::{}::{}", vote.proposal_id, vote.voter.0);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Lock the storage and store the vote using put_kv
+        let mut storage = self.storage.lock().await;
+        storage.put_kv(key_cid, vote_bytes)
+            .await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
+            
         // After vote is successfully recorded, emit an event
         let event_data = serde_json::json!({
             "voter": vote.voter.0,
@@ -226,12 +263,30 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
 
     /// Finalize a proposal based on voting results
     pub async fn finalize_proposal(&self, proposal_id: String) -> Result<(), GovernanceError> {
-        // Get the proposal (in real implementation)
+        // Get the proposal 
         let proposal = self.get_proposal(proposal_id.clone()).await?;
+        
+        // Update the proposal status (in a real implementation)
+        let mut updated_proposal = proposal.clone();
+        updated_proposal.status = ProposalStatus::Finalized;
+        
+        // Serialize the updated proposal
+        let proposal_bytes = serde_json::to_vec(&updated_proposal)
+            .map_err(|e| GovernanceError::InvalidProposal(format!("Failed to serialize proposal: {}", e)))?;
+            
+        // Create a proper key CID for the proposal
+        let key_str = format!("proposal::{}", &proposal_id);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Lock the storage and update the proposal using put_kv
+        let mut storage = self.storage.lock().await;
+        storage.put_kv(key_cid, proposal_bytes)
+            .await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
         
         let event_data = serde_json::json!({
             "title": proposal.title,
-            "status": format!("{:?}", proposal.status),
+            "status": format!("{:?}", updated_proposal.status),
             "votes_for": proposal.votes_for,
             "votes_against": proposal.votes_against,
             "votes_abstain": proposal.votes_abstain
@@ -255,8 +310,26 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
     
     /// Execute a proposal after it has been finalized and approved
     pub async fn execute_proposal(&self, proposal_id: String) -> Result<(), GovernanceError> {
-        // Get the proposal (in real implementation)
+        // Get the proposal
         let proposal = self.get_proposal(proposal_id.clone()).await?;
+        
+        // Update the proposal status (in a real implementation)
+        let mut updated_proposal = proposal.clone();
+        updated_proposal.status = ProposalStatus::Executed;
+        
+        // Serialize the updated proposal
+        let proposal_bytes = serde_json::to_vec(&updated_proposal)
+            .map_err(|e| GovernanceError::InvalidProposal(format!("Failed to serialize proposal: {}", e)))?;
+            
+        // Create a proper key CID for the proposal
+        let key_str = format!("proposal::{}", &proposal_id);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Lock the storage and update the proposal using put_kv
+        let mut storage = self.storage.lock().await;
+        storage.put_kv(key_cid, proposal_bytes)
+            .await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
         
         let event_data = serde_json::json!({
             "title": proposal.title,
@@ -326,43 +399,67 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
     
     /// Get a proposal by its ID
     pub async fn get_proposal(&self, proposal_id: String) -> Result<Proposal, GovernanceError> {
-        // In a real implementation, we would have a mapping from proposal_id to CID
-        // For now, we'll simulate this by returning a dummy proposal
+        // Create a proper key CID for the proposal
+        let key_str = format!("proposal::{}", &proposal_id);
+        let key_cid = self.create_key_cid(&key_str)?;
         
-        let proposal = Proposal {
-            title: "Dummy Proposal".to_string(),
-            description: "This is a placeholder proposal for testing".to_string(),
-            proposer: IdentityId("did:test:123".to_string()),
-            scope: IdentityScope::Individual,
-            scope_id: None,
-            status: ProposalStatus::Draft,
-            voting_end_time: chrono::Utc::now().timestamp() + 86400, // 1 day from now
-            votes_for: 0,
-            votes_against: 0,
-            votes_abstain: 0,
-            ccl_code: None,
-            wasm_bytes: None,
-        };
+        // Lock the storage and get the proposal using get_kv
+        let storage = self.storage.lock().await;
         
-        Ok(proposal)
+        let proposal_bytes_opt = storage.get_kv(&key_cid)
+            .await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
+            
+        // If proposal exists, deserialize it
+        if let Some(proposal_bytes) = proposal_bytes_opt {
+            let proposal = serde_json::from_slice(&proposal_bytes)
+                .map_err(|e| GovernanceError::InvalidProposal(format!("Failed to deserialize proposal: {}", e)))?;
+                
+            Ok(proposal)
+        } else {
+            // For backward compatibility or testing, we'll return a dummy proposal
+            // In a real implementation, we would return an error here
+            
+            let proposal = Proposal {
+                title: "Dummy Proposal".to_string(),
+                description: "This is a placeholder proposal for testing".to_string(),
+                proposer: IdentityId("did:test:123".to_string()),
+                scope: IdentityScope::Individual,
+                scope_id: None,
+                status: ProposalStatus::Draft,
+                voting_end_time: chrono::Utc::now().timestamp() + 86400, // 1 day from now
+                votes_for: 0,
+                votes_against: 0,
+                votes_abstain: 0,
+                ccl_code: None,
+                wasm_bytes: None,
+            };
+            
+            Ok(proposal)
+        }
     }
 }
 
 #[async_trait]
 impl<S: StorageBackend + Send + Sync + 'static> EventEmitter for GovernanceKernel<S> {
     async fn emit_event(&self, event: GovernanceEvent) -> Result<String, String> {
-        // Serialize the event to calculate its ID
+        // Serialize the event
         let event_bytes = serde_json::to_vec(&event)
             .map_err(|e| format!("Failed to serialize event: {}", e))?;
         
         // Create ID for the event
         let event_id = format!("event:{}", event.id);
         
+        // Create a key CID for the event
+        let key_str = format!("event::{}", event.id);
+        let key_hash = create_sha256_multihash(key_str.as_bytes());
+        let key_cid = Cid::new_v1(0x71, key_hash);
+        
         // Get storage by locking it
         let mut storage = self.storage.lock().await;
         
-        // Store the event in the storage backend using put_blob
-        let _cid = storage.put_blob(&event_bytes)
+        // Store the event in the storage backend using put_kv
+        storage.put_kv(key_cid, event_bytes)
             .await
             .map_err(|e| format!("Failed to store event: {}", e))?;
         

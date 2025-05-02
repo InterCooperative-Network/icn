@@ -22,6 +22,7 @@ proc-macro2 = "1.0"
 pest = "2.7"
 pest_derive = "2.7"
 anyhow = "1.0"
+sha2 = "0.10.6"
 icn-core-vm = { path = "../core-vm" }
 icn-identity = { path = "../identity" }
 icn-storage = { path = "../storage" }
