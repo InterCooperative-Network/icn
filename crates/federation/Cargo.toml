@@ -8,9 +8,16 @@ description = "Federation sync, Quorum, Guardian Mandates, and Blob replication 
 icn-identity = { path = "../identity" }
 icn-dag = { path = "../dag" }
 icn-storage = { path = "../storage" }
-libp2p = { workspace = true }
+
+# LibP2P dependencies
+libp2p = { version = "0.53", features = ["tokio", "tcp", "noise", "yamux", "gossipsub", "mdns", "kad", "request-response", "macros", "identify", "serde", "json"] }
+tokio = { version = "1.35", features = ["sync", "rt-multi-thread", "time", "macros", "io-util"] }
+futures = { version = "0.3", features = ["thread-pool"] }
+
+# Serialization/error handling
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true } 
+serde_json = { workspace = true }
+async-trait = { workspace = true } 

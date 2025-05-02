@@ -214,33 +214,29 @@ pub fn verify_signature(message: &[u8], signature: &Signature, did: &IdentityId)
 }
 
 /// Represents a verifiable credential
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VerifiableCredential {
-    /// The context of the credential
-    #[serde(rename = "@context")]
-    pub context: Vec<String>,
-    
-    /// The id of the credential
+    /// The ID of this credential
     pub id: String,
     
-    /// The types of the credential
+    /// The type(s) of this credential
     #[serde(rename = "type")]
-    pub types: Vec<String>,
+    pub credential_type: Vec<String>,
     
-    /// The issuer of the credential
+    /// The issuer of this credential
     pub issuer: String,
     
-    /// The issuance date of the credential
+    /// The issuance date of this credential
     pub issuanceDate: String,
     
-    /// The subject of the credential
+    /// The subject of this credential
     pub credentialSubject: serde_json::Value,
     
-    /// The proof of the credential (optional - for future JWS/ZK proofs)
+    /// The proof of this credential (optional - for future JWS/ZK proofs)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<serde_json::Value>,
     
-    /// The expiration date of the credential (optional)
+    /// The expiration date of this credential (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expirationDate: Option<String>,
 }
@@ -269,12 +265,8 @@ impl VerifiableCredential {
         let issuance_date = now.to_rfc3339();
         
         Self {
-            context: vec![
-                "https://www.w3.org/2018/credentials/v1".to_string(),
-                "https://icn.coop/credentials/v1".to_string(),
-            ],
             id: format!("urn:uuid:{}", Uuid::new_v4()),
-            types,
+            credential_type: types,
             issuer: issuer.0.clone(),
             issuanceDate: issuance_date,
             credentialSubject: serde_json::Value::Object(subject_map),
@@ -327,7 +319,7 @@ pub fn sign_credential(vc: VerifiableCredential, issuer_did: &str, _keypair: &Ke
 }
 
 /// Represents a trust bundle
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TrustBundle {
     /// The epoch ID of this trust bundle
     pub epoch_id: u64,
@@ -508,7 +500,7 @@ mod tests {
         );
         
         // Verify basic fields
-        assert_eq!(vc.types, vec!["VerifiableCredential".to_string(), "DeveloperCredential".to_string()]);
+        assert_eq!(vc.credential_type, vec!["VerifiableCredential".to_string(), "DeveloperCredential".to_string()]);
         assert_eq!(vc.issuer, issuer_id.0);
         
         // Check subject
