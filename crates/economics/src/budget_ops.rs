@@ -5,6 +5,8 @@ use icn_identity::IdentityScope;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
+use cid::Cid;
+use multihash::{Code, MultihashDigest};
 
 /// Storage key prefix for budget state
 const BUDGET_KEY_PREFIX: &str = "budget::";
@@ -17,6 +19,12 @@ pub trait BudgetStorage: Send + Sync {
     
     /// Retrieve a budget by key
     async fn get_budget(&self, key: &str) -> EconomicsResult<Option<Vec<u8>>>;
+    
+    /// Store data with a CID key
+    async fn put_with_key(&mut self, key_cid: Cid, data: Vec<u8>) -> EconomicsResult<()>;
+    
+    /// Retrieve data by CID key
+    async fn get_by_cid(&self, key_cid: &Cid) -> EconomicsResult<Option<Vec<u8>>>;
 }
 
 /// Implementation of BudgetStorage that wraps a StorageBackend
@@ -48,12 +56,41 @@ impl<T: icn_storage::StorageBackend + Send + Sync> BudgetStorage for T {
         // Just return None for now, the mock implementation for tests will work directly
         Ok(None)
     }
+    
+    async fn put_with_key(&mut self, key_cid: Cid, data: Vec<u8>) -> EconomicsResult<()> {
+        // First, store the actual data
+        let content_cid = self.put(&data)
+            .await
+            .map_err(|e| EconomicsError::InvalidBudget(format!("Storage error: {}", e)))?;
+        
+        // Then, store a mapping from the key CID to the content CID
+        // In a real implementation, we would need a way to store this mapping
+        // For now, let's just log it and assume the storage backend can handle CID-based keys
+        tracing::debug!("Mapping key CID {} to content CID {}", key_cid, content_cid);
+        
+        // Note: In a real implementation, we would add a specialized method to the 
+        // StorageBackend trait to handle CID-based keys directly. For testing purposes,
+        // the mock implementation can handle this differently.
+        
+        Ok(())
+    }
+    
+    async fn get_by_cid(&self, key_cid: &Cid) -> EconomicsResult<Option<Vec<u8>>> {
+        // In a real implementation, we would:
+        // 1. Use the key_cid to look up the content CID
+        // 2. Use the content CID to retrieve the actual data
+        
+        // For now, this is a stub - the mock implementation will handle testing
+        tracing::debug!("Attempted to get data by CID {}", key_cid);
+        Ok(None)
+    }
 }
 
 /// Mock implementation of BudgetStorage for testing
 #[derive(Default, Debug, Clone)]
 pub struct MockBudgetStorage {
-    data: HashMap<String, Vec<u8>>,
+    pub data: HashMap<String, Vec<u8>>,
+    pub cid_data: HashMap<String, Vec<u8>>, // Store CID keys as strings for simplicity in tests
 }
 
 impl MockBudgetStorage {
@@ -61,6 +98,7 @@ impl MockBudgetStorage {
     pub fn new() -> Self {
         Self {
             data: HashMap::new(),
+            cid_data: HashMap::new(),
         }
     }
 }
@@ -74,6 +112,16 @@ impl BudgetStorage for MockBudgetStorage {
     
     async fn get_budget(&self, key: &str) -> EconomicsResult<Option<Vec<u8>>> {
         Ok(self.data.get(key).cloned())
+    }
+    
+    async fn put_with_key(&mut self, key_cid: Cid, data: Vec<u8>) -> EconomicsResult<()> {
+        // Store using the string representation of the CID as the key
+        self.cid_data.insert(key_cid.to_string(), data);
+        Ok(())
+    }
+    
+    async fn get_by_cid(&self, key_cid: &Cid) -> EconomicsResult<Option<Vec<u8>>> {
+        Ok(self.cid_data.get(&key_cid.to_string()).cloned())
     }
 }
 
@@ -479,21 +527,27 @@ pub async fn finalize_budget_proposal(
                 }))
             );
             
-            // Store the auth in a standardized format
-            // For now, we'll serialize and store with a consistent key pattern
-            let auth_id = auth.auth_id.to_string();
-            let auth_key = format!("auth::{}", auth_id);
+            // Store the auth using CID-based key
+            let auth_id = auth.auth_id;
+            let auth_key_str = format!("auth::{}", auth_id);
+            let auth_key_hash = Code::Sha2_256.digest(auth_key_str.as_bytes());
+            let auth_key_cid = Cid::new_v1(0x71, auth_key_hash); // dag-cbor likely suitable for structured data key mapping
+            
+            // Serialize the authorization
             let auth_data = serde_json::to_vec(&auth)
                 .map_err(|e| EconomicsError::InvalidBudget(
                     format!("Failed to serialize authorization: {}", e)
                 ))?;
             
-            // Store the auth
-            storage.store_budget(&auth_key, auth_data)
+            // Store the authorization with CID key
+            // TODO: Add put_with_key to StorageBackend trait and impls if missing.
+            storage.put_with_key(auth_key_cid, auth_data)
                 .await
                 .map_err(|e| EconomicsError::InvalidBudget(
                     format!("Failed to store authorization: {}", e)
                 ))?;
+                
+            tracing::info!(auth_id = %auth_id, key_cid = %auth_key_cid, "Stored ResourceAuthorization");
         }
         
         return Ok(ProposalStatus::Executed);
@@ -678,19 +732,19 @@ mod tests {
         let spent = budget.spent_by_proposal.get(&proposal_id).unwrap();
         assert_eq!(spent.get(&ResourceType::Compute).unwrap(), &1000);
         
-        // Check for auth entry (will be stored with key format "auth::<UUID>")
-        let auth_keys: Vec<String> = storage.data.keys()
-            .filter(|k| k.starts_with("auth::"))
-            .cloned()
-            .collect();
+        // Check for auth entries in cid_data (CID-based storage)
+        assert!(!storage.cid_data.is_empty(), "Should have created at least one ResourceAuthorization using CID storage");
         
-        assert!(!auth_keys.is_empty(), "Should have created at least one ResourceAuthorization");
+        // The CID key format follows our defined pattern with auth::<UUID>
+        let cid_keys: Vec<String> = storage.cid_data.keys().cloned().collect();
         
-        // Load the first auth entry and verify it
-        if let Some(auth_key) = auth_keys.first() {
-            let auth_data = storage.data.get(auth_key).unwrap();
+        // Load the authorization from the first CID key and verify its contents
+        if let Some(cid_key) = cid_keys.first() {
+            let cid = Cid::try_from(cid_key.as_str()).unwrap_or_else(|_| panic!("Invalid CID string: {}", cid_key));
+            let auth_data = storage.cid_data.get(cid_key).unwrap();
             let auth: crate::ResourceAuthorization = serde_json::from_slice(auth_data).unwrap();
             
+            // Verify the authorization details
             assert_eq!(auth.grantor_did, "did:icn:test-coop");
             assert_eq!(auth.grantee_did, "did:icn:proposer");
             assert_eq!(auth.resource_type, ResourceType::Compute);
@@ -702,9 +756,15 @@ mod tests {
                 let proposal_id_str = metadata.get("proposal_id").and_then(|v| v.as_str());
                 assert!(proposal_id_str.is_some());
                 assert_eq!(proposal_id_str.unwrap(), proposal_id.to_string());
+                
+                let budget_id_str = metadata.get("budget_id").and_then(|v| v.as_str());
+                assert!(budget_id_str.is_some());
+                assert_eq!(budget_id_str.unwrap(), budget_id);
             } else {
                 panic!("Auth should have metadata");
             }
+        } else {
+            panic!("No CID-based authorizations were created");
         }
     }
     

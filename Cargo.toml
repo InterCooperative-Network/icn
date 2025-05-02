@@ -25,7 +25,7 @@ wasmer = "3.1"
 wasmer-wasi = "3.1"
 libp2p = "0.53"
 multihash = "0.16.3"
-cid = "0.8.6"
+cid = { version = "0.8.6", features = ["serde"] }
 did-method-key = "0.2"
 hashbrown = "0.14"
 merkle-cbt = "0.3"
