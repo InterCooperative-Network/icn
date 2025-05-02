@@ -241,6 +241,9 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
             _ => return Err(anyhow::anyhow!("Invalid vote type: {}", vote_type)),
         };
         
+        // Get voter DID from caller context
+        let voter_did = caller.data().ctx.caller_did.clone();
+        
         // Call the host function
         {
             let budget_id = budget_id.clone();
@@ -284,10 +287,13 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
         if status_ptr >= 0 {
             let status_int = match status {
                 icn_economics::ProposalStatus::Proposed => 0,
-                icn_economics::ProposalStatus::Approved => 1,
-                icn_economics::ProposalStatus::Rejected => 2,
-                icn_economics::ProposalStatus::Completed => 3,
-                icn_economics::ProposalStatus::Cancelled => 4,
+                icn_economics::ProposalStatus::VotingOpen => 1,
+                icn_economics::ProposalStatus::VotingClosed => 2,
+                icn_economics::ProposalStatus::Approved => 3,
+                icn_economics::ProposalStatus::Rejected => 4,
+                icn_economics::ProposalStatus::Executed => 5,
+                icn_economics::ProposalStatus::Failed => 6,
+                icn_economics::ProposalStatus::Cancelled => 7,
             };
             crate::mem_helpers::write_memory_u32(&mut caller, status_ptr, status_int)?;
         }
@@ -324,10 +330,13 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
         if status_ptr >= 0 {
             let status_int = match status {
                 icn_economics::ProposalStatus::Proposed => 0,
-                icn_economics::ProposalStatus::Approved => 1,
-                icn_economics::ProposalStatus::Rejected => 2,
-                icn_economics::ProposalStatus::Completed => 3,
-                icn_economics::ProposalStatus::Cancelled => 4,
+                icn_economics::ProposalStatus::VotingOpen => 1,
+                icn_economics::ProposalStatus::VotingClosed => 2,
+                icn_economics::ProposalStatus::Approved => 3,
+                icn_economics::ProposalStatus::Rejected => 4,
+                icn_economics::ProposalStatus::Executed => 5,
+                icn_economics::ProposalStatus::Failed => 6,
+                icn_economics::ProposalStatus::Cancelled => 7,
             };
             crate::mem_helpers::write_memory_u32(&mut caller, status_ptr, status_int)?;
         }

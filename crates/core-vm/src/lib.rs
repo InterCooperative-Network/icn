@@ -31,10 +31,12 @@ mod storage_helpers;
 mod economics_helpers;
 mod logging_helpers;
 mod dag_helpers;
+mod cid_utils;
 
 // Add this after imports, before existing modules
 mod blob_storage;
 use blob_storage::InMemoryBlobStore;
+use cid_utils::{convert_to_storage_cid, convert_from_storage_cid};
 
 /// Log level for VM execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -379,35 +381,31 @@ impl HostEnvironment for ConcreteHostEnvironment {
         // Track resource usage
         self.record_resource_usage(ResourceType::Storage, 1000)?;
         
-        // Convert to storage CID type
-        let storage_cid = convert_to_storage_cid(&key)
+        // Convert to storage CID type using utility function
+        let storage_cid = cid_utils::convert_to_storage_cid(&key)
             .map_err(|e| HostError::StorageError(e))?;
         
         // Clone the storage to avoid holding the lock across await points
-        let storage_clone = self.storage.clone();
+        let storage_clone = Arc::clone(&self.storage);
         
-        // Using futures::executor::block_on for synchronous operations
-        let maybe_data = futures::executor::block_on(async move {
-            // Acquire lock
-            let guard = match storage_clone.lock() {
-                Ok(guard) => guard,
-                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
-            };
+        // Get the data, making sure to drop the MutexGuard before awaiting
+        let data = {
+            // Acquire lock in a block scope
+            let guard = storage_clone.lock()
+                .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
             
-            // Call get() which returns a future
-            let data_result = match guard.get(&storage_cid).await {
-                Ok(data) => data,
-                Err(e) => return Err(HostError::StorageError(e.to_string())),
-            };
+            // Clone the data out while we still have the lock
+            let result = guard.get(&storage_cid);
             
-            // Clone the data while we still have the lock
-            let cloned_data = data_result.map(|data| data.clone());
+            // Explicitly drop the guard before awaiting
+            drop(guard);
             
-            // Return result
-            Ok::<Option<Vec<u8>>, HostError>(cloned_data)
-        })?;
+            // Now we can safely await
+            result.await
+                .map_err(|e| HostError::StorageError(e.to_string()))?
+        };
         
-        Ok(maybe_data)
+        Ok(data)
     }
     
     async fn storage_put(&mut self, _key: Cid, value: Vec<u8>) -> HostResult<()> {
@@ -691,7 +689,7 @@ impl HostEnvironment for ConcreteHostEnvironment {
         icn_economics::budget_ops::record_budget_vote(
             &budget_id, 
             proposal_id, 
-            &voter_did, 
+            voter_did.clone(), // Clone here to avoid ownership issues
             vote, 
             &mut adapter
         )

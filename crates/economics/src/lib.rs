@@ -366,17 +366,36 @@ pub struct ParticipatoryBudget {
     pub end_timestamp: i64,
 }
 
+/// Voting method for budget proposals
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VotingMethod {
+    /// Simple majority voting (>50%)
+    SimpleMajority,
+    
+    /// Quadratic voting (votes weighted by square root of stake)
+    Quadratic,
+    
+    /// Threshold voting (requires specific % of yes votes)
+    Threshold,
+}
+
 /// Configuration rules for budget governance derived from CCL
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetRulesConfig {
-    /// Voting method (e.g., "quadratic_voting", "simple_majority")
-    pub voting_method: Option<String>,
+    /// Voting method for this budget
+    pub voting_method: Option<VotingMethod>,
     
     /// Resource categories with allocation constraints
     pub categories: Option<HashMap<String, CategoryRule>>,
     
-    /// Minimum participants needed for decisions
+    /// Minimum participants needed for decisions (quorum)
     pub min_participants: Option<u32>,
+    
+    /// Percentage of votes needed for quorum (0-100)
+    pub quorum_percentage: Option<u8>,
+    
+    /// Percentage of votes needed for approval threshold (0-100)
+    pub threshold_percentage: Option<u8>,
     
     /// Other custom rules specific to this budget
     pub custom_rules: Option<serde_json::Value>,
@@ -398,17 +417,26 @@ pub struct CategoryRule {
 /// Status of a budget proposal
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProposalStatus {
-    /// Proposal has been submitted but not yet approved
+    /// Proposal has been submitted but not yet opened for voting
     Proposed,
     
-    /// Proposal has been approved for implementation
+    /// Proposal is open for voting
+    VotingOpen,
+    
+    /// Voting period has closed but not yet tallied
+    VotingClosed,
+    
+    /// Proposal has been approved
     Approved,
     
     /// Proposal has been rejected
     Rejected,
     
-    /// Proposal has been implemented and completed
-    Completed,
+    /// Proposal has been executed (resources allocated)
+    Executed,
+    
+    /// Proposal execution has failed
+    Failed,
     
     /// Proposal has been cancelled
     Cancelled,
