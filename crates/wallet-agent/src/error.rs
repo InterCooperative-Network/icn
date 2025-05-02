@@ -18,6 +18,24 @@ pub enum AgentError {
     #[error("Credential error: {0}")]
     CredentialError(String),
     
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
+    
+    #[error("Authentication error: {0}")]
+    AuthenticationError(String),
+    
+    #[error("Permission error: {0}")]
+    PermissionError(String),
+    
+    #[error("Resource not found: {0}")]
+    ResourceNotFound(String),
+    
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
+    
+    #[error("Server error: {0}")]
+    ServerError(String),
+    
     #[error("Core wallet error: {0}")]
     CoreError(#[from] CoreError),
 }
