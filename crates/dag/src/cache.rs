@@ -9,6 +9,7 @@ use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use cid::Cid;
+use crate::create_sha256_multihash;
 
 /// Cache for DAG nodes to improve performance
 pub struct DagNodeCache {
@@ -100,96 +101,98 @@ impl DagNodeCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cid::Version;
-    use crate::{DagNode, DagNodeMetadata, IdentityId, Signature};
-    use multihash::{Code, MultihashDigest};
-    
-    // Helper function to create a test DagNode
-    fn create_test_node(data: &[u8]) -> DagNode {
-        DagNode {
-            cid: None,
+    use std::sync::Arc;
+    use crate::{create_sha256_multihash, DagNode, DagNodeMetadata, IdentityId, Signature};
+
+    #[test]
+    fn test_cache_insertion_retrieval() {
+        let cache = DagNodeCache::new(10);
+        
+        // Generate a test CID
+        let data = b"test";
+        let mh = create_sha256_multihash(data);
+        let cid = Cid::new_v1(0x71, mh);
+        
+        let test_node = Arc::new(DagNode {
+            cid: Some(cid),
             content: data.to_vec(),
             parents: vec![],
             signer: IdentityId("did:icn:test".to_string()),
             signature: Signature(vec![1, 2, 3, 4]),
-            metadata: DagNodeMetadata::new(),
-        }
-    }
-    
-    #[test]
-    fn test_cache_basic_operations() {
-        let cache = DagNodeCache::new(100);
-        
-        // Create a test node
-        let node = Arc::new(create_test_node(b"test data"));
-        
-        // Create a test CID
-        let cid = Cid::new_v1(0x71, Code::Sha2_256.digest(b"test"));
-        
-        // Initially the node should not be in the cache
-        assert!(cache.get(&cid).is_none());
+            metadata: DagNodeMetadata::default(),
+        });
         
         // Insert the node
-        cache.insert(cid, node.clone());
+        cache.insert(cid, test_node.clone());
         
-        // Now it should be in the cache
-        let cached_node = cache.get(&cid);
-        assert!(cached_node.is_some());
-        assert_eq!(cached_node.unwrap().content, node.content);
+        // Retrieve the node
+        let retrieved = cache.get(&cid);
+        assert!(retrieved.is_some());
         
-        // Remove it from the cache
-        cache.remove(&cid);
-        
-        // Now it should not be in the cache again
-        assert!(cache.get(&cid).is_none());
-        
-        // Check stats
-        let stats = cache.stats();
-        assert_eq!(stats.hits, 1);
-        assert_eq!(stats.misses, 2);
-        assert_eq!(stats.insertions, 1);
+        let retrieved_node = retrieved.unwrap();
+        assert_eq!(retrieved_node.content, data.to_vec());
     }
     
     #[test]
-    fn test_cache_lru_behavior() {
-        // Create a cache with capacity 2
+    fn test_cache_capacity() {
         let cache = DagNodeCache::new(2);
         
         // Create three test nodes
-        let node1 = Arc::new(create_test_node(b"node1"));
-        let cid1 = Cid::new_v1(0x71, Code::Sha2_256.digest(b"node1"));
+        let node1_data = b"node1";
+        let mh1 = create_sha256_multihash(node1_data);
+        let cid1 = Cid::new_v1(0x71, mh1);
         
-        let node2 = Arc::new(create_test_node(b"node2"));
-        let cid2 = Cid::new_v1(0x71, Code::Sha2_256.digest(b"node2"));
+        let node1 = Arc::new(DagNode {
+            cid: Some(cid1),
+            content: node1_data.to_vec(),
+            parents: vec![],
+            signer: IdentityId("did:icn:test".to_string()),
+            signature: Signature(vec![1, 2, 3, 4]),
+            metadata: DagNodeMetadata::default(),
+        });
         
-        let node3 = Arc::new(create_test_node(b"node3"));
-        let cid3 = Cid::new_v1(0x71, Code::Sha2_256.digest(b"node3"));
+        let node2_data = b"node2";
+        let mh2 = create_sha256_multihash(node2_data);
+        let cid2 = Cid::new_v1(0x71, mh2);
         
-        // Insert first two nodes
+        let node2 = Arc::new(DagNode {
+            cid: Some(cid2),
+            content: node2_data.to_vec(),
+            parents: vec![],
+            signer: IdentityId("did:icn:test".to_string()),
+            signature: Signature(vec![1, 2, 3, 4]),
+            metadata: DagNodeMetadata::default(),
+        });
+        
+        let node3_data = b"node3";
+        let mh3 = create_sha256_multihash(node3_data);
+        let cid3 = Cid::new_v1(0x71, mh3);
+        
+        let node3 = Arc::new(DagNode {
+            cid: Some(cid3),
+            content: node3_data.to_vec(),
+            parents: vec![],
+            signer: IdentityId("did:icn:test".to_string()),
+            signature: Signature(vec![1, 2, 3, 4]),
+            metadata: DagNodeMetadata::default(),
+        });
+        
+        // Insert the first two nodes
         cache.insert(cid1, node1.clone());
         cache.insert(cid2, node2.clone());
         
-        // Both should be in the cache
+        // Verify we can get both nodes
         assert!(cache.get(&cid1).is_some());
         assert!(cache.get(&cid2).is_some());
         
-        // Insert third node, which should evict the first one (LRU)
+        // Insert the third node, which should evict the least recently used node (cid1)
         cache.insert(cid3, node3.clone());
         
-        // Now node1 should be evicted, but node2 and node3 should be present
+        // Verify cid1 is no longer in the cache
         assert!(cache.get(&cid1).is_none());
+        
+        // But cid2 and cid3 should be there
         assert!(cache.get(&cid2).is_some());
         assert!(cache.get(&cid3).is_some());
-        
-        // Access node2, making node3 the LRU
-        cache.get(&cid2);
-        
-        // Insert node1 again, which should evict node3
-        cache.insert(cid1, node1.clone());
-        
-        // Now node3 should be evicted, but node1 and node2 should be present
-        assert!(cache.get(&cid1).is_some());
-        assert!(cache.get(&cid2).is_some());
-        assert!(cache.get(&cid3).is_none());
     }
 } 

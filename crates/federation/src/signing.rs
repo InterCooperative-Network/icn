@@ -100,7 +100,7 @@ impl MandateBuilder {
     /// Create the signed mandate
     pub async fn build(self) -> FederationResult<GuardianMandate> {
         let dag_node = self.dag_node.ok_or_else(|| 
-            FederationError::InvalidMandate("DAG node is required".to_string())
+            FederationError::AuthenticationError("DAG node is required".to_string())
         )?;
         
         create_signed_mandate(
@@ -150,7 +150,7 @@ pub async fn create_signed_mandate(
                 votes.push((guardian_id.clone(), signature));
             },
             Err(e) => {
-                return Err(FederationError::InvalidMandate(
+                return Err(FederationError::AuthenticationError(
                     format!("Failed to collect signature from guardian {}: {}", guardian_id.0, e)
                 ));
             }
@@ -201,7 +201,7 @@ pub async fn create_signed_trust_bundle(
                 votes.push((guardian_id.clone(), signature));
             },
             Err(e) => {
-                return Err(FederationError::InvalidMandate(
+                return Err(FederationError::AuthenticationError(
                     format!("Failed to collect signature from guardian {}: {}", guardian_id.0, e)
                 ));
             }

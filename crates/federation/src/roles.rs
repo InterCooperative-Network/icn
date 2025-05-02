@@ -7,14 +7,13 @@
  */
 
 use cid::Cid;
-use futures::lock::Mutex;
-use multihash::{Code, MultihashDigest};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
+use futures::lock::Mutex;
+use std::collections::HashMap;
 use tracing;
 
-use crate::FederationError;
-use crate::FederationResult;
+use crate::errors::{FederationError, FederationResult};
 use icn_identity::IdentityId;
 use icn_storage::{StorageBackend, ReplicationPolicy as StorageReplicationPolicy};
 use icn_governance_kernel::config::GovernanceConfig;
@@ -88,7 +87,7 @@ impl LegacyGovernanceConfig {
 /// Derive a storage key for a scope's governance configuration
 pub fn config_key_for_scope(scope_id: &str) -> Cid {
     let key_str = format!("config::scope::{}", scope_id);
-    let key_hash = Code::Sha2_256.digest(key_str.as_bytes());
+    let key_hash = crate::create_sha256_multihash(key_str.as_bytes());
     Cid::new_v1(0x71, key_hash) // dag-cbor codec for config data
 }
 
@@ -135,7 +134,7 @@ pub async fn get_authorized_guardians(
     
     // If we have no entries, return early
     if all_cids.is_empty() {
-        return Err(FederationError::ConfigNotFound(context_id.to_string()));
+        return Err(FederationError::StorageError(format!("Configuration not found for context: {}", context_id)));
     }
     
     // For each CID, try to get the content and check if it's a config for our context
@@ -168,7 +167,7 @@ pub async fn get_authorized_guardians(
     }
     
     // If we got here, we didn't find a matching config
-    Err(FederationError::ConfigNotFound(context_id.to_string()))
+    Err(FederationError::StorageError(format!("Configuration not found for context: {}", context_id)))
 }
 
 /// Helper to parse config bytes into guardian list
@@ -192,7 +191,7 @@ fn parse_config_bytes(bytes: Vec<u8>, context_id: &str) -> FederationResult<Vec<
                     Ok(guardian_dids)
                 },
                 Err(e2) => {
-                    Err(FederationError::Internal(format!(
+                    Err(FederationError::InternalError(format!(
                         "Config deserialization failed for {}: primary error: {}, legacy error: {}", 
                         context_id, e1, e2
                     )))
@@ -242,7 +241,7 @@ where
 {
     // Serialize the configuration
     let config_bytes = serde_json::to_vec(config)
-        .map_err(|e| FederationError::InvalidPolicy(
+        .map_err(|e| FederationError::SerializationError(
             format!("Failed to serialize governance config: {}", e)
         ))?;
     
@@ -252,7 +251,7 @@ where
     // Store the configuration
     let storage_lock = storage.lock().await;
     let result = storage_lock.put_blob(&config_bytes).await
-        .map_err(|e| FederationError::SyncFailed(
+        .map_err(|e| FederationError::NetworkError(
             format!("Failed to store governance config: {}", e)
         ))?;
     
@@ -378,7 +377,7 @@ fn parse_config_for_replication_policy(bytes: Vec<u8>, context_id: &str) -> Fede
                     Ok(StorageReplicationPolicy::Factor(3))
                 },
                 Err(e2) => {
-                    Err(FederationError::Internal(format!(
+                    Err(FederationError::InternalError(format!(
                         "Config deserialization failed for {}: primary error: {}, legacy error: {}", 
                         context_id, e1, e2
                     )))
@@ -386,6 +385,13 @@ fn parse_config_for_replication_policy(bytes: Vec<u8>, context_id: &str) -> Fede
             }
         }
     }
+}
+
+fn get_config_cid(context_id: &str) -> Cid {
+    // Create a key from the context id
+    let key_str = format!("config::{}", context_id);
+    let key_hash = crate::create_sha256_multihash(key_str.as_bytes());
+    Cid::new_v1(0x71, key_hash) // dag-cbor codec for config data
 }
 
 #[cfg(test)]
@@ -501,10 +507,10 @@ mod tests {
         // Should return a ConfigNotFound error, not an empty list
         assert!(result.is_err());
         match result.unwrap_err() {
-            FederationError::ConfigNotFound(id) => {
-                assert_eq!(id, "non-existent-federation");
+            FederationError::StorageError(id) => {
+                assert_eq!(id, "Configuration not found for context: non-existent-federation");
             },
-            e => panic!("Expected ConfigNotFound error, got: {:?}", e),
+            e => panic!("Expected StorageError error, got: {:?}", e),
         }
     }
 } 
