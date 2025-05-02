@@ -464,11 +464,13 @@ async fn run_event_loop(
                         let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
                         
                         // First check if we have it locally
-                        let storage_lock = storage.lock().await;
-                        let local_result = storage_lock.get_kv(&_key_cid).await;
-                        drop(storage_lock);
-                        
-                        match local_result {
+                        let storage_clone = storage.clone();
+                        let bundle_result = {
+                            let storage_lock = storage_clone.lock().await;
+                            storage_lock.get_kv(&_key_cid).await
+                        };
+
+                        match bundle_result {
                             Ok(Some(bundle_bytes)) => {
                                 // We have it locally, deserialize and return
                                 match serde_json::from_slice::<TrustBundle>(&bundle_bytes) {
@@ -823,9 +825,11 @@ async fn handle_behavior_event(
             let _key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
             
             // Attempt to retrieve the TrustBundle from storage
-            let storage_lock = storage.lock().await;
-            let bundle_result = storage_lock.get_kv(&_key_cid).await;
-            drop(storage_lock); // Release lock as soon as possible
+            let storage_clone = storage.clone();
+            let bundle_result = {
+                let storage_lock = storage_clone.lock().await;
+                storage_lock.get_kv(&_key_cid).await
+            };
             
             let response = match bundle_result {
                 Ok(Some(bundle_bytes)) => {
@@ -909,8 +913,13 @@ async fn handle_behavior_event(
                                 let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
                                 
                                 // Store the bundle
-                                let storage_lock = storage.lock().await;
-                                match storage_lock.put_kv(key_cid, bundle_bytes).await {
+                                let storage_clone = storage.clone();
+                                let store_result = {
+                                    let storage_lock = storage_clone.lock().await;
+                                    storage_lock.put_kv(key_cid, bundle_bytes).await
+                                };
+
+                                match store_result {
                                     Ok(_) => {
                                         info!("Successfully stored TrustBundle for epoch {} (key: {})", 
                                              received_bundle.epoch_id, key_cid);
@@ -1096,16 +1105,29 @@ async fn handle_behavior_event(
                                 "Failed to calculate CID for fetched blob"
                             );
                             
+                            // Send error response
+                            let response = network::ReplicateBlobResponse {
+                                success: false,
+                                error_msg: Some("Failed to calculate CID for fetched blob".to_string()),
+                            };
+                            
+                            if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                                error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                            }
+                        }
+                    },
+                    None => {
+                        error!(
                             peer = %peer,
                             cid = %original_cid,
-                            error = ?error,
-                            "Blob fetch outbound failure"
+                            error = ?response.error_msg,
+                            "Blob fetch response contained no data"
                         );
                         
                         // Send error response
                         let response = network::ReplicateBlobResponse {
                             success: false,
-                            error_msg: Some(format!("Blob fetch outbound failure: {:?}", error)),
+                            error_msg: Some(format!("Blob fetch response contained no data: {:?}", response.error_msg)),
                         };
                         
                         if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
@@ -1116,7 +1138,32 @@ async fn handle_behavior_event(
             }
         },
         
-        // Handle blob fetch inbound failures
+        // Handle blob fetch outbound failures
+        network::IcnFederationBehaviourEvent::BlobFetchProtocol(request_response::Event::OutboundFailure { 
+            peer, 
+            error,
+            request_id,
+            ..
+        }) => {
+            // Check if this is a fetch we're tracking
+            if let Some((original_cid, replication_response_channel)) = pending_blob_fetches.remove(&request_id) {
+                error!(
+                    peer = %peer,
+                    cid = %original_cid,
+                    error = ?error,
+                    "Blob fetch outbound failure"
+                );
+                
+                // Send error response
+                let response = network::ReplicateBlobResponse {
+                    success: false,
+                    error_msg: Some(format!("Blob fetch outbound failure: {:?}", error)),
+                };
+                
+                if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(replication_response_channel, response) {
+                    error!(cid = %original_cid, "Failed to send replication response: {:?}", e);
+                }
+            }
         },
         
         // Handle blob fetch inbound failures
@@ -1325,49 +1372,70 @@ impl BlobStorageAdapter {
 #[async_trait]
 impl icn_storage::DistributedStorage for BlobStorageAdapter {
     async fn put_blob(&self, content: &[u8]) -> icn_storage::StorageResult<cid::Cid> {
-        // Get storage lock
-        let storage_lock = self.storage.lock().await;
+        // Clone the storage to use in async context
+        let storage = self.storage.clone();
         
-        // Use the storage backend's put method
-        let cid = storage_lock.put_blob(content).await?;
+        // Get a lock, perform operation, then release lock
+        let result = {
+            let storage_guard = storage.lock().await;
+            storage_guard.put_blob(content).await
+        };
         
-        Ok(cid)
+        // Return the result after the lock is dropped
+        result
     }
     
     async fn get_blob(&self, cid: &cid::Cid) -> icn_storage::StorageResult<Option<Vec<u8>>> {
-        // Get storage lock
-        let storage_lock = self.storage.lock().await;
+        // Clone the storage to use in async context
+        let storage = self.storage.clone();
         
-        // Directly try to get the blob from storage
-        let maybe_data = storage_lock.get_blob(cid).await?;
+        // Get a lock, perform operation, then release lock
+        let result = {
+            let storage_guard = storage.lock().await;
+            storage_guard.get_blob(cid).await
+        };
         
-        Ok(maybe_data)
+        // Return the result after the lock is dropped
+        result
     }
     
     async fn blob_exists(&self, cid: &cid::Cid) -> icn_storage::StorageResult<bool> {
-        // Get storage lock
-        let storage_lock = self.storage.lock().await;
+        // Clone the storage to use in async context
+        let storage = self.storage.clone();
         
-        // Use the storage backend's contains method
-        storage_lock.contains_blob(cid).await
+        // Get a lock, perform operation, then release lock
+        let result = {
+            let storage_guard = storage.lock().await;
+            storage_guard.contains_blob(cid).await
+        };
+        
+        // Return the result after the lock is dropped
+        result
     }
     
     async fn blob_size(&self, cid: &cid::Cid) -> icn_storage::StorageResult<Option<u64>> {
-        // Get storage lock
-        let storage_lock = self.storage.lock().await;
+        // Clone the storage to use in async context
+        let storage = self.storage.clone();
         
-        // Get the blob data
-        let maybe_data = storage_lock.get_blob(cid).await?;
+        // Get a lock, perform operation, then release lock
+        let result = {
+            let storage_guard = storage.lock().await;
+            storage_guard.get_blob(cid).await
+        };
         
-        // Return the size if found
-        Ok(maybe_data.map(|data| data.len() as u64))
+        // Process the result after the lock is dropped
+        match result {
+            Ok(Some(content)) => Ok(Some(content.len() as u64)),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
     
     async fn is_pinned(&self, cid: &cid::Cid) -> icn_storage::StorageResult<bool> {
         // Get the pinned blobs set
         let pinned_blobs = self.pinned_blobs.lock().await;
         
-        // Check if the CID is in the set
+        // Check if the CID is in the set (an immediate operation, no need for special handling)
         Ok(pinned_blobs.contains(cid))
     }
     
@@ -1382,7 +1450,7 @@ impl icn_storage::DistributedStorage for BlobStorageAdapter {
         // Get the pinned blobs set
         let mut pinned_blobs = self.pinned_blobs.lock().await;
         
-        // Add the CID to the set
+        // Add the CID to the set (immediate operation, no await point)
         pinned_blobs.insert(*cid);
         
         Ok(())
@@ -1392,7 +1460,7 @@ impl icn_storage::DistributedStorage for BlobStorageAdapter {
         // Get the pinned blobs set
         let mut pinned_blobs = self.pinned_blobs.lock().await;
         
-        // Remove the CID from the set
+        // Remove the CID from the set (immediate operation, no await point)
         pinned_blobs.remove(cid);
         
         Ok(())

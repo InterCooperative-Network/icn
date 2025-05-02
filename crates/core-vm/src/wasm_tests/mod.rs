@@ -3,6 +3,9 @@
 use crate::*;
 use icn_storage::AsyncInMemoryStorage;
 use wat::parse_str;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use std::path::PathBuf;
 
 /// Test WebAssembly module in WAT format - simple log test
 const TEST_LOG_WAT: &str = r#"

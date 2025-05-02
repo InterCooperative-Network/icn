@@ -8,6 +8,7 @@ It uses clap to define subcommands for interacting with the runtime.
 use clap::{Parser, Subcommand};
 use tracing_subscriber;
 use uuid;
+use tokio::sync::Mutex;
 
 #[derive(Parser)]
 #[clap(
@@ -563,12 +564,12 @@ fn create_identity_context(did: &str) -> std::sync::Arc<icn_core_vm::IdentityCon
 }
 
 // Helper function to create an in-memory storage backend
-fn create_in_memory_storage() -> std::sync::Arc<std::sync::Mutex<dyn icn_storage::StorageBackend + Send + Sync>> {
-    use std::sync::{Arc, Mutex};
+fn create_in_memory_storage() -> std::sync::Arc<tokio::sync::Mutex<dyn icn_storage::StorageBackend + Send + Sync>> {
+    use std::sync::Arc;
     use icn_storage::AsyncInMemoryStorage;
     
     // Create and return the storage backend
-    Arc::new(Mutex::new(AsyncInMemoryStorage::new()))
+    Arc::new(tokio::sync::Mutex::new(AsyncInMemoryStorage::new()))
 }
 
 /// Handle export-vc command to export a credential with JWS proof
@@ -585,7 +586,7 @@ async fn handle_export_vc_command(
     use icn_identity::sign_credential;
     use icn_execution_tools::CredentialHelper;
     use icn_storage::{AsyncInMemoryStorage, StorageBackend};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::fs;
     
     // Check if credential ID is a valid CID
@@ -593,11 +594,11 @@ async fn handle_export_vc_command(
         .map_err(|e| anyhow::anyhow!("Invalid credential ID (not a valid CID): {}", e))?;
     
     // Create a storage backend
-    let storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new() as AsyncInMemoryStorage));
+    let storage = Arc::new(tokio::sync::Mutex::new(AsyncInMemoryStorage::new() as AsyncInMemoryStorage));
     
     // Load subject data from storage
-    let storage_lock = storage.lock().unwrap();
-    let content_result = StorageBackend::get(&*storage_lock, &cid).await;
+    let storage_lock = storage.lock().await;
+    let content_result = storage_lock.get_blob(&cid).await;
     drop(storage_lock);
     
     let content = match content_result {
