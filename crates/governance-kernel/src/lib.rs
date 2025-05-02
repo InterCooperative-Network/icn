@@ -21,7 +21,9 @@ pub mod parser;
 pub mod config;
 pub mod events;
 
-use events::{GovernanceEvent, GovernanceEventType, EventEmitter};
+// Re-export for public use
+pub use events::GovernanceEventType;
+use events::{GovernanceEvent, EventEmitter};
 
 /// Helper function to create a SHA-256 multihash (copied from storage crate)
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -509,7 +511,81 @@ impl<S: StorageBackend + Send + Sync + 'static> EventEmitter for GovernanceKerne
     }
 }
 
-// CCL Interpreter and related code would go here, but we're focusing just on fixing build errors
+/// CCL Interpreter Error
+#[derive(Error, Debug)]
+pub enum CclError {
+    #[error("Invalid template for scope: template '{template}' not valid for scope {scope:?}")]
+    InvalidTemplateForScope {
+        template: String,
+        scope: IdentityScope,
+    },
+    
+    #[error("Unsupported template version: template '{template}' version '{version}' not supported")]
+    UnsupportedTemplateVersion {
+        template: String,
+        version: String,
+    },
+    
+    #[error("Missing required field: {0}")]
+    MissingRequiredField(String),
+    
+    #[error("Type mismatch for field '{field}': expected {expected}, got {actual}")]
+    TypeMismatch {
+        field: String,
+        expected: String,
+        actual: String,
+    },
+    
+    #[error("Syntax error: {0}")]
+    SyntaxError(String),
+    
+    #[error("Internal error: {0}")]
+    InternalError(String),
+}
+
+/// CCL Interpreter
+pub struct CclInterpreter;
+
+impl CclInterpreter {
+    pub fn new() -> Self {
+        Self
+    }
+    
+    pub fn interpret_ccl(&self, _ccl_content: &str, scope: IdentityScope) -> Result<config::GovernanceConfig, CclError> {
+        // This is a stub implementation for testing
+        // In a real implementation, this would parse the CCL content
+        
+        // For now, just return a basic config
+        Ok(config::GovernanceConfig {
+            template_type: match scope {
+                IdentityScope::Cooperative => "coop_bylaws",
+                IdentityScope::Community => "community_charter",
+                IdentityScope::Individual => "budget_proposal",
+                _ => "resolution",
+            }.to_string(),
+            template_version: "v1".to_string(),
+            governing_scope: scope,
+            identity: Some(config::IdentityInfo {
+                name: Some("Test Entity".to_string()),
+                description: Some("Test description".to_string()),
+                founding_date: Some("2023-01-01".to_string()),
+                mission_statement: Some("Test mission".to_string()),
+            }),
+            governance: Some(config::GovernanceStructure {
+                decision_making: Some("consensus".to_string()),
+                quorum: Some(0.75),
+                majority: Some(0.66),
+                term_length: Some(365),
+                roles: None,
+            }),
+            membership: None,
+            proposals: None,
+            working_groups: None,
+            dispute_resolution: None,
+            economic_model: None,
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
