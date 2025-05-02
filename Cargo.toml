@@ -9,6 +9,7 @@ members = [
     "crates/storage",
     "crates/agoranet-integration",
     "crates/execution-tools",
+    "crates/ccl-compiler",
     "cli",
 ]
 resolver = "2"

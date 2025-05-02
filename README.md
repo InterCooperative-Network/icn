@@ -23,6 +23,13 @@ The heart of the system, providing:
 - Proposal processing and execution
 - Democratic decision-making primitives
 
+### CCL to WASM Compilation
+A powerful bridge between governance rules and execution:
+- Transform declarative CCL templates into executable WASM
+- Domain-specific language (DSL) inputs for action parameterization
+- Verifiable, deterministic execution of governance rules
+- Integration with the VM for resource-controlled execution
+
 ### DAG System
 A verifiable, append-only data structure supporting:
 - Immutable operation history
@@ -86,6 +93,9 @@ The CoVM CLI provides access to all runtime functionality:
 # Register a new identity
 ./target/release/covm identity register --scope cooperative --name "My Cooperative"
 
+# Compile a CCL template with DSL input into a WASM module
+./target/release/covm compile --ccl-template examples/cooperative_bylaws.ccl --dsl-input examples/dsl/propose_join.dsl --output proposal.wasm --scope cooperative
+
 # Create a proposal using a CCL template
 ./target/release/covm propose --ccl-template examples/cooperative_bylaws.ccl --dsl-input my_params.json --identity did:icn:my-identity
 
@@ -93,7 +103,7 @@ The CoVM CLI provides access to all runtime functionality:
 ./target/release/covm vote --proposal-id <CID> --vote approve --reason "Aligns with our values" --identity did:icn:my-identity
 
 # Execute an approved proposal
-./target/release/covm execute --proposal-id <CID> --identity did:icn:my-identity
+./target/release/covm execute --proposal-payload proposal.wasm --constitution examples/cooperative_bylaws.ccl --identity did:icn:my-identity --scope cooperative
 
 # Export a verifiable credential
 ./target/release/covm export-vc --credential-id <CID> --output credential.json
@@ -104,6 +114,7 @@ The CoVM CLI provides access to all runtime functionality:
 Comprehensive documentation is available in the `docs/` directory:
 
 - [Governance Kernel](docs/GOVERNANCE_KERNEL.md)
+- [CCL to WASM Compilation](docs/CCL_TO_WASM.md)
 - [DAG System](docs/DAG_SYSTEM.md)
 - [Identity System](docs/IDENTITY_SYSTEM.md)
 - [Economic System](docs/ECONOMIC_SYSTEM.md)

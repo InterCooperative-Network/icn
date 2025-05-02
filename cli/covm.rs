@@ -5,10 +5,20 @@ This is the main entry point for the ICN Runtime command-line interface.
 It uses clap to define subcommands for interacting with the runtime.
 */
 
-use clap::{Parser, Subcommand};
+// Standard library imports
+use std::fs;
 use tracing_subscriber;
 use uuid;
+use tokio;
+use clap::{Parser, Subcommand};
+
+// Internal crate imports
+use icn_identity::{IdentityId, IdentityScope};
+use icn_governance_kernel::CclInterpreter;
+use icn_core_vm::IdentityContext;
 use tokio::sync::Mutex;
+use std::path::PathBuf;
+use std::{io};
 
 #[derive(Parser)]
 #[clap(
@@ -122,6 +132,125 @@ enum Commands {
         #[clap(long, short = 't')]
         credential_type: Option<String>,
     },
+    
+    /// Compile a CCL template with DSL input into a WASM module
+    #[clap(name = "compile")]
+    Compile {
+        /// Path to the CCL template file (.ccl)
+        #[clap(long, short = 't')]
+        ccl_template: String,
+        
+        /// Path to the DSL input file (.dsl or .json)
+        #[clap(long, short = 'i')]
+        dsl_input: String,
+        
+        /// Output file path for the compiled WASM (.wasm)
+        #[clap(long, short = 'o')]
+        output: String,
+        
+        /// Identity scope (Cooperative, Community, Individual)
+        #[clap(long, short = 's')]
+        scope: String,
+        
+        /// Whether to include debug information in the WASM
+        #[clap(long)]
+        debug: bool,
+        
+        /// Whether to optimize the WASM
+        #[clap(long, default_value = "true")]
+        optimize: bool,
+    },
+}
+
+// Add this to handle the compile command
+async fn handle_compile_command(
+    ccl_template: String,
+    dsl_input: String,
+    output: String,
+    scope: String,
+    debug: bool,
+    optimize: bool,
+    verbose: bool,
+) -> anyhow::Result<()> {
+    use icn_ccl_compiler::{CclCompiler, CompilationOptions};
+    use icn_governance_kernel::CclInterpreter;
+    use icn_identity::IdentityScope;
+    use std::fs::File;
+    use std::io::Write;
+    
+    // Parse the identity scope
+    let identity_scope = match scope.to_lowercase().as_str() {
+        "cooperative" => IdentityScope::Cooperative,
+        "community" => IdentityScope::Community,
+        "individual" => IdentityScope::Individual,
+        _ => return Err(anyhow::anyhow!("Invalid scope: {}", scope)),
+    };
+    
+    if verbose {
+        println!("Reading CCL template from: {}", ccl_template);
+    }
+    
+    // Read the CCL template
+    let ccl_content = fs::read_to_string(&ccl_template)
+        .map_err(|e| anyhow::anyhow!("Failed to read CCL template: {}", e))?;
+    
+    if verbose {
+        println!("Reading DSL input from: {}", dsl_input);
+    }
+    
+    // Read the DSL input
+    let dsl_content = fs::read_to_string(&dsl_input)
+        .map_err(|e| anyhow::anyhow!("Failed to read DSL input: {}", e))?;
+    
+    // Parse the DSL JSON
+    let dsl_json: serde_json::Value = serde_json::from_str(&dsl_content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse DSL input as JSON: {}", e))?;
+    
+    // Create CCL interpreter
+    let interpreter = CclInterpreter::new();
+    
+    if verbose {
+        println!("Interpreting CCL template...");
+    }
+    
+    // Interpret the CCL content
+    let governance_config = interpreter.interpret_ccl(&ccl_content, identity_scope)
+        .map_err(|e| anyhow::anyhow!("CCL interpretation failed: {}", e))?;
+    
+    if verbose {
+        println!("Successfully interpreted CCL template: {}:{}", 
+            governance_config.template_type, governance_config.template_version);
+    }
+    
+    // Create compilation options
+    let options = CompilationOptions {
+        include_debug_info: debug,
+        optimize,
+        memory_limits: None, // Use default memory limits
+    };
+    
+    if verbose {
+        println!("Compiling CCL template with DSL input to WASM...");
+    }
+    
+    // Create compiler and compile to WASM
+    let compiler = CclCompiler::new();
+    let wasm_bytes = compiler.compile_to_wasm(&governance_config, &dsl_json, Some(options))
+        .map_err(|e| anyhow::anyhow!("Compilation failed: {}", e))?;
+    
+    if verbose {
+        println!("Successfully compiled WASM module ({} bytes)", wasm_bytes.len());
+    }
+    
+    // Write the WASM to the output file
+    let mut file = File::create(&output)
+        .map_err(|e| anyhow::anyhow!("Failed to create output file: {}", e))?;
+    file.write_all(&wasm_bytes)
+        .map_err(|e| anyhow::anyhow!("Failed to write output file: {}", e))?;
+    
+    println!("Successfully compiled WASM module and wrote to: {}", output);
+    
+    Ok(())
 }
 
 // Add this to handle the execute command
@@ -710,51 +839,59 @@ async fn handle_export_vc_command(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .init();
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
     
-    // Parse command-line arguments
+    // Parse command line arguments
     let cli = Cli::parse();
     
-    // Set verbose mode if requested
-    if cli.verbose {
-        println!("Verbose mode enabled");
-    }
-    
-    // Execute the requested command
-    match cli.command {
+    // Handle commands
+    match &cli.command {
         Commands::Propose { ccl_template, dsl_input, identity } => {
-            println!("Proposing with template: {}, input: {}, identity: {}", 
-                    ccl_template, dsl_input, identity);
+            println!("Proposing with template: {}, dsl: {}, identity: {}", 
+                     ccl_template, dsl_input, identity);
+            // TODO(V3-MVP): Implement proposal creation
             Ok(())
         },
         Commands::Vote { proposal_id, vote, reason, identity } => {
             println!("Voting {} on proposal: {} with reason: {}, identity: {}", 
-                    vote, proposal_id, reason, identity);
+                     vote, proposal_id, reason, identity);
+            // TODO(V3-MVP): Implement voting
             Ok(())
         },
         Commands::Identity { scope, name } => {
             println!("Registering identity with scope: {}, name: {}", scope, name);
+            // TODO(V3-MVP): Implement identity registration
             Ok(())
         },
         Commands::Execute { proposal_payload, constitution, identity, scope, proposal_id } => {
             handle_execute_command(
-                proposal_payload, 
-                constitution, 
-                identity, 
-                scope, 
-                proposal_id,
+                proposal_payload.clone(),
+                constitution.clone(),
+                identity.clone(),
+                scope.clone(),
+                proposal_id.clone(),
                 cli.verbose
             ).await
         },
         Commands::ExportVc { credential_id, output, signing_key, issuer, credential_type } => {
             handle_export_vc_command(
-                credential_id,
-                output,
-                signing_key,
-                issuer,
-                credential_type,
+                credential_id.clone(),
+                output.clone(),
+                signing_key.clone(),
+                issuer.clone(),
+                credential_type.clone(),
+                cli.verbose
+            ).await
+        },
+        Commands::Compile { ccl_template, dsl_input, output, scope, debug, optimize } => {
+            handle_compile_command(
+                ccl_template.clone(),
+                dsl_input.clone(),
+                output.clone(),
+                scope.clone(),
+                debug,
+                optimize,
                 cli.verbose
             ).await
         },

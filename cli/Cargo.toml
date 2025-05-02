@@ -25,6 +25,7 @@ icn-identity = { path = "../crates/identity" }
 icn-storage = { path = "../crates/storage" }
 icn-economics = { path = "../crates/economics" }
 icn-execution-tools = { path = "../crates/execution-tools" }
+icn-ccl-compiler = { path = "../crates/ccl-compiler" }
 
 [[bin]]
 name = "covm"

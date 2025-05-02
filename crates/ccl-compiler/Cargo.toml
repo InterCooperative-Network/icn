@@ -1,0 +1,42 @@
+[package]
+name = "icn-ccl-compiler"
+version = "0.1.0"
+edition = "2021"
+description = "Compiler for Constitutional Cooperative Language (CCL) to WASM modules"
+authors = ["InterCooperative Network"]
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+# Project internal dependencies
+icn-governance-kernel = { path = "../governance-kernel" }
+icn-identity = { path = "../identity" }
+icn-economics = { path = "../economics" }
+
+# WASM compilation
+wasm-encoder = "0.25.0"
+wasmtime = "12.0.2"
+
+# Utilities
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+uuid = { version = "1.5", features = ["v4", "serde"] }
+
+# Async
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+
+# Optional templating
+askama = { version = "0.12", optional = true }
+tera = { version = "1.19", optional = true }
+
+[dev-dependencies]
+# For integration tests
+icn-core-vm = { path = "../core-vm" }
+icn-storage = { path = "../storage" }
+
+[features]
+default = []
+templating = ["askama", "tera"] 
