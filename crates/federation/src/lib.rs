@@ -199,6 +199,14 @@ pub enum FederationManagerMessage {
 /// Configuration for the federation manager
 #[derive(Debug, Clone)]
 pub struct FederationManagerConfig {
+    /// Period between bootstrap attempts (connecting to known peers)
+    pub bootstrap_period: Duration,
+    /// Interval between peer discovery/sync operations
+    pub peer_sync_interval: Duration,
+    /// Interval between trust bundle synchronization attempts
+    pub trust_bundle_sync_interval: Duration,
+    /// Maximum number of peers to maintain connections with
+    pub max_peers: usize,
     /// Bootstrap peers to connect to
     pub bootstrap_peers: Vec<Multiaddr>,
     /// Listen addresses
@@ -212,6 +220,10 @@ pub struct FederationManagerConfig {
 impl Default for FederationManagerConfig {
     fn default() -> Self {
         Self {
+            bootstrap_period: Duration::from_secs(30),
+            peer_sync_interval: Duration::from_secs(60),
+            trust_bundle_sync_interval: Duration::from_secs(300),
+            max_peers: 25,
             bootstrap_peers: Vec::new(),
             listen_addresses: vec!["/ip4/0.0.0.0/tcp/0".parse().unwrap()],
             gossipsub_heartbeat_interval: Duration::from_secs(1),
@@ -385,9 +397,58 @@ impl FederationManager {
     
     /// Get the latest known epoch from storage
     pub async fn get_latest_known_epoch(&self) -> FederationResult<u64> {
-        // For MVP, just return 0 as a placeholder
-        // TODO(V3-MVP): Implement proper epoch tracking
-        Ok(0)
+        // Get the storage lock
+        let storage = self.storage.clone();
+        let storage_guard = storage.lock().await;
+        
+        // Define the key for the latest epoch metadata
+        let meta_key = "federation::latest_epoch";
+        let meta_hash = multihash::Code::Sha2_256.digest(meta_key.as_bytes());
+        let meta_cid = cid::Cid::new_v1(0x71, meta_hash); // Raw codec
+        
+        // Try to get the latest epoch value from storage
+        let result = storage_guard.get_kv(&meta_cid).await;
+        
+        match result {
+            Ok(Some(epoch_bytes)) => {
+                // Parse the stored epoch value
+                let epoch_str = String::from_utf8_lossy(&epoch_bytes);
+                epoch_str.parse::<u64>()
+                    .map_err(|e| FederationError::Internal(format!("Failed to parse epoch: {}", e)))
+            },
+            Ok(None) => {
+                // No stored epoch value, return 0 as the initial epoch
+                Ok(0)
+            },
+            Err(e) => {
+                Err(FederationError::StorageError(format!("Failed to retrieve latest epoch: {}", e)))
+            }
+        }
+    }
+    
+    /// Update the latest known epoch in storage
+    pub async fn update_latest_known_epoch(&self, epoch: u64) -> FederationResult<()> {
+        // Get current latest epoch
+        let current_epoch = self.get_latest_known_epoch().await?;
+        
+        // Only update if the new epoch is higher than the current one
+        if epoch <= current_epoch {
+            return Ok(());
+        }
+        
+        // Get the storage lock
+        let storage = self.storage.clone();
+        let storage_guard = storage.lock().await;
+        
+        // Define the key for the latest epoch metadata
+        let meta_key = "federation::latest_epoch";
+        let meta_hash = multihash::Code::Sha2_256.digest(meta_key.as_bytes());
+        let meta_cid = cid::Cid::new_v1(0x71, meta_hash); // Raw codec
+        
+        // Store the new epoch value
+        let epoch_bytes = epoch.to_string().into_bytes();
+        storage_guard.put_kv(meta_cid, epoch_bytes).await
+            .map_err(|e| FederationError::StorageError(format!("Failed to update latest epoch: {}", e)))
     }
     
     /// Announce blob as a provider on the Kademlia DHT
@@ -900,9 +961,33 @@ async fn handle_behavior_event(
                             received_bundle.epoch_id, 
                             bundle_hash[0], bundle_hash[1], bundle_hash[2], bundle_hash[3]);
                         
-                        // TODO(V3): Check received_bundle.epoch_id against local state for replay protection
-                        // TODO(V3): Check received_bundle.federation_id matches expected federation
-                        // TODO(V3): Potentially check DAG root consistency with local state
+                        // Check received_bundle.epoch_id against local state for replay protection
+                        // Create a FederationManager instance from the swarm to access the storage
+                        let fed_manager = FederationManager {
+                            local_peer_id: swarm.local_peer_id().clone(),
+                            keypair: swarm.behaviour().keypair.clone(),
+                            sender: mpsc::channel(1).0, // Dummy sender, not used in this context
+                            _event_loop_handle: tokio::spawn(async {}), // Dummy task, not used
+                            known_peers: HashMap::new(),
+                            config: FederationManagerConfig::default(),
+                            storage: Arc::clone(&storage),
+                        };
+                        
+                        // Get latest known epoch
+                        let current_latest_epoch = match fed_manager.get_latest_known_epoch().await {
+                            Ok(epoch) => epoch,
+                            Err(e) => {
+                                error!("Failed to get latest known epoch: {}", e);
+                                0 // Default to 0 in case of error
+                            }
+                        };
+                        
+                        // Only process if this is a new epoch
+                        if received_bundle.epoch_id <= current_latest_epoch {
+                            warn!("Received TrustBundle for epoch {} is not newer than our current latest epoch {}, ignoring", 
+                                 received_bundle.epoch_id, current_latest_epoch);
+                            return;
+                        }
                         
                         // Serialize the bundle for storage
                         match serde_json::to_vec(received_bundle) {
@@ -924,8 +1009,15 @@ async fn handle_behavior_event(
                                         info!("Successfully stored TrustBundle for epoch {} (key: {})", 
                                              received_bundle.epoch_id, key_cid);
                                         
-                                        // Update latest known epoch if this is newer
-                                        // TODO(V3): Implement proper epoch tracking
+                                        // Update latest known epoch
+                                        if let Err(e) = fed_manager.update_latest_known_epoch(received_bundle.epoch_id).await {
+                                            error!("Failed to update latest known epoch: {}", e);
+                                        } else {
+                                            info!("Updated latest known epoch to {}", received_bundle.epoch_id);
+                                            
+                                            // Optionally notify other systems about the new TrustBundle
+                                            // (could emit an event or callback here)
+                                        }
                                     },
                                     Err(e) => {
                                         error!("Failed to store TrustBundle: {}", e);
@@ -937,14 +1029,8 @@ async fn handle_behavior_event(
                             }
                         }
                     },
-                    Ok(false) => {
-                        warn!("TrustBundle validation failed for epoch {} (invalid quorum or signatures)", received_bundle.epoch_id);
-                        if let Some(proof) = &received_bundle.proof {
-                            warn!("Quorum config: {:?}, votes: {}", proof.config, proof.votes.len());
-                        }
-                    },
                     Err(e) => {
-                        error!("TrustBundle cryptographic validation error for epoch {}: {}", received_bundle.epoch_id, e);
+                        error!("Failed to serialize TrustBundle: {}", e);
                     }
                 }
             } else {
@@ -1334,8 +1420,16 @@ async fn request_trust_bundle_from_network(
     match rx.await {
         Ok(result) => {
             match result {
-                Ok(Some(_)) => {
+                Ok(Some(bundle)) => {
                     debug!("Successfully received TrustBundle for epoch {}", epoch);
+                    // If we got a bundle, request the next epoch as well
+                    // This helps to ensure we don't miss any epochs during sync
+                    tokio::spawn(async move {
+                        let next_epoch = epoch + 1;
+                        if let Err(e) = request_trust_bundle_from_network(sender.clone(), next_epoch).await {
+                            debug!("No more TrustBundles found after epoch {}: {}", epoch, e);
+                        }
+                    });
                 },
                 Ok(None) => {
                     debug!("No TrustBundle available for epoch {}", epoch);

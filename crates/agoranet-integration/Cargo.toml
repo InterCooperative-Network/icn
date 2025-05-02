@@ -7,8 +7,12 @@ description = "Deliberation thread linking logic stub for the ICN Runtime"
 [dependencies]
 icn-identity = { path = "../identity" }
 icn-dag = { path = "../dag" }
+icn-governance-kernel = { path = "../governance-kernel" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true } 
+serde_json = { workspace = true }
+cid = { workspace = true }
+uuid = { version = "1.3", features = ["v4", "serde"] }
+async-trait = { workspace = true } 

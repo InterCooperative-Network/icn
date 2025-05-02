@@ -11,15 +11,28 @@ enabling declarative rules to be compiled into executable WASM modules.
 - Governance is expressed through declarative rules, compiled to .dsl (WASM) for execution
 */
 
-use icn_identity::IdentityScope;
+use icn_identity::{IdentityId, IdentityScope};
+use icn_core_vm::IdentityContext;
+use icn_storage::StorageBackend;
 use thiserror::Error;
 use tracing;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use serde_json;
+use multihash;
+use cid::Cid;
+use async_trait::async_trait;
+use chrono;
+use serde::{Serialize, Deserialize};
 
 // Declare the modules
 pub mod ast;
 pub mod parser;
 pub mod config;
+pub mod events;
+
+use events::{GovernanceEvent, GovernanceEventType, EventEmitter};
+use icn_identity::VerifiableCredential;
 
 /// Errors that can occur during CCL processing
 #[derive(Debug, Error)]
@@ -1047,6 +1060,411 @@ impl CclInterpreter {
             CclTemplate::ResolutionV1 => Ok(include_str!("../templates/resolution_v1.ccl")),
             CclTemplate::ParticipationRulesV1 => Ok(include_str!("../templates/participation_rules_v1.ccl")),
         }
+    }
+}
+
+/// Add this to the error enum
+#[derive(Error, Debug)]
+pub enum GovernanceError {
+    #[error("Proposal not found: {0}")]
+    ProposalNotFound(String),
+    
+    #[error("Invalid proposal: {0}")]
+    InvalidProposal(String),
+    
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+    
+    #[error("Storage error: {0}")]
+    StorageError(String),
+    
+    #[error("Event emission error: {0}")]
+    EventEmissionError(String),
+}
+
+/// Vote choice in a governance proposal
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum VoteChoice {
+    For,
+    Against,
+    Abstain,
+}
+
+/// Proposal status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ProposalStatus {
+    Draft,
+    Active,
+    Passed,
+    Rejected,
+    Executed,
+    Expired,
+}
+
+/// A governance proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Proposal {
+    /// Proposal title
+    pub title: String,
+    
+    /// Proposal description
+    pub description: String,
+    
+    /// The proposer's identity
+    pub proposer: IdentityId,
+    
+    /// The scope of this proposal (e.g., Federation, DAO)
+    pub scope: IdentityScope,
+    
+    /// The specific scope id (e.g., federation id, dao id)
+    pub scope_id: Option<IdentityId>,
+    
+    /// The proposal's status
+    pub status: ProposalStatus,
+    
+    /// Voting period end time (Unix timestamp)
+    pub voting_end_time: i64,
+    
+    /// Votes for the proposal
+    pub votes_for: u64,
+    
+    /// Votes against the proposal
+    pub votes_against: u64,
+    
+    /// Votes abstaining
+    pub votes_abstain: u64,
+    
+    /// CCL code for this proposal
+    pub ccl_code: Option<String>,
+    
+    /// Compiled WASM for this proposal (if applicable)
+    pub wasm_bytes: Option<Vec<u8>>,
+}
+
+impl Proposal {
+    /// Create a new proposal
+    pub fn new(
+        title: String,
+        description: String,
+        proposer: IdentityId,
+        scope: IdentityScope,
+        scope_id: Option<IdentityId>,
+        voting_period_seconds: u64,
+        ccl_code: Option<String>,
+    ) -> Self {
+        // Calculate voting end time
+        let now = chrono::Utc::now().timestamp();
+        let voting_end_time = now + voting_period_seconds as i64;
+        
+        Self {
+            title,
+            description,
+            proposer,
+            scope,
+            scope_id,
+            status: ProposalStatus::Active,
+            voting_end_time,
+            votes_for: 0,
+            votes_against: 0,
+            votes_abstain: 0,
+            ccl_code,
+            wasm_bytes: None,
+        }
+    }
+    
+    /// Calculate the CID of this proposal
+    pub fn calculate_cid(&self) -> Result<Cid, GovernanceError> {
+        // Serialize the proposal to calculate its CID
+        let proposal_bytes = serde_json::to_vec(self)
+            .map_err(|e| GovernanceError::InvalidProposal(format!("Failed to serialize proposal: {}", e)))?;
+        
+        // Create CID for the proposal
+        let hash = multihash::Code::Sha2_256.digest(&proposal_bytes);
+        let proposal_cid = Cid::new_v1(0x55, hash); // dag-cbor codec
+        
+        Ok(proposal_cid)
+    }
+}
+
+/// A vote on a governance proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Vote {
+    /// The voter's identity
+    pub voter: IdentityId,
+    
+    /// The proposal being voted on
+    pub proposal_cid: Cid,
+    
+    /// The vote choice
+    pub choice: VoteChoice,
+    
+    /// The weight of this vote (default: 1)
+    pub weight: u64,
+    
+    /// The scope of this vote (e.g., Federation, DAO)
+    pub scope: IdentityScope,
+    
+    /// The specific scope id (e.g., federation id, dao id)
+    pub scope_id: Option<IdentityId>,
+    
+    /// Optional reason for the vote
+    pub reason: Option<String>,
+    
+    /// Timestamp of the vote (Unix timestamp)
+    pub timestamp: i64,
+}
+
+impl Vote {
+    /// Create a new vote
+    pub fn new(
+        voter: IdentityId,
+        proposal_cid: Cid,
+        choice: VoteChoice,
+        scope: IdentityScope,
+        scope_id: Option<IdentityId>,
+        reason: Option<String>,
+    ) -> Self {
+        let now = chrono::Utc::now().timestamp();
+        
+        Self {
+            voter,
+            proposal_cid,
+            choice,
+            weight: 1,
+            scope,
+            scope_id,
+            reason,
+            timestamp: now,
+        }
+    }
+}
+
+/// Governance kernel implementation
+pub struct GovernanceKernel<S> {
+    storage: Arc<Mutex<S>>,
+    identity: Arc<IdentityContext>,
+    // Add event storage for emitted events
+    events: Arc<Mutex<HashMap<Cid, GovernanceEvent>>>,
+    // Add VC storage for issued credentials
+    credentials: Arc<Mutex<HashMap<Cid, VerifiableCredential>>>,
+}
+
+impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
+    /// Create a new governance kernel
+    pub fn new(storage: Arc<Mutex<S>>, identity: Arc<IdentityContext>) -> Self {
+        Self {
+            storage,
+            identity,
+            events: Arc::new(Mutex::new(HashMap::new())),
+            credentials: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Process a proposal by submitting it to the governance system
+    pub async fn process_proposal(&self, proposal: Proposal) -> Result<Cid, GovernanceError> {
+        // ... existing code ...
+
+        // After proposal is successfully processed, emit an event
+        let proposal_cid = proposal.calculate_cid()?;
+        
+        // Create an event for the proposal creation
+        let event_data = serde_json::json!({
+            "title": proposal.title,
+            "description": proposal.description,
+            "proposer": proposal.proposer.0
+        });
+        
+        let event = GovernanceEvent::new(
+            GovernanceEventType::ProposalCreated,
+            proposal.proposer.clone(),
+            Some(proposal_cid),
+            proposal.scope_id.clone(),
+            Some(proposal.scope.clone()),
+            event_data
+        );
+        
+        // Emit the event and convert to VC
+        let (_, vc) = self.emit_event_with_vc(event).await
+            .map_err(|e| GovernanceError::EventEmissionError(e))?;
+        
+        // For now, we're not using the VC directly but could return or store it
+        
+        Ok(proposal_cid)
+    }
+
+    /// Record a vote on a proposal
+    pub async fn record_vote(&self, vote: Vote) -> Result<(), GovernanceError> {
+        // ... existing code ...
+        
+        // After vote is successfully recorded, emit an event
+        let event_data = serde_json::json!({
+            "voter": vote.voter.0,
+            "choice": format!("{:?}", vote.choice),
+            "weight": vote.weight,
+            "reason": vote.reason
+        });
+        
+        let event = GovernanceEvent::new(
+            GovernanceEventType::VoteCast,
+            vote.voter.clone(),
+            Some(vote.proposal_cid),
+            vote.scope_id.clone(),
+            Some(vote.scope),
+            event_data
+        );
+        
+        // Emit the event
+        self.emit_event(event).await
+            .map_err(|e| GovernanceError::EventEmissionError(e))?;
+        
+        Ok(())
+    }
+
+    /// Finalize a proposal based on voting results
+    pub async fn finalize_proposal(&self, proposal_cid: Cid) -> Result<(), GovernanceError> {
+        // ... existing code ...
+        
+        // After proposal is successfully finalized, emit an event
+        let proposal = self.get_proposal(proposal_cid).await?;
+        
+        let event_data = serde_json::json!({
+            "title": proposal.title,
+            "status": format!("{:?}", proposal.status),
+            "votes_for": proposal.votes_for,
+            "votes_against": proposal.votes_against,
+            "votes_abstain": proposal.votes_abstain
+        });
+        
+        let event = GovernanceEvent::new(
+            GovernanceEventType::ProposalFinalized,
+            proposal.proposer.clone(),
+            Some(proposal_cid),
+            proposal.scope_id.clone(),
+            Some(proposal.scope),
+            event_data
+        );
+        
+        // Emit the event and convert to VC
+        let (_, vc) = self.emit_event_with_vc(event).await
+            .map_err(|e| GovernanceError::EventEmissionError(e))?;
+        
+        // For now, we're not using the VC directly but could return or store it
+        
+        Ok(())
+    }
+    
+    /// Execute a proposal after it has been finalized and approved
+    pub async fn execute_proposal(&self, proposal_cid: Cid) -> Result<(), GovernanceError> {
+        // ... existing code ...
+        
+        // After proposal is successfully executed, emit an event
+        let proposal = self.get_proposal(proposal_cid).await?;
+        
+        let event_data = serde_json::json!({
+            "title": proposal.title,
+            "execution_status": "completed",
+            "execution_timestamp": chrono::Utc::now().timestamp()
+        });
+        
+        let event = GovernanceEvent::new(
+            GovernanceEventType::ProposalExecuted,
+            proposal.proposer.clone(),
+            Some(proposal_cid),
+            proposal.scope_id.clone(),
+            Some(proposal.scope),
+            event_data
+        );
+        
+        // Emit the event
+        self.emit_event(event).await
+            .map_err(|e| GovernanceError::EventEmissionError(e))?;
+        
+        Ok(())
+    }
+    
+    /// Get all events emitted by the governance kernel
+    pub async fn get_events(&self) -> Vec<GovernanceEvent> {
+        let events = self.events.lock().await;
+        events.values().cloned().collect()
+    }
+    
+    /// Get all verifiable credentials issued by the governance kernel
+    pub async fn get_credentials(&self) -> Vec<VerifiableCredential> {
+        let credentials = self.credentials.lock().await;
+        credentials.values().cloned().collect()
+    }
+    
+    /// Get events related to a specific proposal
+    pub async fn get_proposal_events(&self, proposal_cid: Cid) -> Vec<GovernanceEvent> {
+        let events = self.events.lock().await;
+        events.values()
+            .filter(|event| event.proposal_cid.as_ref() == Some(&proposal_cid))
+            .cloned()
+            .collect()
+    }
+    
+    /// Get verifiable credentials related to a specific proposal
+    pub async fn get_proposal_credentials(&self, proposal_cid: Cid) -> Vec<VerifiableCredential> {
+        let credentials = self.credentials.lock().await;
+        // We need to get the events first to know which events are related to this proposal
+        let events = self.events.lock().await;
+        
+        // Filter events related to this proposal, get their CIDs, then find matching credentials
+        let event_cids: Vec<Cid> = events.iter()
+            .filter(|(_, event)| event.proposal_cid.as_ref() == Some(&proposal_cid))
+            .map(|(cid, _)| *cid)
+            .collect();
+        
+        // Return credentials that match the event CIDs
+        credentials.iter()
+            .filter(|(cid, _)| event_cids.contains(cid))
+            .map(|(_, vc)| vc.clone())
+            .collect()
+    }
+    
+    /// Get a proposal by its CID
+    pub async fn get_proposal(&self, proposal_cid: Cid) -> Result<Proposal, GovernanceError> {
+        // Generate a key for the proposal in storage
+        let key_str = format!("proposal::{}", proposal_cid);
+        let key_hash = multihash::Code::Sha2_256.digest(key_str.as_bytes());
+        let key_cid = Cid::new_v1(0x71, key_hash); // Raw codec
+        
+        // Lock the storage and retrieve the proposal
+        let storage = self.storage.lock().await;
+        let proposal_bytes = storage.get_kv(&key_cid).await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?
+            .ok_or_else(|| GovernanceError::ProposalNotFound(proposal_cid.to_string()))?;
+        
+        // Deserialize the proposal
+        let proposal: Proposal = serde_json::from_slice(&proposal_bytes)
+            .map_err(|e| GovernanceError::InvalidProposal(format!("Failed to deserialize proposal: {}", e)))?;
+        
+        Ok(proposal)
+    }
+}
+
+#[async_trait]
+impl<S: StorageBackend + Send + Sync + 'static> EventEmitter for GovernanceKernel<S> {
+    async fn emit_event(&self, event: GovernanceEvent) -> Result<Cid, String> {
+        // Serialize the event to calculate its CID
+        let event_bytes = serde_json::to_vec(&event)
+            .map_err(|e| format!("Failed to serialize event: {}", e))?;
+        
+        // Create CID for the event
+        let hash = multihash::Code::Sha2_256.digest(&event_bytes);
+        let event_cid = cid::Cid::new_v1(0x55, hash); // dag-cbor codec
+        
+        // Store the event in the storage backend
+        let storage = self.storage.lock().await;
+        storage.put_kv(event_cid, event_bytes.clone())
+            .await
+            .map_err(|e| format!("Failed to store event: {}", e))?;
+        
+        // Add to internal events map
+        let mut events = self.events.lock().await;
+        events.insert(event_cid, event.clone());
+        
+        Ok(event_cid)
     }
 }
 

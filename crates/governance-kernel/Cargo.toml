@@ -8,6 +8,7 @@ description = "CCL interpretation and Core Law Modules for the ICN Runtime"
 icn-identity = { path = "../identity" }
 icn-core-vm = { path = "../core-vm" }
 icn-economics = { path = "../economics" }
+icn-storage = { path = "../storage" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
@@ -15,4 +16,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 pest = "2.7"
 pest_derive = "2.7"
-chrono = "0.4" 
+chrono = "0.4"
+uuid = { version = "1.3", features = ["v4", "serde"] }
+cid = { workspace = true }
+multihash = { workspace = true }
+async-trait = { workspace = true } 

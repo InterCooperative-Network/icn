@@ -3,10 +3,10 @@ use wasmtime::{Memory, AsContextMut, Caller};
 use crate::StoreData;
 
 /// Get the memory export from a WASM module
-pub fn get_memory<'a>(caller: &mut Caller<'a, StoreData>) -> Result<Memory, anyhow::Error> {
+pub fn get_memory(caller: &mut Caller<'_, StoreData>) -> Result<Memory, anyhow::Error> {
     caller.get_export("memory")
         .and_then(|export| export.into_memory())
-        .ok_or_else(|| anyhow::anyhow!("No memory export found"))
+        .ok_or_else(|| anyhow::anyhow!("Failed to find memory export"))
 }
 
 /// Read a string from WASM memory

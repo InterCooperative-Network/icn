@@ -2820,12 +2820,16 @@ name = "icn-agoranet-integration"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "cid",
  "icn-dag",
+ "icn-governance-kernel",
  "icn-identity",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2949,6 +2953,8 @@ name = "icn-execution-tools"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "cid",
  "clap",
  "icn-core-vm",
  "icn-dag",
@@ -2962,6 +2968,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2993,16 +3000,21 @@ name = "icn-governance-kernel"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
+ "cid",
  "icn-core-vm",
  "icn-economics",
  "icn-identity",
+ "icn-storage",
+ "multihash 0.16.3",
  "pest",
  "pest_derive",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

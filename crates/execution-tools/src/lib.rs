@@ -16,6 +16,9 @@ use icn_identity::{IdentityId, IdentityScope, VerifiableCredential};
 use thiserror::Error;
 use std::fs;
 use std::path::Path;
+use icn_core_vm::{ResourceType, ResourceAuthorization};
+use icn_governance_kernel::config::ProposalTemplate;
+use std::collections::HashMap;
 
 /// Errors that can occur during execution
 #[derive(Debug, Error)]
@@ -157,6 +160,106 @@ pub mod cli_helpers {
         // Placeholder implementation
         Err(anyhow::anyhow!("Not implemented"))
     }
+}
+
+/// Derive resource authorizations from a proposal template
+pub fn derive_authorizations(template: &ProposalTemplate) -> Vec<ResourceAuthorization> {
+    let mut authorizations = Vec::new();
+    
+    // Start with base authorizations that every proposal needs
+    authorizations.push(ResourceAuthorization::new(
+        ResourceType::Compute, 
+        1_000_000, // Base computation allowance
+        None,     // No specific context
+        "Base computation allowance for proposal execution".to_string()
+    ));
+    
+    authorizations.push(ResourceAuthorization::new(
+        ResourceType::Storage, 
+        500_000, // Base storage allowance (bytes)
+        None,    // No specific context
+        "Base storage allowance for proposal execution".to_string()
+    ));
+    
+    // If the template indicates it works with the DAG, add DAG authorization
+    if template.uses_dag {
+        authorizations.push(ResourceAuthorization::new(
+            ResourceType::DAG, 
+            10,     // Number of DAG operations
+            None,   // No specific context
+            "DAG operations allowance for proposal execution".to_string()
+        ));
+    }
+    
+    // If the template indicates it needs to perform economic operations
+    if template.uses_economics {
+        authorizations.push(ResourceAuthorization::new(
+            ResourceType::Budget, 
+            5,      // Number of budget operations
+            None,   // No specific context
+            "Budget operations allowance for proposal execution".to_string()
+        ));
+    }
+    
+    // If the template indicates identity operations
+    if template.uses_identity {
+        authorizations.push(ResourceAuthorization::new(
+            ResourceType::Identity, 
+            10,     // Number of identity operations
+            None,   // No specific context
+            "Identity operations allowance for proposal execution".to_string()
+        ));
+    }
+    
+    // Add custom authorizations from the template
+    for (resource, amount) in &template.resource_authorizations {
+        // Check if we already have this resource type
+        let existing_index = authorizations.iter().position(|a| a.resource_type == *resource);
+        
+        if let Some(index) = existing_index {
+            // Update existing authorization if the new amount is higher
+            if authorizations[index].amount < *amount {
+                authorizations[index].amount = *amount;
+            }
+        } else {
+            // Add a new authorization
+            authorizations.push(ResourceAuthorization::new(
+                resource.clone(),
+                *amount,
+                None,
+                format!("Custom {} authorization from template", resource)
+            ));
+        }
+    }
+    
+    authorizations
+}
+
+/// Prepare a VM context for CCL execution based on proposal and template
+pub fn prepare_execution_context(
+    proposal_cid: cid::Cid,
+    template: &ProposalTemplate,
+    caller_did: String,
+    caller_scope: icn_identity::IdentityScope
+) -> icn_core_vm::VmContext {
+    // Derive authorizations from the template
+    let authorizations = derive_authorizations(template);
+    
+    // Get all resource types from the authorizations
+    let resource_types = authorizations.iter()
+        .map(|auth| auth.resource_type.clone())
+        .collect();
+    
+    // Create a VM context with the appropriate authorizations
+    icn_core_vm::VmContext::with_authorizations(
+        caller_did,
+        caller_scope,
+        resource_types,
+        authorizations,
+        uuid::Uuid::new_v4().to_string(), // Generate a unique execution ID
+        chrono::Utc::now().timestamp(),   // Current timestamp
+        Some(proposal_cid.to_string())    // Associated proposal CID
+    )
 }
 
 #[cfg(test)]
