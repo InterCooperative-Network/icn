@@ -1561,6 +1561,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid",
+ "futures",
  "icn-dag",
  "icn-economics",
  "icn-identity",
