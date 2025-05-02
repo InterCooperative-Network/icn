@@ -16,7 +16,7 @@ use tracing;
 use crate::FederationError;
 use crate::FederationResult;
 use icn_identity::IdentityId;
-use icn_storage::StorageBackend;
+use icn_storage::{StorageBackend, ReplicationPolicy as StorageReplicationPolicy};
 use icn_governance_kernel::config::GovernanceConfig;
 
 /// Simple structure to represent governance roles
@@ -273,6 +273,119 @@ pub async fn is_authorized_guardian(
 {
     let guardians = get_authorized_guardians(context_id, Arc::clone(&storage)).await?;
     Ok(guardians.contains(identity))
+}
+
+/// Get the replication policy for a specific context ID
+/// 
+/// This looks up a governance configuration from storage based on the context ID
+/// (which could be a federation ID, scope ID, etc.) and extracts the replication policy
+/// that applies to that context.
+pub async fn get_replication_policy(
+    context_id: &str, 
+    storage: Arc<Mutex<dyn StorageBackend + Send + Sync>>
+) -> FederationResult<StorageReplicationPolicy> {
+    // First, try the direct approach - looking up by the context_id key
+    let key_cid = config_key_for_scope(context_id);
+    tracing::debug!(context_id, key = %key_cid, "Looking up config for replication policy");
+    
+    let store_lock = storage.lock().await;
+    match store_lock.get(&key_cid).await {
+        Ok(Some(bytes)) => {
+            // Drop the lock before parsing
+            drop(store_lock);
+            return parse_config_for_replication_policy(bytes, context_id);
+        },
+        // Otherwise, continue with the fallback approach
+        _ => drop(store_lock)
+    }
+    
+    // Fallback: List all available entries and check each one
+    let all_cids = {
+        let store_lock = storage.lock().await;
+        match store_lock.list_all().await {
+            Ok(cids) => {
+                drop(store_lock);
+                cids
+            },
+            Err(e) => {
+                drop(store_lock);
+                return Err(FederationError::StorageError(format!(
+                    "Failed to list storage contents: {}", e
+                )));
+            }
+        }
+    };
+    
+    // If we have no entries, return default policy
+    if all_cids.is_empty() {
+        tracing::debug!(context_id, "No governance configs found, using default replication policy");
+        return Ok(StorageReplicationPolicy::Factor(3)); // Default to 3 replicas
+    }
+    
+    // For each CID, try to get the content and check if it's a config for our context
+    for cid in all_cids {
+        let bytes = {
+            let store_lock = storage.lock().await;
+            match store_lock.get(&cid).await {
+                Ok(Some(bytes)) => {
+                    drop(store_lock);
+                    bytes
+                },
+                _ => {
+                    drop(store_lock);
+                    continue;
+                }
+            }
+        };
+        
+        // Try to parse as governance config and check if it matches our context
+        if let Ok(legacy_config) = serde_json::from_slice::<LegacyGovernanceConfig>(&bytes) {
+            if legacy_config.scope_id == context_id {
+                // Legacy configs don't have storage policies, return default
+                return Ok(StorageReplicationPolicy::Factor(3));
+            }
+        } else if let Ok(kernel_config) = serde_json::from_slice::<GovernanceConfig>(&bytes) {
+            // Extract storage policy from kernel config
+            // For now, we'll return a default policy
+            return Ok(StorageReplicationPolicy::Factor(3));
+        }
+    }
+    
+    // If we got here, we didn't find a matching config
+    // Return a default policy rather than an error
+    tracing::debug!(context_id, "No matching governance config found, using default replication policy");
+    Ok(StorageReplicationPolicy::Factor(3))
+}
+
+/// Helper function to extract replication policy from governance config bytes
+fn parse_config_for_replication_policy(bytes: Vec<u8>, context_id: &str) -> FederationResult<StorageReplicationPolicy> {
+    // Try to deserialize as GovernanceConfig from governance-kernel first
+    match serde_json::from_slice::<GovernanceConfig>(&bytes) {
+        Ok(config) => {
+            // Extract storage policy if available
+            // In a real implementation, this would access config.storage.replication_policy or similar
+            // For now, return a default policy
+            tracing::debug!(context_id, "Found governance config, but no storage policy defined");
+            Ok(StorageReplicationPolicy::Factor(3))
+        },
+        Err(e1) => {
+            // Try legacy format, which doesn't have storage policies
+            tracing::debug!(context_id, error = %e1, "Failed to parse as governance-kernel config, trying legacy format");
+            
+            match serde_json::from_slice::<LegacyGovernanceConfig>(&bytes) {
+                Ok(_) => {
+                    tracing::debug!(context_id, "Found legacy config, using default replication policy");
+                    Ok(StorageReplicationPolicy::Factor(3))
+                },
+                Err(e2) => {
+                    Err(FederationError::Internal(format!(
+                        "Config deserialization failed for {}: primary error: {}, legacy error: {}", 
+                        context_id, e1, e2
+                    )))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

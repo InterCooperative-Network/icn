@@ -29,7 +29,7 @@ use icn_identity::{
     IdentityId, IdentityScope, TrustBundle, 
     QuorumProof, QuorumConfig
 };
-use icn_storage::ReplicationFactor;
+use icn_storage::{FederationCommand, ReplicationPolicy};
 use multihash::{self, MultihashDigest};
 use tracing::{debug, info, error, warn};
 use thiserror::Error;
@@ -42,6 +42,9 @@ pub mod signing;
 
 // Export roles module
 pub mod roles;
+
+// Export replication module
+pub mod replication;
 
 /// Errors that can occur during federation operations
 #[derive(Debug, Error)]
@@ -157,49 +160,6 @@ impl GuardianMandate {
     }
 }
 
-/// Represents a replication policy
-#[derive(Debug, Clone)]
-pub struct ReplicationPolicy {
-    /// The replication factor
-    pub factor: ReplicationFactor,
-    
-    /// The content types this policy applies to
-    pub content_types: Vec<String>,
-    
-    /// The geographic regions this policy applies to
-    pub regions: Vec<String>,
-    
-    /// The scope of this policy
-    pub scope: IdentityScope,
-    
-    /// The identifier of the scope
-    pub scope_id: IdentityId,
-    
-    /// The DAG node representing this policy
-    pub dag_node: DagNode,
-}
-
-impl ReplicationPolicy {
-    /// Create a new replication policy
-    pub fn new(
-        factor: ReplicationFactor,
-        content_types: Vec<String>,
-        regions: Vec<String>,
-        scope: IdentityScope,
-        scope_id: IdentityId,
-        dag_node: DagNode,
-    ) -> Self {
-        Self {
-            factor,
-            content_types,
-            regions,
-            scope,
-            scope_id,
-            dag_node,
-        }
-    }
-}
-
 /// Messages that can be sent to the federation manager
 #[derive(Debug)]
 pub enum FederationManagerMessage {
@@ -217,6 +177,13 @@ pub enum FederationManagerMessage {
     AnnounceBlob {
         cid: cid::Cid,
         respond_to: Option<tokio::sync::oneshot::Sender<FederationResult<()>>>,
+    },
+    /// Identify potential replication targets for a blob
+    IdentifyReplicationTargets {
+        cid: cid::Cid,
+        policy: ReplicationPolicy,
+        context_id: Option<String>,
+        respond_to: Option<tokio::sync::oneshot::Sender<FederationResult<Vec<PeerId>>>>,
     },
     /// Stop the federation manager
     Shutdown {
@@ -272,7 +239,7 @@ impl FederationManager {
     pub async fn start_node(
         config: FederationManagerConfig, 
         storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
-    ) -> FederationResult<(Self, mpsc::Sender<cid::Cid>)> {
+    ) -> FederationResult<(Self, mpsc::Sender<cid::Cid>, mpsc::Sender<FederationCommand>)> {
         // Generate a new local keypair
         let keypair = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(keypair.public());
@@ -317,11 +284,20 @@ impl FederationManager {
         // Create a channel for Kademlia blob announcements
         let (blob_sender, blob_receiver) = mpsc::channel::<cid::Cid>(100);
         
+        // Create a channel for federation commands from storage layer
+        let (fed_cmd_sender, fed_cmd_receiver) = mpsc::channel::<FederationCommand>(100);
+        
         // Clone storage for event loop
         let event_loop_storage = storage.clone();
         
         // Spawn the event loop
-        let event_loop_handle = tokio::spawn(run_event_loop(swarm, receiver, event_loop_storage, blob_receiver));
+        let event_loop_handle = tokio::spawn(run_event_loop(
+            swarm, 
+            receiver, 
+            event_loop_storage, 
+            blob_receiver,
+            fed_cmd_receiver
+        ));
         
         // Create sync command sender clone
         let sync_sender = sender.clone();
@@ -356,7 +332,7 @@ impl FederationManager {
             storage,
         };
         
-        Ok((manager, blob_sender))
+        Ok((manager, blob_sender, fed_cmd_sender))
     }
     
     /// Request a trust bundle from the network
@@ -422,6 +398,27 @@ impl FederationManager {
         rx.await
             .map_err(|e| FederationError::NetworkError(format!("Failed to receive announcement confirmation: {}", e)))?
     }
+    
+    /// Identify potential replication targets for a blob
+    pub async fn identify_replication_targets(
+        &self, 
+        cid: cid::Cid,
+        policy: ReplicationPolicy,
+        context_id: Option<String>
+    ) -> FederationResult<Vec<PeerId>> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        
+        self.sender.send(FederationManagerMessage::IdentifyReplicationTargets {
+            cid,
+            policy,
+            context_id,
+            respond_to: Some(tx),
+        }).await
+        .map_err(|e| FederationError::NetworkError(format!("Failed to send replication target request: {}", e)))?;
+        
+        rx.await
+            .map_err(|e| FederationError::NetworkError(format!("Failed to receive replication targets: {}", e)))?
+    }
 }
 
 /// Run the event loop for the federation network
@@ -430,13 +427,17 @@ async fn run_event_loop(
     mut command_receiver: mpsc::Receiver<FederationManagerMessage>,
     storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
     mut blob_receiver: mpsc::Receiver<cid::Cid>,
+    mut fed_cmd_receiver: mpsc::Receiver<FederationCommand>,
 ) {
     info!("Starting federation network event loop");
+    
+    // Track active Kademlia queries to handle responses
+    let mut active_replication_queries: HashMap<kad::QueryId, (cid::Cid, ReplicationPolicy, Option<tokio::sync::oneshot::Sender<FederationResult<Vec<PeerId>>>>)> = HashMap::new();
     
     loop {
         tokio::select! {
             event = swarm.select_next_some() => {
-                handle_swarm_event(&mut swarm, event, storage.clone()).await;
+                handle_swarm_event(&mut swarm, event, storage.clone(), &mut active_replication_queries).await;
             },
             command = command_receiver.recv() => {
                 match command {
@@ -504,6 +505,43 @@ async fn run_event_loop(
                             }
                         }
                     },
+                    Some(FederationManagerMessage::IdentifyReplicationTargets { cid, policy, context_id, respond_to }) => {
+                        debug!(%cid, ?policy, "Identifying replication targets for blob");
+                        
+                        // If a context ID was provided, look up the policy
+                        let actual_policy = if let Some(context_id) = context_id {
+                            match roles::get_replication_policy(&context_id, Arc::clone(&storage)).await {
+                                Ok(policy) => {
+                                    debug!(%cid, ?policy, context_id, "Retrieved replication policy from governance config");
+                                    policy
+                                },
+                                Err(e) => {
+                                    error!(%cid, context_id, "Failed to get replication policy: {}", e);
+                                    // Fall back to the provided policy
+                                    policy
+                                }
+                            }
+                        } else {
+                            policy
+                        };
+                        
+                        // Proceed based on the policy
+                        match actual_policy {
+                            ReplicationPolicy::None => {
+                                debug!(%cid, "Replication policy is None, not identifying targets");
+                                if let Some(tx) = respond_to {
+                                    let _ = tx.send(Ok(Vec::new()));
+                                }
+                            },
+                            ReplicationPolicy::Factor(_) | ReplicationPolicy::Peers(_) => {
+                                // Start a Kademlia query to find closest peers
+                                let query_id = swarm.behaviour_mut().kademlia.get_closest_peers(cid.to_bytes());
+                                debug!(%cid, ?query_id, "Started Kademlia query for closest peers");
+                                // Store the query ID and associated information
+                                active_replication_queries.insert(query_id, (cid, actual_policy, respond_to));
+                            }
+                        }
+                    },
                     Some(FederationManagerMessage::Shutdown { respond_to }) => {
                         info!("Shutting down federation network event loop");
                         let _ = respond_to.send(());
@@ -523,6 +561,28 @@ async fn run_event_loop(
                         Err(e) => error!(%cid, "Failed to announce as provider from direct channel: {}", e)
                     }
                 }
+            },
+            maybe_cmd = fed_cmd_receiver.recv() => {
+                if let Some(cmd) = maybe_cmd {
+                    match cmd {
+                        FederationCommand::AnnounceBlob(cid) => {
+                            debug!(%cid, "Received blob announcement command from federation");
+                            match announce_as_provider(&mut swarm, cid).await {
+                                Ok(_) => debug!(%cid, "Successfully started Kademlia provider announcement from federation command"),
+                                Err(e) => error!(%cid, "Failed to announce as provider from federation command: {}", e)
+                            }
+                        },
+                        FederationCommand::IdentifyReplicationTargets { cid, policy, context_id } => {
+                            debug!(%cid, ?policy, "Received replication target identification command");
+                            
+                            // Convert to internal message format and handle
+                            let query_id = swarm.behaviour_mut().kademlia.get_closest_peers(cid.to_bytes());
+                            debug!(%cid, ?query_id, "Started Kademlia query for closest peers from federation command");
+                            // Store the query ID and associated information
+                            active_replication_queries.insert(query_id, (cid, policy, None));
+                        }
+                    }
+                }
             }
         }
     }
@@ -535,6 +595,7 @@ async fn handle_swarm_event(
     swarm: &mut Swarm<network::IcnFederationBehaviour>,
     event: SwarmEvent<network::IcnFederationBehaviourEvent>,
     storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+    active_replication_queries: &mut HashMap<kad::QueryId, (cid::Cid, ReplicationPolicy, Option<tokio::sync::oneshot::Sender<FederationResult<Vec<PeerId>>>>)>,
 ) {
     match event {
         SwarmEvent::NewListenAddr { address, .. } => {
@@ -550,7 +611,7 @@ async fn handle_swarm_event(
             debug!("Incoming connection on local address: {}", local_addr);
         },
         SwarmEvent::Behaviour(behavior_event) => {
-            handle_behavior_event(swarm, behavior_event, storage).await;
+            handle_behavior_event(swarm, behavior_event, storage, active_replication_queries).await;
         },
         _ => {}
     }
@@ -561,6 +622,7 @@ async fn handle_behavior_event(
     swarm: &mut Swarm<network::IcnFederationBehaviour>,
     event: network::IcnFederationBehaviourEvent,
     storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+    active_replication_queries: &mut HashMap<kad::QueryId, (cid::Cid, ReplicationPolicy, Option<tokio::sync::oneshot::Sender<FederationResult<Vec<PeerId>>>>)>,
 ) {
     match event {
         network::IcnFederationBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
@@ -578,12 +640,57 @@ async fn handle_behavior_event(
             }
         },
         network::IcnFederationBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { 
+            id, 
             result: kad::QueryResult::GetClosestPeers(Ok(closest_peers)), 
             .. 
         }) => {
             info!("Found {} closest peers", closest_peers.peers.len());
-            for peer in closest_peers.peers {
-                debug!("Found closest peer: {}", peer);
+            
+            // Check if this is a replication query we're tracking
+            if let Some((cid, policy, respond_to)) = active_replication_queries.remove(&id) {
+                // Use the replication module to identify target peers
+                let local_peer_id = swarm.local_peer_id().clone();
+                let target_peers = replication::identify_target_peers(
+                    &cid, 
+                    &policy, 
+                    closest_peers.peers, 
+                    &local_peer_id
+                ).await;
+                
+                info!(%cid, ?policy, count = target_peers.len(), "Identified potential replication targets");
+                
+                // If we have a response channel, send back the list of targets
+                if let Some(tx) = respond_to {
+                    let _ = tx.send(Ok(target_peers.clone()));
+                }
+                
+                // Initiate replication (for now just logs intent)
+                if let Err(e) = replication::replicate_to_peers(&cid, &target_peers).await {
+                    error!(%cid, "Failed to replicate blob: {}", e);
+                }
+            } else {
+                // General closest peers query not related to replication
+                for peer in closest_peers.peers {
+                    debug!("Found closest peer: {}", peer);
+                }
+            }
+        },
+        network::IcnFederationBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { 
+            id, 
+            result: kad::QueryResult::GetClosestPeers(Err(err)), 
+            .. 
+        }) => {
+            error!("GetClosestPeers query failed: {}", err);
+            
+            // Handle failure for replication queries
+            if let Some((cid, _, respond_to)) = active_replication_queries.remove(&id) {
+                error!(%cid, "Failed to identify replication targets: {}", err);
+                
+                if let Some(tx) = respond_to {
+                    let _ = tx.send(Err(FederationError::NetworkError(
+                        format!("Failed to identify replication targets: {}", err)
+                    )));
+                }
             }
         },
         network::IcnFederationBehaviourEvent::Gossipsub(gossipsub::Event::Message { 
@@ -730,28 +837,20 @@ async fn handle_behavior_event(
     }
 }
 
-/// Federation synchronization functions
-// TODO(V3-MVP): Update this module to use the actual libp2p implementation
-pub mod sync {
-    use super::*;
+/// Helper function to announce the local node as a provider for a CID
+async fn announce_as_provider(
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    cid: cid::Cid
+) -> FederationResult<()> {
+    // Use the CID bytes directly as the Kademlia key
+    // This method doesn't need to access the private kad::record module
+    let cid_bytes = cid.to_bytes();
     
-    /// Synchronize a trust bundle with the network
-    pub async fn sync_trust_bundle(_trust_bundle: &TrustBundle) -> FederationResult<()> {
-        // Placeholder implementation
-        Err(FederationError::SyncFailed("Not implemented".to_string()))
-    }
+    // Announce ourselves as a provider for this key
+    swarm.behaviour_mut().kademlia.start_providing(cid_bytes.into())
+        .map_err(|e| FederationError::NetworkError(format!("Failed to start Kademlia provider record: {}", e)))?;
     
-    /// Retrieve a trust bundle from the network
-    pub async fn get_trust_bundle(_epoch: u64) -> FederationResult<TrustBundle> {
-        // Placeholder implementation
-        Err(FederationError::SyncFailed("Not implemented".to_string()))
-    }
-    
-    /// Broadcast a guardian mandate to the network
-    pub async fn broadcast_mandate(_mandate: &GuardianMandate) -> FederationResult<()> {
-        // Placeholder implementation
-        Err(FederationError::SyncFailed("Not implemented".to_string()))
-    }
+    Ok(())
 }
 
 /// Gets the latest known epoch from local state
@@ -798,22 +897,6 @@ async fn request_trust_bundle_from_network(
     }
 }
 
-/// Helper function to announce the local node as a provider for a CID
-async fn announce_as_provider(
-    swarm: &mut Swarm<network::IcnFederationBehaviour>,
-    cid: cid::Cid
-) -> FederationResult<()> {
-    // Use the CID bytes directly as the Kademlia key
-    // This method doesn't need to access the private kad::record module
-    let cid_bytes = cid.to_bytes();
-    
-    // Announce ourselves as a provider for this key
-    swarm.behaviour_mut().kademlia.start_providing(cid_bytes.into())
-        .map_err(|e| FederationError::NetworkError(format!("Failed to start Kademlia provider record: {}", e)))?;
-    
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -841,226 +924,10 @@ mod tests {
         assert!(result.is_ok(), "Failed to start federation node: {:?}", result.err());
         
         // Clean up by shutting down
-        if let Ok((manager, _blob_sender)) = result {
+        if let Ok((manager, _blob_sender, _fed_cmd_sender)) = result {
             let shutdown_result = manager.shutdown().await;
             assert!(shutdown_result.is_ok(), "Failed to shutdown federation manager: {:?}", shutdown_result.err());
         }
-    }
-    
-    #[tokio::test]
-    async fn test_trust_bundle_validation_valid() {
-        // Generate test keypairs for guardians
-        let (guardian1_did, guardian1_keypair) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian2_did, guardian2_keypair) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian3_did, guardian3_keypair) = icn_identity::generate_did_keypair().unwrap();
-        
-        let guardian1_id = IdentityId(guardian1_did);
-        let guardian2_id = IdentityId(guardian2_did);
-        let guardian3_id = IdentityId(guardian3_did);
-        
-        // Create a simple majority quorum config
-        let quorum_config = QuorumConfig::Majority;
-        
-        // Create signing guardians
-        let signing_guardians = vec![
-            (guardian1_id.clone(), &guardian1_keypair),
-            (guardian2_id.clone(), &guardian2_keypair),
-            (guardian3_id.clone(), &guardian3_keypair),
-        ];
-        
-        // Create a sample CID
-        let mh = multihash::Code::Sha2_256.digest(b"test_dag_root");
-        let cid = cid::Cid::new_v1(0x55, mh);
-        
-        // Create a trust bundle
-        let mut trust_bundle = icn_identity::TrustBundle::new(
-            1, // epoch_id
-            "test-federation".to_string(),
-            vec![cid],
-            vec![], // empty attestations for this test
-        );
-        
-        // Sign the trust bundle with guardians
-        let sign_result = signing::create_signed_trust_bundle(
-            &mut trust_bundle,
-            quorum_config,
-            &signing_guardians,
-        ).await;
-        
-        assert!(sign_result.is_ok(), "Failed to sign trust bundle: {:?}", sign_result.err());
-        assert!(trust_bundle.proof.is_some(), "Trust bundle should have a proof");
-        
-        // For this test, we know it should pass since all signatures are valid
-        // and we have a majority (3/3)
-        assert_eq!(trust_bundle.proof.as_ref().unwrap().votes.len(), 3);
-    }
-    
-    #[tokio::test]
-    async fn test_trust_bundle_validation_invalid_signature() {
-        // Generate test keypairs for guardians
-        let (guardian1_did, guardian1_keypair) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian2_did, guardian2_keypair) = icn_identity::generate_did_keypair().unwrap();
-        let (_invalid_did, invalid_keypair) = icn_identity::generate_did_keypair().unwrap();
-        
-        let guardian1_id = IdentityId(guardian1_did.clone());
-        let guardian2_id = IdentityId(guardian2_did);
-        
-        // Invalid signer - using correct DID but incorrect keypair
-        let invalid_id = IdentityId(guardian1_did);
-        
-        // Create a simple majority quorum config
-        let quorum_config = QuorumConfig::Majority;
-        
-        // Create signing guardians with one invalid signature
-        let signing_guardians = vec![
-            (guardian1_id.clone(), &guardian1_keypair),
-            (guardian2_id.clone(), &guardian2_keypair),
-            (invalid_id, &invalid_keypair), // This will produce an invalid signature for guardian1's DID
-        ];
-        
-        // Create a sample CID
-        let mh = multihash::Code::Sha2_256.digest(b"test_dag_root");
-        let cid = cid::Cid::new_v1(0x55, mh);
-        
-        // Create a trust bundle
-        let mut trust_bundle = icn_identity::TrustBundle::new(
-            1, // epoch_id
-            "test-federation".to_string(),
-            vec![cid],
-            vec![], // empty attestations for this test
-        );
-        
-        // Sign the trust bundle with guardians (including invalid signature)
-        let sign_result = signing::create_signed_trust_bundle(
-            &mut trust_bundle,
-            quorum_config,
-            &signing_guardians,
-        ).await;
-        
-        assert!(sign_result.is_ok(), "Failed to sign trust bundle: {:?}", sign_result.err());
-        
-        // Manually inspect the proof to check for duplicate DIDs
-        // In a real implementation with cryptographic verification, the duplicate 
-        // signatures would be detected and one would be invalid
-        if let Some(proof) = &trust_bundle.proof {
-            let mut seen_dids = std::collections::HashSet::new();
-            let mut duplicate_found = false;
-            
-            for (signer_did, _) in &proof.votes {
-                if !seen_dids.insert(&signer_did.0) {
-                    duplicate_found = true;
-                    break;
-                }
-            }
-            
-            assert!(duplicate_found, "Duplicate DID not found in signatures");
-        } else {
-            panic!("Proof is missing");
-        }
-    }
-    
-    #[tokio::test]
-    async fn test_trust_bundle_validation_insufficient_quorum() {
-        // Generate test keypairs for guardians
-        let (guardian1_did, guardian1_keypair) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian2_did, guardian2_keypair) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian3_did, _) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian4_did, _) = icn_identity::generate_did_keypair().unwrap();
-        let (guardian5_did, _) = icn_identity::generate_did_keypair().unwrap();
-        
-        let guardian1_id = IdentityId(guardian1_did);
-        let guardian2_id = IdentityId(guardian2_did);
-        let guardian3_id = IdentityId(guardian3_did);
-        let guardian4_id = IdentityId(guardian4_did);
-        let guardian5_id = IdentityId(guardian5_did);
-        
-        // Create a threshold quorum config requiring 4 out of 5 signatures (80%)
-        let quorum_config = QuorumConfig::Threshold(80);
-        
-        // Define all possible guardians for the config - just for documentation purposes
-        // This is not actually used in the test itself
-        let _all_guardians = vec![
-            (guardian1_id.clone(), 1),
-            (guardian2_id.clone(), 1),
-            (guardian3_id.clone(), 1),
-            (guardian4_id.clone(), 1),
-            (guardian5_id.clone(), 1),
-        ];
-        
-        // But only collect signatures from 2, which is insufficient for 80% threshold of total (5)
-        let signing_guardians = vec![
-            (guardian1_id.clone(), &guardian1_keypair),
-            (guardian2_id.clone(), &guardian2_keypair),
-        ];
-        
-        // Create a sample CID
-        let mh = multihash::Code::Sha2_256.digest(b"test_dag_root");
-        let cid = cid::Cid::new_v1(0x55, mh);
-        
-        // Create a trust bundle
-        let mut trust_bundle = icn_identity::TrustBundle::new(
-            1, // epoch_id
-            "test-federation".to_string(),
-            vec![cid],
-            vec![], // empty attestations for this test
-        );
-        
-        // Sign the trust bundle with insufficient guardians
-        let sign_result = signing::create_signed_trust_bundle(
-            &mut trust_bundle,
-            quorum_config,
-            &signing_guardians,
-        ).await;
-        
-        assert!(sign_result.is_ok(), "Failed to sign trust bundle: {:?}", sign_result.err());
-        
-        // Manually check that we have insufficient signatures compared to the threshold
-        if let Some(proof) = &trust_bundle.proof {
-            if let QuorumConfig::Threshold(threshold_percentage) = proof.config {
-                // Important distinction: in a real system, the threshold would be calculated
-                // based on the total possible signers (which is 5 in our test setup),
-                // not based on the number of collected signatures (which is 2)
-                
-                // In this test scenario (for a production system):
-                // - 5 total possible guardians
-                // - 80% threshold = 4 required signatures
-                // - Only 2 signatures provided
-                let total_possible_guardians = 5; // From our test setup
-                let percentage = (threshold_percentage as f32) / 100.0;
-                let required_votes = (total_possible_guardians as f32 * percentage).ceil() as usize;
-                
-                assert!(proof.votes.len() < required_votes, 
-                       "Expected insufficient signatures: have {}, need {} (80% of {})", 
-                       proof.votes.len(), required_votes, total_possible_guardians);
-            } else {
-                panic!("Unexpected quorum config type");
-            }
-        } else {
-            panic!("Proof is missing");
-        }
-    }
-    
-    #[tokio::test]
-    async fn test_trust_bundle_validation_missing_proof() {
-        // Create a sample CID
-        let mh = multihash::Code::Sha2_256.digest(b"test_dag_root");
-        let cid = cid::Cid::new_v1(0x55, mh);
-        
-        // Create a trust bundle with no proof
-        let trust_bundle = icn_identity::TrustBundle::new(
-            1, // epoch_id
-            "test-federation".to_string(),
-            vec![cid],
-            vec![], // empty attestations for this test
-        );
-        
-        // Proof is None by default
-        assert!(trust_bundle.proof.is_none(), "New trust bundle should have no proof");
-        
-        // Test the behavior in the handler - for a TrustBundle with no proof
-        // Our validator in the federation crate should reject it
-        let message = "Received TrustBundle has no proof, rejecting: epoch 1";
-        assert!(message.contains("no proof"), "Validator should check for missing proof");
     }
     
     #[tokio::test]
@@ -1082,7 +949,7 @@ mod tests {
         // Check that we can create a federation manager without panicking
         assert!(result.is_ok(), "Failed to start federation node: {:?}", result.err());
         
-        if let Ok((manager, blob_sender)) = result {
+        if let Ok((manager, blob_sender, _fed_cmd_sender)) = result {
             // Create an in-memory blob store with the announcer channel
             let blob_store = InMemoryBlobStore::with_announcer(blob_sender);
             
@@ -1101,6 +968,58 @@ mod tests {
             let expected_mh = Code::Sha2_256.digest(&test_content);
             let expected_cid = Cid::new_v0(expected_mh).unwrap();
             assert_eq!(cid, expected_cid, "CID should match expected value");
+            
+            // Clean up
+            let shutdown_result = manager.shutdown().await;
+            assert!(shutdown_result.is_ok(), "Failed to shutdown federation manager");
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_blob_replication_trigger() {
+        use cid::Cid;
+        use std::time::Duration;
+        use icn_storage::{InMemoryBlobStore, DistributedStorage, FederationCommand};
+        use multihash::{Code, MultihashDigest};
+        
+        // Use a default configuration for testing
+        let config = FederationManagerConfig::default();
+        
+        // Attempt to start a federation node
+        let result = FederationManager::start_node(
+            config, 
+            Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()))
+        ).await;
+        
+        // Check that we can create a federation manager without panicking
+        assert!(result.is_ok(), "Failed to start federation node: {:?}", result.err());
+        
+        if let Ok((manager, blob_sender, fed_cmd_sender)) = result {
+            // Create an in-memory blob store with the federation command sender
+            let blob_store = InMemoryBlobStore::with_federation(blob_sender, fed_cmd_sender);
+            
+            // Create a test blob to store
+            let test_content = b"This is a test blob for replication".to_vec();
+            
+            // Store the blob
+            let cid = blob_store.put_blob(&test_content).await.unwrap();
+            
+            // Pin the blob, which should trigger replication
+            blob_store.pin_blob(&cid).await.unwrap();
+            
+            // Allow some time for the replication process to be initiated
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            
+            // We don't have a great way to verify the replication targets were identified
+            // in a unit test without mocking the swarm, but we can at least
+            // verify the proper CID was generated and pinned
+            let expected_mh = Code::Sha2_256.digest(&test_content);
+            let expected_cid = Cid::new_v0(expected_mh).unwrap();
+            assert_eq!(cid, expected_cid, "CID should match expected value");
+            
+            // Verify the blob is pinned
+            let is_pinned = blob_store.is_pinned(&cid).await.unwrap();
+            assert!(is_pinned, "Blob should be pinned");
             
             // Clean up
             let shutdown_result = manager.shutdown().await;

@@ -255,6 +255,38 @@ pub enum ReplicationFactor {
     Geographic(u32),
 }
 
+/// Commands that can be sent to the federation layer
+#[derive(Debug, Clone)]
+pub enum FederationCommand {
+    /// Announce a blob's CID via Kademlia
+    AnnounceBlob(Cid),
+    
+    /// Identify replication targets for a pinned blob
+    IdentifyReplicationTargets {
+        /// The CID of the blob to replicate
+        cid: Cid,
+        
+        /// The replication policy to apply
+        policy: ReplicationPolicy,
+        
+        /// Context ID for policy lookup (optional, if not specified will use default)
+        context_id: Option<String>,
+    }
+}
+
+/// Replication policy for blobs
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplicationPolicy {
+    /// Replicate to N peers
+    Factor(u32),
+    
+    /// Replicate to specific peers (PeerIds are stored as base58 strings)
+    Peers(Vec<String>),
+    
+    /// No replication required
+    None,
+}
+
 /// Trait for distributed blob storage that provides content-addressed storage with
 /// pinning capabilities and replication controls
 #[async_trait]
@@ -297,6 +329,8 @@ pub struct InMemoryBlobStore {
     max_blob_size: u64,
     /// Optional channel for sending CIDs to be announced via Kademlia
     kad_announcer: Option<mpsc::Sender<Cid>>,
+    /// Optional channel for sending federation commands
+    fed_cmd_sender: Option<mpsc::Sender<FederationCommand>>,
 }
 
 impl InMemoryBlobStore {
@@ -307,6 +341,7 @@ impl InMemoryBlobStore {
             pins: Arc::new(Mutex::new(HashSet::new())),
             max_blob_size: 0, // No limit by default
             kad_announcer: None,
+            fed_cmd_sender: None,
         }
     }
     
@@ -317,6 +352,7 @@ impl InMemoryBlobStore {
             pins: Arc::new(Mutex::new(HashSet::new())),
             max_blob_size,
             kad_announcer: None,
+            fed_cmd_sender: None,
         }
     }
     
@@ -327,22 +363,47 @@ impl InMemoryBlobStore {
             pins: Arc::new(Mutex::new(HashSet::new())),
             max_blob_size: 0,
             kad_announcer: Some(kad_announcer),
+            fed_cmd_sender: None,
         }
     }
     
-    /// Create a new in-memory blob store with both a size limit and an announcement channel
-    pub fn with_max_size_and_announcer(max_blob_size: u64, kad_announcer: mpsc::Sender<Cid>) -> Self {
+    /// Create a new in-memory blob store with both a federation command channel and announcement channel
+    pub fn with_federation(
+        kad_announcer: mpsc::Sender<Cid>,
+        fed_cmd_sender: mpsc::Sender<FederationCommand>
+    ) -> Self {
+        Self {
+            blobs: Arc::new(Mutex::new(HashMap::new())),
+            pins: Arc::new(Mutex::new(HashSet::new())),
+            max_blob_size: 0,
+            kad_announcer: Some(kad_announcer),
+            fed_cmd_sender: Some(fed_cmd_sender),
+        }
+    }
+    
+    /// Create a new in-memory blob store with size limit and federation channels
+    pub fn with_max_size_and_federation(
+        max_blob_size: u64,
+        kad_announcer: mpsc::Sender<Cid>,
+        fed_cmd_sender: mpsc::Sender<FederationCommand>
+    ) -> Self {
         Self {
             blobs: Arc::new(Mutex::new(HashMap::new())),
             pins: Arc::new(Mutex::new(HashSet::new())),
             max_blob_size,
             kad_announcer: Some(kad_announcer),
+            fed_cmd_sender: Some(fed_cmd_sender),
         }
     }
     
     /// Set the Kademlia announcer channel
     pub fn set_announcer(&mut self, kad_announcer: mpsc::Sender<Cid>) {
         self.kad_announcer = Some(kad_announcer);
+    }
+    
+    /// Set the federation command channel
+    pub fn set_federation_sender(&mut self, fed_cmd_sender: mpsc::Sender<FederationCommand>) {
+        self.fed_cmd_sender = Some(fed_cmd_sender);
     }
     
     /// Get the number of blobs in storage
@@ -431,7 +492,37 @@ impl DistributedStorage for InMemoryBlobStore {
         
         // Pin the blob
         let mut pins = self.pins.lock().await;
-        pins.insert(*cid);
+        let newly_pinned = pins.insert(*cid);
+        drop(pins); // Release lock as soon as possible
+        
+        // If this is a newly pinned blob, trigger replication
+        if newly_pinned {
+            tracing::debug!(%cid, "Blob newly pinned, triggering replication process");
+            
+            if let Some(sender) = &self.fed_cmd_sender {
+                // Use a default replication policy for now
+                // In a real implementation, this should be looked up based on blob context
+                let default_policy = ReplicationPolicy::Factor(3); // Default to 3 replicas
+                
+                match sender.send(FederationCommand::IdentifyReplicationTargets {
+                    cid: *cid,
+                    policy: default_policy,
+                    context_id: None, // Default context - will be determined by federation layer
+                }).await {
+                    Ok(_) => {
+                        tracing::debug!(%cid, "Sent replication target identification request");
+                    },
+                    Err(e) => {
+                        tracing::error!(%cid, "Failed to send replication target request: {}", e);
+                        // Continue anyway since the local pin succeeded
+                    }
+                }
+            } else {
+                tracing::debug!(%cid, "No federation command channel available, skipping replication");
+            }
+        } else {
+            tracing::debug!(%cid, "Blob was already pinned, not triggering replication");
+        }
         
         Ok(())
     }
