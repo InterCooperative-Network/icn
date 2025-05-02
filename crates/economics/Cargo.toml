@@ -1,0 +1,14 @@
+[package]
+name = "icn-economics"
+version = "0.1.0"
+edition = "2021"
+description = "Scoped tokens, Metering logic, Treasury ops, and Budgeting primitives for the ICN Runtime"
+
+[dependencies]
+icn-identity = { path = "../identity" }
+icn-dag = { path = "../dag" }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 

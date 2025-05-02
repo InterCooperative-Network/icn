@@ -1,0 +1,14 @@
+[package]
+name = "icn-governance-kernel"
+version = "0.1.0"
+edition = "2021"
+description = "CCL interpretation and Core Law Modules for the ICN Runtime"
+
+[dependencies]
+icn-core-vm = { path = "../core-vm" }
+icn-identity = { path = "../identity" }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 

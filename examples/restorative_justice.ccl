@@ -1,0 +1,193 @@
+// ICN Restorative Justice Template (V1)
+// This is a sample CCL template for defining restorative justice processes.
+
+restorative_justice:v1 {
+  // Process identity and scope
+  identity {
+    name: "Community Restorative Justice Framework"
+    scope: Community
+    purpose: "To heal harm, restore relationships, and strengthen community through participatory, non-punitive justice processes"
+    values: ["accountability", "healing", "participation", "reintegration", "transformation"]
+  }
+  
+  // Core principles
+  principles {
+    focus_on_harm: "Address the harm done rather than rule-breaking"
+    inclusive_involvement: "Include all affected parties in the process"
+    voluntary_participation: "Ensure voluntary participation of all parties"
+    respect_for_all: "Maintain respect for the dignity of all participants"
+    truthful_communication: "Encourage open and honest dialogue"
+    responsibility_taking: "Support those who caused harm to take responsibility"
+    reintegration: "Work toward reintegration and restoration of relationships"
+    community_strengthening: "Use conflicts as opportunities to strengthen community"
+  }
+  
+  // Process stages
+  process {
+    initiation: {
+      access_points: ["self_referral", "community_member_referral", "circle_referral", "guardian_referral"]
+      assessment: {
+        criteria: ["willingness_of_participants", "safety_considerations", "nature_of_harm"]
+        performed_by: "trained_facilitators"
+        preliminary_support: "immediate_support_for_affected_parties"
+      }
+    }
+    
+    preparation: {
+      facilitator_selection: {
+        criteria: ["training_certification", "impartiality", "community_trust"]
+        process: "facilitator_pool_with_participant_input"
+        number: "typically_two"
+      }
+      
+      participant_preparation: {
+        meetings: "individual_preparatory_sessions"
+        focus: ["process_understanding", "needs_identification", "expectation_setting"]
+        support_persons: "participants_may_bring_supporters"
+        communication: "clear_documentation_and_scheduling"
+      }
+    }
+    
+    circle_process: {
+      format: {
+        seating: "circular_arrangement"
+        talking_piece: "used_to_designate_speaker"
+        phases: ["opening_ceremony", "introductions", "building_trust", "exploring_harm", "addressing_needs", "agreement_development", "closing"]
+      }
+      
+      facilitation: {
+        role: ["create_safe_space", "guide_process", "ensure_participation", "maintain_focus_on_harm_and_healing"]
+        technique: "questions_rather_than_directives"
+        adaptability: "responsive_to_emotional_needs_and_dynamics"
+      }
+      
+      agreements: {
+        components: ["acknowledgment_of_harm", "concrete_actions", "resource_needs", "timeline", "follow_up_process"]
+        documentation: "written_and_signed_by_participants"
+        flexibility: "can_be_revised_as_needed"
+      }
+    }
+    
+    implementation: {
+      support: {
+        types: ["accountability_partners", "skill_development", "resource_provision", "community_engagement"]
+        circles: "ongoing_support_circles_as_needed"
+      }
+      
+      monitoring: {
+        process: "collaborative_and_non_punitive"
+        check_ins: "regular_scheduled_follow_up"
+        adaptation: "agreements_can_evolve_based_on_progress_and_challenges"
+      }
+      
+      completion: {
+        criteria: "fulfillment_of_agreements_and_healing_indicators"
+        celebration: "acknowledgment_of_completion_and_growth"
+        reintegration: "formal_welcome_back_if_appropriate"
+      }
+    }
+  }
+  
+  // Roles and responsibilities
+  roles {
+    facilitators: {
+      selection: "trained_community_members_with_certification"
+      responsibilities: ["process_design", "preparation", "facilitation", "documentation", "follow_up_coordination"]
+      support: "ongoing_supervision_and_peer_support"
+      recusal: "mandatory_for_conflicts_of_interest"
+    }
+    
+    participants: {
+      person_who_caused_harm: {
+        expectations: ["voluntary_participation", "truth_telling", "responsibility_taking", "agreement_fulfillment"]
+        rights: ["respectful_treatment", "support_person", "voice_needs", "question_process"]
+      }
+      
+      harmed_party: {
+        expectations: ["voluntary_participation", "express_impact", "contribute_to_solutions"]
+        rights: ["safety_provisions", "support_person", "set_boundaries", "withdraw_if_needed"]
+      }
+      
+      supporters: {
+        role: "provide_emotional_support_and_perspective"
+        limitations: "not_to_speak_for_participants_or_dominate"
+      }
+      
+      community_members: {
+        selection: "representatives_of_affected_community"
+        role: ["share_community_impact", "offer_resources", "support_agreements"]
+      }
+    }
+    
+    guardians: {
+      intervention_threshold: "process_breakdown_or_serious_safety_concerns"
+      approach: "minimally_invasive_to_restore_process"
+      accountability: "transparent_documentation_of_involvement"
+    }
+  }
+  
+  // Special considerations
+  special_cases {
+    power_imbalances: {
+      assessment: "mandatory_evaluation_of_power_dynamics"
+      mitigations: ["additional_support", "separate_processes", "representation"]
+      facilitator_requirements: "specific_training_in_power_dynamics"
+    }
+    
+    serious_harm: {
+      definition: "harm_causing_significant_trauma_or_community_disruption"
+      approach: "specialized_facilitation_with_trauma_awareness"
+      external_resources: "professional_support_services_integration"
+      timeline: "extended_preparation_and_process_timeframe"
+    }
+    
+    recurring_patterns: {
+      identification: "tracking_system_for_repeated_harm_situations"
+      escalation: "community_council_review_for_persistent_patterns"
+      systemic_approach: "addressing_underlying_community_factors"
+    }
+  }
+  
+  // Integration with governance
+  governance_integration {
+    relationship_to_policies: {
+      preference: "restorative_processes_as_first_response"
+      limitations: "clear_situations_requiring_immediate_protective_action"
+      policy_improvement: "learnings_feed_into_policy_development"
+    }
+    
+    record_keeping: {
+      privacy: "confidential_with_consent-based_sharing"
+      data_collection: "anonymized_patterns_for_community_learning"
+      storage: "secure_with_limited_access"
+      retention: "time-limited_with_clear_deletion_policy"
+    }
+    
+    resource_allocation: {
+      budget: "dedicated_community_resources_for_training_and_facilitation"
+      time: "recognized_community_contribution"
+      space: "appropriate_private_spaces_for_processes"
+    }
+  }
+  
+  // Development and sustainability
+  sustainability {
+    training: {
+      initial: "comprehensive_restorative_practices_training"
+      ongoing: "regular_skill_development_and_reflection"
+      train_the_trainer: "community_capacity_building"
+    }
+    
+    evaluation: {
+      metrics: ["participant_experience", "agreement_completion", "recidivism", "community_perception"]
+      process: "regular_review_and_adaptation"
+      external_assessment: "periodic_external_review"
+    }
+    
+    community_education: {
+      scope: "all_community_members_receive_basic_training"
+      integration: "restorative_practices_in_everyday_interactions"
+      materials: "accessible_multilingual_resources"
+    }
+  }
+} 

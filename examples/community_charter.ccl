@@ -1,0 +1,187 @@
+// ICN Community Charter Template (V1)
+// This is a sample CCL template for defining community governance.
+
+community_charter:v1 {
+  // Community identity and scope
+  identity {
+    name: "Example Community Network"
+    scope: Community
+    mission: "To create a resilient, distributed network for community-owned infrastructure"
+    values: ["solidarity", "sustainability", "accessibility", "knowledge_sharing"]
+  }
+  
+  // Membership and participation
+  membership {
+    types {
+      core: {
+        rights: ["vote", "propose", "access_all_resources", "represent_community"]
+        responsibilities: ["regular_participation", "uphold_values", "contribute_resources"]
+        onboarding: {
+          process: ["application", "contribution_period", "member_vote"]
+          contribution_period: "2 months"
+          approval_threshold: "70%"
+        }
+      }
+      general: {
+        rights: ["participate_forums", "propose", "access_basic_resources"]
+        responsibilities: ["respect_guidelines", "moderate_usage"]
+        onboarding: {
+          process: ["registration", "orientation"]
+          approval: "automatic_with_verification"
+        }
+      }
+      observer: {
+        rights: ["access_public_resources", "attend_open_meetings"]
+        responsibilities: ["respect_guidelines"]
+        onboarding: {
+          process: ["registration"]
+        }
+      }
+    }
+    
+    participation_pathways {
+      contribution_types: ["infrastructure", "moderation", "content", "code", "education", "outreach"]
+      recognition_system: "contribution_badges"
+      advancement: "contribution_based"
+    }
+  }
+  
+  // Governance structure
+  governance {
+    decision_making {
+      deliberative: true
+      voting {
+        standard_threshold: "60%"
+        constitutional_threshold: "75%"
+        quorum: "40%"
+      }
+      
+      proposal_process {
+        stages: ["ideation", "discussion", "refinement", "voting", "implementation", "evaluation"]
+        timeframes {
+          discussion_min: "14 days"
+          voting_period: "7 days"
+        }
+      }
+    }
+    
+    circles {
+      formation_threshold: "5 members"
+      autonomy: {
+        resource_allocation: "bounded_budget"
+        decision_making: "domain_specific"
+        reporting: "monthly_updates"
+      }
+      
+      core_circles: {
+        coordination: {
+          purpose: "Cross-circle coordination and charter stewardship"
+          selection: "delegation_from_other_circles"
+          term: "6 months rotating"
+        }
+        infrastructure: {
+          purpose: "Physical and digital infrastructure maintenance and development"
+          selection: "skills_based_and_consent"
+        }
+        community_care: {
+          purpose: "Conflict resolution, accessibility, and mutual aid coordination"
+          selection: "election"
+        }
+        knowledge: {
+          purpose: "Documentation, education, and knowledge commons stewardship"
+          selection: "volunteer_with_approval"
+        }
+      }
+    }
+    
+    meetings {
+      community_assembly: {
+        frequency: "quarterly"
+        notice: "21 days"
+        facilitation: "trained_facilitator_rotation"
+        remote_participation: "full_access"
+      }
+      circle_meetings: {
+        frequency: "as_needed_minimum_monthly"
+        documentation: "required_and_accessible"
+      }
+    }
+  }
+  
+  // Commons governance
+  commons {
+    digital_resources {
+      access_levels: ["public", "general", "core"]
+      stewardship: "circle_specific"
+      contribution_recognition: "transparent_credit"
+    }
+    
+    physical_resources {
+      shared_infrastructure: ["network_hardware", "meeting_spaces", "tools"]
+      access_protocol: "training_based"
+      maintenance: "shared_responsibility_with_coordinators"
+    }
+    
+    knowledge_commons {
+      documentation_standards: "accessible_and_multilingual"
+      licensing: "cooperative_commons_license"
+      archives: "distributed_with_integrity_verification"
+    }
+  }
+  
+  // Resource allocation
+  economics {
+    resource_pooling {
+      contribution_types: ["financial", "labor", "materials", "space", "skills"]
+      accounting: "transparent_and_multi_dimensional"
+    }
+    
+    participatory_budgeting {
+      frequency: "semi_annual"
+      allocation_method: "consensus_with_fallback_voting"
+      categories: ["maintenance", "development", "community_care", "outreach"]
+      minimum_allocations: {
+        maintenance: "30%"
+        community_care: "20%"
+      }
+    }
+    
+    external_resources {
+      funding_criteria: "aligned_with_values_and_non_extractive"
+      decision_threshold: "70%_core_members"
+    }
+  }
+  
+  // Conflict resolution
+  conflict_resolution {
+    process: ["direct_communication", "peer_mediation", "circle_support", "community_council"]
+    restorative_approach: true
+    guardian_intervention {
+      threshold: "persistent_pattern_or_harm"
+      request_path: "community_care_circle_or_70%_vote"
+    }
+  }
+  
+  // Communication
+  communication {
+    channels {
+      decision_making: ["forum", "assembly", "circle_meetings"]
+      coordination: ["matrix", "signal", "community_calendar"]
+      public: ["website", "fediverse", "public_events"]
+    }
+    
+    information_accessibility {
+      languages: ["community_specific", "minimum_two"]
+      formats: ["text", "audio", "visual"]
+      technical_levels: ["beginner_friendly", "technical_details_available"]
+    }
+  }
+  
+  // Charter amendments
+  amendments {
+    proposal_process: "formal_with_draft_period"
+    deliberation_period: "minimum_30_days"
+    approval_threshold: "75%_core_members"
+    review_cycle: "annual_with_asynchronous_proposals"
+  }
+} 

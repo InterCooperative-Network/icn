@@ -1,0 +1,31 @@
+[workspace]
+members = [
+    "crates/core-vm",
+    "crates/governance-kernel",
+    "crates/dag",
+    "crates/identity",
+    "crates/economics",
+    "crates/federation",
+    "crates/storage",
+    "crates/agoranet-integration",
+    "crates/execution-tools",
+    "cli",
+]
+resolver = "2"
+
+[workspace.dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+wasmer = "3.1"
+wasmer-wasi = "3.1"
+libp2p = "0.53"
+multihash = "0.19"
+cid = "0.10"
+did-method-key = "0.2"
+hashbrown = "0.14"
+merkle-cbt = "0.3" 

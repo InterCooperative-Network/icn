@@ -1,0 +1,16 @@
+[package]
+name = "icn-dag"
+version = "0.1.0"
+edition = "2021"
+description = "DAG objects, Merkle anchoring, and Lineage for the ICN Runtime"
+
+[dependencies]
+icn-identity = { path = "../identity" }
+merkle-cbt = { workspace = true }
+multihash = { workspace = true }
+cid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 

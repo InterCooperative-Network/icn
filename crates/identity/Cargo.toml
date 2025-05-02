@@ -1,0 +1,13 @@
+[package]
+name = "icn-identity"
+version = "0.1.0"
+edition = "2021"
+description = "DIDs, VCs, TrustBundles, Anchors, and ZK for the ICN Runtime"
+
+[dependencies]
+did-method-key = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 

@@ -1,0 +1,16 @@
+[package]
+name = "icn-storage"
+version = "0.1.0"
+edition = "2021"
+description = "Abstract storage backend trait and Distributed Blob Storage primitives for the ICN Runtime"
+
+[dependencies]
+icn-identity = { path = "../identity" }
+multihash = { workspace = true }
+cid = { workspace = true }
+hashbrown = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 

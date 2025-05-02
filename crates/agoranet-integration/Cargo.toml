@@ -1,0 +1,14 @@
+[package]
+name = "icn-agoranet-integration"
+version = "0.1.0"
+edition = "2021"
+description = "Deliberation thread linking logic stub for the ICN Runtime"
+
+[dependencies]
+icn-identity = { path = "../identity" }
+icn-dag = { path = "../dag" }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 
