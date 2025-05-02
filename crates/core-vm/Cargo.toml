@@ -9,9 +9,9 @@ icn-identity = { path = "../identity" }
 icn-storage = { path = "../storage" }
 icn-dag = { path = "../dag" }
 icn-economics = { path = "../economics" }
-wasmtime = { version = "12.0", features = ["async"] }
+wasmtime = "9.0"
 thiserror = { workspace = true }
-tracing = { version = "0.1", features = ["log"] }
+tracing = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

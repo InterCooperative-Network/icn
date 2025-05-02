@@ -7,6 +7,7 @@ within a sandboxed environment.
 
 pub mod mem_helpers;
 pub mod resources;
+pub mod host_abi;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -279,8 +280,8 @@ pub fn execute_wasm(
     params: &[u8],
     vm_context: VMContext,
 ) -> Result<ExecutionResult, VmError> {
-    // In a real implementation, this would use a proper WASM runtime like wasmtime
-    // For now, we'll simply simulate execution
+    use wasmtime::{Config, Engine, Module, Store, Linker};
+    use crate::host_abi;
     
     // Create a host environment
     let mut host_env = ConcreteHostEnvironment::new(vm_context);
@@ -288,22 +289,73 @@ pub fn execute_wasm(
     // Record baseline compute usage for instantiation
     host_env.record_compute_usage(1000)?;
     
+    // Create wasmtime engine with appropriate security settings
+    let mut config = Config::new();
+    config.consume_fuel(true); // Enable fuel-based resource limiting
+    config.max_wasm_stack(64 * 1024); // Limit stack size to 64k
+    config.wasm_reference_types(false); // Disable reference types for security
+    config.wasm_bulk_memory(false); // Disable bulk memory operations
+    config.wasm_multi_value(false); // Disable multi-value returns
+    
+    let engine = Engine::new(&config).map_err(|e| 
+        VmError::InitializationError(format!("Failed to create engine: {}", e)))?;
+        
+    // Compile the module
+    let module = Module::new(&engine, wasm_bytes).map_err(|e|
+        VmError::InitializationError(format!("Failed to compile module: {}", e)))?;
+        
+    // Create a store with our host environment
+    let mut store = Store::new(&engine, host_env);
+    
+    // Set initial fuel allocation (100 units per byte of wasm)
+    let initial_fuel = wasm_bytes.len() as u64 * 100;
+    store.add_fuel(initial_fuel).map_err(|e|
+        VmError::InitializationError(format!("Failed to add fuel: {}", e)))?;
+    
+    // Create a linker and register host functions
+    let mut linker = Linker::new(&engine);
+    host_abi::register_host_functions(&mut store, &mut linker).map_err(|e|
+        VmError::InitializationError(format!("Failed to register host functions: {}", e)))?;
+    
+    // Instantiate the module
+    let instance = linker.instantiate(&mut store, &module).map_err(|e|
+        VmError::InitializationError(format!("Failed to instantiate module: {}", e)))?;
+    
+    // Get the exported function
+    let func = instance.get_func(&mut store, function_name).ok_or_else(||
+        VmError::ExecutionError(format!("Function not found: {}", function_name)))?;
+    
     // Log the function call
-    host_env.log(&format!("Executing function: {}", function_name))?;
+    debug!("Executing function: {}", function_name);
     
-    // Record compute usage for execution (simulated)
-    host_env.record_compute_usage(5000)?;
+    // Prepare parameters
+    let mut results = vec![wasmtime::Val::I32(0)]; // Assuming i32 return type
     
-    // Create a resource consumption record
-    let resources = ResourceConsumption {
-        compute: host_env.get_compute_consumed(),
-        storage: host_env.get_storage_consumed(),
-        network: host_env.get_network_consumed(),
+    // Call the function
+    func.call(&mut store, &[], &mut results).map_err(|e|
+        VmError::ExecutionError(format!("Execution failed: {}", e)))?;
+    
+    // Extract result
+    let return_value = match results.get(0) {
+        Some(wasmtime::Val::I32(i)) => *i as i32,
+        _ => 0,
+    };
+    
+    // Get resource consumption from the host environment
+    let env = store.data();
+    let resources = resources::ResourceConsumption {
+        compute: env.get_compute_consumed(),
+        storage: env.get_storage_consumed(),
+        network: env.get_network_consumed(),
         token: 0,
     };
     
+    // Get remaining fuel
+    let remaining_fuel = store.fuel_consumed().unwrap_or(0);
+    debug!("Execution used {} fuel units", initial_fuel - remaining_fuel);
+    
     // Return a successful result
-    Ok(ExecutionResult::success(vec![42], resources))
+    Ok(ExecutionResult::success(vec![return_value as u8], resources))
 }
 
 

@@ -1,11 +1,21 @@
+/*!
+# Governance Events
+
+This module defines the event and credential structure for governance actions.
+Events are emitted when governance actions occur, and credentials are generated
+to provide verifiable proofs of these actions.
+*/
+
 use cid::Cid;
 use serde::{Serialize, Deserialize};
 use icn_identity::{IdentityId, IdentityScope, VerifiableCredential};
 use uuid::Uuid;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::collections::HashMap;
 
 /// Types of governance events that can be emitted
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
 pub enum GovernanceEventType {
     /// A new governance proposal was created
     ProposalCreated,
@@ -19,35 +29,45 @@ pub enum GovernanceEventType {
     MandateIssued,
     /// A trust bundle was created 
     TrustBundleCreated,
+    /// A trust bundle was updated
+    TrustBundleUpdated,
     /// A custom event
     Custom(String),
 }
 
+/// Status of an event (for filtering)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum EventStatus {
+    /// Event was successful
+    Success,
+    /// Event failed
+    Failed,
+    /// Event is pending
+    Pending,
+}
+
 /// A governance event that can be emitted by the kernel
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GovernanceEvent {
-    /// Unique ID for this event
-    pub id: Uuid,
-    
-    /// The type of event
+    /// Unique ID for the event
+    pub id: String,
+    /// Type of event
     pub event_type: GovernanceEventType,
-    
-    /// The DID of the entity that generated this event
-    pub emitter: IdentityId,
-    
-    /// Timestamp (Unix timestamp in seconds)
+    /// Timestamp of the event (seconds since UNIX epoch)
     pub timestamp: u64,
-    
-    /// Related proposal CID (if relevant)
+    /// The identity that triggered the event
+    pub issuer: IdentityId,
+    /// The scope of the event (e.g., Federation, Community)
+    pub scope: IdentityScope,
+    /// The organization or federation this event belongs to (if any)
+    pub organization: Option<IdentityId>,
+    /// The proposal CID this event relates to (if any)
     pub proposal_cid: Option<Cid>,
-    
-    /// Related scope (e.g., federation ID or other scope identifier)
-    pub scope_id: Option<IdentityId>,
-    
-    /// Scope type (e.g., Federation, DAO, etc.)
-    pub scope_type: Option<IdentityScope>,
-    
-    /// Additional event-specific data
+    /// Status of the event
+    pub status: EventStatus,
+    /// Additional data specific to the event type (JSON-encoded)
     pub data: serde_json::Value,
 }
 
@@ -55,80 +75,63 @@ impl GovernanceEvent {
     /// Create a new governance event
     pub fn new(
         event_type: GovernanceEventType,
-        emitter: IdentityId,
+        issuer: IdentityId,
+        scope: IdentityScope,
+        organization: Option<IdentityId>,
         proposal_cid: Option<Cid>,
-        scope_id: Option<IdentityId>,
-        scope_type: Option<IdentityScope>,
         data: serde_json::Value,
     ) -> Self {
-        // Get current timestamp
+        let id = Uuid::new_v4().to_string();
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
+            .unwrap_or_default()
             .as_secs();
-        
+            
         Self {
-            id: Uuid::new_v4(),
+            id,
             event_type,
-            emitter,
             timestamp,
+            issuer,
+            scope,
+            organization,
             proposal_cid,
-            scope_id,
-            scope_type,
+            status: EventStatus::Success,
             data,
         }
     }
     
-    /// Convert this event to a Verifiable Credential
-    pub async fn to_verifiable_credential(&self) -> VerifiableCredential {
-        // Create a new VC with appropriate type
-        let mut credential_types = vec!["VerifiableCredential".to_string()];
+    /// Convert the event to a VerifiableCredential
+    pub fn to_credential(&self, issuer_did: &str) -> VerifiableCredential {
+        let mut credential_types = vec!["GovernanceCredential".to_string()];
         
-        // Add specific type based on event type
+        // Add specific credential type based on event type
         match self.event_type {
-            GovernanceEventType::ProposalCreated => {
-                credential_types.push("ProposalCreationCredential".to_string());
-            },
-            GovernanceEventType::VoteCast => {
-                credential_types.push("VoteCastCredential".to_string());
-            },
-            GovernanceEventType::ProposalFinalized => {
-                credential_types.push("ProposalFinalizationCredential".to_string());
-            },
-            GovernanceEventType::ProposalExecuted => {
-                credential_types.push("ProposalExecutionCredential".to_string());
-            },
-            GovernanceEventType::MandateIssued => {
-                credential_types.push("MandateCredential".to_string());
-            },
-            GovernanceEventType::TrustBundleCreated => {
-                credential_types.push("TrustBundleCredential".to_string());
-            },
-            GovernanceEventType::Custom(ref custom_type) => {
-                credential_types.push(format!("{}Credential", custom_type));
-            }
+            GovernanceEventType::ProposalCreated => credential_types.push("ProposalCreationCredential".to_string()),
+            GovernanceEventType::VoteCast => credential_types.push("VoteCastCredential".to_string()),
+            GovernanceEventType::ProposalFinalized => credential_types.push("ProposalFinalizationCredential".to_string()),
+            GovernanceEventType::ProposalExecuted => credential_types.push("ProposalExecutionCredential".to_string()),
+            GovernanceEventType::MandateIssued => credential_types.push("MandateIssuanceCredential".to_string()),
+            GovernanceEventType::TrustBundleCreated => credential_types.push("TrustBundleCreationCredential".to_string()),
+            GovernanceEventType::TrustBundleUpdated => credential_types.push("TrustBundleUpdateCredential".to_string()),
+            GovernanceEventType::Custom(ref name) => credential_types.push(format!("{}Credential", name)),
         }
         
-        // Create credential subject
+        // Create credential subject with event data
         let mut subject_map = serde_json::Map::new();
         
-        // Add event data
-        subject_map.insert("eventId".to_string(), serde_json::Value::String(self.id.to_string()));
-        subject_map.insert("eventType".to_string(), serde_json::to_value(&self.event_type).unwrap());
-        subject_map.insert("timestamp".to_string(), serde_json::Value::Number(self.timestamp.into()));
+        // Add standard fields
+        subject_map.insert("eventId".to_string(), serde_json::Value::String(self.id.clone()));
+        subject_map.insert("eventType".to_string(), serde_json::Value::String(format!("{:?}", self.event_type)));
+        subject_map.insert("timestamp".to_string(), serde_json::Value::Number(serde_json::Number::from(self.timestamp)));
+        subject_map.insert("issuerId".to_string(), serde_json::Value::String(self.issuer.to_string()));
+        subject_map.insert("scope".to_string(), serde_json::Value::String(format!("{:?}", self.scope)));
         
-        // Add proposal CID if present
+        if let Some(org) = &self.organization {
+            subject_map.insert("organizationId".to_string(), serde_json::Value::String(org.to_string()));
+        }
+        
         if let Some(cid) = &self.proposal_cid {
             subject_map.insert("proposalCid".to_string(), serde_json::Value::String(cid.to_string()));
-        }
-        
-        // Add scope information if present
-        if let Some(scope_id) = &self.scope_id {
-            subject_map.insert("scopeId".to_string(), serde_json::Value::String(scope_id.0.clone()));
-        }
-        
-        if let Some(scope_type) = &self.scope_type {
-            subject_map.insert("scopeType".to_string(), serde_json::to_value(scope_type).unwrap());
         }
         
         // Add event-specific data
@@ -137,27 +140,43 @@ impl GovernanceEvent {
         // Create the credential with the event emitter as the issuer
         VerifiableCredential::new(
             credential_types,
-            self.emitter.0.clone(),
-            self.emitter.0.clone(),
+            issuer_did.to_string(),
+            // Add subject DID - using the event issuer as the subject
+            self.issuer.to_string(),
             serde_json::Value::Object(subject_map)
         )
     }
 }
 
-/// EventEmitter trait for components that need to emit governance events
-#[async_trait::async_trait]
+/// Interface for components that can emit governance events
 pub trait EventEmitter {
     /// Emit a governance event
-    async fn emit_event(&self, event: GovernanceEvent) -> Result<Cid, String>;
+    fn emit_event(&self, event: GovernanceEvent) -> Result<(), String>;
     
-    /// Emit a governance event and return it as a Verifiable Credential
-    async fn emit_event_with_vc(&self, event: GovernanceEvent) -> Result<(Cid, VerifiableCredential), String> {
-        // Convert the event to a VC
-        let vc = event.to_verifiable_credential().await;
-        
-        // Emit the event
-        let event_cid = self.emit_event(event).await?;
-        
-        Ok((event_cid, vc))
+    /// Get events related to a specific proposal
+    fn get_events_for_proposal(&self, proposal_cid: Cid) -> Result<Vec<GovernanceEvent>, String>;
+    
+    /// Get credentials related to a specific proposal
+    fn get_credentials_for_proposal(&self, proposal_cid: Cid) -> Result<Vec<VerifiableCredential>, String>;
+}
+
+/// A simple in-memory event emitter for testing
+#[derive(Clone)]
+pub struct InMemoryEventEmitter(pub IdentityId);
+
+impl EventEmitter for InMemoryEventEmitter {
+    fn emit_event(&self, event: GovernanceEvent) -> Result<(), String> {
+        println!("Emitted event: {:?}", event);
+        Ok(())
+    }
+    
+    fn get_events_for_proposal(&self, proposal_cid: Cid) -> Result<Vec<GovernanceEvent>, String> {
+        // This is just a stub for testing
+        Ok(Vec::new())
+    }
+    
+    fn get_credentials_for_proposal(&self, proposal_cid: Cid) -> Result<Vec<VerifiableCredential>, String> {
+        // This is just a stub for testing
+        Ok(Vec::new())
     }
 } 

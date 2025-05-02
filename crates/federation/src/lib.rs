@@ -51,45 +51,11 @@ pub mod replication;
 // Add this import at the top where other imports are
 use libp2p::request_response::OutboundRequestId;
 
-/// Errors that can occur during federation operations
-#[derive(Debug, Error)]
-pub enum FederationError {
-    #[error("Invalid guardian mandate: {0}")]
-    InvalidMandate(String),
-    
-    #[error("Quorum not reached: {0}")]
-    QuorumNotReached(String),
-    
-    #[error("Sync failed: {0}")]
-    SyncFailed(String),
-    
-    #[error("Invalid policy: {0}")]
-    InvalidPolicy(String),
-    
-    #[error("Network error: {0}")]
-    NetworkError(String),
-    
-    #[error("Transport error: {0}")]
-    TransportError(String),
-    
-    #[error("Connection error: {0}")]
-    ConnectionError(String),
-    
-    #[error("Protocol error: {0}")]
-    ProtocolError(String),
-    
-    #[error("Storage error: {0}")]
-    StorageError(String),
-    
-    #[error("Configuration not found: {0}")]
-    ConfigNotFound(String),
-    
-    #[error("Internal error: {0}")]
-    Internal(String),
-}
+// Export error types
+pub mod errors;
 
-/// Result type for federation operations
-pub type FederationResult<T> = Result<T, FederationError>;
+// Re-export error types from the errors module
+pub use errors::{FederationError, FederationResult, FederationResultExt, TrustBundleErrorKind};
 
 /// Represents a guardian mandate
 #[derive(Debug, Clone)]

@@ -14,4 +14,7 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true } 
+serde_json = { workspace = true }
+icn-storage = { path = "../storage" }
+async-trait = { workspace = true }
+lru = "0.11" 
