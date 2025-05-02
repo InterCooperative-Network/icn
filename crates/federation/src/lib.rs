@@ -1345,7 +1345,7 @@ mod tests {
     async fn test_p2p_blob_fetch() {
         use std::time::Duration;
         use cid::Cid;
-        use icn_storage::{AsyncInMemoryStorage, StorageResult};
+        use icn_storage::{AsyncInMemoryStorage, StorageResult, StorageBackend};
         use multihash::{Code, MultihashDigest};
         use libp2p::kad::QueryId;
         
@@ -1355,15 +1355,18 @@ mod tests {
         let cid = Cid::new_v0(mh).unwrap();
         
         // Create storage and adapter
-        let storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
-        let blob_storage = Arc::new(BlobStorageAdapter::new(Arc::clone(&storage)));
+        let storage = AsyncInMemoryStorage::new();
+        // Box the storage backend to create a trait object
+        let storage_box: Box<dyn StorageBackend + Send + Sync> = Box::new(storage);
+        let storage_arc = Arc::new(Mutex::new(storage_box));
+        let blob_storage = Arc::new(BlobStorageAdapter::new(storage_arc));
         
-        // Create a mock query ID
-        let query_id = QueryId::new();
+        // Create a mock query ID manually (QueryId doesn't have a new() method)
+        let query_id = libp2p::kad::QueryId::from(42u64);
         
         // Simulate a provider giving us the data by adding it to storage
         {
-            let storage_lock = storage.lock().await;
+            let storage_lock = blob_storage.storage.lock().await;
             storage_lock.put(&test_content).await.unwrap();
         }
         

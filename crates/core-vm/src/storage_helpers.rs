@@ -1,8 +1,7 @@
 use anyhow;
 use wasmtime::Linker;
 use crate::{StoreData, HostEnvironment};
-use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_bytes, write_memory_u32};
-use cid::Cid;
+use crate::mem_helpers::{read_memory_bytes, write_memory_bytes, write_memory_u32};
 use futures::executor::block_on;
 use crate::cid_utils;
 
@@ -18,8 +17,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         // Call the host function to get the value
         let result = {
             // Clone the host environment for use in async context
-            let mut host_env = caller.data_mut().host.clone();
-            let cid = cid.clone();
+            let mut host_env = caller.data().host.clone();
             
             // Execute the async function in a blocking context
             block_on(async {
@@ -64,7 +62,6 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         
         // Call the host function
         {
-            let cid = cid.clone();
             let value = value.clone();
             let mut host_env = caller.data().host.clone();
             
@@ -110,8 +107,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
         
         // Call the host function
         let result = {
-            let cid = cid.clone();
-            let mut host_env = caller.data_mut().host.clone();
+            let mut host_env = caller.data().host.clone();
             
             // Execute the async function in a blocking context
             block_on(async {

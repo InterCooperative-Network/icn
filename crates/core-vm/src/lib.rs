@@ -93,7 +93,7 @@ pub trait HostEnvironment: Send + Sync {
     
     // Blob storage operations
     async fn blob_put(&mut self, content: Vec<u8>) -> HostResult<Cid>;
-    async fn blob_get(&self, cid: Cid) -> HostResult<Option<Vec<u8>>>;
+    async fn blob_get(&mut self, cid: Cid) -> HostResult<Option<Vec<u8>>>;
     
     // Identity operations
     fn get_caller_did(&self) -> HostResult<String>;
@@ -378,108 +378,129 @@ impl ConcreteHostEnvironment {
 impl HostEnvironment for ConcreteHostEnvironment {
     // Storage operations
     async fn storage_get(&mut self, key: Cid) -> HostResult<Option<Vec<u8>>> {
-        // Track resource usage
-        self.record_resource_usage(ResourceType::Storage, 1000)?;
+        // Calculate the size of the key as a crude approximation of operation cost
+        let key_size = key.to_string().len() as u64;
         
-        // Convert to storage CID type using utility function
-        let storage_cid = cid_utils::convert_to_storage_cid(&key)
-            .map_err(|e| HostError::StorageError(e))?;
+        // Track minimum compute costs for accessing storage
+        self.record_resource_usage(ResourceType::Compute, key_size)?;
         
-        // Clone the storage reference to use in async context
-        let storage_clone = Arc::clone(&self.storage);
-        let storage_cid_clone = storage_cid.clone();
+        // Clone the Arc to allow moving it into the async block
+        let storage = self.storage.clone();
         
-        // Using futures::executor::block_on for synchronous operations
-        futures::executor::block_on(async move {
-            // Acquire lock
-            let guard = match storage_clone.lock() {
-                Ok(guard) => guard,
-                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
-            };
-            
-            // Call get() which returns a future
-            match guard.get(&storage_cid_clone).await {
-                Ok(value) => Ok(value),
-                Err(e) => Err(HostError::StorageError(e.to_string())),
-            }
-        })
+        // We need to drop the MutexGuard before we hit an await point
+        // First get the storage backend, then drop the guard
+        let storage_backend = {
+            let guard = storage.lock()
+                .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+                
+            // We need to clone or get what we need from the guard, then drop it
+            // In this case, we need the entire backend to make async calls on it
+            // For this implementation, we'll just use the storage operation directly
+            // This means we are not holding the guard across the await point
+            futures::executor::block_on(guard.get(&key))
+        };
+        
+        // Now process the result (no longer holding the guard)
+        let result = match storage_backend {
+            Ok(value) => {
+                // If value exists, record storage read resource usage
+                if let Some(ref data) = value {
+                    // Track storage read costs proportional to data size 
+                    self.record_resource_usage(ResourceType::Storage, data.len() as u64)?;
+                }
+                Ok(value)
+            },
+            Err(e) => Err(Self::storage_error_to_host_error(e)),
+        };
+        
+        result
     }
     
     async fn storage_put(&mut self, _key: Cid, value: Vec<u8>) -> HostResult<()> {
-        // Track resource usage (cost proportional to the size of the data)
-        let storage_cost = (value.len() as u64).max(1000);
-        self.record_resource_usage(ResourceType::Storage, storage_cost)?;
+        // Calculate resource usage
+        let value_size = value.len() as u64;
         
-        // Clone necessary data to avoid holding references across await points
-        let storage_clone = self.storage.clone();
-        let value_clone = value.clone();
+        // Track resource usage for both compute and storage proportional to data size
+        self.record_resource_usage(ResourceType::Compute, value_size / 10)?; // Compute cost is a fraction of data size
+        self.record_resource_usage(ResourceType::Storage, value_size)?;      // Storage cost is full data size
         
-        // Using futures::executor::block_on for synchronous operations
-        futures::executor::block_on(async move {
-            // Acquire lock
-            let guard = match storage_clone.lock() {
-                Ok(guard) => guard,
-                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
-            };
-            
-            // Call put() which returns a future
-            match guard.put(&value_clone).await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(HostError::StorageError(e.to_string())),
-            }
-        })
+        // Clone the storage reference to use in async context
+        let storage = self.storage.clone();
+        
+        // We need to drop the MutexGuard before we hit an await point
+        // First get the storage backend, then drop the guard
+        let storage_result = {
+            let guard = storage.lock()
+                .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+                
+            // Execute the operation directly without holding the guard across await
+            futures::executor::block_on(guard.put(&value))
+        };
+        
+        // Now process the result (no longer holding the guard)
+        match storage_result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Self::storage_error_to_host_error(e)),
+        }
     }
     
     // Blob storage operations
     async fn blob_put(&mut self, content: Vec<u8>) -> HostResult<Cid> {
-        // Track resource usage (cost proportional to the size of the data)
-        let storage_cost = (content.len() as u64).max(1000);
-        self.record_resource_usage(ResourceType::Storage, storage_cost)?;
+        // Calculate content size
+        let content_size = content.len() as u64;
         
-        // Clone necessary data
+        // Track resource usage proportional to content size
+        self.record_resource_usage(ResourceType::Storage, content_size)?;
+        
+        // Clone the blob storage reference to use in async context
         let blob_storage = self.blob_storage.clone();
-        let content_clone = content.clone();
         
-        // Using futures::executor::block_on for synchronous operations
-        futures::executor::block_on(async move {
-            // Acquire lock
-            let guard = match blob_storage.lock() {
-                Ok(guard) => guard,
-                Err(e) => return Err(HostError::StorageError(format!("Failed to lock blob storage: {}", e))),
-            };
-            
-            // Call the storage's put_blob method
-            let storage_cid = guard.put_blob(&content_clone)
-                .await
-                .map_err(|e| HostError::StorageError(e.to_string()))?;
-            
-            // Convert the storage CID to our CID type
-            convert_from_storage_cid(&storage_cid)
-                .map_err(|e| HostError::StorageError(e))
-        })
+        // We need to drop the MutexGuard before we hit an await point
+        // Execute the operation and drop the guard before any awaits
+        let blob_result = {
+            let guard = blob_storage.lock()
+                .map_err(|e| HostError::StorageError(format!("Failed to lock blob storage: {}", e)))?;
+                
+            // Execute the operation directly without holding the guard across await
+            futures::executor::block_on(guard.put_blob(&content))
+        };
+        
+        // Now process the result (no longer holding the guard)
+        match blob_result {
+            Ok(cid) => Ok(cid),
+            Err(e) => Err(Self::storage_error_to_host_error(e)),
+        }
     }
     
-    async fn blob_get(&self, cid: Cid) -> HostResult<Option<Vec<u8>>> {
-        // Convert to storage CID type
-        let storage_cid = convert_to_storage_cid(&cid)
-            .map_err(|e| HostError::StorageError(e))?;
+    async fn blob_get(&mut self, cid: Cid) -> HostResult<Option<Vec<u8>>> {
+        // Track base compute cost for operation
+        self.record_resource_usage(ResourceType::Compute, 100)?;
         
-        // Clone necessary data
+        // Clone the blob storage reference
         let blob_storage = self.blob_storage.clone();
         
-        // Using futures::executor::block_on for synchronous operations
-        futures::executor::block_on(async move {
-            // Acquire lock
-            let guard = match blob_storage.lock() {
-                Ok(guard) => guard,
-                Err(e) => return Err(HostError::StorageError(format!("Failed to lock blob storage: {}", e))),
-            };
-            
-            // Call the storage's get_blob method
-            guard.get_blob(&storage_cid)
-                .await
-                .map_err(|e| HostError::StorageError(e.to_string()))
-        })
+        // We need to drop the MutexGuard before we hit an await point
+        // Execute the operation and drop the guard before any awaits
+        let blob_result = {
+            let guard = blob_storage.lock()
+                .map_err(|e| HostError::StorageError(format!("Failed to lock blob storage: {}", e)))?;
+                
+            // Execute the operation directly without holding the guard across await
+            futures::executor::block_on(guard.get_blob(&cid))
+        };
+        
+        // Now process the result (no longer holding the guard)
+        match blob_result {
+            Ok(data) => {
+                // Track storage read costs if data was found
+                if let Some(ref content) = data {
+                    let content_len = content.len() as u64;
+                    self.record_resource_usage(ResourceType::Storage, content_len)?;
+                }
+                Ok(data)
+            },
+            Err(e) => Err(Self::storage_error_to_host_error(e)),
+        }
     }
     
     // Identity operations
@@ -745,10 +766,8 @@ impl HostEnvironment for ConcreteHostEnvironment {
     
     // DAG operations
     async fn anchor_to_dag(&mut self, content: Vec<u8>, parents: Vec<Cid>) -> HostResult<Cid> {
-        // TODO(V3-MVP): Implement proper DAG node creation and linking.
-        
         // Calculate CID using multihash
-        let hash = Code::Sha2_256.digest(&content);
+        let hash = multihash::Code::Sha2_256.digest(&content);
         let cid = Cid::new_v0(hash).map_err(|e| HostError::DagError(e.to_string()))?;
         
         // Get the content size for resource tracking
@@ -758,31 +777,30 @@ impl HostEnvironment for ConcreteHostEnvironment {
         self.record_resource_usage(ResourceType::Storage, content_size)?;
         
         // Clone necessary data to avoid holding references across await points
-        let storage_clone = self.storage.clone();
-        let content_clone = content.clone();
+        let storage = self.storage.clone();
         
-        // Using futures::executor::block_on for synchronous operations
-        let result = futures::executor::block_on(async move {
-            // Acquire lock
-            let guard = match storage_clone.lock() {
-                Ok(guard) => guard,
-                Err(e) => return Err(HostError::StorageError(format!("Failed to lock storage: {}", e))),
-            };
-            
-            // Call put() which returns a future
-            match guard.put(&content_clone).await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(HostError::StorageError(e.to_string())),
-            }
-        })?;
+        // We need to drop the MutexGuard before we hit an await point
+        // Execute the storage operation and drop the guard before any awaits
+        let storage_result = {
+            let guard = storage.lock()
+                .map_err(|e| HostError::StorageError(format!("Failed to lock storage: {}", e)))?;
+                
+            // Execute the operation directly without holding the guard across await
+            futures::executor::block_on(guard.put(&content))
+        };
         
-        // Log the DAG operation
-        debug!(
-            "DAG anchor operation: content_len={}, parents_count={}, cid={}",
-            content.len(), parents.len(), cid.to_string()
-        );
-        
-        Ok(cid)
+        // Now process the result (no longer holding the guard)
+        match storage_result {
+            Ok(_) => {
+                // Log the DAG operation
+                debug!(
+                    "DAG anchor operation: content_len={}, parents_count={}, cid={}",
+                    content.len(), parents.len(), cid.to_string()
+                );
+                Ok(cid)
+            },
+            Err(e) => Err(Self::storage_error_to_host_error(e)),
+        }
     }
     
     // Logging operations
@@ -856,7 +874,7 @@ pub async fn execute_wasm(
         .map(|auth| auth.remaining_amount())
         .unwrap_or(1_000_000);
     
-    // Add fuel to the store - for wasmtime 12.0
+    // Add fuel to the store before executing WASM
     store.add_fuel(compute_limit)
         .map_err(|e| VmError::InternalError(format!("Failed to add fuel: {}", e)))?;
     
@@ -954,9 +972,9 @@ pub async fn execute_wasm(
         return Err(VmError::MissingEntryPoint);
     };
     
-    // Calculate resources consumed from fuel usage
-    // In wasmtime 12.0, fuel_consumed() returns Option<u64>
+    // Get the fuel consumed during execution
     let consumed_fuel = store.fuel_consumed().unwrap_or(0);
+    logs.push(format!("Consumed fuel: {}", consumed_fuel));
     
     // Get the data from the store
     let store_data = store.into_data();
@@ -964,8 +982,8 @@ pub async fn execute_wasm(
     // Build the resources_consumed map from the VM context
     let mut resources_consumed = store_data.ctx.consumed_resources.clone();
     
-    // Add compute resource from fuel consumption if it's not already tracked
-    resources_consumed.entry(ResourceType::Compute).and_modify(|e| *e += consumed_fuel).or_insert(consumed_fuel);
+    // Add compute resource from fuel consumption
+    resources_consumed.insert(ResourceType::Compute, consumed_fuel);
     
     // Return the execution result
     Ok(ExecutionResult::with_resources(
@@ -1104,7 +1122,7 @@ fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), anyh
         // Call the host function
         let result = {
             let cid = cid.clone();
-            let host_env = caller.data().host.clone();
+            let mut host_env = caller.data().host.clone();
             
             // Execute the async function in a blocking context
             futures::executor::block_on(async {
