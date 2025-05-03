@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # Genesis node (first federation node)
+  federation-node-genesis:
+    image: icn-runtime:latest
+    build:
+      context: ../..
+      dockerfile: runtime/devnet/Dockerfile
+    container_name: icn-federation-genesis
+    command: >
+      sh -c "
+        icn-runtime federation init --name 'ICN Test Federation' 
+        --nodes 'did:icn:federation:genesis,did:icn:federation:node1,did:icn:federation:node2' 
+        --genesis-node 'did:icn:federation:genesis' 
+        --config-file /config/federation_icn.toml 
+        --output-dir /data/federation 
+        && icn-runtime daemon --federation --node-id 'did:icn:federation:genesis' 
+        --trust-bundle /data/federation/trust_bundle.json"
+    ports:
+      - "9000:9000"  # API port
+      - "9090:9090"  # Metrics port
+    volumes:
+      - ./config:/config
+      - ./data/genesis:/data
+    environment:
+      - ICN_LOG=info
+      - ICN_STORAGE_DIR=/data/storage
+      - ICN_METRICS=true
+    networks:
+      - icn-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Second federation node
+  federation-node-1:
+    image: icn-runtime:latest
+    container_name: icn-federation-node1
+    depends_on:
+      federation-node-genesis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        icn-runtime daemon --federation --node-id 'did:icn:federation:node1' 
+        --join-federation http://federation-node-genesis:9000 
+        --trust-bundle /config/trust_bundle.json"
+    ports:
+      - "9001:9000"  # API port
+      - "9091:9090"  # Metrics port
+    volumes:
+      - ./config:/config
+      - ./data/node1:/data
+    environment:
+      - ICN_LOG=info
+      - ICN_STORAGE_DIR=/data/storage
+      - ICN_METRICS=true
+    networks:
+      - icn-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Third federation node
+  federation-node-2:
+    image: icn-runtime:latest
+    container_name: icn-federation-node2
+    depends_on:
+      federation-node-genesis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        icn-runtime daemon --federation --node-id 'did:icn:federation:node2' 
+        --join-federation http://federation-node-genesis:9000 
+        --trust-bundle /config/trust_bundle.json"
+    ports:
+      - "9002:9000"  # API port
+      - "9092:9090"  # Metrics port
+    volumes:
+      - ./config:/config
+      - ./data/node2:/data
+    environment:
+      - ICN_LOG=info
+      - ICN_STORAGE_DIR=/data/storage
+      - ICN_METRICS=true
+    networks:
+      - icn-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: icn-prometheus
+    ports:
+      - "9200:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - icn-network
+    depends_on:
+      - federation-node-genesis
+      - federation-node-1
+      - federation-node-2
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: icn-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - icn-network
+    depends_on:
+      - prometheus
+
+networks:
+  icn-network:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data: 
