@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use crate::error::{WalletResult, WalletError};
-use crate::store::secure::SecureStorageProvider;
-use super::super::SecurePlatform;
+use super::{SecureStorageProvider, SecurePlatform};
 
 /// Mock secure storage provider, simulating secure enclave behavior
 /// but storing in memory. Useful for testing.

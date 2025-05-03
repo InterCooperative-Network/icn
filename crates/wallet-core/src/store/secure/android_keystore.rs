@@ -5,7 +5,7 @@ use jni::sys::{jbyteArray, jobject};
 use std::sync::{Arc, Mutex};
 use tokio::task;
 use crate::error::{WalletResult, WalletError};
-use super::super::secure::SecureStorageProvider;
+use super::SecureStorageProvider;
 
 /// Android Keystore provider implementation for secure storage
 /// Uses the Android Keystore System to securely store and retrieve keys

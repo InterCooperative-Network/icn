@@ -2,7 +2,12 @@ pub mod file;
 pub mod secure;
 
 pub use file::FileStore;
-pub use secure::*;
+pub use secure::{
+    SecureStorageProvider,
+    SecurePlatform,
+    MockSecureProvider,
+    get_platform_provider,
+};
 
 use async_trait::async_trait;
 use crate::error::{WalletResult, WalletError};

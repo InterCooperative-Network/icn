@@ -19,6 +19,12 @@ pub enum WalletError {
     
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
+    
+    #[error("Not found: {0}")]
+    NotFound(String),
+    
+    #[error("Store error: {0}")]
+    StoreError(String),
 }
 
 pub type WalletResult<T> = Result<T, WalletError>; 

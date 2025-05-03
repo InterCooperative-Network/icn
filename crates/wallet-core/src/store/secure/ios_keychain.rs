@@ -6,7 +6,7 @@ use std::slice;
 use std::sync::Arc;
 use tokio::task;
 use crate::error::{WalletResult, WalletError};
-use super::super::secure::SecureStorageProvider;
+use super::SecureStorageProvider;
 
 /// iOS Keychain provider implementation for secure storage
 /// Uses the iOS Secure Enclave/Keychain to securely store and retrieve keys

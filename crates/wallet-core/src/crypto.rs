@@ -74,7 +74,12 @@ impl<'de> Deserialize<'de> for KeyPair {
 
 impl KeyPair {
     pub fn generate() -> Self {
-        let signing_key = SigningKey::generate(&mut OsRng);
+        let mut rng = OsRng;
+        // Create a random set of bytes for the signing key
+        let mut secret_bytes = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rng, &mut secret_bytes);
+        // Create a signing key from those bytes
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
         let verifying_key = VerifyingKey::from(&signing_key);
         
         Self { 

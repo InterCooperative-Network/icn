@@ -30,6 +30,22 @@ pub struct CredentialProof {
     jws: String,
 }
 
+impl CredentialProof {
+    pub fn get_jws(&self) -> &str {
+        &self.jws
+    }
+    
+    pub fn new(proof_type: String, created: String, verification_method: String, proof_purpose: String, jws: String) -> Self {
+        Self {
+            proof_type,
+            created,
+            verification_method,
+            proof_purpose,
+            jws,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifiablePresentation {
     #[serde(rename = "@context")]
