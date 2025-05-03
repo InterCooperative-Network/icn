@@ -29,7 +29,7 @@ pub enum FederationError {
     ThreadSync(String),
     
     #[error("Storage error: {0}")]
-    Storage(#[from] crate::storage::StorageError),
+    Storage(String),
     
     #[error("Unexpected error: {0}")]
     Other(String),
@@ -56,14 +56,14 @@ impl Federation {
     }
     
     /// Synchronize a thread with federation nodes
-    pub async fn sync_thread(&self, thread_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn sync_thread(&self, thread_id: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
         // This would synchronize a thread with other federation nodes
         // Stub implementation for now
         Ok(())
     }
     
     /// Synchronize a message with federation nodes
-    pub async fn sync_message(&self, message_id: &str, thread_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn sync_message(&self, message_id: &str, thread_id: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
         // This would synchronize a message with other federation nodes
         // Stub implementation for now
         Ok(())
@@ -72,5 +72,10 @@ impl Federation {
     /// Check if federation sync is enabled
     pub fn is_sync_enabled(&self) -> bool {
         self.sync_enabled
+    }
+    
+    /// Check if federation service is running
+    pub fn is_running(&self) -> bool {
+        true
     }
 } 

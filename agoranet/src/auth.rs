@@ -8,6 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use base64::{Engine, engine::general_purpose::URL_SAFE};
+use crate::state::AppState;
 
 // Auth token structure that mirrors the one in wallet-core
 #[derive(Debug, Serialize, Deserialize)]

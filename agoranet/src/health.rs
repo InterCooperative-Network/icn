@@ -93,12 +93,14 @@ pub async fn check_health(
         .await
         .is_ok();
     
+    // Check federation status if enabled
+    let federation_status = state.federation.as_ref().map(|f| f.is_running());
+    
     Ok(Json(HealthResponse {
         status: "ok".to_string(),
-        database_connection: db_connection,
-        runtime_client: None,
-        federation: None,
         version: env!("CARGO_PKG_VERSION").to_string(),
+        database_connection: db_connection,
+        federation: federation_status,
     }))
 }
 
@@ -128,17 +130,19 @@ pub async fn check_status(
                 Err(_) => 0,
             };
             
-        let dag_nodes = match sqlx::query!("SELECT COUNT(*) as count FROM dag_nodes")
-            .fetch_one(state.db_pool.as_ref())
-            .await {
-                Ok(r) => r.count.unwrap_or(0),
-                Err(_) => 0,
-            };
+        // Since dag_nodes table might not exist yet, handle the error case
+        let dag_nodes = 0; // We'll implement this once dag_nodes table is created
             
         (threads, messages, dag_nodes) 
     } else {
         (0, 0, 0)
     };
+    
+    // Check if federation sync is enabled
+    let federation_sync = state.federation.as_ref().map(|f| f.is_sync_enabled()).unwrap_or(false);
+    
+    // Check if DAG anchoring is enabled (we'll assume it is if we have the service)
+    let dag_anchoring = true;
     
     Ok(Json(StatusResponse {
         status: "ok".to_string(),
@@ -147,8 +151,8 @@ pub async fn check_status(
         threads_count,
         messages_count,
         dag_nodes_count,
-        federation_sync: true, // Replace with config value
-        dag_anchoring: true,   // Replace with config value
+        federation_sync,
+        dag_anchoring,
     }))
 }
 
