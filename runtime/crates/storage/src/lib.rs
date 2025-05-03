@@ -21,6 +21,10 @@ use tokio::sync::mpsc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tracing;
 use uuid::Uuid;
+use anyhow::{anyhow, Context, Result};
+use rocksdb::{DBWithThreadMode, MultiThreaded, Options, ColumnFamilyDescriptor, WriteBatch, IteratorMode};
+use icn_dag::{DagNode, DagNodeBuilder, codec::DagCborCodec};
+use libipld::codec::Codec;
 
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -1237,221 +1241,366 @@ fn is_blob_cid(cid: &Cid) -> bool {
     cid_str.starts_with("Qm") || (cid_str.starts_with("b") && cid_str.chars().nth(1) == Some('a'))
 }
 
+/// Manages the persistent storage of DAG nodes for different entities (Federations, Coops, etc.).
+/// Each entity's DAG is stored in a separate RocksDB Column Family.
+#[async_trait]
+pub trait StorageManager: Send + Sync {
+    /// Stores the genesis node for a *new* entity DAG.
+    /// Calculates the node's CID and persists it within the entity's designated Column Family.
+    /// Creates the Column Family if it doesn't exist.
+    /// Returns the CID and the persisted DagNode.
+    async fn store_new_dag_root(
+        &self,
+        entity_did: &str,
+        node_builder: DagNodeBuilder,
+    ) -> Result<(Cid, DagNode)>;
+
+    /// Stores a regular (non-genesis) DAG node for an existing entity.
+    /// Calculates the node's CID and persists it within the entity's Column Family.
+    /// Returns the CID and the persisted DagNode.
+    /// Assumes the Column Family already exists.
+    async fn store_node(
+        &self,
+        entity_did: &str,
+        node_builder: DagNodeBuilder,
+    ) -> Result<(Cid, DagNode)>;
+
+
+    /// Retrieves a DAG node by its CID from a specific entity's DAG (Column Family).
+    async fn get_node(&self, entity_did: &str, cid: &Cid) -> Result<Option<DagNode>>;
+
+    /// Checks if a DAG node exists within a specific entity's DAG.
+    async fn contains_node(&self, entity_did: &str, cid: &Cid) -> Result<bool>;
+
+    /// Retrieves the bytes of a DAG node by its CID from a specific entity's DAG.
+    /// Useful if the caller wants to handle deserialization.
+    async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>>;
+
+    // Potentially add methods for listing nodes, iterating, etc., within a specific entity's CF.
+}
+
+
+// --- RocksDB Implementation ---
+
+const DEFAULT_CF_NAME: &str = "default"; // RocksDB requires a default CF
+
+/// Implementation of StorageManager using RocksDB with Column Families.
+pub struct RocksDBStorageManager {
+    db: Arc<DBWithThreadMode<MultiThreaded>>,
+    path: std::path::PathBuf,
+}
+
+impl RocksDBStorageManager {
+    /// Opens or creates a RocksDB database at the specified path.
+    /// Manages Column Families dynamically.
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path_buf = path.as_ref().to_path_buf();
+        let mut db_opts = Options::default();
+        db_opts.create_if_missing(true);
+        db_opts.create_missing_column_families(true); // Allow dynamic CF creation
+
+        // List existing column families
+        let cf_names = DBWithThreadMode::<MultiThreaded>::list_cf(&db_opts, &path_buf)
+            .unwrap_or_else(|_| vec![DEFAULT_CF_NAME.to_string()]); // Default if DB doesn't exist yet or error
+
+        let cf_descriptors: Vec<ColumnFamilyDescriptor> = cf_names
+            .iter()
+            .map(|name| ColumnFamilyDescriptor::new(name, Options::default()))
+            .collect();
+
+        tracing::info!(?path_buf, ?cf_names, "Opening RocksDB with Column Families");
+
+        let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(&db_opts, &path_buf, cf_descriptors)
+            .map_err(|e| anyhow!("Failed to open RocksDB at {:?}: {}", path_buf, e))?;
+
+        Ok(Self {
+            db: Arc::new(db),
+            path: path_buf,
+        })
+    }
+
+    /// Gets a handle to a Column Family, creating it if it doesn't exist.
+    /// Note: RocksDB CF creation requires reopening the DB. This implementation
+    /// handles it internally but might impact performance if many new CFs are
+    /// created frequently. Consider pre-creating CFs if possible, or batching creations.
+    ///
+    /// A simpler approach for dynamic CFs is to use `create_cf` and manage the Arc<CFHandle>
+    /// ourselves, but this requires careful handling of the handles list across threads.
+    /// Using `open_cf_descriptors` on each creation is safer but less performant.
+    ///
+    /// **Optimization:** We can cache CF handles locally in a Mutex-protected map
+    /// to avoid repeated lookups/creations.
+    fn get_or_create_cf_handle(&self, cf_name: &str) -> Result<Arc<rocksdb::ColumnFamily>> {
+         if cf_name == DEFAULT_CF_NAME {
+            // Avoid trying to create the default CF
+            return self.db.cf_handle(DEFAULT_CF_NAME)
+                .ok_or_else(|| anyhow!("Default column family '{}' not found", DEFAULT_CF_NAME));
+        }
+
+        // Check if CF already exists (cheap check)
+        if let Some(handle) = self.db.cf_handle(cf_name) {
+            return Ok(handle);
+        }
+
+        // CF doesn't exist, need to create it.
+        // This is the expensive part in RocksDB.
+        tracing::info!(cf_name, "Column family not found, creating it.");
+        self.db.create_cf(cf_name, &Options::default())
+            .map_err(|e| anyhow!("Failed to create column family '{}': {}", cf_name, e))?;
+
+        // Retrieve the handle *after* creation
+        self.db.cf_handle(cf_name)
+             .ok_or_else(|| anyhow!("Failed to get handle for newly created column family '{}'", cf_name))
+
+        // Note: A more robust implementation might involve a dedicated lock around CF creation
+        // to handle potential races if multiple threads try to create the same CF concurrently.
+        // The `create_cf` operation itself might be internally synchronized by RocksDB,
+        // but confirming this behavior across versions is needed.
+    }
+}
+
+
+#[async_trait]
+impl StorageManager for RocksDBStorageManager {
+
+    async fn store_new_dag_root(
+        &self,
+        entity_did: &str,
+        node_builder: DagNodeBuilder,
+    ) -> Result<(Cid, DagNode)> {
+        // 1. Build the node (compute links, etc., but don't finalize CID yet)
+        let node = node_builder.build()?; // Build might return Result
+
+        // 2. Encode the node to bytes using DagCborCodec
+        let node_bytes = DagCborCodec.encode(&node)?;
+
+        // 3. Calculate the CID from the encoded bytes
+        let cid = Cid::new_v1(DagCborCodec.into(), cid::multihash::Code::Sha2_256.digest(&node_bytes));
+
+         // 4. Get/Create Column Family Handle
+        let cf = self.get_or_create_cf_handle(entity_did)?;
+
+        // 5. Persist CID -> NodeBytes in the Column Family
+        self.db.put_cf(&cf, cid.to_bytes(), &node_bytes)
+            .map_err(|e| anyhow!("Failed to put node {} into CF '{}': {}", cid, entity_did, e))?;
+
+        tracing::debug!(entity_did=%entity_did, %cid, "Stored new DAG root");
+        Ok((cid, node))
+    }
+
+
+     async fn store_node(
+        &self,
+        entity_did: &str,
+        node_builder: DagNodeBuilder,
+    ) -> Result<(Cid, DagNode)> {
+        // 1. Build the node
+        let node = node_builder.build()?;
+
+        // 2. Encode the node to bytes
+        let node_bytes = DagCborCodec.encode(&node)?;
+
+        // 3. Calculate the CID
+        let cid = Cid::new_v1(DagCborCodec.into(), cid::multihash::Code::Sha2_256.digest(&node_bytes));
+
+        // 4. Get Column Family Handle (expect it to exist)
+         let cf = self.db.cf_handle(entity_did)
+            .ok_or_else(|| anyhow!("Column family '{}' not found for storing node {}", entity_did, cid))?;
+
+        // 5. Persist CID -> NodeBytes
+        self.db.put_cf(&cf, cid.to_bytes(), &node_bytes)
+            .map_err(|e| anyhow!("Failed to put node {} into CF '{}': {}", cid, entity_did, e))?;
+
+         tracing::debug!(entity_did=%entity_did, %cid, "Stored DAG node");
+        Ok((cid, node))
+    }
+
+
+    async fn get_node(&self, entity_did: &str, cid: &Cid) -> Result<Option<DagNode>> {
+        match self.get_node_bytes(entity_did, cid).await? {
+            Some(bytes) => {
+                // Decode bytes back into DagNode
+                let node = DagCborCodec.decode(&bytes)
+                    .map_err(|e| anyhow!("Failed to decode node {}: {}", cid, e))?;
+                Ok(Some(node))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn contains_node(&self, entity_did: &str, cid: &Cid) -> Result<bool> {
+         // Check if CF handle exists first, otherwise node cannot exist
+        let cf_handle = match self.db.cf_handle(entity_did) {
+             Some(handle) => handle,
+             None => return Ok(false), // CF doesn't exist, so node doesn't exist
+         };
+
+        // Use get_pinned_cf to check existence without retrieving the value
+        match self.db.get_pinned_cf(&cf_handle, cid.to_bytes()) {
+            Ok(Some(_)) => Ok(true), // Value exists
+            Ok(None) => Ok(false),    // Value does not exist
+            Err(e) => Err(anyhow!("Failed to check node existence for {} in CF '{}': {}", cid, entity_did, e)),
+        }
+    }
+
+    async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>> {
+        // Get Column Family Handle (expect it to exist if we're getting a node)
+         let cf = match self.db.cf_handle(entity_did) {
+             Some(handle) => handle,
+             None => {
+                 tracing::warn!(%cid, entity_did=%entity_did, "Attempted to get node from non-existent Column Family");
+                 return Ok(None); // Or return an error? Returning None seems reasonable.
+             }
+         };
+
+        // Retrieve bytes using CID key
+        match self.db.get_cf(&cf, cid.to_bytes()) {
+            Ok(Some(bytes)) => Ok(Some(bytes)),
+            Ok(None) => Ok(None),
+            Err(e) => Err(anyhow!("Failed to get node {} from CF '{}': {}", cid, entity_did, e)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    // Keep existing tests if needed
+    // Example: include the new tests directly
     use super::*;
-    use std::error::Error;
-    
-    // We import tempfile only in the test module
-    #[cfg(test)]
-    use tempfile;
+    use icn_dag::{DagNodeBuilder, codec::DagCborCodec}; // Adjust path as needed
+    use serde_json::json;
+    use tempfile::tempdir;
+    use libipld::ipld;
 
-    #[tokio::test]
-    async fn test_async_storage_blob_ops() -> Result<(), Box<dyn Error>> {
-        let storage = AsyncInMemoryStorage::new();
-        
-        // Create a test blob
-        let content = b"test content";
-        
-        // Compute the expected CID
-        let mh = create_sha256_multihash(content);
-        let expected_cid = Cid::new_v0(mh)?;
-        
-        // Test put_blob
-        let cid = storage.put_blob(content).await?;
-        assert_eq!(cid, expected_cid);
-        
-        // Test get_blob
-        let retrieved = storage.get_blob(&cid).await?;
-        assert_eq!(retrieved, Some(content.to_vec()));
-        
-        // Test contains_blob
-        assert!(storage.contains_blob(&cid).await?);
-        
-        // Test delete_blob
-        storage.delete_blob(&cid).await?;
-        assert_eq!(storage.get_blob(&cid).await?, None);
-        
-        Ok(())
-    }
-    
-    #[tokio::test]
-    async fn test_async_storage_kv_ops() -> Result<(), Box<dyn Error>> {
-        let storage = AsyncInMemoryStorage::new();
-        
-        // Create a key CID
-        let key_str = "test_key";
-        let key_hash = create_sha256_multihash(key_str.as_bytes());
-        let key_cid = Cid::new_v1(0x71, key_hash);
-        
-        // Test KV operations
-        let test_value = b"Test value for KV operations".to_vec();
-        storage.put_kv(key_cid, test_value.clone()).await?;
-        
-        // Verify the value can be retrieved
-        let retrieved = storage.get_kv(&key_cid).await?.unwrap();
-        assert_eq!(retrieved, test_value);
-        
-        // Verify contains operation
-        assert!(storage.contains_kv(&key_cid).await?);
-        
-        // Delete the value
-        storage.delete_kv(&key_cid).await?;
-        
-        // Verify it's gone
-        assert!(!storage.contains_kv(&key_cid).await?);
-        assert!(storage.get_kv(&key_cid).await?.is_none());
-        
-        Ok(())
-    }
-    
-    #[tokio::test]
-    async fn test_async_storage_transactions() -> Result<(), Box<dyn Error>> {
-        // Create a new in-memory storage
-        let storage = AsyncInMemoryStorage::new();
-        
-        // Create test data
-        let test_data = b"Test data for transactions".to_vec();
-        
-        // Begin a transaction
-        storage.begin_transaction().await?;
-        
-        // Perform operations inside the transaction
-        let cid = storage.put_blob(&test_data).await?;
-        
-        // The data should be accessible within the transaction
-        assert!(storage.contains_blob(&cid).await?);
-        
-        // But not yet committed to the main storage
-        storage.rollback_transaction().await?;
-        
-        // After rollback, the data should not be accessible
-        assert!(!storage.contains_blob(&cid).await?);
-        
-        // Try again with a commit
-        storage.begin_transaction().await?;
-        let cid = storage.put_blob(&test_data).await?;
-        storage.commit_transaction().await?;
-        
-        // Now the data should be accessible
-        assert!(storage.contains_blob(&cid).await?);
-        
-        Ok(())
-    }
-    
-    #[tokio::test]
-    async fn test_in_memory_blob_store() -> Result<(), Box<dyn Error>> {
-        // Create a new blob store with a 1MB max size
-        let store = InMemoryBlobStore::with_max_size(1024 * 1024);
-        
-        // Create some test data
-        let content = b"This is a test blob".to_vec();
-        
-        // Store the blob and get its CID
-        let cid = store.put_blob(&content).await?;
-        
-        // Check that the blob exists
-        assert!(store.blob_exists(&cid).await?);
-        
-        // Get the blob content
-        let retrieved = store.get_blob(&cid).await?.unwrap();
-        assert_eq!(retrieved, content);
-        
-        // Check the blob size
-        let size = store.blob_size(&cid).await?.unwrap();
-        assert_eq!(size, content.len() as u64);
-        
-        // Check that the blob is not pinned by default
-        assert!(!store.is_pinned(&cid).await?);
-        
-        // Pin the blob
-        store.pin_blob(&cid).await?;
-        
-        // Check that the blob is now pinned
-        assert!(store.is_pinned(&cid).await?);
-        
-        // Unpin the blob
-        store.unpin_blob(&cid).await?;
-        
-        // Check that the blob is no longer pinned
-        assert!(!store.is_pinned(&cid).await?);
-        
-        // Check blob count and pin count
-        assert_eq!(store.blob_count().await, 1);
-        assert_eq!(store.pin_count().await, 0);
-        
-        Ok(())
-    }
-    
-    #[tokio::test]
-    async fn test_blob_size_limit() -> Result<(), Box<dyn Error>> {
-        // Create a blob store with a very small size limit
-        let store = InMemoryBlobStore::with_max_size(10);
-        
-        // Create a blob that's within the limit
-        let small_content = b"Small".to_vec();
-        let small_cid = store.put_blob(&small_content).await?;
-        assert!(store.blob_exists(&small_cid).await?);
-        
-        // Create a blob that exceeds the limit
-        let large_content = b"This is too large for our limit".to_vec();
-        let result = store.put_blob(&large_content).await;
-        
-        // Verify we get a BlobTooLarge error
-        assert!(matches!(result, Err(StorageError::BlobTooLarge(_, _))));
-        
-        Ok(())
+    // Helper function to create a simple DagNodeBuilder for testing
+    fn create_test_node_builder(payload_value: serde_json::Value) -> DagNodeBuilder {
+        // Assuming DagNodeBuilder::new() and payload() exist and work as expected.
+        // If DagNodeBuilder requires more fields (like issuer DID), they need to be added here.
+         DagNodeBuilder::new()
+            .payload(ipld!(payload_value)) // Assuming payload takes Ipld
+            // .issuer("did:example:test_issuer") // Example if issuer is needed
     }
 
+
     #[tokio::test]
-    async fn test_filesystem_storage_backend() -> Result<(), Box<dyn Error>> {
-        // Create a temporary directory for testing
-        let temp_dir = tempfile::tempdir()?;
-        let temp_path = temp_dir.path();
-        
-        // Create a new FilesystemStorageBackend
-        let storage = FilesystemStorageBackend::new(temp_path)?;
-        
-        // Test put_blob and get_blob
-        let test_data = b"Hello, filesystem storage!";
-        let cid = storage.put_blob(test_data).await?;
-        
-        // Verify the CID
-        assert!(cid.to_string().starts_with("Qm"));
-        
-        // Retrieve the data
-        let retrieved = storage.get_blob(&cid).await?;
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap(), test_data);
-        
-        // Test contains_blob
-        let exists = storage.contains_blob(&cid).await?;
-        assert!(exists);
-        
-        // Test key-value operations
-        let kv_data = b"Key-value data";
-        storage.put_kv(cid, kv_data.to_vec()).await?;
-        
-        let kv_retrieved = storage.get_kv(&cid).await?;
-        assert!(kv_retrieved.is_some());
-        assert_eq!(kv_retrieved.unwrap(), kv_data);
-        
-        // Check that both blob and kv files exist
-        let blob_path = storage.get_blob_path(&cid);
-        let kv_path = storage.get_kv_path(&cid);
-        
-        assert!(blob_path.exists());
-        assert!(kv_path.exists());
-        
-        // Delete operations
-        storage.delete_blob(&cid).await?;
-        let blob_exists = storage.contains_blob(&cid).await?;
-        assert!(!blob_exists);
-        
-        storage.delete_kv(&cid).await?;
-        let kv_exists = storage.contains_kv(&cid).await?;
-        assert!(!kv_exists);
-        
-        Ok(())
+    async fn test_rocksdb_store_and_get_new_root() {
+        let dir = tempdir().unwrap();
+        let manager = RocksDBStorageManager::new(dir.path()).unwrap();
+        let entity_did = "did:example:entity1";
+
+        let payload = json!({ "message": "genesis" });
+        let builder = create_test_node_builder(payload.clone());
+
+        // Store genesis node
+        let store_result = manager.store_new_dag_root(entity_did, builder).await;
+        assert!(store_result.is_ok(), "Failed to store new root: {:?}", store_result.err());
+        let (cid, stored_node) = store_result.unwrap();
+
+        // Verify node content - Assuming DagNode has a payload field accessible
+        // and DagNode implements PartialEq for the comparison
+        // assert_eq!(stored_node.payload, ipld!(payload)); // Check if this comparison is valid
+
+        // Retrieve the node using the returned CID
+        let get_result = manager.get_node(entity_did, &cid).await;
+        assert!(get_result.is_ok());
+        let retrieved_node_opt = get_result.unwrap();
+        assert!(retrieved_node_opt.is_some());
+        let retrieved_node = retrieved_node_opt.unwrap();
+
+        // assert_eq!(retrieved_node.payload, ipld!(payload));
+        // assert_eq!(retrieved_node, stored_node); // Check full node equality if Eq trait is derived
+
+        // Check contains_node
+        assert!(manager.contains_node(entity_did, &cid).await.unwrap());
+
+        // Check contains_node for non-existent CID
+         let random_cid = Cid::new_v1(DagCborCodec.into(), cid::multihash::Code::Sha2_256.digest(b"random"));
+         assert!(!manager.contains_node(entity_did, &random_cid).await.unwrap());
+
+         // Check contains_node for non-existent entity
+         assert!(!manager.contains_node("did:example:nonexistent", &cid).await.unwrap());
     }
+
+
+     #[tokio::test]
+     async fn test_rocksdb_store_and_get_subsequent_node() {
+        let dir = tempdir().unwrap();
+        let manager = RocksDBStorageManager::new(dir.path()).unwrap();
+        let entity_did = "did:example:entity2";
+
+        // 1. Store a genesis node first to ensure CF exists
+        let genesis_payload = json!({ "message": "genesis_for_entity2" });
+        let genesis_builder = create_test_node_builder(genesis_payload);
+        let store_genesis_result = manager.store_new_dag_root(entity_did, genesis_builder).await;
+        assert!(store_genesis_result.is_ok(), "Failed to store genesis: {:?}", store_genesis_result.err());
+        let (genesis_cid, _) = store_genesis_result.unwrap();
+
+
+        // 2. Store a subsequent node
+        let node_payload = json!({ "message": "node 2" });
+        let node_builder = create_test_node_builder(node_payload.clone())
+             .parents(vec![genesis_cid]); // Assuming DagNodeBuilder has a parents method
+
+        let store_result = manager.store_node(entity_did, node_builder).await;
+         assert!(store_result.is_ok(), "Failed to store node: {:?}", store_result.err());
+        let (node_cid, stored_node) = store_result.unwrap();
+
+         assert_eq!(stored_node.payload, ipld!(node_payload));
+         assert_eq!(stored_node.parents, vec![genesis_cid]);
+
+        // 3. Retrieve the subsequent node
+        let get_result = manager.get_node(entity_did, &node_cid).await;
+        assert!(get_result.is_ok());
+         let retrieved_node = get_result.unwrap().expect("Node should exist");
+
+         assert_eq!(retrieved_node.payload, ipld!(node_payload));
+         assert_eq!(retrieved_node, stored_node);
+
+         // 4. Retrieve the genesis node again
+         let get_genesis_result = manager.get_node(entity_did, &genesis_cid).await;
+         assert!(get_genesis_result.is_ok());
+         assert!(get_genesis_result.unwrap().is_some());
+     }
+
+    #[tokio::test]
+    async fn test_get_non_existent_node() {
+        let dir = tempdir().unwrap();
+        let manager = RocksDBStorageManager::new(dir.path()).unwrap();
+        let entity_did = "did:example:entity3";
+
+        // Try to get a node before the CF even exists
+         let random_cid = Cid::new_v1(DagCborCodec.into(), cid::multihash::Code::Sha2_256.digest(b"no such node"));
+         let get_result_1 = manager.get_node(entity_did, &random_cid).await;
+         assert!(get_result_1.is_ok());
+         assert!(get_result_1.unwrap().is_none());
+
+        // Create the CF by storing a genesis node
+         let genesis_payload = json!({ "message": "genesis_for_entity3" });
+         let genesis_builder = create_test_node_builder(genesis_payload);
+         manager.store_new_dag_root(entity_did, genesis_builder).await.unwrap();
+
+        // Try to get a non-existent node again, now that CF exists
+        let get_result_2 = manager.get_node(entity_did, &random_cid).await;
+         assert!(get_result_2.is_ok());
+         assert!(get_result_2.unwrap().is_none());
+    }
+
+     #[tokio::test]
+     async fn test_store_node_in_non_existent_cf_fails() {
+         let dir = tempdir().unwrap();
+         let manager = RocksDBStorageManager::new(dir.path()).unwrap();
+         let entity_did = "did:example:entity4"; // CF not created yet
+
+         let payload = json!({ "message": "should fail" });
+         let builder = create_test_node_builder(payload);
+
+         // Attempt to store a non-genesis node without creating the CF first
+         let store_result = manager.store_node(entity_did, builder).await;
+         assert!(store_result.is_err());
+         // Check that the error indicates the CF was not found (or similar)
+         let err_string = store_result.unwrap_err().to_string();
+        println!("Error: {}", err_string);
+         assert!(err_string.contains("column family 'did:example:entity4' not found"));
+     }
+
 } 

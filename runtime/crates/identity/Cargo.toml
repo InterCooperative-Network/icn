@@ -21,14 +21,14 @@ rand = "0.8"
 sha2 = "0.10"
 uuid = { version = "1.4", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-bs58 = "0.4"
+bs58 = "0.5"
 base64 = "0.21"
 
 # W3C DID/VC standards and JWS implementation
-ssi = { version = "0.10.2", features = ["w3c", "ed25519"] }
+ssi = { version = "0.6", features = ["ed25519", "did-key"] }
 
 # W3C DID/VC standards - simplify for now as we're implementing our own
 # ssi = { version = "0.6", features = ["vc", "jwk", "did"] }
 
 [dev-dependencies]
-tokio = { version = "1.28", features = ["rt", "macros"] } 
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] } 

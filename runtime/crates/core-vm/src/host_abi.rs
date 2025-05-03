@@ -12,10 +12,15 @@ use crate::{
     ConcreteHostEnvironment, VmError, ResourceType,
     HostEnvironment
 };
-use crate::mem_helpers::{read_memory_string, write_memory_string};
-use wasmtime::{Caller, Memory, Trap, WasmBacktrace};
+use crate::mem_helpers::{read_memory_string, write_memory_string, read_memory_bytes, safe_check_bounds};
+use wasmtime::{Caller, Linker, Memory, Trap, WasmBacktrace};
 use tracing::*;
-use anyhow::Error;
+use anyhow::{anyhow, Error};
+use crate::InternalHostError;
+use icn_storage::StorageError;
+use cid::Cid;
+use std::convert::TryInto;
+use std::io::Cursor;
 
 /// Maximum allowed length for a key or value in bytes
 const MAX_STRING_LENGTH: usize = 1024 * 1024; // 1 MB
@@ -23,95 +28,356 @@ const MAX_STRING_LENGTH: usize = 1024 * 1024; // 1 MB
 /// Maximum allowed size for a memory allocation
 const MAX_ALLOCATION_SIZE: u32 = 1024 * 1024 * 10; // 10 MB
 
-/// Safely read a string from WebAssembly memory with bounds checking
-fn safe_read_string(
-    caller: &mut Caller<'_, ConcreteHostEnvironment>,
-    ptr: i32,
-    len: i32,
-) -> Result<String, Error> {
-    // Validate pointer and length
-    if ptr < 0 {
-        return Err(Error::msg(format!("Negative pointer: {}", ptr)));
+/// Trait result type alias
+type HostAbiResult<T> = Result<T, Error>;
+
+/// Maps InternalHostError to a negative i32 code for WASM return.
+fn map_internal_error_to_wasm(err: InternalHostError) -> i32 {
+    error!(error = %err, "Internal host error during ABI call");
+    match err {
+        InternalHostError::IdentityError(_) => -1,
+        InternalHostError::StorageError(_) => -2,
+        InternalHostError::DagError(_) => -3,
+        InternalHostError::CodecError(_) => -4,
+        InternalHostError::InvalidInput(_) => -5,
+        InternalHostError::ConfigurationError(_) => -6,
+        InternalHostError::Other(_) => -99, // Generic internal error
+        // Map VmError::ResourceLimitExceeded specifically if needed
+        // Or handle resource limits before calling the internal logic
     }
-    
-    if len < 0 {
-        return Err(Error::msg(format!("Negative length: {}", len)));
-    }
-    
-    if len as usize > MAX_STRING_LENGTH {
-        return Err(Error::msg(format!(
-            "String too long: {} (max {})",
-            len,
-            MAX_STRING_LENGTH
-        )));
-    }
-    
-    // Get memory from caller
-    let memory = caller
-        .get_export("memory")
-        .and_then(|export| export.into_memory())
-        .ok_or_else(|| Error::msg("Failed to find memory export"))?;
-    
-    // Check if the range is within bounds
-    let memory_size = memory.data_size(&mut *caller);
-    if (ptr as u64 + len as u64) > memory_size as u64 {
-        return Err(Error::msg(format!(
-            "Memory access out of bounds: ptr={}, len={}, memory_size={}",
-            ptr, len, memory_size
-        )));
-    }
-    
-    // Read the string safely
-    read_memory_string(caller, ptr, len)
 }
 
-/// Safely write a string to WebAssembly memory with bounds checking
+/// Function to map anyhow::Error from helpers to i32 WASM error code
+/// Using a distinct code for memory/ABI argument errors
+fn map_abi_error_to_wasm(err: Error) -> i32 {
+    error!(error = %err, "Host ABI argument/memory error");
+    -101 // Example: Generic ABI error code
+}
+
+/// Function to map VmError (e.g., resource limit) to i32 WASM error code
+fn map_vm_error_to_wasm(err: VmError) -> i32 {
+    error!(error = %err, "Host resource/VM error");
+    match err {
+        VmError::ResourceLimitExceeded(_) => -102,
+        _ => -100, // Other VM errors
+    }
+}
+
+/// Checks compute resource limits before proceeding.
+fn check_compute(caller: &Caller<'_, ConcreteHostEnvironment>, cost: u64) -> Result<(), i32> {
+     let env = caller.data();
+     let current = env.get_compute_consumed();
+     let limit = env.vm_context.resource_authorizations().iter()
+         .find(|auth| auth.resource_type == ResourceType::Compute)
+         .map_or(0, |auth| auth.limit);
+
+     if current.saturating_add(cost) > limit {
+         error!(current, cost, limit, "Compute resource limit exceeded");
+         Err(map_vm_error_to_wasm(VmError::ResourceLimitExceeded("Compute limit hit".into())))
+     } else {
+         Ok(())
+     }
+}
+
+/// Safely read bytes, returning HostAbiResult
+fn safe_read_bytes(
+    caller: &Caller<'_, ConcreteHostEnvironment>,
+    ptr: u32,
+    len: u32,
+) -> HostAbiResult<Vec<u8>> {
+    let memory = caller.get_export("memory")
+        .and_then(|exp| exp.into_memory())
+        .ok_or_else(|| anyhow!("Memory export not found"))?;
+    safe_check_bounds(&memory, caller, ptr, len)?;
+    let data = memory.data(caller);
+    Ok(data[ptr as usize..(ptr + len) as usize].to_vec())
+}
+
+/// Safely read string, returning HostAbiResult
+fn safe_read_string(
+    caller: &Caller<'_, ConcreteHostEnvironment>,
+    ptr: u32,
+    len: u32,
+) -> HostAbiResult<String> {
+    let bytes = safe_read_bytes(caller, ptr, len)?;
+    String::from_utf8(bytes).map_err(|e| anyhow!("Invalid UTF-8 sequence: {}", e))
+}
+
+/// Safely write bytes to WASM memory.
+fn safe_write_bytes(
+    caller: &mut Caller<'_, ConcreteHostEnvironment>,
+    bytes: &[u8],
+    out_ptr: u32,
+    max_len: u32,
+) -> HostAbiResult<usize> { // Returns bytes written
+    let bytes_len = bytes.len();
+    if bytes_len > max_len as usize {
+        return Err(anyhow!("Output buffer too small: required {}, max {}", bytes_len, max_len));
+    }
+
+    let memory = caller.get_export("memory")
+        .and_then(|exp| exp.into_memory())
+        .ok_or_else(|| anyhow!("Memory export not found"))?;
+
+    // Check bounds *before* writing
+    safe_check_bounds(&memory, caller, out_ptr, bytes_len as u32)?;
+
+    memory.write(caller, out_ptr as usize, bytes)
+        .map_err(|e| anyhow!("Memory write failed: {}", e))?;
+
+    Ok(bytes_len)
+}
+
+/// Safely write string to WASM memory.
 fn safe_write_string(
     caller: &mut Caller<'_, ConcreteHostEnvironment>,
     value: &str,
-    ptr: i32,
-    max_len: i32,
-) -> Result<i32, Error> {
-    // Validate pointer and length
-    if ptr < 0 {
-        return Err(Error::msg(format!("Negative pointer: {}", ptr)));
+    ptr: u32,
+    max_len: u32,
+) -> HostAbiResult<i32> {
+    safe_write_bytes(caller, value.as_bytes(), ptr, max_len).map(|len| len as i32)
+}
+
+/// Helper for reading Vec<Vec<u8>> from WASM memory.
+/// Reads an array of pointers and an array of lengths.
+fn read_vec_of_bytes(
+    caller: &Caller<'_, ConcreteHostEnvironment>,
+    ptr_ptr: u32,
+    count: u32,
+    lens_ptr: u32,
+) -> HostAbiResult<(Vec<Vec<u8>>, u64)> { // Return cost as well
+    let mut vecs = Vec::with_capacity(count as usize);
+    let mut cost = 0u64;
+    let memory = caller.get_export("memory")
+        .and_then(|exp| exp.into_memory())
+        .ok_or_else(|| anyhow!("Memory export not found"))?;
+
+    // Check bounds for reading the pointer array and length array
+    safe_check_bounds(&memory, caller, ptr_ptr, count * 4)?;
+    safe_check_bounds(&memory, caller, lens_ptr, count * 4)?;
+
+    let data = memory.data(caller);
+
+    for i in 0..count {
+        // Read the pointer to the i-th byte vector
+        let current_ptr_offset = (ptr_ptr + i * 4) as usize;
+        let current_ptr_bytes: [u8; 4] = data[current_ptr_offset..current_ptr_offset + 4]
+            .try_into()
+            .map_err(|_| anyhow!("Failed to read pointer bytes"))?;
+        let current_ptr = u32::from_le_bytes(current_ptr_bytes);
+
+        // Read the length of the i-th byte vector
+        let current_len_offset = (lens_ptr + i * 4) as usize;
+        let current_len_bytes: [u8; 4] = data[current_len_offset..current_len_offset + 4]
+            .try_into()
+            .map_err(|_| anyhow!("Failed to read length bytes"))?;
+        let current_len = u32::from_le_bytes(current_len_bytes);
+
+        // Read the actual bytes using safe_read_bytes (which does its own bounds check)
+        let bytes = safe_read_bytes(caller, current_ptr, current_len)?;
+        cost += current_len as u64;
+        vecs.push(bytes);
     }
-    
-    if max_len < 0 {
-        return Err(Error::msg(format!("Negative max length: {}", max_len)));
+
+    Ok((vecs, cost))
+}
+
+/// Wrapper for host_create_sub_dag
+fn host_create_sub_dag_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    parent_did_ptr: u32,
+    parent_did_len: u32,
+    genesis_payload_ptr: u32,
+    genesis_payload_len: u32,
+    entity_type_ptr: u32,
+    entity_type_len: u32,
+    did_out_ptr: u32,
+    did_out_max_len: u32
+) -> Result<i32, Trap> { // Trap on fatal error
+    debug!(parent_did_ptr, genesis_payload_ptr, entity_type_ptr, "host_create_sub_dag called");
+    let result = || -> HostAbiResult<String> {
+        let parent_did = safe_read_string(&caller, parent_did_ptr, parent_did_len)?;
+        let genesis_payload = safe_read_bytes(&caller, genesis_payload_ptr, genesis_payload_len)?;
+        let entity_type = safe_read_string(&caller, entity_type_ptr, entity_type_len)?;
+        Ok((parent_did, genesis_payload, entity_type))
+    }();
+
+    let (parent_did, genesis_payload, entity_type) = match result {
+        Ok(data) => data,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+
+    // Resource check
+    let estimated_compute_cost = 7000_u64;
+    let estimated_storage_cost = genesis_payload.len() as u64 + 512;
+    if let Err(code) = check_compute(&caller, estimated_compute_cost) { return Ok(code); }
+    // TODO: Check storage limit if necessary
+
+    // Call async logic
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    let result = handle.block_on(env.create_sub_entity_dag(&parent_did, genesis_payload, &entity_type));
+
+    match result {
+        Ok(new_did) => {
+            debug!(new_did=%new_did, "Sub-entity creation successful");
+            // Write DID back
+            match safe_write_string(&mut caller, &new_did, did_out_ptr, did_out_max_len) {
+                Ok(len) => Ok(len),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        }
+        Err(internal_err) => Ok(map_internal_error_to_wasm(internal_err)),
     }
-    
-    if max_len as usize > MAX_STRING_LENGTH {
-        return Err(Error::msg(format!(
-            "Max length too large: {} (max {})",
-            max_len,
-            MAX_STRING_LENGTH
-        )));
+}
+
+/// Wrapper for host_store_node
+fn host_store_node_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    entity_did_ptr: u32, entity_did_len: u32,
+    payload_ptr: u32, payload_len: u32,
+    parents_cids_ptr_ptr: u32, parents_cids_count: u32, parent_cid_lens_ptr: u32,
+    signature_ptr: u32, signature_len: u32,
+    metadata_ptr: u32, metadata_len: u32,
+    cid_out_ptr: u32, cid_out_max_len: u32,
+) -> Result<i32, Trap> {
+    debug!("Host ABI: host_store_node called");
+    let mut cost = 1000; // Base cost
+
+    // Use closure for fallible reading
+    let result = || -> HostAbiResult<_> {
+        let entity_did = safe_read_string(&caller, entity_did_ptr, entity_did_len)?;
+        cost += entity_did_len as u64 * 2;
+        let payload_bytes = safe_read_bytes(&caller, payload_ptr, payload_len)?;
+        cost += payload_len as u64;
+        let signature_bytes = safe_read_bytes(&caller, signature_ptr, signature_len)?;
+        cost += signature_len as u64;
+        let metadata_bytes = safe_read_bytes(&caller, metadata_ptr, metadata_len)?;
+        cost += metadata_len as u64;
+
+        let (parent_cids_bytes, read_cost) = read_vec_of_bytes(
+            &caller,
+            parents_cids_ptr_ptr,
+            parents_cids_count,
+            parent_cid_lens_ptr,
+        )?;
+        cost += read_cost;
+        Ok((entity_did, payload_bytes, parent_cids_bytes, signature_bytes, metadata_bytes))
+    }();
+
+    let (entity_did, payload_bytes, parent_cids_bytes, signature_bytes, metadata_bytes) = match result {
+        Ok(data) => data,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+
+    // Preliminary resource check
+    if let Err(code) = check_compute(&caller, cost) { return Ok(code); }
+
+    // Call async logic
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    let result = handle.block_on(env.store_node(
+        &entity_did,
+        payload_bytes,
+        parent_cids_bytes,
+        signature_bytes,
+        metadata_bytes,
+    ));
+
+    match result {
+        Ok(cid) => {
+            let cid_bytes = cid.to_bytes();
+            match safe_write_bytes(&mut caller, &cid_bytes, cid_out_ptr, cid_out_max_len) {
+                Ok(len) => Ok(len as i32),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        }
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
     }
-    
-    // Get memory from caller
-    let memory = caller
-        .get_export("memory")
-        .and_then(|export| export.into_memory())
-        .ok_or_else(|| Error::msg("Failed to find memory export"))?;
-    
-    // Check if the range is within bounds
-    let memory_size = memory.data_size(&mut *caller);
-    if (ptr as u64 + max_len as u64) > memory_size as u64 {
-        return Err(Error::msg(format!(
-            "Memory access out of bounds: ptr={}, max_len={}, memory_size={}",
-            ptr, max_len, memory_size
-        )));
+}
+
+/// Wrapper for host_get_node
+fn host_get_node_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    entity_did_ptr: u32, entity_did_len: u32,
+    cid_ptr: u32, cid_len: u32,
+    node_out_ptr: u32, node_out_max_len: u32,
+) -> Result<i32, Trap> {
+    debug!("Host ABI: host_get_node called");
+    let mut cost = 200; // Base cost
+
+    let result = || -> HostAbiResult<_> {
+        let entity_did = safe_read_string(&caller, entity_did_ptr, entity_did_len)?;
+        cost += entity_did_len as u64;
+        let cid_bytes = safe_read_bytes(&caller, cid_ptr, cid_len)?;
+        cost += cid_len as u64;
+        Ok((entity_did, cid_bytes))
+    }();
+
+     let (entity_did, cid_bytes) = match result {
+        Ok(data) => data,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+
+    // Preliminary resource check
+    if let Err(code) = check_compute(&caller, cost) { return Ok(code); }
+
+    // Call async logic
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    let result = handle.block_on(env.get_node(&entity_did, cid_bytes));
+
+    match result {
+        Ok(Some(node_bytes)) => {
+            match safe_write_bytes(&mut caller, &node_bytes, node_out_ptr, node_out_max_len) {
+                Ok(len) => Ok(len as i32),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        }
+        Ok(None) => Ok(0), // Indicate node not found
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
     }
-    
-    // Write the string safely
-    let written = write_memory_string(caller, memory, value, ptr as u32, max_len as u32)?;
-    Ok(written as i32)
+}
+
+/// Wrapper for host_contains_node
+fn host_contains_node_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    entity_did_ptr: u32, entity_did_len: u32,
+    cid_ptr: u32, cid_len: u32,
+) -> Result<i32, Trap> {
+    debug!("Host ABI: host_contains_node called");
+    let mut cost = 100; // Base cost
+
+    let result = || -> HostAbiResult<_> {
+        let entity_did = safe_read_string(&caller, entity_did_ptr, entity_did_len)?;
+        cost += entity_did_len as u64;
+        let cid_bytes = safe_read_bytes(&caller, cid_ptr, cid_len)?;
+        cost += cid_len as u64;
+        Ok((entity_did, cid_bytes))
+    }();
+
+     let (entity_did, cid_bytes) = match result {
+        Ok(data) => data,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+
+    // Preliminary resource check
+    if let Err(code) = check_compute(&caller, cost) { return Ok(code); }
+
+    // Call async logic
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    let result = handle.block_on(env.contains_node(&entity_did, cid_bytes));
+
+    match result {
+        Ok(true) => Ok(1),
+        Ok(false) => Ok(0),
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
+    }
 }
 
 /// Register all host functions with a wasmtime::Linker
 pub fn register_host_functions(
-    _store: &mut wasmtime::Store<ConcreteHostEnvironment>,
     linker: &mut wasmtime::Linker<ConcreteHostEnvironment>,
 ) -> Result<(), VmError> {
     // Define host_get_value function
@@ -218,52 +484,29 @@ pub fn register_host_functions(
     // Define host_log function
     linker.func_wrap(
         "env", 
-        "log", 
+        "host_log", 
         |mut caller: Caller<'_, ConcreteHostEnvironment>, message_ptr: i32, message_len: i32| -> Result<i32, Error> {
-            // Read message from memory
             let message = safe_read_string(&mut caller, message_ptr, message_len)?;
-            
-            // Get a reference to the environment
             let env = caller.data_mut();
-            
-            // Measure operation cost
-            let operation_cost = std::cmp::max(1, message_len / 500) as u64;
-            env.record_compute_usage(operation_cost)
-                .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-            
-            // Log the message
-            match env.log(&message) {
-                Ok(_) => Ok(message_len), // Return message length on success
-                Err(e) => {
-                    warn!("host_log failed: {}", e);
-                    Ok(0) // Failure
-                }
-            }
+            let cost = std::cmp::max(1, message_len / 500) as u64;
+            env.record_compute_usage(cost)?;
+            debug!("[VM] {}", message);
+            Ok(message_len)
         }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register log: {}", e)))?;
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_log: {}", e)))?;
     
     // Define host_get_caller_did function
     linker.func_wrap(
         "env", 
-        "get_caller_did", 
+        "host_get_caller_did", 
         |mut caller: Caller<'_, ConcreteHostEnvironment>, ptr: i32, max_len: i32| -> Result<i32, Error> {
-            // Get a reference to the environment
             let env = caller.data_mut();
-            
-            // Get the caller DID
             let did = env.caller_did().to_string();
-            
-            // Measure minimal operation cost
-            env.record_compute_usage(1)
-                .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-            
-            // Drop env before writing to memory
-            std::mem::drop(env);
-            
-            // Write to memory
+            env.record_compute_usage(10)?;
+            drop(env);
             safe_write_string(&mut caller, &did, ptr, max_len)
         }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register get_caller_did: {}", e)))?;
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_caller_did: {}", e)))?;
     
     // Define host_verify_signature function
     linker.func_wrap(
@@ -296,5 +539,31 @@ pub fn register_host_functions(
         }
     ).map_err(|e| VmError::InitializationError(format!("Failed to register verify_signature: {}", e)))?;
     
+    // Define host_create_sub_dag function
+    linker.func_wrap(
+        "env",
+        "host_create_sub_dag",
+        host_create_sub_dag_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_create_sub_dag: {}", e)))?;
+
+    // DAG Node Operations
+    linker.func_wrap(
+        "env",
+        "host_store_node",
+        host_store_node_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_store_node: {}", e)))?;
+
+    linker.func_wrap(
+        "env",
+        "host_get_node",
+        host_get_node_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_node: {}", e)))?;
+
+    linker.func_wrap(
+        "env",
+        "host_contains_node",
+        host_contains_node_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_contains_node: {}", e)))?;
+
     Ok(())
 } 

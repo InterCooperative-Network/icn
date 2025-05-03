@@ -20,6 +20,7 @@ tokio = { version = "1.0", features = ["sync", "rt-multi-thread", "macros", "fs"
 sha2 = "0.10.9"
 tempfile = "3.19.1"
 uuid = { version = "1.16.0", features = ["v4"] }
+rocksdb = { version = "0.21", default-features = false, features = ["multi-threaded-cf"] }
 
 [dev-dependencies] 
 tempfile = "3.19.1"

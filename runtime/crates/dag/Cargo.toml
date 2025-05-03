@@ -9,12 +9,12 @@ icn-identity = { path = "../identity" }
 merkle-cbt = { workspace = true }
 multihash = { workspace = true }
 cid = { workspace = true }
-libipld-core = { workspace = true }
+libipld = { workspace = true, features = ["serde-codec"] }
+libipld-dagcbor = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 icn-storage = { path = "../storage" }
 async-trait = { workspace = true }
 lru = "0.11" 
