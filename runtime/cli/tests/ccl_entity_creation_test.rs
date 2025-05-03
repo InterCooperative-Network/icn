@@ -10,7 +10,7 @@ use icn_governance_kernel::config::GovernanceConfig;
 use icn_identity::{
     ConcreteIdentityManager, IdentityId, IdentityManager, IdentityScope, KeyPair, KeyStorage,
 };
-use icn_storage::{RocksDBStorageManager, StorageManager};
+use icn_storage::{MemoryStorageManager, StorageManager};
 use libipld::Ipld;
 use serde_json::json;
 use std::path::PathBuf;
@@ -49,10 +49,9 @@ async fn verify_node_signature(
 async fn setup_test_env() -> Result<(Arc<dyn IdentityManager>, Arc<dyn StorageManager>, TempDir, String)> {
     // Create temporary directory for storage
     let temp_dir = TempDir::new()?;
-    let storage_path = temp_dir.path().to_path_buf();
     
-    // Initialize StorageManager with the temporary directory
-    let storage_manager = Arc::new(RocksDBStorageManager::new(storage_path.clone()).await?);
+    // Initialize StorageManager with an in-memory implementation
+    let storage_manager = Arc::new(MemoryStorageManager::new());
     
     // Initialize IdentityManager (in-memory for simplicity)
     let identity_manager = Arc::new(ConcreteIdentityManager::new_in_memory());

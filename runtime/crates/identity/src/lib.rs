@@ -29,6 +29,7 @@ use ssi::did::DIDMethod;
 use ssi::did_resolve::{DIDResolver as SsiResolver, ResolutionInputMetadata, ResolutionMetadata, DocumentMetadata};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex}; // Using Mutex for simple in-memory storage for now
+use did_method_key::DIDKey;
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -306,7 +307,7 @@ impl MetadataStorage for InMemoryMetadataStorage {
 pub struct ConcreteIdentityManager {
     key_storage: Arc<dyn KeyStorage>,
     metadata_storage: Arc<dyn MetadataStorage>,
-    did_method: ssi::did_key::DidKey, // Use ssi's did:key implementation
+    did_method: DIDKey,
 }
 
 impl ConcreteIdentityManager {
@@ -317,7 +318,7 @@ impl ConcreteIdentityManager {
         Self {
             key_storage,
             metadata_storage,
-            did_method: ssi::did_key::DidKey {},
+            did_method: DIDKey {},
         }
     }
 }
@@ -325,27 +326,14 @@ impl ConcreteIdentityManager {
 #[async_trait]
 impl IdentityManager for ConcreteIdentityManager {
     async fn generate_and_store_did_key(&self) -> Result<(String, JWK)> {
-        // 1. Generate Ed25519 keypair using ssi
-        //    Note: ssi JWK generation often includes private key params (d).
-        let keypair_jwk = JWK::generate_ed25519().map_err(|e| {
-            IdentityError::KeypairGenerationFailed(format!("Failed to generate Ed25519 key: {}", e))
-        })?;
-
-        // 2. Derive the did:key string from the public key part
-        let did_key_str = self.did_method.generate(&keypair_jwk).ok_or_else(|| {
-            IdentityError::InvalidDid("Failed to generate did:key string from JWK".to_string())
-        })?;
-
-        // 3. Securely store the full keypair (including private parts)
-        //    The KeyStorage trait needs to handle this securely.
-        //    For InMemoryKeyStorage, it's just stored directly.
-        self.key_storage.store_key(&did_key_str, &keypair_jwk).await?;
-
-        // 4. Extract the public key JWK to return (remove private key 'd' parameter)
-        let mut public_jwk = keypair_jwk.clone();
-        public_jwk.params.d = None; // Ensure private key material is not returned
-
-        Ok((did_key_str, public_jwk))
+        // Generate a new key pair and DID
+        let (did, key) = generate_did_key().await?;
+        
+        // Store the private key
+        self.key_storage.store_key(&did, &key).await?;
+        
+        // Return the DID and key
+        Ok((did, key))
     }
 
     async fn register_entity_metadata(
@@ -998,6 +986,23 @@ impl AnchorCredential {
         
         Ok(true)
     }
+}
+
+/// Generate a random DID:key and private key
+pub async fn generate_did_key() -> Result<(String, JWK)> {
+    // Generate a random Ed25519 key pair
+    let keypair_jwk = JWK::generate_ed25519().map_err(|e| {
+        IdentityError::KeypairGenerationFailed(format!("Failed to generate Ed25519 key: {}", e))
+    })?;
+
+    // Create a DID:key identifier
+    let did_method = DIDKey {};
+    let did_key_str = did_method.generate(&keypair_jwk).ok_or_else(|| {
+        IdentityError::InvalidDid("Failed to generate did:key string from JWK".to_string())
+    })?;
+    
+    // Return the DID and key
+    Ok((did_key_str, keypair_jwk))
 }
 
 #[cfg(test)]

@@ -9,8 +9,8 @@ icn-identity = { path = "../identity" }
 merkle-cbt = { workspace = true }
 multihash = { workspace = true }
 cid = { workspace = true }
-libipld = { workspace = true, features = ["serde-codec"] }
-libipld-dagcbor = { workspace = true }
+libipld = { workspace = true, features = ["derive"] }
+serde_ipld_dagcbor = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }

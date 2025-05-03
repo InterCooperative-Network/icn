@@ -22,6 +22,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tracing;
 use uuid::Uuid;
 use anyhow::{anyhow, Context, Result};
+#[cfg(feature = "rocksdb-storage")]
 use rocksdb::{DBWithThreadMode, MultiThreaded, Options, ColumnFamilyDescriptor, WriteBatch, IteratorMode};
 use icn_dag::{DagNode, DagNodeBuilder, codec::DagCborCodec};
 use libipld::codec::Codec;
@@ -1284,7 +1285,8 @@ pub trait StorageManager: Send + Sync {
 
 const DEFAULT_CF_NAME: &str = "default"; // RocksDB requires a default CF
 
-/// Implementation of StorageManager using RocksDB with Column Families.
+/// Storage manager implementation using RocksDB
+#[cfg(feature = "rocksdb-storage")]
 pub struct RocksDBStorageManager {
     db: Arc<DBWithThreadMode<MultiThreaded>>,
     path: std::path::PathBuf,
@@ -1359,7 +1361,7 @@ impl RocksDBStorageManager {
     }
 }
 
-
+#[cfg(feature = "rocksdb-storage")]
 #[async_trait]
 impl StorageManager for RocksDBStorageManager {
 
@@ -1603,4 +1605,117 @@ mod tests {
          assert!(err_string.contains("column family 'did:example:entity4' not found"));
      }
 
+} 
+
+// Add a memory-based storage implementation
+/// An in-memory implementation of StorageManager for testing
+pub struct MemoryStorageManager {
+    blobs: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    nodes: Arc<Mutex<HashMap<String, HashMap<String, Vec<u8>>>>>,
+}
+
+impl MemoryStorageManager {
+    /// Create a new in-memory storage manager
+    pub fn new() -> Self {
+        MemoryStorageManager {
+            blobs: Arc::new(Mutex::new(HashMap::new())),
+            nodes: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+    
+    /// Helper to create a storage key for a blob
+    fn blob_key(cid: &Cid) -> String {
+        format!("blob:{}", cid.to_string())
+    }
+    
+    /// Helper to create a storage key for a node
+    fn node_key(did: &str, cid: &Cid) -> (String, String) {
+        (did.to_string(), cid.to_string())
+    }
+}
+
+#[async_trait]
+impl StorageManager for MemoryStorageManager {
+    async fn store_blob(&self, data: &[u8]) -> Result<Cid> {
+        // Hash the data to create a CID
+        let mh = create_sha256_multihash(data);
+        let cid = Cid::new_v1(0x55, mh); // 0x55 is the multicodec code for raw binary
+        
+        // Store the data with the CID as the key
+        let key = Self::blob_key(&cid);
+        let mut blobs = self.blobs.lock().await;
+        blobs.insert(key, data.to_vec());
+        
+        Ok(cid)
+    }
+    
+    async fn get_blob(&self, cid: &Cid) -> Result<Option<Vec<u8>>> {
+        let key = Self::blob_key(cid);
+        let blobs = self.blobs.lock().await;
+        Ok(blobs.get(&key).cloned())
+    }
+    
+    async fn store_node(&self, did: &str, node: &DagNode) -> Result<Cid> {
+        // Encode the node
+        let encoded = DagCborCodec.encode(node)?;
+        
+        // Hash the encoded data to create a CID
+        let mh = create_sha256_multihash(&encoded);
+        let cid = Cid::new_v1(0x71, mh); // 0x71 is the multicodec code for dag-cbor
+        
+        // Store the encoded node with did/cid as keys
+        let (did_key, cid_key) = Self::node_key(did, &cid);
+        let mut nodes = self.nodes.lock().await;
+        let did_nodes = nodes.entry(did_key).or_insert_with(HashMap::new);
+        did_nodes.insert(cid_key, encoded);
+        
+        Ok(cid)
+    }
+    
+    async fn get_node(&self, did: &str, cid: &Cid) -> Result<Option<DagNode>> {
+        let (did_key, cid_key) = Self::node_key(did, cid);
+        let nodes = self.nodes.lock().await;
+        
+        if let Some(did_nodes) = nodes.get(&did_key) {
+            if let Some(encoded) = did_nodes.get(&cid_key) {
+                // Decode the node
+                let node = DagCborCodec.decode::<DagNode>(encoded)?;
+                return Ok(Some(node));
+            }
+        }
+        
+        Ok(None)
+    }
+    
+    async fn get_node_bytes(&self, did: &str, cid: &Cid) -> Result<Option<Vec<u8>>> {
+        let (did_key, cid_key) = Self::node_key(did, cid);
+        let nodes = self.nodes.lock().await;
+        
+        if let Some(did_nodes) = nodes.get(&did_key) {
+            if let Some(encoded) = did_nodes.get(&cid_key) {
+                return Ok(Some(encoded.clone()));
+            }
+        }
+        
+        Ok(None)
+    }
+    
+    async fn get_all_nodes(&self, did: &str) -> Result<Vec<(Cid, DagNode)>> {
+        let nodes = self.nodes.lock().await;
+        let did_key = did.to_string();
+        
+        if let Some(did_nodes) = nodes.get(&did_key) {
+            let mut result = Vec::new();
+            
+            for (cid_str, encoded) in did_nodes {
+                let cid = Cid::try_from(cid_str.as_str())?;
+                let node = DagCborCodec.decode::<DagNode>(encoded)?;
+                result.push((cid, node));
+            }
+            
+            return Ok(result);
+        }
+        
+        Ok(Vec::new())
+    }
 } 

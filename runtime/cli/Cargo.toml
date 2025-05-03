@@ -24,17 +24,17 @@ bs58 = "0.5"
 wasmer-wasi = { workspace = true }
 multihash = { workspace = true }
 serde = { workspace = true }
-libipld = { version = "0.16", features = ["derive"] }
-libipld-dagcbor = "0.16"
+libipld = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
 ed25519-dalek = { version = "1.0", features = ["std", "serde"] }
-ssi = { version = "0.7", default-features = false, features = ["ed25519", "rsa"] }
+ssi = { workspace = true, features = ["ed25519", "rsa"] }
 tempfile = "3.8"
 
 # ICN crates
 icn-core-vm = { path = "../crates/core-vm" }
 icn-governance-kernel = { path = "../crates/governance-kernel" }
 icn-identity = { path = "../crates/identity", features = ["jwk", "signing"] }
-icn-storage = { path = "../crates/storage" }
+icn-storage = { path = "../crates/storage", default-features = false, features = ["memory-storage"] }
 icn-economics = { path = "../crates/economics" }
 icn-execution-tools = { path = "../crates/execution-tools" }
 icn-ccl-compiler = { path = "../crates/ccl-compiler" }

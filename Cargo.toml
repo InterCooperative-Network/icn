@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "agoranet",
     "runtime",
+    "runtime/cli",
     "wallet",
     "runtime/crates/*",
     "wallet/crates/*"
@@ -30,11 +31,22 @@ libp2p = "0.53"
 multihash = { version = "0.16.3", features = ["sha2"] }
 cid = { version = "0.10.1", features = ["serde"] }
 
+# IPLD related dependencies
+# Note: libipld is officially deprecated in favor of ipld-core, but we'll keep both for compatibility
+libipld = { version = "0.16", features = ["derive"] }
+libipld-core = "0.13.1"
+# For DAG-CBOR serialization - using the recommended libraries
+serde_ipld_dagcbor = "0.4"
+ipld-core = "0.3"
+
+# Identity and security
+# Using ssi 0.7 with features that are available
+ssi = { version = "0.7", features = ["ed25519", "rsa"] }
+did-method-key = "0.2"
+
 # Runtime-specific dependencies
 wasmer = "3.1"
 wasmer-wasi = "3.1"
-did-method-key = "0.2"
 hashbrown = "0.14"
 merkle-cbt = "0.3"
-libipld-core = "0.13.1"
 backoff = "0.4.0"

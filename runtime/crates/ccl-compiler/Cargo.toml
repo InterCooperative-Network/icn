@@ -21,24 +21,24 @@ wasmtime = "12.0.2"
 jsonschema = "0.17"
 
 # IPLD & DAG-CBOR serialization
-libipld = { version = "0.16", features = ["derive"] }
-libipld-dagcbor = "0.16"
-cid = "0.10"
+libipld = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+cid = { workspace = true }
 
 # Date and time
 chrono = "0.4"
 
 # Utilities
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0"
-thiserror = "1.0"
-tracing = "0.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 uuid = { version = "1.5", features = ["v4", "serde"] }
 
 # Async
 tokio = { version = "1.0", features = ["full"] }
-futures = "0.3"
+futures = { workspace = true }
 
 # Optional templating
 askama = { version = "0.12", optional = true }

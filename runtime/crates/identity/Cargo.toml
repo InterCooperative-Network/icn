@@ -25,10 +25,15 @@ bs58 = "0.5"
 base64 = "0.21"
 
 # W3C DID/VC standards and JWS implementation
-ssi = { version = "0.6", features = ["ed25519", "did-key"] }
+ssi = { workspace = true }
 
 # W3C DID/VC standards - simplify for now as we're implementing our own
-# ssi = { version = "0.6", features = ["vc", "jwk", "did"] }
+# ssi = { version = "0.7", default-features = false, features = ["vc", "jwk", "did"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] } 
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = []
+jwk = []
+signing = [] 
