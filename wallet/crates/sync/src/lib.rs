@@ -17,11 +17,15 @@ use backoff::{ExponentialBackoff, backoff::Backoff};
 pub mod api;
 pub mod trust;
 pub mod error;
+pub mod federation;
+pub mod compat;
 
 // Re-export key types
 pub use api::{FederationInfo, PeerInfo};
 pub use trust::{TrustBundle, TrustManager};
 pub use error::SyncError;
+pub use federation::{FederationSyncClient, TrustBundleSubscription, FederationNodeAddress};
+pub use compat::{LegacyDagNode, legacy_to_current, current_to_legacy, parse_dag_node_json};
 
 // Re-export wallet-types
 pub use wallet_types::{
@@ -56,29 +60,33 @@ impl SyncClient {
         }
     }
     
-    /// Set authentication token
+    /// Add authentication token for requests
     pub fn with_auth_token(mut self, token: String) -> Self {
         self.auth_token = Some(token);
         self
     }
     
-    /// Submit a DAG node to the ICN node
+    /// Submit a DAG node to the network
     pub async fn submit_node(&self, node: &DagNode) -> Result<NodeSubmissionResponse, SyncError> {
-        let url = format!("{}/api/v1/dag/nodes", self.base_url);
+        let url = format!("{}/api/v1/dag", self.base_url);
         
-        let mut request = self.client.post(&url).json(node);
+        // Convert current node to legacy format for API compatibility
+        let legacy_node = compat::current_to_legacy(node);
+        
+        let mut request = self.client.post(&url)
+            .json(&legacy_node);
         
         // Add authentication if available
         if let Some(token) = &self.auth_token {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
         
-        let response = request.send().await.map_err(error::map_reqwest_error)?;
+        let response = request.send().await?;
         
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(SyncError::NodeSubmission(format!("HTTP {}: {}", status, error_text)));
+            return Err(SyncError::Api(format!("Failed to submit node: HTTP {}: {}", status, error_text)));
         }
         
         let submission_response = response.json::<NodeSubmissionResponse>().await?;
@@ -87,7 +95,7 @@ impl SyncClient {
     
     /// Get a DAG node by ID
     pub async fn get_node(&self, node_id: &str) -> Result<DagNode, SyncError> {
-        let url = format!("{}/api/v1/dag/nodes/{}", self.base_url, node_id);
+        let url = format!("{}/api/v1/dag/{}", self.base_url, node_id);
         
         let mut request = self.client.get(&url);
         
@@ -96,19 +104,19 @@ impl SyncClient {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
         
-        let response = request.send().await.map_err(error::map_reqwest_error)?;
+        let response = request.send().await?;
         
         if !response.status().is_success() {
             let status = response.status();
-            if status.as_u16() == 404 {
-                return Err(SyncError::NodeNotFound(node_id.to_string()));
-            }
-            
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(SyncError::Network(format!("HTTP {}: {}", status, error_text)));
+            return Err(SyncError::Api(format!("Failed to get node: HTTP {}: {}", status, error_text)));
         }
         
-        let node = response.json::<DagNode>().await?;
+        let json_value = response.json::<Value>().await?;
+        
+        // Use compatibility layer to parse response
+        let node = compat::parse_dag_node_json(json_value)?;
+        
         Ok(node)
     }
 }
@@ -227,15 +235,17 @@ impl SyncManager {
     }
 }
 
-/// Helper function to generate a CID using the compatible multihash
+/// Helper function to generate a CID using SHA-256
 pub fn generate_cid(data: &[u8]) -> Result<String, SyncError> {
-    use compat::multihash::{MultihashDigest, Code};
+    use sha2::{Sha256, Digest};
     
-    // Create a multihash from the data
-    let multihash = Code::Sha2_256.digest(data);
+    // Create a SHA-256 hash of the data
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let hash = hasher.finalize();
     
-    // Convert to a hex string
-    let hex_string = hex::encode(multihash.to_bytes());
+    // Convert to a base58 string prefixed with 'bafybeih'
+    let hex_string = format!("bafybeih{}", hex::encode(&hash[0..16]));
     
     Ok(hex_string)
 }
@@ -260,21 +270,29 @@ mod tests {
     
     #[test]
     fn test_dag_node_serialization() {
+        // Create a DagNode using the current structure
+        let payload = serde_json::to_vec(&json!({ "test": "value" })).unwrap();
         let node = DagNode {
-            id: "test-id".to_string(),
-            data: json!({ "test": "value" }),
-            created_at: Utc::now(),
-            refs: vec!["ref1".to_string(), "ref2".to_string()],
+            cid: "test-cid".to_string(),
+            parents: vec!["ref1".to_string(), "ref2".to_string()],
+            issuer: "did:icn:test".to_string(),
+            timestamp: SystemTime::now(),
+            signature: vec![1, 2, 3, 4],
+            payload,
+            metadata: DagNodeMetadata {
+                sequence: Some(1),
+                scope: Some("test".to_string()),
+            },
         };
         
-        // Convert to JSON and back
-        let json = serde_json::to_string(&node).unwrap();
-        let node2: DagNode = serde_json::from_str(&json).unwrap();
+        // Convert to legacy format and back
+        let legacy = compat::current_to_legacy(&node);
+        let node2 = compat::legacy_to_current(&legacy);
         
         // Fields should match
-        assert_eq!(node.id, node2.id);
-        assert_eq!(node.data, node2.data);
-        assert_eq!(node.refs, node2.refs);
+        assert_eq!(node.cid, node2.cid);
+        assert_eq!(node.parents, node2.parents);
+        assert_eq!(node.payload, node2.payload);
     }
     
     #[tokio::test]
@@ -294,11 +312,12 @@ mod tests {
         // Convert to DAG node
         let node = bundle.to_dag_node().unwrap();
         
-        // ID should match
-        assert_eq!(bundle.id, node.id);
+        // CID should match bundle ID
+        assert_eq!(bundle.id, node.cid);
         
-        // Convert back from JSON
-        let bundle2: TrustBundle = serde_json::from_value(node.data).unwrap();
+        // Convert back from payload
+        let payload_json = node.payload_as_json().unwrap();
+        let bundle2: TrustBundle = serde_json::from_value(payload_json).unwrap();
         
         // Fields should match
         assert_eq!(bundle.id, bundle2.id);

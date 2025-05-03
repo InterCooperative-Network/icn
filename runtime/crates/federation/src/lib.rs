@@ -60,8 +60,20 @@ pub use errors::{FederationError, FederationResult, FederationResultExt, TrustBu
 // Add the debug_api module
 pub mod debug_api;
 
+// Add the health module
+pub mod health;
+
+// Add the sync module
+pub mod sync;
+
 // Re-export debug API types for integration testing
 pub use debug_api::{DebugApi, ProposalStatusResponse, DagNodeResponse, FederationStatusResponse};
+
+// Re-export health API types
+pub use health::{
+    FederationHealth, FederationDiagnostic, ReplicationStatus, 
+    QuorumHealth, PeerDiagnostic, EpochDiagnostic
+};
 
 /// Represents a guardian mandate
 #[derive(Debug, Clone)]

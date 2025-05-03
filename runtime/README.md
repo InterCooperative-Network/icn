@@ -154,4 +154,123 @@ The ICN Runtime now supports automated integration testing with improved stabili
 - **Event Monitoring**: WebSocket monitoring tools to verify event emission
 - **State Reset**: Utilities to reset runtime state between test runs
 
-See the [integration testing documentation](tests/README.md) for detailed information on how to use these features for automated testing. 
+See the [integration testing documentation](tests/README.md) for detailed information on how to use these features for automated testing.
+
+## Phase 2: Federation Mechanics
+
+The ICN Runtime now includes Phase 2 functionality, implementing robust federation mechanics for trust, replication, and synchronization:
+
+### TrustBundle Synchronization
+
+The federation protocol now supports epoch-aware TrustBundle synchronization:
+
+- Runtime nodes automatically discover and exchange TrustBundles using the `/icn/trustbundle/1.0.0` protocol
+- TrustBundles contain DAG roots, attestations, and federation membership information
+- Bundles are verified using quorum signatures before being accepted and stored
+- Epochs ensure consistent progression of federation state
+
+Wallet clients can now sync with federation nodes using the `SyncClient`:
+
+```rust
+// Create a federation client connected to runtime nodes
+let mut federation_client = SyncClient::federation_client("my-wallet-did");
+
+// Add federation nodes to connect to
+federation_client.add_federation_node(FederationNodeAddress {
+    http_url: "http://localhost:8080",
+    p2p_addr: Some("/ip4/127.0.0.1/tcp/4001"),
+    node_id: None,
+});
+
+// Get the latest trust bundle
+let bundle = federation_client.get_latest_trust_bundle().await?;
+println!("Got trust bundle for epoch {}", bundle.epoch);
+
+// Subscribe to trust bundle updates
+let mut subscription = federation_client.subscribe_to_trust_bundles();
+tokio::spawn(async move {
+    while let Some(bundle) = subscription.next().await {
+        println!("New trust bundle received: epoch {}", bundle.epoch);
+    }
+});
+```
+
+### Blob Replication Protocol
+
+Content-addressed blobs are now replicated across the federation:
+
+- Pinned blobs trigger the replication protocol according to policy
+- Replication policies can specify factor, specific peers, or no replication
+- Replication status is tracked and verified
+- The protocol handles content discovery, transfer, and integrity validation
+
+Runtime API for blob replication:
+
+```rust
+// Pin a blob (triggers replication)
+let cid = blob_store.put_blob(&content).await?;
+blob_store.pin_blob(&cid).await?;
+
+// Explicitly control replication
+let policy = ReplicationPolicy::Factor(3); // Replicate to 3 peers
+federation_manager
+    .identify_replication_targets(cid, policy, context_id)
+    .await?;
+```
+
+Wallet API for blob retrieval:
+
+```rust
+// Fetch a blob by CID
+let cid = "bafybeihcqkmk7dqtvcf...";
+let blob_data = federation_client.get_blob(cid).await?;
+```
+
+### Federation Health and Discovery
+
+Health endpoints provide detailed federation status:
+
+- REST API endpoint at `/api/v1/federation/health`
+- Reports on epoch status, peer connectivity, and replication health
+- Includes quorum diagnostics showing federation composition
+
+A diagnostic dashboard is available at `/api/v1/federation/diagnostics` with:
+
+- Detailed peer information
+- DAG consistency checks
+- Blob replication statistics
+- Detected inconsistencies or issues
+
+### Testing with Multiple Nodes
+
+A Docker Compose configuration for testing federation with multiple nodes is provided:
+
+1. Configuration includes genesis, validator, guardian, and observer nodes
+2. Each node has different roles and permissions in the federation
+3. Automatic bootstrap and peer discovery is configured
+
+To start the test environment:
+
+```bash
+cd runtime
+docker-compose -f docker-compose.integration.yml up -d
+```
+
+Monitor federation status:
+- Federation dashboard: http://localhost:3002
+- Metrics: http://localhost:3001 (Grafana)
+
+### Configuration
+
+Federation behavior can be configured in `runtime-config.toml`:
+
+```toml
+[federation]
+bootstrap_period_sec = 30
+peer_sync_interval_sec = 60
+trust_bundle_sync_interval_sec = 300
+max_peers = 25
+default_replication_factor = 3
+```
+
+See [FEDERATION_PROTOCOL.md](docs/FEDERATION_PROTOCOL.md) and [BLOB_REPLICATION.md](docs/BLOB_REPLICATION.md) for detailed documentation. 
