@@ -139,7 +139,7 @@ impl TrustBundle {
     /// Count nodes by role
     pub fn count_nodes_by_role(&self, role: &str) -> usize {
         self.metadata.iter()
-            .filter(|(k, v)| k.starts_with("role:") && v == role)
+            .filter(|(k, v)| k.starts_with("role:") && v == &role)
             .count()
     }
 }
