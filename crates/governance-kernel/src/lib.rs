@@ -181,8 +181,88 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
         Ok(key_cid)
     }
 
+    /// Load the governance configuration for a given scope
+    async fn load_governance_config(&self, scope_id: &str) -> Result<Option<config::GovernanceConfig>, GovernanceError> {
+        // Create the key for the governance config based on scope
+        let key_str = format!("governance::config::{}", scope_id);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Get the storage lock
+        let storage = self.storage.lock().await;
+        
+        // Try to load the governance config
+        match storage.get_kv(&key_cid).await {
+            Ok(Some(config_bytes)) => {
+                // Deserialize the config
+                let config = serde_json::from_slice(&config_bytes)
+                    .map_err(|e| GovernanceError::StorageError(format!("Failed to deserialize governance config: {}", e)))?;
+                
+                Ok(Some(config))
+            },
+            Ok(None) => {
+                // No config found for this scope
+                Ok(None)
+            },
+            Err(e) => {
+                // Storage error
+                Err(GovernanceError::StorageError(format!("Failed to load governance config: {}", e)))
+            }
+        }
+    }
+    
+    /// Check if caller has a specific permission according to governance config
+    async fn check_permission(&self, caller_id: &IdentityId, scope_id: &str, permission: &str) -> Result<bool, GovernanceError> {
+        // Load the governance config
+        let config_opt = self.load_governance_config(scope_id).await?;
+        
+        if let Some(config) = config_opt {
+            // Check if there are roles defined in the governance config
+            if let Some(governance) = &config.governance {
+                if let Some(defined_roles) = &governance.roles {
+                    // Get the roles assigned to this identity
+                    let assigned_role_names = self.get_assigned_roles(caller_id, scope_id).await?;
+                    
+                    // If no roles are assigned, the caller doesn't have permission
+                    if assigned_role_names.is_empty() {
+                        return Ok(false);
+                    }
+                    
+                    // Check if any assigned roles have the required permission
+                    for role in defined_roles {
+                        if assigned_role_names.contains(&role.name) && role.permissions.contains(&permission.to_string()) {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            
+            // No applicable permission found
+            Ok(false)
+        } else {
+            // No governance config found
+            Err(GovernanceError::Unauthorized(format!("No governance configuration found for scope {}", scope_id)))
+        }
+    }
+
     /// Process a proposal by submitting it to the governance system
     pub async fn process_proposal(&self, proposal: Proposal) -> Result<String, GovernanceError> {
+        // Get the scope_id string for authorization check
+        let scope_id_str = if let Some(sid) = &proposal.scope_id {
+            sid.0.as_str()
+        } else {
+            return Err(GovernanceError::InvalidProposal("Proposal must have a scope_id".to_string()));
+        };
+        
+        // Check if the proposer has permission to create proposals in this scope
+        let is_authorized = self.check_permission(&proposal.proposer, scope_id_str, "create_proposals").await?;
+        
+        if !is_authorized {
+            return Err(GovernanceError::Unauthorized(format!(
+                "Identity {} is not authorized to create proposals in scope {}", 
+                proposal.proposer.0, scope_id_str
+            )));
+        }
+        
         // Create an ID for the proposal
         let proposal_id = proposal.calculate_id();
         
@@ -225,6 +305,31 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
 
     /// Record a vote on a proposal
     pub async fn record_vote(&self, vote: Vote) -> Result<(), GovernanceError> {
+        // Get the scope_id string for authorization check
+        let scope_id_str = if let Some(sid) = &vote.scope_id {
+            sid.0.as_str()
+        } else {
+            return Err(GovernanceError::InvalidProposal("Vote must have a scope_id".to_string()));
+        };
+        
+        // Check if the voter has permission to vote on proposals in this scope
+        let is_authorized = self.check_permission(&vote.voter, scope_id_str, "vote_on_proposals").await?;
+        
+        if !is_authorized {
+            return Err(GovernanceError::Unauthorized(format!(
+                "Identity {} is not authorized to vote on proposals in scope {}", 
+                vote.voter.0, scope_id_str
+            )));
+        }
+        
+        // Also check if the proposal exists and is in a votable state
+        let proposal = self.get_proposal(vote.proposal_id.clone()).await?;
+        if proposal.status != ProposalStatus::Active && proposal.status != ProposalStatus::Draft {
+            return Err(GovernanceError::InvalidProposal(format!(
+                "Cannot vote on proposal with status {:?}", proposal.status
+            )));
+        }
+        
         // Serialize the vote
         let vote_bytes = serde_json::to_vec(&vote)
             .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize vote: {}", e)))?;
@@ -438,6 +543,54 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
             };
             
             Ok(proposal)
+        }
+    }
+
+    /// Assign roles to an identity within a specific scope
+    pub async fn assign_roles(&self, identity_id: &IdentityId, scope_id: &str, roles: Vec<String>) -> Result<(), GovernanceError> {
+        // Create a key for storing role assignments
+        let key_str = format!("governance::roles::{}::{}", scope_id, identity_id.0);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Serialize the roles
+        let roles_bytes = serde_json::to_vec(&roles)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize roles: {}", e)))?;
+        
+        // Store the roles in storage
+        let mut storage = self.storage.lock().await;
+        storage.put_kv(key_cid, roles_bytes)
+            .await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    /// Get the roles assigned to an identity within a specific scope
+    pub async fn get_assigned_roles(&self, identity_id: &IdentityId, scope_id: &str) -> Result<Vec<String>, GovernanceError> {
+        // Create the key for retrieving role assignments
+        let key_str = format!("governance::roles::{}::{}", scope_id, identity_id.0);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Get the storage lock
+        let storage = self.storage.lock().await;
+        
+        // Try to load the role assignments
+        match storage.get_kv(&key_cid).await {
+            Ok(Some(roles_bytes)) => {
+                // Deserialize the roles
+                let roles: Vec<String> = serde_json::from_slice(&roles_bytes)
+                    .map_err(|e| GovernanceError::StorageError(format!("Failed to deserialize roles: {}", e)))?;
+                
+                Ok(roles)
+            },
+            Ok(None) => {
+                // No roles assigned
+                Ok(Vec::new())
+            },
+            Err(e) => {
+                // Storage error
+                Err(GovernanceError::StorageError(format!("Failed to load role assignments: {}", e)))
+            }
         }
     }
 }
