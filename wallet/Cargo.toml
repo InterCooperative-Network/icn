@@ -4,23 +4,12 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-[workspace]
-resolver = "2"
-members = [
-  "crates/wallet-core",
-  "crates/wallet-agent",
-  "crates/wallet-sync",
-  "crates/wallet-ui-api",
-  # "crates/wallet-ffi", # Temporarily disabled until we fix other crates
-  "crates/wallet-types",
-  "cli"
-]
-
-# Dependencies are now inherited from the root workspace
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-anyhow = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+# Direct dependencies
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+futures = "0.3"
