@@ -11,15 +11,17 @@ storage backend trait and distributed blob storage primitives.
 */
 
 use async_trait::async_trait;
-use cid::{Cid, multihash};
+use cid::Cid;
 use futures::lock::Mutex;
 use hashbrown::{HashMap, HashSet};
-use icn_identity::{IdentityId, IdentityScope};
 use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tracing;
+use uuid::Uuid;
+use std::collections::HashMap;
 
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -294,25 +296,65 @@ impl StorageBackend for AsyncInMemoryStorage {
     
     // New blob methods
     async fn put_blob(&self, value_bytes: &[u8]) -> StorageResult<Cid> {
-        // Since our old put method works the same as put_blob for this implementation,
-        // we can just call it directly
-        self.put(value_bytes).await
+        // Create a multihash using SHA-256
+        let mh = create_sha256_multihash(value_bytes);
+        
+        // Create CID v0 with the digest
+        let cid = Cid::new_v0(mh)
+            .map_err(|e| StorageError::InvalidCid(e.to_string()))?;
+        
+        // Check if we're in a transaction, handle accordingly
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            let mut tx_clone = tx.clone();
+            tx_clone.insert(cid, Some(value_bytes.to_vec()));
+            drop(tx_lock);
+            
+            let mut tx_lock = self.transaction.lock().await;
+            *tx_lock = Some(tx_clone);
+        } else {
+            let mut data_lock = self.data.lock().await;
+            data_lock.insert(cid, value_bytes.to_vec());
+        }
+        
+        Ok(cid)
     }
     
-    async fn get_blob(&self, content_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
-        // Since our old get method works the same as get_blob for this implementation,
-        // we can just call it directly
-        self.get(content_cid).await
+    async fn get_blob(&self, cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // Check if we're in a transaction
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            if let Some(value) = tx.get(cid) {
+                return Ok(value.clone());
+            }
+        }
+        
+        // If not in transaction, or not found in transaction, check the main storage
+        let data_lock = self.data.lock().await;
+        Ok(data_lock.get(cid).cloned())
     }
     
     async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool> {
-        // Call the legacy method
-        self.contains(content_cid).await
+        // Check if we're in a transaction
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx) = &*tx_lock {
+            if let Some(value) = tx.get(content_cid) {
+                return Ok(value.is_some());
+            }
+        }
+        
+        // If not in transaction or not found in transaction, check main storage
+        let data_lock = self.data.lock().await;
+        Ok(data_lock.contains_key(content_cid))
     }
     
     async fn delete_blob(&self, content_cid: &Cid) -> StorageResult<()> {
-        // Call the legacy method
-        self.delete(content_cid).await
+        let mut data_lock = self.data.lock().await;
+        data_lock.remove(content_cid);
+        Ok(())
     }
     
     // New key-value methods
@@ -336,18 +378,19 @@ impl StorageBackend for AsyncInMemoryStorage {
     }
     
     async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
-        // For this implementation, get_kv is the same as get_blob
-        self.get(key_cid).await
+        let data_lock = self.data.lock().await;
+        Ok(data_lock.get(key_cid).cloned())
     }
     
     async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool> {
-        // For this implementation, contains_kv is the same as contains_blob
-        self.contains(key_cid).await
+        let data_lock = self.data.lock().await;
+        Ok(data_lock.contains_key(key_cid))
     }
     
     async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()> {
-        // For this implementation, delete_kv is the same as delete_blob
-        self.delete(key_cid).await
+        let mut data_lock = self.data.lock().await;
+        data_lock.remove(key_cid);
+        Ok(())
     }
 }
 
@@ -554,7 +597,7 @@ impl DistributedStorage for InMemoryBlobStore {
         blobs.insert(cid, content.to_vec());
         
         // If we have a Kad announcer, let's announce the CID
-        if let Some(mut announcer) = self.kad_announcer.clone() {
+        if let Some(announcer) = self.kad_announcer.clone() {
             tokio::spawn(async move {
                 if let Err(e) = announcer.send(cid).await {
                     tracing::warn!("Failed to send CID to announcer: {:?}", e);
@@ -642,6 +685,10 @@ impl DistributedStorage for InMemoryBlobStore {
 pub struct FilesystemStorageBackend {
     /// The root directory where all data will be stored
     data_dir: std::path::PathBuf,
+    /// Holds pending changes during a transaction. `None` means no active transaction.
+    /// `Some(HashMap)` holds the transaction state. Key is CID.
+    /// Value is `Some(Vec<u8>)` for a PUT/update, `None` for a DELETE.
+    transaction: Arc<Mutex<Option<HashMap<Cid, Option<Vec<u8>>>>>>,
 }
 
 impl FilesystemStorageBackend {
@@ -664,7 +711,10 @@ impl FilesystemStorageBackend {
                 .map_err(|e| StorageError::IoError(format!("Failed to create kv directory: {}", e)))?;
         }
         
-        Ok(Self { data_dir })
+        Ok(Self { 
+            data_dir,
+            transaction: Arc::new(Mutex::new(None))
+        })
     }
     
     /// Helper method to get the file path for a blob CID
@@ -715,6 +765,215 @@ impl FilesystemStorageBackend {
             self.data_dir.join("kv").join(shard_level_1).join(shard_level_2).join(&cid_string)
         }
     }
+
+    /// Internal helper method to write a blob to the filesystem
+    async fn _write_blob_to_filesystem(&self, cid: &Cid, value_bytes: &[u8]) -> StorageResult<()> {
+        // Calculate the path where we'll store this blob
+        let final_path = self.get_blob_path(cid);
+        
+        // Create the directory structure if it doesn't exist
+        if let Some(parent) = final_path.parent() {
+            tokio::fs::create_dir_all(parent).await
+                .map_err(|e| StorageError::IoError(format!("Failed to create directory: {}", e)))?;
+        }
+        
+        // Generate a unique temporary file path in the same directory
+        let temp_path = if let Some(parent) = final_path.parent() {
+            let temp_filename = format!("{}.tmp", Uuid::new_v4());
+            parent.join(temp_filename)
+        } else {
+            return Err(StorageError::IoError("Invalid file path".to_string()));
+        };
+        
+        // TODO: Acquire exclusive file lock on final_path using fs2 or similar for process safety
+        
+        // Create and open the temporary file
+        let file = tokio::fs::File::create(&temp_path).await
+            .map_err(|e| StorageError::IoError(format!("Failed to create temporary file: {}", e)))?;
+        
+        // Use a buffered writer for better performance
+        let mut writer = BufWriter::new(file);
+        
+        // Write the data to the temporary file
+        writer.write_all(value_bytes).await
+            .map_err(|e| StorageError::IoError(format!("Failed to write to temporary file: {}", e)))?;
+        
+        // Ensure all data is flushed to disk
+        writer.flush().await
+            .map_err(|e| StorageError::IoError(format!("Failed to flush temporary file: {}", e)))?;
+        
+        // Atomically rename the temp file to the final file path
+        tokio::fs::rename(&temp_path, &final_path).await
+            .map_err(|e| {
+                // Try to clean up the temp file on error
+                let _ = std::fs::remove_file(&temp_path);
+                StorageError::IoError(format!("Failed to rename temporary file: {}", e))
+            })?;
+        
+        // TODO: Release file lock here
+        
+        Ok(())
+    }
+
+    /// Internal helper method to write a key-value pair to the filesystem
+    async fn _write_kv_to_filesystem(&self, key_cid: &Cid, value_bytes: &[u8]) -> StorageResult<()> {
+        // Calculate the path where we'll store this key-value
+        let final_path = self.get_kv_path(key_cid);
+        
+        // Create the directory structure if it doesn't exist
+        if let Some(parent) = final_path.parent() {
+            tokio::fs::create_dir_all(parent).await
+                .map_err(|e| StorageError::IoError(format!("Failed to create directory: {}", e)))?;
+        }
+        
+        // Generate a unique temporary file path in the same directory
+        let temp_path = if let Some(parent) = final_path.parent() {
+            let temp_filename = format!("{}.tmp", Uuid::new_v4());
+            parent.join(temp_filename)
+        } else {
+            return Err(StorageError::IoError("Invalid file path".to_string()));
+        };
+        
+        // TODO: Acquire exclusive file lock on final_path using fs2 or similar for process safety
+        
+        // Create and open the temporary file
+        let file = tokio::fs::File::create(&temp_path).await
+            .map_err(|e| StorageError::IoError(format!("Failed to create temporary file: {}", e)))?;
+        
+        // Use a buffered writer for better performance
+        let mut writer = BufWriter::new(file);
+        
+        // Write the data to the temporary file
+        writer.write_all(value_bytes).await
+            .map_err(|e| StorageError::IoError(format!("Failed to write to temporary file: {}", e)))?;
+        
+        // Ensure all data is flushed to disk
+        writer.flush().await
+            .map_err(|e| StorageError::IoError(format!("Failed to flush temporary file: {}", e)))?;
+        
+        // Atomically rename the temp file to the final file path
+        tokio::fs::rename(&temp_path, &final_path).await
+            .map_err(|e| {
+                // Try to clean up the temp file on error
+                let _ = std::fs::remove_file(&temp_path);
+                StorageError::IoError(format!("Failed to rename temporary file: {}", e))
+            })?;
+        
+        // TODO: Release file lock here
+        
+        Ok(())
+    }
+
+    /// Internal helper method to read a blob from the filesystem
+    async fn _read_blob_from_filesystem(&self, cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // Calculate the file path
+        let file_path = self.get_blob_path(cid);
+        
+        // TODO: Acquire shared file lock on file_path
+        
+        // Try to open the file
+        let file_result = tokio::fs::File::open(&file_path).await;
+        match file_result {
+            Ok(mut file) => {
+                // File exists, read its entire content
+                let mut buffer = Vec::new();
+                match file.read_to_end(&mut buffer).await {
+                    Ok(_) => {
+                        // TODO: Release shared file lock
+                        // Optional integrity check could go here
+                        Ok(Some(buffer))
+                    },
+                    Err(e) => {
+                        // TODO: Release shared file lock
+                        Err(StorageError::IoError(format!("Failed to read file: {}", e)))
+                    }
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // TODO: Release shared file lock (if acquired)
+                Ok(None)
+            },
+            Err(e) => {
+                // TODO: Release shared file lock (if acquired)
+                Err(StorageError::IoError(format!("Failed to open file: {}", e)))
+            }
+        }
+    }
+
+    /// Internal helper method to read a key-value pair from the filesystem
+    async fn _read_kv_from_filesystem(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // Calculate the file path
+        let file_path = self.get_kv_path(key_cid);
+        
+        // TODO: Acquire shared file lock on file_path
+        
+        // Try to open the file
+        let file_result = tokio::fs::File::open(&file_path).await;
+        match file_result {
+            Ok(mut file) => {
+                // File exists, read its entire content
+                let mut buffer = Vec::new();
+                match file.read_to_end(&mut buffer).await {
+                    Ok(_) => {
+                        // TODO: Release shared file lock
+                        Ok(Some(buffer))
+                    },
+                    Err(e) => {
+                        // TODO: Release shared file lock
+                        Err(StorageError::IoError(format!("Failed to read file: {}", e)))
+                    }
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // TODO: Release shared file lock (if acquired)
+                Ok(None)
+            },
+            Err(e) => {
+                // TODO: Release shared file lock (if acquired)
+                Err(StorageError::IoError(format!("Failed to open file: {}", e)))
+            }
+        }
+    }
+
+    /// Internal helper method to check if a blob exists on the filesystem
+    async fn _blob_exists_on_filesystem(&self, cid: &Cid) -> StorageResult<bool> {
+        let path = self.get_blob_path(cid);
+        match tokio::fs::metadata(path).await {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(StorageError::IoError(format!("Failed to check if file exists: {}", e))),
+        }
+    }
+
+    /// Internal helper method to check if a key-value pair exists on the filesystem
+    async fn _kv_exists_on_filesystem(&self, key_cid: &Cid) -> StorageResult<bool> {
+        let path = self.get_kv_path(key_cid);
+        match tokio::fs::metadata(path).await {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(StorageError::IoError(format!("Failed to check if file exists: {}", e))),
+        }
+    }
+
+    /// Internal helper method to delete a blob from the filesystem
+    async fn _delete_blob_from_filesystem(&self, cid: &Cid) -> StorageResult<()> {
+        let path = self.get_blob_path(cid);
+        match tokio::fs::remove_file(path).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()), // Idempotent delete
+            Err(e) => Err(StorageError::IoError(format!("Failed to delete file: {}", e))),
+        }
+    }
+
+    /// Internal helper method to delete a key-value pair from the filesystem
+    async fn _delete_kv_from_filesystem(&self, key_cid: &Cid) -> StorageResult<()> {
+        let path = self.get_kv_path(key_cid);
+        match tokio::fs::remove_file(path).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()), // Idempotent delete
+            Err(e) => Err(StorageError::IoError(format!("Failed to delete file: {}", e))),
+        }
+    }
 }
 
 #[async_trait]
@@ -757,18 +1016,63 @@ impl StorageBackend for FilesystemStorageBackend {
         Ok(())
     }
     
-    // --- Transaction methods (basic implementation) ---
+    // --- Transaction methods ---
     async fn begin_transaction(&self) -> StorageResult<()> {
-        // For simplicity, this implementation does not support transactions yet
-        Err(StorageError::NotSupported("Transactions not yet implemented for FilesystemStorageBackend".to_string()))
+        let mut tx_lock = self.transaction.lock().await;
+        
+        if tx_lock.is_some() {
+            return Err(StorageError::TransactionFailed("Transaction already in progress".to_string()));
+        }
+        
+        // Start new transaction
+        *tx_lock = Some(HashMap::new());
+        Ok(())
     }
     
     async fn commit_transaction(&self) -> StorageResult<()> {
-        Err(StorageError::NotSupported("Transactions not yet implemented for FilesystemStorageBackend".to_string()))
+        let tx_opt = {
+            let mut tx_lock = self.transaction.lock().await;
+            tx_lock.take()
+        };
+        
+        if let Some(tx) = tx_opt {
+            // Apply all changes from transaction
+            for (cid, value_opt) in tx {
+                if is_blob_cid(&cid) {
+                    // Handle blob operations
+                    if let Some(value) = value_opt {
+                        // Write/update blob
+                        self._write_blob_to_filesystem(&cid, &value).await?;
+                    } else {
+                        // Delete blob
+                        self._delete_blob_from_filesystem(&cid).await?;
+                    }
+                } else {
+                    // Handle key-value operations
+                    if let Some(value) = value_opt {
+                        // Write/update key-value
+                        self._write_kv_to_filesystem(&cid, &value).await?;
+                    } else {
+                        // Delete key-value
+                        self._delete_kv_from_filesystem(&cid).await?;
+                    }
+                }
+            }
+            Ok(())
+        } else {
+            Err(StorageError::TransactionFailed("No transaction in progress".to_string()))
+        }
     }
     
     async fn rollback_transaction(&self) -> StorageResult<()> {
-        Err(StorageError::NotSupported("Transactions not yet implemented for FilesystemStorageBackend".to_string()))
+        let mut tx_lock = self.transaction.lock().await;
+        
+        if tx_lock.is_some() {
+            *tx_lock = None;
+            Ok(())
+        } else {
+            Err(StorageError::TransactionFailed("No transaction in progress".to_string()))
+        }
     }
     
     async fn flush(&self) -> StorageResult<()> {
@@ -778,49 +1082,6 @@ impl StorageBackend for FilesystemStorageBackend {
     
     // --- Blob methods ---
     
-    /// Implement get_blob according to the specified design
-    async fn get_blob(&self, cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
-        // 1. Calculate Path
-        let final_file_path = self.get_blob_path(cid);
-        
-        // 2. Concurrency Control (Read Lock)
-        // TODO: Acquire an async *shared* file lock on final_file_path using fs2 or similar
-        // Rationale: Allows multiple readers, blocks writers during read.
-        
-        // 3. Check Existence & Open File
-        let file_result = tokio::fs::File::open(&final_file_path).await;
-        let mut file = match file_result {
-            Ok(file) => file,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // TODO: Release the shared file lock here
-                return Ok(None);
-            },
-            Err(e) => {
-                // TODO: Release the shared file lock here
-                return Err(StorageError::IoError(e.to_string()));
-            }
-        };
-        
-        // 4. Read Content
-        let mut content_vec = Vec::new();
-        match tokio::io::AsyncReadExt::read_to_end(&mut file, &mut content_vec).await {
-            Ok(_) => {
-                // 5. Integrity Check (Optional Placeholder)
-                // TODO (Optional/Configurable): let calculated_cid = calculate_cid(&content_vec);
-                // if calculated_cid != *cid { return Err(StorageError::IntegrityError(...)); }
-                // Rationale: Verifies data hasn't been corrupted at rest, adds overhead.
-                
-                // 6. Release Lock & Return
-                // TODO: Release the shared file lock here
-                Ok(Some(content_vec))
-            },
-            Err(e) => {
-                // TODO: Release the shared file lock here
-                Err(StorageError::IoError(format!("Failed to read file: {}", e)))
-            }
-        }
-    }
-    
     async fn put_blob(&self, value_bytes: &[u8]) -> StorageResult<Cid> {
         // Create a multihash using SHA-256
         let mh = create_sha256_multihash(value_bytes);
@@ -829,104 +1090,151 @@ impl StorageBackend for FilesystemStorageBackend {
         let cid = Cid::new_v0(mh)
             .map_err(|e| StorageError::InvalidCid(e.to_string()))?;
         
-        // Calculate the path where we'll store this blob
-        let final_path = self.get_blob_path(&cid);
+        // Check if we're in a transaction
+        let mut tx_lock = self.transaction.lock().await;
         
-        // Create the directory structure if it doesn't exist
-        if let Some(parent) = final_path.parent() {
-            tokio::fs::create_dir_all(parent).await
-                .map_err(|e| StorageError::IoError(format!("Failed to create directory: {}", e)))?;
+        if let Some(tx_map) = &mut *tx_lock {
+            // We're in a transaction, stage the change
+            tx_map.insert(cid, Some(value_bytes.to_vec()));
+        } else {
+            // No transaction, write directly to filesystem
+            drop(tx_lock); // Release the lock before I/O
+            self._write_blob_to_filesystem(&cid, value_bytes).await?;
         }
-        
-        // TODO: Implement the write-to-temp, then rename strategy for atomic writes
-        
-        // For now, we'll implement a basic direct write (non-atomic)
-        tokio::fs::write(&final_path, value_bytes).await
-            .map_err(|e| StorageError::IoError(format!("Failed to write file: {}", e)))?;
         
         Ok(cid)
     }
     
-    async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool> {
-        let path = self.get_blob_path(content_cid);
-        match tokio::fs::metadata(path).await {
-            Ok(_) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(StorageError::IoError(e.to_string())),
+    async fn get_blob(&self, cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // Check if we're in a transaction
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx_map) = &*tx_lock {
+            // Check if the CID exists in the transaction map
+            if let Some(value_opt) = tx_map.get(cid) {
+                // Found in transaction
+                return Ok(value_opt.clone());
+            }
+            // Not found in transaction, release lock and continue to filesystem check
         }
+        
+        // No transaction or not found in transaction, check the filesystem
+        drop(tx_lock); // Release the lock before I/O
+        self._read_blob_from_filesystem(cid).await
+    }
+    
+    async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool> {
+        // Check if we're in a transaction
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx_map) = &*tx_lock {
+            // Check if the CID exists in the transaction map
+            if let Some(value_opt) = tx_map.get(content_cid) {
+                // Found in transaction, check if it's a delete
+                return Ok(value_opt.is_some());
+            }
+            // Not found in transaction, release lock and continue to filesystem check
+        }
+        
+        // No transaction or not found in transaction, check the filesystem
+        drop(tx_lock); // Release the lock before I/O
+        self._blob_exists_on_filesystem(content_cid).await
     }
     
     async fn delete_blob(&self, content_cid: &Cid) -> StorageResult<()> {
-        let path = self.get_blob_path(content_cid);
-        match tokio::fs::remove_file(path).await {
-            Ok(_) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(StorageError::IoError(e.to_string())),
+        // Check if we're in a transaction
+        let mut tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx_map) = &mut *tx_lock {
+            // We're in a transaction, stage the delete
+            tx_map.insert(*content_cid, None);
+        } else {
+            // No transaction, delete directly from filesystem
+            drop(tx_lock); // Release the lock before I/O
+            self._delete_blob_from_filesystem(content_cid).await?;
         }
+        
+        Ok(())
     }
     
     // --- Key-Value methods ---
     
     async fn put_kv(&self, key_cid: Cid, value_bytes: Vec<u8>) -> StorageResult<()> {
-        // Calculate the path where we'll store this key-value
-        let final_path = self.get_kv_path(&key_cid);
+        // Check if we're in a transaction
+        let mut tx_lock = self.transaction.lock().await;
         
-        // Create the directory structure if it doesn't exist
-        if let Some(parent) = final_path.parent() {
-            tokio::fs::create_dir_all(parent).await
-                .map_err(|e| StorageError::IoError(format!("Failed to create directory: {}", e)))?;
+        if let Some(tx_map) = &mut *tx_lock {
+            // We're in a transaction, stage the change
+            tx_map.insert(key_cid, Some(value_bytes));
+        } else {
+            // No transaction, write directly to filesystem
+            drop(tx_lock); // Release the lock before I/O
+            self._write_kv_to_filesystem(&key_cid, &value_bytes).await?;
         }
-        
-        // TODO: Implement the write-to-temp, then rename strategy for atomic writes
-        
-        // For now, we'll implement a basic direct write (non-atomic)
-        tokio::fs::write(&final_path, value_bytes).await
-            .map_err(|e| StorageError::IoError(format!("Failed to write file: {}", e)))?;
         
         Ok(())
     }
     
     async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
-        // Calculate the file path
-        let final_file_path = self.get_kv_path(key_cid);
+        // Check if we're in a transaction
+        let tx_lock = self.transaction.lock().await;
         
-        // Try to open the file
-        let file_result = tokio::fs::File::open(&final_file_path).await;
-        let mut file = match file_result {
-            Ok(file) => file,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(None);
-            },
-            Err(e) => {
-                return Err(StorageError::IoError(e.to_string()));
+        if let Some(tx_map) = &*tx_lock {
+            // Check if the CID exists in the transaction map
+            if let Some(value_opt) = tx_map.get(key_cid) {
+                // Found in transaction
+                return Ok(value_opt.clone());
             }
-        };
-        
-        // Read the file content
-        let mut content_vec = Vec::new();
-        match tokio::io::AsyncReadExt::read_to_end(&mut file, &mut content_vec).await {
-            Ok(_) => Ok(Some(content_vec)),
-            Err(e) => Err(StorageError::IoError(format!("Failed to read file: {}", e)))
+            // Not found in transaction, release lock and continue to filesystem check
         }
+        
+        // No transaction or not found in transaction, check the filesystem
+        drop(tx_lock); // Release the lock before I/O
+        self._read_kv_from_filesystem(key_cid).await
     }
     
     async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool> {
-        let path = self.get_kv_path(key_cid);
-        match tokio::fs::metadata(path).await {
-            Ok(_) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(StorageError::IoError(e.to_string())),
+        // Check if we're in a transaction
+        let tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx_map) = &*tx_lock {
+            // Check if the CID exists in the transaction map
+            if let Some(value_opt) = tx_map.get(key_cid) {
+                // Found in transaction, check if it's a delete
+                return Ok(value_opt.is_some());
+            }
+            // Not found in transaction, release lock and continue to filesystem check
         }
+        
+        // No transaction or not found in transaction, check the filesystem
+        drop(tx_lock); // Release the lock before I/O
+        self._kv_exists_on_filesystem(key_cid).await
     }
     
     async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()> {
-        let path = self.get_kv_path(key_cid);
-        match tokio::fs::remove_file(path).await {
-            Ok(_) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(StorageError::IoError(e.to_string())),
+        // Check if we're in a transaction
+        let mut tx_lock = self.transaction.lock().await;
+        
+        if let Some(tx_map) = &mut *tx_lock {
+            // We're in a transaction, stage the delete
+            tx_map.insert(*key_cid, None);
+        } else {
+            // No transaction, delete directly from filesystem
+            drop(tx_lock); // Release the lock before I/O
+            self._delete_kv_from_filesystem(key_cid).await?;
         }
+        
+        Ok(())
     }
+}
+
+/// Helper function to determine if a CID is a blob content CID or a key CID
+/// This is a simplified heuristic; you might want to improve this based on your CID scheme
+fn is_blob_cid(cid: &Cid) -> bool {
+    // In this implementation, we're assuming CIDs starting with "Qm" (base58 v0 CIDs) 
+    // or "baf..." (base32 v1 CIDs) are content-addressed blobs
+    let cid_str = cid.to_string();
+    cid_str.starts_with("Qm") || (cid_str.starts_with("b") && cid_str.chars().nth(1) == Some('a'))
 }
 
 #[cfg(test)]
