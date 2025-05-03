@@ -3,6 +3,7 @@ use serde_json::Value;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use crate::error::{WalletResult, WalletError};
 use crate::identity::IdentityWallet;
+use crate::vc::{VerifiableCredential, CredentialProof, VerifiablePresentation};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifiableCredential {
@@ -18,18 +19,6 @@ pub struct VerifiableCredential {
     proof: Option<CredentialProof>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CredentialProof {
-    #[serde(rename = "type")]
-    proof_type: String,
-    created: String,
-    #[serde(rename = "verificationMethod")]
-    verification_method: String,
-    #[serde(rename = "proofPurpose")]
-    proof_purpose: String,
-    jws: String,
-}
-
 pub struct CredentialSigner {
     wallet: IdentityWallet,
 }
@@ -42,25 +31,15 @@ impl CredentialSigner {
     pub fn issue_credential(&self, subject_data: Value, credential_types: Vec<String>) -> WalletResult<VerifiableCredential> {
         let issuance_date = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         
-        let mut credential = VerifiableCredential {
-            context: vec![
-                "https://www.w3.org/2018/credentials/v1".to_string(),
-                "https://www.w3.org/2018/credentials/examples/v1".to_string(),
-            ],
-            credential_type: vec!["VerifiableCredential".to_string()],
-            issuer: self.wallet.did.to_string(),
-            issuance_date: issuance_date.clone(),
-            credential_subject: subject_data,
-            proof: None,
-        };
-        
-        // Add additional credential types
-        credential.credential_type.extend(credential_types);
+        // Create credential without proof
+        let credential = VerifiableCredential::new(
+            self.wallet.did.to_string(),
+            subject_data,
+            credential_types,
+        );
         
         // Sign the credential
-        let unsigned_json = serde_json::to_string(&credential)
-            .map_err(|e| WalletError::SerializationError(format!("Failed to serialize credential: {}", e)))?;
-            
+        let unsigned_json = credential.to_json()?;
         let signature = self.wallet.sign_message(unsigned_json.as_bytes());
         
         // Create JWS
@@ -68,15 +47,15 @@ impl CredentialSigner {
             BASE64.encode(signature));
             
         // Add proof
-        credential.proof = Some(CredentialProof {
+        let proof = CredentialProof {
             proof_type: "Ed25519Signature2020".to_string(),
             created: issuance_date,
             verification_method: format!("{}#keys-1", self.wallet.did),
             proof_purpose: "assertionMethod".to_string(),
             jws,
-        });
+        };
         
-        Ok(credential)
+        Ok(credential.with_proof(proof))
     }
     
     pub fn verify_credential(&self, credential: &VerifiableCredential) -> WalletResult<bool> {
@@ -96,8 +75,7 @@ impl CredentialSigner {
             proof: None,
         };
         
-        let unsigned_json = serde_json::to_string(&credential_copy)
-            .map_err(|e| WalletError::SerializationError(format!("Failed to serialize credential: {}", e)))?;
+        let unsigned_json = credential_copy.to_json()?;
             
         // Extract JWS parts
         let jws_parts: Vec<&str> = proof.jws.split('.').collect();
@@ -129,5 +107,32 @@ impl CredentialSigner {
         
         // Create a new credential with only the disclosed fields
         self.issue_credential(subject_data, credential.credential_type.clone())
+    }
+    
+    pub fn create_presentation(&self, credentials: Vec<VerifiableCredential>) -> WalletResult<VerifiablePresentation> {
+        let presentation = VerifiablePresentation::new(
+            self.wallet.did.to_string(),
+            credentials,
+        );
+        
+        // Sign the presentation
+        let unsigned_json = presentation.to_json()?;
+        let signature = self.wallet.sign_message(unsigned_json.as_bytes());
+        
+        // Create JWS
+        let jws = format!("eyJhbGciOiJFZERTQSJ9..{}",
+            BASE64.encode(signature));
+            
+        // Create proof
+        let issuance_date = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let proof = CredentialProof {
+            proof_type: "Ed25519Signature2020".to_string(),
+            created: issuance_date,
+            verification_method: format!("{}#keys-1", self.wallet.did),
+            proof_purpose: "authentication".to_string(),
+            jws,
+        };
+        
+        Ok(presentation.with_proof(proof))
     }
 } 

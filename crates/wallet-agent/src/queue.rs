@@ -7,25 +7,203 @@ use uuid::Uuid;
 use wallet_core::identity::IdentityWallet;
 use crate::error::{AgentResult, AgentError};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use chrono::{DateTime, Utc};
+use wallet_core::error::{WalletResult, WalletError};
+use wallet_core::dag::{DagNode, DagThread, ThreadType};
+use wallet_core::store::LocalWalletStore;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum ActionType {
-    Proposal,
-    Vote,
-    Appeal,
-    Credential,
-    Verification,
-    Custom(String),
+/// An action that is waiting to be processed and submitted to the DAG
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingAction {
+    /// Unique ID for this action
+    pub id: String,
+    /// The type of action
+    pub action_type: ActionType,
+    /// The DID of the identity performing this action
+    pub creator_did: String,
+    /// The payload for this action
+    pub payload: Value,
+    /// When this action was created
+    pub created_at: DateTime<Utc>,
+    /// The status of this action
+    pub status: ActionStatus,
+    /// Any error message if the action failed
+    pub error_message: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QueuedAction {
-    pub id: String,
-    pub action_type: ActionType,
-    pub payload: Value,
-    pub created_at: i64,
-    pub signed: bool,
-    pub signature: Option<String>,
+/// The type of action being performed
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ActionType {
+    /// Create a governance proposal
+    Proposal,
+    /// Vote on a proposal
+    Vote,
+    /// Anchor data to the DAG
+    Anchor,
+}
+
+/// The status of a pending action
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ActionStatus {
+    /// The action is pending and waiting to be processed
+    Pending,
+    /// The action is currently being processed
+    Processing,
+    /// The action was successfully processed
+    Completed,
+    /// The action failed to process
+    Failed,
+}
+
+/// Manager for handling pending actions
+pub struct ActionQueue<S: LocalWalletStore> {
+    store: S,
+}
+
+impl<S: LocalWalletStore> ActionQueue<S> {
+    pub fn new(store: S) -> Self {
+        Self { store }
+    }
+    
+    /// Queue a new action
+    pub async fn queue_action(
+        &self,
+        action_type: ActionType,
+        creator_did: &str,
+        payload: Value,
+    ) -> WalletResult<PendingAction> {
+        let action = PendingAction {
+            id: Uuid::new_v4().to_string(),
+            action_type,
+            creator_did: creator_did.to_string(),
+            payload,
+            created_at: Utc::now(),
+            status: ActionStatus::Pending,
+            error_message: None,
+        };
+        
+        self.save_action(&action).await?;
+        
+        Ok(action)
+    }
+    
+    /// Get all pending actions
+    pub async fn get_pending_actions(&self) -> WalletResult<Vec<PendingAction>> {
+        let action_ids = self.store.list_items("actions").await?;
+        let mut pending_actions = Vec::new();
+        
+        for id in action_ids {
+            let action: PendingAction = self.store.load_json("actions", &id).await?;
+            if action.status == ActionStatus::Pending {
+                pending_actions.push(action);
+            }
+        }
+        
+        Ok(pending_actions)
+    }
+    
+    /// Get a specific action by ID
+    pub async fn get_action(&self, id: &str) -> WalletResult<PendingAction> {
+        self.store.load_json("actions", id).await
+    }
+    
+    /// Update the status of an action
+    pub async fn update_action_status(
+        &self,
+        id: &str,
+        status: ActionStatus,
+        error_message: Option<String>,
+    ) -> WalletResult<PendingAction> {
+        let mut action = self.get_action(id).await?;
+        action.status = status;
+        action.error_message = error_message;
+        
+        self.save_action(&action).await?;
+        
+        Ok(action)
+    }
+    
+    /// Save an action to the store
+    async fn save_action(&self, action: &PendingAction) -> WalletResult<()> {
+        self.store.save_json("actions", &action.id, action).await
+    }
+    
+    /// Process a pending action and create a DAG node
+    pub async fn process_action(
+        &self,
+        action_id: &str,
+        identity: &IdentityWallet,
+    ) -> WalletResult<()> {
+        // Update status to processing
+        let action = self.update_action_status(action_id, ActionStatus::Processing, None).await?;
+        
+        // Convert action to DAG node
+        let thread_type = match action.action_type {
+            ActionType::Proposal => ThreadType::Proposal,
+            ActionType::Vote => ThreadType::Vote,
+            ActionType::Anchor => ThreadType::Anchor,
+        };
+        
+        let result = self.create_dag_node(action.id.clone(), thread_type, &action.payload, identity).await;
+        
+        match result {
+            Ok(_) => {
+                // Update status to completed
+                self.update_action_status(action_id, ActionStatus::Completed, None).await?;
+            },
+            Err(e) => {
+                // Update status to failed
+                let error_message = format!("Failed to process action: {}", e);
+                self.update_action_status(action_id, ActionStatus::Failed, Some(error_message)).await?;
+                return Err(e);
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Create a DAG node from an action
+    async fn create_dag_node(
+        &self,
+        action_id: String,
+        thread_type: ThreadType,
+        payload: &Value,
+        identity: &IdentityWallet,
+    ) -> WalletResult<()> {
+        // In a real implementation, this would:
+        // 1. Create a DAG node with the payload
+        // 2. Sign it with the identity
+        // 3. Store it locally
+        // 4. Queue it for synchronization
+        // For this example, we'll just stub this out
+        
+        // Create a DAG node
+        let mut node = DagNode::new(payload.clone());
+        
+        // Sign the node
+        let node_json = serde_json::to_string(&node)
+            .map_err(|e| WalletError::SerializationError(format!("Failed to serialize node: {}", e)))?;
+        let signature = identity.sign_message(node_json.as_bytes());
+        let signature_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &signature);
+        
+        node.add_signature(&identity.did.to_string(), &signature_b64);
+        
+        // Create a thread if it doesn't exist yet
+        let thread_id = format!("{}-thread", action_id);
+        let thread = DagThread::new(
+            thread_type,
+            identity.did.to_string(),
+            "temp-cid".to_string(), // This would be the actual CID in a real implementation
+            Some(format!("Action {}", action_id)),
+            None,
+        );
+        
+        // Store the node and thread
+        self.store.save_dag_node("temp-cid", &node).await?;
+        self.store.save_dag_thread(&thread_id, &thread).await?;
+        
+        Ok(())
+    }
 }
 
 pub struct ProposalQueue {
