@@ -40,10 +40,16 @@ impl<S: LocalWalletStore> SyncManagerAdapter<S> {
     pub async fn submit_dag_node(&self, node: &DagNode) -> AgentResult<NodeSubmissionResponse> {
         // In a real implementation, this would submit to the network
         // For now, just return a successful response
+        let node_id = node.links.get("self").cloned().unwrap_or_default();
         Ok(NodeSubmissionResponse {
             success: true,
-            cid: Some(node.links.get("self").cloned().unwrap_or_default()),
+            id: node_id.clone(),
+            cid: node_id,
+            timestamp: Utc::now().to_rfc3339(),
+            block_number: None,
             error: None,
+            data: HashMap::new(),
+            links: HashMap::new(),
         })
     }
 }
@@ -180,17 +186,15 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
             match sync_manager.submit_dag_node(&dag_node).await {
                 Ok(submission_result) => {
                     // Update the DAG node with the assigned CID if different
-                    if let Some(assigned_cid) = submission_result.cid {
-                        if assigned_cid != node_id {
-                            debug!("Node CID reassigned from {} to {}", node_id, assigned_cid);
-                            
-                            // Save the node with the new CID
-                            let mut updated_node = dag_node.clone();
-                            updated_node.links.insert("self".to_string(), assigned_cid.clone());
-                            
-                            self.store.save_dag_node(&assigned_cid, &updated_node).await
-                                .map_err(|e| AgentError::CoreError(e))?;
-                        }
+                    if submission_result.cid != node_id {
+                        debug!("Node CID reassigned from {} to {}", node_id, submission_result.cid);
+                        
+                        // Save the node with the new CID
+                        let mut updated_node = dag_node.clone();
+                        updated_node.links.insert("self".to_string(), submission_result.cid.clone());
+                        
+                        self.store.save_dag_node(&submission_result.cid, &updated_node).await
+                            .map_err(|e| AgentError::CoreError(e))?;
                     }
                     
                     ProcessingStatus::Submitted
@@ -238,6 +242,16 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
                 action.payload.get("thread_id")
                     .and_then(|v| v.as_str())
                     .map(|id| id.to_string())
+            },
+            ActionType::Custom => {
+                // For custom actions, look for thread_id or create a new one
+                action.payload.get("thread_id")
+                    .and_then(|v| v.as_str())
+                    .map(|id| id.to_string())
+            },
+            // For all other action types, create a new thread based on action ID
+            _ => {
+                Some(format!("action:{}", action.id))
             }
         }
     }
@@ -303,6 +317,9 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
                     ActionType::Proposal => ThreadType::Proposal,
                     ActionType::Vote => ThreadType::Vote,
                     ActionType::Anchor => ThreadType::Anchor,
+                    ActionType::Custom => ThreadType::Custom,
+                    // Map other action types to appropriate thread types
+                    _ => ThreadType::Generic,
                 };
                 
                 // Extract title from payload if available
@@ -346,7 +363,12 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
             )));
         }
         
-        debug!("Node {} submitted successfully", node_id);
+        if !response.cid.is_empty() {
+            debug!("Node {} submitted successfully with CID {}", node_id, response.cid);
+        } else {
+            debug!("Node {} submitted successfully but no CID was returned", node_id);
+        }
+        
         Ok(response)
     }
     

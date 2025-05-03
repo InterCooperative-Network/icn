@@ -36,6 +36,10 @@ pub struct NodeSubmissionResponse {
     /// Transaction or submission ID
     pub id: String,
     
+    /// CID alias for compatibility (same as id)
+    #[serde(alias = "cid", default = "default_empty_string")]
+    pub cid: String,
+    
     /// Timestamp of the submission
     pub timestamp: String,
     
@@ -48,4 +52,13 @@ pub struct NodeSubmissionResponse {
     /// Additional response data
     #[serde(default)]
     pub data: HashMap<String, String>,
+    
+    /// Links to related resources
+    #[serde(default)]
+    pub links: HashMap<String, String>,
+}
+
+/// Default empty string function for optional fields
+fn default_empty_string() -> String {
+    String::new()
 } 

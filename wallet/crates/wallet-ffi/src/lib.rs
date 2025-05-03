@@ -20,12 +20,31 @@ use wallet_core::dag::{DagThread, DagNode, CachedDagThreadInfo as CoreCachedDagT
 use wallet_core::error::{WalletError as CoreWalletError, WalletResult};
 use wallet_core::identity::IdentityWallet;
 use wallet_core::store::file::FileStore;
-use wallet_agent::{ActionQueue, PendingAction};
-use wallet_agent::{ActionProcessor, ProcessingStatus, ThreadConflict, ConflictResolutionStrategy};
 use wallet_types::action::{ActionStatus as CoreActionStatus, ActionType};
 use wallet_types::network::{NetworkStatus, NodeSubmissionResponse};
 use wallet_sync::trust::TrustBundleValidator;
+
+// Conditionally import wallet-agent
+#[cfg(feature = "agent")]
+use wallet_agent::{ActionQueue, PendingAction};
+#[cfg(feature = "agent")]
+use wallet_agent::{ActionProcessor, ProcessingStatus, ThreadConflict, ConflictResolutionStrategy};
+#[cfg(feature = "agent")]
 use wallet_agent::governance::TrustBundle;
+#[cfg(feature = "agent")]
+use wallet_agent::error::AgentError;
+
+// Define TrustBundle for when agent feature is not enabled
+#[cfg(not(feature = "agent"))]
+#[derive(Debug, Clone)]
+pub struct TrustBundle {
+    pub id: String,
+    pub name: String,
+    pub version: i64,
+    pub guardians: Vec<String>,
+    pub threshold: usize,
+    pub active: bool,
+}
 
 // Global Tokio runtime for async operations
 static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
@@ -116,13 +135,14 @@ impl From<wallet_sync::error::SyncError> for WalletError {
     }
 }
 
-// Convert ActionProcessorError to our FFI error type
-impl From<wallet_agent::error::AgentError> for WalletError {
-    fn from(error: wallet_agent::error::AgentError) -> Self {
+// Conditionally implement From<AgentError> for when agent feature is enabled
+#[cfg(feature = "agent")]
+impl From<AgentError> for WalletError {
+    fn from(error: AgentError) -> Self {
         match error {
-            wallet_agent::error::AgentError::CoreError(core_err) => core_err.into(),
-            wallet_agent::error::AgentError::ValidationError(msg) => WalletError::ValidationError(msg),
-            wallet_agent::error::AgentError::NotFound(msg) => WalletError::NotFound(msg),
+            AgentError::CoreError(core_err) => core_err.into(),
+            AgentError::ValidationError(msg) => WalletError::ValidationError(msg),
+            AgentError::NotFound(msg) => WalletError::NotFound(msg),
             _ => WalletError::UnknownError(format!("{}", error)),
         }
     }
@@ -333,6 +353,7 @@ impl Into<CoreWalletConfig> for WalletConfig {
 // The main API for mobile platforms
 pub struct WalletApi {
     store: Arc<FileStore>,
+    #[cfg(feature = "agent")]
     processor: Arc<Mutex<ActionProcessor<FileStore>>>,
     sync_manager: Arc<Mutex<SyncManager<FileStore>>>,
     config: Arc<Mutex<CoreWalletConfig>>,
@@ -515,6 +536,7 @@ impl WalletApi {
         
         Ok(Self {
             store,
+            #[cfg(feature = "agent")]
             processor: Arc::new(Mutex::new(processor)),
             sync_manager: Arc::new(Mutex::new(sync_manager)),
             config: Arc::new(Mutex::new(core_config)),

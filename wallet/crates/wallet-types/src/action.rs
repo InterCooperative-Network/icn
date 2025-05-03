@@ -38,6 +38,18 @@ pub enum ActionType {
     
     /// Reject an action
     Reject,
+    
+    /// Proposal action for governance
+    Proposal,
+    
+    /// Vote action for governance
+    Vote,
+    
+    /// Anchor action for data anchoring
+    Anchor,
+    
+    /// Custom action type
+    Custom,
 }
 
 /// Status of an action
@@ -63,4 +75,7 @@ pub enum ActionStatus {
     
     /// Action is expired
     Expired,
+    
+    /// Action is being processed
+    Processing,
 } 

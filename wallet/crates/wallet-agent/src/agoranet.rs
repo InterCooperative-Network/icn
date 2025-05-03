@@ -228,75 +228,91 @@ impl AgoraNetClient {
             query_params.insert("topic", t);
         }
         
-        // Execute request with retry logic
+        // Define the operation to fetch threads
         let url = format!("{}/threads", self.base_url);
+        let self_clone = self.clone();
+        let query_params_clone = query_params.clone();
         
-        // Configure backoff strategy
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(30)),
-            ..ExponentialBackoff::default()
-        };
+        // Execute with retry logic
+        let threads = self.retry_with_backoff("fetch threads", move || {
+            let url = url.clone();
+            let query_params = query_params_clone.clone();
+            let client = self_clone.clone();
+            
+            async move {
+                client.try_get_threads(&url, &query_params).await
+            }
+        }).await?;
         
-        // Lock to prevent multiple retry-heavy operations from running concurrently
-        // which could overload the server or trigger rate limits
-        let _lock = self.connectivity_lock.lock().await;
+        // Update the cache
+        {
+            let mut cache = self.thread_cache.write().await;
+            cache.insert(cache_key, CacheEntry {
+                data: threads.clone(),
+                expires_at: Instant::now() + self.cache_ttl,
+            });
+        }
         
-        // Retry with exponential backoff
-        let result = async {
-            let response = self.http_client.get(&url)
-                .query(&query_params)
-                .header("Authorization", format!("DID {}", self.identity.did))
-                .send()
-                .await
-                .map_err(|e| {
-                    if e.is_timeout() || e.is_connect() {
-                        backoff::Error::transient(e)
-                    } else {
-                        backoff::Error::permanent(e)
-                    }
-                })?;
-                
-            // Check status code
-            if !response.status().is_success() {
-                // Handle different error status codes
-                match response.status() {
-                    StatusCode::FORBIDDEN | 
-                    StatusCode::UNAUTHORIZED | 
-                    StatusCode::NOT_FOUND |
-                    StatusCode::TOO_MANY_REQUESTS | 
-                    StatusCode::INTERNAL_SERVER_ERROR => {
-                        return Err(backoff::Error::permanent(self.handle_api_response::<Vec<ThreadSummary>>(response, "fetching threads").await?));
-                    },
-                    _ => {
-                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
-                            "Network error fetching threads: {}", response.status()
-                        ))));
-                    }
+        Ok(threads)
+    }
+    
+    /// Helper function to attempt fetching threads without retry logic
+    async fn try_get_threads(&self, url: &str, query_params: &HashMap<&str, &str>) -> AgentResult<Vec<ThreadSummary>> {
+        let response = self.http_client.get(url)
+            .query(query_params)
+            .header("Authorization", format!("DID {}", self.identity.did))
+            .send()
+            .await
+            .map_err(|e| {
+                if e.is_timeout() || e.is_connect() {
+                    AgentError::ConnectionError(format!("Connection error: {}", e))
+                } else {
+                    AgentError::NetworkError(format!("Network error: {}", e))
+                }
+            })?;
+            
+        // Check status code
+        if !response.status().is_success() {
+            // Handle different error status codes
+            match response.status() {
+                StatusCode::FORBIDDEN => {
+                    return Err(AgentError::PermissionError(format!(
+                        "Permission denied fetching threads: {}", response.status()
+                    )));
+                },
+                StatusCode::UNAUTHORIZED => {
+                    return Err(AgentError::AuthenticationError(format!(
+                        "Authentication failed fetching threads: {}", response.status()
+                    )));
+                },
+                StatusCode::NOT_FOUND => {
+                    return Err(AgentError::ResourceNotFound(format!(
+                        "Resource not found fetching threads: {}", response.status()
+                    )));
+                },
+                StatusCode::TOO_MANY_REQUESTS => {
+                    return Err(AgentError::RateLimitExceeded(format!(
+                        "Rate limit exceeded fetching threads: {}", response.status()
+                    )));
+                },
+                StatusCode::INTERNAL_SERVER_ERROR => {
+                    return Err(AgentError::ServerError(format!(
+                        "Server error fetching threads: {}", response.status()
+                    )));
+                },
+                _ => {
+                    return Err(AgentError::ConnectionError(format!(
+                        "Network error fetching threads: {}", response.status()
+                    )));
                 }
             }
-            
-            // Try to parse the response as a list of thread info
-            let threads: Vec<ThreadSummary> = response.json().await
-                .map_err(|e| backoff::Error::permanent(AgentError::SerializationError(format!(
-                    "Failed to deserialize thread list: {}", e
-                ))))?;
-                
-            Ok(threads)
-        }.await;
-        
-        match result {
-            Ok(threads) => {
-                // Update the cache
-                let mut cache = self.thread_cache.write().await;
-                cache.insert(cache_key, CacheEntry {
-                    data: threads.clone(),
-                    expires_at: Instant::now() + self.cache_ttl,
-                });
-                
-                Ok(threads)
-            },
-            Err(e) => Err(e)
         }
+        
+        // Try to parse the response as a list of thread info
+        response.json::<Vec<ThreadSummary>>().await
+            .map_err(|e| AgentError::SerializationError(format!(
+                "Failed to deserialize thread list: {}", e
+            )))
     }
     
     /// Fetch a specific thread by ID with caching and retry logic
@@ -312,80 +328,98 @@ impl AgoraNetClient {
             }
         }
         
-        // Execute request with retry logic
+        // Define the operation to fetch the thread
         let url = format!("{}/threads/{}", self.base_url, thread_id);
+        let thread_id_clone = thread_id.to_string();
+        let self_clone = self.clone();
         
-        // Configure backoff strategy
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(30)),
-            ..ExponentialBackoff::default()
-        };
+        // Execute with retry logic
+        let thread = self.retry_with_backoff("fetch thread details", move || {
+            let url = url.clone();
+            let thread_id = thread_id_clone.clone();
+            let client = self_clone.clone();
+            
+            async move {
+                client.try_get_thread(&url, &thread_id).await
+            }
+        }).await?;
         
-        // Lock to prevent multiple retry-heavy operations
-        let _lock = self.connectivity_lock.lock().await;
+        // Update the cache
+        {
+            // Update the thread detail cache
+            let mut cache = self.thread_detail_cache.write().await;
+            cache.insert(thread_id.to_string(), CacheEntry {
+                data: thread.clone(),
+                expires_at: Instant::now() + self.cache_ttl,
+            });
+            
+            // Also update the credential links cache
+            let mut link_cache = self.credential_link_cache.write().await;
+            link_cache.insert(thread_id.to_string(), CacheEntry {
+                data: thread.credential_links.clone(),
+                expires_at: Instant::now() + self.cache_ttl,
+            });
+        }
         
-        // Retry with exponential backoff
-        let result = async {
-            let response = self.http_client.get(&url)
-                .header("Authorization", format!("DID {}", self.identity.did))
-                .send()
-                .await
-                .map_err(|e| {
-                    if e.is_timeout() || e.is_connect() {
-                        backoff::Error::transient(e)
-                    } else {
-                        backoff::Error::permanent(e)
-                    }
-                })?;
-                
-            // Check status code
-            if !response.status().is_success() {
-                // Handle different error status codes
-                match response.status() {
-                    StatusCode::FORBIDDEN | 
-                    StatusCode::UNAUTHORIZED | 
-                    StatusCode::NOT_FOUND |
-                    StatusCode::TOO_MANY_REQUESTS | 
-                    StatusCode::INTERNAL_SERVER_ERROR => {
-                        return Err(backoff::Error::permanent(self.handle_api_response::<ThreadDetail>(response, "fetching thread details").await?));
-                    },
-                    _ => {
-                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
-                            "Network error fetching thread details: {}", response.status()
-                        ))));
-                    }
+        Ok(thread)
+    }
+    
+    /// Helper method to fetch a thread without retry logic
+    async fn try_get_thread(&self, url: &str, thread_id: &str) -> AgentResult<ThreadDetail> {
+        let response = self.http_client.get(url)
+            .header("Authorization", format!("DID {}", self.identity.did))
+            .send()
+            .await
+            .map_err(|e| {
+                if e.is_timeout() || e.is_connect() {
+                    AgentError::ConnectionError(format!("Connection error: {}", e))
+                } else {
+                    AgentError::NetworkError(format!("Network error: {}", e))
+                }
+            })?;
+            
+        // Check status code
+        if !response.status().is_success() {
+            // Handle different error status codes
+            match response.status() {
+                StatusCode::FORBIDDEN => {
+                    return Err(AgentError::PermissionError(format!(
+                        "Permission denied fetching thread {}: {}", thread_id, response.status()
+                    )));
+                },
+                StatusCode::UNAUTHORIZED => {
+                    return Err(AgentError::AuthenticationError(format!(
+                        "Authentication failed fetching thread {}: {}", thread_id, response.status()
+                    )));
+                },
+                StatusCode::NOT_FOUND => {
+                    return Err(AgentError::ResourceNotFound(format!(
+                        "Thread not found: {}", thread_id
+                    )));
+                },
+                StatusCode::TOO_MANY_REQUESTS => {
+                    return Err(AgentError::RateLimitExceeded(format!(
+                        "Rate limit exceeded fetching thread {}: {}", thread_id, response.status()
+                    )));
+                },
+                StatusCode::INTERNAL_SERVER_ERROR => {
+                    return Err(AgentError::ServerError(format!(
+                        "Server error fetching thread {}: {}", thread_id, response.status()
+                    )));
+                },
+                _ => {
+                    return Err(AgentError::ConnectionError(format!(
+                        "Network error fetching thread {}: {}", thread_id, response.status()
+                    )));
                 }
             }
-            
-            // Try to parse the response as thread details
-            let thread: ThreadDetail = response.json().await
-                .map_err(|e| backoff::Error::permanent(AgentError::SerializationError(format!(
-                    "Failed to deserialize thread details: {}", e
-                ))))?;
-                
-            Ok(thread)
-        }.await;
-        
-        match result {
-            Ok(thread) => {
-                // Update the cache
-                let mut cache = self.thread_detail_cache.write().await;
-                cache.insert(thread_id.to_string(), CacheEntry {
-                    data: thread.clone(),
-                    expires_at: Instant::now() + self.cache_ttl,
-                });
-                
-                // Also update the credential links cache
-                let mut link_cache = self.credential_link_cache.write().await;
-                link_cache.insert(thread_id.to_string(), CacheEntry {
-                    data: thread.credential_links.clone(),
-                    expires_at: Instant::now() + self.cache_ttl,
-                });
-                
-                Ok(thread)
-            },
-            Err(e) => Err(e)
         }
+        
+        // Try to parse the response as thread details
+        response.json::<ThreadDetail>().await
+            .map_err(|e| AgentError::SerializationError(format!(
+                "Failed to deserialize thread details: {}", e
+            )))
     }
     
     /// Link a credential to a thread with retry logic
@@ -692,6 +726,70 @@ impl AgoraNetClient {
             StatusCode::TOO_MANY_REQUESTS => Err(AgentError::RateLimitExceeded(error_message)),
             StatusCode::INTERNAL_SERVER_ERROR => Err(AgentError::ServerError(error_message)),
             _ => Err(AgentError::GovernanceError(error_message)),
+        }
+    }
+
+    /// Generic retry function for network operations
+    async fn retry_with_backoff<T, F, Fut>(&self, operation_name: &str, operation: F) -> AgentResult<T> 
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = AgentResult<T>>,
+    {
+        // Configure backoff strategy
+        let backoff = ExponentialBackoff {
+            max_elapsed_time: Some(Duration::from_secs(30)),
+            ..ExponentialBackoff::default()
+        };
+        
+        // Lock to prevent multiple retry-heavy operations from running concurrently
+        let _lock = self.connectivity_lock.lock().await;
+        
+        // Use a direct approach without backoff::Error type conversions
+        let mut retry_count = 0;
+        let max_retries = 5;
+        let mut last_error = None;
+        
+        loop {
+            if retry_count >= max_retries {
+                return Err(AgentError::RetryExhausted(format!(
+                    "Failed to {} after {} retries: {:?}", 
+                    operation_name,
+                    max_retries, 
+                    last_error.unwrap_or_else(|| "Unknown error".to_string())
+                )));
+            }
+            
+            match operation().await {
+                Ok(result) => {
+                    if retry_count > 0 {
+                        debug!("Operation '{}' succeeded after {} retries", operation_name, retry_count);
+                    }
+                    return Ok(result);
+                },
+                Err(e) => {
+                    // Check if this is a transient error that we should retry
+                    if matches!(e, 
+                        AgentError::ConnectionError(_) | 
+                        AgentError::NetworkError(_) |
+                        AgentError::ServerError(_) |
+                        AgentError::RateLimitExceeded(_)
+                    ) {
+                        retry_count += 1;
+                        last_error = Some(e.to_string());
+                        
+                        // Calculate backoff delay
+                        let delay = backoff.next_backoff().unwrap_or(Duration::from_millis(500));
+                        debug!("Retrying '{}' after delay: {:?} (attempt {} of {})", 
+                            operation_name, delay, retry_count, max_retries);
+                        
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    } else {
+                        // Non-transient error, don't retry
+                        return Err(e);
+                    }
+                }
+            }
         }
     }
 } 

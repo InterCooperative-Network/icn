@@ -15,7 +15,7 @@ pub enum AgentError {
     
     /// Core wallet error (from wallet-core)
     #[error("Core error: {0}")]
-    CoreError(#[from] wallet_core::error::WalletError),
+    CoreError(#[from] CoreError),
     
     /// Shared error (from wallet-types)
     #[error("Shared error: {0}")]
@@ -121,15 +121,17 @@ pub enum AgentError {
     #[error("Task error: {0}")]
     TaskError(String),
     
+    /// Retry exhausted
+    #[error("Retry exhausted: {0}")]
+    RetryExhausted(String),
+    
+    /// Retry error
+    #[error("Retry error: {0}")]
+    RetryError(String),
+    
     /// Other error
     #[error("Other error: {0}")]
     Other(String),
-}
-
-impl From<wallet_core::error::WalletError> for AgentError {
-    fn from(err: wallet_core::error::WalletError) -> Self {
-        AgentError::WalletCoreError(err.to_string())
-    }
 }
 
 impl From<tokio::task::JoinError> for AgentError {
@@ -154,6 +156,18 @@ impl From<reqwest::Error> for AgentError {
             AgentError::SerializationError(format!("Failed to decode response: {}", err))
         } else {
             AgentError::Other(err.to_string())
+        }
+    }
+}
+
+// Add conversion from backoff::Error<AgentError> to AgentError
+impl From<backoff::Error<AgentError>> for AgentError {
+    fn from(err: backoff::Error<AgentError>) -> Self {
+        match err {
+            backoff::Error::Permanent(e) => e,
+            backoff::Error::Transient { err, retry_after: _ } => {
+                AgentError::RetryError(format!("Transient error during retry: {}", err))
+            }
         }
     }
 }
