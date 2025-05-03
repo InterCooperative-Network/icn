@@ -28,6 +28,8 @@ use icn_core_vm::IdentityContext;
 use icn_dag::DagNode;
 use icn_federation::{GuardianMandate, signing};
 use cid::Cid;
+use icn_identity::{IdentityManager, ConcreteIdentityManager, KeyStorage};
+use icn_storage::{StorageManager, RocksDBStorageManager, AsyncInMemoryStorage};
 
 #[derive(Parser)]
 #[clap(
@@ -397,8 +399,37 @@ async fn handle_compile_command(
     Ok(())
 }
 
-// Add this to handle the execute command
-async fn handle_execute_command(
+// Add a new helper function for signing DAG node data
+pub async fn sign_node_data(
+    identity_manager: &Arc<dyn IdentityManager>,
+    signer_did: &str,
+    node_data_to_sign: &[u8]
+) -> anyhow::Result<Vec<u8>> {
+    // Retrieve the JWK (JSON Web Key) for the signer DID
+    let jwk_opt = identity_manager.get_key(signer_did).await
+        .map_err(|e| anyhow::anyhow!("Failed to retrieve key for signer DID {}: {}", signer_did, e))?;
+    
+    let jwk = jwk_opt.ok_or_else(|| 
+        anyhow::anyhow!("No key found for signer DID: {}", signer_did))?;
+    
+    // Ensure the JWK contains private key material
+    if jwk.d.is_none() {
+        return Err(anyhow::anyhow!("JWK for {} does not contain private key material", signer_did));
+    }
+    
+    // Convert JWK to KeyPair for signing
+    let key_pair = icn_identity::KeyPair::try_from_jwk(&jwk)
+        .map_err(|e| anyhow::anyhow!("Failed to convert JWK to KeyPair: {}", e))?;
+    
+    // Sign the data using the KeyPair's sign method
+    let signature = key_pair.sign(node_data_to_sign)
+        .map_err(|e| anyhow::anyhow!("Failed to sign node data: {}", e))?;
+    
+    Ok(signature)
+}
+
+// Update the handle_execute_command function to initialize parent keys and sign the anchor node
+pub async fn handle_execute_command(
     proposal_payload: String,
     constitution: String,
     identity: String,
@@ -410,7 +441,9 @@ async fn handle_execute_command(
     use cid::Cid;
     use std::time::{SystemTime, UNIX_EPOCH};
     use icn_core_vm::{VMContext, ResourceType, ResourceAuthorization};
-    use icn_identity::IdentityScope;
+    use icn_identity::{IdentityScope, IdentityManager, ConcreteIdentityManager, KeyStorage};
+    use icn_storage::{StorageManager, RocksDBStorageManager, AsyncInMemoryStorage};
+    use std::sync::Arc;
     
     // Create our own CclInterpreter implementation
     struct CclInterpreter;
@@ -500,19 +533,67 @@ async fn handle_execute_command(
     // Create a simple identity context for execution
     let identity_ctx = create_identity_context(&identity);
     
-    // Create the VM context - now AFTER identity_ctx is created
+    // Create the VM context
     let vm_context = VMContext::new(
         identity_ctx.clone(),
         core_vm_authorizations,
     );
     
-    // Fixed execute_wasm call to match the updated function signature
+    // Create a storage manager instance (use in-memory for CLI purposes)
+    let storage_backend = Arc::new(tokio::sync::Mutex::new(AsyncInMemoryStorage::new()));
+    let storage_manager = Arc::new(RocksDBStorageManager::new_in_memory().await);
+    
+    // Create an identity manager instance
+    let identity_manager = Arc::new(ConcreteIdentityManager::new_in_memory());
+    
+    // The parent federation DID (assuming the caller's identity is the federation)
+    // For hardcoded testing, we can use a known federation DID
+    let parent_federation_did = Some(identity.clone());
+    
+    // Step 1: Initialize Parent Key - Ensure the parent federation DID has a key pair
+    if let Some(ref parent_did) = parent_federation_did {
+        // First check if key already exists
+        let existing_key = identity_manager.get_key(parent_did).await;
+        
+        // If key doesn't exist or there was an error retrieving it, generate a new one
+        if existing_key.is_err() || existing_key.unwrap().is_none() {
+            if verbose {
+                println!("Generating new key pair for parent federation: {}", parent_did);
+            }
+            
+            // Generate and store a key pair for the parent federation DID
+            let key_result = identity_manager.generate_and_store_did_key().await;
+            match key_result {
+                Ok((new_did, _)) => {
+                    if verbose {
+                        println!("Generated key for parent federation (DID: {})", new_did);
+                    }
+                    // Important: If this is a new DID, update the parent_federation_did to use it
+                    if parent_did != &new_did {
+                        if verbose {
+                            println!("Note: Parent federation DID changed from {} to {}", parent_did, new_did);
+                        }
+                    }
+                },
+                Err(e) => {
+                    return Err(anyhow::anyhow!("Failed to generate key for parent federation: {}", e));
+                }
+            }
+        } else if verbose {
+            println!("Using existing key for parent federation: {}", parent_did);
+        }
+    }
+    
+    // Execute the WASM with explicit managers and parent federation DID
     let result = icn_core_vm::execute_wasm(
         &wasm_bytes,
         "main", // Use the main function name
         &[],    // No parameters
-        vm_context
-    ).map_err(|e| anyhow::anyhow!("WASM execution failed: {}", e))?;
+        vm_context,
+        storage_manager.clone(),
+        identity_manager.clone(),
+        parent_federation_did.clone()
+    ).await.map_err(|e| anyhow::anyhow!("WASM execution failed: {}", e))?;
     
     // Print the execution result
     println!("Execution result:");
@@ -536,6 +617,91 @@ async fn handle_execute_command(
             println!("  Return data: {}", output_str);
         } else {
             println!("  Return data: {:?}", result.return_data);
+        }
+    }
+    
+    // Step 2: Parent Anchoring - Check if entity creation occurred
+    if let (Some(new_entity_did), Some(genesis_cid)) = (result.created_entity_did, result.created_entity_genesis_cid) {
+        println!("\nNew entity created:");
+        println!("  DID: {}", new_entity_did);
+        println!("  Genesis CID: {}", genesis_cid);
+        
+        // Anchor the entity creation in the parent federation's DAG
+        if let Some(parent_did) = parent_federation_did {
+            if verbose {
+                println!("Anchoring new entity in parent federation DAG: {}", parent_did);
+            }
+            
+            // Create an anchor node with entity creation details
+            use libipld::{ipld, Ipld};
+            use icn_dag::{DagNodeBuilder, DagNodeMetadata, DagNode, codec::DagCborCodec};
+            use icn_identity::IdentityId;
+            use chrono::Utc;
+            
+            // Build the anchor payload
+            let anchor_payload = ipld!({
+                "event": "entity_created",
+                "entity_did": new_entity_did.clone(),
+                "entity_type": match identity_scope {
+                    IdentityScope::Cooperative => "Cooperative",
+                    IdentityScope::Community => "Community",
+                    IdentityScope::Individual => "Individual",
+                    _ => "Unknown",
+                },
+                "genesis_cid": genesis_cid.to_string(),
+                "timestamp": Utc::now().timestamp(),
+                "created_by": identity.clone(),
+            });
+            
+            // Create metadata for the anchor node
+            let anchor_metadata = DagNodeMetadata {
+                timestamp: Utc::now().timestamp() as u64,
+                sequence: Some(1), // Sequence will be adjusted by StorageManager
+                scope: Some(parent_did.clone()),
+            };
+            
+            // Build the initial node without signature
+            let issuer_id = IdentityId::new(parent_did.clone());
+            let partial_node_builder = DagNodeBuilder::new()
+                .issuer(issuer_id.clone())
+                .payload(anchor_payload.clone())
+                .metadata(anchor_metadata.clone())
+                .parents(vec![]); // Let the storage manager resolve the parents
+                
+            // Step 3: Sign the node data
+            // Create a canonical representation of the node data to sign
+            let partial_node = partial_node_builder.clone().build_unsigned();
+            
+            // Encode the partial node to get bytes for signing
+            // Note: In a real implementation, you would follow a specific canonicalization algorithm
+            let node_data_to_sign = DagCborCodec.encode(&partial_node)
+                .map_err(|e| anyhow::anyhow!("Failed to encode node for signing: {}", e))?;
+            
+            // Sign the node data
+            let signature_result = sign_node_data(&identity_manager, &parent_did, &node_data_to_sign).await;
+            
+            match signature_result {
+                Ok(signature) => {
+                    // Complete the node builder with the signature
+                    let node_builder = partial_node_builder.signature(signature);
+                    
+                    // Store the anchor node in the parent federation's DAG
+                    match storage_manager.store_node(&parent_did, node_builder).await {
+                        Ok((anchor_cid, _)) => {
+                            println!("  Entity anchored in parent federation");
+                            println!("  Anchor CID: {}", anchor_cid);
+                        },
+                        Err(e) => {
+                            println!("  WARNING: Failed to anchor entity in parent federation: {}", e);
+                        }
+                    }
+                },
+                Err(e) => {
+                    println!("  WARNING: Failed to sign anchor node: {}", e);
+                }
+            }
+        } else {
+            println!("  WARNING: No parent federation DID provided, entity not anchored");
         }
     }
     
@@ -652,7 +818,7 @@ fn convert_resource_type(vm_resource_type: &icn_core_vm::ResourceType) -> icn_ec
 }
 
 // Helper function to create an identity context
-fn create_identity_context(did: &str) -> std::sync::Arc<icn_core_vm::IdentityContext> {
+pub fn create_identity_context(did: &str) -> std::sync::Arc<icn_core_vm::IdentityContext> {
     // Generate a keypair
     let (_, keypair) = icn_identity::generate_did_keypair().unwrap();
     

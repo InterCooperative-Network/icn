@@ -1,12 +1,18 @@
 /*!
 # ICN Runtime CLI Library
 
-This crate provides the command-line interface for the ICN Runtime, as well as
-reusable functionality for other crates in the workspace.
+This library exports functions from the ICN Runtime CLI for testing purposes.
 */
 
-// Re-export the derive_authorizations function for use in tests
-pub use crate::covm::derive_authorizations;
+/// Re-export CLI functions for testing
+mod covm;
 
-// Include the modules
-pub mod covm; 
+pub use covm::{
+    handle_execute_command, 
+    sign_node_data, 
+    create_identity_context, 
+    derive_core_vm_authorizations,
+};
+
+/// Export version info
+pub const VERSION: &str = env!("CARGO_PKG_VERSION"); 
