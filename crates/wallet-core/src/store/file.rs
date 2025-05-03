@@ -7,7 +7,7 @@ use tokio::fs::{create_dir_all, read_to_string, write};
 use crate::error::{WalletResult, WalletError};
 use crate::identity::IdentityWallet;
 use crate::vc::VerifiableCredential;
-use crate::dag::{DagNode, DagThread};
+use crate::dag::{DagNode, DagThread, CachedDagThreadInfo};
 use crate::crypto::KeyPair;
 use super::LocalWalletStore;
 
@@ -89,7 +89,7 @@ impl FileStore {
 #[async_trait]
 impl LocalWalletStore for FileStore {
     async fn init(&self) -> WalletResult<()> {
-        for dir in &["identities", "credentials", "dag/nodes", "dag/threads", "keys"] {
+        for dir in &["identities", "credentials", "dag/nodes", "dag/threads", "dag/cache", "keys"] {
             self.ensure_dir(dir).await?;
         }
         Ok(())
@@ -171,5 +171,17 @@ impl LocalWalletStore for FileStore {
     
     async fn list_keypairs(&self) -> WalletResult<Vec<String>> {
         self.list_items("keys").await
+    }
+    
+    async fn save_dag_thread_cache(&self, thread_id: &str, cache: &CachedDagThreadInfo) -> WalletResult<()> {
+        self.save_json("dag/cache", thread_id, cache).await
+    }
+    
+    async fn load_dag_thread_cache(&self, thread_id: &str) -> WalletResult<CachedDagThreadInfo> {
+        self.load_json("dag/cache", thread_id).await
+    }
+    
+    async fn list_dag_thread_caches(&self) -> WalletResult<Vec<String>> {
+        self.list_items("dag/cache").await
     }
 } 

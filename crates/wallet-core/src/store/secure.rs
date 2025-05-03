@@ -9,6 +9,8 @@ use crate::dag::{DagNode, DagThread};
 use crate::crypto::KeyPair;
 use super::LocalWalletStore;
 use super::file::FileStore;
+use super::secure::SecureStorageProvider;
+use super::secure::get_platform_provider;
 
 /// Platform types for secure storage
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -40,59 +42,6 @@ pub trait SecureStorageProvider: Send + Sync + Clone {
     
     /// List all keys in secure storage
     async fn list_keys(&self) -> WalletResult<Vec<String>>;
-}
-
-/// Mock secure storage provider, simulating secure enclave behavior
-/// but storing in memory. Useful for testing.
-#[derive(Clone)]
-pub struct MockSecureProvider {
-    /// In-memory store
-    store: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-    /// The simulated platform, affects behavior
-    platform: SecurePlatform,
-}
-
-impl MockSecureProvider {
-    pub fn new(platform: SecurePlatform) -> Self {
-        Self {
-            store: Arc::new(Mutex::new(HashMap::new())),
-            platform,
-        }
-    }
-}
-
-#[async_trait]
-impl SecureStorageProvider for MockSecureProvider {
-    async fn store(&self, key: &str, data: &[u8]) -> WalletResult<()> {
-        let mut store = self.store.lock().unwrap();
-        store.insert(key.to_string(), data.to_vec());
-        Ok(())
-    }
-    
-    async fn retrieve(&self, key: &str) -> WalletResult<Vec<u8>> {
-        let store = self.store.lock().unwrap();
-        store.get(key)
-            .cloned()
-            .ok_or_else(|| WalletError::NotFound(format!("Key not found in secure storage: {}", key)))
-    }
-    
-    async fn delete(&self, key: &str) -> WalletResult<()> {
-        let mut store = self.store.lock().unwrap();
-        if store.remove(key).is_none() {
-            return Err(WalletError::NotFound(format!("Key not found in secure storage: {}", key)));
-        }
-        Ok(())
-    }
-    
-    async fn exists(&self, key: &str) -> WalletResult<bool> {
-        let store = self.store.lock().unwrap();
-        Ok(store.contains_key(key))
-    }
-    
-    async fn list_keys(&self) -> WalletResult<Vec<String>> {
-        let store = self.store.lock().unwrap();
-        Ok(store.keys().cloned().collect())
-    }
 }
 
 /// A secure storage implementation that uses a secure provider for key data
@@ -224,9 +173,9 @@ impl<P: SecureStorageProvider + 'static> LocalWalletStore for SecureStore<P> {
     }
 }
 
-/// Create a mock secure store appropriate for the given platform
-pub fn create_mock_secure_store(platform: SecurePlatform, file_base_path: &str) -> impl LocalWalletStore {
-    let mock_provider = MockSecureProvider::new(platform);
+/// Create a secure store appropriate for the current platform
+pub fn create_platform_secure_store(file_base_path: &str) -> impl LocalWalletStore {
+    let platform_provider = get_platform_provider();
     let file_store = FileStore::new(file_base_path);
-    SecureStore::new(mock_provider, file_store, "icn.wallet")
+    SecureStore::new(platform_provider, file_store, "icn.wallet")
 } 

@@ -2,58 +2,64 @@ use thiserror::Error;
 use wallet_core::error::WalletError as CoreError;
 use wallet_sync::SyncError;
 
+/// Agent error types
 #[derive(Error, Debug)]
 pub enum AgentError {
-    #[error("Queue error: {0}")]
-    QueueError(String),
+    /// Invalid parameters
+    #[error("Invalid parameters: {0}")]
+    InvalidParameters(String),
     
-    #[error("Storage error: {0}")]
-    StorageError(String),
-    
-    #[error("Governance error: {0}")]
-    GovernanceError(String),
-    
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-    
-    #[error("Credential error: {0}")]
-    CredentialError(String),
-    
-    #[error("Connection error: {0}")]
-    ConnectionError(String),
-    
-    #[error("Authentication error: {0}")]
-    AuthenticationError(String),
-    
-    #[error("Permission error: {0}")]
-    PermissionError(String),
-    
-    #[error("Resource not found: {0}")]
-    ResourceNotFound(String),
-    
-    #[error("Rate limit exceeded: {0}")]
-    RateLimitExceeded(String),
-    
-    #[error("Server error: {0}")]
-    ServerError(String),
-    
-    #[error("Core wallet error: {0}")]
-    CoreError(#[from] CoreError),
-    
-    #[error("Feature not implemented: {0}")]
-    NotImplemented(String),
-    
+    /// Invalid state
     #[error("Invalid state: {0}")]
     InvalidState(String),
     
-    #[error("Store error: {0}")]
-    StoreError(String),
+    /// Core wallet error (from wallet-core)
+    #[error("Core error: {0}")]
+    CoreError(#[from] wallet_core::error::WalletError),
     
+    /// Sync error (from wallet-sync)
     #[error("Sync error: {0}")]
     SyncError(String),
     
+    /// Storage error
+    #[error("Storage error: {0}")]
+    StorageError(String),
+    
+    /// Store error
+    #[error("Store error: {0}")]
+    StoreError(String),
+    
+    /// Processing error
+    #[error("Processing error: {0}")]
+    ProcessingError(String),
+    
+    /// Authentication error
+    #[error("Authentication error: {0}")]
+    AuthenticationError(String),
+    
+    /// Serialization error
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+    
+    /// DAG error
     #[error("DAG error: {0}")]
     DagError(String),
+    
+    /// Action error
+    #[error("Action error: {0}")]
+    ActionError(String),
+    
+    /// Not found
+    #[error("Not found: {0}")]
+    NotFound(String),
+    
+    /// Not implemented
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+    
+    /// User intervention required
+    #[error("User intervention required: {0}")]
+    UserInterventionRequired(String),
 }
 
 pub type AgentResult<T> = Result<T, AgentError>; 

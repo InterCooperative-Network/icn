@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use crate::error::{WalletResult, WalletError};
 use crate::identity::IdentityWallet;
 use crate::vc::VerifiableCredential;
-use crate::dag::{DagNode, DagThread};
+use crate::dag::{DagNode, DagThread, CachedDagThreadInfo};
 use crate::crypto::KeyPair;
 
 /// Trait defining storage operations for wallet data
@@ -64,4 +64,13 @@ pub trait LocalWalletStore: Send + Sync + Clone {
     
     /// List all stored keypair IDs
     async fn list_keypairs(&self) -> WalletResult<Vec<String>>;
+
+    /// Save DAG thread cache information
+    async fn save_dag_thread_cache(&self, thread_id: &str, cache: &CachedDagThreadInfo) -> WalletResult<()>;
+    
+    /// Load DAG thread cache information
+    async fn load_dag_thread_cache(&self, thread_id: &str) -> WalletResult<CachedDagThreadInfo>;
+    
+    /// List all cached DAG thread IDs
+    async fn list_dag_thread_caches(&self) -> WalletResult<Vec<String>>;
 } 

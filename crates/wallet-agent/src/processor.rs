@@ -40,7 +40,7 @@ pub struct ThreadConflict {
 }
 
 /// Strategy for resolving conflicts in DAG threads
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ConflictResolutionStrategy {
     /// Use the node with the earliest timestamp
     EarliestTimestamp,
@@ -48,8 +48,12 @@ pub enum ConflictResolutionStrategy {
     HighestAuthority,
     /// Use the node with the most signatures
     MostSignatures,
-    /// Ask for manual resolution
-    Manual,
+    /// Take the remote state (network version)
+    TakeRemote,
+    /// Take the local state (overwrite remote)
+    TakeLocal,
+    /// Ask the user to decide which version to keep
+    AskUser,
 }
 
 /// Processes actions from the action queue into signed DAG nodes
@@ -374,7 +378,17 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
     
     /// Detect and resolve conflicts in a DAG thread
     pub async fn resolve_thread_conflicts(&self, thread_id: &str) -> AgentResult<Option<ThreadConflict>> {
-        info!("Checking for conflicts in thread: {}", thread_id);
+        // Use the default strategy (EarliestTimestamp) for backward compatibility
+        self.resolve_thread_conflicts_with_strategy(thread_id, ConflictResolutionStrategy::EarliestTimestamp).await
+    }
+    
+    /// Resolve conflicts with a specific strategy
+    pub async fn resolve_thread_conflicts_with_strategy(
+        &self, 
+        thread_id: &str, 
+        strategy: ConflictResolutionStrategy
+    ) -> AgentResult<Option<ThreadConflict>> {
+        info!("Checking for conflicts in thread: {} using strategy: {:?}", thread_id, strategy);
         
         // First, load the full thread history
         let thread_history = self.load_thread_history(thread_id).await?;
@@ -412,10 +426,23 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
         let (parent_cid, conflicting_cids) = conflicts.pop().unwrap();
         
         // Apply the conflict resolution strategy
-        let strategy = ConflictResolutionStrategy::EarliestTimestamp;
-        let resolved_cid = self.apply_resolution_strategy(
+        let resolved_cid = match self.apply_resolution_strategy(
             &strategy, &conflicting_cids, &nodes_by_cid
-        )?;
+        ) {
+            Ok(cid) => cid,
+            Err(AgentError::UserInterventionRequired(msg)) => {
+                // If user intervention is required, return the conflict without resolving it
+                // This allows higher-level components to handle the user interaction
+                return Ok(Some(ThreadConflict {
+                    thread_id: thread_id.to_string(),
+                    conflicting_cids,
+                    detected_at: std::time::SystemTime::now(),
+                    resolution_strategy: strategy,
+                    resolved_cid: None, // No resolution yet
+                }));
+            },
+            Err(e) => return Err(e),
+        };
         
         // Create a conflict record
         let conflict = ThreadConflict {
@@ -429,7 +456,8 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
         // Update the thread to point to the resolved node
         self.update_thread_to_resolved_cid(thread_id, &resolved_cid).await?;
         
-        info!("Resolved conflict in thread {}. Selected CID: {}", thread_id, resolved_cid);
+        info!("Resolved conflict in thread {} using strategy {:?}. Selected CID: {}", 
+              thread_id, strategy, resolved_cid);
         
         Ok(Some(conflict))
     }
@@ -479,11 +507,99 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
                     .cloned()
                     .ok_or_else(|| AgentError::DagError("No valid node found for conflict resolution".to_string()))
             },
+            ConflictResolutionStrategy::TakeLocal => {
+                // Find the local node (last in our DAG thread)
+                if let Some(last_cid) = self.get_local_head_cid(conflicting_cids, nodes_by_cid) {
+                    info!("Conflict resolution: Taking local version (CID: {})", last_cid);
+                    Ok(last_cid)
+                } else {
+                    Err(AgentError::DagError("Could not determine local head node for conflict resolution".to_string()))
+                }
+            },
+            ConflictResolutionStrategy::TakeRemote => {
+                // Find the remote node (node that's not in our local thread)
+                if let Some(remote_cid) = self.get_remote_cid(conflicting_cids, nodes_by_cid) {
+                    info!("Conflict resolution: Taking remote version (CID: {})", remote_cid);
+                    Ok(remote_cid)
+                } else {
+                    Err(AgentError::DagError("Could not determine remote node for conflict resolution".to_string()))
+                }
+            },
+            ConflictResolutionStrategy::AskUser => {
+                // Log that user intervention is required
+                warn!("Conflict resolution requires user intervention for CIDs: {:?}", conflicting_cids);
+                
+                // For now, we can't actually ask the user directly from this layer
+                // Return a specific error that can be caught by higher layers
+                Err(AgentError::UserInterventionRequired(
+                    format!("User decision required to resolve conflict between: {:?}", conflicting_cids)
+                ))
+            },
             // Other strategies would be implemented similarly
             _ => Err(AgentError::NotImplemented(
                 format!("Conflict resolution strategy {:?} not implemented", strategy)
             )),
         }
+    }
+    
+    /// Get the local head CID from the conflicting CIDs
+    fn get_local_head_cid(&self, conflicting_cids: &[String], nodes_by_cid: &HashMap<String, DagNode>) -> Option<String> {
+        // In a real implementation, we would determine which node is the latest one we know about locally
+        // For simplicity in this implementation, we'll take the node with the latest timestamp that
+        // has a creator that matches our local identity
+        
+        // First, try to find a node created by our identity
+        let mut local_cids = Vec::new();
+        
+        for cid in conflicting_cids {
+            if let Some(node) = nodes_by_cid.get(cid) {
+                // In a real implementation, we would check if this node was created locally
+                // For now, we'll use a heuristic: if we have the node stored locally and it's
+                // not marked as from a sync, consider it local
+                if node.content.get("local_created") == Some(&serde_json::Value::Bool(true)) {
+                    local_cids.push(cid.clone());
+                }
+            }
+        }
+        
+        // If we found local nodes, return the one with the latest timestamp
+        if !local_cids.is_empty() {
+            let mut latest_cid = local_cids[0].clone();
+            let mut latest_time = nodes_by_cid.get(&latest_cid).map(|n| n.timestamp).unwrap_or_default();
+            
+            for cid in &local_cids[1..] {
+                if let Some(node) = nodes_by_cid.get(cid) {
+                    if node.timestamp > latest_time {
+                        latest_time = node.timestamp;
+                        latest_cid = cid.clone();
+                    }
+                }
+            }
+            
+            return Some(latest_cid);
+        }
+        
+        // If we couldn't determine which is local, just return the first one
+        conflicting_cids.first().cloned()
+    }
+    
+    /// Get the remote CID from the conflicting CIDs
+    fn get_remote_cid(&self, conflicting_cids: &[String], nodes_by_cid: &HashMap<String, DagNode>) -> Option<String> {
+        // In a real implementation, we would determine which node is from the network
+        // For simplicity in this implementation, we'll take any node that is not created locally
+        
+        for cid in conflicting_cids {
+            if let Some(node) = nodes_by_cid.get(cid) {
+                // If the node is not marked as locally created, consider it remote
+                if node.content.get("local_created") != Some(&serde_json::Value::Bool(true)) {
+                    return Some(cid.clone());
+                }
+            }
+        }
+        
+        // If we couldn't determine which is remote, just return the last one
+        // (assuming it's more likely to be remote)
+        conflicting_cids.last().cloned()
     }
     
     /// Load the full history of a thread

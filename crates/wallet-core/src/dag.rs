@@ -54,6 +54,25 @@ pub struct DagThread {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Cached information about a DAG thread
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedDagThreadInfo {
+    /// The thread ID
+    pub thread_id: String,
+    /// The thread type
+    pub thread_type: ThreadType,
+    /// The list of node CIDs in the thread, in order from oldest to newest
+    pub node_cids: Vec<String>,
+    /// Head CID (root of the thread)
+    pub head_cid: String,
+    /// Tail CID (latest node in the thread)
+    pub tail_cid: String,
+    /// When this cache was last updated
+    pub last_updated: DateTime<Utc>,
+    /// Additional metadata about the thread
+    pub metadata: HashMap<String, String>,
+}
+
 #[derive(Debug, Default)]
 pub struct DagOperations {
     // In a real implementation, this might store crypto keys, trusted CIDs, etc.
@@ -96,6 +115,37 @@ impl DagThread {
     pub fn update_latest_cid(&mut self, cid: String) {
         self.latest_cid = cid;
         self.updated_at = Utc::now();
+    }
+}
+
+impl CachedDagThreadInfo {
+    /// Create a new cached thread info
+    pub fn new(thread_id: &str, thread_type: ThreadType, head_cid: &str) -> Self {
+        let now = Utc::now();
+        Self {
+            thread_id: thread_id.to_string(),
+            thread_type,
+            node_cids: vec![head_cid.to_string()],
+            head_cid: head_cid.to_string(),
+            tail_cid: head_cid.to_string(),
+            last_updated: now,
+            metadata: HashMap::new(),
+        }
+    }
+    
+    /// Add a node CID to the thread cache
+    pub fn add_node(&mut self, cid: &str) {
+        if !self.node_cids.contains(&cid.to_string()) {
+            self.node_cids.push(cid.to_string());
+            self.tail_cid = cid.to_string();
+            self.last_updated = Utc::now();
+        }
+    }
+    
+    /// Add metadata to the thread cache
+    pub fn add_metadata(&mut self, key: &str, value: &str) {
+        self.metadata.insert(key.to_string(), value.to_string());
+        self.last_updated = Utc::now();
     }
 }
 

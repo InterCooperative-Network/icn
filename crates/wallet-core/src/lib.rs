@@ -5,6 +5,7 @@ pub mod credential;
 pub mod vc;
 pub mod dag;
 pub mod store;
+pub mod config;
 
 pub use identity::IdentityWallet;
 pub use credential::CredentialSigner;
