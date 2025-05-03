@@ -15,6 +15,7 @@ use reqwest::Client as HttpClient;
 use backoff::{ExponentialBackoff, Error as BackoffError};
 use tracing::{info, warn, error, debug, trace};
 use std::sync::Arc;
+use chrono::{DateTime, Utc};
 
 const DEFAULT_SYNC_SERVERS: [&str; 2] = [
     "https://icn-federation.example.com/api",
@@ -81,7 +82,8 @@ struct BundleMetadata {
     /// Source server from which this bundle was fetched
     source_server: String,
     /// When the bundle was last fetched/updated
-    last_updated: SystemTime,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    last_updated: DateTime<Utc>,
     /// The raw bundle content hash (helps detect actual changes)
     content_hash: String,
 }
@@ -106,7 +108,7 @@ pub struct SyncClient {
     bundle_metadata: Arc<RwLock<HashMap<String, BundleMetadata>>>,
     
     /// Tracks the last sync time for incremental syncs
-    last_sync_time: Arc<RwLock<Option<SystemTime>>>,
+    last_sync_time: Arc<RwLock<Option<DateTime<Utc>>>>,
     
     /// Lock for sync operations to prevent concurrent syncs
     sync_lock: Arc<Mutex<()>>,
@@ -189,7 +191,7 @@ impl SyncClient {
                                     // Create default metadata
                                     BundleMetadata {
                                         source_server: "local".to_string(),
-                                        last_updated: SystemTime::now(),
+                                        last_updated: Utc::now(),
                                         content_hash,
                                     }
                                 }
@@ -198,7 +200,7 @@ impl SyncClient {
                             // Create default metadata
                             BundleMetadata {
                                 source_server: "local".to_string(),
-                                last_updated: SystemTime::now(),
+                                last_updated: Utc::now(),
                                 content_hash,
                             }
                         };
@@ -251,7 +253,7 @@ impl SyncClient {
         let mut errors = Vec::new();
         
         // Record last successful sync time for incremental updates
-        let sync_start_time = SystemTime::now();
+        let sync_start_time = Utc::now();
         
         // Get current state for conflict resolution
         let current_bundles = {
@@ -382,7 +384,7 @@ impl SyncClient {
             // Create metadata
             let bundle_metadata = BundleMetadata {
                 source_server: source_server.to_string(),
-                last_updated: SystemTime::now(),
+                last_updated: Utc::now(),
                 content_hash,
             };
             
@@ -415,10 +417,9 @@ impl SyncClient {
         // Only request incremental updates from primary server to avoid conflicts
         if is_primary {
             if let Some(last_sync) = *self.last_sync_time.read().await {
-                // Format timestamp as ISO 8601 / RFC 3339
-                if let Ok(last_sync_str) = chrono::DateTime::<chrono::Utc>::from(last_sync).to_rfc3339().parse::<String>() {
-                    query_params.insert("since", last_sync_str);
-                }
+                // Convert SystemTime to DateTime<Utc> and format as RFC 3339
+                let last_sync_dt: DateTime<Utc> = last_sync.into();
+                query_params.insert("since", last_sync_dt.to_rfc3339());
             }
         }
         
@@ -429,7 +430,7 @@ impl SyncClient {
             ..ExponentialBackoff::default()
         };
         
-        let result = backoff::future::retry(backoff, || async {
+        match backoff::future::retry(backoff, || async {
             match self.http_client.get(&url)
                 .query(&query_params)
                 .header("Authorization", format!("DID {}", self.identity.did))
@@ -479,16 +480,9 @@ impl SyncClient {
                     }
                 }
             }
-        }).await;
-        
-        match result {
+        }).await {
             Ok(bundles) => Ok(bundles),
-            Err(e) => {
-                match e {
-                    BackoffError::Permanent(e) => Err(e),
-                    BackoffError::Transient { err, retry_after } => Err(err),
-                }
-            },
+            Err(e) => Err(e.into()),
         }
     }
     
@@ -539,7 +533,7 @@ impl SyncClient {
                 ..Default::default()
             };
             
-            let result = backoff::future::retry(backoff, || async {
+            let result = match backoff::future::retry(backoff, || async {
                 match self.http_client.get(&url)
                     .header("Authorization", format!("DID {}", self.identity.did))
                     .send().await
@@ -584,7 +578,10 @@ impl SyncClient {
                         }
                     }
                 }
-            }).await;
+            }).await {
+                Ok(obj) => Ok(obj),
+                Err(e) => Err(e.into()),
+            };
             
             match result {
                 Ok(obj) => {
@@ -609,20 +606,13 @@ impl SyncClient {
                 },
                 Err(e) => {
                     match e {
-                        BackoffError::Permanent(SyncError::ResourceNotFound(_)) => {
+                        SyncError::ResourceNotFound(_) => {
                             // Not found on this server, try next server
                             continue;
                         },
-                        BackoffError::Permanent(e) => {
-                            return Err(e);
-                        },
-                        BackoffError::Transient { err, retry_after } => {
-                            warn!("Failed to fetch DAG object from {}: {}", server_url, err);
+                        _ => {
+                            warn!("Failed to fetch DAG object from {}: {}", server_url, e);
                             // Try next server
-                            if let Some(retry_after) = retry_after {
-                                warn!("Retrying in {} seconds", retry_after.as_secs());
-                                tokio::time::sleep(retry_after).await;
-                            }
                         }
                     }
                 }

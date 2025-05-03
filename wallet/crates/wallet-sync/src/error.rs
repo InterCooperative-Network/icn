@@ -95,4 +95,14 @@ impl From<reqwest::Error> for SyncError {
             SyncError::ConnectionError(format!("HTTP error: {}", error))
         }
     }
+}
+
+// Add conversion from backoff::Error to SyncError
+impl From<backoff::Error<SyncError>> for SyncError {
+    fn from(err: backoff::Error<SyncError>) -> Self {
+        match err {
+            backoff::Error::Permanent(e) => e,
+            backoff::Error::Transient { err, .. } => err,
+        }
+    }
 } 

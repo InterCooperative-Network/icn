@@ -18,6 +18,7 @@ use reqwest::{Client as HttpClient, StatusCode};
 use backoff::{ExponentialBackoff, future::retry};
 use tracing::{info, warn, error, debug};
 use wallet_core::config::{WalletConfig, SyncConfig};
+use chrono::{DateTime, Utc};
 
 // Default federation endpoint URLs
 const DEFAULT_FEDERATION_NODE_URL: &str = "http://mock-federation-node";
@@ -136,7 +137,7 @@ impl MockTrustBundleData {
             metadata: HashMap::new(),
             version: self.version as u32, // Convert u64 to u32
             signatures: HashMap::new(),
-            valid_until: Some(SystemTime::now() + Duration::from_secs(86400 * 30)), // 30 days
+            valid_until: Some(Utc::now() + chrono::Duration::days(30)), // 30 days
             created_at: chrono::Utc::now(), // Add created_at field
             links: HashMap::new(), // Add links field
         }
@@ -518,8 +519,7 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         match result {
             Ok(bundle) => Ok(bundle),
-            Err(backoff::Error::Permanent(e)) => Err(e),
-            Err(backoff::Error::Transient { err, .. }) => Err(err),
+            Err(e) => Err(e.into()),
         }
     }
     
@@ -595,8 +595,7 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         match result {
             Ok(bundle) => Ok(bundle),
-            Err(backoff::Error::Permanent(e)) => Err(e),
-            Err(backoff::Error::Transient { err, .. }) => Err(err),
+            Err(e) => Err(e.into()),
         }
     }
     
@@ -681,8 +680,7 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         let node = match result {
             Ok(node) => node,
-            Err(backoff::Error::Permanent(e)) => return Err(e),
-            Err(backoff::Error::Transient { err, .. }) => return Err(err),
+            Err(e) => return Err(e.into()),
         };
         
         // Cache the node locally
@@ -825,8 +823,7 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         let thread = match result {
             Ok(thread) => thread,
-            Err(backoff::Error::Permanent(e)) => return Err(e),
-            Err(backoff::Error::Transient { err, .. }) => return Err(err),
+            Err(e) => return Err(e.into()),
         };
         
         // Save the thread to local storage
@@ -1136,8 +1133,7 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         match result {
             Ok(responses) => Ok(responses),
-            Err(backoff::Error::Permanent(e)) => Err(e),
-            Err(backoff::Error::Transient { err, .. }) => Err(err),
+            Err(e) => Err(e.into()),
         }
     }
     
@@ -1227,8 +1223,7 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         let response = match result {
             Ok(response) => response,
-            Err(backoff::Error::Permanent(e)) => return Err(e),
-            Err(backoff::Error::Transient { err, .. }) => return Err(err),
+            Err(e) => return Err(e.into()),
         };
         
         // If submission was successful and we got a CID, update local cache
@@ -1380,8 +1375,8 @@ impl<S: LocalWalletStore + 'static> SyncManager<S> {
         
         // 3. Check expiration if set
         if let Some(expires_at) = bundle.valid_until {
-            let now = std::time::SystemTime::now();
-            if expires_at < now {
+            let now = SystemTime::now();
+            if expires_at < DateTime::<Utc>::from(now) {
                 return Err(SyncError::ValidationError(
                     format!("Trust bundle has expired at {:?}", expires_at)
                 ));

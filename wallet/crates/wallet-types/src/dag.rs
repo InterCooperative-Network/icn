@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 /// DAG node structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +20,8 @@ pub struct DagNode {
     pub creator: String,
     
     /// Timestamp
-    pub timestamp: SystemTime,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub timestamp: DateTime<Utc>,
     
     /// Content type
     pub content_type: String,
@@ -38,7 +39,8 @@ pub struct DagNode {
     pub links: HashMap<String, String>,
     
     /// Created time for the node
-    pub created_at: Option<SystemTime>,
+    #[serde(with = "chrono::serde::ts_seconds_option")]
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 /// DAG Thread structure
@@ -57,7 +59,8 @@ pub struct DagThread {
     pub nodes: Vec<String>,
     
     /// Last updated timestamp
-    pub last_updated: SystemTime,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub last_updated: DateTime<Utc>,
     
     /// The latest CID in the thread
     pub latest_cid: String,

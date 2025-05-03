@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 pub mod error;
 pub mod action;
@@ -27,13 +27,15 @@ pub struct TrustBundle {
     #[serde(default)]
     pub metadata: HashMap<String, String>,
     /// Bundle expiration timestamp (optional)
-    pub valid_until: Option<SystemTime>,
+    #[serde(with = "chrono::serde::ts_seconds_option")]
+    pub valid_until: Option<DateTime<Utc>>,
     /// Federation ID
     pub federation_id: String,
     /// Version number
     pub version: u32,
     /// Creation timestamp
-    pub created_at: SystemTime,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub created_at: DateTime<Utc>,
     /// Whether this bundle is active
     pub active: bool,
     /// Signature threshold

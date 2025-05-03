@@ -8,8 +8,8 @@ members = [
     "wallet/crates/*"
 ]
 exclude = [
-    "wallet/crates/wallet-sync",
-    "agoranet"
+    "agoranet",
+    "wallet/crates/wallet-ffi"
 ]
 
 [workspace.dependencies]

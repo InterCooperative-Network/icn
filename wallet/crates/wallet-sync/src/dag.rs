@@ -6,6 +6,7 @@ use crate::error::{SyncResult, SyncError};
 use sha2::{Sha256, Digest};
 use multihash_0_16_3::{Code, MultihashDigest};
 use hex;
+use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagObject {
@@ -104,6 +105,9 @@ pub struct MockDagNode {
     pub cid: String,
     pub parents: Vec<String>,
     pub content: serde_json::Value,
+    pub creator: String,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub timestamp: DateTime<Utc>,
 }
 
 impl MockDagNode {
