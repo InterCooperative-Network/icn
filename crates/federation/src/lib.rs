@@ -796,7 +796,7 @@ async fn run_event_loop(
 }
 
 /// Handle incoming blob replication requests
-async fn handle_blob_replication_request(
+pub async fn handle_blob_replication_request(
     request: network::ReplicateBlobRequest,
     channel: request_response::ResponseChannel<network::ReplicateBlobResponse>,
     swarm: &mut Swarm<network::IcnFederationBehaviour>,
@@ -820,7 +820,9 @@ async fn handle_blob_replication_request(
                         success: true,
                         error_msg: None,
                     };
-                    let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                    if let Err(e) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                        error!(%cid, "Failed to send success response: {:?}", e);
+                    }
                 },
                 Err(e) => {
                     // Failed to pin, send error response
@@ -829,7 +831,9 @@ async fn handle_blob_replication_request(
                         success: false,
                         error_msg: Some(format!("Failed to pin blob: {}", e)),
                     };
-                    let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                    if let Err(send_err) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                        error!(%cid, "Failed to send error response: {:?}", send_err);
+                    }
                 }
             }
         },
@@ -838,7 +842,6 @@ async fn handle_blob_replication_request(
             info!(%cid, "Blob not found locally, searching for providers");
             
             // Start a Kademlia query for providers of this CID
-            // The get_providers method returns a QueryId directly, not a Result
             let record_key = kad::RecordKey::new(&cid.to_bytes());
             let query_id = swarm.behaviour_mut().kademlia.get_providers(record_key);
             
@@ -854,7 +857,9 @@ async fn handle_blob_replication_request(
                 success: false,
                 error_msg: Some(format!("Storage error: {}", e)),
             };
-            let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+            if let Err(send_err) = swarm.behaviour_mut().blob_replication.send_response(channel, response) {
+                error!(%cid, "Failed to send error response: {:?}", send_err);
+            }
         }
     }
 }
@@ -1088,20 +1093,20 @@ async fn handle_identify_replication_targets(
 }
 
 /// Helper struct for interacting with storage
-struct BlobStorageAdapter {
-    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+pub struct BlobStorageAdapter {
+    pub storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
 }
 
 impl BlobStorageAdapter {
     /// Check if a blob exists in storage
-    async fn blob_exists(&self, cid: &cid::Cid) -> FederationResult<bool> {
+    pub async fn blob_exists(&self, cid: &cid::Cid) -> FederationResult<bool> {
         let storage_guard = self.storage.lock().await;
         storage_guard.contains_blob(cid).await
             .map_err(|e| FederationError::StorageError(format!("Failed to check blob existence: {}", e)))
     }
     
     /// Pin a blob in storage
-    async fn pin_blob(&self, cid: &cid::Cid) -> FederationResult<()> {
+    pub async fn pin_blob(&self, cid: &cid::Cid) -> FederationResult<()> {
         let storage_guard = self.storage.lock().await;
         
         // First check if the blob exists
@@ -1120,14 +1125,14 @@ impl BlobStorageAdapter {
     }
     
     /// Store a blob in storage
-    async fn put_blob(&self, data: &[u8]) -> FederationResult<cid::Cid> {
+    pub async fn put_blob(&self, data: &[u8]) -> FederationResult<cid::Cid> {
         let storage_guard = self.storage.lock().await;
         storage_guard.put_blob(data).await
             .map_err(|e| FederationError::StorageError(format!("Failed to store blob: {}", e)))
     }
     
     /// Get a blob from storage
-    async fn get_blob(&self, cid: &cid::Cid) -> FederationResult<Option<Vec<u8>>> {
+    pub async fn get_blob(&self, cid: &cid::Cid) -> FederationResult<Option<Vec<u8>>> {
         let storage_guard = self.storage.lock().await;
         storage_guard.get_blob(cid).await
             .map_err(|e| FederationError::StorageError(format!("Failed to get blob: {}", e)))
