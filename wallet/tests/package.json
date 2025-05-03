@@ -1,0 +1,15 @@
+{
+  "name": "icn-wallet-tests",
+  "version": "1.0.0",
+  "description": "Test utilities for ICN Wallet",
+  "main": "mock_agoranet.js",
+  "scripts": {
+    "mock-agoranet": "node mock_agoranet.js",
+    "setup": "./setup_test_env.sh"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  }
+} 

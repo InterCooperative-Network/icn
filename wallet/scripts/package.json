@@ -1,0 +1,15 @@
+{
+  "name": "icn-wallet-client",
+  "version": "1.0.0",
+  "description": "ICN Wallet WebSocket Client for Testing",
+  "main": "websocket_client.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node websocket_client.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+} 

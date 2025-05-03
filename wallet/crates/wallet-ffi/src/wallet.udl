@@ -1,0 +1,53 @@
+namespace wallet {
+    [Error]
+    enum WalletError {
+        "StoreError",
+        "SyncError", 
+        "ValidationError",
+        "NotFound",
+        "ConfigError",
+        "CryptoError",
+        "SerializationError",
+        "InvalidInput",
+        "Unauthorized",
+        "UnknownError"
+    };
+
+    enum SyncStatus {
+        "Idle",
+        "Syncing",
+        "Error",
+        "Offline"
+    };
+
+    enum ActionStatus {
+        "Pending",
+        "Processing",
+        "Completed",
+        "Failed",
+        "Rejected"
+    };
+
+    enum DagThreadType {
+        "Proposal",
+        "Vote",
+        "Anchor",
+        "Custom"
+    };
+
+    dictionary WalletConfig {
+        string storage_path;
+    };
+
+    // Minimal API for testing
+    interface WalletApi {
+        [Throws=WalletError]
+        constructor(WalletConfig? config = null);
+
+        [Throws=WalletError]
+        WalletConfig get_config();
+
+        [Throws=WalletError]
+        void update_config(WalletConfig config);
+    };
+}; 

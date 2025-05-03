@@ -1,0 +1,14 @@
+pub mod identity;
+pub mod crypto;
+pub mod error;
+pub mod credential;
+pub mod vc;
+pub mod dag;
+pub mod store;
+pub mod config;
+
+pub use identity::IdentityWallet;
+pub use credential::CredentialSigner;
+pub use vc::{VerifiableCredential, VerifiablePresentation};
+pub use error::{WalletError, WalletResult};
+pub use crypto::KeyPair;

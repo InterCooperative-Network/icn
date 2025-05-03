@@ -1,0 +1,5 @@
+requests==2.31.0
+pytest==7.4.0
+pytest-timeout==2.2.0
+docker-compose==1.29.2
+colorama==0.4.6 

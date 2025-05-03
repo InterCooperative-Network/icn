@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/wallet-core",
+  "crates/wallet-agent",
+  "crates/wallet-sync",
+  "crates/wallet-ui-api",
+  # "crates/wallet-ffi", # Temporarily disabled until we fix other crates
+  "crates/wallet-types",
+  "cli"
+]
