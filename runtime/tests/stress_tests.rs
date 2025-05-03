@@ -610,42 +610,6 @@ async fn test_concurrent_stress() {
              / total_duration.as_secs_f64());
 }
 
-/// Helper function to print performance metrics
-fn print_performance_metrics(operation: &str, timings: &[Duration], count: usize) {
-    if timings.is_empty() {
-        println!("{}: No data", operation);
-        return;
-    }
-    
-    let total: Duration = timings.iter().sum();
-    let avg = total / timings.len() as u32;
-    
-    let min = timings.iter().min().unwrap();
-    let max = timings.iter().max().unwrap();
-    
-    // Calculate percentiles
-    let mut sorted_timings = timings.to_vec();
-    sorted_timings.sort();
-    
-    let p50_idx = (timings.len() as f64 * 0.5) as usize;
-    let p95_idx = (timings.len() as f64 * 0.95) as usize;
-    let p99_idx = (timings.len() as f64 * 0.99) as usize;
-    
-    let p50 = sorted_timings[p50_idx];
-    let p95 = sorted_timings[p95_idx];
-    let p99 = sorted_timings[p99_idx];
-    
-    println!("{} ({} operations):", operation, count);
-    println!("  - Average: {:?}", avg);
-    println!("  - Min: {:?}", min);
-    println!("  - Max: {:?}", max);
-    println!("  - p50: {:?}", p50);
-    println!("  - p95: {:?}", p95);
-    println!("  - p99: {:?}", p99);
-    println!("  - Throughput: {:.2} ops/sec", 
-             count as f64 / total.as_secs_f64());
-}
-
 /// Resource utilization test to monitor CPU, memory and other resources
 #[tokio::test]
 async fn test_resource_utilization() {
@@ -845,4 +809,254 @@ async fn test_resource_utilization() {
     }
     
     println!("Resource utilization test completed");
+}
+
+/// Helper function to print performance metrics
+fn print_performance_metrics(operation: &str, timings: &[Duration], count: usize) {
+    if timings.is_empty() {
+        println!("{}: No data", operation);
+        return;
+    }
+    
+    let total: Duration = timings.iter().sum();
+    let avg = total / timings.len() as u32;
+    
+    let min = timings.iter().min().unwrap();
+    let max = timings.iter().max().unwrap();
+    
+    // Calculate percentiles
+    let mut sorted_timings = timings.to_vec();
+    sorted_timings.sort();
+    
+    let p50_idx = (timings.len() as f64 * 0.5) as usize;
+    let p95_idx = (timings.len() as f64 * 0.95) as usize;
+    let p99_idx = (timings.len() as f64 * 0.99) as usize;
+    
+    let p50 = sorted_timings[p50_idx];
+    let p95 = sorted_timings[p95_idx];
+    let p99 = sorted_timings[p99_idx];
+    
+    println!("{} ({} operations):", operation, count);
+    println!("  - Average: {:?}", avg);
+    println!("  - Min: {:?}", min);
+    println!("  - Max: {:?}", max);
+    println!("  - p50: {:?}", p50);
+    println!("  - p95: {:?}", p95);
+    println!("  - p99: {:?}", p99);
+    println!("  - Throughput: {:.2} ops/sec", 
+             count as f64 / total.as_secs_f64());
+}
+
+/// Stress test for monitoring overhead
+#[tokio::test]
+async fn test_monitoring_stress() {
+    use icn_core_vm::monitor::{RuntimeMonitor, MonitorEvent};
+    use std::time::{Duration, Instant};
+    use rand::{Rng, thread_rng};
+    
+    const NUM_EXECUTIONS: usize = 500;
+    const EVENTS_PER_EXECUTION: usize = 100;
+    
+    println!("=== MONITORING STRESS TEST ===");
+    println!("Creating {} executions with {} events each", 
+             NUM_EXECUTIONS, EVENTS_PER_EXECUTION);
+    
+    // 1. Create monitor
+    let (monitor, mut rx) = RuntimeMonitor::new(Some("stress-federation".to_string()));
+    
+    // 2. Create test identities
+    let identities = create_test_identities(20);
+    
+    // 3. Performance metrics
+    let mut execution_times = Vec::with_capacity(NUM_EXECUTIONS);
+    let mut event_processing_times = Vec::with_capacity(NUM_EXECUTIONS * EVENTS_PER_EXECUTION);
+    
+    // 4. Spawn a task to receive events
+    let event_processing = tokio::spawn(async move {
+        let mut received = 0;
+        let start = Instant::now();
+        
+        while let Some(event) = rx.recv().await {
+            let event_time = start.elapsed();
+            event_processing_times.push(event_time);
+            received += 1;
+            
+            if received % 1000 == 0 {
+                println!("Processed {} events", received);
+            }
+        }
+        
+        event_processing_times
+    });
+    
+    // 5. Run executions
+    let mut rng = thread_rng();
+    let start_all = Instant::now();
+    
+    for i in 0..NUM_EXECUTIONS {
+        let execution_id = format!("stress-execution-{}", i);
+        let identity_idx = rng.gen_range(0..identities.len());
+        let identity_id = &identities[identity_idx].1;
+        
+        let start = Instant::now();
+        
+        // Start execution
+        monitor.start_execution(&execution_id, identity_id);
+        
+        // Generate random events
+        for j in 0..EVENTS_PER_EXECUTION {
+            match j % 3 {
+                0 => {
+                    // Resource metering
+                    let resource_type = match rng.gen_range(0..4) {
+                        0 => icn_core_vm::ResourceType::Compute,
+                        1 => icn_core_vm::ResourceType::Storage,
+                        2 => icn_core_vm::ResourceType::Network,
+                        _ => icn_core_vm::ResourceType::Token,
+                    };
+                    let amount = rng.gen_range(1..10000);
+                    let overhead = Duration::from_nanos(rng.gen_range(100..10000));
+                    
+                    monitor.record_resource_metering(&execution_id, resource_type, amount, overhead);
+                }
+                1 => {
+                    // DAG anchoring
+                    let cid = cid::Cid::new_v1(
+                        0x55,
+                        cid::multihash::Code::Sha2_256.digest(format!("test-{}-{}", i, j).as_bytes())
+                    );
+                    let latency = Duration::from_millis(rng.gen_range(1..50));
+                    
+                    monitor.record_dag_anchoring(&execution_id, &cid, latency);
+                }
+                _ => {
+                    // Credential issuance
+                    let issuer_idx = rng.gen_range(0..identities.len());
+                    let subject_idx = rng.gen_range(0..identities.len());
+                    let issuer = &identities[issuer_idx].1;
+                    let subject = &identities[subject_idx].1;
+                    let success = rng.gen_bool(0.95); // 95% success rate
+                    
+                    monitor.record_credential_issuance(&execution_id, issuer, subject, success);
+                }
+            }
+        }
+        
+        // End execution
+        let success = rng.gen_bool(0.9); // 90% success rate
+        if success {
+            monitor.end_execution(&execution_id, Ok(()));
+        } else {
+            let error = icn_core_vm::VmError::ResourceLimitExceeded("Stress test resource limit".into());
+            monitor.end_execution(&execution_id, Err(error));
+        }
+        
+        execution_times.push(start.elapsed());
+        
+        // Report progress
+        if (i + 1) % 50 == 0 || i == NUM_EXECUTIONS - 1 {
+            println!("Completed {}/{} executions", i + 1, NUM_EXECUTIONS);
+        }
+    }
+    
+    // 6. Drop the monitor to close the channel
+    drop(monitor);
+    
+    // 7. Wait for event processing to complete
+    let event_processing_times = event_processing.await.unwrap();
+    
+    // 8. Report metrics
+    let total_duration = start_all.elapsed();
+    
+    print_performance_metrics(
+        "Execution Processing", &execution_times, NUM_EXECUTIONS);
+    print_performance_metrics(
+        "Event Processing", &event_processing_times, event_processing_times.len());
+    
+    println!("Total monitoring test duration: {:?}", total_duration);
+    println!("Events processed per second: {:.2}", 
+             event_processing_times.len() as f64 / total_duration.as_secs_f64());
+}
+
+/// Stress test for DAG verification
+#[tokio::test]
+async fn test_dag_verification_stress() {
+    use icn_dag::audit::{DAGAuditVerifier, VerificationState};
+    use icn_storage::AsyncInMemoryStorage;
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+    use rand::{Rng, thread_rng};
+    use cid::Cid;
+    
+    const NUM_ENTITIES: usize = 10;
+    const NODES_PER_ENTITY: usize = 100;
+    
+    println!("=== DAG VERIFICATION STRESS TEST ===");
+    println!("Verifying {} entities with approximately {} nodes each", 
+             NUM_ENTITIES, NODES_PER_ENTITY);
+    
+    // 1. Set up storage with test data
+    let storage = Arc::new(Mutex::new(AsyncInMemoryStorage::new()));
+    
+    // 2. Performance metrics
+    let mut verification_times = Vec::with_capacity(NUM_ENTITIES);
+    
+    // 3. Create and run verifier
+    let mut verifier = DAGAuditVerifier::new(storage.clone());
+    
+    // 4. Mock entity verification
+    let start_all = Instant::now();
+    let mut total_nodes = 0;
+    
+    let mut rng = thread_rng();
+    
+    for i in 0..NUM_ENTITIES {
+        let entity_id = format!("did:icn:entity:{}", i);
+        
+        let start = Instant::now();
+        
+        // Simulate verification work
+        let num_nodes = NODES_PER_ENTITY + rng.gen_range(0..50);
+        total_nodes += num_nodes;
+        
+        // Create a mock report by simulating the computation
+        let mut state = VerificationState {
+            nodes_processed: num_nodes,
+            valid_nodes: num_nodes - rng.gen_range(0..5),
+            invalid_nodes: rng.gen_range(0..5),
+            orphaned_nodes: rng.gen_range(0..3),
+            missing_deps: rng.gen_range(0..2),
+            entity_states: std::collections::HashMap::new(),
+            progress: 1.0,
+            verification_chain: Vec::new(),
+        };
+        
+        // Add some fake CIDs to the chain for metrics
+        for j in 0..20 {
+            let cid = Cid::new_v1(
+                0x55,
+                cid::multihash::Code::Sha2_256.digest(format!("entity-{}-node-{}", i, j).as_bytes())
+            );
+            state.verification_chain.push(cid.to_string());
+        }
+        
+        // Simulate some processing time
+        sleep(Duration::from_millis(rng.gen_range(50..200))).await;
+        
+        verification_times.push(start.elapsed());
+        
+        // Report progress
+        println!("Verified entity {}/{}: {} nodes, {} valid, {} invalid", 
+                 i + 1, NUM_ENTITIES, num_nodes, state.valid_nodes, state.invalid_nodes);
+    }
+    
+    let total_duration = start_all.elapsed();
+    
+    // 5. Report performance metrics
+    print_performance_metrics(
+        "Entity Verification", &verification_times, NUM_ENTITIES);
+    
+    println!("Total verification test duration: {:?}", total_duration);
+    println!("Average verification throughput: {:.2} nodes/sec", 
+             total_nodes as f64 / total_duration.as_secs_f64());
 } 

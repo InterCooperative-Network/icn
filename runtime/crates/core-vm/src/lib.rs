@@ -9,6 +9,12 @@ pub mod mem_helpers;
 pub mod resources;
 pub mod host_abi;
 mod credentials;
+pub mod storage_helpers;
+pub mod blob_storage;
+pub mod cid_utils;
+pub mod dag_helpers;
+pub mod economics_helpers;
+pub mod monitor;
 
 use std::collections::HashMap;
 use std::sync::Arc;

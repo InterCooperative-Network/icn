@@ -64,6 +64,20 @@ fi
 
 echo ""
 
+# Run stress tests (new)
+if ! run_test_suite "Runtime Stress Tests" "cargo test --test stress_tests -- --nocapture"; then
+    FAILURES=$((FAILURES+1))
+fi
+
+echo ""
+
+# Run performance metrics tests (new)
+if ! run_test_suite "Performance Metrics Tests" "cargo test --test metrics_tests --package icn-core-vm"; then
+    FAILURES=$((FAILURES+1))
+fi
+
+echo ""
+
 # Report overall results
 if [ $FAILURES -eq 0 ]; then
     echo -e "${GREEN}All integration tests passed!${NC}"

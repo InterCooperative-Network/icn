@@ -22,6 +22,8 @@ use std::sync::{Arc, Mutex};
 use icn_storage::StorageBackend;
 use anyhow::Result;
 
+pub mod audit;
+
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
     // Create a new SHA-256 multihash
