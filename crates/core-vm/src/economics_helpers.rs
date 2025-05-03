@@ -12,12 +12,15 @@ pub fn write_memory_string(caller: &mut wasmtime::Caller<'_, StoreData>, ptr: i3
 }
 
 /// Register economics-related host functions
-pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<(), AnyhowError> {
+pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<(), wasmtime::Error> {
     // check_resource_authorization: Check if a resource usage is authorized
-    linker.func_wrap("env", "host_check_resource_authorization", |caller: wasmtime::Caller<'_, StoreData>,
-                     resource_type: i32, amount: i32| -> Result<i32, AnyhowError> {
+    linker.func_wrap("env", "host_check_resource_authorization", 
+        |caller: wasmtime::Caller<'_, StoreData>,
+         resource_type: i32, amount: i32| 
+         -> Result<i32, wasmtime::Trap> {
+             
         if amount < 0 {
-            return Err(anyhow::anyhow!("Amount cannot be negative"));
+            return Err(wasmtime::Trap::throw("Amount cannot be negative"));
         }
         
         // Convert resource_type integer to ResourceType
@@ -25,12 +28,12 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
             0 => icn_economics::ResourceType::Compute,
             1 => icn_economics::ResourceType::Storage,
             2 => icn_economics::ResourceType::NetworkBandwidth,
-            _ => return Err(anyhow::anyhow!("Invalid resource type: {}", resource_type)),
+            _ => return Err(wasmtime::Trap::throw(format!("Invalid resource type: {}", resource_type))),
         };
         
         // Call the host function
         let authorized = caller.data().host.check_resource_authorization(res_type, amount as u64)
-            .map_err(|e| anyhow::anyhow!("Resource authorization check failed: {}", e))?;
+            .map_err(|e| wasmtime::Trap::throw(format!("Resource authorization check failed: {}", e)))?;
         
         // Return 1 for authorized, 0 for not authorized
         Ok(if authorized { 1 } else { 0 })

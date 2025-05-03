@@ -4,6 +4,8 @@ use crate::ConcreteHostEnvironment;
 
 /// Get the memory export from a WASM module
 pub fn get_memory(caller: &mut Caller<'_, ConcreteHostEnvironment>) -> Result<Memory, anyhow::Error> {
+    // In newer wasmtime versions, get_export is now available directly on Caller
+    // instead of through as_context_mut()
     caller.get_export("memory")
         .and_then(|export| export.into_memory())
         .ok_or_else(|| anyhow::anyhow!("Failed to find memory export"))
