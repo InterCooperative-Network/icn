@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use futures::lock::Mutex;
 
 use crate::errors::{FederationError, FederationResult};
 use icn_dag::DagNode;
@@ -83,18 +83,17 @@ pub trait DebugApi: Send + Sync {
     async fn query_current_trust_bundle(&self) -> FederationResult<Option<TrustBundle>>;
 }
 
-// Implementation of the trait and HTTP routing is only compiled when testing feature is enabled
 #[cfg(feature = "testing")]
-mod implementation {
+pub mod implementation {
     use super::*;
-    use std::collections::HashMap;
-
+    use tracing::info;
+    
     /// Basic implementation of the Debug API
     pub struct BasicDebugApi {
         storage: Arc<Mutex<dyn StorageBackend + Send + Sync>>,
         federation_manager: Arc<crate::FederationManager>,
     }
-
+    
     impl BasicDebugApi {
         /// Create a new instance of the basic debug API implementation
         pub fn new(
@@ -106,54 +105,57 @@ mod implementation {
                 federation_manager,
             }
         }
-        
-        /// Helper method to get a DAG node from storage
-        async fn get_dag_node(&self, cid: &Cid) -> FederationResult<Option<DagNode>> {
-            let storage_lock = self.storage.lock().await;
-            let node_bytes = storage_lock.get_blob(cid).await
-                .map_err(|e| FederationError::StorageError(format!("Failed to get DAG node: {}", e)))?;
-            
-            if let Some(bytes) = node_bytes {
-                let node: DagNode = serde_json::from_slice(&bytes)
-                    .map_err(|e| FederationError::SerializationError(format!("Failed to deserialize DAG node: {}", e)))?;
-                Ok(Some(node))
-            } else {
-                Ok(None)
-            }
-        }
     }
-
+    
     #[async_trait]
     impl DebugApi for BasicDebugApi {
-        async fn query_proposal_status(&self, proposal_cid: &Cid) -> FederationResult<ProposalStatusResponse> {
-            todo!("This API is only available when the testing feature is enabled")
+        async fn query_proposal_status(&self, _proposal_cid: &Cid) -> FederationResult<ProposalStatusResponse> {
+            // Simple placeholder implementation
+            Ok(ProposalStatusResponse {
+                exists: false,
+                status: "NotImplemented".to_string(),
+                created_at: None,
+                finalized_at: None,
+                vote_count: 0,
+                executed: false,
+            })
         }
         
-        async fn query_dag_node(&self, node_cid: &Cid) -> FederationResult<Option<DagNodeResponse>> {
-            todo!("This API is only available when the testing feature is enabled")
+        async fn query_dag_node(&self, _node_cid: &Cid) -> FederationResult<Option<DagNodeResponse>> {
+            // Simple placeholder implementation
+            Ok(None)
         }
         
         async fn query_federation_status(&self) -> FederationResult<FederationStatusResponse> {
-            todo!("This API is only available when the testing feature is enabled")
+            // Simple placeholder implementation
+            Ok(FederationStatusResponse {
+                current_epoch: 0,
+                node_count: 0,
+                connected_peers: 0,
+                validator_count: 0,
+                guardian_count: 0,
+                observer_count: 0,
+            })
         }
         
         async fn query_connected_peers(&self) -> FederationResult<Vec<String>> {
-            todo!("This API is only available when the testing feature is enabled")
+            // Simple placeholder implementation
+            Ok(Vec::new())
         }
         
         async fn query_current_trust_bundle(&self) -> FederationResult<Option<TrustBundle>> {
-            todo!("This API is only available when the testing feature is enabled")
+            // Simple placeholder implementation
+            Ok(None)
         }
     }
-
-    // This function would register HTTP routes when a proper HTTP server is available
-    #[cfg(any(debug_assertions, test, feature = "testing"))]
+    
+    // Placeholder for registering HTTP routes
     pub fn register_debug_api_routes(debug_api: Arc<dyn DebugApi>) {
-        // This function is a stub until a proper HTTP server implementation is added
-        let _ = debug_api;
+        // Placeholder implementation that logs instead of starting an HTTP server
+        info!("Debug API registered (HTTP server disabled for now)");
+        let _ = debug_api; // Avoid unused variable warning
     }
 }
 
-// Re-export the implementation when testing feature is enabled
 #[cfg(feature = "testing")]
 pub use implementation::*; 

@@ -679,6 +679,35 @@ impl TrustBundle {
             Err(IdentityError::VerificationError("Missing proof in TrustBundle".to_string()))
         }
     }
+
+    /// Count the number of nodes with a specific role in this trust bundle
+    /// 
+    /// This method examines attestations and counts nodes with matching roles.
+    /// It assumes that node roles are included in the credentialSubject of each attestation
+    /// with a "role" field.
+    pub fn count_nodes_by_role(&self, role: &str) -> usize {
+        let mut count = 0;
+        
+        for attestation in &self.attestations {
+            // Skip malformed attestations
+            if !attestation.credentialSubject.is_object() {
+                continue;
+            }
+            
+            let subject = attestation.credentialSubject.as_object().unwrap();
+            
+            // If there's a "role" field matching our target role, count this node
+            if let Some(node_role) = subject.get("role") {
+                if let Some(role_str) = node_role.as_str() {
+                    if role_str.to_lowercase() == role.to_lowercase() {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        
+        count
+    }
 }
 
 /// Represents an anchor subject

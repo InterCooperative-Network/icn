@@ -16,9 +16,17 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 use std::collections::HashMap;
+use cid::Cid;
+use sha2::{Sha256, Digest};
+use std::sync::Arc;
+use futures::lock::Mutex;
+use crate::token_storage::{TokenStorage, AuthorizationStorage};
 
 // New budget operations module
 pub mod budget_ops;
+
+// New token storage module
+pub mod token_storage;
 
 /// Errors that can occur during economic operations
 #[derive(Debug, Error)]
@@ -224,7 +232,7 @@ impl ResourceAuthorization {
 }
 
 /// Create a new resource authorization
-pub fn create_authorization(
+pub async fn create_authorization(
     grantor_did: String,
     grantee_did: String,
     resource_type: ResourceType,
@@ -232,8 +240,10 @@ pub fn create_authorization(
     scope: IdentityScope,
     expiry_timestamp: Option<i64>,
     metadata: Option<serde_json::Value>,
-) -> ResourceAuthorization {
-    ResourceAuthorization::new(
+    storage: &mut impl token_storage::AuthorizationStorage,
+) -> EconomicsResult<ResourceAuthorization> {
+    // Create the authorization
+    let auth = ResourceAuthorization::new(
         grantor_did,
         grantee_did,
         resource_type,
@@ -241,15 +251,25 @@ pub fn create_authorization(
         scope,
         expiry_timestamp,
         metadata,
-    )
+    );
+    
+    // Store in persistent storage
+    storage.store_authorization(&auth).await?;
+    
+    Ok(auth)
 }
 
 /// Validate if a resource authorization can be used for the requested amount at the current time
-pub fn validate_authorization_usage(
-    auth: &ResourceAuthorization,
+pub async fn validate_authorization_usage(
+    auth_id: &Uuid,
     requested_amount: u64,
     current_timestamp: i64,
+    storage: &impl token_storage::AuthorizationStorage,
 ) -> EconomicsResult<()> {
+    // Retrieve the authorization from storage
+    let auth = storage.get_authorization(auth_id).await?
+        .ok_or_else(|| EconomicsError::AuthorizationNotFound(*auth_id))?;
+    
     // Check if authorization has expired
     if !auth.is_valid(current_timestamp) {
         if let Some(expiry) = auth.expiry_timestamp {
@@ -270,31 +290,43 @@ pub fn validate_authorization_usage(
 }
 
 /// Consume some amount from a resource authorization
-pub fn consume_authorization(
-    auth: &mut ResourceAuthorization,
+pub async fn consume_authorization(
+    auth_id: &Uuid,
     consumed_amount: u64,
     current_timestamp: i64,
-) -> EconomicsResult<()> {
+    storage: &mut impl token_storage::AuthorizationStorage,
+) -> EconomicsResult<ResourceAuthorization> {
     // First validate the usage
-    validate_authorization_usage(auth, consumed_amount, current_timestamp)?;
+    validate_authorization_usage(auth_id, consumed_amount, current_timestamp, storage).await?;
+    
+    // Retrieve the authorization from storage
+    let mut auth = storage.get_authorization(auth_id).await?
+        .ok_or_else(|| EconomicsError::AuthorizationNotFound(*auth_id))?;
     
     // Update the consumed amount
     auth.consumed_amount += consumed_amount;
     
-    Ok(())
+    // Store the updated authorization
+    storage.update_authorization(&auth).await?;
+    
+    Ok(auth)
 }
 
 /// Host ABI functions for token operations
 pub mod token_ops {
     use super::*;
+    use crate::token_storage::TokenStorage;
+    use std::sync::Arc;
+    use futures::lock::Mutex;
     
     /// Mint a new token
-    pub fn mint_token(
+    pub async fn mint_token(
         owner_did: String,
         resource_type: ResourceType,
         amount: u64,
         scope: IdentityScope,
         metadata: Option<serde_json::Value>,
+        storage: &mut impl TokenStorage,
     ) -> EconomicsResult<ScopedResourceToken> {
         // Create token with current timestamp
         let now = chrono::Utc::now().timestamp();
@@ -307,28 +339,84 @@ pub mod token_ops {
             now,
         );
         
-        // TODO(V3-MVP): Add token to state/storage
+        // Store the token in persistent storage
+        storage.store_token(&token).await?;
         
         Ok(token)
     }
     
-    /// Transfer a token
-    pub fn transfer_token(
-        _token_id: Uuid,
-        _from_did: &str,
-        _to_did: &str,
+    /// Transfer a token from one owner to another
+    pub async fn transfer_token(
+        token_id: Uuid,
+        from_did: &str,
+        to_did: &str,
+        storage: &mut impl TokenStorage,
     ) -> EconomicsResult<()> {
-        // TODO(V3-MVP): Implement token transfer logic with state/storage
-        Err(EconomicsError::InvalidToken("Not implemented".to_string()))
+        // Retrieve the token
+        let token_opt = storage.get_token(&token_id).await?;
+        
+        // Check if token exists
+        let mut token = token_opt.ok_or_else(|| 
+            EconomicsError::TokenNotFound(token_id)
+        )?;
+        
+        // Verify ownership
+        if token.owner_did != from_did {
+            return Err(EconomicsError::Unauthorized(
+                format!("Token {} is not owned by {}", token_id, from_did)
+            ));
+        }
+        
+        // Update ownership
+        token.owner_did = to_did.to_string();
+        
+        // Store the updated token
+        storage.store_token(&token).await?;
+        
+        Ok(())
     }
     
-    /// Burn a token
-    pub fn burn_token(
-        _token_id: Uuid,
-        _owner_did: &str,
+    /// Burn a token (remove it from circulation)
+    pub async fn burn_token(
+        token_id: Uuid,
+        owner_did: &str,
+        storage: &mut impl TokenStorage,
     ) -> EconomicsResult<()> {
-        // TODO(V3-MVP): Implement token burning logic with state/storage
-        Err(EconomicsError::InvalidToken("Not implemented".to_string()))
+        // Retrieve the token
+        let token_opt = storage.get_token(&token_id).await?;
+        
+        // Check if token exists
+        let token = token_opt.ok_or_else(|| 
+            EconomicsError::TokenNotFound(token_id)
+        )?;
+        
+        // Verify ownership
+        if token.owner_did != owner_did {
+            return Err(EconomicsError::Unauthorized(
+                format!("Token {} is not owned by {}", token_id, owner_did)
+            ));
+        }
+        
+        // Delete the token from storage
+        storage.delete_token(&token_id).await?;
+        
+        Ok(())
+    }
+    
+    /// Get all tokens owned by a specific DID
+    pub async fn get_tokens_by_owner(
+        owner_did: &str, 
+        storage: &impl TokenStorage
+    ) -> EconomicsResult<Vec<ScopedResourceToken>> {
+        storage.list_tokens_by_owner(owner_did).await
+    }
+    
+    /// Get token by ID
+    pub async fn get_token_by_id(
+        token_id: &Uuid,
+        storage: &impl TokenStorage
+    ) -> EconomicsResult<Option<ScopedResourceToken>> {
+        storage.get_token(token_id).await
     }
 }
 
@@ -495,6 +583,8 @@ pub struct BudgetProposal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::token_storage::{MockTokenStorage, MockAuthorizationStorage, MockEconomicsStorage};
+    use crate::token_storage::{TokenStorage, AuthorizationStorage};
     
     #[test]
     fn test_resource_type() {
@@ -527,47 +617,14 @@ mod tests {
         assert!(!token.is_valid_for_scope(&IdentityScope::Community));
     }
     
-    #[test]
-    fn test_resource_authorization() {
+    #[tokio::test]
+    async fn test_resource_authorization() {
+        let mut storage = MockEconomicsStorage::new();
         let now = chrono::Utc::now().timestamp();
         let future = now + 3600; // 1 hour in the future
         
-        let auth = ResourceAuthorization::new(
-            "did:icn:system".to_string(),
-            "did:icn:bob".to_string(),
-            ResourceType::Storage,
-            1000,
-            IdentityScope::Individual,
-            Some(future),
-            None,
-        );
-        
-        assert_eq!(auth.authorized_amount, 1000);
-        assert_eq!(auth.consumed_amount, 0);
-        assert_eq!(auth.remaining_amount(), 1000);
-        assert!(auth.is_valid(now));
-        
-        // Test with expired authorization
-        let past = now - 3600; // 1 hour in the past
-        let expired_auth = ResourceAuthorization::new(
-            "did:icn:system".to_string(),
-            "did:icn:bob".to_string(),
-            ResourceType::Storage,
-            1000,
-            IdentityScope::Individual,
-            Some(past),
-            None,
-        );
-        
-        assert!(!expired_auth.is_valid(now));
-    }
-    
-    #[test]
-    fn test_authorization_helpers() {
-        let now = chrono::Utc::now().timestamp();
-        let future = now + 3600; // 1 hour in the future
-        
-        let mut auth = ResourceAuthorization::new(
+        // Create authorization
+        let auth = create_authorization(
             "did:icn:system".to_string(),
             "did:icn:bob".to_string(),
             ResourceType::Compute,
@@ -575,24 +632,35 @@ mod tests {
             IdentityScope::Individual,
             Some(future),
             None,
-        );
+            &mut storage,
+        ).await.unwrap();
+        
+        // Verify the authorization was stored
+        let stored_auth = storage.get_authorization(&auth.auth_id).await.unwrap().unwrap();
+        assert_eq!(stored_auth.auth_id, auth.auth_id);
+        assert_eq!(stored_auth.authorized_amount, 1000);
+        assert_eq!(stored_auth.consumed_amount, 0);
         
         // Test validation
-        assert!(validate_authorization_usage(&auth, 500, now).is_ok());
-        assert!(validate_authorization_usage(&auth, 1001, now).is_err());
+        assert!(validate_authorization_usage(&auth.auth_id, 500, now, &storage).await.is_ok());
+        assert!(validate_authorization_usage(&auth.auth_id, 1001, now, &storage).await.is_err());
         
         // Test consumption
-        assert!(consume_authorization(&mut auth, 300, now).is_ok());
-        assert_eq!(auth.consumed_amount, 300);
-        assert_eq!(auth.remaining_amount(), 700);
+        let updated_auth = consume_authorization(&auth.auth_id, 300, now, &mut storage).await.unwrap();
+        assert_eq!(updated_auth.consumed_amount, 300);
+        assert_eq!(updated_auth.remaining_amount(), 700);
+        
+        // Verify the update was persisted
+        let stored_auth = storage.get_authorization(&auth.auth_id).await.unwrap().unwrap();
+        assert_eq!(stored_auth.consumed_amount, 300);
         
         // Test overconsumption
-        assert!(consume_authorization(&mut auth, 800, now).is_err());
-        assert_eq!(auth.consumed_amount, 300); // Should remain unchanged
+        let result = consume_authorization(&auth.auth_id, 800, now, &mut storage).await;
+        assert!(result.is_err());
         
-        // Test consuming with expired auth
+        // Create an expired authorization
         let past = now - 3600; // 1 hour in the past
-        let mut expired_auth = ResourceAuthorization::new(
+        let expired_auth = create_authorization(
             "did:icn:system".to_string(),
             "did:icn:bob".to_string(),
             ResourceType::Storage,
@@ -600,25 +668,168 @@ mod tests {
             IdentityScope::Individual,
             Some(past),
             None,
-        );
+            &mut storage,
+        ).await.unwrap();
         
-        assert!(consume_authorization(&mut expired_auth, 100, now).is_err());
-        assert_eq!(expired_auth.consumed_amount, 0); // Should remain unchanged
+        // Test consuming with expired auth
+        let result = consume_authorization(&expired_auth.auth_id, 100, now, &mut storage).await;
+        assert!(result.is_err());
+        
+        // List authorizations for grantee
+        let bob_auths = storage.list_authorizations_by_grantee("did:icn:bob").await.unwrap();
+        assert_eq!(bob_auths.len(), 2);
     }
     
     #[test]
     fn test_token_creation() {
-        let token = token_ops::mint_token(
+        // This test doesn't test persistence, so we don't create a storage instance
+        // We're just verifying the ScopedResourceToken struct works as expected
+        let token = ScopedResourceToken::new(
             "did:icn:charlie".to_string(),
             ResourceType::NetworkBandwidth,
             5000,
             IdentityScope::Community,
             Some(serde_json::json!({"community": "developers"})),
-        ).unwrap();
+            chrono::Utc::now().timestamp(),
+        );
         
         assert_eq!(token.owner_did, "did:icn:charlie");
         assert!(matches!(token.resource_type, ResourceType::NetworkBandwidth));
         assert_eq!(token.amount, 5000);
         assert!(matches!(token.scope, IdentityScope::Community));
+    }
+    
+    #[tokio::test]
+    async fn test_token_operations() {
+        // Create test storage
+        let mut storage = MockTokenStorage::new();
+        
+        // Test minting a token
+        let token = token_ops::mint_token(
+            "did:icn:alice".to_string(),
+            ResourceType::Compute,
+            100,
+            IdentityScope::Individual,
+            Some(serde_json::json!({"purpose": "testing"})),
+            &mut storage
+        ).await.unwrap();
+        
+        // Verify token was stored
+        let stored_token = storage.get_token(&token.token_id).await.unwrap().unwrap();
+        assert_eq!(stored_token.token_id, token.token_id);
+        assert_eq!(stored_token.amount, 100);
+        
+        // Test transferring the token
+        token_ops::transfer_token(
+            token.token_id,
+            "did:icn:alice",
+            "did:icn:bob",
+            &mut storage
+        ).await.unwrap();
+        
+        // Verify the transfer
+        let transferred_token = token_ops::get_token_by_id(&token.token_id, &storage).await.unwrap().unwrap();
+        assert_eq!(transferred_token.owner_did, "did:icn:bob");
+        
+        // Test burning the token
+        token_ops::burn_token(
+            token.token_id,
+            "did:icn:bob",
+            &mut storage
+        ).await.unwrap();
+        
+        // Verify the token was burned (deleted)
+        let burned_token = token_ops::get_token_by_id(&token.token_id, &storage).await.unwrap();
+        assert!(burned_token.is_none());
+    }
+    
+    #[tokio::test]
+    async fn test_token_unauthorized_operations() {
+        // Create test storage
+        let mut storage = MockTokenStorage::new();
+        
+        // Mint a token
+        let token = token_ops::mint_token(
+            "did:icn:alice".to_string(),
+            ResourceType::Storage,
+            200,
+            IdentityScope::Individual,
+            None,
+            &mut storage
+        ).await.unwrap();
+        
+        // Test unauthorized transfer
+        let result = token_ops::transfer_token(
+            token.token_id,
+            "did:icn:bob", // Not the owner
+            "did:icn:charlie",
+            &mut storage
+        ).await;
+        
+        assert!(result.is_err());
+        if let Err(EconomicsError::Unauthorized(_)) = result {
+            // Expected error
+        } else {
+            panic!("Expected Unauthorized error, got: {:?}", result);
+        }
+        
+        // Test unauthorized burn
+        let result = token_ops::burn_token(
+            token.token_id,
+            "did:icn:eve", // Not the owner
+            &mut storage
+        ).await;
+        
+        assert!(result.is_err());
+        if let Err(EconomicsError::Unauthorized(_)) = result {
+            // Expected error
+        } else {
+            panic!("Expected Unauthorized error, got: {:?}", result);
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_tokens_by_owner() {
+        // Create test storage
+        let mut storage = MockTokenStorage::new();
+        
+        // Mint three tokens with different owners
+        let _token1 = token_ops::mint_token(
+            "did:icn:alice".to_string(),
+            ResourceType::Compute,
+            100,
+            IdentityScope::Individual,
+            None,
+            &mut storage
+        ).await.unwrap();
+        
+        let _token2 = token_ops::mint_token(
+            "did:icn:alice".to_string(),
+            ResourceType::Storage,
+            200,
+            IdentityScope::Individual,
+            None,
+            &mut storage
+        ).await.unwrap();
+        
+        let token3 = token_ops::mint_token(
+            "did:icn:bob".to_string(),
+            ResourceType::NetworkBandwidth,
+            300,
+            IdentityScope::Individual,
+            None,
+            &mut storage
+        ).await.unwrap();
+        
+        // Test listing tokens by owner
+        let alice_tokens = token_ops::get_tokens_by_owner("did:icn:alice", &storage).await.unwrap();
+        assert_eq!(alice_tokens.len(), 2);
+        
+        let bob_tokens = token_ops::get_tokens_by_owner("did:icn:bob", &storage).await.unwrap();
+        assert_eq!(bob_tokens.len(), 1);
+        assert_eq!(bob_tokens[0].token_id, token3.token_id);
+        
+        let charlie_tokens = token_ops::get_tokens_by_owner("did:icn:charlie", &storage).await.unwrap();
+        assert_eq!(charlie_tokens.len(), 0);
     }
 } 

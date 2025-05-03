@@ -195,6 +195,16 @@ impl DagNode {
     pub fn cid(&self) -> DagResult<Cid> {
         self.cid.ok_or_else(|| DagError::InvalidCid("CID not calculated".to_string()))
     }
+    
+    /// Get the links (parent CIDs) of this node
+    pub fn links(&self) -> &[Cid] {
+        &self.parents
+    }
+    
+    /// Get the timestamp of this node
+    pub fn timestamp(&self) -> i64 {
+        self.metadata.timestamp as i64
+    }
 }
 
 /// Represents a lineage attestation for a DAG node

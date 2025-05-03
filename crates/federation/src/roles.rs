@@ -18,6 +18,36 @@ use icn_identity::IdentityId;
 use icn_storage::{StorageBackend, ReplicationPolicy as StorageReplicationPolicy};
 use icn_governance_kernel::config::GovernanceConfig;
 
+/// Node roles in a federation
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NodeRole {
+    /// Validator node that participates in consensus
+    Validator,
+    
+    /// Guardian node with special privileges for governance
+    Guardian,
+    
+    /// Observer node that tracks the network but doesn't participate in consensus
+    Observer,
+}
+
+impl NodeRole {
+    /// Convert the role to a string representation
+    pub fn as_str(&self) -> &str {
+        match self {
+            NodeRole::Validator => "validator",
+            NodeRole::Guardian => "guardian",
+            NodeRole::Observer => "observer",
+        }
+    }
+}
+
+impl std::fmt::Display for NodeRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 /// Simple structure to represent governance roles
 /// 
 /// Note: This is a simplified version used for backward compatibility.
