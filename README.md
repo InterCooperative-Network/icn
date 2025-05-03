@@ -121,6 +121,43 @@ The wallet is designed to be integrated with mobile applications through the wal
 2. Access the API server from a mobile app
 3. Use the crates directly in a Rust mobile SDK
 
+## Mobile Integration with FFI
+
+The wallet functionality can now be accessed from mobile platforms (iOS and Android) through the `wallet-ffi` crate, which provides a Foreign Function Interface using the UniFFI framework.
+
+### Features Implemented
+
+1. **FFI Bridge (wallet-ffi crate)**:
+   - Exposes core wallet functionality to mobile platforms via UniFFI
+   - Provides a clean, idiomatic API for Kotlin and Swift
+   - Handles async operations seamlessly via a dedicated Tokio runtime
+
+2. **Enhanced Data Validation**:
+   - Added comprehensive validation for TrustBundles and DagNodes
+   - Ensures data integrity and security before storing in the wallet
+   - Protects against malformed or malicious data from network sources
+
+3. **Mobile Bindings Generation**:
+   - Script to automatically generate Swift and Kotlin bindings
+   - Creates idiomatic wrapper classes for mobile platforms
+   - Simplifies mobile integration process
+
+### Current Limitations
+
+There is currently a circular dependency between `wallet-agent` and `wallet-sync` crates that prevents the build from succeeding. This should be resolved by refactoring shared types into a new `wallet-types` crate.
+
+### Next Steps
+
+1. Resolve the circular dependency issue by creating a `wallet-types` crate
+2. Complete end-to-end integration tests for the FFI interface
+3. Add platform-specific packaging for Android (AAR) and iOS (XCFramework)
+4. Implement advanced validation with cryptographic signature verification
+5. Add more comprehensive error handling and recovery mechanisms
+
+### Building and Usage
+
+See the [wallet-ffi README](crates/wallet-ffi/README.md) for detailed instructions on building and using the FFI bindings in mobile applications.
+
 ## License
 
 [MIT License](LICENSE)

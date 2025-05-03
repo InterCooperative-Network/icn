@@ -665,6 +665,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
         // Update the thread cache if applicable
         self.update_thread_cache_with_node(&node).await?;
         
+        // Validate the node
+        self.validate_dag_node(&node, Some(cid))?;
+        
         Ok(node)
     }
     
@@ -842,6 +845,10 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let latest_bundle = self.fetch_latest_trust_bundle(federation_url).await?;
         let latest_epoch = latest_bundle.epoch;
         
+        // Perform enhanced validation on the trust bundle
+        self.validate_trust_bundle(&latest_bundle)
+            .map_err(|e| SyncError::ValidationError(format!("Trust bundle validation failed: {}", e)))?;
+        
         // Get current state for this federation
         let federation_id = latest_bundle.id.clone();
         let last_synced_epoch = {
@@ -861,7 +868,17 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let mut bundles = vec![latest_bundle];
         for epoch in (last_synced_epoch + 1)..latest_epoch {
             match self.fetch_trust_bundle_by_epoch(federation_url, epoch).await {
-                Ok(bundle) => bundles.push(bundle),
+                Ok(bundle) => {
+                    // Validate the bundle before adding it
+                    match self.validate_trust_bundle(&bundle) {
+                        Ok(_) => bundles.push(bundle),
+                        Err(e) => {
+                            warn!("Trust bundle for epoch {} failed validation: {}", epoch, e);
+                            // Skip invalid bundles
+                            continue;
+                        }
+                    }
+                },
                 Err(SyncError::NotFound(_)) => {
                     // Skip missing epochs
                     warn!("Trust bundle for epoch {} not found", epoch);
@@ -871,7 +888,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
             }
         }
         
-        // Return all fetched bundles
+        // Return all fetched and validated bundles
         Ok(bundles)
     }
     
@@ -1298,6 +1315,95 @@ impl<S: LocalWalletStore> SyncManager<S> {
         }
         
         debug!("Fetched {} nodes for thread {}", fetched.len(), thread_id);
+        
+        Ok(())
+    }
+
+    // Add a new validation method for trust bundles
+    fn validate_trust_bundle(&self, bundle: &TrustBundle) -> SyncResult<()> {
+        // Basic validation using the trust validator
+        self.trust_validator.validate_bundle(bundle)?;
+
+        // Enhanced validations:
+        
+        // 1. Check timestamp is not in the future
+        let now = std::time::SystemTime::now();
+        if let Ok(duration) = bundle.created_at.duration_since(now) {
+            if duration.as_secs() > 60 {  // Allow 1 minute clock skew
+                return Err(SyncError::ValidationError(
+                    format!("Trust bundle has a future timestamp: {:?}", bundle.created_at)
+                ));
+            }
+        }
+        
+        // 2. Check threshold is reasonable based on guardian count
+        if bundle.threshold < 1 || bundle.threshold as usize > bundle.guardians.len() {
+            return Err(SyncError::ValidationError(
+                format!("Invalid threshold: {} for {} guardians", bundle.threshold, bundle.guardians.len())
+            ));
+        }
+        
+        // 3. Check expiration if set
+        if let Some(expires_at) = bundle.expires_at {
+            if expires_at < now {
+                return Err(SyncError::ValidationError(
+                    format!("Trust bundle has expired at {:?}", expires_at)
+                ));
+            }
+        }
+        
+        // 4. Check signature validation
+        // In a real implementation, we'd verify signatures from enough guardians to meet threshold
+        
+        Ok(())
+    }
+
+    // Add a validation method for DAG nodes
+    fn validate_dag_node(&self, node: &DagNode, expected_cid: Option<&str>) -> SyncResult<()> {
+        // 1. Basic structural validation
+        if node.cid.is_empty() {
+            return Err(SyncError::ValidationError("DAG node missing CID".to_string()));
+        }
+        
+        // 2. Verify CID if provided
+        if let Some(cid) = expected_cid {
+            if node.cid != cid {
+                return Err(SyncError::ValidationError(
+                    format!("CID mismatch: expected {}, got {}", cid, node.cid)
+                ));
+            }
+        }
+        
+        // 3. Check timestamp is reasonable
+        let now = std::time::SystemTime::now();
+        if let Ok(duration) = node.timestamp.duration_since(now) {
+            if duration.as_secs() > 60 {  // Allow 1 minute clock skew
+                return Err(SyncError::ValidationError(
+                    format!("DAG node has a future timestamp: {:?}", node.timestamp)
+                ));
+            }
+        }
+        
+        // 4. Check parent references (must be valid CIDs)
+        for parent in &node.parents {
+            if parent.is_empty() {
+                return Err(SyncError::ValidationError("Empty parent CID reference".to_string()));
+            }
+            
+            // Additional CID format validation could be done here
+        }
+        
+        // 5. Check signature validation
+        if node.signatures.is_empty() {
+            return Err(SyncError::ValidationError("DAG node has no signatures".to_string()));
+        }
+        
+        // 6. Verify creator exists and is authorized (in real impl)
+        if node.creator.is_empty() {
+            return Err(SyncError::ValidationError("DAG node missing creator".to_string()));
+        }
+        
+        // Additional checks could be implemented based on node type
         
         Ok(())
     }

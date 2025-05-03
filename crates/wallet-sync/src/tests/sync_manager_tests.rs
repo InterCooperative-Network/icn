@@ -302,4 +302,194 @@ mod network_status_tests {
         // This part is left as a placeholder for when the actual implementation
         // has a way to inject mock network status
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, SystemTime};
+    use wallet_core::store::file::FileStore;
+    use wallet_core::identity::IdentityWallet;
+    use wallet_agent::governance::TrustBundle;
+    use wallet_core::dag::DagNode;
+    use std::collections::HashMap;
+    use mockito;
+    use serde_json::json;
+
+    fn setup_test_identity() -> IdentityWallet {
+        IdentityWallet::new("test", Some("Test Identity")).unwrap()
+    }
+
+    fn setup_test_store() -> FileStore {
+        let temp_dir = tempfile::tempdir().unwrap();
+        FileStore::new(temp_dir.path())
+    }
+
+    fn setup_sync_manager(store: FileStore, identity: IdentityWallet) -> SyncManager<FileStore> {
+        // Setup config with mock server URL
+        let mut config = SyncManagerConfig::default();
+        config.federation_urls = vec![mockito::server_url()];
+        
+        SyncManager::new(identity, store, Some(config))
+    }
+
+    fn create_valid_trust_bundle() -> TrustBundle {
+        TrustBundle {
+            id: "test-bundle-1".to_string(),
+            epoch: 1,
+            threshold: 2,
+            guardians: vec![
+                "did:icn:guardian1".to_string(),
+                "did:icn:guardian2".to_string(),
+                "did:icn:guardian3".to_string(),
+            ],
+            active: true,
+            created_at: SystemTime::now(),
+            expires_at: None,
+            links: HashMap::new(),
+            signatures: HashMap::new(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    fn create_valid_dag_node() -> DagNode {
+        DagNode {
+            cid: "bafyreihpcgxa6wjz2cl3mfpxssjcm54chzoj66xtnxekyxuio5h5tsuxsy".to_string(),
+            parents: vec!["bafyreia4k7k7qpx52pe6je6zymkmufetmdllycnvhg2bopjadhdvw2a3m4".to_string()],
+            epoch: 1,
+            creator: "did:icn:creator1".to_string(),
+            timestamp: SystemTime::now(),
+            content_type: "test".to_string(),
+            content: serde_json::json!({"test": "data"}),
+            signatures: vec!["signature1".to_string()],
+        }
+    }
+
+    #[tokio::test]
+    async fn test_trust_bundle_validation() {
+        let identity = setup_test_identity();
+        let store = setup_test_store();
+        let sync_manager = setup_sync_manager(store, identity);
+        
+        // Test valid bundle
+        let valid_bundle = create_valid_trust_bundle();
+        let result = sync_manager.validate_trust_bundle(&valid_bundle);
+        assert!(result.is_ok());
+        
+        // Test invalid bundle - future timestamp
+        let mut future_bundle = valid_bundle.clone();
+        future_bundle.created_at = SystemTime::now() + Duration::from_secs(3600); // 1 hour in future
+        let result = sync_manager.validate_trust_bundle(&future_bundle);
+        assert!(result.is_err());
+        
+        // Test invalid bundle - bad threshold
+        let mut bad_threshold_bundle = valid_bundle.clone();
+        bad_threshold_bundle.threshold = 5; // More than # of guardians
+        let result = sync_manager.validate_trust_bundle(&bad_threshold_bundle);
+        assert!(result.is_err());
+        
+        // Test invalid bundle - expired
+        let mut expired_bundle = valid_bundle.clone();
+        expired_bundle.expires_at = Some(SystemTime::now() - Duration::from_secs(3600)); // 1 hour ago
+        let result = sync_manager.validate_trust_bundle(&expired_bundle);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_dag_node_validation() {
+        let identity = setup_test_identity();
+        let store = setup_test_store();
+        let sync_manager = setup_sync_manager(store, identity);
+        
+        // Test valid node
+        let valid_node = create_valid_dag_node();
+        let result = sync_manager.validate_dag_node(&valid_node, None);
+        assert!(result.is_ok());
+        
+        // Test valid node with expected CID
+        let result = sync_manager.validate_dag_node(&valid_node, 
+            Some("bafyreihpcgxa6wjz2cl3mfpxssjcm54chzoj66xtnxekyxuio5h5tsuxsy"));
+        assert!(result.is_ok());
+        
+        // Test CID mismatch
+        let result = sync_manager.validate_dag_node(&valid_node, Some("wrong-cid"));
+        assert!(result.is_err());
+        
+        // Test invalid node - missing CID
+        let mut no_cid_node = valid_node.clone();
+        no_cid_node.cid = "".to_string();
+        let result = sync_manager.validate_dag_node(&no_cid_node, None);
+        assert!(result.is_err());
+        
+        // Test invalid node - future timestamp
+        let mut future_node = valid_node.clone();
+        future_node.timestamp = SystemTime::now() + Duration::from_secs(3600); // 1 hour in future
+        let result = sync_manager.validate_dag_node(&future_node, None);
+        assert!(result.is_err());
+        
+        // Test invalid node - empty parent CID
+        let mut bad_parent_node = valid_node.clone();
+        bad_parent_node.parents = vec!["".to_string()];
+        let result = sync_manager.validate_dag_node(&bad_parent_node, None);
+        assert!(result.is_err());
+        
+        // Test invalid node - no signatures
+        let mut no_sig_node = valid_node.clone();
+        no_sig_node.signatures = vec![];
+        let result = sync_manager.validate_dag_node(&no_sig_node, None);
+        assert!(result.is_err());
+        
+        // Test invalid node - no creator
+        let mut no_creator_node = valid_node.clone();
+        no_creator_node.creator = "".to_string();
+        let result = sync_manager.validate_dag_node(&no_creator_node, None);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_sync_with_mock_server() {
+        let identity = setup_test_identity();
+        let store = setup_test_store();
+        let sync_manager = setup_sync_manager(store, identity);
+        
+        // Setup a mock response for the latest bundle
+        let valid_bundle = create_valid_trust_bundle();
+        let bundle_json = serde_json::to_string(&valid_bundle).unwrap();
+        
+        let mock = mockito::mock("GET", "/bundles/latest")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(&bundle_json)
+            .create();
+        
+        // Test syncing from the mock server
+        let result = sync_manager.fetch_latest_trust_bundle(&mockito::server_url()).await;
+        mock.assert();
+        
+        assert!(result.is_ok());
+        let fetched_bundle = result.unwrap();
+        assert_eq!(fetched_bundle.id, valid_bundle.id);
+        
+        // Test with invalid data
+        let mut future_bundle = valid_bundle.clone();
+        future_bundle.created_at = SystemTime::now() + Duration::from_secs(3600); // 1 hour in future
+        let invalid_bundle_json = serde_json::to_string(&future_bundle).unwrap();
+        
+        let mock = mockito::mock("GET", "/bundles/latest")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(&invalid_bundle_json)
+            .create();
+        
+        // This should return an error due to validation failure
+        let result = sync_manager.sync_trust_bundles(&mockito::server_url()).await;
+        mock.assert();
+        
+        assert!(result.is_err());
+        if let Err(SyncError::ValidationError(_)) = result {
+            // Expected validation error
+        } else {
+            panic!("Expected ValidationError, got: {:?}", result);
+        }
+    }
 } 
