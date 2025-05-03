@@ -21,6 +21,8 @@ use icn_dag::{DagNodeBuilder, DagNode, codec::DagCborCodec};
 use libipld::{Ipld, ipld, codec::Codec};
 use anyhow::{anyhow, Result};
 use std::sync::RwLock;
+use wasmtime::{Config, Engine, Instance, Module, Store, Caller};
+use uuid;
 
 pub use resources::{ResourceType, ResourceAuthorization, ResourceConsumption};
 
@@ -85,6 +87,18 @@ impl VMContext {
     /// Get the resource authorizations
     pub fn resource_authorizations(&self) -> &[ResourceAuthorization] {
         &self.resource_authorizations
+    }
+}
+
+impl Default for VMContext {
+    fn default() -> Self {
+        Self {
+            identity_context: Arc::new(IdentityContext {
+                keypair: Arc::new(KeyPair::new()),
+                did: "did:icn:anonymous".to_string(),
+            }),
+            resource_authorizations: Vec::new(),
+        }
     }
 }
 
@@ -261,6 +275,43 @@ impl ConcreteHostEnvironment {
         self.consumed_resources.get(&ResourceType::Network).copied().unwrap_or(0)
     }
 
+    /// Record consumption of a resource type
+    fn record_resource_usage(&self, resource_type: ResourceType, amount: u64) -> Result<(), VmError> {
+        // Update the usage tracking
+        let mut usage = self.resource_usage.write().unwrap();
+        let entry = usage.entry(resource_type).or_insert(0);
+        
+        // Check for overflow
+        let new_total = entry.checked_add(amount).ok_or_else(|| {
+            VmError::ResourceLimitExceeded(format!(
+                "Resource consumption would overflow for {:?}",
+                resource_type
+            ))
+        })?;
+        
+        // Check authorization limits
+        let auth_limit = self.vm_context.resource_authorizations().iter()
+            .find(|auth| auth.resource_type == resource_type)
+            .map(|auth| auth.limit)
+            .unwrap_or(u64::MAX);
+        
+        if new_total > auth_limit {
+            return Err(VmError::ResourceLimitExceeded(format!(
+                "Resource limit exceeded for {:?}: {} > {}",
+                resource_type, new_total, auth_limit
+            )));
+        }
+        
+        // Update the usage tracking
+        *entry = new_total;
+        
+        // Also update the legacy consumed_resources tracker for backward compatibility
+        let consumed_entry = self.consumed_resources.entry(resource_type).or_insert(0);
+        *consumed_entry = new_total;
+        
+        Ok(())
+    }
+
     /// Record consumption of compute resources
     pub fn record_compute_usage(&self, amount: u64) -> Result<(), VmError> {
         self.record_resource_usage(ResourceType::Compute, amount)
@@ -274,37 +325,6 @@ impl ConcreteHostEnvironment {
     /// Record consumption of network resources
     pub fn record_network_usage(&self, amount: u64) -> Result<(), VmError> {
         self.record_resource_usage(ResourceType::Network, amount)
-    }
-
-    /// Record consumption of a resource type
-    fn record_resource_usage(&self, resource_type: ResourceType, amount: u64) -> Result<(), VmError> {
-        let usage = self.resource_usage.read().unwrap();
-        let current = usage.entry(resource_type).or_insert(0);
-        let new_total = current.checked_add(amount).ok_or_else(|| {
-            VmError::ResourceLimitExceeded(format!(
-                "Resource consumption would overflow for {:?}",
-                resource_type
-            ))
-        })?;
-
-        // Check if this would exceed the authorization limit
-        let auth = self.vm_context.resource_authorizations().iter()
-            .find(|auth| auth.resource_type == resource_type)
-            .ok_or_else(|| {
-                VmError::Unauthorized(format!(
-                    "No authorization for resource type {:?}",
-                    resource_type
-                ))
-            })?;
-
-        if new_total > auth.limit {
-            return Err(VmError::ResourceLimitExceeded(format!(
-                "Resource limit exceeded for {:?}: {} > {}",
-                resource_type, new_total, auth.limit
-            )));
-        }
-
-        Ok(())
     }
 
     /// Get the caller's DID
@@ -551,7 +571,8 @@ impl ConcreteHostEnvironment {
     /// Returns the CID of the anchored data on success
     pub async fn anchor_to_dag(&self, key: &str, data: Vec<u8>) -> Result<String, InternalHostError> {
         // Get the dag_store from environment
-        let dag_store = self.storage_manager.dag_store()
+        let storage_manager = self.storage_manager()?;
+        let dag_store = storage_manager.dag_store()
             .map_err(|e| InternalHostError::StorageError(format!("Failed to get DAG store: {}", e)))?;
             
         // Calculate content CID
@@ -726,6 +747,48 @@ impl ConcreteHostEnvironment {
     pub fn set_last_anchor_cid(&self, cid: String) {
         let mut last_cid = self.last_anchor_cid.write().unwrap();
         *last_cid = Some(cid);
+    }
+
+    /// Retrieve DAG anchors by scope and type
+    pub async fn get_anchors_by_scope_and_type(&self, scope: &str, anchor_type: &str) -> Result<Vec<(String, Vec<u8>)>, InternalHostError> {
+        // Get storage manager
+        let storage_manager = self.storage_manager()
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to get storage manager: {}", e)))?;
+        
+        // Create a prefix for the anchor keys
+        let prefix = if anchor_type.starts_with("credential:") {
+            anchor_type.to_string()
+        } else {
+            format!("{}:{}", scope, anchor_type)
+        };
+        
+        // List DAG nodes with this prefix
+        // Note: In a real implementation, we would need a way to list DAG nodes by prefix
+        // For now, we'll assume the storage manager has this capability
+        
+        // Mock implementation - this would be replaced with actual implementation
+        // that uses the storage manager to get anchors matching the prefix
+        let anchors = Vec::new();
+        
+        Ok(anchors)
+    }
+
+    /// Get a reference to the storage manager
+    pub fn storage_manager(&self) -> Result<&Arc<dyn StorageManager>, InternalHostError> {
+        Ok(&self.storage_manager)
+    }
+
+    /// Store a key-value pair in storage
+    pub fn set_value(&self, key: &str, value: Vec<u8>) -> Result<(), InternalHostError> {
+        // Record storage usage
+        self.record_resource_usage(ResourceType::Storage, value.len() as u64)
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to record storage usage: {}", e)))?;
+        
+        // In a real implementation, this would store the value in a storage system
+        // For now, we just log it
+        info!(key = %key, value_len = %value.len(), "Storing key-value pair");
+        
+        Ok(())
     }
 }
 
