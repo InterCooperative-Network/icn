@@ -9,3 +9,5 @@ pub mod store;
 pub use identity::IdentityWallet;
 pub use credential::CredentialSigner;
 pub use vc::{VerifiableCredential, VerifiablePresentation};
+pub use error::{WalletError, WalletResult};
+pub use crypto::KeyPair;

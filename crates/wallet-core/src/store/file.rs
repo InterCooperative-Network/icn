@@ -1,84 +1,15 @@
-// This file is deprecated and is maintained only for backward compatibility.
-// For new code, use the modules under store/ instead.
-
-// Re-export from the new module structure
-pub use crate::store::LocalWalletStore;
-pub use crate::store::file::FileStore;
-pub use crate::store::secure::{
-    SecurePlatform, 
-    SecureStorageProvider,
-    MockSecureProvider,
-    SecureStore,
-    create_mock_secure_store,
-};
-
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
-use tokio::fs::{File, create_dir_all, read_to_string, write};
-use tokio::io::Error as IoError;
+use tokio::fs::{create_dir_all, read_to_string, write};
 use crate::error::{WalletResult, WalletError};
 use crate::identity::IdentityWallet;
 use crate::vc::VerifiableCredential;
 use crate::dag::{DagNode, DagThread};
 use crate::crypto::KeyPair;
-
-/// Trait defining storage operations for wallet data
-#[async_trait]
-pub trait LocalWalletStore: Send + Sync + Clone {
-    /// Initialize the store
-    async fn init(&self) -> WalletResult<()>;
-    
-    /// Save an identity to the store
-    async fn save_identity(&self, identity: &IdentityWallet) -> WalletResult<()>;
-    
-    /// Load an identity from the store by DID
-    async fn load_identity(&self, did: &str) -> WalletResult<IdentityWallet>;
-    
-    /// List all stored identities
-    async fn list_identities(&self) -> WalletResult<Vec<String>>;
-    
-    /// Save a credential to the store
-    async fn save_credential(&self, credential: &VerifiableCredential, id: &str) -> WalletResult<()>;
-    
-    /// Load a credential from the store by ID
-    async fn load_credential(&self, id: &str) -> WalletResult<VerifiableCredential>;
-    
-    /// List all stored credentials
-    async fn list_credentials(&self) -> WalletResult<Vec<String>>;
-    
-    /// Save a DAG node to the store
-    async fn save_dag_node(&self, cid: &str, node: &DagNode) -> WalletResult<()>;
-    
-    /// Load a DAG node from the store by CID
-    async fn load_dag_node(&self, cid: &str) -> WalletResult<DagNode>;
-    
-    /// Save a DAG thread to the store
-    async fn save_dag_thread(&self, thread_id: &str, thread: &DagThread) -> WalletResult<()>;
-    
-    /// Load a DAG thread from the store by ID
-    async fn load_dag_thread(&self, thread_id: &str) -> WalletResult<DagThread>;
-    
-    /// List all stored DAG threads
-    async fn list_dag_threads(&self) -> WalletResult<Vec<String>>;
-
-    /// Store a keypair securely, identified by a unique ID
-    async fn store_keypair(&self, id: &str, keypair: &KeyPair) -> WalletResult<()>;
-    
-    /// Load a keypair by its ID
-    async fn load_keypair(&self, id: &str) -> WalletResult<KeyPair>;
-    
-    /// Delete a keypair by its ID
-    async fn delete_keypair(&self, id: &str) -> WalletResult<()>;
-    
-    /// Check if a keypair exists
-    async fn has_keypair(&self, id: &str) -> WalletResult<bool>;
-    
-    /// List all stored keypair IDs
-    async fn list_keypairs(&self) -> WalletResult<Vec<String>>;
-}
+use super::LocalWalletStore;
 
 /// File-based implementation of the LocalWalletStore trait
 #[derive(Clone)]

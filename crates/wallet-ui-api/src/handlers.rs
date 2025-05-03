@@ -4,14 +4,20 @@ use axum::{
 };
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use wallet_core::identity::{IdentityWallet, IdentityScope};
-use wallet_core::credential::{VerifiableCredential, CredentialSigner};
-use wallet_agent::queue::ActionType;
-use wallet_agent::agoranet::{ThreadSummary, ThreadDetail, CredentialLink};
-use crate::error::{ApiResult, ApiError};
-use crate::state::SharedState;
 use uuid::Uuid;
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use wallet_core::identity::{IdentityWallet, IdentityScope};
+use wallet_core::credential::CredentialSigner;
+use wallet_core::vc::VerifiableCredential;
+use wallet_core::store::LocalWalletStore;
+use wallet_agent::queue::{ActionType, ActionQueue, PendingAction};
+use wallet_agent::agoranet::{ThreadSummary, ThreadDetail, CredentialLink};
+use wallet_sync::SyncManager;
+
+use crate::error::{ApiResult, ApiError};
+use crate::state::AppState;
 
 // Request/Response types
 #[derive(Debug, Deserialize)]
@@ -63,48 +69,57 @@ pub struct LinkCredentialRequest {
     pub credential_id: String,
 }
 
-// Handler implementations
-pub async fn list_identities(
-    State(state): State<SharedState>,
-) -> ApiResult<Json<Vec<IdentityResponse>>> {
-    let identities = state.identities.read().await;
-    
-    let response: Vec<IdentityResponse> = identities
-        .iter()
-        .map(|(id, wallet)| {
-            IdentityResponse {
-                id: id.clone(),
-                did: wallet.did.to_string(),
-                scope: format!("{:?}", wallet.scope),
-                document: wallet.to_document(),
-            }
-        })
-        .collect();
-    
-    Ok(Json(response))
+// Health check endpoint
+pub async fn health_check() -> StatusCode {
+    StatusCode::OK
 }
 
-pub async fn get_identity(
-    State(state): State<SharedState>,
-    Path(id): Path<String>,
-) -> ApiResult<Json<IdentityResponse>> {
-    let identities = state.identities.read().await;
+// Handler implementations for identities
+pub async fn list_identities<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+) -> ApiResult<Json<Vec<IdentityResponse>>> {
+    let dids = state.store.list_identities().await
+        .map_err(|e| ApiError::StoreError(format!("Failed to list identities: {}", e)))?;
     
-    let wallet = identities.get(&id)
-        .ok_or_else(|| ApiError::NotFound(format!("Identity not found: {}", id)))?;
+    let mut responses = Vec::new();
+    
+    for did in dids {
+        let identity = state.store.load_identity(&did).await
+            .map_err(|e| ApiError::StoreError(format!("Failed to load identity {}: {}", did, e)))?;
+            
+        responses.push(IdentityResponse {
+            id: did.clone(),
+            did: identity.did.to_string(),
+            scope: format!("{:?}", identity.scope),
+            document: identity.to_document(),
+        });
+    }
+    
+    Ok(Json(responses))
+}
+
+pub async fn get_identity<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+    Path(did): Path<String>,
+) -> ApiResult<Json<IdentityResponse>> {
+    let identity = state.store.load_identity(&did).await
+        .map_err(|e| match e {
+            wallet_core::WalletError::NotFound(_) => ApiError::NotFound(format!("Identity not found: {}", did)),
+            _ => ApiError::StoreError(format!("Failed to load identity: {}", e)),
+        })?;
     
     let response = IdentityResponse {
-        id,
-        did: wallet.did.to_string(),
-        scope: format!("{:?}", wallet.scope),
-        document: wallet.to_document(),
+        id: did,
+        did: identity.did.to_string(),
+        scope: format!("{:?}", identity.scope),
+        document: identity.to_document(),
     };
     
     Ok(Json(response))
 }
 
-pub async fn create_identity(
-    State(state): State<SharedState>,
+pub async fn create_identity<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
     Json(request): Json<CreateIdentityRequest>,
 ) -> ApiResult<Json<IdentityResponse>> {
     let scope = match request.scope.to_lowercase().as_str() {
@@ -115,18 +130,171 @@ pub async fn create_identity(
         _ => IdentityScope::Custom(request.scope.clone()),
     };
     
-    let wallet = IdentityWallet::new(scope, request.metadata);
-    let id = Uuid::new_v4().to_string();
+    // Create a new identity wallet with its own keypair
+    let identity = IdentityWallet::new(scope, request.metadata);
+    let did = identity.did.to_string();
+    
+    // Save the identity to the secure store
+    state.store.save_identity(&identity).await
+        .map_err(|e| ApiError::StoreError(format!("Failed to save identity: {}", e)))?;
+    
+    // Save the keypair securely too (with the same ID for simplicity)
+    state.store.store_keypair(&did, &identity.keypair).await
+        .map_err(|e| ApiError::StoreError(format!("Failed to save keypair: {}", e)))?;
     
     let response = IdentityResponse {
-        id: id.clone(),
-        did: wallet.did.to_string(),
-        scope: format!("{:?}", wallet.scope),
-        document: wallet.to_document(),
+        id: did.clone(),
+        did,
+        scope: format!("{:?}", identity.scope),
+        document: identity.to_document(),
     };
     
-    let mut identities = state.identities.write().await;
-    identities.insert(id, wallet);
+    Ok(Json(response))
+}
+
+// Handler implementations for credential operations
+pub async fn create_credential<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+    Path(issuer_did): Path<String>,
+    Json(request): Json<CreateCredentialRequest>,
+) -> ApiResult<Json<CredentialResponse>> {
+    // 1. Load the issuer identity
+    let issuer = state.store.load_identity(&issuer_did).await
+        .map_err(|e| ApiError::NotFound(format!("Issuer identity not found: {}", e)))?;
+    
+    // 2. Create a credential signer from the issuer
+    let signer = CredentialSigner::new(issuer);
+    
+    // 3. Issue the credential
+    let credential = signer.issue_credential(request.subject_data, request.credential_types)
+        .map_err(|e| ApiError::CoreError(e))?;
+    
+    // 4. Generate a unique ID for the credential
+    let id = Uuid::new_v4().to_string();
+    
+    // 5. Store the credential
+    state.store.save_credential(&credential, &id).await
+        .map_err(|e| ApiError::StoreError(format!("Failed to save credential: {}", e)))?;
+    
+    // 6. Convert the credential to JSON for the response
+    let credential_json = serde_json::to_value(&credential)
+        .map_err(|e| ApiError::SerializationError(format!("Failed to serialize credential: {}", e)))?;
+    
+    let response = CredentialResponse {
+        credential: credential_json,
+    };
+    
+    Ok(Json(response))
+}
+
+pub async fn verify_credential<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+    Json(credential_value): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    // 1. Deserialize the credential
+    let credential: VerifiableCredential = serde_json::from_value(credential_value)
+        .map_err(|e| ApiError::InvalidRequest(format!("Invalid credential format: {}", e)))?;
+    
+    // 2. Get the issuer DID from the credential
+    let issuer_did = credential.issuer.clone();
+    
+    // 3. Try to load the issuer identity
+    let issuer_result = state.store.load_identity(&issuer_did).await;
+    
+    // 4. Validate the credential
+    let is_valid = match issuer_result {
+        Ok(issuer) => {
+            let signer = CredentialSigner::new(issuer);
+            signer.verify_credential(&credential)
+                .map_err(|e| ApiError::CoreError(e))?
+        },
+        Err(_) => false, // If we don't have the issuer, mark as invalid
+    };
+    
+    let response = serde_json::json!({
+        "valid": is_valid,
+        "issuer": issuer_did,
+    });
+    
+    Ok(Json(response))
+}
+
+// Handler implementations for action queue operations
+pub async fn queue_action<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+    Json(payload): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    // 1. Create an action queue
+    let queue = ActionQueue::new(state.store.clone());
+    
+    // 2. Parse the action type from the payload
+    let action_type = payload["action_type"]
+        .as_str()
+        .ok_or_else(|| ApiError::InvalidRequest("Missing action_type in payload".to_string()))?;
+    
+    let action_type = match action_type {
+        "proposal" => ActionType::Proposal,
+        "vote" => ActionType::Vote,
+        "anchor" => ActionType::Anchor,
+        _ => return Err(ApiError::InvalidRequest(format!("Invalid action type: {}", action_type))),
+    };
+    
+    // 3. Get the creator DID from the payload
+    let creator_did = payload["creator_did"]
+        .as_str()
+        .ok_or_else(|| ApiError::InvalidRequest("Missing creator_did in payload".to_string()))?
+        .to_string();
+    
+    // 4. Queue the action
+    let action_id = queue.queue_action(action_type, creator_did, payload.clone())
+        .map_err(|e| ApiError::AgentError(e))?;
+    
+    let response = serde_json::json!({
+        "action_id": action_id,
+        "status": "queued",
+    });
+    
+    Ok(Json(response))
+}
+
+// Handler implementations for sync operations
+pub async fn sync_dag<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+) -> ApiResult<Json<Value>> {
+    // 1. Get the first identity to use for auth (in a real app, use the active identity)
+    let identities = state.store.list_identities().await
+        .map_err(|e| ApiError::StoreError(format!("Failed to list identities: {}", e)))?;
+    
+    if identities.is_empty() {
+        return Err(ApiError::AuthError("No identities available for sync".to_string()));
+    }
+    
+    let identity = state.store.load_identity(&identities[0]).await
+        .map_err(|e| ApiError::StoreError(format!("Failed to load identity: {}", e)))?;
+    
+    // 2. Create a sync manager
+    let sync_manager = SyncManager::new(identity, state.store.clone(), None);
+    
+    // 3. Perform sync
+    sync_manager.sync_all().await
+        .map_err(|e| ApiError::SyncError(format!("Sync failed: {}", e)))?;
+    
+    // 4. Get sync state
+    let sync_state = sync_manager.get_sync_state("default").await;
+    
+    let response = match sync_state {
+        Some(state) => serde_json::json!({
+            "federation_id": state.federation_id,
+            "last_synced_epoch": state.last_synced_epoch,
+            "trust_bundles_count": state.trust_bundles_count,
+            "dag_headers_count": state.dag_headers_count,
+            "status": "success",
+        }),
+        None => serde_json::json!({
+            "status": "success",
+            "message": "Sync completed but no state available",
+        }),
+    };
     
     Ok(Json(response))
 }
@@ -155,35 +323,35 @@ pub async fn sign_proposal(
     Ok(Json(response))
 }
 
-pub async fn sync_dag(
+pub async fn sync_trust_bundles(
     State(state): State<SharedState>,
 ) -> ApiResult<Json<Value>> {
+    // 1. First load any local bundles from disk
+    let guardian = state.create_guardian().await?;
+    let local_count = guardian.load_trust_bundles_from_disk().await?;
+    
+    // 2. Then sync from the network
     let client = state.create_sync_client().await?;
-    
-    let bundles = client.sync_trust_bundles().await
+    let network_bundles = client.sync_trust_bundles().await
         .map_err(ApiError::SyncError)?;
-        
+    
+    // Store the length before we start consuming bundles
+    let network_bundles_count = network_bundles.len();
+    
+    // 3. Store the network bundles
+    let mut stored_count = 0;
+    for bundle in network_bundles {
+        // Store returns an error for invalid bundles, which we'll ignore
+        if guardian.store_trust_bundle(bundle).await.is_ok() {
+            stored_count += 1;
+        }
+    }
+    
     let response = serde_json::json!({
-        "synced_bundles": bundles.len(),
+        "local_bundles_loaded": local_count,
+        "network_bundles_synced": network_bundles_count,
+        "network_bundles_stored": stored_count,
         "status": "success",
-    });
-    
-    Ok(Json(response))
-}
-
-pub async fn verify_credential(
-    State(state): State<SharedState>,
-    Json(credential): Json<Value>,
-) -> ApiResult<Json<Value>> {
-    let identity = state.get_active_identity().await?;
-    
-    // In a real implementation, this would create a CredentialSigner and verify
-    // the credential cryptographically
-    
-    let response = serde_json::json!({
-        "valid": true,
-        "issuer": credential.get("issuer").and_then(|v| v.as_str()).unwrap_or("unknown"),
-        "verified_by": identity.did.to_string(),
     });
     
     Ok(Json(response))
@@ -355,44 +523,4 @@ pub async fn create_execution_receipt(
     ).await;
     
     Ok(Json(receipt))
-}
-
-// Enhanced sync endpoint that loads from disk and syncs from network
-pub async fn sync_trust_bundles(
-    State(state): State<SharedState>,
-) -> ApiResult<Json<Value>> {
-    // 1. First load any local bundles from disk
-    let guardian = state.create_guardian().await?;
-    let local_count = guardian.load_trust_bundles_from_disk().await?;
-    
-    // 2. Then sync from the network
-    let client = state.create_sync_client().await?;
-    let network_bundles = client.sync_trust_bundles().await
-        .map_err(ApiError::SyncError)?;
-    
-    // Store the length before we start consuming bundles
-    let network_bundles_count = network_bundles.len();
-    
-    // 3. Store the network bundles
-    let mut stored_count = 0;
-    for bundle in network_bundles {
-        // Store returns an error for invalid bundles, which we'll ignore
-        if guardian.store_trust_bundle(bundle).await.is_ok() {
-            stored_count += 1;
-        }
-    }
-    
-    let response = serde_json::json!({
-        "local_bundles_loaded": local_count,
-        "network_bundles_synced": network_bundles_count,
-        "network_bundles_stored": stored_count,
-        "status": "success",
-    });
-    
-    Ok(Json(response))
-}
-
-/// Health check endpoint
-pub async fn health_check() -> StatusCode {
-    StatusCode::OK
 } 

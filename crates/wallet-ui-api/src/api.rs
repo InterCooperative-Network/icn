@@ -6,11 +6,12 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 use tower_http::cors::{CorsLayer, Any};
-use crate::state::{AppState, SharedState};
+use crate::state::AppState;
 use crate::handlers;
+use wallet_core::store::LocalWalletStore;
 
 pub struct WalletAPI {
-    state: SharedState,
+    state: Arc<AppState<S>>,
 }
 
 impl WalletAPI {
@@ -33,39 +34,22 @@ impl WalletAPI {
             
         let app = Router::new()
             // Health check endpoint
-            .route("/api/health", get(handlers::health_check))
+            .route("/health", get(handlers::health_check))
             
             // Identity routes
-            .route("/api/did/list", get(handlers::list_identities))
-            .route("/api/did/:id", get(handlers::get_identity))
-            .route("/api/did/create", post(handlers::create_identity))
-            .route("/api/did/activate/:id", post(handlers::set_active_identity))
-            
-            // Proposal routes
-            .route("/api/proposal/sign", post(handlers::sign_proposal))
-            .route("/api/actions/:action_type", get(handlers::list_actions))
+            .route("/did/list", get(handlers::list_identities::<S>))
+            .route("/did/:id", get(handlers::get_identity::<S>))
+            .route("/did/create", post(handlers::create_identity::<S>))
             
             // Credential routes
-            .route("/api/vc/verify", post(handlers::verify_credential))
+            .route("/vc/issue/:issuer_did", post(handlers::create_credential::<S>))
+            .route("/vc/verify", post(handlers::verify_credential::<S>))
+            
+            // Action queue routes
+            .route("/actions/queue", post(handlers::queue_action::<S>))
             
             // Sync routes
-            .route("/api/sync/dag", post(handlers::sync_dag))
-            .route("/api/sync/trust-bundles", post(handlers::sync_trust_bundles))
-            
-            // Trust Bundle routes
-            .route("/api/bundles", get(handlers::list_trust_bundles))
-            .route("/api/guardian/status", get(handlers::check_guardian_status))
-            .route("/api/proposals/:proposal_id/receipt", post(handlers::create_execution_receipt))
-            
-            // Governance routes
-            .route("/api/governance/appeal/:mandate_id", post(handlers::appeal_mandate))
-            
-            // AgoraNet integration routes
-            .route("/api/agoranet/threads", get(handlers::get_threads))
-            .route("/api/agoranet/threads/:thread_id", get(handlers::get_thread))
-            .route("/api/agoranet/threads/:thread_id/credential-links", get(handlers::get_credential_links))
-            .route("/api/agoranet/credential-link", post(handlers::link_credential))
-            .route("/api/agoranet/proposals/:proposal_id/notify", post(handlers::notify_proposal_event))
+            .route("/sync/dag", post(handlers::sync_dag::<S>))
             
             .layer(cors)
             .with_state(self.state.clone());
@@ -77,4 +61,30 @@ impl WalletAPI {
             
         Ok(())
     }
+}
+
+/// Create the API router with the application state
+pub fn create_api_router<S: LocalWalletStore + 'static>(
+    state: Arc<AppState<S>>,
+) -> Router {
+    Router::new()
+        // Health check endpoint
+        .route("/health", get(handlers::health_check))
+        
+        // Identity routes
+        .route("/did/list", get(handlers::list_identities::<S>))
+        .route("/did/:id", get(handlers::get_identity::<S>))
+        .route("/did/create", post(handlers::create_identity::<S>))
+        
+        // Credential routes
+        .route("/vc/issue/:issuer_did", post(handlers::create_credential::<S>))
+        .route("/vc/verify", post(handlers::verify_credential::<S>))
+        
+        // Action queue routes
+        .route("/actions/queue", post(handlers::queue_action::<S>))
+        
+        // Sync routes
+        .route("/sync/dag", post(handlers::sync_dag::<S>))
+        
+        .with_state(state)
 } 
