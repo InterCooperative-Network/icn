@@ -33,6 +33,18 @@ pub enum SyncError {
     
     #[error("HTTP client error: {0}")]
     HttpError(String),
+    
+    #[error("Not found: {0}")]
+    NotFound(String),
+    
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+    
+    #[error("Network submission error: {0}")]
+    SubmissionError(String),
+    
+    #[error("Network timeout: {0}")]
+    TimeoutError(String),
 }
 
 pub type SyncResult<T> = Result<T, SyncError>; 

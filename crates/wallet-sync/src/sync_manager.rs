@@ -13,7 +13,28 @@ use crate::error::{SyncResult, SyncError};
 use crate::trust::TrustBundleValidator;
 use crate::client::SyncClient;
 use wallet_agent::governance::TrustBundle;
-use reqwest::Client as HttpClient;
+use reqwest::{Client as HttpClient, StatusCode};
+use backoff::{ExponentialBackoff, future::retry};
+use tracing::{info, warn, error, debug};
+
+// Default federation endpoint URLs
+const DEFAULT_FEDERATION_NODE_URL: &str = "http://mock-federation-node";
+const DEFAULT_BUNDLE_ENDPOINT: &str = "/bundles/latest";
+const DEFAULT_NODE_ENDPOINT: &str = "/nodes";
+const DEFAULT_THREAD_ENDPOINT: &str = "/threads";
+const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
+const MAX_RETRY_ATTEMPTS: u32 = 3;
+
+/// Response from node submission
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeSubmissionResponse {
+    /// Success status
+    pub success: bool,
+    /// CID assigned to the node
+    pub cid: Option<String>,
+    /// Error message if submission failed
+    pub error: Option<String>,
+}
 
 /// Represents the sync state for a federation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,16 +66,22 @@ pub struct SyncManagerConfig {
     pub auto_sync_on_startup: bool,
     /// Whether to auto-sync periodically
     pub auto_sync_periodic: bool,
+    /// HTTP request timeout in seconds
+    pub request_timeout_seconds: u64,
+    /// Maximum number of retry attempts for HTTP requests
+    pub max_retry_attempts: u32,
 }
 
 impl Default for SyncManagerConfig {
     fn default() -> Self {
         Self {
-            federation_urls: vec!["https://icn-federation.example.com/api".to_string()],
+            federation_urls: vec![DEFAULT_FEDERATION_NODE_URL.to_string()],
             sync_state_path: PathBuf::from("./storage/sync"),
             sync_interval_seconds: 3600, // 1 hour
             auto_sync_on_startup: true,
             auto_sync_periodic: true,
+            request_timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+            max_retry_attempts: MAX_RETRY_ATTEMPTS,
         }
     }
 }
@@ -176,9 +203,15 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let config = config.unwrap_or_default();
         let trust_validator = TrustBundleValidator::new(identity.clone());
         
+        // Create an HTTP client with configurable timeout
+        let http_client = HttpClient::builder()
+            .timeout(Duration::from_secs(config.request_timeout_seconds))
+            .build()
+            .unwrap_or_else(|_| HttpClient::new());
+        
         Self {
             identity,
-            http_client: HttpClient::new(),
+            http_client,
             store,
             trust_validator,
             config,
@@ -254,6 +287,8 @@ impl<S: LocalWalletStore> SyncManager<S> {
                         auto_sync_on_startup: false,
                         auto_sync_periodic: false,
                         sync_state_path: PathBuf::from("./storage/sync"),
+                        request_timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+                        max_retry_attempts: MAX_RETRY_ATTEMPTS,
                     })
                 );
                 
@@ -331,40 +366,150 @@ impl<S: LocalWalletStore> SyncManager<S> {
         Ok(())
     }
     
-    /// Fetch the latest trust bundle from the federation
+    /// Fetch the latest trust bundle from the federation with retry logic
     pub async fn fetch_latest_trust_bundle(&self, federation_url: &str) -> SyncResult<TrustBundle> {
-        let url = format!("{}/latest-bundle", federation_url);
+        // Construct the URL for the bundle endpoint
+        let url = format!("{}{}", federation_url, DEFAULT_BUNDLE_ENDPOINT);
+        debug!("Fetching latest trust bundle from {}", url);
         
-        // In a real implementation, we would make an HTTP request to the federation
-        // For now, use a mock implementation
-        let response = self.http_client.get(&url)
-            .send()
-            .await
-            .map_err(|e| SyncError::ConnectionError(format!("Failed to fetch latest trust bundle: {}", e)))?;
+        // Define the backoff strategy for retries
+        let backoff = ExponentialBackoff {
+            max_elapsed_time: Some(Duration::from_secs(60)),
+            max_interval: Duration::from_secs(10),
+            max_retries: Some(self.config.max_retry_attempts),
+            ..ExponentialBackoff::default()
+        };
+        
+        // Create authentication headers with the identity DID
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("X-Identity-DID", 
+            self.identity.did.to_string().parse()
+                .map_err(|_| SyncError::ProtocolError("Invalid DID for header".to_string()))?);
+        
+        // Execute the request with retry logic
+        let result = retry(backoff, || async {
+            let response = self.http_client.get(&url)
+                .headers(headers.clone())
+                .send()
+                .await
+                .map_err(|e| {
+                    let error = SyncError::ConnectionError(format!("Failed to fetch trust bundle: {}", e));
+                    // Map network errors to backoff::Error::Transient for retry
+                    backoff::Error::transient(error)
+                })?;
+                
+            // Check status code
+            let status = response.status();
+            if !status.is_success() {
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error = SyncError::ProtocolError(format!(
+                    "Failed to fetch trust bundle. Status: {}, Error: {}", status, error_text
+                ));
+                
+                // Only retry on server errors (5xx)
+                if status.is_server_error() {
+                    return Err(backoff::Error::transient(error));
+                } else {
+                    return Err(backoff::Error::permanent(error));
+                }
+            }
             
-        if !response.status().is_success() {
-            return Err(SyncError::ConnectionError(format!(
-                "Failed to fetch latest trust bundle. Status: {}", response.status()
-            )));
+            // Parse the response body as JSON
+            let bundle: TrustBundle = response.json().await
+                .map_err(|e| {
+                    let error = SyncError::SerializationError(format!("Failed to parse trust bundle: {}", e));
+                    backoff::Error::permanent(error)
+                })?;
+                
+            Ok(bundle)
+        }).await;
+        
+        match result {
+            Ok(bundle) => Ok(bundle),
+            Err(backoff::Error::Permanent(e)) => Err(e),
+            Err(backoff::Error::Transient { error, .. }) => Err(error),
         }
+    }
+    
+    /// Fetch a specific trust bundle by epoch
+    pub async fn fetch_trust_bundle_by_epoch(&self, federation_url: &str, epoch: u64) -> SyncResult<TrustBundle> {
+        // Construct the URL for the bundle endpoint with epoch
+        let url = format!("{}/bundles/{}", federation_url, epoch);
+        debug!("Fetching trust bundle for epoch {} from {}", epoch, url);
         
-        // Parse the response body as JSON
-        let bundle: TrustBundle = response.json()
-            .await
-            .map_err(|e| SyncError::SerializationError(format!("Failed to parse trust bundle: {}", e)))?;
+        // Define the backoff strategy for retries
+        let backoff = ExponentialBackoff {
+            max_elapsed_time: Some(Duration::from_secs(60)),
+            max_interval: Duration::from_secs(10),
+            max_retries: Some(self.config.max_retry_attempts),
+            ..ExponentialBackoff::default()
+        };
+        
+        // Create authentication headers with the identity DID
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("X-Identity-DID", 
+            self.identity.did.to_string().parse()
+                .map_err(|_| SyncError::ProtocolError("Invalid DID for header".to_string()))?);
+        
+        // Execute the request with retry logic
+        let result = retry(backoff, || async {
+            let response = self.http_client.get(&url)
+                .headers(headers.clone())
+                .send()
+                .await
+                .map_err(|e| {
+                    let error = SyncError::ConnectionError(format!("Failed to fetch trust bundle: {}", e));
+                    // Map network errors to backoff::Error::Transient for retry
+                    backoff::Error::transient(error)
+                })?;
+                
+            // Check status code
+            let status = response.status();
+            if !status.is_success() {
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error = SyncError::ProtocolError(format!(
+                    "Failed to fetch trust bundle. Status: {}, Error: {}", status, error_text
+                ));
+                
+                // Only retry on server errors (5xx)
+                if status.is_server_error() {
+                    return Err(backoff::Error::transient(error));
+                } else {
+                    return Err(backoff::Error::permanent(error));
+                }
+            }
             
-        Ok(bundle)
+            // Parse the response body as JSON
+            let bundle: TrustBundle = response.json().await
+                .map_err(|e| {
+                    let error = SyncError::SerializationError(format!("Failed to parse trust bundle: {}", e));
+                    backoff::Error::permanent(error)
+                })?;
+                
+            Ok(bundle)
+        }).await;
+        
+        match result {
+            Ok(bundle) => Ok(bundle),
+            Err(backoff::Error::Permanent(e)) => Err(e),
+            Err(backoff::Error::Transient { error, .. }) => Err(error),
+        }
     }
     
     /// Synchronize trust bundles from the federation
     pub async fn sync_trust_bundles(&self, federation_url: &str) -> SyncResult<Vec<TrustBundle>> {
+        debug!("Syncing trust bundles from {}", federation_url);
+        
         // In a real implementation, this would fetch from the actual federation
-        // For testing purposes, we'll use a mock implementation
+        // Attempt to fetch the latest bundle from the network
         let bundle = match self.fetch_latest_trust_bundle(federation_url).await {
-            Ok(bundle) => bundle,
+            Ok(bundle) => {
+                debug!("Successfully fetched trust bundle from network: {}", bundle.id);
+                bundle
+            },
             Err(e) => {
-                eprintln!("Failed to fetch bundle from {}: {}", federation_url, e);
-                // Fall back to mock data
+                warn!("Failed to fetch bundle from {}: {}. Using mock data instead.", federation_url, e);
+                // Fall back to mock data if network fetch fails
                 let mock_data = MockTrustBundleData::new("default", 1);
                 mock_data.to_trust_bundle()
             }
@@ -372,11 +517,143 @@ impl<S: LocalWalletStore> SyncManager<S> {
         
         // Validate the bundle
         if let Err(e) = self.trust_validator.validate_bundle(&bundle) {
-            eprintln!("Invalid trust bundle: {}", e);
+            error!("Invalid trust bundle: {}", e);
             return Err(SyncError::VerificationError(format!("Invalid trust bundle: {}", e)));
         }
         
         Ok(vec![bundle])
+    }
+    
+    /// Submit a DAG node to the federation
+    pub async fn submit_dag_node(&self, node: &DagNode) -> SyncResult<NodeSubmissionResponse> {
+        // Use the first federation URL by default
+        if self.config.federation_urls.is_empty() {
+            return Err(SyncError::ConfigurationError("No federation URLs configured".to_string()));
+        }
+        
+        // Use the first federation URL
+        let federation_url = &self.config.federation_urls[0];
+        let url = format!("{}{}", federation_url, DEFAULT_NODE_ENDPOINT);
+        debug!("Submitting DAG node to {}", url);
+        
+        // Define the backoff strategy for retries
+        let backoff = ExponentialBackoff {
+            max_elapsed_time: Some(Duration::from_secs(60)),
+            max_interval: Duration::from_secs(10),
+            max_retries: Some(self.config.max_retry_attempts),
+            ..ExponentialBackoff::default()
+        };
+        
+        // Create authentication headers with the identity DID
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("X-Identity-DID", 
+            self.identity.did.to_string().parse()
+                .map_err(|_| SyncError::ProtocolError("Invalid DID for header".to_string()))?);
+        
+        // Execute the request with retry logic
+        let result = retry(backoff, || async {
+            let response = self.http_client.post(&url)
+                .headers(headers.clone())
+                .json(node)
+                .send()
+                .await
+                .map_err(|e| {
+                    let error = SyncError::ConnectionError(format!("Failed to submit DAG node: {}", e));
+                    // Map network errors to backoff::Error::Transient for retry
+                    backoff::Error::transient(error)
+                })?;
+                
+            // Check status code
+            let status = response.status();
+            if !status.is_success() {
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error = SyncError::ProtocolError(format!(
+                    "Failed to submit DAG node. Status: {}, Error: {}", status, error_text
+                ));
+                
+                // Only retry on server errors (5xx)
+                if status.is_server_error() {
+                    return Err(backoff::Error::transient(error));
+                } else {
+                    return Err(backoff::Error::permanent(error));
+                }
+            }
+            
+            // Parse the response body as JSON
+            let submission_response: NodeSubmissionResponse = response.json().await
+                .map_err(|e| {
+                    let error = SyncError::SerializationError(format!("Failed to parse submission response: {}", e));
+                    backoff::Error::permanent(error)
+                })?;
+                
+            Ok(submission_response)
+        }).await;
+        
+        match result {
+            Ok(response) => Ok(response),
+            Err(backoff::Error::Permanent(e)) => Err(e),
+            Err(backoff::Error::Transient { error, .. }) => Err(error),
+        }
+    }
+    
+    /// Get a DagThread by its ID
+    pub async fn fetch_dag_thread(&self, thread_id: &str) -> SyncResult<DagThread> {
+        // First try to load from local store
+        match self.store.load_dag_thread(thread_id).await {
+            Ok(thread) => {
+                debug!("Loaded DAG thread from local store: {}", thread_id);
+                return Ok(thread);
+            },
+            Err(e) => {
+                debug!("Failed to load DAG thread from store: {}. Will attempt to fetch from network.", e);
+            }
+        }
+        
+        // If not found locally, try to fetch from the network
+        if self.config.federation_urls.is_empty() {
+            return Err(SyncError::ConfigurationError("No federation URLs configured".to_string()));
+        }
+        
+        // Use the first federation URL
+        let federation_url = &self.config.federation_urls[0];
+        let url = format!("{}{}/{}", federation_url, DEFAULT_THREAD_ENDPOINT, thread_id);
+        debug!("Fetching DAG thread from {}", url);
+        
+        // Create authentication headers with the identity DID
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("X-Identity-DID", 
+            self.identity.did.to_string().parse()
+                .map_err(|_| SyncError::ProtocolError("Invalid DID for header".to_string()))?);
+        
+        // Make the request
+        let response = self.http_client.get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| SyncError::ConnectionError(format!("Failed to fetch DAG thread: {}", e)))?;
+            
+        // Check status code
+        let status = response.status();
+        if !status.is_success() {
+            if status == StatusCode::NOT_FOUND {
+                return Err(SyncError::NotFound(format!("DAG thread not found: {}", thread_id)));
+            }
+            
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(SyncError::ProtocolError(format!(
+                "Failed to fetch DAG thread. Status: {}, Error: {}", status, error_text
+            )));
+        }
+        
+        // Parse the response body as JSON
+        let thread: DagThread = response.json().await
+            .map_err(|e| SyncError::SerializationError(format!("Failed to parse DAG thread: {}", e)))?;
+            
+        // Store the thread locally
+        self.store.save_dag_thread(thread_id, &thread).await
+            .map_err(|e| SyncError::CoreError(e))?;
+            
+        Ok(thread)
     }
     
     /// Save a trust bundle to the wallet store
