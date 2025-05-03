@@ -4,6 +4,9 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
+use std::sync::Arc;
+
+mod routes;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,10 +17,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_connections(5)
         .connect(&database_url)
         .await?;
+    
+    let pool = Arc::new(pool);
 
     let app = Router::new()
         .route("/health", get(|| async { "ok" }))
-        // .merge(other_routes)
+        .merge(routes::threads::routes())
         .with_state(pool);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "3001".to_string());
