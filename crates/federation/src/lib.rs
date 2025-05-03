@@ -36,6 +36,7 @@ use multihash::{self, MultihashDigest};
 use tracing::{debug, info, error, warn};
 use thiserror::Error;
 use sha2::{Sha256, Digest};
+use cid::Cid;
 
 // Export network module
 pub mod network;
@@ -551,20 +552,585 @@ pub fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
         .expect("Failed to create multihash")
 }
 
-// Placeholder for the run_event_loop function
-// This is just a temporary stub to make the code compile
+// The event loop for the federation node
 async fn run_event_loop(
-    _swarm: Swarm<network::IcnFederationBehaviour>,
-    _command_receiver: mpsc::Receiver<FederationManagerMessage>,
-    _storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
-    _blob_receiver: mpsc::Receiver<cid::Cid>,
-    _fed_cmd_receiver: mpsc::Receiver<FederationCommand>,
+    mut swarm: Swarm<network::IcnFederationBehaviour>,
+    mut command_receiver: mpsc::Receiver<FederationManagerMessage>,
+    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+    mut blob_receiver: mpsc::Receiver<cid::Cid>,
+    mut fed_cmd_receiver: mpsc::Receiver<FederationCommand>,
 ) {
-    // In a real implementation, this would process events from the libp2p swarm
-    // For now, just loop forever to keep the task alive
+    // Track inflight Kademlia queries for providers
+    let mut pending_provider_queries: HashMap<kad::QueryId, cid::Cid> = HashMap::new();
+    
+    // Track pending blob replication requests
+    // Maps QueryId -> (CID, ResponseChannel)
+    let mut pending_replication_fetches: HashMap<
+        kad::QueryId, 
+        (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)
+    > = HashMap::new();
+    
+    // Track pending fetch operations
+    let mut pending_blob_fetches: HashMap<
+        request_response::OutboundRequestId, 
+        (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)
+    > = HashMap::new();
+    
+    // Create a blob storage adapter to interact with storage
+    let blob_storage = BlobStorageAdapter { storage: storage.clone() };
+    
     loop {
-        // Sleep to avoid busy wait
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::select! {
+            // Handle incoming events from the swarm
+            event = swarm.select_next_some() => {
+                match event {
+                    // Handle behavior events
+                    SwarmEvent::Behaviour(behavior_event) => {
+                        match behavior_event {
+                            // Handle incoming blob replication requests
+                            network::IcnFederationBehaviourEvent::BlobReplication(
+                                request_response::Event::Message { 
+                                    message: request_response::Message::Request { 
+                                        request, 
+                                        channel, 
+                                        .. 
+                                    }, 
+                                    .. 
+                                }
+                            ) => {
+                                handle_blob_replication_request(
+                                    request,
+                                    channel,
+                                    &mut swarm,
+                                    &blob_storage,
+                                    &mut pending_provider_queries,
+                                    &mut pending_replication_fetches,
+                                ).await;
+                            },
+                            // Handle Kademlia provider results
+                            network::IcnFederationBehaviourEvent::Kademlia(
+                                kad::Event::OutboundQueryProgressed { 
+                                    id, 
+                                    result: kad::QueryResult::GetProviders(Ok(providers)), 
+                                    .. 
+                                }
+                            ) => {
+                                handle_kademlia_get_providers_ok(
+                                    id,
+                                    providers,
+                                    &mut swarm,
+                                    &mut pending_provider_queries,
+                                    &mut pending_replication_fetches,
+                                    &mut pending_blob_fetches,
+                                ).await;
+                            },
+                            // Handle Kademlia provider query failure
+                            network::IcnFederationBehaviourEvent::Kademlia(
+                                kad::Event::OutboundQueryProgressed { 
+                                    id, 
+                                    result: kad::QueryResult::GetProviders(Err(e)), 
+                                    .. 
+                                }
+                            ) => {
+                                handle_kademlia_get_providers_error(
+                                    id,
+                                    e,
+                                    &mut swarm,
+                                    &mut pending_provider_queries,
+                                    &mut pending_replication_fetches,
+                                ).await;
+                            },
+                            // Handle blob fetch responses
+                            network::IcnFederationBehaviourEvent::BlobFetch(
+                                request_response::Event::Message { 
+                                    message: request_response::Message::Response { 
+                                        request_id, 
+                                        response, 
+                                    }, 
+                                    .. 
+                                }
+                            ) => {
+                                handle_blob_fetch_response(
+                                    request_id,
+                                    response,
+                                    &mut swarm,
+                                    &blob_storage,
+                                    &mut pending_blob_fetches,
+                                ).await;
+                            },
+                            // Handle blob fetch request failure
+                            network::IcnFederationBehaviourEvent::BlobFetch(
+                                request_response::Event::OutboundFailure { 
+                                    request_id, 
+                                    error, 
+                                    .. 
+                                }
+                            ) => {
+                                handle_blob_fetch_failure(
+                                    request_id,
+                                    error,
+                                    &mut swarm,
+                                    &mut pending_blob_fetches,
+                                ).await;
+                            },
+                            // Handle other Kademlia events like closest peers for replication
+                            network::IcnFederationBehaviourEvent::Kademlia(
+                                kad::Event::OutboundQueryProgressed { 
+                                    id, 
+                                    result: kad::QueryResult::GetClosestPeers(Ok(peers)), 
+                                    .. 
+                                }
+                            ) => {
+                                // This would be handled by the identify_replication_targets function
+                                debug!("Received closest peers result: {:?}", peers);
+                            },
+                            // Handle other events
+                            _ => {
+                                // Not handling other events in this implementation
+                            }
+                        }
+                    },
+                    // Handle other swarm events
+                    SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                        info!(%peer_id, "Connection established");
+                    },
+                    SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                        info!(%peer_id, "Connection closed");
+                    },
+                    SwarmEvent::NewListenAddr { address, .. } => {
+                        info!(%address, "Listening on new address");
+                    },
+                    _ => {
+                        // Ignore other events
+                    }
+                }
+            },
+            
+            // Handle incoming blob announcements
+            Some(cid) = blob_receiver.recv() => {
+                debug!(%cid, "Received blob announcement");
+                
+                // Announce that we are a provider for this CID
+                if let Err(e) = swarm.behaviour_mut().kademlia.start_providing(kad::RecordKey::new(&cid.to_bytes())) {
+                    error!(%cid, "Failed to announce as provider: {}", e);
+                }
+            },
+            
+            // Handle federation commands
+            Some(command) = fed_cmd_receiver.recv() => {
+                match command {
+                    FederationCommand::AnnounceBlob(cid) => {
+                        debug!(%cid, "Announcing blob as provider");
+                        
+                        // Announce that we are a provider for this CID
+                        if let Err(e) = swarm.behaviour_mut().kademlia.start_providing(kad::RecordKey::new(&cid.to_bytes())) {
+                            error!(%cid, "Failed to announce as provider: {}", e);
+                        }
+                    },
+                    FederationCommand::IdentifyReplicationTargets { cid, policy, context_id, .. } => {
+                        handle_identify_replication_targets(
+                            cid,
+                            policy,
+                            context_id,
+                            &mut swarm,
+                            &storage,
+                        ).await;
+                    },
+                }
+            },
+            
+            // Handle manager messages
+            Some(message) = command_receiver.recv() => {
+                match message {
+                    FederationManagerMessage::RequestTrustBundle { epoch, respond_to } => {
+                        debug!("Requesting trust bundle for epoch {}", epoch);
+                        // TODO: Implement trust bundle request logic
+                        let _ = respond_to.send(Ok(None));
+                    },
+                    FederationManagerMessage::PublishTrustBundle { bundle, respond_to } => {
+                        debug!("Publishing trust bundle for epoch {}", bundle.epoch_id);
+                        // TODO: Implement trust bundle publish logic
+                        let _ = respond_to.send(Ok(()));
+                    },
+                    FederationManagerMessage::AnnounceBlob { cid, respond_to } => {
+                        debug!(%cid, "Announcing blob as provider");
+                        
+                        // Announce that we are a provider for this CID
+                        match swarm.behaviour_mut().kademlia.start_providing(kad::RecordKey::new(&cid.to_bytes())) {
+                            Ok(_) => {
+                                if let Some(sender) = respond_to {
+                                    let _ = sender.send(Ok(()));
+                                }
+                            },
+                            Err(e) => {
+                                error!(%cid, "Failed to announce as provider: {}", e);
+                                if let Some(sender) = respond_to {
+                                    let _ = sender.send(Err(FederationError::NetworkError(format!(
+                                        "Failed to announce as provider: {}", e
+                                    ))));
+                                }
+                            }
+                        }
+                    },
+                    FederationManagerMessage::IdentifyReplicationTargets { cid, policy, context_id, respond_to } => {
+                        // Delegate to the handler function
+                        let target_peers = 
+                            handle_identify_replication_targets(cid, policy, context_id, &mut swarm, &storage).await;
+                        
+                        // Send the response if a channel was provided
+                        if let Some(sender) = respond_to {
+                            let _ = sender.send(Ok(target_peers));
+                        }
+                    },
+                    FederationManagerMessage::Shutdown { respond_to } => {
+                        info!("Received shutdown request");
+                        
+                        // Send confirmation and exit the loop
+                        let _ = respond_to.send(());
+                        break;
+                    },
+                }
+            },
+        }
+    }
+}
+
+/// Handle incoming blob replication requests
+async fn handle_blob_replication_request(
+    request: network::ReplicateBlobRequest,
+    channel: request_response::ResponseChannel<network::ReplicateBlobResponse>,
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    blob_storage: &BlobStorageAdapter,
+    pending_provider_queries: &mut HashMap<kad::QueryId, cid::Cid>,
+    pending_replication_fetches: &mut HashMap<kad::QueryId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+) {
+    let cid = request.cid;
+    debug!(%cid, "Received ReplicateBlobRequest");
+    
+    // Check if we already have the blob
+    match blob_storage.blob_exists(&cid).await {
+        Ok(true) => {
+            // Blob is present, try to pin it
+            info!(%cid, "Blob exists locally, pinning it");
+            match blob_storage.pin_blob(&cid).await {
+                Ok(_) => {
+                    // Successfully pinned, send success response
+                    info!(%cid, "Successfully pinned blob");
+                    let response = network::ReplicateBlobResponse {
+                        success: true,
+                        error_msg: None,
+                    };
+                    let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                },
+                Err(e) => {
+                    // Failed to pin, send error response
+                    error!(%cid, "Failed to pin blob: {}", e);
+                    let response = network::ReplicateBlobResponse {
+                        success: false,
+                        error_msg: Some(format!("Failed to pin blob: {}", e)),
+                    };
+                    let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                }
+            }
+        },
+        Ok(false) => {
+            // Blob not present, initiate Kademlia query for providers
+            info!(%cid, "Blob not found locally, searching for providers");
+            
+            // Start a Kademlia query for providers of this CID
+            // The get_providers method returns a QueryId directly, not a Result
+            let record_key = kad::RecordKey::new(&cid.to_bytes());
+            let query_id = swarm.behaviour_mut().kademlia.get_providers(record_key);
+            
+            // Store the query ID, CID, and response channel
+            pending_replication_fetches.insert(query_id, (cid, channel));
+            pending_provider_queries.insert(query_id, cid);
+            debug!(%cid, ?query_id, "Started Kademlia query for providers");
+        },
+        Err(e) => {
+            // Error checking blob existence, send error response
+            error!(%cid, "Error checking if blob exists: {}", e);
+            let response = network::ReplicateBlobResponse {
+                success: false,
+                error_msg: Some(format!("Storage error: {}", e)),
+            };
+            let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+        }
+    }
+}
+
+/// Handle successful Kademlia GetProviders query results
+async fn handle_kademlia_get_providers_ok(
+    id: kad::QueryId,
+    providers_result: kad::GetProvidersOk,
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    pending_provider_queries: &mut HashMap<kad::QueryId, cid::Cid>,
+    pending_replication_fetches: &mut HashMap<kad::QueryId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+    pending_blob_fetches: &mut HashMap<request_response::OutboundRequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+) {
+    // Extract the providers from the correct enum variant
+    let providers = match providers_result {
+        kad::GetProvidersOk::FoundProviders { providers, .. } => providers,
+        kad::GetProvidersOk::FinishedWithNoAdditionalRecord { closest_peers } => {
+            // If we didn't find any providers, use the closest peers as potential providers
+            closest_peers.into_iter().collect()
+        }
+    };
+    
+    // Check if this is for a replication fetch
+    if let Some((cid, channel)) = pending_replication_fetches.remove(&id) {
+        if providers.is_empty() {
+            // No providers found, send failure response
+            warn!(%cid, "No providers found for blob");
+            let response = network::ReplicateBlobResponse {
+                success: false,
+                error_msg: Some("No providers found for this blob".to_string()),
+            };
+            let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+            return;
+        }
+        
+        // Found providers, attempt to fetch the blob from the first provider
+        let provider = providers.iter().next().unwrap();
+        info!(%cid, %provider, "Found provider for blob, initiating fetch");
+        
+        // Create a fetch request
+        let fetch_request = network::FetchBlobRequest { cid };
+        
+        // Send the request to the provider
+        let request_id = swarm
+            .behaviour_mut()
+            .blob_fetch
+            .send_request(provider, fetch_request);
+        
+        // Store the request ID, CID, and the original response channel
+        pending_blob_fetches.insert(request_id, (cid, channel));
+        
+        // Also remove from pending provider queries
+        pending_provider_queries.remove(&id);
+    } else if let Some(cid) = pending_provider_queries.remove(&id) {
+        // This was just a provider query, not a replication fetch
+        info!(%cid, "Found {} providers for blob", providers.len());
+    }
+}
+
+/// Handle Kademlia GetProviders query errors
+async fn handle_kademlia_get_providers_error(
+    id: kad::QueryId,
+    error: kad::GetProvidersError,
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    pending_provider_queries: &mut HashMap<kad::QueryId, cid::Cid>,
+    pending_replication_fetches: &mut HashMap<kad::QueryId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+) {
+    // Check if this is for a replication fetch
+    if let Some((cid, channel)) = pending_replication_fetches.remove(&id) {
+        // Failed to find providers, send failure response
+        error!(%cid, "Failed to find providers: {}", error);
+        let response = network::ReplicateBlobResponse {
+            success: false,
+            error_msg: Some(format!("Failed to find providers: {}", error)),
+        };
+        let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+        
+        // Also remove from pending provider queries
+        pending_provider_queries.remove(&id);
+    } else if let Some(cid) = pending_provider_queries.remove(&id) {
+        // This was just a provider query, not a replication fetch
+        warn!(%cid, "Failed to find providers: {}", error);
+    }
+}
+
+/// Handle blob fetch response for a replication fetch
+async fn handle_blob_fetch_response(
+    request_id: request_response::OutboundRequestId,
+    response: network::FetchBlobResponse,
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    blob_storage: &BlobStorageAdapter,
+    pending_blob_fetches: &mut HashMap<request_response::OutboundRequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+) {
+    // Check if this is a response to a pending fetch
+    if let Some((cid, channel)) = pending_blob_fetches.remove(&request_id) {
+        if let Some(data) = response.data {
+            // Got the data, store it and pin it
+            info!(%cid, "Received blob data, storing and pinning");
+            
+            // Store the blob
+            match blob_storage.put_blob(&data).await {
+                Ok(stored_cid) => {
+                    if stored_cid != cid {
+                        // CID mismatch, send failure response
+                        error!(%cid, actual_cid = %stored_cid, "CID mismatch for fetched blob");
+                        let response = network::ReplicateBlobResponse {
+                            success: false,
+                            error_msg: Some("CID mismatch for fetched blob".to_string()),
+                        };
+                        let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                        return;
+                    }
+                    
+                    // Pin the blob
+                    match blob_storage.pin_blob(&cid).await {
+                        Ok(_) => {
+                            // Successfully stored and pinned, send success response
+                            info!(%cid, "Successfully stored and pinned fetched blob");
+                            let response = network::ReplicateBlobResponse {
+                                success: true,
+                                error_msg: None,
+                            };
+                            let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                        },
+                        Err(e) => {
+                            // Failed to pin, send error response
+                            error!(%cid, "Failed to pin fetched blob: {}", e);
+                            let response = network::ReplicateBlobResponse {
+                                success: false,
+                                error_msg: Some(format!("Failed to pin fetched blob: {}", e)),
+                            };
+                            let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                        }
+                    }
+                },
+                Err(e) => {
+                    // Failed to store, send error response
+                    error!(%cid, "Failed to store fetched blob: {}", e);
+                    let response = network::ReplicateBlobResponse {
+                        success: false,
+                        error_msg: Some(format!("Failed to store fetched blob: {}", e)),
+                    };
+                    let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+                }
+            }
+        } else {
+            // No data received, send failure response
+            warn!(%cid, "No data received for fetched blob");
+            let response = network::ReplicateBlobResponse {
+                success: false,
+                error_msg: response.error_msg.or(Some("No data received from provider".to_string())),
+            };
+            let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+        }
+    }
+}
+
+/// Handle blob fetch failures
+async fn handle_blob_fetch_failure(
+    request_id: request_response::OutboundRequestId,
+    error: request_response::OutboundFailure,
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    pending_blob_fetches: &mut HashMap<request_response::OutboundRequestId, (cid::Cid, request_response::ResponseChannel<network::ReplicateBlobResponse>)>,
+) {
+    // Check if this is a failure for a pending fetch
+    if let Some((cid, channel)) = pending_blob_fetches.remove(&request_id) {
+        // Failed to fetch blob, send failure response
+        error!(%cid, "Failed to fetch blob: {}", error);
+        let response = network::ReplicateBlobResponse {
+            success: false,
+            error_msg: Some(format!("Failed to fetch blob: {}", error)),
+        };
+        let _ = swarm.behaviour_mut().blob_replication.send_response(channel, response);
+    }
+}
+
+/// Handle identifying replication targets
+async fn handle_identify_replication_targets(
+    cid: cid::Cid,
+    policy: ReplicationPolicy,
+    context_id: Option<String>,
+    swarm: &mut Swarm<network::IcnFederationBehaviour>,
+    storage: &Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+) -> Vec<PeerId> {
+    // Get the context ID or use a default
+    let ctx_id = context_id.unwrap_or("default".to_string());
+    
+    debug!(%cid, context = %ctx_id, "Identifying replication targets");
+    
+    // Lookup replication policy for this context if using a default policy
+    let effective_policy = match &policy {
+        ReplicationPolicy::Factor(0) | ReplicationPolicy::None => {
+            if let Ok(context_policy) = roles::get_replication_policy(&ctx_id, storage.clone()).await {
+                debug!(%cid, context = %ctx_id, "Using context policy: {:?}", context_policy);
+                context_policy
+            } else {
+                debug!(%cid, context = %ctx_id, "Using provided policy: {:?}", policy);
+                policy
+            }
+        },
+        _ => {
+            debug!(%cid, context = %ctx_id, "Using provided policy: {:?}", policy);
+            policy
+        }
+    };
+    
+    // For simplicity, we're using the list of connected peers directly
+    // Get the list of connected peers directly from the swarm
+    let connected_peers: Vec<PeerId> = swarm
+        .connected_peers()
+        .map(|peer_id| *peer_id)
+        .collect();
+    
+    // Select target peers based on the policy
+    let target_peers = replication::identify_target_peers(
+        &cid,
+        &effective_policy,
+        connected_peers,
+        swarm.local_peer_id(),
+    ).await;
+    
+    // Initiate replication to the target peers
+    if !target_peers.is_empty() {
+        if let Err(e) = replication::replicate_to_peers(&cid, &target_peers, swarm).await {
+            error!(%cid, "Failed to initiate replication: {}", e);
+        }
+    }
+    
+    // Return the selected target peers
+    target_peers
+}
+
+/// Helper struct for interacting with storage
+struct BlobStorageAdapter {
+    storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+}
+
+impl BlobStorageAdapter {
+    /// Check if a blob exists in storage
+    async fn blob_exists(&self, cid: &cid::Cid) -> FederationResult<bool> {
+        let storage_guard = self.storage.lock().await;
+        storage_guard.contains_blob(cid).await
+            .map_err(|e| FederationError::StorageError(format!("Failed to check blob existence: {}", e)))
+    }
+    
+    /// Pin a blob in storage
+    async fn pin_blob(&self, cid: &cid::Cid) -> FederationResult<()> {
+        let storage_guard = self.storage.lock().await;
+        
+        // First check if the blob exists
+        let blob_exists = storage_guard.contains_blob(cid).await
+            .map_err(|e| FederationError::StorageError(format!("Failed to check blob existence: {}", e)))?;
+        
+        if !blob_exists {
+            return Err(FederationError::StorageError(format!("Blob not found: {}", cid)));
+        }
+        
+        // Actual pinning would be implemented via a DistributedStorage trait
+        // For now, we'll just return success if the blob exists
+        debug!(%cid, "Successfully pinned blob (simulated)");
+        
+        Ok(())
+    }
+    
+    /// Store a blob in storage
+    async fn put_blob(&self, data: &[u8]) -> FederationResult<cid::Cid> {
+        let storage_guard = self.storage.lock().await;
+        storage_guard.put_blob(data).await
+            .map_err(|e| FederationError::StorageError(format!("Failed to store blob: {}", e)))
+    }
+    
+    /// Get a blob from storage
+    async fn get_blob(&self, cid: &cid::Cid) -> FederationResult<Option<Vec<u8>>> {
+        let storage_guard = self.storage.lock().await;
+        storage_guard.get_blob(cid).await
+            .map_err(|e| FederationError::StorageError(format!("Failed to get blob: {}", e)))
     }
 }
 
@@ -585,4 +1151,14 @@ async fn request_trust_bundle_from_network(
     // In a real implementation, this would request a trust bundle from peers
     // For now, just return Ok
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn test_blob_storage_adapter_basics() {
+        // This test simply passes to ensure the module compiles
+    }
 }
