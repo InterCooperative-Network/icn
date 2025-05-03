@@ -580,6 +580,15 @@ pub struct BudgetProposal {
     pub metadata: Option<serde_json::Value>,
 }
 
+pub mod resources;
+pub mod policy;
+
+pub use resources::{ResourceType, ResourceBalance, ResourceAccount};
+pub use policy::{
+    FederationPolicy, PolicyEnforcer, PolicyError, 
+    TokenAuthorizationRule, RateLimit, ResourceType as PolicyResourceType
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;

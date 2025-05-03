@@ -75,6 +75,17 @@ pub use health::{
     QuorumHealth, PeerDiagnostic, EpochDiagnostic
 };
 
+pub mod config;
+pub mod peer;
+pub mod credential_sync;
+
+pub use config::FederationConfig;
+pub use peer::{FederationPeer, PeerManager};
+pub use credential_sync::{
+    CredentialSyncService, CredentialSyncConfig, SyncParameters,
+    SyncCredentialType, CredentialVerifier, SimpleCredentialVerifier
+};
+
 /// Represents a guardian mandate
 #[derive(Debug, Clone)]
 pub struct GuardianMandate {
