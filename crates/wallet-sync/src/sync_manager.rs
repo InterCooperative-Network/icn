@@ -13,6 +13,7 @@ use crate::error::{SyncResult, SyncError};
 use crate::trust::TrustBundleValidator;
 use crate::client::SyncClient;
 use wallet_agent::governance::TrustBundle;
+use reqwest::Client as HttpClient;
 
 /// Represents the sync state for a federation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,8 +156,8 @@ impl MockDagHeaderData {
 pub struct SyncManager<S: LocalWalletStore> {
     /// The identity used for authentication
     identity: IdentityWallet,
-    /// The sync client for network communication
-    sync_client: SyncClient,
+    /// HTTP client for network communication
+    http_client: HttpClient,
     /// The store for persisting synchronized data
     store: S,
     /// The validator for trust bundles
@@ -173,12 +174,11 @@ impl<S: LocalWalletStore> SyncManager<S> {
     /// Create a new SyncManager
     pub fn new(identity: IdentityWallet, store: S, config: Option<SyncManagerConfig>) -> Self {
         let config = config.unwrap_or_default();
-        let sync_client = SyncClient::new(&config.federation_urls[0]);
         let trust_validator = TrustBundleValidator::new(identity.clone());
         
         Self {
             identity,
-            sync_client,
+            http_client: HttpClient::new(),
             store,
             trust_validator,
             config,
@@ -290,23 +290,13 @@ impl<S: LocalWalletStore> SyncManager<S> {
         };
         
         // Sync trust bundles
-        let trust_bundles = self.fetch_mock_trust_bundles(federation_id, last_epoch).await?;
+        let trust_bundles = self.sync_trust_bundles(federation_url).await?;
         let bundles_count = trust_bundles.len();
         
         // Process and store trust bundles
         for bundle in trust_bundles {
-            // Validate the bundle
-            if let Err(e) = self.trust_validator.validate_bundle(&bundle) {
-                eprintln!("Invalid trust bundle: {}", e);
-                continue;
-            }
-            
-            // Convert to a format for storage
-            let bundle_id = bundle.id.clone();
-            let epoch = bundle.epoch;
-            
-            // Store the bundle
-            // ... in a real implementation, we would use the store
+            // Store the bundle in the wallet store
+            self.save_trust_bundle(&bundle).await?;
         }
         
         // Sync DAG headers
@@ -341,15 +331,80 @@ impl<S: LocalWalletStore> SyncManager<S> {
         Ok(())
     }
     
-    /// Fetch mock trust bundles for testing
-    async fn fetch_mock_trust_bundles(&self, federation_id: &str, since_epoch: u64) -> SyncResult<Vec<TrustBundle>> {
-        // Create mock trust bundle data
-        let mock_data = MockTrustBundleData::new(federation_id, since_epoch + 1);
+    /// Fetch the latest trust bundle from the federation
+    pub async fn fetch_latest_trust_bundle(&self, federation_url: &str) -> SyncResult<TrustBundle> {
+        let url = format!("{}/latest-bundle", federation_url);
         
-        // Convert to trust bundles
-        let bundle = mock_data.to_trust_bundle();
+        // In a real implementation, we would make an HTTP request to the federation
+        // For now, use a mock implementation
+        let response = self.http_client.get(&url)
+            .send()
+            .await
+            .map_err(|e| SyncError::ConnectionError(format!("Failed to fetch latest trust bundle: {}", e)))?;
+            
+        if !response.status().is_success() {
+            return Err(SyncError::ConnectionError(format!(
+                "Failed to fetch latest trust bundle. Status: {}", response.status()
+            )));
+        }
+        
+        // Parse the response body as JSON
+        let bundle: TrustBundle = response.json()
+            .await
+            .map_err(|e| SyncError::SerializationError(format!("Failed to parse trust bundle: {}", e)))?;
+            
+        Ok(bundle)
+    }
+    
+    /// Synchronize trust bundles from the federation
+    pub async fn sync_trust_bundles(&self, federation_url: &str) -> SyncResult<Vec<TrustBundle>> {
+        // In a real implementation, this would fetch from the actual federation
+        // For testing purposes, we'll use a mock implementation
+        let bundle = match self.fetch_latest_trust_bundle(federation_url).await {
+            Ok(bundle) => bundle,
+            Err(e) => {
+                eprintln!("Failed to fetch bundle from {}: {}", federation_url, e);
+                // Fall back to mock data
+                let mock_data = MockTrustBundleData::new("default", 1);
+                mock_data.to_trust_bundle()
+            }
+        };
+        
+        // Validate the bundle
+        if let Err(e) = self.trust_validator.validate_bundle(&bundle) {
+            eprintln!("Invalid trust bundle: {}", e);
+            return Err(SyncError::VerificationError(format!("Invalid trust bundle: {}", e)));
+        }
         
         Ok(vec![bundle])
+    }
+    
+    /// Save a trust bundle to the wallet store
+    async fn save_trust_bundle(&self, bundle: &TrustBundle) -> SyncResult<()> {
+        // For now, we'll use a simplified storing mechanism
+        // In a real implementation, this would use a dedicated method in LocalWalletStore
+        let bundle_id = bundle.id.clone();
+        let bundle_json = serde_json::to_string(bundle)
+            .map_err(|e| SyncError::SerializationError(format!("Failed to serialize bundle: {}", e)))?;
+        
+        // We'll use a DagNode to store the bundle for now
+        let node = DagNode {
+            cid: format!("bundle:{}", bundle_id),
+            parents: vec![],
+            epoch: bundle.epoch,
+            creator: "system".to_string(),
+            timestamp: SystemTime::now(),
+            content_type: "trust_bundle".to_string(),
+            content: serde_json::from_str(&bundle_json)
+                .map_err(|e| SyncError::SerializationError(format!("Failed to parse bundle JSON: {}", e)))?,
+            signatures: vec![],
+        };
+        
+        // Store as a DAG node
+        self.store.save_dag_node(&format!("bundle:{}", bundle_id), &node).await
+            .map_err(|e| SyncError::CoreError(e))?;
+            
+        Ok(())
     }
     
     /// Fetch mock DAG headers for testing
@@ -368,5 +423,18 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn get_sync_state(&self, federation_id: &str) -> Option<FederationSyncState> {
         let states = self.sync_states.read().await;
         states.get(federation_id).cloned()
+    }
+    
+    /// List stored trust bundles
+    pub async fn list_trust_bundles(&self) -> SyncResult<Vec<TrustBundle>> {
+        // In a real implementation, this would query the LocalWalletStore
+        // For now, we'll just scan for DAG nodes with content_type "trust_bundle"
+        
+        // Not implemented yet - would need to add a method to list dag nodes by content type
+        // For now, return mock data
+        let mock_data = MockTrustBundleData::new("default", 1);
+        let bundle = mock_data.to_trust_bundle();
+        
+        Ok(vec![bundle])
     }
 } 

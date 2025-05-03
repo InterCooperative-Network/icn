@@ -13,6 +13,7 @@ use wallet_core::credential::CredentialSigner;
 use wallet_core::vc::VerifiableCredential;
 use wallet_core::store::LocalWalletStore;
 use wallet_agent::queue::{ActionType, ActionQueue, PendingAction};
+use wallet_agent::ActionProcessor;
 use wallet_agent::agoranet::{ThreadSummary, ThreadDetail, CredentialLink};
 use wallet_sync::SyncManager;
 
@@ -55,6 +56,35 @@ pub struct CreateCredentialRequest {
 #[derive(Debug, Serialize)]
 pub struct CredentialResponse {
     pub credential: Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DagNodeResponse {
+    pub cid: String,
+    pub content_type: String,
+    pub creator: String,
+    pub timestamp: String,
+    pub content: Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ActionResponse {
+    pub id: String,
+    pub action_type: String,
+    pub creator_did: String,
+    pub status: String,
+    pub created_at: String,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BundleResponse {
+    pub id: String,
+    pub version: u64,
+    pub epoch: u64,
+    pub guardian_count: usize,
+    pub created_at: String,
+    pub valid_until: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -257,6 +287,55 @@ pub async fn queue_action<S: LocalWalletStore>(
     Ok(Json(response))
 }
 
+// Handler for processing a queued action
+pub async fn process_action<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+    Path(action_id): Path<String>,
+) -> ApiResult<Json<DagNodeResponse>> {
+    // Create an action processor
+    let processor = ActionProcessor::new(state.store.clone());
+    
+    // Process the action
+    let result = processor.process_action(&action_id).await
+        .map_err(|e| ApiError::AgentError(e))?;
+        
+    // Convert the DAG node to a response
+    let response = DagNodeResponse {
+        cid: result.cid.clone(),
+        content_type: result.content_type.clone(),
+        creator: result.creator.clone(),
+        timestamp: format!("{:?}", result.timestamp),
+        content: result.content.clone(),
+    };
+    
+    Ok(Json(response))
+}
+
+// Handler for getting an action status
+pub async fn get_action<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+    Path(action_id): Path<String>,
+) -> ApiResult<Json<ActionResponse>> {
+    // Create an action queue
+    let queue = ActionQueue::new(state.store.clone());
+    
+    // Get the action
+    let action = queue.get_action(&action_id).await
+        .map_err(|e| ApiError::AgentError(e))?;
+        
+    // Convert to response
+    let response = ActionResponse {
+        id: action.id,
+        action_type: format!("{:?}", action.action_type),
+        creator_did: action.creator_did,
+        status: format!("{:?}", action.status),
+        created_at: action.created_at.to_rfc3339(),
+        error_message: action.error_message,
+    };
+    
+    Ok(Json(response))
+}
+
 // Handler implementations for sync operations
 pub async fn sync_dag<S: LocalWalletStore>(
     State(state): State<Arc<AppState<S>>>,
@@ -299,6 +378,77 @@ pub async fn sync_dag<S: LocalWalletStore>(
     Ok(Json(response))
 }
 
+// Handler to trigger trust bundle synchronization
+pub async fn sync_trust_bundles<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+) -> ApiResult<Json<Value>> {
+    // Get the first identity to use for auth
+    let identities = state.store.list_identities().await
+        .map_err(|e| ApiError::StoreError(format!("Failed to list identities: {}", e)))?;
+    
+    if identities.is_empty() {
+        return Err(ApiError::AuthError("No identities available for sync".to_string()));
+    }
+    
+    let identity = state.store.load_identity(&identities[0]).await
+        .map_err(|e| ApiError::StoreError(format!("Failed to load identity: {}", e)))?;
+    
+    // Create a sync manager
+    let sync_manager = SyncManager::new(identity, state.store.clone(), None);
+    
+    // Get the federation URL from config
+    let federation_url = &state.config.federation_url;
+    
+    // Sync trust bundles
+    let bundles = sync_manager.sync_trust_bundles(federation_url).await
+        .map_err(|e| ApiError::SyncError(format!("Failed to sync trust bundles: {}", e)))?;
+    
+    // Return summary
+    let response = serde_json::json!({
+        "bundles_synced": bundles.len(),
+        "status": "success",
+    });
+    
+    Ok(Json(response))
+}
+
+// Handler to list stored trust bundles
+pub async fn list_trust_bundles<S: LocalWalletStore>(
+    State(state): State<Arc<AppState<S>>>,
+) -> ApiResult<Json<Vec<BundleResponse>>> {
+    // Get the first identity to use for auth
+    let identities = state.store.list_identities().await
+        .map_err(|e| ApiError::StoreError(format!("Failed to list identities: {}", e)))?;
+    
+    if identities.is_empty() {
+        return Err(ApiError::AuthError("No identities available for sync".to_string()));
+    }
+    
+    let identity = state.store.load_identity(&identities[0]).await
+        .map_err(|e| ApiError::StoreError(format!("Failed to load identity: {}", e)))?;
+    
+    // Create a sync manager
+    let sync_manager = SyncManager::new(identity, state.store.clone(), None);
+    
+    // List trust bundles
+    let bundles = sync_manager.list_trust_bundles().await
+        .map_err(|e| ApiError::SyncError(format!("Failed to list trust bundles: {}", e)))?;
+    
+    // Convert to response format
+    let responses = bundles.into_iter().map(|bundle| {
+        BundleResponse {
+            id: bundle.id,
+            version: bundle.version,
+            epoch: bundle.epoch,
+            guardian_count: bundle.guardians.len(),
+            created_at: format!("{:?}", bundle.created_at),
+            valid_until: format!("{:?}", bundle.valid_until),
+        }
+    }).collect();
+    
+    Ok(Json(responses))
+}
+
 pub async fn set_active_identity(
     State(state): State<SharedState>,
     Path(id): Path<String>,
@@ -319,40 +469,6 @@ pub async fn sign_proposal(
         action_id,
         signed: true,
     };
-    
-    Ok(Json(response))
-}
-
-pub async fn sync_trust_bundles(
-    State(state): State<SharedState>,
-) -> ApiResult<Json<Value>> {
-    // 1. First load any local bundles from disk
-    let guardian = state.create_guardian().await?;
-    let local_count = guardian.load_trust_bundles_from_disk().await?;
-    
-    // 2. Then sync from the network
-    let client = state.create_sync_client().await?;
-    let network_bundles = client.sync_trust_bundles().await
-        .map_err(ApiError::SyncError)?;
-    
-    // Store the length before we start consuming bundles
-    let network_bundles_count = network_bundles.len();
-    
-    // 3. Store the network bundles
-    let mut stored_count = 0;
-    for bundle in network_bundles {
-        // Store returns an error for invalid bundles, which we'll ignore
-        if guardian.store_trust_bundle(bundle).await.is_ok() {
-            stored_count += 1;
-        }
-    }
-    
-    let response = serde_json::json!({
-        "local_bundles_loaded": local_count,
-        "network_bundles_synced": network_bundles_count,
-        "network_bundles_stored": stored_count,
-        "status": "success",
-    });
     
     Ok(Json(response))
 }
@@ -472,17 +588,6 @@ pub async fn notify_proposal_event(
     client.notify_proposal_event(&proposal_id, "status_update", details).await?;
     
     Ok(StatusCode::OK)
-}
-
-// Trust Bundle handlers
-pub async fn list_trust_bundles(
-    State(state): State<SharedState>,
-) -> ApiResult<Json<Vec<wallet_agent::governance::TrustBundle>>> {
-    let guardian = state.create_guardian().await?;
-    
-    let bundles = guardian.list_trust_bundles().await?;
-    
-    Ok(Json(bundles))
 }
 
 pub async fn check_guardian_status(

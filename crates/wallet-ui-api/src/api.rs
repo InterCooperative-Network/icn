@@ -27,9 +27,15 @@ pub fn create_api_router<S: LocalWalletStore + 'static>(
         
         // Action queue routes
         .route("/actions/queue", post(handlers::queue_action::<S>))
+        .route("/actions/:action_id", get(handlers::get_action::<S>))
+        .route("/actions/:action_id/process", post(handlers::process_action::<S>))
         
         // Sync routes
         .route("/sync/dag", post(handlers::sync_dag::<S>))
+        .route("/sync/trust-bundles", post(handlers::sync_trust_bundles::<S>))
+        
+        // TrustBundle routes
+        .route("/bundles", get(handlers::list_trust_bundles::<S>))
         
         .with_state(state)
 } 

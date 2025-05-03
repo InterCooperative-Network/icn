@@ -61,6 +61,7 @@ pub struct ActionQueue<S: LocalWalletStore> {
 }
 
 impl<S: LocalWalletStore> ActionQueue<S> {
+    /// Create a new ActionQueue with the given store
     pub fn new(store: S) -> Self {
         Self { store }
     }
@@ -69,140 +70,93 @@ impl<S: LocalWalletStore> ActionQueue<S> {
     pub async fn queue_action(
         &self,
         action_type: ActionType,
-        creator_did: &str,
+        creator_did: String,
         payload: Value,
-    ) -> WalletResult<PendingAction> {
+    ) -> AgentResult<String> {
+        // Generate a unique ID for this action
+        let action_id = Uuid::new_v4().to_string();
+        
+        // Create the pending action
         let action = PendingAction {
-            id: Uuid::new_v4().to_string(),
+            id: action_id.clone(),
             action_type,
-            creator_did: creator_did.to_string(),
+            creator_did,
             payload,
             created_at: Utc::now(),
             status: ActionStatus::Pending,
             error_message: None,
         };
         
+        // Save the action to the store
         self.save_action(&action).await?;
         
-        Ok(action)
+        Ok(action_id)
     }
     
-    /// Get all pending actions
-    pub async fn get_pending_actions(&self) -> WalletResult<Vec<PendingAction>> {
-        let action_ids = self.store.list_items("actions").await?;
-        let mut pending_actions = Vec::new();
+    /// Get an action by its ID
+    pub async fn get_action(&self, action_id: &str) -> AgentResult<PendingAction> {
+        // Load action data from the store
+        // We'll use a custom format for the ID to avoid collisions
+        let cid = format!("action:{}", action_id);
         
-        for id in action_ids {
-            let action: PendingAction = self.store.load_json("actions", &id).await?;
-            if action.status == ActionStatus::Pending {
-                pending_actions.push(action);
-            }
-        }
-        
-        Ok(pending_actions)
-    }
-    
-    /// Get a specific action by ID
-    pub async fn get_action(&self, id: &str) -> WalletResult<PendingAction> {
-        self.store.load_json("actions", id).await
-    }
-    
-    /// Update the status of an action
-    pub async fn update_action_status(
-        &self,
-        id: &str,
-        status: ActionStatus,
-        error_message: Option<String>,
-    ) -> WalletResult<PendingAction> {
-        let mut action = self.get_action(id).await?;
-        action.status = status;
-        action.error_message = error_message;
-        
-        self.save_action(&action).await?;
-        
+        let node = self.store.load_dag_node(&cid).await
+            .map_err(|e| match e {
+                WalletError::NotFound(_) => AgentError::NotFound(format!("Action not found: {}", action_id)),
+                _ => AgentError::CoreError(e),
+            })?;
+            
+        // Convert from DAG node to PendingAction
+        let action: PendingAction = serde_json::from_value(node.content.clone())
+            .map_err(|e| AgentError::SerializationError(format!("Failed to deserialize action: {}", e)))?;
+            
         Ok(action)
     }
     
     /// Save an action to the store
-    async fn save_action(&self, action: &PendingAction) -> WalletResult<()> {
-        self.store.save_json("actions", &action.id, action).await
-    }
-    
-    /// Process a pending action and create a DAG node
-    pub async fn process_action(
-        &self,
-        action_id: &str,
-        identity: &IdentityWallet,
-    ) -> WalletResult<()> {
-        // Update status to processing
-        let action = self.update_action_status(action_id, ActionStatus::Processing, None).await?;
+    pub async fn save_action(&self, action: &PendingAction) -> AgentResult<()> {
+        // Convert the action to a DAG node for storage
+        let cid = format!("action:{}", action.id);
         
-        // Convert action to DAG node
-        let thread_type = match action.action_type {
-            ActionType::Proposal => ThreadType::Proposal,
-            ActionType::Vote => ThreadType::Vote,
-            ActionType::Anchor => ThreadType::Anchor,
+        let node = DagNode {
+            cid: cid.clone(),
+            parents: vec![],
+            epoch: 0,
+            creator: "system".to_string(),
+            timestamp: std::time::SystemTime::now(),
+            content_type: "pending_action".to_string(),
+            content: serde_json::to_value(action)
+                .map_err(|e| AgentError::SerializationError(format!("Failed to serialize action: {}", e)))?,
+            signatures: vec![],
         };
         
-        let result = self.create_dag_node(action.id.clone(), thread_type, &action.payload, identity).await;
-        
-        match result {
-            Ok(_) => {
-                // Update status to completed
-                self.update_action_status(action_id, ActionStatus::Completed, None).await?;
-            },
-            Err(e) => {
-                // Update status to failed
-                let error_message = format!("Failed to process action: {}", e);
-                self.update_action_status(action_id, ActionStatus::Failed, Some(error_message)).await?;
-                return Err(e);
-            }
-        }
-        
+        // Save the node to the store
+        self.store.save_dag_node(&cid, &node).await
+            .map_err(|e| AgentError::CoreError(e))?;
+            
         Ok(())
     }
     
-    /// Create a DAG node from an action
-    async fn create_dag_node(
-        &self,
-        action_id: String,
-        thread_type: ThreadType,
-        payload: &Value,
-        identity: &IdentityWallet,
-    ) -> WalletResult<()> {
-        // In a real implementation, this would:
-        // 1. Create a DAG node with the payload
-        // 2. Sign it with the identity
-        // 3. Store it locally
-        // 4. Queue it for synchronization
-        // For this example, we'll just stub this out
+    /// Update an existing action
+    pub async fn update_action(&self, action: &PendingAction) -> AgentResult<()> {
+        // Simply save the updated action
+        self.save_action(action).await
+    }
+    
+    /// List all actions with an optional filter by type
+    pub async fn list_actions(&self, action_type: Option<ActionType>) -> AgentResult<Vec<PendingAction>> {
+        // Not implemented yet - would need support in LocalWalletStore to list nodes by content type
+        // For now, return empty list
+        Ok(vec![])
+    }
+    
+    /// Mark an action as failed
+    pub async fn mark_action_failed(&self, action_id: &str, error_message: String) -> AgentResult<()> {
+        let mut action = self.get_action(action_id).await?;
         
-        // Create a DAG node
-        let mut node = DagNode::new(payload.clone());
+        action.status = ActionStatus::Failed;
+        action.error_message = Some(error_message);
         
-        // Sign the node
-        let node_json = serde_json::to_string(&node)
-            .map_err(|e| WalletError::SerializationError(format!("Failed to serialize node: {}", e)))?;
-        let signature = identity.sign_message(node_json.as_bytes());
-        let signature_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &signature);
-        
-        node.add_signature(&identity.did.to_string(), &signature_b64);
-        
-        // Create a thread if it doesn't exist yet
-        let thread_id = format!("{}-thread", action_id);
-        let thread = DagThread::new(
-            thread_type,
-            identity.did.to_string(),
-            "temp-cid".to_string(), // This would be the actual CID in a real implementation
-            Some(format!("Action {}", action_id)),
-            None,
-        );
-        
-        // Store the node and thread
-        self.store.save_dag_node("temp-cid", &node).await?;
-        self.store.save_dag_thread(&thread_id, &thread).await?;
-        
-        Ok(())
+        self.update_action(&action).await
     }
 }
 

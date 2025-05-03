@@ -183,7 +183,68 @@ async fn test_action_queue_and_sync() {
     assert!(queue_action_response["action_id"].as_str().unwrap().len() > 0);
     assert_eq!(queue_action_response["status"].as_str().unwrap(), "queued");
     
-    // Test 2: Sync DAG
+    let action_id = queue_action_response["action_id"].as_str().unwrap().to_string();
+    
+    // Test 2: Get action status
+    let action_status_response = client.get(
+        &format!("/actions/{}", action_id)
+    ).await;
+    
+    assert_eq!(action_status_response["id"].as_str().unwrap(), action_id);
+    assert_eq!(action_status_response["status"].as_str().unwrap(), "Pending");
+    
+    // Test 3: Process the action
+    let process_response = client.post(
+        &format!("/actions/{}/process", action_id),
+        json!({})
+    ).await;
+    
+    assert!(process_response["cid"].as_str().unwrap().len() > 0);
+    assert!(process_response["content_type"].as_str().unwrap().contains("proposal"));
+    
+    // Test 4: Verify the action was processed
+    let updated_status_response = client.get(
+        &format!("/actions/{}", action_id)
+    ).await;
+    
+    assert_eq!(updated_status_response["status"].as_str().unwrap(), "Completed");
+    
+    // Test 5: Sync trust bundles
+    let sync_response = client.post(
+        "/sync/trust-bundles",
+        json!({})
+    ).await;
+    
+    assert_eq!(sync_response["status"].as_str().unwrap(), "success");
+    assert!(sync_response["bundles_synced"].as_u64().unwrap() > 0);
+    
+    // Test 6: List trust bundles
+    let bundles_response = client.get("/bundles").await;
+    
+    assert!(bundles_response.as_array().unwrap().len() > 0);
+    let bundle = &bundles_response.as_array().unwrap()[0];
+    assert!(bundle["id"].as_str().unwrap().len() > 0);
+    
+    // Shutdown the server
+    shutdown_tx.send(()).unwrap();
+}
+
+#[tokio::test]
+async fn test_sync_dag() {
+    // Start the test server
+    let (addr, shutdown_tx) = start_test_server().await;
+    let client = TestClient::new(addr);
+    
+    // Create an identity first
+    let create_identity_response = client.post(
+        "/did/create", 
+        json!({
+            "scope": "personal",
+            "metadata": { "name": "Test User" }
+        })
+    ).await;
+    
+    // Test: Sync DAG
     let sync_response = client.post("/sync/dag", json!({})).await;
     assert_eq!(sync_response["status"].as_str().unwrap(), "success");
     
