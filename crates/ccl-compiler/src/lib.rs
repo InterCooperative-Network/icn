@@ -503,12 +503,12 @@ impl CclCompiler {
         let metadata_json = serde_json::to_string(&metadata)
             .map_err(|e| CompilerError::General(format!("Failed to serialize metadata: {}", e)))?;
         
-        // Extract key and value for store_data action
+        // Extract key and value for store_data action or key for get_data action
         let mut key_cid_str = String::new();
         let mut value_bytes = Vec::new();
         
-        if action == "store_data" {
-            // Extract key_cid and value from DSL input
+        // Extract key_cid for both store_data and get_data actions
+        if action == "store_data" || action == "get_data" {
             if let Some(key) = dsl_input.get("key_cid") {
                 if let Some(key_str) = key.as_str() {
                     key_cid_str = key_str.to_string();
@@ -516,9 +516,12 @@ impl CclCompiler {
                     return Err(CompilerError::DslError("key_cid must be a string".to_string()));
                 }
             } else {
-                return Err(CompilerError::DslError("store_data action requires key_cid field".to_string()));
+                return Err(CompilerError::DslError(format!("{} action requires key_cid field", action)));
             }
-            
+        }
+        
+        // Extract value only for store_data action
+        if action == "store_data" {
             if let Some(value) = dsl_input.get("value") {
                 // Handle different value types
                 if let Some(value_str) = value.as_str() {
@@ -626,8 +629,25 @@ impl CclCompiler {
             template_info_bytes.iter().copied(), // Data bytes - copied to ensure we have actual u8 values
         );
         
-        // For store_data action, embed key_cid and value in data section
-        if action == "store_data" {
+        // Define additional message strings for get_data action
+        let data_found_msg = "Data found for key";
+        let data_not_found_msg = "Data not found for key";
+
+        // Add message strings to data section
+        data_section.active(
+            0, // Memory index
+            &wasm_encoder::ConstExpr::i32_const(1536), // Offset for data_found_msg
+            data_found_msg.as_bytes().iter().copied(),
+        );
+        
+        data_section.active(
+            0, // Memory index
+            &wasm_encoder::ConstExpr::i32_const(1600), // Offset for data_not_found_msg
+            data_not_found_msg.as_bytes().iter().copied(),
+        );
+        
+        // For store_data or get_data action, embed key_cid in data section
+        if action == "store_data" || action == "get_data" {
             // Store key_cid at memory offset 2048
             let key_cid_bytes = key_cid_str.as_bytes();
             data_section.active(
@@ -636,12 +656,15 @@ impl CclCompiler {
                 key_cid_bytes.iter().copied(),
             );
             
-            // Store value at memory offset 4096
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(4096), // Offset for value
-                value_bytes.iter().copied(),
-            );
+            // For store_data action, also embed the value
+            if action == "store_data" {
+                // Store value at memory offset 4096
+                data_section.active(
+                    0, // Memory index
+                    &wasm_encoder::ConstExpr::i32_const(4096), // Offset for value
+                    value_bytes.iter().copied(),
+                );
+            }
         }
         
         module.section(&data_section);
@@ -666,7 +689,7 @@ impl CclCompiler {
         // This function is called by the runtime to execute the governance action
         let mut invoke_func = wasm_encoder::Function::new(vec![
             // Local variables - format is (count, type)
-            (1, wasm_encoder::ValType::I32), // Local 0: Status code
+            (2, wasm_encoder::ValType::I32), // Local 0: Status code, Local 1: Result code from host calls
         ]);
         
         // Store default return value (failure = 1, will be set to 0 on success)
@@ -706,6 +729,59 @@ impl CclCompiler {
             invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0)); // Set local 0 to success
             
             invoke_func.instruction(&wasm_encoder::Instruction::End); // End if block
+            
+        } else if action == "get_data" {
+            // For get_data action, call host_storage_get with the embedded key_cid
+
+            // Define spaces for retrieved data and length
+            // 6144 for storing the length (4 bytes)
+            // 8192 for storing the retrieved data (up to some reasonable size)
+            
+            // Load key_cid pointer and length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2048)); // key_cid pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(key_cid_str.len() as i32)); // key_cid length
+            
+            // Load output buffer pointer and length pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8192)); // Output buffer at 8192
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6144)); // Length pointer at 6144
+            
+            // Call host_storage_get (imported function at index 1)
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store result in local 1
+            
+            // Check if data was found (host_storage_get returns 1 on success)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Eq);
+            
+            // If data was found
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // Log "Data found" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1536)); // "Data found" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(data_found_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set success status (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // Else block (data not found)
+            invoke_func.instruction(&wasm_encoder::Instruction::Else);
+            
+            // Log "Data not found" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1600)); // "Data not found" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(data_not_found_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set failure status (1) - already the default, but being explicit
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // End if/else
+            invoke_func.instruction(&wasm_encoder::Instruction::End);
             
         } else if action == "propose_membership" {
             // Logic for propose_membership action

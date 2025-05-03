@@ -494,4 +494,137 @@ fn test_store_data_wasm_generation() {
     assert!(has_key_cid_data, "WASM should contain the key_cid data");
     assert!(has_value_data, "WASM should contain the value data");
     assert!(has_metadata_section, "WASM should have metadata section");
+}
+
+#[test]
+fn test_get_data_wasm_generation() {
+    // Create a compiler instance
+    let compiler = CclCompiler::new();
+    
+    // Create a CCL config
+    let ccl_config = create_test_ccl_config();
+    
+    // Create a DSL input for get_data action
+    let dsl_input = serde_json::json!({
+        "action": "get_data",
+        "key_cid": "bafybeihx6e2r6fxmbeki6qnpj6if6dbgdipau7udrplgvgn2kev7pu5lzi"
+    });
+    
+    // Compile to WASM with debug info
+    let options = CompilationOptions {
+        include_debug_info: true,
+        validate_schema: false,
+        ..CompilationOptions::default()
+    };
+    
+    let wasm_bytes = compiler.generate_wasm_module(&ccl_config, &dsl_input, &options)
+        .expect("WASM generation should succeed");
+    
+    // Check that the module generates valid WebAssembly
+    assert!(!wasm_bytes.is_empty());
+    assert_eq!(&wasm_bytes[0..4], &[0x00, 0x61, 0x73, 0x6d]); // WebAssembly magic number
+    
+    // Parse the WASM and verify its structure
+    let mut has_storage_get_import = false;
+    let mut has_log_message_import = false;
+    let mut has_invoke_call_to_storage_get = false;
+    let mut has_invoke_call_to_log_message = false;
+    let mut has_key_cid_data = false;
+    let mut has_data_found_message = false;
+    let mut has_data_not_found_message = false;
+    let mut has_if_else_structure = false;
+    let mut has_metadata_section = false;
+    
+    // The key_cid string we're looking for
+    let key_cid = "bafybeihx6e2r6fxmbeki6qnpj6if6dbgdipau7udrplgvgn2kev7pu5lzi";
+    
+    // Parsed WASM validation using wasmparser
+    for payload in Parser::new(0).parse_all(&wasm_bytes) {
+        match payload.expect("Should parse WASM payload") {
+            Payload::ImportSection(import_section) => {
+                for import in import_section {
+                    let import = import.expect("Should parse import");
+                    if import.module == "env" && import.name == "host_storage_get" {
+                        has_storage_get_import = true;
+                    }
+                    if import.module == "env" && import.name == "host_log_message" {
+                        has_log_message_import = true;
+                    }
+                }
+            },
+            Payload::CodeSectionEntry(func_body) => {
+                let mut operators = func_body.get_operators_reader().expect("Should read operators");
+                let mut has_if_op = false;
+                let mut has_else_op = false;
+                
+                while !operators.eof() {
+                    match operators.read().expect("Should read operator") {
+                        Operator::Call { function_index } => {
+                            // Check if we call the storage_get function (index 1 in our imports)
+                            if function_index == 1 {
+                                has_invoke_call_to_storage_get = true;
+                            }
+                            // Check if we call the log_message function (index 0 in our imports)
+                            if function_index == 0 {
+                                has_invoke_call_to_log_message = true;
+                            }
+                        },
+                        Operator::If { .. } => {
+                            has_if_op = true;
+                        },
+                        Operator::Else => {
+                            has_else_op = true;
+                        },
+                        _ => {}
+                    }
+                }
+                
+                // Check if we have a complete if/else structure
+                has_if_else_structure = has_if_op && has_else_op;
+            },
+            Payload::DataSection(data_section) => {
+                for data in data_section {
+                    let data = data.expect("Should parse data");
+                    let data_bytes = data.data.to_vec();
+                    
+                    // Check for key_cid in data
+                    if data_bytes.windows(key_cid.len()).any(|window| window == key_cid.as_bytes()) {
+                        has_key_cid_data = true;
+                    }
+                    
+                    // Check for the status messages
+                    if data_bytes.windows("Data found for key".len()).any(|window| window == "Data found for key".as_bytes()) {
+                        has_data_found_message = true;
+                    }
+                    
+                    if data_bytes.windows("Data not found for key".len()).any(|window| window == "Data not found for key".as_bytes()) {
+                        has_data_not_found_message = true;
+                    }
+                }
+            },
+            Payload::CustomSection(section) => {
+                if section.name() == "icn-metadata" {
+                    has_metadata_section = true;
+                    
+                    // Verify metadata contains the action type
+                    let metadata_str = std::str::from_utf8(section.data())
+                        .expect("Metadata should be valid UTF-8");
+                    
+                    assert!(metadata_str.contains("get_data"), "Metadata should contain the action type");
+                }
+            },
+            _ => {}
+        }
+    }
+    
+    // Verify all expected elements are present in the generated WASM
+    assert!(has_storage_get_import, "WASM should import host_storage_get function");
+    assert!(has_log_message_import, "WASM should import host_log_message function");
+    assert!(has_invoke_call_to_storage_get, "WASM should call host_storage_get in invoke function");
+    assert!(has_invoke_call_to_log_message, "WASM should call host_log_message in invoke function");
+    assert!(has_key_cid_data, "WASM should contain the key_cid data");
+    assert!(has_data_found_message, "WASM should contain 'Data found' message");
+    assert!(has_data_not_found_message, "WASM should contain 'Data not found' message");
+    assert!(has_if_else_structure, "WASM should contain if/else structures for conditional logic");
+    assert!(has_metadata_section, "WASM should have metadata section");
 } 
