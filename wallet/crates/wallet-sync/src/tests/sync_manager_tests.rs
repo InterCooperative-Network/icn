@@ -6,6 +6,7 @@ use wallet_core::store::{LocalWalletStore, MemoryStore};
 use crate::sync_manager::{SyncManager, SyncManagerConfig, NodeSubmissionResponse};
 use crate::error::SyncResult;
 use mockito::{mock, server_url};
+use wallet_types::TrustBundle;
 
 // Helper to create a test SyncManager with mocked HTTP endpoints
 fn create_test_sync_manager() -> (SyncManager<MemoryStore>, MemoryStore) {
@@ -310,7 +311,7 @@ mod tests {
     use std::time::{Duration, SystemTime};
     use wallet_core::store::file::FileStore;
     use wallet_core::identity::IdentityWallet;
-    use wallet_agent::governance::TrustBundle;
+    use wallet_types::TrustBundle;
     use wallet_core::dag::DagNode;
     use std::collections::HashMap;
     use mockito;

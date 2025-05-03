@@ -1,5 +1,5 @@
 use wallet_core::identity::IdentityWallet;
-use wallet_agent::governance::TrustBundle;
+use wallet_types::TrustBundle;
 use crate::error::SyncResult;
 
 pub struct TrustBundleValidator {

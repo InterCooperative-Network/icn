@@ -12,7 +12,7 @@ use wallet_core::store::LocalWalletStore;
 use crate::error::{SyncResult, SyncError};
 use crate::trust::TrustBundleValidator;
 use crate::client::SyncClient;
-use wallet_agent::governance::TrustBundle;
+use wallet_types::TrustBundle;
 use wallet_types::network::{NetworkStatus, NodeSubmissionResponse};
 use reqwest::{Client as HttpClient, StatusCode};
 use backoff::{ExponentialBackoff, future::retry};
@@ -1349,7 +1349,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         }
         
         // 3. Check expiration if set
-        if let Some(expires_at) = bundle.expires_at {
+        if let Some(expires_at) = bundle.valid_until {
             if expires_at < now {
                 return Err(SyncError::ValidationError(
                     format!("Trust bundle has expired at {:?}", expires_at)

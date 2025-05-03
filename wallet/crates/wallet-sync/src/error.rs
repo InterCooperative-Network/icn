@@ -17,6 +17,14 @@ pub enum SyncError {
     #[error("Verification error: {0}")]
     VerificationError(String),
     
+    /// Validation error
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+    
+    /// Resource not found
+    #[error("Resource not found: {0}")]
+    ResourceNotFound(String),
+    
     /// DAG error
     #[error("DAG error: {0}")]
     DagError(String),

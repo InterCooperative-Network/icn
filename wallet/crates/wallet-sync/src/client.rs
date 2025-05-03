@@ -10,7 +10,7 @@ use crate::error::{SyncResult, SyncError};
 use crate::trust::TrustBundleValidator;
 use crate::dag::{DagObject, DagVerifier};
 use cid::Cid;
-use wallet_agent::governance::TrustBundle;
+use wallet_types::TrustBundle;
 use reqwest::Client as HttpClient;
 use backoff::{ExponentialBackoff, Error as BackoffError};
 use tracing::{info, warn, error, debug, trace};
