@@ -604,9 +604,51 @@ pub fn derive_authorizations(
     timestamp: i64,
     verbose: bool
 ) -> (Vec<icn_economics::ResourceType>, Vec<icn_economics::ResourceAuthorization>) {
-    // This is just a stub that would convert between the economics and core_vm versions
-    // For now, return empty vectors since we're using the core_vm version directly
-    (Vec::new(), Vec::new())
+    // Get the core-vm authorizations
+    let core_vm_authorizations = derive_core_vm_authorizations(
+        config, 
+        caller_did, 
+        scope, 
+        timestamp, 
+        verbose
+    );
+    
+    // Convert and collect the resource types
+    let resource_types: Vec<icn_economics::ResourceType> = core_vm_authorizations
+        .iter()
+        .map(|auth| convert_resource_type(&auth.resource_type))
+        .collect();
+    
+    // Convert and collect the authorizations
+    let econ_authorizations: Vec<icn_economics::ResourceAuthorization> = core_vm_authorizations
+        .iter()
+        .map(|auth| {
+            icn_economics::ResourceAuthorization::new(
+                "system".to_string(),
+                caller_did.to_string(),
+                convert_resource_type(&auth.resource_type),
+                auth.limit,
+                scope,
+                None, // No expiry timestamp
+                Some(serde_json::json!({
+                    "description": auth.description.clone(),
+                    "context": auth.context.clone()
+                }))
+            )
+        })
+        .collect();
+    
+    (resource_types, econ_authorizations)
+}
+
+/// Helper function to convert from core_vm ResourceType to economics ResourceType
+fn convert_resource_type(vm_resource_type: &icn_core_vm::ResourceType) -> icn_economics::ResourceType {
+    match vm_resource_type {
+        icn_core_vm::ResourceType::Compute => icn_economics::ResourceType::Compute,
+        icn_core_vm::ResourceType::Storage => icn_economics::ResourceType::Storage,
+        icn_core_vm::ResourceType::Network => icn_economics::ResourceType::NetworkBandwidth,
+        icn_core_vm::ResourceType::Token => icn_economics::ResourceType::Custom { identifier: "token".to_string() },
+    }
 }
 
 // Helper function to create an identity context

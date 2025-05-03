@@ -551,39 +551,748 @@ impl CclInterpreter {
         Self
     }
     
-    pub fn interpret_ccl(&self, _ccl_content: &str, scope: IdentityScope) -> Result<config::GovernanceConfig, CclError> {
-        // This is a stub implementation for testing
-        // In a real implementation, this would parse the CCL content
+    pub fn interpret_ccl(&self, ccl_content: &str, scope: IdentityScope) -> Result<config::GovernanceConfig, CclError> {
+        // First, parse the CCL content using the parser
+        let parse_result = parser::parse_ccl(ccl_content);
         
-        // For now, just return a basic config
-        Ok(config::GovernanceConfig {
-            template_type: match scope {
-                IdentityScope::Cooperative => "coop_bylaws",
-                IdentityScope::Community => "community_charter",
-                IdentityScope::Individual => "budget_proposal",
-                _ => "resolution",
-            }.to_string(),
-            template_version: "v1".to_string(),
+        if let Err(e) = parse_result {
+            return Err(CclError::SyntaxError(e.to_string()));
+        }
+        
+        let ast = parse_result.unwrap();
+        
+        // Extract template type and version
+        let template_string = ast.template_type.clone();
+        let mut template_type = template_string.clone();
+        let mut template_version = "v1".to_string();
+        
+        // Check if there's a version in the template type (format: "type:version")
+        if let Some(_idx) = template_string.find(':') {
+            let parts: Vec<&str> = template_string.split(':').collect();
+            if parts.len() == 2 {
+                template_type = parts[0].to_string();
+                template_version = parts[1].to_string();
+            }
+        }
+        
+        // Validate template type against scope
+        match (template_type.as_str(), scope) {
+            ("community_charter", IdentityScope::Community) => {},
+            ("coop_bylaws", IdentityScope::Cooperative) => {},
+            ("budget_proposal", _) => {}, // Budget proposals can be used in any scope
+            ("resolution", _) => {}, // Resolutions can be used in any scope
+            ("participation_rules", _) => {}, // Participation rules can be used in any scope
+            _ => {
+                if (template_type == "community_charter" && scope != IdentityScope::Community) ||
+                   (template_type == "coop_bylaws" && scope != IdentityScope::Cooperative) {
+                    return Err(CclError::InvalidTemplateForScope {
+                        template: template_type,
+                        scope,
+                    });
+                }
+            }
+        }
+        
+        // Validate template version
+        if template_version != "v1" && template_version != "v2" {
+            return Err(CclError::UnsupportedTemplateVersion {
+                template: ast.template_type,
+                version: template_version,
+            });
+        }
+        
+        // Validate type correctness in the CCL content
+        if let ast::CclValue::Object(pairs) = &ast.content {
+            for pair in pairs {
+                if pair.key == "governance" {
+                    if let ast::CclValue::Object(gov_pairs) = &pair.value {
+                        for gov_pair in gov_pairs {
+                            match gov_pair.key.as_str() {
+                                "quorum" => {
+                                    if let ast::CclValue::String(_) = &gov_pair.value {
+                                        return Err(CclError::TypeMismatch { 
+                                            field: "quorum".to_string(), 
+                                            expected: "number".to_string(), 
+                                            actual: "string".to_string() 
+                                        });
+                                    }
+                                },
+                                _ => {}
+                            }
+                        }
+                    }
+                } else if pair.key == "membership" {
+                    if let ast::CclValue::Object(mem_pairs) = &pair.value {
+                        for mem_pair in mem_pairs {
+                            if mem_pair.key == "onboarding" {
+                                if let ast::CclValue::Object(onb_pairs) = &mem_pair.value {
+                                    for onb_pair in onb_pairs {
+                                        match onb_pair.key.as_str() {
+                                            "trial_period_days" => {
+                                                if let ast::CclValue::Boolean(_) = &onb_pair.value {
+                                                    return Err(CclError::TypeMismatch { 
+                                                        field: "trial_period_days".to_string(), 
+                                                        expected: "integer".to_string(),
+                                                        actual: "boolean".to_string() 
+                                                    });
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Begin building the configuration
+        let mut config = config::GovernanceConfig {
+            template_type,
+            template_version,
             governing_scope: scope,
-            identity: Some(config::IdentityInfo {
-                name: Some("Test Entity".to_string()),
-                description: Some("Test description".to_string()),
-                founding_date: Some("2023-01-01".to_string()),
-                mission_statement: Some("Test mission".to_string()),
-            }),
-            governance: Some(config::GovernanceStructure {
-                decision_making: Some("consensus".to_string()),
-                quorum: Some(0.75),
-                majority: Some(0.66),
-                term_length: Some(365),
-                roles: None,
-            }),
+            identity: None,
+            governance: None,
             membership: None,
             proposals: None,
             working_groups: None,
             dispute_resolution: None,
             economic_model: None,
-        })
+        };
+        
+        // Process the content object
+        match ast.content {
+            ast::CclValue::Object(pairs) => {
+                // Extract identity information
+                let identity_info = self.extract_identity_info(&pairs);
+                if identity_info.is_some() {
+                    config.identity = identity_info;
+                }
+                
+                // Extract governance structure
+                let governance = self.extract_governance_structure(&pairs);
+                config.governance = governance;
+                
+                // Extract membership rules
+                let membership = self.extract_membership_rules(&pairs);
+                config.membership = membership;
+                
+                // Extract proposal process
+                let proposals = self.extract_proposal_process(&pairs);
+                config.proposals = proposals;
+                
+                // Extract working groups
+                let working_groups = self.extract_working_groups(&pairs);
+                config.working_groups = working_groups;
+                
+                // Extract dispute resolution
+                let dispute_resolution = self.extract_dispute_resolution(&pairs);
+                config.dispute_resolution = dispute_resolution;
+                
+                // Extract economic model
+                let economic_model = self.extract_economic_model(&pairs);
+                config.economic_model = economic_model;
+                
+                // Validate required fields based on template type
+                self.validate_required_fields(&config)?;
+            },
+            _ => {
+                return Err(CclError::SyntaxError("Expected object as root content".to_string()));
+            }
+        }
+        
+        Ok(config)
+    }
+    
+    // Helper method to extract identity info from CCL pairs
+    fn extract_identity_info(&self, pairs: &[ast::CclPair]) -> Option<config::IdentityInfo> {
+        let mut name = None;
+        let mut description = None;
+        let mut founding_date = None;
+        let mut mission_statement = None;
+        
+        for pair in pairs {
+            match pair.key.as_str() {
+                "name" => {
+                    if let ast::CclValue::String(s) = &pair.value {
+                        name = Some(s.clone());
+                    } else {
+                        // Type mismatch, but we'll continue
+                    }
+                },
+                "description" => {
+                    if let ast::CclValue::String(s) = &pair.value {
+                        description = Some(s.clone());
+                    }
+                },
+                "founding_date" => {
+                    if let ast::CclValue::String(s) = &pair.value {
+                        founding_date = Some(s.clone());
+                    }
+                },
+                "mission_statement" => {
+                    if let ast::CclValue::String(s) = &pair.value {
+                        mission_statement = Some(s.clone());
+                    }
+                },
+                _ => {}
+            }
+        }
+        
+        if name.is_some() || description.is_some() || founding_date.is_some() || mission_statement.is_some() {
+            Some(config::IdentityInfo {
+                name,
+                description,
+                founding_date,
+                mission_statement,
+            })
+        } else {
+            None
+        }
+    }
+    
+    // Helper method to extract governance structure from CCL pairs
+    fn extract_governance_structure(&self, pairs: &[ast::CclPair]) -> Option<config::GovernanceStructure> {
+        for pair in pairs {
+            if pair.key == "governance" {
+                if let ast::CclValue::Object(gov_pairs) = &pair.value {
+                    let mut decision_making = None;
+                    let mut quorum = None;
+                    let mut majority = None;
+                    let mut term_length = None;
+                    let mut roles = None;
+                    
+                    for gov_pair in gov_pairs {
+                        match gov_pair.key.as_str() {
+                            "decision_making" => {
+                                if let ast::CclValue::String(s) = &gov_pair.value {
+                                    decision_making = Some(s.clone());
+                                }
+                            },
+                            "quorum" => {
+                                if let ast::CclValue::Number(n) = &gov_pair.value {
+                                    quorum = Some(*n);
+                                }
+                            },
+                            "majority" => {
+                                if let ast::CclValue::Number(n) = &gov_pair.value {
+                                    majority = Some(*n);
+                                }
+                            },
+                            "term_length" => {
+                                if let ast::CclValue::Number(n) = &gov_pair.value {
+                                    term_length = Some(*n as u64);
+                                }
+                            },
+                            "roles" => {
+                                if let ast::CclValue::Array(role_values) = &gov_pair.value {
+                                    let mut role_vec = Vec::new();
+                                    
+                                    for role_val in role_values {
+                                        if let ast::CclValue::Object(role_pairs) = role_val {
+                                            let mut role_name = String::new();
+                                            let mut permissions = Vec::new();
+                                            
+                                            for rp in role_pairs {
+                                                if rp.key == "name" {
+                                                    if let ast::CclValue::String(s) = &rp.value {
+                                                        role_name = s.clone();
+                                                    }
+                                                } else if rp.key == "permissions" {
+                                                    if let ast::CclValue::Array(perm_vals) = &rp.value {
+                                                        for pv in perm_vals {
+                                                            if let ast::CclValue::String(s) = pv {
+                                                                permissions.push(s.clone());
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if !role_name.is_empty() {
+                                                role_vec.push(config::Role {
+                                                    name: role_name,
+                                                    permissions,
+                                                });
+                                            }
+                                        }
+                                    }
+                                    
+                                    if !role_vec.is_empty() {
+                                        roles = Some(role_vec);
+                                    }
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                    
+                    return Some(config::GovernanceStructure {
+                        decision_making,
+                        quorum,
+                        majority,
+                        term_length,
+                        roles,
+                    });
+                }
+            }
+        }
+        
+        None
+    }
+    
+    // Helper method to extract membership rules from CCL pairs
+    fn extract_membership_rules(&self, pairs: &[ast::CclPair]) -> Option<config::MembershipRules> {
+        for pair in pairs {
+            if pair.key == "membership" {
+                if let ast::CclValue::Object(mem_pairs) = &pair.value {
+                    let mut onboarding = None;
+                    let mut dues = None;
+                    let mut offboarding = None;
+                    
+                    for mem_pair in mem_pairs {
+                        match mem_pair.key.as_str() {
+                            "onboarding" => {
+                                if let ast::CclValue::Object(onb_pairs) = &mem_pair.value {
+                                    let mut requires_sponsor = None;
+                                    let mut trial_period_days = None;
+                                    let mut requirements = None;
+                                    
+                                    for onb_pair in onb_pairs {
+                                        match onb_pair.key.as_str() {
+                                            "requires_sponsor" => {
+                                                if let ast::CclValue::Boolean(b) = &onb_pair.value {
+                                                    requires_sponsor = Some(*b);
+                                                }
+                                            },
+                                            "trial_period_days" => {
+                                                if let ast::CclValue::Number(n) = &onb_pair.value {
+                                                    trial_period_days = Some(*n as u64);
+                                                }
+                                            },
+                                            "requirements" => {
+                                                if let ast::CclValue::Array(req_vals) = &onb_pair.value {
+                                                    let mut req_vec = Vec::new();
+                                                    
+                                                    for rv in req_vals {
+                                                        if let ast::CclValue::String(s) = rv {
+                                                            req_vec.push(s.clone());
+                                                        }
+                                                    }
+                                                    
+                                                    if !req_vec.is_empty() {
+                                                        requirements = Some(req_vec);
+                                                    }
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                    
+                                    onboarding = Some(config::Onboarding {
+                                        requires_sponsor,
+                                        trial_period_days,
+                                        requirements,
+                                    });
+                                }
+                            },
+                            "dues" => {
+                                if let ast::CclValue::Object(dues_pairs) = &mem_pair.value {
+                                    let mut amount = None;
+                                    let mut frequency = None;
+                                    let mut variable_options = None;
+                                    
+                                    for dues_pair in dues_pairs {
+                                        match dues_pair.key.as_str() {
+                                            "amount" => {
+                                                if let ast::CclValue::Number(n) = &dues_pair.value {
+                                                    amount = Some(*n as u64);
+                                                }
+                                            },
+                                            "frequency" => {
+                                                if let ast::CclValue::String(s) = &dues_pair.value {
+                                                    frequency = Some(s.clone());
+                                                }
+                                            },
+                                            "variable_options" => {
+                                                if let ast::CclValue::Array(opt_vals) = &dues_pair.value {
+                                                    let mut opt_vec = Vec::new();
+                                                    
+                                                    for ov in opt_vals {
+                                                        if let ast::CclValue::Object(opt_pairs) = ov {
+                                                            let mut opt_amount = 0;
+                                                            let mut opt_description = String::new();
+                                                            
+                                                            for op in opt_pairs {
+                                                                if op.key == "amount" {
+                                                                    if let ast::CclValue::Number(n) = &op.value {
+                                                                        opt_amount = *n as u64;
+                                                                    }
+                                                                } else if op.key == "description" {
+                                                                    if let ast::CclValue::String(s) = &op.value {
+                                                                        opt_description = s.clone();
+                                                                    }
+                                                                }
+                                                            }
+                                                            
+                                                            if !opt_description.is_empty() {
+                                                                opt_vec.push(config::DuesOption {
+                                                                    amount: opt_amount,
+                                                                    description: opt_description,
+                                                                });
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    if !opt_vec.is_empty() {
+                                                        variable_options = Some(opt_vec);
+                                                    }
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                    
+                                    dues = Some(config::Dues {
+                                        amount,
+                                        frequency,
+                                        variable_options,
+                                    });
+                                }
+                            },
+                            "offboarding" => {
+                                if let ast::CclValue::Object(off_pairs) = &mem_pair.value {
+                                    let mut notice_period_days = None;
+                                    let mut max_inactive_days = None;
+                                    
+                                    for off_pair in off_pairs {
+                                        match off_pair.key.as_str() {
+                                            "notice_period_days" => {
+                                                if let ast::CclValue::Number(n) = &off_pair.value {
+                                                    notice_period_days = Some(*n as u64);
+                                                }
+                                            },
+                                            "max_inactive_days" => {
+                                                if let ast::CclValue::Number(n) = &off_pair.value {
+                                                    max_inactive_days = Some(*n as u64);
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                    
+                                    offboarding = Some(config::Offboarding {
+                                        notice_period_days,
+                                        max_inactive_days,
+                                    });
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                    
+                    return Some(config::MembershipRules {
+                        onboarding,
+                        dues,
+                        offboarding,
+                    });
+                }
+            }
+        }
+        
+        None
+    }
+    
+    // Helper method to extract proposal process from CCL pairs
+    fn extract_proposal_process(&self, pairs: &[ast::CclPair]) -> Option<config::ProposalProcess> {
+        for pair in pairs {
+            if pair.key == "proposals" {
+                if let ast::CclValue::Object(prop_pairs) = &pair.value {
+                    let mut types = None;
+                    
+                    for prop_pair in prop_pairs {
+                        if prop_pair.key == "types" {
+                            if let ast::CclValue::Array(type_vals) = &prop_pair.value {
+                                let mut type_vec = Vec::new();
+                                
+                                for tv in type_vals {
+                                    if let ast::CclValue::Object(type_pairs) = tv {
+                                        let mut name = String::new();
+                                        let mut quorum_modifier = None;
+                                        let mut majority_modifier = None;
+                                        let mut discussion_period_days = None;
+                                        
+                                        for tp in type_pairs {
+                                            match tp.key.as_str() {
+                                                "name" => {
+                                                    if let ast::CclValue::String(s) = &tp.value {
+                                                        name = s.clone();
+                                                    }
+                                                },
+                                                "quorum_modifier" => {
+                                                    if let ast::CclValue::Number(n) = &tp.value {
+                                                        quorum_modifier = Some(*n);
+                                                    }
+                                                },
+                                                "majority_modifier" => {
+                                                    if let ast::CclValue::Number(n) = &tp.value {
+                                                        majority_modifier = Some(*n);
+                                                    }
+                                                },
+                                                "discussion_period_days" => {
+                                                    if let ast::CclValue::Number(n) = &tp.value {
+                                                        discussion_period_days = Some(*n as u64);
+                                                    }
+                                                },
+                                                _ => {}
+                                            }
+                                        }
+                                        
+                                        if !name.is_empty() {
+                                            type_vec.push(config::ProposalType {
+                                                name,
+                                                quorum_modifier,
+                                                majority_modifier,
+                                                discussion_period_days,
+                                            });
+                                        }
+                                    }
+                                }
+                                
+                                if !type_vec.is_empty() {
+                                    types = Some(type_vec);
+                                }
+                            }
+                        }
+                    }
+                    
+                    return Some(config::ProposalProcess {
+                        types,
+                    });
+                }
+            }
+        }
+        
+        None
+    }
+    
+    // Helper method to extract working groups structure from CCL pairs
+    fn extract_working_groups(&self, pairs: &[ast::CclPair]) -> Option<config::WorkingGroups> {
+        for pair in pairs {
+            if pair.key == "working_groups" {
+                if let ast::CclValue::Object(wg_pairs) = &pair.value {
+                    let mut formation_threshold = None;
+                    let mut dissolution_threshold = None;
+                    let mut resource_allocation = None;
+                    
+                    for wg_pair in wg_pairs {
+                        match wg_pair.key.as_str() {
+                            "formation_threshold" => {
+                                if let ast::CclValue::Number(n) = &wg_pair.value {
+                                    formation_threshold = Some(*n as u64);
+                                }
+                            },
+                            "dissolution_threshold" => {
+                                if let ast::CclValue::Number(n) = &wg_pair.value {
+                                    dissolution_threshold = Some(*n as u64);
+                                }
+                            },
+                            "resource_allocation" => {
+                                if let ast::CclValue::Object(ra_pairs) = &wg_pair.value {
+                                    let mut default_budget = None;
+                                    let mut requires_approval = None;
+                                    
+                                    for ra_pair in ra_pairs {
+                                        match ra_pair.key.as_str() {
+                                            "default_budget" => {
+                                                if let ast::CclValue::Number(n) = &ra_pair.value {
+                                                    default_budget = Some(*n as u64);
+                                                }
+                                            },
+                                            "requires_approval" => {
+                                                if let ast::CclValue::Boolean(b) = &ra_pair.value {
+                                                    requires_approval = Some(*b);
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                    
+                                    resource_allocation = Some(config::ResourceAllocation {
+                                        default_budget,
+                                        requires_approval,
+                                    });
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                    
+                    return Some(config::WorkingGroups {
+                        formation_threshold,
+                        dissolution_threshold,
+                        resource_allocation,
+                    });
+                }
+            }
+        }
+        
+        None
+    }
+    
+    // Helper method to extract dispute resolution process from CCL pairs
+    fn extract_dispute_resolution(&self, pairs: &[ast::CclPair]) -> Option<config::DisputeResolution> {
+        for pair in pairs {
+            if pair.key == "dispute_resolution" {
+                if let ast::CclValue::Object(dr_pairs) = &pair.value {
+                    let mut process = None;
+                    let mut committee_size = None;
+                    
+                    for dr_pair in dr_pairs {
+                        match dr_pair.key.as_str() {
+                            "process" => {
+                                if let ast::CclValue::Array(proc_vals) = &dr_pair.value {
+                                    let mut proc_vec = Vec::new();
+                                    
+                                    for pv in proc_vals {
+                                        if let ast::CclValue::String(s) = pv {
+                                            proc_vec.push(s.clone());
+                                        }
+                                    }
+                                    
+                                    if !proc_vec.is_empty() {
+                                        process = Some(proc_vec);
+                                    }
+                                }
+                            },
+                            "committee_size" => {
+                                if let ast::CclValue::Number(n) = &dr_pair.value {
+                                    committee_size = Some(*n as u64);
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                    
+                    return Some(config::DisputeResolution {
+                        process,
+                        committee_size,
+                    });
+                }
+            }
+        }
+        
+        None
+    }
+    
+    // Helper method to extract economic model from CCL pairs
+    fn extract_economic_model(&self, pairs: &[ast::CclPair]) -> Option<config::EconomicModel> {
+        for pair in pairs {
+            if pair.key == "economic_model" {
+                if let ast::CclValue::Object(econ_pairs) = &pair.value {
+                    let mut surplus_distribution = None;
+                    let mut compensation_policy = None;
+                    
+                    for econ_pair in econ_pairs {
+                        match econ_pair.key.as_str() {
+                            "surplus_distribution" => {
+                                if let ast::CclValue::String(s) = &econ_pair.value {
+                                    surplus_distribution = Some(s.clone());
+                                }
+                            },
+                            "compensation_policy" => {
+                                if let ast::CclValue::Object(comp_pairs) = &econ_pair.value {
+                                    let mut hourly_rates = None;
+                                    let mut track_hours = None;
+                                    let mut volunteer_options = None;
+                                    
+                                    for comp_pair in comp_pairs {
+                                        match comp_pair.key.as_str() {
+                                            "hourly_rates" => {
+                                                if let ast::CclValue::Object(rate_pairs) = &comp_pair.value {
+                                                    let mut rates = std::collections::HashMap::new();
+                                                    
+                                                    for rp in rate_pairs {
+                                                        if let ast::CclValue::Number(n) = &rp.value {
+                                                            rates.insert(rp.key.clone(), *n as u64);
+                                                        }
+                                                    }
+                                                    
+                                                    if !rates.is_empty() {
+                                                        hourly_rates = Some(rates);
+                                                    }
+                                                }
+                                            },
+                                            "track_hours" => {
+                                                if let ast::CclValue::Boolean(b) = &comp_pair.value {
+                                                    track_hours = Some(*b);
+                                                }
+                                            },
+                                            "volunteer_options" => {
+                                                if let ast::CclValue::Boolean(b) = &comp_pair.value {
+                                                    volunteer_options = Some(*b);
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                    
+                                    compensation_policy = Some(config::CompensationPolicy {
+                                        hourly_rates,
+                                        track_hours,
+                                        volunteer_options,
+                                    });
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                    
+                    return Some(config::EconomicModel {
+                        surplus_distribution,
+                        compensation_policy,
+                    });
+                }
+            }
+        }
+        
+        None
+    }
+    
+    // Helper method to validate required fields based on template type
+    fn validate_required_fields(&self, config: &config::GovernanceConfig) -> Result<(), CclError> {
+        match config.template_type.as_str() {
+            "coop_bylaws" => {
+                if config.governance.is_none() {
+                    return Err(CclError::MissingRequiredField("governance section is required for coop_bylaws".to_string()));
+                }
+            },
+            "community_charter" => {
+                if config.governance.is_none() {
+                    return Err(CclError::MissingRequiredField("governance section is required for community_charter".to_string()));
+                }
+            },
+            "participation_rules" => {
+                if config.membership.is_none() {
+                    return Err(CclError::MissingRequiredField("membership section is required for participation_rules".to_string()));
+                }
+            },
+            "resolution" => {
+                if config.identity.is_none() {
+                    return Err(CclError::MissingRequiredField("identity section is required for resolution".to_string()));
+                }
+            },
+            "budget_proposal" => {
+                if config.economic_model.is_none() {
+                    return Err(CclError::MissingRequiredField("economic_model section is required for budget_proposal".to_string()));
+                }
+            },
+            _ => {}
+        }
+        
+        Ok(())
     }
 }
 

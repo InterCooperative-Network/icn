@@ -458,6 +458,12 @@ impl FederationManager {
         rx.await
             .map_err(|e| FederationError::NetworkError(format!("Failed to receive replication targets: {}", e)))?
     }
+
+    /// Get the listen addresses for this federation node
+    pub fn get_listen_addresses(&self) -> Vec<Multiaddr> {
+        // Return a clone of the listen addresses from the config
+        self.config.listen_addresses.clone()
+    }
 }
 
 /// Run the event loop for the federation network
@@ -536,8 +542,59 @@ async fn run_event_loop(
                     },
                     Some(FederationManagerMessage::PublishTrustBundle { bundle, respond_to }) => {
                         debug!("Received request to publish trust bundle for epoch {}", bundle.epoch_id);
-                        // TODO(V3-MVP): Implement actual trust bundle publication via gossipsub
-                        let _ = respond_to.send(Ok(()));
+                        
+                        // Serialize the bundle for storage
+                        match serde_json::to_vec(&bundle) {
+                            Ok(bundle_bytes) => {
+                                // Generate the storage key based on epoch_id
+                                let key_str = format!("trustbundle::epoch::{}", bundle.epoch_id);
+                                let key_hash = create_sha256_multihash(key_str.as_bytes());
+                                let key_cid = cid::Cid::new_v1(0x71, key_hash); // Raw codec
+                                
+                                // Store the bundle
+                                let storage_clone = storage.clone();
+                                let store_result = {
+                                    let storage_lock = storage_clone.lock().await;
+                                    storage_lock.put_kv(key_cid, bundle_bytes).await
+                                };
+
+                                match store_result {
+                                    Ok(_) => {
+                                        info!("Successfully stored TrustBundle for epoch {}", bundle.epoch_id);
+                                        
+                                        // Create a FederationManager instance from the swarm to access the update method
+                                        let fed_manager = FederationManager {
+                                            local_peer_id: swarm.local_peer_id().clone(),
+                                            keypair: identity::Keypair::generate_ed25519(), // Create a new keypair since we can't access the existing one
+                                            sender: mpsc::channel(1).0, // Dummy sender, not used in this context
+                                            _event_loop_handle: tokio::spawn(async {}), // Dummy task, not used
+                                            known_peers: HashMap::new(),
+                                            config: FederationManagerConfig::default(),
+                                            storage: Arc::clone(&storage),
+                                        };
+                                        
+                                        // Update latest known epoch
+                                        if let Err(e) = fed_manager.update_latest_known_epoch(bundle.epoch_id).await {
+                                            error!("Failed to update latest known epoch: {}", e);
+                                            let _ = respond_to.send(Err(FederationError::StorageError(format!("Failed to update epoch: {}", e))));
+                                        } else {
+                                            info!("Updated latest known epoch to {}", bundle.epoch_id);
+                                            
+                                            // TODO(V3-MVP): Implement actual trust bundle publication via gossipsub
+                                            let _ = respond_to.send(Ok(()));
+                                        }
+                                    },
+                                    Err(e) => {
+                                        error!("Failed to store TrustBundle: {}", e);
+                                        let _ = respond_to.send(Err(FederationError::StorageError(format!("Failed to store bundle: {}", e))));
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                error!("Failed to serialize TrustBundle: {}", e);
+                                let _ = respond_to.send(Err(FederationError::SerializationError(format!("Failed to serialize bundle: {}", e))));
+                            }
+                        }
                     },
                     Some(FederationManagerMessage::AnnounceBlob { cid, respond_to }) => {
                         debug!(%cid, "Announcing as provider for blob via Kademlia");

@@ -53,9 +53,7 @@ fn project_path(path: &str) -> String {
     Path::new(root).parent().unwrap().join(path).to_string_lossy().to_string()
 }
 
-// Test the authorization derivation logic with cooperative_bylaws.ccl
-// Marking as ignored due to integration issues between crates
-#[ignore]
+// Test now enabled with updated API usage after dependency unification
 #[test]
 fn test_coop_bylaws_authorization_derivation() {
     // Load the CCL content
@@ -113,9 +111,7 @@ fn test_coop_bylaws_authorization_derivation() {
     println!("Resource types: {:?}", resource_types);
 }
 
-// Test the authorization derivation logic with simple_community_charter.ccl
-// Marking as ignored due to integration issues between crates
-#[ignore]
+// Test now enabled with updated API usage after dependency unification
 #[test]
 fn test_community_charter_authorization_derivation() {
     // Load the CCL content
