@@ -138,4 +138,55 @@ curl http://localhost:8080/api/v1/debug/proposal/$PROPOSAL_CID
 2. **Verification**: Use multiple points of verification (API, events, logs)
 3. **Determinism**: Set fixed timeouts and ensure tests are repeatable
 4. **Logging**: Enable structured logging for easier parsing
-5. **Error Handling**: Validate proper error responses and recovery 
+5. **Error Handling**: Validate proper error responses and recovery
+
+## Integration Tests
+
+The runtime integration tests demonstrate how different components of the ICN Runtime work together to provide a complete solution. These tests are intended to be more comprehensive than unit tests and cover realistic usage scenarios.
+
+### Available Tests
+
+1. **Entity Creation Test (`entity_creation_test.rs`)** - Tests creation of basic entities through the API
+2. **CCL Entity Creation Test (`ccl_entity_creation_test.rs`)** - Tests creation of entities using CCL templates
+3. **Full Governance Cycle Test (`full_governance_cycle.rs`)** - Tests the complete governance workflow from proposal submission through execution and credential issuance
+
+### Wallet Integration
+
+The `full_governance_cycle.rs` test demonstrates integration between wallet and runtime components:
+
+1. Creating an identity
+2. Submitting a governance proposal
+3. Voting on the proposal
+4. Finalizing the proposal
+5. Executing the proposal
+6. Retrieving and verifying credentials
+
+This test ensures that wallet components can interact properly with the runtime using the shared types defined in `wallet-types`. It validates the full lifecycle of a governance proposal through both runtime and wallet perspectives.
+
+### Running Tests
+
+To run all integration tests:
+
+```bash
+cd runtime
+cargo test --test '*'
+```
+
+To run a specific test:
+
+```bash
+cd runtime
+cargo test --test full_governance_cycle
+```
+
+## CLI Testing Tools
+
+In addition to automated tests, the CLI provides tools for manually testing wallet-runtime integration:
+
+```bash
+# Test the full governance cycle
+cargo run --bin covm wallet-test governance-cycle
+
+# Customize test parameters
+cargo run --bin covm wallet-test governance-cycle --user-did "did:icn:custom:user1" --voting-period 3600
+``` 

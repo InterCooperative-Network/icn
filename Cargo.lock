@@ -955,7 +955,7 @@ dependencies = [
  "hex",
  "http 0.2.12",
  "iri-string",
- "libipld 0.14.0",
+ "libipld",
  "serde",
  "serde_with 2.3.3",
  "siwe",
@@ -1180,6 +1180,15 @@ name = "clear_on_drop"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38508a63f4979f0048febc9966fadbd48e5dab31fd0ec6a3f151bbf4a74f7423"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "cmake"
+version = "0.1.54"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
 dependencies = [
  "cc",
 ]
@@ -2110,6 +2119,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "186e05a59d4c50738528153b83b0b0194d3a29507dfec16eccd4b342903397d0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2120,6 +2138,18 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13c863f0904021b108aa8b2f55046443e6b1ebde8fd4a15c399893aae4fa069f"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "log",
 ]
 
 [[package]]
@@ -2230,7 +2260,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a3cc21c33af89af0930c8cae4ade5e6fdc17b5d2c97b3d2e2edb67a1cf683f3"
 dependencies = [
- "env_logger",
+ "env_logger 0.10.2",
  "log",
 ]
 
@@ -2242,6 +2272,12 @@ checksum = "cfcf0ed7fe52a17a03854ec54a9f76d6d84508d1c0e66bc1793301c73fc8493c"
 dependencies = [
  "static_assertions",
 ]
+
+[[package]]
+name = "fixedbitset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
@@ -2605,8 +2641,8 @@ dependencies = [
  "aho-corasick",
  "bstr",
  "log",
- "regex-automata",
- "regex-syntax",
+ "regex-automata 0.4.9",
+ "regex-syntax 0.8.5",
 ]
 
 [[package]]
@@ -3115,7 +3151,7 @@ dependencies = [
  "icn-identity",
  "icn-storage",
  "jsonschema",
- "libipld 0.16.0",
+ "libipld",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
@@ -3143,9 +3179,9 @@ dependencies = [
  "icn-economics",
  "icn-identity",
  "icn-storage",
- "libipld 0.16.0",
+ "libipld",
  "log",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3178,8 +3214,8 @@ dependencies = [
  "icn-governance-kernel",
  "icn-identity",
  "icn-storage",
- "libipld 0.16.0",
- "multihash 0.18.1",
+ "libipld",
+ "multihash 0.16.3",
  "predicates 2.1.5",
  "rand 0.8.5",
  "serde",
@@ -3191,6 +3227,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "wallet-types",
  "wasmer-wasi",
 ]
 
@@ -3203,10 +3240,10 @@ dependencies = [
  "cid 0.10.1",
  "icn-identity",
  "icn-storage",
- "libipld 0.16.0",
+ "libipld",
  "lru 0.11.1",
  "merkle-cbt",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "serde",
  "serde_ipld_dagcbor",
  "sha2 0.10.9",
@@ -3226,7 +3263,7 @@ dependencies = [
  "icn-dag",
  "icn-identity",
  "icn-storage",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -3275,7 +3312,7 @@ dependencies = [
  "icn-storage",
  "libp2p",
  "libp2p-request-response",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -3300,7 +3337,7 @@ dependencies = [
  "icn-economics",
  "icn-identity",
  "icn-storage",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "pest",
  "pest_derive",
  "proc-macro2",
@@ -3327,7 +3364,7 @@ dependencies = [
  "chrono",
  "cid 0.10.1",
  "did-method-key",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -3363,7 +3400,7 @@ dependencies = [
  "futures",
  "hashbrown 0.14.5",
  "icn-identity",
- "multihash 0.18.1",
+ "multihash 0.16.3",
  "rocksdb",
  "serde",
  "serde_json",
@@ -3604,7 +3641,7 @@ dependencies = [
  "globset",
  "log",
  "memchr",
- "regex-automata",
+ "regex-automata 0.4.9",
  "same-file",
  "walkdir",
  "winapi-util",
@@ -4137,32 +4174,15 @@ dependencies = [
  "async-trait",
  "cached",
  "fnv",
- "libipld-cbor 0.14.0",
- "libipld-cbor-derive 0.14.0",
- "libipld-core 0.14.0",
- "libipld-json 0.14.0",
- "libipld-macro 0.14.0",
+ "libipld-cbor",
+ "libipld-cbor-derive",
+ "libipld-core",
+ "libipld-json",
+ "libipld-macro",
+ "libipld-pb",
  "log",
  "multihash 0.16.3",
  "parking_lot",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "libipld"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1ccd6b8ffb3afee7081fcaec00e1b099fd1c7ccf35ba5729d88538fcc3b4599"
-dependencies = [
- "fnv",
- "libipld-cbor 0.16.0",
- "libipld-cbor-derive 0.16.0",
- "libipld-core 0.16.0",
- "libipld-json 0.16.0",
- "libipld-macro 0.16.0",
- "libipld-pb",
- "log",
- "multihash 0.18.1",
  "thiserror 1.0.69",
 ]
 
@@ -4173,18 +4193,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8dd1ab68c9d26f20c7d0dfea6eecbae8c00359875210001b33ca27d4a02f3d09"
 dependencies = [
  "byteorder",
- "libipld-core 0.14.0",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "libipld-cbor"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77d98c9d1747aa5eef1cf099cd648c3fd2d235249f5fed07522aaebc348e423b"
-dependencies = [
- "byteorder",
- "libipld-core 0.16.0",
+ "libipld-core",
  "thiserror 1.0.69",
 ]
 
@@ -4193,19 +4202,6 @@ name = "libipld-cbor-derive"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69ec2f49393a1347a2d95ebcb248ff75d0d47235919b678036c010a8cd927375"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "synstructure 0.12.6",
-]
-
-[[package]]
-name = "libipld-cbor-derive"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d5ba3a729b72973e456a1812b0afe2e176a376c1836cc1528e9fc98ae8cb838"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -4230,39 +4226,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "libipld-core"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5acd707e8d8b092e967b2af978ed84709eaded82b75effe6cb6f6cc797ef8158"
-dependencies = [
- "anyhow",
- "cid 0.10.1",
- "core2",
- "multibase 0.9.1",
- "multihash 0.18.1",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "libipld-json"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18aa481a87f084d98473dd9ece253a9569c762b75f6bbba8217d54e48c9d63b3"
 dependencies = [
- "libipld-core 0.14.0",
+ "libipld-core",
  "multihash 0.16.3",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "libipld-json"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25856def940047b07b25c33d4e66d248597049ab0202085215dc4dca0487731c"
-dependencies = [
- "libipld-core 0.16.0",
- "multihash 0.18.1",
  "serde",
  "serde_json",
 ]
@@ -4273,27 +4243,18 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "852c011562ae5059b67c3a917f9f5945af5a68df8e39ede4444fff33274d25e2"
 dependencies = [
- "libipld-core 0.14.0",
-]
-
-[[package]]
-name = "libipld-macro"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71171c54214f866ae6722f3027f81dff0931e600e5a61e6b1b6a49ca0b5ed4ae"
-dependencies = [
- "libipld-core 0.16.0",
+ "libipld-core",
 ]
 
 [[package]]
 name = "libipld-pb"
-version = "0.16.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3f2d0f866c4cd5dc9aa8068c429ba478d2882a3a4b70ab56f7e9a0eddf5d16f"
+checksum = "c003be513496578115256a1b4ac7b80d4ece2462c9869dfb736fd30d8bb1d1c0"
 dependencies = [
- "bytes",
- "libipld-core 0.16.0",
- "quick-protobuf",
+ "libipld-core",
+ "prost",
+ "prost-build",
  "thiserror 1.0.69",
 ]
 
@@ -4893,6 +4854,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "matchers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
+dependencies = [
+ "regex-automata 0.1.10",
+]
+
+[[package]]
 name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5140,6 +5110,12 @@ dependencies = [
  "syn 1.0.109",
  "synstructure 0.12.6",
 ]
+
+[[package]]
+name = "multimap"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
 
 [[package]]
 name = "multistream-select"
@@ -5661,6 +5637,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "petgraph"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
+dependencies = [
+ "fixedbitset",
+ "indexmap 2.9.0",
+]
+
+[[package]]
 name = "phf"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6005,6 +5991,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
+dependencies = [
+ "bytes",
+ "prost-derive",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ae5a4388762d5815a9fc0dea33c56b021cdc8dde0c55e0c9ca57197254b0cab"
+dependencies = [
+ "bytes",
+ "cfg-if",
+ "cmake",
+ "heck 0.4.1",
+ "itertools",
+ "lazy_static",
+ "log",
+ "multimap",
+ "petgraph",
+ "prost",
+ "prost-types",
+ "regex",
+ "tempfile",
+ "which",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
+dependencies = [
+ "bytes",
+ "prost",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6345,8 +6386,17 @@ checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata",
- "regex-syntax",
+ "regex-automata 0.4.9",
+ "regex-syntax 0.8.5",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
+dependencies = [
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -6357,8 +6407,14 @@ checksum = "809e8dc61f6de73b46c85f4c96486310fe304c434cfa43669d7b40f711150908"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.8.5",
 ]
+
+[[package]]
+name = "regex-syntax"
+version = "0.6.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
 
 [[package]]
 name = "regex-syntax"
@@ -7790,7 +7846,7 @@ checksum = "0982f62c7860922026a9d9edc6c604de79693ee4c5c6bd65be11e2ff66b1df09"
 dependencies = [
  "base64 0.12.3",
  "chrono",
- "libipld 0.14.0",
+ "libipld",
  "serde",
  "serde_json",
  "serde_with 1.14.0",
@@ -7816,7 +7872,7 @@ dependencies = [
  "chrono",
  "flate2",
  "iref",
- "libipld 0.14.0",
+ "libipld",
  "multihash 0.16.3",
  "reqwest",
  "serde",
@@ -8125,6 +8181,28 @@ name = "termtree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
+
+[[package]]
+name = "test-log"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7f46083d221181166e5b6f6b1e5f1d499f3a76888826e6cb1d057554157cd0f"
+dependencies = [
+ "env_logger 0.11.8",
+ "test-log-macros",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "test-log-macros"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "888d0c3c6db53c0fdab160d2ed5e12ba745383d3e85813f2ea0f2b1475ab553f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
 
 [[package]]
 name = "thiserror"
@@ -8479,10 +8557,14 @@ version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8189decb5ac0fa7bc8b96b7cb9b2701d60d48805aca84a238004d665fcc4008"
 dependencies = [
+ "matchers",
  "nu-ansi-term",
+ "once_cell",
+ "regex",
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "tracing",
  "tracing-core",
  "tracing-log",
 ]
@@ -8803,22 +8885,38 @@ dependencies = [
 name = "wallet-sync"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "backoff",
  "chrono",
- "ed25519-dalek 1.0.1",
+ "cid 0.10.1",
+ "futures",
  "hex",
+ "mockito",
  "multihash 0.16.3",
  "reqwest",
  "serde",
  "serde_json",
+ "test-log",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-test",
  "tracing",
  "uuid",
- "wallet-identity",
- "wallet-storage",
+ "wallet-types",
+]
+
+[[package]]
+name = "wallet-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cid 0.10.1",
+ "libipld",
+ "multihash 0.16.3",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -9577,6 +9675,18 @@ name = "webpki-roots"
 version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
+
+[[package]]
+name = "which"
+version = "4.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ba24419a2078cd2b0f2ede2691b6c66d8e47836da3b6db8265ebad47afbfc7"
+dependencies = [
+ "either",
+ "home",
+ "once_cell",
+ "rustix 0.38.44",
+]
 
 [[package]]
 name = "whoami"

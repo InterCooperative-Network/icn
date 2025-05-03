@@ -6,7 +6,8 @@ members = [
     "runtime/cli",
     "wallet",
     "runtime/crates/*",
-    "wallet/crates/*"
+    "wallet/crates/*",
+    "wallet/crates/wallet-types"
 ]
 exclude = [
     # No need to exclude agoranet since it's already included as a member
@@ -28,12 +29,12 @@ clap = { version = "4.4", features = ["derive"] }
 
 # Network and storage
 libp2p = "0.53"
-multihash = { version = "0.18.1", features = ["sha2"] } # Updated to 0.18.1 per fix-wallet-sync.md
+multihash = { version = "0.16.3", features = ["sha2"] } # Reverted to 0.16.3 for compatibility
 cid = { version = "0.10.1", features = ["serde"] }
 
 # IPLD related dependencies
 # Note: libipld is officially deprecated in favor of ipld-core, but we'll keep both for compatibility
-libipld = { version = "0.16", features = ["derive"] }
+libipld = { version = "0.14", features = ["derive"] }
 libipld-core = "0.13.1"
 # For DAG-CBOR serialization - using the recommended libraries
 serde_ipld_dagcbor = "0.4"
@@ -58,3 +59,6 @@ wasmer-wasi = "3.1"
 hashbrown = "0.14"
 merkle-cbt = "0.3"
 backoff = "0.4.0"
+
+# Wallet-specific dependencies
+wallet-types = { path = "./wallet/crates/wallet-types" }

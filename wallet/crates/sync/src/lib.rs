@@ -23,56 +23,15 @@ pub use api::{FederationInfo, PeerInfo};
 pub use trust::{TrustBundle, TrustManager};
 pub use error::SyncError;
 
-// Re-export multihash to avoid version conflicts
-pub mod compat {
-    pub use multihash_0_16_3 as multihash;
-}
-
-/// DAG Node representation compatible with wallet and runtime
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DagNode {
-    /// Node identifier (CID)
-    pub id: String, 
-    
-    /// Node data as JSON value
-    pub data: Value,
-    
-    /// Creation timestamp
-    #[serde(with = "chrono::serde::ts_milliseconds")]
-    pub created_at: DateTime<Utc>,
-    
-    /// References to other nodes
-    pub refs: Vec<String>,
-}
-
-impl DagNode {
-    /// Create a new DAG node
-    pub fn new(id: String, data: Value, refs: Vec<String>) -> Self {
-        Self {
-            id,
-            data,
-            created_at: Utc::now(),
-            refs,
-        }
-    }
-}
-
-/// Response from node submission API
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeSubmissionResponse {
-    /// Node ID (CID)
-    pub id: String,
-    
-    /// Timestamp when the node was accepted
-    #[serde(with = "chrono::serde::ts_milliseconds")]
-    pub timestamp: DateTime<Utc>,
-    
-    /// Block number (if applicable)
-    pub block_number: Option<u64>,
-    
-    /// Node data
-    pub data: Option<Value>,
-}
+// Re-export wallet-types
+pub use wallet_types::{
+    DagNode, 
+    DagNodeMetadata, 
+    DagThread,
+    NodeSubmissionResponse,
+    WalletError, 
+    WalletResult,
+};
 
 /// Synchronization client for interacting with ICN nodes
 #[derive(Clone)]
@@ -207,6 +166,7 @@ impl SyncService {
 pub struct SyncManager {
     client: SyncClient,
     service: SyncService,
+    trust_manager: Option<TrustManager>,
 }
 
 impl SyncManager {
@@ -218,6 +178,7 @@ impl SyncManager {
         Self {
             client,
             service,
+            trust_manager: None,
         }
     }
     
@@ -225,6 +186,44 @@ impl SyncManager {
     pub fn with_auth_token(mut self, token: String) -> Self {
         self.client = self.client.with_auth_token(token);
         self
+    }
+    
+    /// With trust manager for validating DAG nodes and TrustBundles
+    pub fn with_trust_manager(mut self, trust_manager: TrustManager) -> Self {
+        self.trust_manager = Some(trust_manager);
+        self
+    }
+    
+    /// Submit a DAG node to the network
+    pub async fn submit_node(&self, node: &DagNode) -> Result<NodeSubmissionResponse, SyncError> {
+        // Verify the node if we have a trust manager
+        if let Some(trust_manager) = &self.trust_manager {
+            trust_manager.verify_dag_node(node).await?;
+        }
+        
+        // Submit the node with retry
+        self.service.submit_node_with_retry(node).await
+    }
+    
+    /// Get a DAG node by ID
+    pub async fn get_node(&self, node_id: &str) -> Result<DagNode, SyncError> {
+        let node = self.client.get_node(node_id).await?;
+        
+        // Verify the node if we have a trust manager
+        if let Some(trust_manager) = &self.trust_manager {
+            trust_manager.verify_dag_node(&node).await?;
+        }
+        
+        Ok(node)
+    }
+    
+    /// Synchronize with the node to get the latest trust bundle
+    pub async fn sync_trust_bundle(&self) -> Result<Option<TrustBundle>, SyncError> {
+        if let Some(trust_manager) = &self.trust_manager {
+            trust_manager.sync_trust_bundle().await
+        } else {
+            Err(SyncError::Internal("No trust manager configured".to_string()))
+        }
     }
 }
 

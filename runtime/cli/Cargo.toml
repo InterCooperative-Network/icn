@@ -41,6 +41,9 @@ icn-ccl-compiler = { path = "../crates/ccl-compiler" }
 icn-federation = { path = "../crates/federation" }
 icn-dag = { path = "../crates/dag" }
 
+# Wallet components
+wallet-types = { path = "../../wallet/crates/wallet-types" }
+
 [[bin]]
 name = "covm"
 path = "covm.rs"
