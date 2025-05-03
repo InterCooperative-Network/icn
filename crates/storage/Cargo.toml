@@ -16,7 +16,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
-tokio = { version = "1.0", features = ["sync", "rt-multi-thread", "macros"] }
+tokio = { version = "1.0", features = ["sync", "rt-multi-thread", "macros", "fs"] }
 sha2 = "0.10.9"
+tempfile = "3.19.1"
 
 [dev-dependencies] 
+tempfile = "3.19.1"

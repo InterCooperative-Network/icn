@@ -637,11 +637,307 @@ impl DistributedStorage for InMemoryBlobStore {
     }
 }
 
+/// A filesystem-based implementation of StorageBackend that stores data on disk
+/// using a sharded directory structure based on CID prefixes.
+pub struct FilesystemStorageBackend {
+    /// The root directory where all data will be stored
+    data_dir: std::path::PathBuf,
+}
+
+impl FilesystemStorageBackend {
+    /// Create a new FilesystemStorageBackend with the given data directory
+    pub fn new<P: AsRef<std::path::Path>>(data_dir: P) -> StorageResult<Self> {
+        let data_dir = data_dir.as_ref().to_path_buf();
+        
+        // Create the base directories if they don't exist
+        let blobs_dir = data_dir.join("blobs");
+        let kv_dir = data_dir.join("kv");
+        
+        // Use tokio's fs to create directories (could use std::fs for sync, but prefering async)
+        if !blobs_dir.exists() {
+            std::fs::create_dir_all(&blobs_dir)
+                .map_err(|e| StorageError::IoError(format!("Failed to create blobs directory: {}", e)))?;
+        }
+        
+        if !kv_dir.exists() {
+            std::fs::create_dir_all(&kv_dir)
+                .map_err(|e| StorageError::IoError(format!("Failed to create kv directory: {}", e)))?;
+        }
+        
+        Ok(Self { data_dir })
+    }
+    
+    /// Helper method to get the file path for a blob CID
+    fn get_blob_path(&self, cid: &Cid) -> std::path::PathBuf {
+        let cid_string = cid.to_string();
+        
+        // Skip the multibase prefix (usually 'b' for Base32)
+        let prefix_offset = if cid_string.starts_with('b') { 1 } else { 0 };
+        
+        // Extract the first 4 characters after the prefix for two levels of sharding
+        // (2 characters each level)
+        let shard_chars: Vec<char> = cid_string.chars().skip(prefix_offset).take(4).collect();
+        
+        if shard_chars.len() < 4 {
+            // If the CID string is too short, just use what we have
+            // This is a fallback and should rarely happen with proper CIDs
+            let shard_level_1 = shard_chars.iter().take(2).collect::<String>();
+            let shard_level_2 = shard_chars.iter().skip(2).take(2).collect::<String>();
+            self.data_dir.join("blobs").join(shard_level_1).join(shard_level_2).join(&cid_string)
+        } else {
+            // Normal case with 4+ characters
+            let shard_level_1 = shard_chars[0..2].iter().collect::<String>();
+            let shard_level_2 = shard_chars[2..4].iter().collect::<String>();
+            self.data_dir.join("blobs").join(shard_level_1).join(shard_level_2).join(&cid_string)
+        }
+    }
+    
+    /// Helper method to get the file path for a key-value CID
+    fn get_kv_path(&self, key_cid: &Cid) -> std::path::PathBuf {
+        let cid_string = key_cid.to_string();
+        
+        // Skip the multibase prefix (usually 'b' for Base32)
+        let prefix_offset = if cid_string.starts_with('b') { 1 } else { 0 };
+        
+        // Extract the first 4 characters after the prefix for two levels of sharding
+        // (2 characters each level)
+        let shard_chars: Vec<char> = cid_string.chars().skip(prefix_offset).take(4).collect();
+        
+        if shard_chars.len() < 4 {
+            // If the CID string is too short, just use what we have
+            let shard_level_1 = shard_chars.iter().take(2).collect::<String>();
+            let shard_level_2 = shard_chars.iter().skip(2).take(2).collect::<String>();
+            self.data_dir.join("kv").join(shard_level_1).join(shard_level_2).join(&cid_string)
+        } else {
+            // Normal case with 4+ characters
+            let shard_level_1 = shard_chars[0..2].iter().collect::<String>();
+            let shard_level_2 = shard_chars[2..4].iter().collect::<String>();
+            self.data_dir.join("kv").join(shard_level_1).join(shard_level_2).join(&cid_string)
+        }
+    }
+}
+
+#[async_trait]
+impl StorageBackend for FilesystemStorageBackend {
+    // --- Legacy methods ---
+    #[allow(deprecated)]
+    async fn get(&self, key: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // For backwards compatibility, we'll try both blob and kv storage
+        if let Some(blob) = self.get_blob(key).await? {
+            return Ok(Some(blob));
+        }
+        
+        self.get_kv(key).await
+    }
+    
+    #[allow(deprecated)]
+    async fn put(&self, value: &[u8]) -> StorageResult<Cid> {
+        // For backwards compatibility, just use put_blob since it's content-addressed
+        self.put_blob(value).await
+    }
+    
+    #[allow(deprecated)]
+    async fn contains(&self, key: &Cid) -> StorageResult<bool> {
+        // Check both blob and kv storage
+        if self.contains_blob(key).await? {
+            return Ok(true);
+        }
+        
+        self.contains_kv(key).await
+    }
+    
+    #[allow(deprecated)]
+    async fn delete(&self, key: &Cid) -> StorageResult<()> {
+        // Try to delete from both blob and kv storage
+        // We don't care if one fails if the other succeeds
+        let _ = self.delete_blob(key).await;
+        let _ = self.delete_kv(key).await;
+        
+        // Return success regardless of whether anything was actually deleted
+        Ok(())
+    }
+    
+    // --- Transaction methods (basic implementation) ---
+    async fn begin_transaction(&self) -> StorageResult<()> {
+        // For simplicity, this implementation does not support transactions yet
+        Err(StorageError::NotSupported("Transactions not yet implemented for FilesystemStorageBackend".to_string()))
+    }
+    
+    async fn commit_transaction(&self) -> StorageResult<()> {
+        Err(StorageError::NotSupported("Transactions not yet implemented for FilesystemStorageBackend".to_string()))
+    }
+    
+    async fn rollback_transaction(&self) -> StorageResult<()> {
+        Err(StorageError::NotSupported("Transactions not yet implemented for FilesystemStorageBackend".to_string()))
+    }
+    
+    async fn flush(&self) -> StorageResult<()> {
+        // Filesystem backend writes directly to disk, so flush is a no-op
+        Ok(())
+    }
+    
+    // --- Blob methods ---
+    
+    /// Implement get_blob according to the specified design
+    async fn get_blob(&self, cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // 1. Calculate Path
+        let final_file_path = self.get_blob_path(cid);
+        
+        // 2. Concurrency Control (Read Lock)
+        // TODO: Acquire an async *shared* file lock on final_file_path using fs2 or similar
+        // Rationale: Allows multiple readers, blocks writers during read.
+        
+        // 3. Check Existence & Open File
+        let file_result = tokio::fs::File::open(&final_file_path).await;
+        let mut file = match file_result {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // TODO: Release the shared file lock here
+                return Ok(None);
+            },
+            Err(e) => {
+                // TODO: Release the shared file lock here
+                return Err(StorageError::IoError(e.to_string()));
+            }
+        };
+        
+        // 4. Read Content
+        let mut content_vec = Vec::new();
+        match tokio::io::AsyncReadExt::read_to_end(&mut file, &mut content_vec).await {
+            Ok(_) => {
+                // 5. Integrity Check (Optional Placeholder)
+                // TODO (Optional/Configurable): let calculated_cid = calculate_cid(&content_vec);
+                // if calculated_cid != *cid { return Err(StorageError::IntegrityError(...)); }
+                // Rationale: Verifies data hasn't been corrupted at rest, adds overhead.
+                
+                // 6. Release Lock & Return
+                // TODO: Release the shared file lock here
+                Ok(Some(content_vec))
+            },
+            Err(e) => {
+                // TODO: Release the shared file lock here
+                Err(StorageError::IoError(format!("Failed to read file: {}", e)))
+            }
+        }
+    }
+    
+    async fn put_blob(&self, value_bytes: &[u8]) -> StorageResult<Cid> {
+        // Create a multihash using SHA-256
+        let mh = create_sha256_multihash(value_bytes);
+        
+        // Create CID v0 with the digest
+        let cid = Cid::new_v0(mh)
+            .map_err(|e| StorageError::InvalidCid(e.to_string()))?;
+        
+        // Calculate the path where we'll store this blob
+        let final_path = self.get_blob_path(&cid);
+        
+        // Create the directory structure if it doesn't exist
+        if let Some(parent) = final_path.parent() {
+            tokio::fs::create_dir_all(parent).await
+                .map_err(|e| StorageError::IoError(format!("Failed to create directory: {}", e)))?;
+        }
+        
+        // TODO: Implement the write-to-temp, then rename strategy for atomic writes
+        
+        // For now, we'll implement a basic direct write (non-atomic)
+        tokio::fs::write(&final_path, value_bytes).await
+            .map_err(|e| StorageError::IoError(format!("Failed to write file: {}", e)))?;
+        
+        Ok(cid)
+    }
+    
+    async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool> {
+        let path = self.get_blob_path(content_cid);
+        match tokio::fs::metadata(path).await {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(StorageError::IoError(e.to_string())),
+        }
+    }
+    
+    async fn delete_blob(&self, content_cid: &Cid) -> StorageResult<()> {
+        let path = self.get_blob_path(content_cid);
+        match tokio::fs::remove_file(path).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(StorageError::IoError(e.to_string())),
+        }
+    }
+    
+    // --- Key-Value methods ---
+    
+    async fn put_kv(&self, key_cid: Cid, value_bytes: Vec<u8>) -> StorageResult<()> {
+        // Calculate the path where we'll store this key-value
+        let final_path = self.get_kv_path(&key_cid);
+        
+        // Create the directory structure if it doesn't exist
+        if let Some(parent) = final_path.parent() {
+            tokio::fs::create_dir_all(parent).await
+                .map_err(|e| StorageError::IoError(format!("Failed to create directory: {}", e)))?;
+        }
+        
+        // TODO: Implement the write-to-temp, then rename strategy for atomic writes
+        
+        // For now, we'll implement a basic direct write (non-atomic)
+        tokio::fs::write(&final_path, value_bytes).await
+            .map_err(|e| StorageError::IoError(format!("Failed to write file: {}", e)))?;
+        
+        Ok(())
+    }
+    
+    async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        // Calculate the file path
+        let final_file_path = self.get_kv_path(key_cid);
+        
+        // Try to open the file
+        let file_result = tokio::fs::File::open(&final_file_path).await;
+        let mut file = match file_result {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(None);
+            },
+            Err(e) => {
+                return Err(StorageError::IoError(e.to_string()));
+            }
+        };
+        
+        // Read the file content
+        let mut content_vec = Vec::new();
+        match tokio::io::AsyncReadExt::read_to_end(&mut file, &mut content_vec).await {
+            Ok(_) => Ok(Some(content_vec)),
+            Err(e) => Err(StorageError::IoError(format!("Failed to read file: {}", e)))
+        }
+    }
+    
+    async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool> {
+        let path = self.get_kv_path(key_cid);
+        match tokio::fs::metadata(path).await {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(StorageError::IoError(e.to_string())),
+        }
+    }
+    
+    async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()> {
+        let path = self.get_kv_path(key_cid);
+        match tokio::fs::remove_file(path).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(StorageError::IoError(e.to_string())),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::error::Error;
     
+    // We import tempfile only in the test module
+    #[cfg(test)]
+    use tempfile;
+
     #[tokio::test]
     async fn test_async_storage_blob_ops() -> Result<(), Box<dyn Error>> {
         let storage = AsyncInMemoryStorage::new();
@@ -795,6 +1091,58 @@ mod tests {
         
         // Verify we get a BlobTooLarge error
         assert!(matches!(result, Err(StorageError::BlobTooLarge(_, _))));
+        
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_filesystem_storage_backend() -> Result<(), Box<dyn Error>> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let temp_path = temp_dir.path();
+        
+        // Create a new FilesystemStorageBackend
+        let storage = FilesystemStorageBackend::new(temp_path)?;
+        
+        // Test put_blob and get_blob
+        let test_data = b"Hello, filesystem storage!";
+        let cid = storage.put_blob(test_data).await?;
+        
+        // Verify the CID
+        assert!(cid.to_string().starts_with("Qm"));
+        
+        // Retrieve the data
+        let retrieved = storage.get_blob(&cid).await?;
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap(), test_data);
+        
+        // Test contains_blob
+        let exists = storage.contains_blob(&cid).await?;
+        assert!(exists);
+        
+        // Test key-value operations
+        let kv_data = b"Key-value data";
+        storage.put_kv(cid, kv_data.to_vec()).await?;
+        
+        let kv_retrieved = storage.get_kv(&cid).await?;
+        assert!(kv_retrieved.is_some());
+        assert_eq!(kv_retrieved.unwrap(), kv_data);
+        
+        // Check that both blob and kv files exist
+        let blob_path = storage.get_blob_path(&cid);
+        let kv_path = storage.get_kv_path(&cid);
+        
+        assert!(blob_path.exists());
+        assert!(kv_path.exists());
+        
+        // Delete operations
+        storage.delete_blob(&cid).await?;
+        let blob_exists = storage.contains_blob(&cid).await?;
+        assert!(!blob_exists);
+        
+        storage.delete_kv(&cid).await?;
+        let kv_exists = storage.contains_kv(&cid).await?;
+        assert!(!kv_exists);
         
         Ok(())
     }
