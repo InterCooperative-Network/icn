@@ -21,7 +21,6 @@ use tokio::sync::mpsc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tracing;
 use uuid::Uuid;
-use std::collections::HashMap;
 
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -246,6 +245,7 @@ impl StorageBackend for AsyncInMemoryStorage {
             return Err(StorageError::TransactionFailed("Transaction already in progress".to_string()));
         }
         
+        // Start new transaction
         *tx_lock = Some(HashMap::new());
         Ok(())
     }
