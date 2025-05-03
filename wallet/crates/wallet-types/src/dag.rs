@@ -34,8 +34,8 @@ pub struct DagNode {
     /// Binary data for the node (if applicable)
     pub data: Option<Vec<u8>>,
     
-    /// Node links (for IPLD compatibility)
-    pub links: Vec<String>,
+    /// Node links (for IPLD compatibility) - map of name to CID
+    pub links: HashMap<String, String>,
     
     /// Created time for the node
     pub created_at: Option<SystemTime>,
@@ -58,4 +58,7 @@ pub struct DagThread {
     
     /// Last updated timestamp
     pub last_updated: SystemTime,
+    
+    /// The latest CID in the thread
+    pub latest_cid: String,
 } 

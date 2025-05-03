@@ -7,6 +7,10 @@ members = [
     "runtime/crates/*",
     "wallet/crates/*"
 ]
+exclude = [
+    "wallet/crates/wallet-sync",
+    "agoranet"
+]
 
 [workspace.dependencies]
 # Common dependencies

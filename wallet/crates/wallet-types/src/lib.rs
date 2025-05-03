@@ -34,4 +34,13 @@ pub struct TrustBundle {
     pub version: u32,
     /// Creation timestamp
     pub created_at: SystemTime,
+    /// Whether this bundle is active
+    pub active: bool,
+    /// Signature threshold
+    pub threshold: u32,
+    /// Signatures map
+    pub signatures: HashMap<String, String>,
+    /// Links to related resources
+    #[serde(default)]
+    pub links: HashMap<String, String>,
 } 

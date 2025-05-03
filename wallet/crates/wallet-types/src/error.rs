@@ -1,44 +1,41 @@
 use thiserror::Error;
+use std::io;
 
-/// Shared error types used by multiple crates
+/// Common error type used across wallet components
 #[derive(Error, Debug)]
 pub enum SharedError {
-    /// Not found error
-    #[error("Not found: {0}")]
-    NotFound(String),
+    /// IO error
+    #[error("IO error: {0}")]
+    IoError(#[from] io::Error),
     
     /// Serialization error
     #[error("Serialization error: {0}")]
     SerializationError(String),
     
-    /// Network error
-    #[error("Network error: {0}")]
-    NetworkError(String),
+    /// Validation error
+    #[error("Validation error: {0}")]
+    ValidationError(String),
     
     /// Authentication error
     #[error("Authentication error: {0}")]
     AuthenticationError(String),
     
-    /// DAG error
-    #[error("DAG error: {0}")]
-    DagError(String),
+    /// Resource not found
+    #[error("Resource not found: {0}")]
+    ResourceNotFound(String),
     
-    /// CID error
-    #[error("CID error: {0}")]
-    CidError(String),
+    /// Connection error
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
     
-    /// Invalid parameters
-    #[error("Invalid parameters: {0}")]
-    InvalidParameters(String),
+    /// Timeout error
+    #[error("Timeout error: {0}")]
+    TimeoutError(String),
     
-    /// Storage error
-    #[error("Storage error: {0}")]
-    StorageError(String),
-    
-    /// Other error
-    #[error("Other error: {0}")]
-    Other(String),
+    /// Generic error
+    #[error("{0}")]
+    GenericError(String),
 }
 
-/// Shared result type
+/// Convenient Result type alias using SharedError
 pub type SharedResult<T> = Result<T, SharedError>; 

@@ -1,27 +1,66 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-/// The type of action being performed
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Types of actions that can be performed by wallet components
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionType {
-    /// Create a governance proposal
-    Proposal,
-    /// Vote on a proposal
-    Vote,
-    /// Anchor data to the DAG
-    Anchor,
+    /// Create a new item
+    Create,
+    
+    /// Update an existing item
+    Update,
+    
+    /// Delete an item
+    Delete,
+    
+    /// Submit data to the network
+    Submit,
+    
+    /// Query or fetch data
+    Query,
+    
+    /// Synchronize data
+    Sync,
+    
+    /// Import data
+    Import,
+    
+    /// Export data
+    Export,
+    
+    /// Sign data
+    Sign,
+    
+    /// Verify signature
+    Verify,
+    
+    /// Approve an action
+    Approve,
+    
+    /// Reject an action
+    Reject,
 }
 
-/// The status of a pending action
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Status of an action
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionStatus {
-    /// The action is pending and waiting to be processed
+    /// Action is pending
     Pending,
-    /// The action is currently being processed
-    Processing,
-    /// The action was successfully processed
+    
+    /// Action is in progress
+    InProgress,
+    
+    /// Action completed successfully
     Completed,
-    /// The action failed to process
+    
+    /// Action failed
     Failed,
-    /// The action was rejected
-    Rejected,
+    
+    /// Action was cancelled
+    Cancelled,
+    
+    /// Action requires approval
+    RequiresApproval,
+    
+    /// Action is expired
+    Expired,
 } 
