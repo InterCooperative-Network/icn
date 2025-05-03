@@ -1,5 +1,6 @@
 use thiserror::Error;
 use wallet_core::error::WalletError as CoreError;
+use wallet_sync::SyncError;
 
 #[derive(Error, Debug)]
 pub enum AgentError {
@@ -38,6 +39,21 @@ pub enum AgentError {
     
     #[error("Core wallet error: {0}")]
     CoreError(#[from] CoreError),
+    
+    #[error("Feature not implemented: {0}")]
+    NotImplemented(String),
+    
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+    
+    #[error("Store error: {0}")]
+    StoreError(String),
+    
+    #[error("Sync error: {0}")]
+    SyncError(String),
+    
+    #[error("DAG error: {0}")]
+    DagError(String),
 }
 
 pub type AgentResult<T> = Result<T, AgentError>; 

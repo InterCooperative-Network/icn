@@ -179,6 +179,25 @@ impl MockDagHeaderData {
     }
 }
 
+/// Network status information for monitoring connectivity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkStatus {
+    /// Connection status to federation nodes
+    pub is_connected: bool,
+    /// Latency to primary federation node in milliseconds
+    pub primary_node_latency: Option<u64>,
+    /// Last successful sync time
+    pub last_successful_sync: Option<SystemTime>,
+    /// Number of pending submissions
+    pub pending_submissions: usize,
+    /// Current federation node in use
+    pub active_federation_url: String,
+    /// Number of successful operations
+    pub successful_operations: usize,
+    /// Number of failed operations
+    pub failed_operations: usize,
+}
+
 /// The SyncManager coordinates synchronization with federation nodes
 pub struct SyncManager<S: LocalWalletStore> {
     /// The identity used for authentication
@@ -713,5 +732,149 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let bundle = mock_data.to_trust_bundle();
         
         Ok(vec![bundle])
+    }
+    
+    /// Get current network status
+    pub async fn get_network_status(&self) -> SyncResult<NetworkStatus> {
+        if self.config.federation_urls.is_empty() {
+            return Err(SyncError::ConfigurationError("No federation URLs configured".to_string()));
+        }
+        
+        // Get the current active federation URL
+        let active_url = &self.config.federation_urls[0];
+        
+        // Check connection by pinging the federation health endpoint
+        let health_url = format!("{}/health", active_url);
+        let is_connected = self.ping_federation(&health_url).await;
+        
+        // Measure latency if connected
+        let primary_node_latency = if is_connected {
+            Some(self.measure_latency(&health_url).await)
+        } else {
+            None
+        };
+        
+        // Get the last successful sync time from sync states
+        let last_successful_sync = {
+            let states = self.sync_states.read().await;
+            states.values()
+                .map(|state| state.last_sync_time)
+                .max()
+        };
+        
+        // Create the status
+        let status = NetworkStatus {
+            is_connected,
+            primary_node_latency,
+            last_successful_sync,
+            pending_submissions: 0, // This would need tracking of pending submissions
+            active_federation_url: active_url.clone(),
+            successful_operations: 0, // This would need a counter in the sync manager
+            failed_operations: 0,    // This would need a counter in the sync manager
+        };
+        
+        Ok(status)
+    }
+    
+    /// Ping federation node to check availability
+    async fn ping_federation(&self, health_url: &str) -> bool {
+        debug!("Pinging federation node at {}", health_url);
+        
+        match self.http_client.get(health_url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+        {
+            Ok(response) => response.status().is_success(),
+            Err(_) => false,
+        }
+    }
+    
+    /// Measure latency to federation node
+    async fn measure_latency(&self, url: &str) -> u64 {
+        let start = std::time::Instant::now();
+        
+        let _ = self.http_client.get(url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await;
+            
+        start.elapsed().as_millis() as u64
+    }
+    
+    /// Submit multiple DAG nodes in a batch
+    pub async fn submit_dag_nodes_batch(&self, nodes: &[DagNode]) -> SyncResult<Vec<NodeSubmissionResponse>> {
+        if nodes.is_empty() {
+            return Ok(vec![]);
+        }
+        
+        if self.config.federation_urls.is_empty() {
+            return Err(SyncError::ConfigurationError("No federation URLs configured".to_string()));
+        }
+        
+        // Use the first federation URL
+        let federation_url = &self.config.federation_urls[0];
+        let url = format!("{}{}/batch", federation_url, DEFAULT_NODE_ENDPOINT);
+        debug!("Batch submitting {} DAG nodes to {}", nodes.len(), url);
+        
+        // Define the backoff strategy for retries
+        let backoff = ExponentialBackoff {
+            max_elapsed_time: Some(Duration::from_secs(60)),
+            max_interval: Duration::from_secs(10),
+            max_retries: Some(self.config.max_retry_attempts),
+            ..ExponentialBackoff::default()
+        };
+        
+        // Create authentication headers with the identity DID
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("X-Identity-DID", 
+            self.identity.did.to_string().parse()
+                .map_err(|_| SyncError::ProtocolError("Invalid DID for header".to_string()))?);
+        
+        // Execute the request with retry logic
+        let result = retry(backoff, || async {
+            let response = self.http_client.post(&url)
+                .headers(headers.clone())
+                .json(nodes)
+                .send()
+                .await
+                .map_err(|e| {
+                    let error = SyncError::ConnectionError(format!("Failed to batch submit DAG nodes: {}", e));
+                    backoff::Error::transient(error)
+                })?;
+                
+            // Check status code
+            let status = response.status();
+            if !status.is_success() {
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error = SyncError::ProtocolError(format!(
+                    "Failed to batch submit DAG nodes. Status: {}, Error: {}", status, error_text
+                ));
+                
+                // Only retry on server errors (5xx)
+                if status.is_server_error() {
+                    return Err(backoff::Error::transient(error));
+                } else {
+                    return Err(backoff::Error::permanent(error));
+                }
+            }
+            
+            // Parse the response body as JSON
+            let submission_responses: Vec<NodeSubmissionResponse> = response.json().await
+                .map_err(|e| {
+                    let error = SyncError::SerializationError(format!(
+                        "Failed to parse batch submission responses: {}", e
+                    ));
+                    backoff::Error::permanent(error)
+                })?;
+                
+            Ok(submission_responses)
+        }).await;
+        
+        match result {
+            Ok(responses) => Ok(responses),
+            Err(backoff::Error::Permanent(e)) => Err(e),
+            Err(backoff::Error::Transient { error, .. }) => Err(error),
+        }
     }
 } 
