@@ -30,6 +30,8 @@ pub enum GovernanceEventType {
     TrustBundleCreated,
     /// A trust bundle was updated
     TrustBundleUpdated,
+    /// A governance configuration was updated
+    ConfigUpdated,
     /// A custom event
     Custom(String),
 }
@@ -112,6 +114,7 @@ impl GovernanceEvent {
             GovernanceEventType::MandateIssued => credential_types.push("MandateIssuanceCredential".to_string()),
             GovernanceEventType::TrustBundleCreated => credential_types.push("TrustBundleCreationCredential".to_string()),
             GovernanceEventType::TrustBundleUpdated => credential_types.push("TrustBundleUpdateCredential".to_string()),
+            GovernanceEventType::ConfigUpdated => credential_types.push("ConfigUpdateCredential".to_string()),
             GovernanceEventType::Custom(ref name) => credential_types.push(format!("{}Credential", name)),
         }
         

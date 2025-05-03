@@ -593,6 +593,45 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
             }
         }
     }
+
+    /// Store a governance configuration for a specific scope
+    pub async fn store_governance_config(&self, scope_id: &str, config: config::GovernanceConfig) -> Result<(), GovernanceError> {
+        // Create the key for storing the governance config
+        let key_str = format!("governance::config::{}", scope_id);
+        let key_cid = self.create_key_cid(&key_str)?;
+        
+        // Serialize the config
+        let config_bytes = serde_json::to_vec(&config)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize governance config: {}", e)))?;
+        
+        // Store the config in storage
+        let mut storage = self.storage.lock().await;
+        storage.put_kv(key_cid, config_bytes)
+            .await
+            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
+        
+        // Emit an event for config update
+        let event_data = serde_json::json!({
+            "scope_id": scope_id,
+            "config_type": config.template_type,
+            "timestamp": chrono::Utc::now().timestamp()
+        });
+        
+        let event = GovernanceEvent::new(
+            GovernanceEventType::ConfigUpdated,
+            IdentityId(format!("did:icn:system:governance")),
+            config.governing_scope,
+            Some(IdentityId(scope_id.to_string())),
+            None,
+            event_data
+        );
+        
+        // Emit the event
+        self.emit_event(event).await
+            .map_err(|e| GovernanceError::EventEmissionError(e))?;
+        
+        Ok(())
+    }
 }
 
 #[async_trait]

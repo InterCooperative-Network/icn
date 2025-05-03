@@ -168,6 +168,10 @@ pub enum FederationManagerMessage {
     Shutdown {
         respond_to: tokio::sync::oneshot::Sender<()>,
     },
+    /// Get connected peers
+    GetConnectedPeers {
+        respond_to: tokio::sync::oneshot::Sender<FederationResult<Vec<String>>>,
+    },
 }
 
 /// Configuration for the federation manager
@@ -484,18 +488,35 @@ impl FederationManager {
         self.config.listen_addresses.clone()
     }
 
+    /// Get connected peers
+    pub async fn get_connected_peers(&self) -> FederationResult<Vec<String>> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        
+        // Create a custom message for getting connected peers
+        // We'll add this variant to the FederationManagerMessage enum separately
+        self.sender.send(FederationManagerMessage::GetConnectedPeers {
+            respond_to: tx,
+        }).await
+        .map_err(|e| FederationError::NetworkError(format!("Failed to send connected peers request: {}", e)))?;
+        
+        rx.await
+            .map_err(|e| FederationError::NetworkError(format!("Failed to receive connected peers: {}", e)))?
+    }
+
     /// Initialize the debug API for development and testing
     /// 
     /// This method is only compiled when the "testing" feature is enabled.
     /// It creates a BasicDebugApi instance and registers HTTP routes for debugging.
     #[cfg(feature = "testing")]
     pub fn init_debug_api(&self) -> FederationResult<Arc<dyn debug_api::DebugApi>> {
-        // Placeholder implementation that just logs and returns a dummy implementation
-        // This will be properly implemented in a future update
-        info!("Debug API initialization requested but disabled in this version");
+        // Create a new BasicDebugApi instance with storage and federation manager
+        let debug_api = Arc::new(debug_api::BasicDebugApi::new(
+            self.storage.clone(),
+            Arc::new(self.clone()),
+        ));
         
-        // Return a dummy implementation that does nothing
-        Ok(Arc::new(DummyDebugApi {}))
+        // Return the debug API
+        Ok(debug_api)
     }
 }
 
@@ -788,6 +809,11 @@ async fn run_event_loop(
                         // Send confirmation and exit the loop
                         let _ = respond_to.send(());
                         break;
+                    },
+                    FederationManagerMessage::GetConnectedPeers { respond_to } => {
+                        // Implement the logic to get connected peers
+                        let connected_peers = get_connected_peers().await;
+                        let _ = respond_to.send(Ok(connected_peers));
                     },
                 }
             },
@@ -1156,6 +1182,13 @@ async fn request_trust_bundle_from_network(
     // In a real implementation, this would request a trust bundle from peers
     // For now, just return Ok
     Ok(())
+}
+
+/// Helper function to get a list of connected peer IDs
+async fn get_connected_peers() -> Vec<String> {
+    // In a full implementation, this would access the swarm and get connected peers
+    // For now, this is a placeholder implementation
+    Vec::new()
 }
 
 #[cfg(test)]
