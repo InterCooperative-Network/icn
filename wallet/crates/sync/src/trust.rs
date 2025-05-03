@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use crate::{SyncClient, SyncError, DagNode, generate_cid};
+use crate::{SyncClient, error::SyncError, DagNode, generate_cid};
 
 /// Trust bundle containing verified DIDs and credentials
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,14 +46,16 @@ impl TrustBundle {
     
     /// Convert to a DAG node
     pub fn to_dag_node(&self) -> Result<DagNode, SyncError> {
-        // Convert to JSON
-        let data = serde_json::to_value(self)?;
+        // Convert to JSON Value (compatible with runtime expectations)
+        let data = serde_json::to_value(self)
+            .map_err(|e| SyncError::Serialization(e))?;
         
         // Generate CID for the serialized JSON
-        let json_bytes = serde_json::to_vec(self)?;
+        let json_bytes = serde_json::to_vec(self)
+            .map_err(|e| SyncError::Serialization(e))?;
         let id = generate_cid(&json_bytes)?;
         
-        // Create DAG node
+        // Create DAG node with timestamp from the trust bundle
         let node = DagNode {
             id: id.clone(),
             data,
@@ -70,7 +72,8 @@ impl TrustBundle {
         self.id = String::new();
         
         // Convert to bytes and generate CID
-        let json_bytes = serde_json::to_vec(self)?;
+        let json_bytes = serde_json::to_vec(self)
+            .map_err(|e| SyncError::Serialization(e))?;
         let id = generate_cid(&json_bytes)?;
         
         // Set the ID
@@ -116,7 +119,8 @@ impl TrustManager {
         let node = self.client.get_node(bundle_id).await?;
         
         // Convert from JSON
-        let trust_bundle = serde_json::from_value(node.data)?;
+        let trust_bundle = serde_json::from_value(node.data)
+            .map_err(|e| SyncError::Serialization(e))?;
         
         Ok(trust_bundle)
     }

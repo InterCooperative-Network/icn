@@ -8765,9 +8765,10 @@ version = "0.1.0"
 name = "wallet-identity"
 version = "0.1.0"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.7",
  "chrono",
  "ed25519-dalek 1.0.1",
+ "getrandom 0.2.16",
  "rand 0.8.5",
  "serde",
  "serde_json",

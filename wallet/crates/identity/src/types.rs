@@ -2,8 +2,13 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use crate::error::{IdentityError, IdentityResult};
-use ed25519_dalek::{Signature, Signer, Verifier, SigningKey, VerifyingKey};
-use std::fmt::{self, Display, Formatter};
+use ed25519_dalek as ed25519;
+use ed25519::{Signer, Verifier, Keypair, SecretKey, PublicKey};
+use std::fmt::{self, Display, Formatter, Debug};
+use base64::{Engine as _, engine::general_purpose};
+
+// Add these explicitly to match the expected versions by ed25519-dalek 1.0
+// use rand_core::{RngCore, CryptoRng};
 
 /// Scope for an identity
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -129,21 +134,26 @@ pub struct IdentityWallet {
 impl IdentityWallet {
     /// Create a new identity wallet with a generated key pair
     pub fn new(name: &str, scope: IdentityScope) -> IdentityResult<Self> {
-        // Generate a new Ed25519 key pair
-        let mut rng = rand::thread_rng();
-        let signing_key = SigningKey::generate(&mut rng);
-        let verifying_key = signing_key.verifying_key();
+        // Generate a new Ed25519 key pair using rand 0.7 compatible constructs
+        let mut seed = [0u8; 32];
+        getrandom::getrandom(&mut seed).map_err(|e| IdentityError::KeyError(format!("Failed to generate random seed: {}", e)))?;
+        
+        // Create a keypair from the random seed
+        let keypair = Keypair::from_bytes(&seed)
+            .map_err(|e| IdentityError::KeyError(format!("Failed to create keypair: {}", e)))?;
+        
+        let public_key = keypair.public;
         
         // Generate the ID from the public key
-        let public_key_bytes = verifying_key.to_bytes();
-        let id = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key_bytes);
+        let public_key_bytes = public_key.as_bytes();
+        let id = general_purpose::URL_SAFE_NO_PAD.encode(public_key_bytes);
         
         // Create the DID
         let did = Did::new("icn", &id);
         
         // Serialize keys
-        let public_key = base64::engine::general_purpose::STANDARD.encode(public_key_bytes);
-        let private_key = base64::engine::general_purpose::STANDARD.encode(signing_key.to_bytes());
+        let public_key_str = general_purpose::STANDARD.encode(public_key_bytes);
+        let private_key_str = general_purpose::STANDARD.encode(keypair.secret.as_bytes());
         
         Ok(Self {
             did,
@@ -151,8 +161,8 @@ impl IdentityWallet {
             scope,
             created_at: Utc::now(),
             metadata: HashMap::new(),
-            public_key,
-            private_key: Some(private_key),
+            public_key: public_key_str,
+            private_key: Some(private_key_str),
         })
     }
     
@@ -177,28 +187,36 @@ impl IdentityWallet {
     }
     
     /// Sign a message using the identity's private key
-    pub fn sign(&self, message: &[u8]) -> IdentityResult<Signature> {
+    pub fn sign(&self, message: &[u8]) -> IdentityResult<ed25519::Signature> {
         let private_key = self.private_key.as_deref()
             .ok_or_else(|| IdentityError::KeyError("No private key available".to_string()))?;
             
-        let key_bytes = base64::engine::general_purpose::STANDARD.decode(private_key)
+        let key_bytes = general_purpose::STANDARD.decode(private_key)
             .map_err(|e| IdentityError::KeyError(format!("Failed to decode private key: {}", e)))?;
             
-        let signing_key = SigningKey::from_bytes(key_bytes.as_slice().try_into()
-            .map_err(|_| IdentityError::KeyError("Invalid private key length".to_string()))?);
+        let secret = SecretKey::from_bytes(&key_bytes)
+            .map_err(|e| IdentityError::KeyError(format!("Invalid private key: {}", e)))?;
             
-        Ok(signing_key.sign(message))
+        let public_bytes = general_purpose::STANDARD.decode(&self.public_key)
+            .map_err(|e| IdentityError::KeyError(format!("Failed to decode public key: {}", e)))?;
+            
+        let public = PublicKey::from_bytes(&public_bytes)
+            .map_err(|e| IdentityError::KeyError(format!("Invalid public key: {}", e)))?;
+            
+        let keypair = Keypair { secret, public };
+            
+        Ok(keypair.sign(message))
     }
     
     /// Verify a signature against this identity's public key
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> IdentityResult<()> {
-        let key_bytes = base64::engine::general_purpose::STANDARD.decode(&self.public_key)
+    pub fn verify(&self, message: &[u8], signature: &ed25519::Signature) -> IdentityResult<()> {
+        let key_bytes = general_purpose::STANDARD.decode(&self.public_key)
             .map_err(|e| IdentityError::KeyError(format!("Failed to decode public key: {}", e)))?;
             
-        let verifying_key = VerifyingKey::from_bytes(key_bytes.as_slice().try_into()
-            .map_err(|_| IdentityError::KeyError("Invalid public key length".to_string()))?)?;
+        let public_key = PublicKey::from_bytes(&key_bytes)
+            .map_err(|e| IdentityError::KeyError(format!("Invalid public key: {}", e)))?;
             
-        verifying_key.verify(message, signature)
+        public_key.verify(message, signature)
             .map_err(|e| IdentityError::VerificationFailed(format!("Signature verification failed: {}", e)))
     }
     
@@ -220,6 +238,4 @@ impl Debug for IdentityWallet {
             .field("has_private_key", &self.private_key.is_some())
             .finish()
     }
-}
-
-use std::fmt::Debug; 
+} 

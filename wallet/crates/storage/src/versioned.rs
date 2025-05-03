@@ -92,7 +92,7 @@ impl FileBasedVersionedStorage {
     }
     
     /// Get the metadata path for a document
-    fn document_metadata_path(&self, collection: &str, id: &str) -> PathBuf {
+    pub fn document_metadata_path(&self, collection: &str, id: &str) -> PathBuf {
         self.document_versions_dir(collection, id).join("metadata.json")
     }
     
@@ -107,7 +107,7 @@ impl FileBasedVersionedStorage {
     }
     
     /// Get the metadata path for a DAG node
-    fn node_metadata_path(&self, node_id: &str) -> PathBuf {
+    pub fn node_metadata_path(&self, node_id: &str) -> PathBuf {
         self.node_versions_dir(node_id).join("metadata.json")
     }
     
@@ -142,15 +142,15 @@ impl FileBasedVersionedStorage {
         &self, 
         metadata_path: &Path, 
         version: u64, 
-        metadata: VersionMetadata
+        metadata: &VersionMetadata
     ) -> StorageResult<()> {
         let mut versions = self.load_version_metadata(metadata_path).await?;
-        versions.insert(version, metadata);
+        versions.insert(version, metadata.clone());
         self.save_version_metadata(metadata_path, &versions).await
     }
     
     /// Get the latest version number from metadata
-    async fn get_latest_version_number(&self, metadata_path: &Path) -> StorageResult<Option<u64>> {
+    pub async fn get_latest_version_number(&self, metadata_path: &Path) -> StorageResult<Option<u64>> {
         let versions = self.load_version_metadata(metadata_path).await?;
         
         if versions.is_empty() {
@@ -189,7 +189,7 @@ impl VersionedStorage for FileBasedVersionedStorage {
         fs::write(&version_path, serialized).await?;
         
         // Add metadata
-        self.add_version_metadata(&metadata_path, metadata.version, metadata).await?;
+        self.add_version_metadata(&metadata_path, metadata.version, &metadata).await?;
         
         debug!("Stored version {} for key: {}", metadata.version, key);
         
@@ -290,7 +290,7 @@ impl VersionedDocumentStorage for FileBasedVersionedStorage {
         fs::write(&version_path, serialized).await?;
         
         // Add metadata
-        self.add_version_metadata(&metadata_path, metadata.version, metadata).await?;
+        self.add_version_metadata(&metadata_path, metadata.version, &metadata).await?;
         
         debug!("Stored version {} for document {}/{}", metadata.version, collection, id);
         
@@ -397,7 +397,7 @@ impl VersionedDagStorage for FileBasedVersionedStorage {
         fs::write(&version_path, serialized).await?;
         
         // Add metadata
-        self.add_version_metadata(&metadata_path, metadata.version, metadata).await?;
+        self.add_version_metadata(&metadata_path, metadata.version, &metadata).await?;
         
         debug!("Stored version {} for DAG node {}", metadata.version, node_id);
         

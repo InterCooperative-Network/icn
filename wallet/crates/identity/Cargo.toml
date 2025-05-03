@@ -18,6 +18,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+# Required for generating random seeds for ed25519
+getrandom = "0.2"
 
 [dev-dependencies]
 tokio-test = "0.4"

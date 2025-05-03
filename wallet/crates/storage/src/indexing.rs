@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use crate::error::{StorageError, StorageResult};
-use crate::traits::{ensure_directory};
+use crate::traits::{ensure_directory, SecureStorage};
 use crate::secure::SimpleSecureStorage;
 use serde::{Serialize, Deserialize};
 use tokio::fs;

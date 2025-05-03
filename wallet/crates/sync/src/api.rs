@@ -3,10 +3,10 @@ use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use chrono::{DateTime, Utc};
 
-use crate::SyncError;
+use crate::error::SyncError;
 use crate::SyncClient;
 
-/// Federation information returned from the node
+/// Federation information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FederationInfo {
     /// Federation ID
@@ -15,34 +15,87 @@ pub struct FederationInfo {
     /// Federation name
     pub name: String,
     
-    /// Federation status
-    pub status: String,
+    /// List of peer IDs
+    pub peers: Vec<String>,
     
-    /// List of peers in the federation
-    pub peers: Vec<PeerInfo>,
+    /// Creation timestamp
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub created_at: DateTime<Utc>,
     
-    /// Federation configuration
-    pub config: Value,
+    /// Additional metadata
+    pub metadata: HashMap<String, String>,
 }
 
-/// Information about a federation peer
+/// Peer information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// Peer ID
     pub id: String,
     
-    /// Peer DID
-    pub did: String,
+    /// Peer name
+    pub name: String,
     
-    /// Peer status (online, offline, etc.)
-    pub status: String,
+    /// Peer URL
+    pub url: String,
     
-    /// Peer endpoint URL
-    pub endpoint: Option<String>,
+    /// Peer type
+    pub peer_type: String,
     
-    /// Last seen timestamp
-    #[serde(with = "chrono::serde::ts_milliseconds_option")]
-    pub last_seen: Option<DateTime<Utc>>,
+    /// Additional metadata
+    pub metadata: HashMap<String, String>,
+}
+
+/// API client for federation info
+pub struct FederationApiClient {
+    /// Base URL for the federation API
+    base_url: String,
+    
+    /// HTTP client
+    client: reqwest::Client,
+}
+
+impl FederationApiClient {
+    /// Create a new federation API client
+    pub fn new(base_url: String) -> Self {
+        Self {
+            base_url,
+            client: reqwest::Client::new(),
+        }
+    }
+    
+    /// Get information about the federation
+    pub async fn get_federation_info(&self) -> Result<FederationInfo, SyncError> {
+        let url = format!("{}/api/v1/federation", self.base_url);
+        
+        let response = self.client.get(&url).send().await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(SyncError::Federation(format!("Failed to get federation info: HTTP {}: {}", status, error_text)));
+        }
+        
+        let federation_info = response.json::<FederationInfo>().await?;
+        
+        Ok(federation_info)
+    }
+    
+    /// Get information about a peer
+    pub async fn get_peer_info(&self, peer_id: &str) -> Result<PeerInfo, SyncError> {
+        let url = format!("{}/api/v1/federation/peers/{}", self.base_url, peer_id);
+        
+        let response = self.client.get(&url).send().await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(SyncError::Federation(format!("Failed to get peer info: HTTP {}: {}", status, error_text)));
+        }
+        
+        let peer_info = response.json::<PeerInfo>().await?;
+        
+        Ok(peer_info)
+    }
 }
 
 /// Federation API client extension for SyncClient
@@ -63,7 +116,7 @@ impl SyncClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(SyncError::NodeError(format!("Failed to get federation info: HTTP {}: {}", status, error_text)));
+            return Err(SyncError::Federation(format!("Failed to get federation info: HTTP {}: {}", status, error_text)));
         }
         
         let federation_info = response.json::<FederationInfo>().await?;
@@ -86,7 +139,7 @@ impl SyncClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(SyncError::NodeError(format!("Failed to get peer info: HTTP {}: {}", status, error_text)));
+            return Err(SyncError::Federation(format!("Failed to get peer info: HTTP {}: {}", status, error_text)));
         }
         
         let peer_info = response.json::<PeerInfo>().await?;
@@ -97,12 +150,8 @@ impl SyncClient {
     pub async fn discover_federation(&self) -> Result<Vec<String>, SyncError> {
         let federation_info = self.get_federation_info().await?;
         
-        // Extract endpoints from online peers
-        let endpoints: Vec<String> = federation_info.peers.iter()
-            .filter(|peer| peer.status == "online")
-            .filter_map(|peer| peer.endpoint.clone())
-            .collect();
-        
-        Ok(endpoints)
+        // Just return the peer IDs from the federation info
+        // We'll need to look up specific details later if needed
+        Ok(federation_info.peers)
     }
 } 

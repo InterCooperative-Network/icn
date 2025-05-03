@@ -4,7 +4,6 @@ use std::fmt;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use thiserror::Error;
 use tracing::{debug, error, info, warn};
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
@@ -17,52 +16,16 @@ use backoff::{ExponentialBackoff, backoff::Backoff};
 // Sub-modules
 pub mod api;
 pub mod trust;
+pub mod error;
 
 // Re-export key types
 pub use api::{FederationInfo, PeerInfo};
 pub use trust::{TrustBundle, TrustManager};
+pub use error::SyncError;
 
 // Re-export multihash to avoid version conflicts
 pub mod compat {
     pub use multihash_0_16_3 as multihash;
-}
-
-/// Error type for synchronization operations
-#[derive(Error, Debug)]
-pub enum SyncError {
-    #[error("Network error: {0}")]
-    NetworkError(#[from] reqwest::Error),
-
-    #[error("JSON serialization error: {0}")]
-    SerdeError(#[from] serde_json::Error),
-
-    #[error("Node error: {0}")]
-    NodeError(String),
-
-    #[error("CID error: {0}")]
-    CidError(String),
-
-    #[error("Storage error: {0}")]
-    StorageError(String),
-
-    #[error("Authentication error: {0}")]
-    AuthError(String),
-
-    #[error("Backoff error: operation timed out")]
-    BackoffError,
-}
-
-// Custom conversion for backoff error handling
-impl<E> From<backoff::Error<E>> for SyncError 
-where 
-    E: Into<SyncError> 
-{
-    fn from(err: backoff::Error<E>) -> Self {
-        match err {
-            backoff::Error::Permanent(e) => e.into(),
-            backoff::Error::Transient(e) => e.into(),
-        }
-    }
 }
 
 /// DAG Node representation compatible with wallet and runtime
@@ -151,12 +114,12 @@ impl SyncClient {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
         
-        let response = request.send().await?;
+        let response = request.send().await.map_err(error::map_reqwest_error)?;
         
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(SyncError::NodeError(format!("Failed to submit node: HTTP {}: {}", status, error_text)));
+            return Err(SyncError::NodeSubmission(format!("HTTP {}: {}", status, error_text)));
         }
         
         let submission_response = response.json::<NodeSubmissionResponse>().await?;
@@ -174,12 +137,16 @@ impl SyncClient {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
         
-        let response = request.send().await?;
+        let response = request.send().await.map_err(error::map_reqwest_error)?;
         
         if !response.status().is_success() {
             let status = response.status();
+            if status.as_u16() == 404 {
+                return Err(SyncError::NodeNotFound(node_id.to_string()));
+            }
+            
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(SyncError::NodeError(format!("Failed to get node: HTTP {}: {}", status, error_text)));
+            return Err(SyncError::Network(format!("HTTP {}: {}", status, error_text)));
         }
         
         let node = response.json::<DagNode>().await?;
@@ -223,7 +190,8 @@ impl SyncService {
                 Err(e) => {
                     // Only retry on network errors
                     match &e {
-                        SyncError::NetworkError(_) => Err(backoff::Error::transient(e)),
+                        SyncError::Network(_) => Err(backoff::Error::transient(e)),
+                        SyncError::Request(_) if e.to_string().contains("timeout") => Err(backoff::Error::transient(e)),
                         _ => Err(backoff::Error::permanent(e)),
                     }
                 }
@@ -232,6 +200,31 @@ impl SyncService {
         
         let result = backoff::future::retry(backoff, operation).await?;
         Ok(result)
+    }
+}
+
+/// Sync manager to coordinate synchronization
+pub struct SyncManager {
+    client: SyncClient,
+    service: SyncService,
+}
+
+impl SyncManager {
+    /// Create a new sync manager
+    pub fn new(node_url: String) -> Self {
+        let client = SyncClient::new(node_url);
+        let service = SyncService::new(client.clone());
+        
+        Self {
+            client,
+            service,
+        }
+    }
+    
+    /// With authentication token
+    pub fn with_auth_token(mut self, token: String) -> Self {
+        self.client = self.client.with_auth_token(token);
+        self
     }
 }
 
