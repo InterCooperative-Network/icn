@@ -503,6 +503,36 @@ impl CclCompiler {
         let metadata_json = serde_json::to_string(&metadata)
             .map_err(|e| CompilerError::General(format!("Failed to serialize metadata: {}", e)))?;
         
+        // Extract key and value for store_data action
+        let mut key_cid_str = String::new();
+        let mut value_bytes = Vec::new();
+        
+        if action == "store_data" {
+            // Extract key_cid and value from DSL input
+            if let Some(key) = dsl_input.get("key_cid") {
+                if let Some(key_str) = key.as_str() {
+                    key_cid_str = key_str.to_string();
+                } else {
+                    return Err(CompilerError::DslError("key_cid must be a string".to_string()));
+                }
+            } else {
+                return Err(CompilerError::DslError("store_data action requires key_cid field".to_string()));
+            }
+            
+            if let Some(value) = dsl_input.get("value") {
+                // Handle different value types
+                if let Some(value_str) = value.as_str() {
+                    value_bytes = value_str.as_bytes().to_vec();
+                } else {
+                    // For non-string values, serialize to JSON
+                    value_bytes = serde_json::to_vec(value)
+                        .map_err(|e| CompilerError::DslError(format!("Failed to serialize value: {}", e)))?;
+                }
+            } else {
+                return Err(CompilerError::DslError("store_data action requires value field".to_string()));
+            }
+        }
+        
         // Step 2: Create a new WASM module
         let mut module = Module::new();
         
@@ -579,7 +609,7 @@ impl CclCompiler {
         
         module.section(&exports);
         
-        // Step 8: Define data section for static strings
+        // Step 8: Define data section for static strings and embedded data
         let mut data_section = wasm_encoder::DataSection::new();
         
         // Create template info string for logging
@@ -595,6 +625,24 @@ impl CclCompiler {
             &wasm_encoder::ConstExpr::i32_const(1024), // Offset in memory
             template_info_bytes.iter().copied(), // Data bytes - copied to ensure we have actual u8 values
         );
+        
+        // For store_data action, embed key_cid and value in data section
+        if action == "store_data" {
+            // Store key_cid at memory offset 2048
+            let key_cid_bytes = key_cid_str.as_bytes();
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(2048), // Offset for key_cid
+                key_cid_bytes.iter().copied(),
+            );
+            
+            // Store value at memory offset 4096
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(4096), // Offset for value
+                value_bytes.iter().copied(),
+            );
+        }
         
         module.section(&data_section);
         
@@ -621,8 +669,8 @@ impl CclCompiler {
             (1, wasm_encoder::ValType::I32), // Local 0: Status code
         ]);
         
-        // Store default return value (success = 0)
-        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        // Store default return value (failure = 1, will be set to 0 on success)
+        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
         invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
         
         // Log that we're starting execution
@@ -631,9 +679,35 @@ impl CclCompiler {
         invoke_func.instruction(&wasm_encoder::Instruction::I32Const(template_info_bytes.len() as i32)); // Message length
         invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
         
-        // Add simple execution logic based on action type
-        // In a real implementation, this would contain action-specific logic
-        if action == "propose_membership" {
+        // Add execution logic based on action type
+        if action == "store_data" {
+            // For store_data action, call host_storage_put with the embedded data
+            
+            // Load key_cid pointer and length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2048)); // key_cid pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(key_cid_str.len() as i32)); // key_cid length
+            
+            // Load value pointer and length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(4096)); // value pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(value_bytes.len() as i32)); // value length
+            
+            // Call host_storage_put (imported function at index 2)
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(2));
+            
+            // Check return value and set status code
+            // If host_storage_put returns non-zero (success), set status to 0 (success)
+            // Otherwise, return 1 (failure, which is the default)
+            
+            // Create a block for if/else construct
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // If result from host_storage_put is non-zero
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Success status
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0)); // Set local 0 to success
+            
+            invoke_func.instruction(&wasm_encoder::Instruction::End); // End if block
+            
+        } else if action == "propose_membership" {
             // Logic for propose_membership action
             // For this example, just return success (0)
             invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
@@ -645,9 +719,7 @@ impl CclCompiler {
             invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
         } else {
             // Default logic for unknown actions
-            // Return "not implemented" status (1)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            // Return "not implemented" status (1) - already set as default
         }
         
         // Return the status code from local 0

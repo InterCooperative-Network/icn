@@ -3,6 +3,7 @@ use icn_governance_kernel::config::GovernanceConfig;
 use icn_identity::IdentityScope;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use wasmparser::{Parser, Payload, Operator};
 
 fn create_test_ccl_config() -> GovernanceConfig {
     GovernanceConfig {
@@ -382,4 +383,115 @@ fn test_schema_validation_with_custom_schema() {
         assert!(err_string.contains("test_field") || err_string.contains("missing"), 
                 "Error message should mention the missing field: {}", err_string);
     }
+}
+
+#[test]
+fn test_store_data_wasm_generation() {
+    // Create a compiler instance
+    let compiler = CclCompiler::new();
+    
+    // Create a CCL config
+    let ccl_config = create_test_ccl_config();
+    
+    // Create a DSL input for store_data action
+    let dsl_input = serde_json::json!({
+        "action": "store_data",
+        "key_cid": "bafybeihx6e2r6fxmbeki6qnpj6if6dbgdipau7udrplgvgn2kev7pu5lzi",
+        "value": {
+            "name": "Test Value",
+            "description": "This is a test value to store",
+            "number": 42
+        }
+    });
+    
+    // Compile to WASM with debug info
+    let options = CompilationOptions {
+        include_debug_info: true,
+        validate_schema: false,
+        ..CompilationOptions::default()
+    };
+    
+    let wasm_bytes = compiler.generate_wasm_module(&ccl_config, &dsl_input, &options)
+        .expect("WASM generation should succeed");
+    
+    // Check that the module generates valid WebAssembly
+    assert!(!wasm_bytes.is_empty());
+    assert_eq!(&wasm_bytes[0..4], &[0x00, 0x61, 0x73, 0x6d]); // WebAssembly magic number
+    
+    // Parse the WASM and verify its structure
+    let mut has_storage_put_import = false;
+    let mut has_invoke_call_to_storage_put = false;
+    let mut has_key_cid_data = false;
+    let mut has_value_data = false;
+    let mut has_metadata_section = false;
+    
+    // The key_cid string we're looking for
+    let key_cid = "bafybeihx6e2r6fxmbeki6qnpj6if6dbgdipau7udrplgvgn2kev7pu5lzi";
+    
+    // Parsed WASM validation using wasmparser
+    for payload in Parser::new(0).parse_all(&wasm_bytes) {
+        match payload.expect("Should parse WASM payload") {
+            Payload::ImportSection(import_section) => {
+                for import in import_section {
+                    let import = import.expect("Should parse import");
+                    if import.module == "env" && import.name == "host_storage_put" {
+                        has_storage_put_import = true;
+                    }
+                }
+            },
+            Payload::CodeSectionEntry(func_body) => {
+                let mut operators = func_body.get_operators_reader().expect("Should read operators");
+                let mut call_indices = Vec::new();
+                
+                while !operators.eof() {
+                    match operators.read().expect("Should read operator") {
+                        Operator::Call { function_index } => {
+                            call_indices.push(function_index);
+                            
+                            // Check if we call the storage_put function (index 2 in our imports)
+                            if function_index == 2 {
+                                has_invoke_call_to_storage_put = true;
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            },
+            Payload::DataSection(data_section) => {
+                for data in data_section {
+                    let data = data.expect("Should parse data");
+                    let data_bytes = data.data.to_vec();
+                    
+                    // Check for key_cid in data
+                    if data_bytes.windows(key_cid.len()).any(|window| window == key_cid.as_bytes()) {
+                        has_key_cid_data = true;
+                    }
+                    
+                    // Check for some part of the value in data
+                    if data_bytes.windows("Test Value".len()).any(|window| window == "Test Value".as_bytes()) {
+                        has_value_data = true;
+                    }
+                }
+            },
+            Payload::CustomSection(section) => {
+                if section.name() == "icn-metadata" {
+                    has_metadata_section = true;
+                    
+                    // Verify metadata contains the action type
+                    let metadata_str = std::str::from_utf8(section.data())
+                        .expect("Metadata should be valid UTF-8");
+                    
+                    assert!(metadata_str.contains("store_data"), "Metadata should contain the action type");
+                }
+            },
+            _ => {}
+        }
+    }
+    
+    // Verify all expected elements are present in the generated WASM
+    assert!(has_storage_put_import, "WASM should import host_storage_put function");
+    assert!(has_invoke_call_to_storage_put, "WASM should call host_storage_put in invoke function");
+    assert!(has_key_cid_data, "WASM should contain the key_cid data");
+    assert!(has_value_data, "WASM should contain the value data");
+    assert!(has_metadata_section, "WASM should have metadata section");
 } 
