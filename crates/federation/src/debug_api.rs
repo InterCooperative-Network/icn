@@ -243,6 +243,7 @@ pub mod axum_implementation {
 pub mod implementation {
     use super::*;
     use tracing::{info, error, debug};
+    use crate::{FederationManager, create_sha256_multihash};
     
     /// Basic implementation of the Debug API
     pub struct BasicDebugApi {
@@ -269,34 +270,32 @@ pub mod implementation {
             debug!("Querying proposal status for CID: {}", proposal_cid);
             
             // Create a key for the proposal, assuming it follows the pattern used in governance-kernel
+            // Note: The key format might differ in the actual governance kernel implementation.
+            // Adjust this if needed based on how proposals are actually stored.
             let key_str = format!("proposal::{}", proposal_cid);
             let storage_guard = self.storage.lock().await;
             
-            // Create a CID for the key in storage
-            let key_hash = crate::create_sha256_multihash(key_str.as_bytes());
-            let key_cid = Cid::new_v1(0x71, key_hash); // dag-cbor codec
+            // Create a CID for the key in storage (assuming dag-cbor for the key itself)
+            let key_hash = create_sha256_multihash(key_str.as_bytes());
+            let key_cid = Cid::new_v1(0x71, key_hash); // Use dag-cbor (0x71) or raw (0x55) as appropriate for keys
             
-            // Try to retrieve the proposal from storage
+            // Try to retrieve the proposal from storage using get_kv
             match storage_guard.get_kv(&key_cid).await {
                 Ok(Some(proposal_bytes)) => {
-                    // Try to deserialize the proposal
+                    // Try to deserialize the proposal assuming JSON format
                     match serde_json::from_slice::<icn_governance_kernel::Proposal>(&proposal_bytes) {
                         Ok(proposal) => {
-                            // Get vote count by querying votes for this proposal
-                            // This is a simplified version; a full implementation would query all votes
-                            let mut vote_count = 0;
+                            // Sum up the votes
+                            let vote_count = (proposal.votes_for + proposal.votes_against + proposal.votes_abstain) as u32;
                             
                             // Check if it's executed
                             let executed = matches!(proposal.status, icn_governance_kernel::ProposalStatus::Executed);
                             
-                            // For finalized_at, we'll check if the proposal is finalized and use the current time as a placeholder
-                            let timestamp = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_secs() as i64;
-                                
-                            let finalized_at = if matches!(proposal.status, icn_governance_kernel::ProposalStatus::Finalized) || executed {
-                                Some(timestamp)
+                            // Timestamps are not directly available in the proposal struct
+                            // Use placeholder logic: created_at = None, finalized_at = voting_end_time if finalized/executed
+                            let created_at = None; // Placeholder - Proposal struct lacks creation timestamp
+                            let finalized_at = if matches!(proposal.status, icn_governance_kernel::ProposalStatus::Finalized | icn_governance_kernel::ProposalStatus::Executed) {
+                                Some(proposal.voting_end_time)
                             } else {
                                 None
                             };
@@ -304,20 +303,21 @@ pub mod implementation {
                             Ok(ProposalStatusResponse {
                                 exists: true,
                                 status: format!("{:?}", proposal.status),
-                                created_at: Some(proposal.voting_end_time - 86400), // Assuming a 1-day voting period
+                                created_at,
                                 finalized_at,
                                 vote_count,
                                 executed,
                             })
                         },
                         Err(e) => {
-                            error!("Failed to deserialize proposal: {}", e);
+                            error!("Failed to deserialize proposal from storage (key: {}): {}", key_cid, e);
                             Err(FederationError::StorageError(format!("Failed to deserialize proposal: {}", e)))
                         }
                     }
                 },
                 Ok(None) => {
-                    // Proposal not found
+                    // Proposal not found for the given key CID
+                    debug!("Proposal not found in storage for key CID: {}", key_cid);
                     Ok(ProposalStatusResponse {
                         exists: false,
                         status: "NotFound".to_string(),
@@ -328,8 +328,8 @@ pub mod implementation {
                     })
                 },
                 Err(e) => {
-                    error!("Storage error when querying proposal: {}", e);
-                    Err(FederationError::StorageError(format!("Failed to query proposal: {}", e)))
+                    error!("Storage error when querying proposal (key: {}): {}", key_cid, e);
+                    Err(FederationError::StorageError(format!("Storage error querying proposal: {}", e)))
                 }
             }
         }
@@ -339,10 +339,10 @@ pub mod implementation {
             
             let storage_guard = self.storage.lock().await;
             
-            // Attempt to retrieve the DAG node blob from storage
+            // Attempt to retrieve the DAG node blob from storage using get_blob
             match storage_guard.get_blob(node_cid).await {
                 Ok(Some(node_bytes)) => {
-                    // Try to deserialize the DAG node
+                    // Try to deserialize the DAG node using serde_json (matching DagStore implementation)
                     match serde_json::from_slice::<DagNode>(&node_bytes) {
                         Ok(node) => {
                             // Convert links (parents) to strings
@@ -350,31 +350,32 @@ pub mod implementation {
                                 .map(|cid| cid.to_string())
                                 .collect();
                             
-                            // Create content type string - in a real implementation, 
-                            // this would be determined by the node's metadata or content
-                            let content_type = "application/octet-stream".to_string();
+                            // Determine content type - Assume JSON storage based on DagStore
+                            let content_type = "application/json".to_string(); 
                             
                             Ok(Some(DagNodeResponse {
                                 cid: node_cid.to_string(),
                                 content_type,
-                                timestamp: node.timestamp(),
+                                timestamp: node.timestamp(), // Uses metadata.timestamp
                                 links,
-                                size: node.content.len(),
+                                size: node_bytes.len(), // Use the size of the raw blob bytes stored
                             }))
                         },
                         Err(e) => {
-                            error!("Failed to deserialize DAG node: {}", e);
-                            Err(FederationError::StorageError(format!("Failed to deserialize DAG node: {}", e)))
+                            error!("Failed to deserialize DAG node {} from JSON: {}", node_cid, e);
+                            // Return error, indicating storage inconsistency or wrong format
+                            Err(FederationError::StorageError(format!("Failed to deserialize DAG node {}: {}", node_cid, e)))
                         }
                     }
                 },
                 Ok(None) => {
                     // Node not found
+                    debug!("DAG node {} not found in storage", node_cid);
                     Ok(None)
                 },
                 Err(e) => {
-                    error!("Storage error when querying DAG node: {}", e);
-                    Err(FederationError::StorageError(format!("Failed to query DAG node: {}", e)))
+                    error!("Storage error when querying DAG node {}: {}", node_cid, e);
+                    Err(FederationError::StorageError(format!("Storage error querying DAG node {}: {}", node_cid, e)))
                 }
             }
         }
@@ -383,40 +384,43 @@ pub mod implementation {
             debug!("Querying federation status");
             
             // Get the current epoch from the federation manager
-            let current_epoch = match self.federation_manager.get_latest_known_epoch().await {
-                Ok(epoch) => epoch,
-                Err(e) => {
-                    error!("Failed to get latest epoch: {}", e);
-                    return Err(FederationError::InternalError(format!("Failed to get latest epoch: {}", e)));
-                }
-            };
+            let current_epoch = self.federation_manager.get_latest_known_epoch().await?;
             
             // Get the current trust bundle to count nodes by role
-            let current_trust_bundle = self.query_current_trust_bundle().await?;
+            // This uses the method implemented below, which calls federation_manager.request_trust_bundle
+            let current_trust_bundle_result = self.query_current_trust_bundle().await;
             
-            // Default node counts
             let mut node_count = 0;
             let mut validator_count = 0;
             let mut guardian_count = 0;
             let mut observer_count = 0;
-            
-            // If there is a trust bundle, count the nodes by role
-            if let Some(bundle) = current_trust_bundle {
-                // Count total nodes in the trust bundle (based on attestations)
-                node_count = bundle.attestations.len();
-                
-                // Count nodes by role
-                validator_count = bundle.count_nodes_by_role("validator");
-                guardian_count = bundle.count_nodes_by_role("guardian");
-                observer_count = bundle.count_nodes_by_role("observer");
+
+            match current_trust_bundle_result {
+                Ok(Some(bundle)) => {
+                    node_count = bundle.attestations.len();
+                    // Use case-sensitive role names based on common practice, adjust if needed
+                    validator_count = bundle.count_nodes_by_role("Validator"); 
+                    guardian_count = bundle.count_nodes_by_role("Guardian");
+                    observer_count = bundle.count_nodes_by_role("Observer");
+                },
+                Ok(None) => {
+                    debug!("No current trust bundle found for epoch {}", current_epoch);
+                    // Counts remain 0
+                },
+                Err(e) => {
+                    // Log the error but continue, returning 0 counts for roles
+                    error!("Failed to query current trust bundle: {}", e);
+                    // Depending on requirements, could return Err here instead
+                }
             }
             
             // Get connected peers count
-            let connected_peers = match self.query_connected_peers().await {
+            let connected_peers_result = self.query_connected_peers().await;
+            let connected_peers = match connected_peers_result {
                 Ok(peers) => peers.len(),
                 Err(e) => {
                     error!("Failed to get connected peers: {}", e);
-                    0 // Default to 0 if there's an error
+                    0 // Default to 0 if there's an error getting peers
                 }
             };
             
@@ -432,18 +436,24 @@ pub mod implementation {
         
         async fn query_connected_peers(&self) -> FederationResult<Vec<String>> {
             debug!("Querying connected peers");
-            
             // Call the FederationManager's method to get connected peers
+            // Ensure FederationManager has this method implemented and accessible
             self.federation_manager.get_connected_peers().await
         }
         
         async fn query_current_trust_bundle(&self) -> FederationResult<Option<TrustBundle>> {
             debug!("Querying current trust bundle");
             
-            // Get the current epoch
+            // Get the latest known epoch
             let current_epoch = self.federation_manager.get_latest_known_epoch().await?;
             
-            // Query the trust bundle for the current epoch
+            if current_epoch == 0 {
+                 debug!("Latest known epoch is 0, assuming no trust bundle available yet.");
+                 return Ok(None);
+            }
+            
+            // Request the trust bundle for the current epoch from the network/cache
+            debug!("Requesting trust bundle for epoch {}", current_epoch);
             self.federation_manager.request_trust_bundle(current_epoch).await
         }
     }
