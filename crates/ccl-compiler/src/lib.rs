@@ -350,6 +350,9 @@ impl CclCompiler {
                             ));
                         }
                     }
+                    "log_caller_info" => {
+                        // This action doesn't require additional fields
+                    }
                     // Add more action-specific validations as needed
                     _ => {
                         return Err(CompilerError::DslError(format!(
@@ -384,7 +387,9 @@ impl CclCompiler {
                 // Specific checks based on action type
                 let action = dsl_obj.get("action").unwrap().as_str().unwrap_or("");
                 match action {
-                    // Add action-specific validations
+                    "log_caller_info" => {
+                        // This action doesn't require additional fields
+                    }
                     _ => {
                         return Err(CompilerError::DslError(format!(
                             "Unknown action '{}' for community charter",
@@ -561,6 +566,14 @@ impl CclCompiler {
         // Parameters: (key_ptr, key_len, value_ptr, value_len), Returns: result code
         types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
         
+        // Type 5: (i32, i32) -> i32 for host_get_caller_did function
+        // Parameters: (output_ptr, max_len), Returns: actual string length
+        types.function(vec![ValType::I32, ValType::I32], vec![ValType::I32]);
+        
+        // Type 6: () -> i32 for host_get_caller_scope function
+        // No parameters, Returns: scope as integer
+        types.function(vec![], vec![ValType::I32]);
+        
         module.section(&types);
         
         // Step 4: Define import section - host functions
@@ -572,6 +585,12 @@ impl CclCompiler {
         // Import storage functions from env module
         imports.import("env", "host_storage_get", EntityType::Function(3));
         imports.import("env", "host_storage_put", EntityType::Function(4));
+        
+        // Import identity functions for log_caller_info action
+        if action == "log_caller_info" {
+            imports.import("env", "host_get_caller_did", EntityType::Function(5));
+            imports.import("env", "host_get_caller_scope", EntityType::Function(6));
+        }
         
         module.section(&imports);
         
@@ -645,6 +664,39 @@ impl CclCompiler {
             &wasm_encoder::ConstExpr::i32_const(1600), // Offset for data_not_found_msg
             data_not_found_msg.as_bytes().iter().copied(),
         );
+        
+        // Define message strings for log_caller_info action
+        if action == "log_caller_info" {
+            let caller_did_prefix = "Caller DID: ";
+            let caller_scope_prefix = "Caller Scope: ";
+            
+            // Add message strings to data section
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(1700), // Offset for caller_did_prefix
+                caller_did_prefix.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(1750), // Offset for caller_scope_prefix
+                caller_scope_prefix.as_bytes().iter().copied(),
+            );
+            
+            // Reserve space for scope digit (just one byte at 1799)
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(1799), // Offset for scope digit
+                [0].iter().copied(), // Single byte placeholder
+            );
+            
+            // Reserve space for caller DID (100 bytes at 9000)
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(9000), // Offset for caller DID buffer
+                vec![0; 100].iter().copied(), // 100 bytes of zeros
+            );
+        }
         
         // For store_data or get_data action, embed key_cid in data section
         if action == "store_data" || action == "get_data" {
@@ -782,6 +834,65 @@ impl CclCompiler {
             
             // End if/else
             invoke_func.instruction(&wasm_encoder::Instruction::End);
+            
+        } else if action == "log_caller_info" {
+            // For log_caller_info action, call identity host functions and log the results
+            
+            // Get the caller's DID into a buffer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(9000)); // Pointer to DID buffer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // Max length for DID
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(3)); // Call host_get_caller_did (offset by base imports)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store returned length in local 1
+            
+            // Log the DID prefix
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1700)); // "Caller DID: " message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(11)); // Length of "Caller DID: "
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Log the actual DID
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(9000)); // Pointer to DID buffer
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // Get the actual DID length
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Get the caller's scope
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(4)); // Call host_get_caller_scope
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store scope in local 1
+            
+            // Convert scope integer to ASCII digit and store at memory[1799]
+            // We need to add '0' (ASCII 48) to the scope value (0-9)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // Get scope value
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(48)); // ASCII '0'
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Add); // scope + '0' = ASCII digit
+            
+            // Store the ASCII digit at memory[1799]
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1799)); // Memory address
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // Get scope value + ASCII '0'
+            
+            // Create a MemArg for the I32Store8 instruction
+            let store_memarg = wasm_encoder::MemArg { 
+                offset: 0,
+                align: 0,
+                memory_index: 0,
+            };
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Store8(store_memarg)); // Store 1 byte
+            
+            // Log the scope prefix
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1750)); // "Caller Scope: " message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(14)); // Length of "Caller Scope: "
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Log the actual scope digit
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1799)); // Pointer to scope digit
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Length is 1 byte
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set success status (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
             
         } else if action == "propose_membership" {
             // Logic for propose_membership action

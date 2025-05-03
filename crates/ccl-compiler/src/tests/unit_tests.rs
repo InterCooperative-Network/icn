@@ -627,4 +627,128 @@ fn test_get_data_wasm_generation() {
     assert!(has_data_not_found_message, "WASM should contain 'Data not found' message");
     assert!(has_if_else_structure, "WASM should contain if/else structures for conditional logic");
     assert!(has_metadata_section, "WASM should have metadata section");
+}
+
+#[test]
+fn test_identity_wasm_generation() {
+    // Create a compiler instance
+    let compiler = CclCompiler::new();
+    
+    // Create a CCL config
+    let ccl_config = create_test_ccl_config();
+    
+    // Create a DSL input for log_caller_info action
+    let dsl_input = serde_json::json!({
+        "action": "log_caller_info"
+    });
+    
+    // Compile to WASM with debug info
+    let options = CompilationOptions {
+        include_debug_info: true,
+        validate_schema: false,
+        ..CompilationOptions::default()
+    };
+    
+    let wasm_bytes = compiler.generate_wasm_module(&ccl_config, &dsl_input, &options)
+        .expect("WASM generation should succeed");
+    
+    // Check that the module generates valid WebAssembly
+    assert!(!wasm_bytes.is_empty());
+    assert_eq!(&wasm_bytes[0..4], &[0x00, 0x61, 0x73, 0x6d]); // WebAssembly magic number
+    
+    // Parse the WASM and verify its structure
+    let mut has_get_caller_did_import = false;
+    let mut has_get_caller_scope_import = false;
+    let mut has_log_message_import = false;
+    let mut has_invoke_call_to_get_caller_did = false;
+    let mut has_invoke_call_to_get_caller_scope = false;
+    let mut has_invoke_call_to_log_message = false;
+    let mut has_caller_did_prefix = false;
+    let mut has_caller_scope_prefix = false;
+    let mut has_i32_store8_instruction = false; // For storing ASCII digit
+    let mut has_metadata_section = false;
+    
+    // Parsed WASM validation using wasmparser
+    for payload in Parser::new(0).parse_all(&wasm_bytes) {
+        match payload.expect("Should parse WASM payload") {
+            Payload::ImportSection(import_section) => {
+                for import in import_section {
+                    let import = import.expect("Should parse import");
+                    if import.module == "env" && import.name == "host_get_caller_did" {
+                        has_get_caller_did_import = true;
+                    }
+                    if import.module == "env" && import.name == "host_get_caller_scope" {
+                        has_get_caller_scope_import = true;
+                    }
+                    if import.module == "env" && import.name == "host_log_message" {
+                        has_log_message_import = true;
+                    }
+                }
+            },
+            Payload::CodeSectionEntry(func_body) => {
+                let mut operators = func_body.get_operators_reader().expect("Should read operators");
+                
+                while !operators.eof() {
+                    match operators.read().expect("Should read operator") {
+                        Operator::Call { function_index } => {
+                            // Check for calls to specific imported functions
+                            // Note: function indexes depend on the order of imports
+                            if function_index == 3 { // host_get_caller_did
+                                has_invoke_call_to_get_caller_did = true;
+                            }
+                            if function_index == 4 { // host_get_caller_scope
+                                has_invoke_call_to_get_caller_scope = true;
+                            }
+                            if function_index == 0 { // host_log_message
+                                has_invoke_call_to_log_message = true;
+                            }
+                        },
+                        Operator::I32Store8 { .. } => {
+                            has_i32_store8_instruction = true; // For storing ASCII digit
+                        },
+                        _ => {}
+                    }
+                }
+            },
+            Payload::DataSection(data_section) => {
+                for data in data_section {
+                    let data = data.expect("Should parse data");
+                    let data_bytes = data.data.to_vec();
+                    
+                    // Check for the prefix strings in data section
+                    if data_bytes.windows("Caller DID: ".len()).any(|window| window == "Caller DID: ".as_bytes()) {
+                        has_caller_did_prefix = true;
+                    }
+                    
+                    if data_bytes.windows("Caller Scope: ".len()).any(|window| window == "Caller Scope: ".as_bytes()) {
+                        has_caller_scope_prefix = true;
+                    }
+                }
+            },
+            Payload::CustomSection(section) => {
+                if section.name() == "icn-metadata" {
+                    has_metadata_section = true;
+                    
+                    // Verify metadata contains the action type
+                    let metadata_str = std::str::from_utf8(section.data())
+                        .expect("Metadata should be valid UTF-8");
+                    
+                    assert!(metadata_str.contains("log_caller_info"), "Metadata should contain the action type");
+                }
+            },
+            _ => {}
+        }
+    }
+    
+    // Verify all expected elements are present in the generated WASM
+    assert!(has_get_caller_did_import, "WASM should import host_get_caller_did function");
+    assert!(has_get_caller_scope_import, "WASM should import host_get_caller_scope function");
+    assert!(has_log_message_import, "WASM should import host_log_message function");
+    assert!(has_invoke_call_to_get_caller_did, "WASM should call host_get_caller_did in invoke function");
+    assert!(has_invoke_call_to_get_caller_scope, "WASM should call host_get_caller_scope in invoke function");
+    assert!(has_invoke_call_to_log_message, "WASM should call host_log_message in invoke function");
+    assert!(has_caller_did_prefix, "WASM should contain 'Caller DID: ' message in data section");
+    assert!(has_caller_scope_prefix, "WASM should contain 'Caller Scope: ' message in data section");
+    assert!(has_i32_store8_instruction, "WASM should contain I32Store8 instruction for storing ASCII digit");
+    assert!(has_metadata_section, "WASM should have metadata section with log_caller_info action");
 } 
