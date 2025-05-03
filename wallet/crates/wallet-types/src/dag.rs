@@ -170,12 +170,17 @@ pub mod runtime_compat {
         
         let parents = parents?;
         
-        // Parse payload as JSON for now (runtime uses Ipld)
-        let payload_json = serde_json::from_slice::<serde_json::Value>(&node.payload)
-            .map_err(|e| format!("Invalid payload JSON: {}", e))?;
-        
-        // Convert JSON to Ipld
-        let payload = json_to_ipld(payload_json);
+        // Try to parse payload as JSON first
+        let payload = match serde_json::from_slice::<serde_json::Value>(&node.payload) {
+            Ok(json_value) => {
+                // JSON parsing successful, convert to Ipld
+                json_to_ipld(json_value)
+            },
+            Err(_) => {
+                // Not valid JSON, treat as binary data
+                Ipld::Bytes(node.payload.clone())
+            }
+        };
         
         // Create runtime metadata
         let metadata = icn_dag::DagNodeMetadata {
@@ -205,9 +210,18 @@ pub mod runtime_compat {
             .map(|cid| cid.to_string())
             .collect();
         
-        // Convert payload to JSON bytes
-        let payload_bytes = ipld_to_json_bytes(&runtime_node.payload)
-            .map_err(|e| format!("Failed to convert IPLD to JSON: {}", e))?;
+        // Convert payload based on IPLD type
+        let payload_bytes = match &runtime_node.payload {
+            Ipld::Bytes(bytes) => {
+                // Direct binary data
+                bytes.clone()
+            },
+            ipld => {
+                // Try to convert to JSON
+                ipld_to_json_bytes(ipld)
+                    .map_err(|e| format!("Failed to convert IPLD to JSON: {}", e))?
+            }
+        };
         
         // Create wallet metadata
         let metadata = DagNodeMetadata {
@@ -303,6 +317,191 @@ pub mod runtime_compat {
                 // Convert CID to string
                 serde_json::Value::String(l.to_string())
             },
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use cid::Cid;
+        use libipld::Ipld;
+
+        #[test]
+        fn test_binary_roundtrip_conversion() {
+            // Create a test CID
+            let cid_str = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+            let cid = Cid::try_from(cid_str).unwrap();
+            
+            // Create binary data that is not valid UTF-8 or JSON
+            let binary_data = vec![
+                0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, // JPEG header
+                0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48,
+                0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 
+                // Random binary data
+                0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0
+            ];
+            
+            // Create a wallet DagNode with binary payload
+            let wallet_node = DagNode {
+                cid: cid_str.to_string(),
+                parents: vec![],
+                issuer: "did:icn:test".to_string(),
+                timestamp: SystemTime::now(),
+                signature: vec![1, 2, 3, 4],
+                payload: binary_data.clone(),
+                metadata: DagNodeMetadata {
+                    sequence: Some(1),
+                    scope: Some("test".to_string()),
+                },
+            };
+            
+            // Convert to runtime node
+            let runtime_node = to_runtime_dag_node(&wallet_node).expect("Conversion to runtime node failed");
+            
+            // Verify payload in runtime node is correctly stored as Ipld::Bytes
+            match &runtime_node.payload {
+                Ipld::Bytes(bytes) => {
+                    assert_eq!(bytes, &binary_data, "Binary data should be preserved exactly");
+                },
+                _ => panic!("Expected Ipld::Bytes for binary data"),
+            }
+            
+            // Convert back to wallet node
+            let wallet_node2 = from_runtime_dag_node(&runtime_node, cid).expect("Conversion back to wallet node failed");
+            
+            // Verify roundtrip payload is preserved
+            assert_eq!(wallet_node.payload, wallet_node2.payload, "Binary payload should be preserved in roundtrip");
+            
+            // Also verify other fields
+            assert_eq!(wallet_node.issuer, wallet_node2.issuer);
+            assert_eq!(wallet_node.metadata.sequence, wallet_node2.metadata.sequence);
+            assert_eq!(wallet_node.metadata.scope, wallet_node2.metadata.scope);
+        }
+
+        #[test]
+        fn test_non_json_handling() {
+            // Create payload that looks like JSON but isn't valid
+            let invalid_json = b"{not valid JSON but has curly braces}";
+            
+            // Create a wallet node with this payload
+            let wallet_node = DagNode {
+                cid: "test-invalid-json".to_string(),
+                parents: vec![],
+                issuer: "did:icn:test".to_string(),
+                timestamp: SystemTime::now(),
+                signature: vec![1, 2, 3, 4],
+                payload: invalid_json.to_vec(),
+                metadata: DagNodeMetadata::default(),
+            };
+            
+            // This should not panic, but convert cleanly to Ipld::Bytes
+            let runtime_node = to_runtime_dag_node(&wallet_node).expect("Should handle invalid JSON gracefully");
+            
+            // Verify it was treated as binary
+            match &runtime_node.payload {
+                Ipld::Bytes(bytes) => {
+                    assert_eq!(bytes, &invalid_json.to_vec());
+                },
+                other => panic!("Expected Ipld::Bytes but got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn test_ipld_bytes_to_wallet_payload() {
+            // Create a runtime node with Ipld::Bytes payload
+            let binary_data = vec![0x01, 0x02, 0x03, 0xF0, 0xFF];
+            let runtime_payload = Ipld::Bytes(binary_data.clone());
+            
+            // Construct a minimal runtime node (using internals directly for test)
+            let runtime_node = icn_dag::DagNode {
+                issuer: icn_identity::IdentityId::new("did:icn:test"),
+                parents: vec![],
+                payload: runtime_payload,
+                signature: vec![9, 8, 7, 6],
+                metadata: icn_dag::DagNodeMetadata {
+                    timestamp: 12345,
+                    sequence: Some(1),
+                    scope: Some("test".to_string()),
+                },
+            };
+            
+            // Convert to wallet node
+            let cid = Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
+            let wallet_node = from_runtime_dag_node(&runtime_node, cid).expect("Conversion failed");
+            
+            // Verify binary data is preserved
+            assert_eq!(wallet_node.payload, binary_data);
+        }
+        
+        #[test]
+        fn test_extreme_binary_edge_cases() {
+            // Test with empty payload
+            let empty_payload = vec![];
+            let wallet_node_empty = DagNode {
+                cid: "empty-payload".to_string(),
+                parents: vec![],
+                issuer: "did:icn:test".to_string(),
+                timestamp: SystemTime::now(),
+                signature: vec![1, 2, 3, 4],
+                payload: empty_payload.clone(),
+                metadata: DagNodeMetadata::default(),
+            };
+            
+            let runtime_node_empty = to_runtime_dag_node(&wallet_node_empty).expect("Empty payload conversion failed");
+            match &runtime_node_empty.payload {
+                Ipld::Bytes(bytes) => {
+                    assert_eq!(bytes.len(), 0, "Empty payload should remain empty");
+                },
+                _ => panic!("Expected Ipld::Bytes for empty payload"),
+            }
+            
+            // Test with large binary payload (1MB of random data)
+            // This simulates a large file or blob
+            let large_payload = vec![0xAA; 1_000_000]; // 1MB of 0xAA bytes
+            let wallet_node_large = DagNode {
+                cid: "large-payload".to_string(),
+                parents: vec![],
+                issuer: "did:icn:test".to_string(),
+                timestamp: SystemTime::now(),
+                signature: vec![1, 2, 3, 4],
+                payload: large_payload.clone(),
+                metadata: DagNodeMetadata::default(),
+            };
+            
+            let runtime_node_large = to_runtime_dag_node(&wallet_node_large).expect("Large payload conversion failed");
+            match &runtime_node_large.payload {
+                Ipld::Bytes(bytes) => {
+                    assert_eq!(bytes.len(), 1_000_000, "Large payload should preserve size");
+                    assert_eq!(bytes[0], 0xAA);
+                    assert_eq!(bytes[999_999], 0xAA);
+                },
+                _ => panic!("Expected Ipld::Bytes for large payload"),
+            }
+            
+            // Test with null bytes and control characters
+            let control_chars = vec![
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 
+                0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
+            ];
+            
+            let wallet_node_control = DagNode {
+                cid: "control-chars".to_string(),
+                parents: vec![],
+                issuer: "did:icn:test".to_string(),
+                timestamp: SystemTime::now(),
+                signature: vec![1, 2, 3, 4],
+                payload: control_chars.clone(),
+                metadata: DagNodeMetadata::default(),
+            };
+            
+            let runtime_node_control = to_runtime_dag_node(&wallet_node_control).expect("Control chars conversion failed");
+            let cid = Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
+            let wallet_node_control2 = from_runtime_dag_node(&runtime_node_control, cid).expect("Round-trip conversion failed");
+            
+            assert_eq!(wallet_node_control.payload, wallet_node_control2.payload, 
+                      "Control characters should be preserved exactly");
         }
     }
 }

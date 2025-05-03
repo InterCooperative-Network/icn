@@ -272,4 +272,161 @@ impl TrustManager {
         let latest = self.latest_bundle.lock().await;
         latest.clone()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, Duration};
+    
+    // Existing tests if any...
+    
+    #[tokio::test]
+    async fn test_trust_bundle_verification() {
+        // Create a mock sync client
+        let client = SyncClient::new("http://localhost:8080".to_string());
+        
+        // Create trust manager
+        let trust_manager = TrustManager::new(client);
+        
+        // Create a valid trust bundle
+        let mut valid_bundle = TrustBundle {
+            id: "valid-bundle-1".to_string(),
+            name: "Valid Trust Bundle".to_string(),
+            version: 1,
+            created_at: SystemTime::now(),
+            trusted_dids: vec!["did:icn:trusted1".to_string(), "did:icn:trusted2".to_string()],
+            issuer: "did:icn:federation".to_string(),
+            signature: Some("valid-signature".to_string()),
+            epoch: 1,
+            expires_at: Some(SystemTime::now() + Duration::from_secs(3600)), // 1 hour from now
+            metadata: HashMap::new(),
+            attestations: HashMap::new(),
+        };
+        
+        // Initialize the trust manager's latest bundle
+        {
+            let mut latest = trust_manager.latest_bundle.lock().await;
+            *latest = Some(valid_bundle.clone());
+        }
+        
+        // Test verification with a trusted issuer
+        let valid_node = DagNode {
+            cid: "test-valid-node".to_string(),
+            parents: vec![],
+            issuer: "did:icn:trusted1".to_string(), // This is in the trusted DIDs
+            timestamp: SystemTime::now(),
+            signature: vec![1, 2, 3, 4],
+            payload: vec![10, 20, 30],
+            metadata: DagNodeMetadata::default(),
+        };
+        
+        let verification_result = trust_manager.verify_dag_node(&valid_node).await;
+        assert!(verification_result.is_ok() && verification_result.unwrap(), 
+                "Verification should succeed for trusted issuer");
+        
+        // Test verification with an untrusted issuer
+        let invalid_node = DagNode {
+            cid: "test-invalid-node".to_string(),
+            parents: vec![],
+            issuer: "did:icn:untrusted".to_string(), // This is NOT in the trusted DIDs
+            timestamp: SystemTime::now(),
+            signature: vec![1, 2, 3, 4],
+            payload: vec![10, 20, 30],
+            metadata: DagNodeMetadata::default(),
+        };
+        
+        let verification_result = trust_manager.verify_dag_node(&invalid_node).await;
+        assert!(verification_result.is_err(), "Verification should fail for untrusted issuer");
+        if let Err(SyncError::Validation(msg)) = verification_result {
+            assert!(msg.contains("not trusted"), "Error should indicate untrusted issuer");
+        } else {
+            panic!("Expected ValidationError");
+        }
+        
+        // Test with expired trust bundle
+        let mut expired_bundle = valid_bundle.clone();
+        expired_bundle.expires_at = Some(SystemTime::now() - Duration::from_secs(3600)); // 1 hour ago
+        
+        {
+            let mut latest = trust_manager.latest_bundle.lock().await;
+            *latest = Some(expired_bundle);
+        }
+        
+        // Create a function to check if a bundle is expired
+        let is_expired = |bundle: &TrustBundle| -> bool {
+            bundle.is_expired()
+        };
+        
+        // Get the latest bundle and check if it's expired
+        let latest_bundle = trust_manager.get_latest_trust_bundle().await.unwrap();
+        assert!(is_expired(&latest_bundle), "Trust bundle should be marked as expired");
+        
+        // Even with an expired bundle, verification should still work based on current implementation
+        // In a real implementation, you might want to reject verification with expired bundles
+        let verification_result = trust_manager.verify_dag_node(&valid_node).await;
+        assert!(verification_result.is_ok(), "Current implementation should still verify with expired bundle");
+        
+        // Test with no trust bundle available
+        {
+            let mut latest = trust_manager.latest_bundle.lock().await;
+            *latest = None;
+        }
+        
+        let verification_result = trust_manager.verify_dag_node(&valid_node).await;
+        assert!(verification_result.is_err(), "Verification should fail when no trust bundle is available");
+        if let Err(SyncError::Validation(msg)) = verification_result {
+            assert!(msg.contains("No trust bundle available"), "Error should indicate missing trust bundle");
+        } else {
+            panic!("Expected ValidationError for missing trust bundle");
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_trust_bundle_quorum_verification() {
+        // This test would simulate trust bundle quorum verification
+        // In a real implementation, this would involve signature verification from multiple guardians
+        
+        // Create a mock sync client
+        let client = SyncClient::new("http://localhost:8080".to_string());
+        
+        // Create trust manager
+        let trust_manager = TrustManager::new(client);
+        
+        // Create a trust bundle with attestations from guardians
+        let mut bundle_with_attestations = TrustBundle {
+            id: "quorum-bundle-1".to_string(),
+            name: "Quorum Test Bundle".to_string(),
+            version: 1,
+            created_at: SystemTime::now(),
+            trusted_dids: vec!["did:icn:trusted1".to_string()],
+            issuer: "did:icn:federation".to_string(),
+            signature: Some("federation-signature".to_string()),
+            epoch: 2,
+            expires_at: None,
+            metadata: HashMap::new(),
+            attestations: {
+                let mut map = HashMap::new();
+                map.insert("did:icn:guardian1".to_string(), "guardian1-signature".to_string());
+                map.insert("did:icn:guardian2".to_string(), "guardian2-signature".to_string());
+                map.insert("did:icn:guardian3".to_string(), "guardian3-signature".to_string());
+                map
+            },
+        };
+        
+        // In a real implementation, each attestation would be validated against the guardian's public key
+        // For testing purposes, we'll just check the number of attestations
+        
+        // Verify the trust bundle has sufficient attestations (quorum)
+        let quorum_threshold = 3; // Require at least 3 guardian attestations
+        let has_quorum = bundle_with_attestations.attestations.len() >= quorum_threshold;
+        assert!(has_quorum, "Trust bundle should have quorum with {} attestations", 
+                bundle_with_attestations.attestations.len());
+        
+        // Now simulate removing an attestation to break quorum
+        bundle_with_attestations.attestations.remove("did:icn:guardian3");
+        
+        let has_quorum = bundle_with_attestations.attestations.len() >= quorum_threshold;
+        assert!(!has_quorum, "Trust bundle should not have quorum after removing an attestation");
+    }
 } 

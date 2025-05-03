@@ -73,10 +73,47 @@ impl From<icn_storage::StorageError> for WalletError {
     }
 }
 
-/// Conversion from Runtime errors to Wallet errors
-/// This trait is implemented when the runtime-compat feature is enabled
+#[cfg(feature = "runtime-compat")]
+impl From<icn_identity::IdentityError> for WalletError {
+    fn from(err: icn_identity::IdentityError) -> Self {
+        match err {
+            icn_identity::IdentityError::VerificationFailed(msg) => WalletError::ValidationError(msg),
+            icn_identity::IdentityError::InvalidDid(msg) => WalletError::IdentityError(format!("Invalid DID: {}", msg)),
+            icn_identity::IdentityError::InvalidScope(msg) => WalletError::IdentityError(format!("Invalid scope: {}", msg)),
+            icn_identity::IdentityError::NotFound(msg) => WalletError::ResourceNotFound(format!("Identity not found: {}", msg)),
+            icn_identity::IdentityError::CryptoError(msg) => WalletError::IdentityError(format!("Crypto error: {}", msg)),
+            icn_identity::IdentityError::KeyError(msg) => WalletError::IdentityError(format!("Key error: {}", msg)),
+            icn_identity::IdentityError::CredentialError(msg) => WalletError::IdentityError(format!("Credential error: {}", msg)),
+            icn_identity::IdentityError::PermissionDenied(msg) => WalletError::AuthenticationError(format!("Permission denied: {}", msg)),
+            _ => WalletError::IdentityError(err.to_string()),
+        }
+    }
+}
+
+#[cfg(feature = "runtime-compat")]
+impl From<icn_federation::FederationError> for WalletError {
+    fn from(err: icn_federation::FederationError) -> Self {
+        match err {
+            icn_federation::FederationError::NotFound(msg) => WalletError::ResourceNotFound(msg),
+            icn_federation::FederationError::ValidationFailed(msg) => WalletError::ValidationError(msg),
+            icn_federation::FederationError::AuthenticationFailed(msg) => WalletError::AuthenticationError(msg),
+            _ => WalletError::RuntimeError(format!("Federation error: {}", err)),
+        }
+    }
+}
+
+#[cfg(feature = "runtime-compat")]
+impl From<icn_governance_kernel::GovernanceError> for WalletError {
+    fn from(err: icn_governance_kernel::GovernanceError) -> Self {
+        WalletError::RuntimeError(format!("Governance error: {}", err))
+    }
+}
+
+/// Trait for converting runtime errors to wallet errors
+/// This trait allows for a consistent way to handle errors across the runtime-wallet boundary
 #[cfg(feature = "runtime-compat")]
 pub trait FromRuntimeError<T> {
+    /// Convert a runtime error to a wallet error
     fn convert_runtime_error(self) -> WalletResult<T>;
 }
 
@@ -85,6 +122,42 @@ pub trait FromRuntimeError<T> {
 impl<T, E: std::fmt::Display> FromRuntimeError<T> for Result<T, E> {
     fn convert_runtime_error(self) -> WalletResult<T> {
         self.map_err(|e| WalletError::RuntimeError(e.to_string()))
+    }
+}
+
+// Specialized implementations for specific runtime error types for optimal error mapping
+#[cfg(feature = "runtime-compat")]
+impl<T> FromRuntimeError<T> for Result<T, icn_dag::DagError> {
+    fn convert_runtime_error(self) -> WalletResult<T> {
+        self.map_err(|e| e.into())
+    }
+}
+
+#[cfg(feature = "runtime-compat")]
+impl<T> FromRuntimeError<T> for Result<T, icn_storage::StorageError> {
+    fn convert_runtime_error(self) -> WalletResult<T> {
+        self.map_err(|e| e.into())
+    }
+}
+
+#[cfg(feature = "runtime-compat")]
+impl<T> FromRuntimeError<T> for Result<T, icn_identity::IdentityError> {
+    fn convert_runtime_error(self) -> WalletResult<T> {
+        self.map_err(|e| e.into())
+    }
+}
+
+#[cfg(feature = "runtime-compat")]
+impl<T> FromRuntimeError<T> for Result<T, icn_federation::FederationError> {
+    fn convert_runtime_error(self) -> WalletResult<T> {
+        self.map_err(|e| e.into())
+    }
+}
+
+#[cfg(feature = "runtime-compat")]
+impl<T> FromRuntimeError<T> for Result<T, icn_governance_kernel::GovernanceError> {
+    fn convert_runtime_error(self) -> WalletResult<T> {
+        self.map_err(|e| e.into())
     }
 }
 
@@ -132,6 +205,88 @@ mod tests {
                 },
                 _ => panic!("Expected RuntimeError variant"),
             }
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "runtime-compat")]
+    fn test_error_type_mapping() {
+        use std::convert::From;
+        
+        // Test mapping from one error to another
+        let storage_err = icn_storage::StorageError::NotFound("test resource".to_string());
+        let wallet_err = WalletError::from(storage_err);
+        
+        match wallet_err {
+            WalletError::StorageError(msg) => {
+                assert!(msg.contains("test resource"), "Error message should be preserved");
+            },
+            _ => panic!("Expected StorageError variant"),
+        }
+    }
+    
+    #[test]
+    #[cfg(feature = "runtime-compat")]
+    fn test_error_propagation_chain() {
+        // This test simulates error propagation through multiple boundaries
+        
+        // Create a chain of results to simulate passing through multiple layers
+        fn level3_function() -> Result<(), icn_dag::DagError> {
+            Err(icn_dag::DagError::InvalidCid("Test DAG error".to_string()))
+        }
+        
+        fn level2_function() -> Result<(), WalletError> {
+            level3_function().convert_runtime_error()
+        }
+        
+        fn level1_function() -> Result<(), WalletError> {
+            level2_function()?;
+            Ok(())
+        }
+        
+        // Test error propagation
+        let result = level1_function();
+        assert!(result.is_err());
+        
+        if let Err(err) = result {
+            match err {
+                WalletError::DagError(msg) => {
+                    assert!(msg.contains("Invalid"), "Error should be properly mapped through the chain");
+                },
+                _ => panic!("Expected DagError variant after propagation"),
+            }
+        }
+    }
+    
+    #[test]
+    #[cfg(feature = "runtime-compat")]
+    fn test_identity_error_mapping() {
+        // Test that IdentityError variants are properly mapped to WalletError variants
+        
+        let verification_err = icn_identity::IdentityError::VerificationFailed(
+            "Signature verification failed".to_string()
+        );
+        let wallet_err = WalletError::from(verification_err);
+        
+        match wallet_err {
+            WalletError::ValidationError(msg) => {
+                assert!(msg.contains("verification failed"), 
+                       "Verification error should map to ValidationError");
+            },
+            _ => panic!("Expected ValidationError variant"),
+        }
+        
+        let not_found_err = icn_identity::IdentityError::NotFound(
+            "Identity did:icn:test not found".to_string()
+        );
+        let wallet_err = WalletError::from(not_found_err);
+        
+        match wallet_err {
+            WalletError::ResourceNotFound(msg) => {
+                assert!(msg.contains("Identity not found"), 
+                       "NotFound error should map to ResourceNotFound");
+            },
+            _ => panic!("Expected ResourceNotFound variant"),
         }
     }
 } 
