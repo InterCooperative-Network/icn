@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Membership Proposal DSL",
+  "description": "Schema for proposing new membership to a cooperative",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["propose_membership"],
+      "description": "The action type for membership proposals"
+    },
+    "applicant_did": {
+      "type": "string",
+      "pattern": "^did:icn:",
+      "description": "The DID of the applicant"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 2,
+      "description": "Full name of the applicant"
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of applicant's skills"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Reason for joining the cooperative"
+    },
+    "sponsor_did": {
+      "type": "string",
+      "pattern": "^did:icn:",
+      "description": "The DID of the existing member sponsoring the application"
+    },
+    "commitment_hours_per_week": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of hours the applicant commits to per week"
+    },
+    "requested_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Roles the applicant is requesting"
+    }
+  },
+  "required": [
+    "action",
+    "applicant_did",
+    "name",
+    "reason"
+  ],
+  "additionalProperties": true
+} 

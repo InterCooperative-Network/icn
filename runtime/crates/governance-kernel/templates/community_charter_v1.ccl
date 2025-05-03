@@ -1,0 +1,138 @@
+/**
+ * Community Charter Template
+ * 
+ * This template defines the governance structure for a community.
+ */
+community_charter {
+    "name": "",
+    "description": "",
+    "founding_date": "",
+    "vision_statement": "",
+    
+    "governance": {
+        "structure": "council",        // Options: council, assembly, stewards
+        "decision_making": "consent",  // Options: consensus, consent, majority, supermajority
+        "quorum": 0.33,                // Fraction of members required for quorum
+        "majority": 0.66,              // Required majority for decisions
+        
+        "council": {
+            "size": 7,                 // Number of council members
+            "term_length": 180,        // Days for elected positions
+            "term_limits": 2,          // Maximum consecutive terms
+            "selection_method": "election"  // Options: election, lottery, nomination
+        }
+    },
+    
+    "membership": {
+        "types": [
+            {
+                "name": "core",
+                "description": "Full participation and decision-making rights",
+                "entry_requirements": [
+                    "Attend at least two community meetings",
+                    "Complete orientation",
+                    "Endorsed by at least two existing members"
+                ],
+                "exit_process": "Provide 30 days notice"
+            },
+            {
+                "name": "contributor",
+                "description": "Participate in working groups without full decision-making rights",
+                "entry_requirements": [
+                    "Complete contributor orientation"
+                ],
+                "exit_process": "Provide notice"
+            },
+            {
+                "name": "supporter",
+                "description": "Support the community through resources or advocacy",
+                "entry_requirements": [],
+                "exit_process": "Provide notice"
+            }
+        ],
+        
+        "code_of_conduct": {
+            "principles": [
+                "Respect for all members",
+                "Transparency in communication",
+                "Commitment to community goals",
+                "Responsible stewardship of resources",
+                "Accountability for actions"
+            ],
+            "enforcement": "council"  // Who enforces the code: council, specific_group, all_members
+        }
+    },
+    
+    "decision_areas": [
+        {
+            "name": "strategy",
+            "description": "Long-term goals and direction",
+            "quorum_modifier": 1.5,
+            "process": "council_then_assembly"
+        },
+        {
+            "name": "operations",
+            "description": "Day-to-day operations and implementation",
+            "quorum_modifier": 1.0,
+            "process": "working_groups"
+        },
+        {
+            "name": "membership",
+            "description": "Decisions about membership and roles",
+            "quorum_modifier": 1.0,
+            "process": "council"
+        },
+        {
+            "name": "resources",
+            "description": "Allocation and use of community resources",
+            "quorum_modifier": 1.2,
+            "process": "assembly"
+        }
+    ],
+    
+    "working_groups": {
+        "formation_process": "proposal",  // Options: proposal, self_organizing
+        "min_members": 2,
+        "max_inactive_days": 90,
+        "resource_allocation": {
+            "approval_threshold": "council",
+            "reporting_frequency_days": 30
+        }
+    },
+    
+    "meetings": {
+        "assembly": {
+            "frequency_days": 30,
+            "min_notice_days": 7,
+            "facilitation": "rotating"
+        },
+        "council": {
+            "frequency_days": 14,
+            "min_notice_days": 3,
+            "facilitation": "elected"
+        },
+        "working_groups": {
+            "frequency_days": 7,
+            "min_notice_days": 1,
+            "facilitation": "self_determined"
+        }
+    },
+    
+    "dispute_resolution": {
+        "steps": [
+            "Direct dialogue",
+            "Facilitated conversation",
+            "Mediation by neutral member",
+            "Council decision"
+        ],
+        "external_mediation": true,
+        "appeals_process": "assembly_review"
+    },
+    
+    "amendments": {
+        "proposal_rights": "core_members",
+        "notice_period_days": 14,
+        "approval_threshold": 0.75,
+        "quorum_modifier": 1.5
+    }
+} 

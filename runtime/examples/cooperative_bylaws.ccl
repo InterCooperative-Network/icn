@@ -1,0 +1,155 @@
+// ICN Cooperative Bylaws Template (V1)
+// This is a sample CCL template for defining cooperative bylaws.
+
+coop_bylaws:v1 {
+  // Cooperative identity and scope
+  identity {
+    name: "Example Cooperative"
+    scope: Cooperative
+    mission: "To provide a democratic workplace focused on sustainable technology"
+  }
+  
+  // Membership rules
+  membership {
+    types {
+      worker: {
+        rights: ["vote", "propose", "profit_share", "labor_contribution"]
+        responsibilities: ["attend_meetings", "contribute_labor"]
+        onboarding: {
+          process: ["application", "interview", "trial_period", "member_vote"]
+          trial_duration: "3 months"
+          approval_threshold: "75%"
+        }
+      }
+      solidarity: {
+        rights: ["attend_meetings", "limited_proposal"]
+        responsibilities: ["pay_dues"]
+        onboarding: {
+          process: ["application", "sponsor", "member_vote"]
+          approval_threshold: "65%"
+        }
+      }
+    }
+    
+    offboarding {
+      voluntary: {
+        notice_period: "30 days"
+        exit_process: ["exit_interview", "return_assets", "account_settlement"]
+      }
+      involuntary: {
+        process: ["formal_concern", "mediation", "vote"]
+        threshold: "75%"
+        appeal: true
+      }
+    }
+  }
+  
+  // Governance structure
+  governance {
+    decision_making {
+      consent_based: true
+      voting {
+        standard_threshold: "50% + 1"
+        constitutional_threshold: "75%"
+        quorum: "66%"
+      }
+      
+      proposal_process {
+        stages: ["draft", "discussion", "deliberation", "decision", "implementation", "review"]
+        timeframes {
+          discussion_min: "7 days"
+          deliberation_min: "3 days"
+        }
+      }
+    }
+    
+    roles {
+      steward: {
+        term: "6 months"
+        responsibilities: ["coordinate_meetings", "track_decisions", "external_representation"]
+        selection: "rotation"
+      }
+      treasurer: {
+        term: "1 year"
+        responsibilities: ["financial_reporting", "budget_oversight", "accounts_management"]
+        selection: "election"
+        threshold: "60%"
+      }
+    }
+    
+    meetings {
+      general_assembly: {
+        frequency: "monthly"
+        notice: "7 days"
+        facilitation: "rotating"
+      }
+      working_groups: {
+        formation: "proposal_based"
+        autonomy_level: "bounded"
+        reporting: "monthly"
+      }
+    }
+  }
+  
+  // Economic model
+  economics {
+    profit_distribution {
+      collective_portion: "40%"
+      individual_portion: "60%"
+      calculation: "labor_hours_weighted"
+    }
+    
+    compensation {
+      base_rate: true
+      skill_multipliers: {
+        entry: "1.0x"
+        experienced: "1.2x"
+        expert: "1.4x"
+      }
+      care_work: "equal_to_productive_work"
+    }
+    
+    capital {
+      member_shares: {
+        buy_in: "affordable_with_payment_plan"
+        valuation: "book_value_no_speculation"
+      }
+      external_investment: {
+        allowed: true
+        non_extractive: true
+        no_governance_rights: true
+      }
+    }
+  }
+  
+  // Dispute resolution
+  conflict_resolution {
+    process: ["direct_dialogue", "facilitated_dialogue", "mediation", "restorative_circle"]
+    guardian_intervention {
+      threshold: "critical_impasse"
+      request_process: "75%_member_vote"
+    }
+  }
+  
+  // Resource allocation
+  resources {
+    commons {
+      shared_assets: ["premises", "equipment", "knowledge_base"]
+      stewardship_model: "collective_responsibility"
+    }
+    
+    participatory_budgeting {
+      frequency: "quarterly"
+      categories: ["operations", "growth", "community", "solidarity"]
+      process: "proposal_and_dot_voting"
+    }
+  }
+  
+  // Constitutional amendment process
+  amendments {
+    proposal_process: "formal_written_with_deliberation"
+    notice_period: "30 days"
+    approval_threshold: "75%"
+    review_period: "annual"
+  }
+} 

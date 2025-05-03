@@ -1,0 +1,41 @@
+[package]
+name = "icn-covm"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line interface for the ICN Runtime (CoVM V3)"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { version = "1.28", features = ["full"] }
+cid = { workspace = true }
+futures = { workspace = true }
+uuid = { version = "1.4", features = ["v4", "serde"] }
+serde_json = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = { version = "0.21", features = ["std"] }
+rand = "0.8"
+bs58 = "0.5"
+wasmer-wasi = { workspace = true }
+multihash = { workspace = true }
+serde = { workspace = true }
+
+# ICN crates
+icn-core-vm = { path = "../crates/core-vm" }
+icn-governance-kernel = { path = "../crates/governance-kernel" }
+icn-identity = { path = "../crates/identity" }
+icn-storage = { path = "../crates/storage" }
+icn-economics = { path = "../crates/economics" }
+icn-execution-tools = { path = "../crates/execution-tools" }
+icn-ccl-compiler = { path = "../crates/ccl-compiler" }
+icn-federation = { path = "../crates/federation" }
+icn-dag = { path = "../crates/dag" }
+
+[[bin]]
+name = "covm"
+path = "covm.rs" 

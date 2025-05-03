@@ -1,0 +1,26 @@
+{
+  "id": "urn:uuid:43276796-0e62-4541-a851-133e12449d6d",
+  "type": [
+    "VerifiableCredential",
+    "AppealCredential"
+  ],
+  "issuer": "did:icn:indv:z6Mkme6xPYwUw4SeWy3r5ATS8tTFuowYMbodKcMu2u3QP1Ja",
+  "issuanceDate": "2025-05-02T15:12:28.260491939+00:00",
+  "credentialSubject": {
+    "appeal_reason": "The voting process was already reviewed and found to be valid",
+    "appeal_timestamp": "2025-05-02T15:12:28.260432742+00:00",
+    "appellant": "did:icn:indv:z6Mkme6xPYwUw4SeWy3r5ATS8tTFuowYMbodKcMu2u3QP1Ja",
+    "id": "did:icn:appeal:aff49346-04b3-4fe2-a437-e21b7baa9af4",
+    "mandate_action": "PAUSE_VOTING",
+    "mandate_guardian": "did:icn:indv:z6Mkme6xPYwUw4SeWy3r5ATS8tTFuowYMbodKcMu2u3QP1Ja",
+    "mandate_id": "d0f7ea9f-292f-4e69-92a7-1d53cf24c706",
+    "mandate_scope_id": "did:icn:community:gardening"
+  },
+  "proof": {
+    "created": "2025-05-02T15:12:28.260747784+00:00",
+    "jws": "eyJhbGciOiJFZERTQSIsImtpZCI6ImRpZDppY246aW5kdjp6Nk1rbWU2eFBZd1V3NFNlV3kzcjVBVFM4dFRGdW93WU1ib2RLY011MnUzUVAxSmEja2V5MSIsInR5cCI6IkpXVCJ9.eyJpZCI6InVybjp1dWlkOjQzMjc2Nzk2LTBlNjItNDU0MS1hODUxLTEzM2UxMjQ0OWQ2ZCIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJBcHBlYWxDcmVkZW50aWFsIl0sImlzc3VlciI6ImRpZDppY246aW5kdjp6Nk1rbWU2eFBZd1V3NFNlV3kzcjVBVFM4dFRGdW93WU1ib2RLY011MnUzUVAxSmEiLCJpc3N1YW5jZURhdGUiOiIyMDI1LTA1LTAyVDE1OjEyOjI4LjI2MDQ5MTkzOSswMDowMCIsImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImFwcGVhbF9yZWFzb24iOiJUaGUgdm90aW5nIHByb2Nlc3Mgd2FzIGFscmVhZHkgcmV2aWV3ZWQgYW5kIGZvdW5kIHRvIGJlIHZhbGlkIiwiYXBwZWFsX3RpbWVzdGFtcCI6IjIwMjUtMDUtMDJUMTU6MTI6MjguMjYwNDMyNzQyKzAwOjAwIiwiYXBwZWxsYW50IjoiZGlkOmljbjppbmR2Ono2TWttZTZ4UFl3VXc0U2VXeTNyNUFUUzh0VEZ1b3dZTWJvZEtjTXUydTNRUDFKYSIsImlkIjoiZGlkOmljbjphcHBlYWw6YWZmNDkzNDYtMDRiMy00ZmUyLWE0MzctZTIxYjdiYWE5YWY0IiwibWFuZGF0ZV9hY3Rpb24iOiJQQVVTRV9WT1RJTkciLCJtYW5kYXRlX2d1YXJkaWFuIjoiZGlkOmljbjppbmR2Ono2TWttZTZ4UFl3VXc0U2VXeTNyNUFUUzh0VEZ1b3dZTWJvZEtjTXUydTNRUDFKYSIsIm1hbmRhdGVfaWQiOiJkMGY3ZWE5Zi0yOTJmLTRlNjktOTJhNy0xZDUzY2YyNGM3MDYiLCJtYW5kYXRlX3Njb3BlX2lkIjoiZGlkOmljbjpjb21tdW5pdHk6Z2FyZGVuaW5nIn19.3HIp7HxAsv5DaPgHayoD-EJkxgJYWtJTmdXsLJ5lmYY",
+    "proofPurpose": "assertionMethod",
+    "type": "JsonWebSignature2020",
+    "verificationMethod": "did:icn:indv:z6Mkme6xPYwUw4SeWy3r5ATS8tTFuowYMbodKcMu2u3QP1Ja#key1"
+  }
+}

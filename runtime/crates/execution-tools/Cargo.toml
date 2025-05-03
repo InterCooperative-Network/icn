@@ -1,0 +1,26 @@
+[package]
+name = "icn-execution-tools"
+version = "0.1.0"
+edition = "2021"
+description = "CLI helpers, Replay logic, and common utils for the ICN Runtime"
+
+[dependencies]
+icn-core-vm = { path = "../core-vm" }
+icn-governance-kernel = { path = "../governance-kernel" }
+icn-dag = { path = "../dag" }
+icn-identity = { path = "../identity" }
+icn-economics = { path = "../economics" }
+icn-federation = { path = "../federation" }
+icn-storage = { path = "../storage" }
+clap = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+cid = { workspace = true }
+uuid = { version = "1.3", features = ["v4", "serde"] }
+chrono = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1.28", features = ["rt", "macros"] } 
