@@ -13,6 +13,7 @@ use crate::error::{SyncResult, SyncError};
 use crate::trust::TrustBundleValidator;
 use crate::client::SyncClient;
 use wallet_agent::governance::TrustBundle;
+use wallet_types::network::{NetworkStatus, NodeSubmissionResponse};
 use reqwest::{Client as HttpClient, StatusCode};
 use backoff::{ExponentialBackoff, future::retry};
 use tracing::{info, warn, error, debug};
@@ -25,17 +26,6 @@ const DEFAULT_NODE_ENDPOINT: &str = "/nodes";
 const DEFAULT_THREAD_ENDPOINT: &str = "/threads";
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const MAX_RETRY_ATTEMPTS: u32 = 3;
-
-/// Response from node submission
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NodeSubmissionResponse {
-    /// Success status
-    pub success: bool,
-    /// CID assigned to the node
-    pub cid: Option<String>,
-    /// Error message if submission failed
-    pub error: Option<String>,
-}
 
 /// Represents the sync state for a federation
 #[derive(Debug, Clone, Serialize, Deserialize)]

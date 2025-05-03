@@ -12,6 +12,7 @@ crate-type = ["cdylib", "staticlib", "lib"]
 wallet-core = { path = "../wallet-core" }
 wallet-agent = { path = "../wallet-agent" }
 wallet-sync = { path = "../wallet-sync" }
+wallet-types = { path = "../wallet-types" }
 uniffi = { version = "0.25.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

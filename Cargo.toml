@@ -6,5 +6,6 @@ members = [
   "crates/wallet-sync",
   "crates/wallet-ui-api",
   "crates/wallet-ffi",
+  "crates/wallet-types",
   "cli"
 ]

@@ -12,4 +12,5 @@ mod tests {
 pub use error::{SyncError, SyncResult};
 pub use client::SyncClient;
 pub use trust::TrustBundleValidator;
-pub use sync_manager::{SyncManager, SyncManagerConfig, NetworkStatus, NodeSubmissionResponse};
+pub use sync_manager::{SyncManager, SyncManagerConfig};
+pub use wallet_types::network::{NetworkStatus, NodeSubmissionResponse};

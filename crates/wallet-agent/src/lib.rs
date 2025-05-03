@@ -10,5 +10,5 @@ mod tests {
 }
 
 pub use error::{AgentError, AgentResult};
-pub use queue::{ActionQueue, ActionType, ActionStatus, PendingAction};
+pub use queue::{ActionQueue, PendingAction};
 pub use processor::{ActionProcessor, ProcessingStatus, ThreadConflict, ConflictResolutionStrategy};

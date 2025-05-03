@@ -1,6 +1,6 @@
 use thiserror::Error;
 use wallet_core::error::WalletError as CoreError;
-use wallet_agent::error::AgentError;
+use wallet_types::error::SharedError;
 
 /// Sync errors
 #[derive(Error, Debug)]
@@ -33,9 +33,9 @@ pub enum SyncError {
     #[error("Core wallet error: {0}")]
     CoreError(#[from] CoreError),
     
-    /// Agent error
-    #[error("Agent error: {0}")]
-    AgentError(#[from] AgentError),
+    /// Shared error (from wallet-types)
+    #[error("Shared error: {0}")]
+    SharedError(#[from] SharedError),
     
     /// HTTP client error
     #[error("HTTP client error: {0}")]
@@ -68,6 +68,10 @@ pub enum SyncError {
     /// Internal error
     #[error("Internal error: {0}")]
     InternalError(String),
+    
+    /// CID error
+    #[error("CID error: {0}")]
+    CidError(String),
 }
 
 /// Sync result type

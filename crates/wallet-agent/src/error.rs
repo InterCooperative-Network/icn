@@ -1,6 +1,6 @@
 use thiserror::Error;
 use wallet_core::error::WalletError as CoreError;
-use wallet_sync::SyncError;
+use wallet_types::error::SharedError;
 
 /// Agent error types
 #[derive(Error, Debug)]
@@ -17,9 +17,9 @@ pub enum AgentError {
     #[error("Core error: {0}")]
     CoreError(#[from] wallet_core::error::WalletError),
     
-    /// Sync error (from wallet-sync)
-    #[error("Sync error: {0}")]
-    SyncError(String),
+    /// Shared error (from wallet-types)
+    #[error("Shared error: {0}")]
+    SharedError(#[from] SharedError),
     
     /// Storage error
     #[error("Storage error: {0}")]
@@ -32,6 +32,10 @@ pub enum AgentError {
     /// Processing error
     #[error("Processing error: {0}")]
     ProcessingError(String),
+    
+    /// Queue error
+    #[error("Queue error: {0}")]
+    QueueError(String),
     
     /// Authentication error
     #[error("Authentication error: {0}")]

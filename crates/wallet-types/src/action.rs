@@ -22,4 +22,6 @@ pub enum ActionStatus {
     Completed,
     /// The action failed to process
     Failed,
+    /// The action was rejected
+    Rejected,
 } 
