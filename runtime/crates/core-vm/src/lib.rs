@@ -8,6 +8,7 @@ within a sandboxed environment.
 pub mod mem_helpers;
 pub mod resources;
 pub mod host_abi;
+mod credentials;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,8 +20,19 @@ use icn_storage::{StorageManager, StorageError};
 use icn_dag::{DagNodeBuilder, DagNode, codec::DagCborCodec};
 use libipld::{Ipld, ipld, codec::Codec};
 use anyhow::{anyhow, Result};
+use std::sync::RwLock;
 
 pub use resources::{ResourceType, ResourceAuthorization, ResourceConsumption};
+
+// Re-export credentials module functionality
+pub use credentials::{
+    CredentialType,
+    VerifiableCredential,
+    ExecutionReceiptSubject,
+    issue_execution_receipt,
+    get_execution_receipt_by_cid,
+    get_execution_receipts_by_proposal,
+};
 
 /// Identity context for the VM execution
 #[derive(Clone)]
@@ -96,6 +108,21 @@ pub enum VmError {
 
     #[error("Host function error: {0}")]
     HostFunctionError(String),
+
+    #[error("Engine creation failed: {0}")]
+    EngineCreationFailed(String),
+
+    #[error("Module creation failed: {0}")]
+    ModuleCreationFailed(String),
+
+    #[error("Fuel allocation failed: {0}")]
+    FuelAllocationFailed(String),
+
+    #[error("Instantiation failed: {0}")]
+    InstantiationFailed(String),
+
+    #[error("Entry point not found: {0}")]
+    EntryPointNotFound(String),
 }
 
 /// Result of VM execution
@@ -192,6 +219,11 @@ pub struct ConcreteHostEnvironment {
     consumed_resources: HashMap<ResourceType, u64>,
     // --- Added temporary state for entity creation --- 
     last_created_entity_info: Option<(String, Cid)>, // Store (DID, Genesis CID)
+    /// Resources consumed during execution
+    resource_usage: RwLock<HashMap<ResourceType, u64>>,
+    
+    /// The last DAG anchor CID created during execution
+    last_anchor_cid: RwLock<Option<String>>,
 }
 
 impl ConcreteHostEnvironment {
@@ -209,6 +241,8 @@ impl ConcreteHostEnvironment {
             parent_federation_did,
             consumed_resources: HashMap::new(),
             last_created_entity_info: None, // Initialize as None
+            resource_usage: RwLock::new(HashMap::new()),
+            last_anchor_cid: RwLock::new(None),
         }
     }
     
@@ -228,23 +262,24 @@ impl ConcreteHostEnvironment {
     }
 
     /// Record consumption of compute resources
-    pub fn record_compute_usage(&mut self, amount: u64) -> Result<(), VmError> {
+    pub fn record_compute_usage(&self, amount: u64) -> Result<(), VmError> {
         self.record_resource_usage(ResourceType::Compute, amount)
     }
 
     /// Record consumption of storage resources
-    pub fn record_storage_usage(&mut self, amount: u64) -> Result<(), VmError> {
+    pub fn record_storage_usage(&self, amount: u64) -> Result<(), VmError> {
         self.record_resource_usage(ResourceType::Storage, amount)
     }
 
     /// Record consumption of network resources
-    pub fn record_network_usage(&mut self, amount: u64) -> Result<(), VmError> {
+    pub fn record_network_usage(&self, amount: u64) -> Result<(), VmError> {
         self.record_resource_usage(ResourceType::Network, amount)
     }
 
     /// Record consumption of a resource type
-    fn record_resource_usage(&mut self, resource_type: ResourceType, amount: u64) -> Result<(), VmError> {
-        let current = self.consumed_resources.entry(resource_type).or_insert(0);
+    fn record_resource_usage(&self, resource_type: ResourceType, amount: u64) -> Result<(), VmError> {
+        let usage = self.resource_usage.read().unwrap();
+        let current = usage.entry(resource_type).or_insert(0);
         let new_total = current.checked_add(amount).ok_or_else(|| {
             VmError::ResourceLimitExceeded(format!(
                 "Resource consumption would overflow for {:?}",
@@ -269,7 +304,6 @@ impl ConcreteHostEnvironment {
             )));
         }
 
-        *current = new_total;
         Ok(())
     }
 
@@ -497,129 +531,323 @@ impl ConcreteHostEnvironment {
     fn take_last_created_entity_info(&mut self) -> Option<(String, Cid)> {
         self.last_created_entity_info.take()
     }
-}
 
-/// Execute a WASM module with the given function and parameters
-pub async fn execute_wasm(
-    wasm_bytes: &[u8],
-    function_name: &str,
-    _params: &[u8], // Parameters might be passed via memory, not this slice
-    vm_context: VMContext,
-    // Pass managers and parent DID to create the environment
-    storage_manager: Arc<dyn StorageManager>,
-    identity_manager: Arc<dyn IdentityManager>,
-    parent_federation_did: Option<String>,
-) -> Result<ExecutionResult, VmError> { // Changed return type to async
-    use wasmtime::{Config, Engine, Module, Store, Linker};
-    use crate::host_abi; // Ensure host_abi is correctly referenced
-    use icn_dag::codec; // Ensure codec is in scope
-
-    // Create a host environment with managers
-    let mut host_env = ConcreteHostEnvironment::new(
-        vm_context,
-        storage_manager,
-        identity_manager,
-        parent_federation_did, // Pass it here
-    );
-
-    // Record baseline compute usage for instantiation (should be done in host_env)
-    // host_env.record_compute_usage(1000)?; // Move recording into methods
-
-    // Create wasmtime engine (consider caching the engine and module compilation)
-    let mut config = Config::new();
-    config.async_support(true); // Enable async support for host functions
-    config.consume_fuel(true); // Enable fuel-based resource limiting
-    config.max_wasm_stack(64 * 1024); // Limit stack size to 64k
-    // Review security settings
-    config.wasm_reference_types(false);
-    config.wasm_bulk_memory(false);
-    config.wasm_multi_value(false);
-
-    let engine = Engine::new(&config).map_err(|e|
-        VmError::InitializationError(format!("Failed to create engine: {}", e)))?;
-
-    // Compile the module
-    let module = Module::new(&engine, wasm_bytes).map_err(|e|
-        VmError::InitializationError(format!("Failed to compile module: {}", e)))?;
-
-    // Create a store with our host environment
-    let mut store = Store::new(&engine, host_env);
-
-    // Set initial fuel allocation (adjust calculation as needed)
-    let initial_fuel = wasm_bytes.len() as u64 * 1000; // Increased fuel multiplier
-    store.add_fuel(initial_fuel).map_err(|e|
-        VmError::InitializationError(format!("Failed to add fuel: {}", e)))?;
-
-    // Create a linker and register host functions
-    let mut linker = Linker::new(&engine);
-    // Pass the linker to the registration function
-    host_abi::register_host_functions(&mut linker) // Pass linker by mutable ref
-        .map_err(|e| VmError::InitializationError(format!("Failed to register host functions: {}", e)))?;
-
-    // Instantiate the module asynchronously (required due to async host funcs)
-     let instance = linker
-        .instantiate_async(&mut store, &module)
-        .await // Use await here
-        .map_err(|e| VmError::InitializationError(format!("Failed to instantiate module: {}", e)))?;
-
-    // Get the exported function
-    let func = instance.get_func(&mut store, function_name).ok_or_else(||
-        VmError::ExecutionError(format!("Function '{}' not found", function_name)))?;
-
-    // Log the function call
-    debug!("Executing WASM function: {}", function_name);
-
-    // Prepare parameters (if function takes params directly) and results buffer
-     // Function signature needs to be known. Assume main takes no args, returns i32 status for now.
-     let mut results = vec![wasmtime::Val::I32(0)];
-     let params = &[]; // Empty params slice
-
-
-    // Call the function asynchronously
-    func.call_async(&mut store, params, &mut results) // Use call_async
-         .await // Use await here
-         .map_err(|trap| {
-             // Execution trapped, create error result
-             let consumed = store.data().consumed_resources.clone(); // Get consumed resources before store is dropped
-             let error_msg = format!("WASM execution trap: {}", trap);
-             ExecutionResult::error(error_msg, ResourceConsumption::from_map(consumed))
-         })?; // Return Err(ExecutionResult) on trap
-
-
-    // --- Execution Succeeded (No Trap) --- 
-
-    // Extract WASM return value
-    let return_value = match results.get(0) {
-         Some(wasmtime::Val::I32(i)) => *i as i32,
-         _ => {
-             warn!("WASM function '{}' did not return an i32", function_name);
-             -1 // Indicate unexpected return type
-         }
-     };
-
-     // Check if the WASM function indicated success (e.g., returned 0)
-     if return_value != 0 {
-         warn!(%return_value, function=%function_name, "WASM function indicated failure");
-         // Potentially create an ExecutionResult error here based on return_value
-     }
-
-
-    // Get final resource consumption
-    let consumed_resources_map = store.data().consumed_resources.clone();
-    let resources = ResourceConsumption::from_map(consumed_resources_map);
-
-    // Check for and retrieve entity creation info from the host environment
-    let entity_info = store.data_mut().take_last_created_entity_info();
-
-    // Build success result
-    let mut result = ExecutionResult::success(vec![return_value as u8], resources);
-
-    // Add entity creation info if it exists
-    if let Some((did, genesis_cid)) = entity_info {
-        result = result.with_entity_creation(did, genesis_cid);
+    /// Helper function to compute a CID for content
+    fn compute_content_cid(data: &[u8]) -> Result<String, InternalHostError> {
+        use sha2::{Sha256, Digest};
+        
+        // Create a SHA-256 hash of the data
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        let hash = hasher.finalize();
+        
+        // Convert to a base58 string prefixed with 'bafybeih'
+        let hex_string = format!("bafybeih{}", hex::encode(&hash[0..16]));
+        
+        Ok(hex_string)
     }
 
-    Ok(result)
+    /// Anchors data to the DAG with the given key
+    /// Returns the CID of the anchored data on success
+    pub async fn anchor_to_dag(&self, key: &str, data: Vec<u8>) -> Result<String, InternalHostError> {
+        // Get the dag_store from environment
+        let dag_store = self.storage_manager.dag_store()
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to get DAG store: {}", e)))?;
+            
+        // Calculate content CID
+        let content_cid = compute_content_cid(&data)
+            .map_err(|e| InternalHostError::DagError(format!("Failed to compute content CID: {}", e)))?;
+        
+        // Prepare DAG node with key, data, and execution context
+        let caller_did = self.caller_did().to_string();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| InternalHostError::Other(format!("Failed to get timestamp: {}", e)))?
+            .as_secs();
+            
+        // Create metadata
+        let metadata = serde_json::json!({
+            "key": key,
+            "timestamp": timestamp,
+            "execution_id": self.vm_context.execution_id(),
+            "caller_did": caller_did
+        });
+        
+        // Store the content first
+        dag_store.store_blob(&content_cid, data)
+            .await
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to store data blob: {}", e)))?;
+            
+        // Create DAG node that references the content
+        let dag_node = serde_json::json!({
+            "key": key,
+            "content_cid": content_cid,
+            "metadata": metadata,
+            "issuer": caller_did
+        });
+        
+        // Serialize the DAG node
+        let node_bytes = serde_json::to_vec(&dag_node)
+            .map_err(|e| InternalHostError::CodecError(format!("Failed to serialize DAG node: {}", e)))?;
+            
+        // Store DAG node and get its CID
+        let node_cid = dag_store.store_node(node_bytes)
+            .await
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to store DAG node: {}", e)))?;
+            
+        // Record a mapping from key to CID for easier lookup
+        let key_mapping = format!("key:{}", key);
+        self.set_value(&key_mapping, node_cid.clone().into_bytes())
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to store key mapping: {}", e)))?;
+            
+        Ok(node_cid)
+    }
+    
+    /// Mint tokens of a specific resource type to a recipient
+    /// Only Guardians can call this method successfully
+    pub async fn mint_tokens(&self, resource_type: ResourceType, recipient: &str, amount: u64) -> Result<(), InternalHostError> {
+        // Check if caller is a Guardian
+        if self.caller_scope() != IdentityScope::Guardian {
+            return Err(InternalHostError::Other(format!(
+                "Only Guardians can mint tokens, caller scope: {:?}", 
+                self.caller_scope()
+            )));
+        }
+        
+        // Log the minting operation
+        info!(
+            resource_type = ?resource_type,
+            recipient = %recipient,
+            amount = %amount,
+            "Minting tokens"
+        );
+        
+        // In a real implementation, this would interact with a token management system
+        // For now, we just simulate success
+        
+        // Record the minting in storage for tracking
+        let mint_record = serde_json::json!({
+            "operation": "mint",
+            "resource_type": format!("{:?}", resource_type),
+            "recipient": recipient,
+            "amount": amount,
+            "timestamp": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| InternalHostError::Other(format!("Failed to get timestamp: {}", e)))?
+                .as_secs(),
+            "minter": self.caller_did()
+        });
+        
+        // Store the mint record
+        let record_key = format!("mint:{}:{}", recipient, uuid::Uuid::new_v4());
+        let record_bytes = serde_json::to_vec(&mint_record)
+            .map_err(|e| InternalHostError::CodecError(format!("Failed to serialize mint record: {}", e)))?;
+            
+        self.set_value(&record_key, record_bytes)
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to store mint record: {}", e)))?;
+            
+        Ok(())
+    }
+    
+    /// Transfer resources from one identity to another
+    pub async fn transfer_resources(
+        &self, 
+        resource_type: ResourceType, 
+        from_did: &str, 
+        to_did: &str, 
+        amount: u64
+    ) -> Result<(), InternalHostError> {
+        // Check authorization
+        if self.caller_did() != from_did {
+            // Allow Guardians to transfer on behalf of others
+            if self.caller_scope() != IdentityScope::Guardian {
+                return Err(InternalHostError::Other(format!(
+                    "Caller {} not authorized to transfer from {}", 
+                    self.caller_did(), from_did
+                )));
+            }
+        }
+        
+        // Log the transfer operation
+        info!(
+            resource_type = ?resource_type,
+            from = %from_did,
+            to = %to_did,
+            amount = %amount,
+            "Transferring resources"
+        );
+        
+        // In a real implementation, this would interact with a token management system
+        // For now, we just simulate success
+        
+        // Record the transfer in storage for tracking
+        let transfer_record = serde_json::json!({
+            "operation": "transfer",
+            "resource_type": format!("{:?}", resource_type),
+            "from": from_did,
+            "to": to_did,
+            "amount": amount,
+            "timestamp": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| InternalHostError::Other(format!("Failed to get timestamp: {}", e)))?
+                .as_secs(),
+            "authorized_by": self.caller_did()
+        });
+        
+        // Store the transfer record
+        let record_key = format!("transfer:{}:{}:{}", from_did, to_did, uuid::Uuid::new_v4());
+        let record_bytes = serde_json::to_vec(&transfer_record)
+            .map_err(|e| InternalHostError::CodecError(format!("Failed to serialize transfer record: {}", e)))?;
+            
+        self.set_value(&record_key, record_bytes)
+            .map_err(|e| InternalHostError::StorageError(format!("Failed to store transfer record: {}", e)))?;
+            
+        Ok(())
+    }
+
+    /// Get the resource usage map
+    pub fn get_resource_usage(&self) -> HashMap<ResourceType, u64> {
+        self.resource_usage.read().unwrap().clone()
+    }
+    
+    /// Record resource usage
+    pub fn record_resource_usage(&self, resource_type: ResourceType, amount: u64) {
+        let mut usage = self.resource_usage.write().unwrap();
+        let entry = usage.entry(resource_type).or_insert(0);
+        *entry += amount;
+    }
+    
+    /// Get the last DAG anchor CID created during execution
+    pub fn get_last_anchor_cid(&self) -> Option<String> {
+        self.last_anchor_cid.read().unwrap().clone()
+    }
+    
+    /// Set the last DAG anchor CID
+    pub fn set_last_anchor_cid(&self, cid: String) {
+        let mut last_cid = self.last_anchor_cid.write().unwrap();
+        *last_cid = Some(cid);
+    }
+}
+
+/// Represents the result of a VM execution
+#[derive(Debug, Clone)]
+pub struct VmExecutionResult {
+    /// Return code from the WASM execution (0 typically means success)
+    pub code: i32,
+    
+    /// Resources consumed during execution
+    pub resource_usage: HashMap<ResourceType, u64>,
+    
+    /// CID of the last DAG anchor created during execution, if any
+    pub dag_anchor_cid: Option<String>,
+}
+
+/// Execute a WASM module in a sandboxed environment
+pub async fn execute_wasm(
+    wasm_bytes: &[u8],
+    context: Option<VMContext>,
+    host_env: &ConcreteHostEnvironment,
+    proposal_id: Option<&str>,
+    federation_scope: Option<&str>,
+) -> Result<VmExecutionResult, VmError> {
+    let context = context.unwrap_or_default();
+    
+    // Create a new Wasmtime engine with appropriate config
+    let mut config = Config::new();
+    config.wasm_bulk_memory(true);
+    config.wasm_reference_types(true);
+    config.async_support(true);
+    config.consume_fuel(true);
+    
+    let engine = Engine::new(&config)
+        .map_err(|e| VmError::EngineCreationFailed(e.to_string()))?;
+    
+    // Set up the WASM module
+    let module = Module::new(&engine, wasm_bytes)
+        .map_err(|e| VmError::ModuleCreationFailed(e.to_string()))?;
+    
+    // Create a new store with the host environment
+    let mut store = Store::new(&engine, host_env.clone());
+    
+    // Allocate fuel for execution (1M units by default)
+    store.add_fuel(1_000_000)
+        .map_err(|e| VmError::FuelAllocationFailed(e.to_string()))?;
+    
+    // Set up the initial resource usage tracking
+    let mut resource_usage = HashMap::new();
+    
+    // Create an instance of the module with imported functions
+    let instance = Instance::new_async(&mut store, &module, &host_abi::create_import_object(&mut store))
+        .await
+        .map_err(|e| VmError::InstantiationFailed(e.to_string()))?;
+    
+    // Get the default export function from the module
+    let execute_fn = instance.get_typed_func::<(), i32>(&mut store, "execute")
+        .map_err(|e| VmError::EntryPointNotFound(e.to_string()))?;
+    
+    // Execute the WASM function
+    let result = execute_fn.call_async(&mut store, ()).await;
+    
+    // Calculate fuel used
+    let fuel_used = store.fuel_consumed().unwrap_or(0);
+    resource_usage.insert(ResourceType::Compute, fuel_used as u64);
+    
+    // Get environment from store to check resource usage
+    let host_env = store.into_data();
+    
+    let execution_result = match result {
+        Ok(code) => {
+            // Add resource usage from host environment
+            // This would be populated by the various host functions during execution
+            for (resource_type, amount) in host_env.get_resource_usage() {
+                let entry = resource_usage.entry(resource_type).or_insert(0);
+                *entry += amount;
+            }
+            
+            let outcome = if code == 0 { "Success" } else { "Failure" };
+            
+            // If we have a proposal ID, issue an execution receipt credential
+            if let (Some(pid), Some(scope)) = (proposal_id, federation_scope) {
+                if let Err(e) = issue_execution_receipt(
+                    &host_env,
+                    pid,
+                    outcome,
+                    resource_usage.clone(),
+                    &host_env.get_last_anchor_cid().unwrap_or_default(),
+                    scope,
+                ).await {
+                    tracing::warn!(error = %e, "Failed to issue execution receipt");
+                }
+            }
+            
+            Ok(VmExecutionResult {
+                code,
+                resource_usage,
+                dag_anchor_cid: host_env.get_last_anchor_cid(),
+            })
+        },
+        Err(e) => {
+            let error_message = e.to_string();
+            
+            // If we have a proposal ID, issue an execution receipt credential for the failure
+            if let (Some(pid), Some(scope)) = (proposal_id, federation_scope) {
+                if let Err(e) = issue_execution_receipt(
+                    &host_env,
+                    pid,
+                    "Error",
+                    resource_usage.clone(),
+                    &host_env.get_last_anchor_cid().unwrap_or_default(),
+                    scope,
+                ).await {
+                    tracing::warn!(error = %e, "Failed to issue execution receipt for error");
+                }
+            }
+            
+            Err(VmError::ExecutionFailed(error_message))
+        }
+    };
+    
+    execution_result
 }
 
 // Helper trait/impl for ResourceConsumption (if not already existing)

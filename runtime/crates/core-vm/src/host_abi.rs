@@ -376,6 +376,337 @@ fn host_contains_node_wrapper(
     }
 }
 
+/// Wrapper for host_check_resource_authorization
+fn host_check_resource_authorization_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    resource_type: i32,
+    amount: i32,
+) -> Result<i32, Trap> {
+    debug!(resource_type, amount, "host_check_resource_authorization called");
+    
+    if amount < 0 {
+        return Err(Trap::new("Amount cannot be negative"));
+    }
+    
+    // Convert resource_type integer to ResourceType
+    let res_type = match resource_type {
+        0 => ResourceType::Compute,
+        1 => ResourceType::Storage,
+        2 => ResourceType::Network,
+        3 => ResourceType::Token,
+        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+    };
+    
+    // Get host environment
+    let env = caller.data();
+    
+    // Check if the caller has authorization for this resource usage
+    let authorized = env.check_resource_authorization(res_type, amount as u64)
+        .map_err(|e| Trap::new(format!("Resource authorization check failed: {}", e)))?;
+    
+    // Return 1 for authorized, 0 for not authorized
+    Ok(if authorized { 1 } else { 0 })
+}
+
+/// Wrapper for host_record_resource_usage
+fn host_record_resource_usage_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    resource_type: i32,
+    amount: i32,
+) -> Result<(), Trap> {
+    debug!(resource_type, amount, "host_record_resource_usage called");
+    
+    if amount < 0 {
+        return Err(Trap::new("Amount cannot be negative"));
+    }
+    
+    // Convert resource_type integer to ResourceType
+    let res_type = match resource_type {
+        0 => ResourceType::Compute,
+        1 => ResourceType::Storage,
+        2 => ResourceType::Network,
+        3 => ResourceType::Token,
+        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+    };
+    
+    // Get host environment and record usage
+    let env = caller.data_mut();
+    
+    // Record the usage
+    env.record_resource_usage(res_type, amount as u64)
+        .map_err(|e| Trap::new(format!("Resource usage recording failed: {}", e)))?;
+    
+    // Also anchor the usage to DAG for governance tracking
+    // Get current timestamp
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+        .as_secs();
+    
+    // Anchor the usage record to DAG (asynchronously, don't block)
+    let usage_record = serde_json::json!({
+        "resource_type": format!("{}", res_type),
+        "amount": amount,
+        "timestamp": timestamp,
+        "caller_did": env.caller_did().to_string(),
+        "execution_context": env.vm_context.execution_id()
+    });
+    
+    // Serialize the usage record
+    let usage_bytes = match serde_json::to_vec(&usage_record) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            // Log the error but don't fail the operation
+            error!("Failed to serialize usage record: {}", e);
+            return Ok(());
+        }
+    };
+    
+    // Spawn a task to anchor the data to DAG
+    let env_clone = env.clone();
+    tokio::spawn(async move {
+        if let Err(e) = env_clone.anchor_to_dag(&format!("resource_usage:{}", timestamp), usage_bytes).await {
+            error!("Failed to anchor resource usage to DAG: {}", e);
+        }
+    });
+    
+    Ok(())
+}
+
+/// Wrapper for host_anchor_to_dag
+fn host_anchor_to_dag_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    key_ptr: i32,
+    key_len: i32,
+    value_ptr: i32,
+    value_len: i32,
+) -> Result<i32, Trap> {
+    debug!(key_ptr, key_len, value_ptr, value_len, "host_anchor_to_dag called");
+    
+    // Get the key from memory
+    let key = read_string_from_memory(&mut caller, key_ptr, key_len)
+        .map_err(|e| Trap::new(format!("Failed to read key from memory: {}", e)))?;
+    
+    // Get the value from memory
+    let value = read_bytes_from_memory(&mut caller, value_ptr, value_len)
+        .map_err(|e| Trap::new(format!("Failed to read value from memory: {}", e)))?;
+    
+    // Get host environment
+    let host_env = caller.data();
+    
+    // Get tokio runtime
+    let handle = tokio::runtime::Handle::current();
+    
+    // Anchor the data to the DAG
+    let cid = handle.block_on(async {
+        host_env.anchor_to_dag(&key, value).await
+            .map_err(|e| Trap::new(format!("Failed to anchor data to DAG: {}", e)))
+    })?;
+    
+    // Store the last anchor CID in the host environment
+    host_env.set_last_anchor_cid(cid.clone());
+    
+    // Write the CID to memory
+    let cid_offset = write_string_to_memory(&mut caller, &cid)
+        .map_err(|e| Trap::new(format!("Failed to write CID to memory: {}", e)))?;
+    
+    Ok(cid_offset)
+}
+
+/// Wrapper for host_mint_token
+fn host_mint_token_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    resource_type: i32,
+    recipient_ptr: i32,
+    recipient_len: i32,
+    amount: i32,
+) -> Result<i32, Trap> {
+    debug!(resource_type, amount, "host_mint_token called");
+    
+    if amount <= 0 {
+        return Err(Trap::new("Amount must be positive"));
+    }
+    
+    // Convert resource_type integer to ResourceType
+    let res_type = match resource_type {
+        0 => ResourceType::Compute,
+        1 => ResourceType::Storage,
+        2 => ResourceType::Network,
+        3 => ResourceType::Token,
+        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+    };
+    
+    // Read recipient DID from memory
+    let recipient_did = match read_memory_string(&mut caller, recipient_ptr, recipient_len) {
+        Ok(did) => did,
+        Err(e) => return Err(Trap::new(format!("Failed to read recipient DID: {}", e))),
+    };
+    
+    // Get host environment
+    let env = caller.data_mut();
+    
+    // Verify Guardian role - only Guardians can mint tokens
+    let caller_scope = env.caller_scope();
+    if caller_scope != IdentityScope::Guardian {
+        error!("Minting attempted by non-Guardian identity scope: {:?}", caller_scope);
+        return Ok(-2); // Not authorized
+    }
+    
+    // Get tokio runtime handle
+    let handle = tokio::runtime::Handle::current();
+    
+    // Call into the economic system to mint tokens
+    // This is a simplified version - in a real implementation we'd have a proper token minting system
+    let token_result = handle.block_on(env.mint_tokens(res_type, &recipient_did, amount as u64));
+    
+    match token_result {
+        Ok(_) => {
+            // Anchor the mint operation to DAG for governance tracking
+            let mint_record = serde_json::json!({
+                "operation": "mint",
+                "resource_type": format!("{}", res_type),
+                "recipient": recipient_did,
+                "amount": amount,
+                "timestamp": std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                    .as_secs(),
+                "issuer": env.caller_did().to_string()
+            });
+            
+            // Serialize the mint record
+            let mint_bytes = match serde_json::to_vec(&mint_record) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    // Log the error but consider the mint operation successful
+                    error!("Failed to serialize mint record: {}", e);
+                    return Ok(1);
+                }
+            };
+            
+            // Attempt to anchor the mint operation to DAG
+            let dag_key = format!("token_mint:{}:{}", recipient_did, std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                .as_secs());
+                
+            if let Err(e) = handle.block_on(env.anchor_to_dag(&dag_key, mint_bytes)) {
+                error!("Failed to anchor mint operation to DAG: {}", e);
+                // Still consider the mint operation successful
+            }
+            
+            Ok(1) // Success
+        }
+        Err(e) => {
+            error!("Failed to mint tokens: {}", e);
+            Ok(-1) // Error
+        }
+    }
+}
+
+/// Wrapper for host_transfer_resource
+fn host_transfer_resource_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    from_ptr: i32,
+    from_len: i32,
+    to_ptr: i32,
+    to_len: i32,
+    resource_type: i32,
+    amount: i32,
+) -> Result<i32, Trap> {
+    debug!(resource_type, amount, "host_transfer_resource called");
+    
+    if amount <= 0 {
+        return Err(Trap::new("Amount must be positive"));
+    }
+    
+    // Convert resource_type integer to ResourceType
+    let res_type = match resource_type {
+        0 => ResourceType::Compute,
+        1 => ResourceType::Storage,
+        2 => ResourceType::Network,
+        3 => ResourceType::Token,
+        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+    };
+    
+    // Read from/to DIDs from memory
+    let from_did = match read_memory_string(&mut caller, from_ptr, from_len) {
+        Ok(did) => did,
+        Err(e) => return Err(Trap::new(format!("Failed to read from DID: {}", e))),
+    };
+    
+    let to_did = match read_memory_string(&mut caller, to_ptr, to_len) {
+        Ok(did) => did,
+        Err(e) => return Err(Trap::new(format!("Failed to read to DID: {}", e))),
+    };
+    
+    // Get host environment
+    let env = caller.data_mut();
+    
+    // Get tokio runtime handle
+    let handle = tokio::runtime::Handle::current();
+    
+    // Check if the caller has authority over the 'from' account
+    // This is a simplified check - in a real system, we'd have signature verification
+    if env.caller_did() != from_did {
+        // Additional check for Guardians, who can transfer on behalf of others
+        if env.caller_scope() != IdentityScope::Guardian {
+            error!("Transfer attempted by unauthorized identity: {} for account {}", 
+                env.caller_did(), from_did);
+            return Ok(-2); // Not authorized
+        }
+    }
+    
+    // Call into the economic system to transfer tokens
+    // This is a simplified version - in a real implementation we'd have a proper token transfer system
+    let transfer_result = handle.block_on(env.transfer_resources(res_type, &from_did, &to_did, amount as u64));
+    
+    match transfer_result {
+        Ok(_) => {
+            // Anchor the transfer operation to DAG for governance tracking
+            let transfer_record = serde_json::json!({
+                "operation": "transfer",
+                "resource_type": format!("{}", res_type),
+                "from": from_did,
+                "to": to_did,
+                "amount": amount,
+                "timestamp": std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                    .as_secs(),
+                "authorized_by": env.caller_did().to_string()
+            });
+            
+            // Serialize the transfer record
+            let transfer_bytes = match serde_json::to_vec(&transfer_record) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    // Log the error but consider the transfer operation successful
+                    error!("Failed to serialize transfer record: {}", e);
+                    return Ok(1);
+                }
+            };
+            
+            // Attempt to anchor the transfer operation to DAG
+            let dag_key = format!("resource_transfer:{}:{}", from_did, std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                .as_secs());
+                
+            if let Err(e) = handle.block_on(env.anchor_to_dag(&dag_key, transfer_bytes)) {
+                error!("Failed to anchor transfer operation to DAG: {}", e);
+                // Still consider the transfer operation successful
+            }
+            
+            Ok(1) // Success
+        }
+        Err(e) => {
+            error!("Failed to transfer resources: {}", e);
+            Ok(-1) // Error
+        }
+    }
+}
+
 /// Register all host functions with a wasmtime::Linker
 pub fn register_host_functions(
     linker: &mut wasmtime::Linker<ConcreteHostEnvironment>,
@@ -564,6 +895,40 @@ pub fn register_host_functions(
         "host_contains_node",
         host_contains_node_wrapper,
     ).map_err(|e| VmError::InitializationError(format!("Failed to register host_contains_node: {}", e)))?;
+
+    // Register the enhanced economic/resource functions
+    linker.func_wrap(
+        "env",
+        "host_check_resource_authorization",
+        host_check_resource_authorization_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_check_resource_authorization: {}", e)))?;
+    
+    linker.func_wrap(
+        "env",
+        "host_record_resource_usage",
+        host_record_resource_usage_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_record_resource_usage: {}", e)))?;
+    
+    // Register the DAG anchoring function
+    linker.func_wrap(
+        "env",
+        "host_anchor_to_dag",
+        host_anchor_to_dag_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_anchor_to_dag: {}", e)))?;
+    
+    // Register token minting function (Guardian-only)
+    linker.func_wrap(
+        "env",
+        "host_mint_token",
+        host_mint_token_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_mint_token: {}", e)))?;
+    
+    // Register resource transfer function
+    linker.func_wrap(
+        "env",
+        "host_transfer_resource",
+        host_transfer_resource_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_transfer_resource: {}", e)))?;
 
     Ok(())
 } 

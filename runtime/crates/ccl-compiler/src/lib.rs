@@ -366,12 +366,56 @@ impl CclCompiler {
                         }
                     }
                     "anchor_data" => {
-                        if !dsl_obj.contains_key("content") {
+                        if !dsl_obj.contains_key("key") {
                             return Err(CompilerError::DslError(
-                                "anchor_data requires 'content' field".to_string(),
+                                "anchor_data requires 'key' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("value") {
+                            return Err(CompilerError::DslError(
+                                "anchor_data requires 'value' field".to_string(),
                             ));
                         }
                         // parents is optional, so no validation needed
+                    }
+                    "mint_token" => {
+                        if !dsl_obj.contains_key("resource_type") {
+                            return Err(CompilerError::DslError(
+                                "mint_token requires 'resource_type' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("recipient") {
+                            return Err(CompilerError::DslError(
+                                "mint_token requires 'recipient' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("amount") {
+                            return Err(CompilerError::DslError(
+                                "mint_token requires 'amount' field".to_string(),
+                            ));
+                        }
+                    }
+                    "transfer_resource" => {
+                        if !dsl_obj.contains_key("from") {
+                            return Err(CompilerError::DslError(
+                                "transfer_resource requires 'from' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("to") {
+                            return Err(CompilerError::DslError(
+                                "transfer_resource requires 'to' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("amount") {
+                            return Err(CompilerError::DslError(
+                                "transfer_resource requires 'amount' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("resource_type") {
+                            return Err(CompilerError::DslError(
+                                "transfer_resource requires 'resource_type' field".to_string(),
+                            ));
+                        }
                     }
                     // Add more action-specific validations as needed
                     _ => {
@@ -506,1352 +550,372 @@ impl CclCompiler {
         Ok(metadata)
     }
 
-    /// Generate a WASM module with embedded CCL config and DSL input
+    /// Generate a WASM module for the given CCL config and DSL input
     fn generate_wasm_module(
         &self,
         ccl_config: &GovernanceConfig,
         dsl_input: &JsonValue,
         options: &CompilationOptions,
     ) -> CompilerResult<Vec<u8>> {
-        use std::borrow::Cow;
+        // Extract action from DSL input
+        let action = self.extract_action_from_dsl(dsl_input)?;
         
-        // Step 1: Extract key information from inputs
-        let template_type = &ccl_config.template_type;
-        let template_version = &ccl_config.template_version;
-        
-        // Extract action from DSL input (with fallback)
-        let action = self.extract_action_from_dsl(dsl_input)
-            .unwrap_or_else(|_| "unknown".to_string());
-        
-        // Create metadata
-        let metadata = self.create_metadata(ccl_config, dsl_input, options)?;
-        let metadata_json = serde_json::to_string(&metadata)
-            .map_err(|e| CompilerError::General(format!("Failed to serialize metadata: {}", e)))?;
-        
-        // Extract key and value for store_data action or key for get_data action
-        let mut key_cid_str = String::new();
-        let mut value_bytes = Vec::new();
-        
-        // Extract key_cid for both store_data and get_data actions
-        if action == "store_data" || action == "get_data" {
-            if let Some(key) = dsl_input.get("key_cid") {
-                if let Some(key_str) = key.as_str() {
-                    key_cid_str = key_str.to_string();
-                } else {
-                    return Err(CompilerError::DslError("key_cid must be a string".to_string()));
-                }
-            } else {
-                return Err(CompilerError::DslError(format!("{} action requires key_cid field", action)));
+        // Generate WASM for the action
+        match action.as_str() {
+            #[cfg(feature = "templating")]
+            "use_template" => {
+                // If the action is "use_template", use the template approach
+                return self.generate_templated_wasm(ccl_config, dsl_input, options);
+            }
+            // For all other actions, generate bytecode directly
+            _ => {
+                // Create a basic WASM module with host function calls
+                let module_bytes = self.generate_basic_wasm_module(ccl_config, dsl_input, options)?;
+                
+                Ok(module_bytes)
             }
         }
+    }
+    
+    /// Generate a basic WASM module for the given action
+    fn generate_basic_wasm_module(
+        &self,
+        ccl_config: &GovernanceConfig,
+        dsl_input: &JsonValue,
+        options: &CompilationOptions,
+    ) -> CompilerResult<Vec<u8>> {
+        // Extract action and parameters
+        let action = self.extract_action_from_dsl(dsl_input)?;
         
-        // Extract value only for store_data action
-        if action == "store_data" {
-            if let Some(value) = dsl_input.get("value") {
-                // Handle different value types
-                if let Some(value_str) = value.as_str() {
-                    value_bytes = value_str.as_bytes().to_vec();
-                } else {
-                    // For non-string values, serialize to JSON
-                    value_bytes = serde_json::to_vec(value)
-                        .map_err(|e| CompilerError::DslError(format!("Failed to serialize value: {}", e)))?;
-                }
-            } else {
-                return Err(CompilerError::DslError("store_data action requires value field".to_string()));
-            }
-        }
-        
-        // Step 2: Create a new WASM module
+        // Create a new WASM module with basic host imports
         let mut module = Module::new();
         
-        // Step 3: Define type section - function signatures
+        // Define memory section with default limits
+        let memory_limits = options.memory_limits.as_ref().unwrap_or(&MemoryLimits::default());
+        let memory = wasm_encoder::MemorySection::new().entry(
+            wasm_encoder::MemoryType {
+                minimum: memory_limits.min_pages,
+                maximum: memory_limits.max_pages,
+                memory64: false,
+                shared: false,
+            }
+        );
+        
+        // Add memory section to module
+        module.section(&memory);
+        
+        // Define type section (function signatures)
         let mut types = TypeSection::new();
         
         // Type 0: () -> () for _start function
         types.function(vec![], vec![]);
         
-        // Type 1: (i32, i32, i32) -> () for host_log_message function
-        // Parameters: (log_level, message_ptr, message_len)
+        // Type 1: (i32, i32) -> i32 for host_log_message function
         types.function(vec![ValType::I32, ValType::I32, ValType::I32], vec![]);
         
-        // Type 2: (i32, i32) -> i32 for invoke function
-        // Parameters: (params_ptr, params_len), Returns: status code
+        // Type 2: (i32, i32) -> i32 for invoke function (our main entry point)
         types.function(vec![ValType::I32, ValType::I32], vec![ValType::I32]);
         
-        // Type 3: (i32, i32, i32, i32) -> i32 for host_storage_get function
-        // Parameters: (key_ptr, key_len, value_ptr, value_len), Returns: result code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        // Type 3: (i32, i32, i32, i32) -> i32 for host_storage_get
+        types.function(
+            vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+            vec![ValType::I32],
+        );
         
-        // Type 4: (i32, i32, i32, i32) -> i32 for host_storage_put function
-        // Parameters: (key_ptr, key_len, value_ptr, value_len), Returns: result code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        // Type 4: (i32, i32, i32, i32) -> i32 for host_storage_put
+        types.function(
+            vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+            vec![ValType::I32],
+        );
         
-        // Type 5: (i32, i32) -> i32 for host_get_caller_did function
-        // Parameters: (output_ptr, max_len), Returns: actual string length
+        // Type 5: (i32, i32) -> i32 for host_get_caller_did
         types.function(vec![ValType::I32, ValType::I32], vec![ValType::I32]);
         
-        // Type 6: () -> i32 for host_get_caller_scope function
-        // No parameters, Returns: scope as integer
+        // Type 6: () -> i32 for host_get_caller_scope
         types.function(vec![], vec![ValType::I32]);
-
-        // Type 7: (i32, i64) -> i32 for host_check_resource_authorization function
-        // Parameters: (resource_type, amount), Returns: authorization status
-        types.function(vec![ValType::I32, ValType::I64], vec![ValType::I32]);
         
-        // Type 8: (i32, i64) -> () for host_record_resource_usage function
-        // Parameters: (resource_type, amount), Returns: nothing
-        types.function(vec![ValType::I32, ValType::I64], vec![]);
+        // Type 7: (i32, i32) -> i32 for host_check_resource_authorization
+        types.function(vec![ValType::I32, ValType::I32], vec![ValType::I32]);
         
-        // Type 9: (i32, i32, i32, i32, i32, i32) -> i32 for host_anchor_to_dag function
-        // Parameters: (content_ptr, content_len, parents_ptr, parents_count, result_ptr, result_capacity), Returns: result length or error code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        // Type 8: (i32, i32) -> () for host_record_resource_usage
+        types.function(vec![ValType::I32, ValType::I32], vec![]);
         
-        // Type 10: (i32, i32, i32, i32, i32, i32, i32, i32) -> i32 for host_create_sub_dag function
-        // Parameters: (parent_did_ptr, parent_did_len, genesis_payload_ptr, genesis_payload_len, entity_type_ptr, entity_type_len, did_out_ptr, did_out_max_len),
-        // Returns: length of result DID or error code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        // Type 9: (i32, i32, i32, i32, i32, i32) -> i32 for host_anchor_to_dag
+        types.function(
+            vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+            vec![ValType::I32],
+        );
         
-        // Type 11: (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) -> i32 for host_store_node function
-        // Parameters: (entity_did_ptr, entity_did_len, payload_ptr, payload_len, parents_ptr_ptr, parents_count, parents_lens_ptr, 
-        //              signature_ptr, signature_len, metadata_ptr, metadata_len, cid_out_ptr, cid_out_max_len)
-        // Returns: length of CID bytes or error code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, 
-                            ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        // Type 10: (i32, i32, i32, i32) -> i32 for host_mint_token
+        types.function(
+            vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], 
+            vec![ValType::I32]
+        );
         
-        // Type 12: (i32, i32, i32, i32, i32, i32) -> i32 for host_get_node function
-        // Parameters: (entity_did_ptr, entity_did_len, cid_ptr, cid_len, node_out_ptr, node_out_max_len)
-        // Returns: length of node bytes or error code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        // Type 11: (i32, i32, i32, i32, i32, i32) -> i32 for host_transfer_resource
+        types.function(
+            vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+            vec![ValType::I32],
+        );
         
-        // Type 13: (i32, i32, i32, i32) -> i32 for host_contains_node function
-        // Parameters: (entity_did_ptr, entity_did_len, cid_ptr, cid_len)
-        // Returns: 1 if node exists, 0 if it doesn't, or negative error code
-        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
-        
+        // Add the type section to the module
         module.section(&types);
         
-        // Step 4: Define import section - host functions
+        // Define import section (host functions we'll use)
         let mut imports = ImportSection::new();
         
-        // Import host_log_message from env module
-        imports.import("env", "host_log_message", EntityType::Function(1));
+        // Import host_log_message from env
+        imports.import(
+            "env",
+            "host_log_message",
+            EntityType::Function(1), // Using type index 1 (log message function)
+        );
         
-        // Import storage functions from env module
+        // Import host_storage_get from env
         imports.import("env", "host_storage_get", EntityType::Function(3));
+        
+        // Import host_storage_put from env
         imports.import("env", "host_storage_put", EntityType::Function(4));
         
-        // Import identity functions for log_caller_info action
-        if action == "log_caller_info" {
-            imports.import("env", "host_get_caller_did", EntityType::Function(5));
-            imports.import("env", "host_get_caller_scope", EntityType::Function(6));
-        }
+        // Import host_get_caller_did from env
+        imports.import("env", "host_get_caller_did", EntityType::Function(5));
         
-        // Import economic functions for perform_metered_action
-        if action == "perform_metered_action" {
-            imports.import("env", "host_check_resource_authorization", EntityType::Function(7));
-            imports.import("env", "host_record_resource_usage", EntityType::Function(8));
-        }
+        // Import host_get_caller_scope from env
+        imports.import("env", "host_get_caller_scope", EntityType::Function(6));
         
-        // Import DAG functions for anchor_data action
-        if action == "anchor_data" {
-            imports.import("env", "host_anchor_to_dag", EntityType::Function(9));
-        }
+        // Import host_check_resource_authorization from env
+        imports.import("env", "host_check_resource_authorization", EntityType::Function(7));
         
-        // Import host functions for entity creation
-        if action == "create_cooperative" || action == "create_community" {
-            imports.import("env", "host_create_sub_dag", EntityType::Function(10));
-        }
+        // Import host_record_resource_usage from env
+        imports.import("env", "host_record_resource_usage", EntityType::Function(8));
         
-        // Import host functions for DAG node management
-        if action == "store_dag_node" {
-            imports.import("env", "host_store_node", EntityType::Function(11));
-        }
+        // Import host_anchor_to_dag from env
+        imports.import("env", "host_anchor_to_dag", EntityType::Function(9));
         
-        if action == "get_dag_node" {
-            imports.import("env", "host_get_node", EntityType::Function(12));
-            imports.import("env", "host_contains_node", EntityType::Function(13));
-        }
+        // Import host_mint_token from env
+        imports.import("env", "host_mint_token", EntityType::Function(10));
         
+        // Import host_transfer_resource from env
+        imports.import("env", "host_transfer_resource", EntityType::Function(11));
+        
+        // Add import section to module
         module.section(&imports);
         
-        // Step 5: Define function section - internal functions
+        // Define function section (indices of our functions' signatures)
         let mut functions = FunctionSection::new();
         
-        // _start function with type 0
+        // Function 10: _start function (type 0)
         functions.function(0);
         
-        // invoke function with type 2
+        // Function 11: invoke function (type 2)
         functions.function(2);
         
+        // Add function section to module
         module.section(&functions);
         
-        // Step 6: Define memory section if needed (using default for now)
-        let default_mem_limits = MemoryLimits::default();
-        let memory_limits = options.memory_limits.as_ref().unwrap_or(&default_mem_limits);
-        let mut memory = wasm_encoder::MemorySection::new();
-        memory.memory(wasm_encoder::MemoryType {
-            minimum: memory_limits.min_pages as u64,
-            maximum: memory_limits.max_pages.map(|pages| pages as u64),
-            memory64: false,
-            shared: false,
-        });
-        module.section(&memory);
-        
-        // Step 7: Define export section
+        // Define export section (functions we export)
         let mut exports = ExportSection::new();
         
         // Export memory
         exports.export("memory", wasm_encoder::ExportKind::Memory, 0);
         
         // Export _start function
-        exports.export("_start", wasm_encoder::ExportKind::Func, 2); // Index 2 including imported functions
+        exports.export("_start", wasm_encoder::ExportKind::Func, 10);
         
         // Export invoke function
-        exports.export("invoke", wasm_encoder::ExportKind::Func, 3); // Index 3 including imported functions
+        exports.export("invoke", wasm_encoder::ExportKind::Func, 11);
         
+        // Add export section to module
         module.section(&exports);
         
-        // Step 8: Define data section for static strings and embedded data
-        let mut data_section = wasm_encoder::DataSection::new();
+        // Extract parameters we'll need for data section
+        let mut data_items = vec![];
         
-        // Create template info string for logging
-        let template_info = format!(
-            "CCL template: {}:{} - Action: {}",
-            template_type, template_version, action
-        );
-        let template_info_bytes = template_info.as_bytes();
+        // Some common messages in our data section
+        let mut data_offset = 0;
         
-        // Add template info to data section at offset 1024
-        data_section.active(
-            0, // Memory index
-            &wasm_encoder::ConstExpr::i32_const(1024), // Offset in memory
-            template_info_bytes.iter().copied(), // Data bytes - copied to ensure we have actual u8 values
-        );
+        // Add a debugging message
+        let debug_msg = format!("Executing {} for template {}", action, ccl_config.template_type);
+        data_items.push((data_offset, debug_msg.into_bytes()));
+        data_offset += debug_msg.len();
         
-        // Define additional message strings for get_data action
-        let data_found_msg = "Data found for key";
-        let data_not_found_msg = "Data not found for key";
-
-        // Add message strings to data section
-        data_section.active(
-            0, // Memory index
-            &wasm_encoder::ConstExpr::i32_const(1536), // Offset for data_found_msg
-            data_found_msg.as_bytes().iter().copied(),
-        );
+        // Memory layout:
+        // 0 - 1000: Debug and status messages
+        // 1000 - 2000: Input parameters
+        // 2000 - 3000: Result buffers
+        // 4000+: Dynamic memory allocation
         
-        data_section.active(
-            0, // Memory index
-            &wasm_encoder::ConstExpr::i32_const(1600), // Offset for data_not_found_msg
-            data_not_found_msg.as_bytes().iter().copied(),
-        );
+        // Reset offset for our input data
+        data_offset = 1000;
         
-        // Define message strings for log_caller_info action
-        if action == "log_caller_info" {
-            let caller_did_prefix = "Caller DID: ";
-            let caller_scope_prefix = "Caller Scope: ";
-            
-            // Add message strings to data section
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(1700), // Offset for caller_did_prefix
-                caller_did_prefix.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(1750), // Offset for caller_scope_prefix
-                caller_scope_prefix.as_bytes().iter().copied(),
-            );
-            
-            // Reserve space for scope digit (just one byte at 1799)
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(1799), // Offset for scope digit
-                [0].iter().copied(), // Single byte placeholder
-            );
-            
-            // Reserve space for caller DID (100 bytes at 9000)
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(9000), // Offset for caller DID buffer
-                vec![0; 100].iter().copied(), // 100 bytes of zeros
-            );
-        }
+        // Allocate space for parameters and extract values
+        let mut param_offsets = HashMap::new();
         
-        // Add message strings for perform_metered_action action
-        if action == "perform_metered_action" {
-            let checking_resource_msg = "Checking resource:";
-            let authorized_msg = "Authorized";
-            let not_authorized_msg = "NOT Authorized";
-            let recording_usage_msg = "Recording usage:";
-            
-            // Add message strings to data section
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(2000), // Offset for checking_resource_msg
-                checking_resource_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(2050), // Offset for authorized_msg
-                authorized_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(2100), // Offset for not_authorized_msg
-                not_authorized_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(2150), // Offset for recording_usage_msg
-                recording_usage_msg.as_bytes().iter().copied(),
-            );
-        }
-        
-        // Add data section for anchor_data action
-        if action == "anchor_data" {
-            // Add message strings to data section
-            let anchoring_success_msg = "Data anchored successfully. CID: ";
-            let anchoring_failed_msg = "Anchoring failed";
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5000), // Offset for success message
-                anchoring_success_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5050), // Offset for failure message
-                anchoring_failed_msg.as_bytes().iter().copied(),
-            );
-            
-            // Extract content from the DSL input
-            let content_bytes = if let Some(content) = dsl_input.get("content") {
-                if let Some(content_str) = content.as_str() {
-                    content_str.as_bytes().to_vec()
-                } else {
-                    // Serialize non-string values to JSON bytes
-                    serde_json::to_vec(content)
-                        .map_err(|e| CompilerError::DslError(format!("Failed to serialize content: {}", e)))?
+        // Extract and store all String parameters
+        if let Some(obj) = dsl_input.as_object() {
+            for (key, value) in obj {
+                // Skip the action since we've already processed it
+                if key == "action" {
+                    continue;
                 }
-            } else {
-                return Err(CompilerError::DslError("anchor_data requires content field".to_string()));
-            };
-            
-            // Add content to data section at offset 3000
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(3000), // Offset for content
-                content_bytes.iter().copied(),
-            );
-            
-            // Process parent CIDs if present
-            let parents = dsl_input.get("parents").and_then(|p| p.as_array()).cloned().unwrap_or_default();
-            let parent_cids: Vec<String> = parents.iter()
-                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                .collect();
-            
-            // Add each parent CID to the data section if we have any
-            if !parent_cids.is_empty() {
-                for (i, cid_str) in parent_cids.iter().enumerate() {
-                    let offset = 4000 + (i * 100); // Assume each CID gets 100 bytes of space
-                    data_section.active(
-                        0, // Memory index
-                        &wasm_encoder::ConstExpr::i32_const(offset as i32),
-                        cid_str.as_bytes().iter().copied(),
-                    );
+                
+                // Handle different parameter types
+                if let Some(value_str) = value.as_str() {
+                    // Store string values in data section
+                    let bytes = value_str.as_bytes();
+                    data_items.push((data_offset, bytes.to_vec()));
+                    param_offsets.insert(key.clone(), (data_offset, bytes.len()));
+                    data_offset += bytes.len() + 1; // +1 for null terminator
+                } else if value.is_number() {
+                    // We'll handle numeric values directly in the code section
+                    // For now just record their existence
+                    param_offsets.insert(key.clone(), (0, 0));
+                } else if let Some(values) = value.as_array() {
+                    // Handle arrays by converting to JSON string for now
+                    // TODO: Handle arrays more efficiently
+                    let json_str = serde_json::to_string(value).unwrap_or_default();
+                    let bytes = json_str.as_bytes();
+                    data_items.push((data_offset, bytes.to_vec()));
+                    param_offsets.insert(key.clone(), (data_offset, bytes.len()));
+                    data_offset += bytes.len() + 1;
                 }
+                // Skip other types for now
             }
-            
-            // Create a buffer for the resulting CID at offset 6000
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(6000), // Offset for CID result buffer
-                vec![0; 100].iter().copied(), // 100 bytes of zeros for CID buffer
-            );
         }
         
-        // For store_data action, also embed the value
-        if action == "store_data" {
-            // Store key_cid at memory offset 2048
-            let key_cid_bytes = key_cid_str.as_bytes();
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(2048), // Offset for key_cid
-                key_cid_bytes.iter().copied(),
-            );
-            
-            // Store value at memory offset 4096
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(4096), // Offset for value
-                value_bytes.iter().copied(),
-            );
-        } else if action == "get_data" {
-            // Store key_cid at memory offset 2048
-            let key_cid_bytes = key_cid_str.as_bytes();
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(2048), // Offset for key_cid
-                key_cid_bytes.iter().copied(),
-            );
-            
-            // Create buffer spaces for use by the get_data action
-            // Buffer at 6144 for storing the length (4 bytes)
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(6144), // Offset for length buffer
-                vec![0; 4].iter().copied(), // 4 bytes of zeros
-            );
-            
-            // Buffer at 8192 for storing the retrieved data (1024 bytes should be enough)
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(8192), // Offset for data buffer
-                vec![0; 1024].iter().copied(), // 1024 bytes of zeros
-            );
-        }
+        // Add a success message
+        let success_msg = "Operation completed successfully";
+        data_items.push((2000, success_msg.as_bytes().to_vec()));
         
-        // Add data section for entity creation actions (after the anchor_data action section, around line 777)
-        if action == "create_cooperative" || action == "create_community" {
-            // Add message strings to data section
-            let entity_created_msg = "Entity created successfully. DID: ";
-            let entity_failed_msg = "Entity creation failed";
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5100), // Offset for success message
-                entity_created_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5150), // Offset for failure message
-                entity_failed_msg.as_bytes().iter().copied(),
-            );
-            
-            // Extract parent_did from DSL input
-            let parent_did = dsl_input.get("parent_did")
-                .and_then(|p| p.as_str())
-                .unwrap_or("did:icn:federation"); // Default to federation DID if not specified
-            
-            // Store parent_did at offset 5200
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5200), // Offset for parent_did
-                parent_did.as_bytes().iter().copied(),
-            );
-            
-            // Extract genesis_payload from DSL input or create default
-            let genesis_payload_bytes = if let Some(payload) = dsl_input.get("genesis_payload") {
-                // Serialize to CBOR
-                let ipld_value = convert_json_to_ipld(payload)?;
-                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?
-            } else {
-                // Create a default payload with name and description
-                let entity_name = dsl_input.get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or(if action == "create_cooperative" { "New Cooperative" } else { "New Community" });
-                
-                let description = dsl_input.get("description")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("Created via CCL");
-                
-                let now = chrono::Utc::now().timestamp();
-                
-                let default_payload = serde_json::json!({
-                    "name": entity_name,
-                    "description": description,
-                    "created_at": now,
-                    "created_by": options.caller_did.clone().unwrap_or_default()
-                });
-                
-                let ipld_value = convert_json_to_ipld(&default_payload)?;
-                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                    .map_err(|e| CompilerError::DslError(format!("Failed to encode default payload as CBOR: {}", e)))?
-            };
-            
-            // Store genesis_payload at offset 5500
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5500), // Offset for genesis_payload
-                genesis_payload_bytes.iter().copied(),
-            );
-            
-            // Set entity_type based on action
-            let entity_type = if action == "create_cooperative" { "Cooperative" } else { "Community" };
-            
-            // Store entity_type at offset 5800
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(5800), // Offset for entity_type
-                entity_type.as_bytes().iter().copied(),
-            );
-            
-            // Create buffer for output DID at offset 6100
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(6100), // Offset for output DID
-                vec![0; 100].iter().copied(), // 100 bytes for DID
-            );
-        }
-        
-        if action == "store_dag_node" {
-            // Add message strings
-            let node_stored_msg = "Node stored successfully. CID: ";
-            let node_failed_msg = "Node storage failed";
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(6200), // Offset for success message
-                node_stored_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(6250), // Offset for failure message
-                node_failed_msg.as_bytes().iter().copied(),
-            );
-            
-            // Extract entity_did from DSL input
-            let entity_did = dsl_input.get("entity_did")
-                .and_then(|p| p.as_str())
-                .unwrap_or(""); // No default, will be a runtime error if not provided
-            
-            // Store entity_did at offset 6300
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(6300), // Offset for entity_did
-                entity_did.as_bytes().iter().copied(),
-            );
-            
-            // Extract payload from DSL input
-            if let Some(payload) = dsl_input.get("payload") {
-                // Serialize to CBOR
-                let ipld_value = convert_json_to_ipld(payload)?;
-                let payload_bytes = libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?;
-                
-                // Store payload at offset 6400
-                data_section.active(
-                    0, // Memory index
-                    &wasm_encoder::ConstExpr::i32_const(6400), // Offset for payload
-                    payload_bytes.iter().copied(),
-                );
-            } else {
-                return Err(CompilerError::DslError("store_dag_node requires payload field".to_string()));
-            }
-            
-            // Extract parent CIDs if present
-            let parents = dsl_input.get("parents").and_then(|p| p.as_array()).cloned().unwrap_or_default();
-            let parent_cids: Vec<String> = parents.iter()
-                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                .collect();
-            
-            // Store parent CIDs at sequential offsets starting at 6500
-            for (i, cid_str) in parent_cids.iter().enumerate() {
-                let offset = 6500 + (i * 100); // Assume each CID gets 100 bytes of space
-                data_section.active(
-                    0, // Memory index
-                    &wasm_encoder::ConstExpr::i32_const(offset as i32),
-                    cid_str.as_bytes().iter().copied(),
-                );
-            }
-            
-            // Store pointers to parent CIDs at 7500
-            // This is an array of 32-bit pointers to each parent CID string
-            let mut parent_ptrs = Vec::new();
-            for i in 0..parent_cids.len() {
-                // Convert each offset to little-endian bytes
-                let ptr = (6500 + (i * 100)) as u32;
-                parent_ptrs.extend_from_slice(&ptr.to_le_bytes());
-            }
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(7500), // Offset for parent pointers array
-                parent_ptrs.iter().copied(),
-            );
-            
-            // Store lengths of parent CIDs at 7600
-            let mut parent_lens = Vec::new();
-            for cid_str in &parent_cids {
-                // Convert each length to little-endian bytes
-                let len = cid_str.len() as u32;
-                parent_lens.extend_from_slice(&len.to_le_bytes());
-            }
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(7600), // Offset for parent lengths array
-                parent_lens.iter().copied(),
-            );
-            
-            // Create empty/dummy signature at 7700
-            // In a real implementation, this would be generated by the calling client
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(7700), // Offset for signature
-                vec![0; 64].iter().copied(), // 64 bytes placeholder signature
-            );
-            
-            // Create default metadata at 7800
-            let metadata = serde_json::json!({
-                "timestamp": chrono::Utc::now().timestamp() as u64,
-                "sequence": 1,
-                "scope": entity_did,
-            });
-            
-            let ipld_value = convert_json_to_ipld(&metadata)?;
-            let metadata_bytes = libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                .map_err(|e| CompilerError::DslError(format!("Failed to encode metadata as CBOR: {}", e)))?;
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(7800), // Offset for metadata
-                metadata_bytes.iter().copied(),
-            );
-            
-            // Create buffer for output CID at offset 7900
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(7900), // Offset for output CID
-                vec![0; 100].iter().copied(), // 100 bytes for CID
-            );
-        }
-        
-        if action == "get_dag_node" {
-            // Add message strings
-            let node_found_msg = "Node found. CID: ";
-            let node_not_found_msg = "Node not found";
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(8000), // Offset for found message
-                node_found_msg.as_bytes().iter().copied(),
-            );
-            
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(8050), // Offset for not found message
-                node_not_found_msg.as_bytes().iter().copied(),
-            );
-            
-            // Extract entity_did from DSL input
-            let entity_did = dsl_input.get("entity_did")
-                .and_then(|p| p.as_str())
-                .unwrap_or(""); // No default, will be a runtime error if not provided
-            
-            // Store entity_did at offset 8100
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(8100), // Offset for entity_did
-                entity_did.as_bytes().iter().copied(),
-            );
-            
-            // Extract CID from DSL input
-            let cid_str = dsl_input.get("cid")
-                .and_then(|c| c.as_str())
-                .unwrap_or(""); // No default, will be a runtime error if not provided
-            
-            // Store CID at offset 8200
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(8200), // Offset for CID
-                cid_str.as_bytes().iter().copied(),
-            );
-            
-            // Create buffer for output node at offset 8300
-            data_section.active(
-                0, // Memory index
-                &wasm_encoder::ConstExpr::i32_const(8300), // Offset for output node
-                vec![0; 1024].iter().copied(), // 1024 bytes for node (adjust as needed)
-            );
-        }
+        // Add an error message
+        let error_msg = "Operation failed";
+        data_items.push((2050, error_msg.as_bytes().to_vec()));
         
         // Add data section to module
+        let mut data_section = wasm_encoder::DataSection::new();
+        for (offset, bytes) in data_items {
+            data_section.active(0, &wasm_encoder::ConstExpr::i32_const(offset as i32), bytes);
+        }
         module.section(&data_section);
         
-        // Step 9: Define code section - function bodies
-        let mut code = CodeSection::new();
+        // Create code section with our function bodies
+        let mut code_section = CodeSection::new();
         
-        // Create _start function body
-        let mut start_func = wasm_encoder::Function::new(vec![]);
-        
-        // _start function just returns
+        // Define _start function (just calls invoke with default parameters)
+        let mut start_func = wasm_encoder::Function::new([]);
         start_func.instruction(&wasm_encoder::Instruction::End);
-        code.function(&start_func);
+        code_section.function(&start_func);
         
-        // Create invoke function body
-        let mut invoke_func = wasm_encoder::Function::new(vec![
-            (1, ValType::I32), // local 0 = status code (i32, return value)
-            (1, ValType::I32), // local 1 = temporary value 1 (i32)
-            (1, ValType::I32), // local 2 = temporary value 2 (i32)
-            (1, ValType::I32), // local 3 = temporary value 3 (i32)
-            (1, ValType::I32), // local 4 = temporary value 4 (i32)
-            (1, ValType::I32), // local 5 = temporary value 5 (i32)
-            (1, ValType::I32), // local 6 = temporary value 6 (i32)
-            (1, ValType::I32), // local 7 = temporary value 7 (i32)
-        ]);
-        
-        // Initialize return value to error (1)
-        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-        invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-        
-        // Log the template info
-        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1024)); // Template info string
-        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(template_info.len() as i32));
-        invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-        
-        // Logic based on action type
-        if action == "store_data" {
-            // For store_data action, call host_storage_put with the embedded data
-            
-            // Load key_cid pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2048)); // key_cid pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(key_cid_str.len() as i32)); // key_cid length
-            
-            // Load value pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(4096)); // value pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(value_bytes.len() as i32)); // value length
-            
-            // Call host_storage_put (imported function at index 2)
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2));
-            
-            // Check return value and set status code
-            // If host_storage_put returns non-zero (success), set status to 0 (success)
-            // Otherwise, return 1 (failure, which is the default)
-            
-            // Create a block for if/else construct
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If result from host_storage_put is non-zero
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Success status
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0)); // Set local 0 to success
-            
-            invoke_func.instruction(&wasm_encoder::Instruction::End); // End if block
-            
-        } else if action == "get_data" {
-            // For get_data action, call host_storage_get with the embedded key_cid
-
-            // Define spaces for retrieved data and length
-            // 6144 for storing the length (4 bytes)
-            // 8192 for storing the retrieved data (up to some reasonable size)
-            
-            // Load key_cid pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2048)); // key_cid pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(key_cid_str.len() as i32)); // key_cid length
-            
-            // Load output buffer pointer and length pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8192)); // Output buffer at 8192
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6144)); // Length pointer at 6144
-            
-            // Call host_storage_get (imported function at index 1)
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store result in local 1
-            
-            // Check if data was found (host_storage_get returns 1 on success)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Eq);
-            
-            // If data was found
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // Log "Data found" message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1536)); // "Data found" message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(data_found_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set success status (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // Else block (data not found)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log "Data not found" message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1600)); // "Data not found" message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(data_not_found_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set failure status (1) - already the default, but being explicit
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End if/else
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-            
-        } else if action == "log_caller_info" {
-            // For log_caller_info action, call identity host functions and log the results
-            
-            // Get the caller's DID into a buffer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(9000)); // Pointer to DID buffer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // Max length for DID
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(3)); // Call host_get_caller_did (offset by base imports)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store returned length in local 1
-            
-            // Log the DID prefix
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1700)); // "Caller DID: " message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(11)); // Length of "Caller DID: "
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Log the actual DID
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(9000)); // Pointer to DID buffer
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // Get the actual DID length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Get the caller's scope
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(4)); // Call host_get_caller_scope
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store scope in local 1
-            
-            // Convert scope integer to ASCII digit and store at memory[1799]
-            // We need to add '0' (ASCII 48) to the scope value (0-9)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // Get scope value
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(48)); // ASCII '0'
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Add); // scope + '0' = ASCII digit
-            
-            // Store the ASCII digit at memory[1799]
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1799)); // Memory address
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // Get scope value + ASCII '0'
-            
-            // Create a MemArg for the I32Store8 instruction
-            let store_memarg = wasm_encoder::MemArg { 
-                offset: 0,
-                align: 0,
-                memory_index: 0,
-            };
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Store8(store_memarg)); // Store 1 byte
-            
-            // Log the scope prefix
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1750)); // "Caller Scope: " message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(14)); // Length of "Caller Scope: "
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Log the actual scope digit
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1799)); // Pointer to scope digit
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Length is 1 byte
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set success status (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-        } else if action == "propose_membership" {
-            // Logic for propose_membership action
-            // For this example, just return success (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-        } else if action == "propose_budget" {
-            // Logic for propose_budget action
-            // For this example, just return success (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-        } else if action == "perform_metered_action" {
-            // Extract resource type and amount from the DSL input
-            let resource_type = dsl_input.get("resource_type")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0); // Default to Compute (0) if not specified
-            
-            let amount = dsl_input.get("amount")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(1); // Default to 1 if not specified
-            
-            // Log "Checking resource:" message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Checking resource message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(17)); // Message length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Call host_check_resource_authorization
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(resource_type as i32)); // Resource type
-            invoke_func.instruction(&wasm_encoder::Instruction::I64Const(amount)); // Amount
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(7)); // Call host_check_resource_authorization
-            
-            // Store the result in local 1
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
-            
-            // Check if authorized (value in local 1)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
-            
-            // If-else block
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If branch (authorized)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Authorized message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(10)); // Message length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Log recording usage message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2100)); // Recording usage message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Message length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Record resource usage
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(resource_type as i32)); // Resource type
-            invoke_func.instruction(&wasm_encoder::Instruction::I64Const(amount)); // Amount
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(8)); // Call host_record_resource_usage
-            
-            // Set return value to success (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // Else branch (not authorized)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log not authorized message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2150)); // Not authorized message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(14)); // Message length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Set return value to error (1)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End if
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-            
-        } else if action == "anchor_data" {
-            // Extract content pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(3000)); // Pointer to content data
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store in local 1
-            
-            // Get content length
-            let content_bytes = if let Some(content) = dsl_input.get("content") {
-                if let Some(content_str) = content.as_str() {
-                    content_str.as_bytes().len()
-                } else {
-                    // Serialize non-string values to JSON bytes
-                    if let Ok(bytes) = serde_json::to_vec(content) {
-                        bytes.len()
-                    } else {
-                        0
-                    }
-                }
-            } else {
-                0
-            };
-            
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(content_bytes as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(2)); // Store content length in local 2
-            
-            // Process parent CIDs
-            let parents = dsl_input.get("parents").and_then(|p| p.as_array()).cloned().unwrap_or_default();
-            let parents_count = parents.len();
-            
-            // Parents array pointer (if we have parents)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(4000)); // Pointer to parents array
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(3)); // Store in local 3
-            
-            // Parents count
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(parents_count as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(4)); // Store in local 4
-            
-            // Prepare buffer for result CID
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6000)); // Pointer to result buffer
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(5)); // Store in local 5
-            
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // Length of result buffer
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(6)); // Store in local 6
-            
-            // Call host_anchor_to_dag with content_ptr, content_len, parents_ptr, parents_count, result_ptr, result_capacity
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // content_ptr
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(2)); // content_len
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(3)); // parents_ptr
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(4)); // parents_count
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(5)); // result_ptr
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(6)); // result_capacity
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(9)); // Call host_anchor_to_dag
-            
-            // Store the result (CID string length or error code) in local 7
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(7));
-            
-            // Check if successful (result >= 0)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(7));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32GeS); // result >= 0
-            
-            // If-else block
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If branch (success)
-            // Log success message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5000)); // Success message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(29)); // Success message length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Log the CID string
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(5)); // CID string pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(7)); // CID string length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Set return value to success (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // Else branch (failure)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log failure message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5050)); // Failure message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Failure message length
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(2)); // Call host_log_message
-            
-            // Set return value to error (1)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End if
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-        } else if action == "create_cooperative" || action == "create_community" {
-            // Get parameters for create_sub_dag call
-            // Parent DID pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5200)); // parent_did pointer
-            let parent_did = dsl_input.get("parent_did")
-                .and_then(|p| p.as_str())
-                .unwrap_or("did:icn:federation");
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(parent_did.len() as i32)); // parent_did length
-            
-            // Genesis payload pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5500)); // genesis_payload pointer
-            
-            // Calculate payload length
-            let genesis_payload_bytes = if let Some(payload) = dsl_input.get("genesis_payload") {
-                let ipld_value = convert_json_to_ipld(payload)?;
-                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?
-            } else {
-                // Calculate length for default payload (already stored in data section)
-                let entity_name = dsl_input.get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or(if action == "create_cooperative" { "New Cooperative" } else { "New Community" });
+        // Define invoke function based on action
+        let invoke_func = match action.as_str() {
+            "log_caller_info" => self.generate_log_caller_info_function(),
+            "perform_metered_action" => {
+                let resource_type = dsl_input.get("resource_type")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
                 
-                let description = dsl_input.get("description")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("Created via CCL");
+                let amount = dsl_input.get("amount")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
                 
-                let now = chrono::Utc::now().timestamp();
+                self.generate_perform_metered_action_function(resource_type, amount)
+            },
+            "anchor_data" => {
+                let key_offset = param_offsets.get("key")
+                    .map(|(offset, _)| *offset as i32)
+                    .unwrap_or(0);
                 
-                let default_payload = serde_json::json!({
-                    "name": entity_name,
-                    "description": description,
-                    "created_at": now,
-                    "created_by": options.caller_did.clone().unwrap_or_default()
-                });
+                let key_len = param_offsets.get("key")
+                    .map(|(_, len)| *len as i32)
+                    .unwrap_or(0);
                 
-                let ipld_value = convert_json_to_ipld(&default_payload)?;
-                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                    .map_err(|e| CompilerError::DslError(format!("Failed to encode default payload as CBOR: {}", e)))?
-            };
-            
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(genesis_payload_bytes.len() as i32)); // genesis_payload length
-            
-            // Entity type pointer and length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5800)); // entity_type pointer
-            let entity_type = if action == "create_cooperative" { "Cooperative" } else { "Community" };
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_type.len() as i32)); // entity_type length
-            
-            // Output DID buffer pointer and max length
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6100)); // output DID pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // max output DID length
-            
-            // Call host_create_sub_dag
-            let import_index = imports.count() - 1; // Get the index of the last imported function
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(import_index));
-            
-            // Store result in local 1
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
-            
-            // Check if creation was successful (result > 0)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32GtS); // result > 0
-            
-            // If-else block
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If branch (success)
-            // Log success message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5100)); // Success message
-            let success_msg = "Entity created successfully. DID: ";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(success_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Log the created DID
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6100)); // DID buffer
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // DID length from result
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set success status (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // Else branch (creation failed)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log failure message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5150)); // Failure message
-            let failure_msg = "Entity creation failed";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(failure_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set return value to error (1)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End if
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-            
-        } else if action == "store_dag_node" {
-            // Parameters for host_store_node
-            // entity_did_ptr, entity_did_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6300)); // entity_did pointer
-            let entity_did = dsl_input.get("entity_did")
-                .and_then(|p| p.as_str())
-                .unwrap_or(""); // No default, will be a runtime error if not provided
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_did.len() as i32)); // entity_did length
-            
-            // payload_ptr, payload_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6400)); // payload pointer
-            // Calculate payload length (already computed when adding to data section)
-            let payload_bytes = if let Some(payload) = dsl_input.get("payload") {
-                let ipld_value = convert_json_to_ipld(payload)?;
-                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?;
-            } else {
-                return Err(CompilerError::DslError("store_dag_node requires payload field".to_string()));
-            };
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(payload_bytes.len() as i32)); // payload length
-            
-            // parents_cids_ptr_ptr, parents_cids_count
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7500)); // parents pointers array
-            let parents = dsl_input.get("parents").and_then(|p| p.as_array()).cloned().unwrap_or_default();
-            let parent_cids: Vec<String> = parents.iter()
-                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                .collect();
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(parent_cids.len() as i32)); // parents count
-            
-            // parent_cid_lens_ptr
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7600)); // parents lengths array
-            
-            // signature_ptr, signature_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7700)); // signature pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(64)); // signature length (64 bytes placeholder)
-            
-            // metadata_ptr, metadata_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7800)); // metadata pointer
-            // Calculate metadata length (already computed when adding to data section)
-            let metadata = serde_json::json!({
-                "timestamp": chrono::Utc::now().timestamp() as u64,
-                "sequence": 1,
-                "scope": entity_did
-            });
-            let ipld_value = convert_json_to_ipld(&metadata)?;
-            let metadata_bytes = libipld_dagcbor::DagCborCodec.encode(&ipld_value)
-                .map_err(|e| CompilerError::DslError(format!("Failed to encode metadata as CBOR: {}", e)))?;
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(metadata_bytes.len() as i32)); // metadata length
-            
-            // cid_out_ptr, cid_out_max_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7900)); // output CID pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // max output CID length
-            
-            // Call host_store_node
-            let import_index = imports.count() - 1; // Get the index of the last imported function
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(import_index));
-            
-            // Store result in local 1
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
-            
-            // Check if storage was successful (result > 0)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32GtS); // result > 0
-            
-            // If-else block
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If branch (success)
-            // Log success message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6200)); // Success message
-            let success_msg = "Node stored successfully. CID: ";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(success_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set success status (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // Else branch (storage failed)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log failure message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6250)); // Failure message
-            let failure_msg = "Node storage failed";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(failure_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set failure status (already default, but being explicit)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End if/else
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-            
-        } else if action == "get_dag_node" {
-            // First, check if the node exists using host_contains_node
-            // entity_did_ptr, entity_did_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8100)); // entity_did pointer
-            let entity_did = dsl_input.get("entity_did")
-                .and_then(|p| p.as_str())
-                .unwrap_or(""); // No default, will be a runtime error if not provided
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_did.len() as i32)); // entity_did length
-            
-            // cid_ptr, cid_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8200)); // CID pointer
-            let cid_str = dsl_input.get("cid")
-                .and_then(|c| c.as_str())
-                .unwrap_or(""); // No default, will be a runtime error if not provided
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(cid_str.len() as i32)); // CID length
-            
-            // Call host_contains_node
-            let contains_index = imports.count() - 1; // Get the index of the host_contains_node function
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(contains_index));
-            
-            // Store result in local 1
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
-            
-            // Check if node exists (result == 1)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Eq); // result == 1
-            
-            // If-else block
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If branch (node exists), call host_get_node
-            // entity_did_ptr, entity_did_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8100)); // entity_did pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_did.len() as i32)); // entity_did length
-            
-            // cid_ptr, cid_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8200)); // CID pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(cid_str.len() as i32)); // CID length
-            
-            // node_out_ptr, node_out_max_len
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8300)); // output node pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1024)); // max output node length
-            
-            // Call host_get_node
-            let get_node_index = contains_index - 1; // Get the index of the host_get_node function
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(get_node_index));
-            
-            // Store result in local 2
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(2));
-            
-            // Check if retrieval was successful (result > 0)
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(2));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::I32GtS); // result > 0
-            
-            // If-else block
-            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
-            
-            // If branch (retrieval success)
-            // Log success message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8000)); // Success message
-            let success_msg = "Node found. CID: ";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(success_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Log the CID
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8200)); // CID pointer
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(cid_str.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set success status (0)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // Else branch (retrieval failed)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log failure message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8050)); // Failure message
-            let failure_msg = "Node not found";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(failure_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set failure status
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End inner if/else
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-            
-            // Else branch (node doesn't exist)
-            invoke_func.instruction(&wasm_encoder::Instruction::Else);
-            
-            // Log "Node not found" message
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8050)); // Not found message
-            let not_found_msg = "Node not found";
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(not_found_msg.len() as i32));
-            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
-            
-            // Set failure status
-            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
-            
-            // End outer if/else
-            invoke_func.instruction(&wasm_encoder::Instruction::End);
-        }
-        
-        // Return the status code from local 0
-        invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(0));
-        invoke_func.instruction(&wasm_encoder::Instruction::End);
-        
-        code.function(&invoke_func);
-        
-        module.section(&code);
-        
-        // Step 10: Add custom sections for metadata
-        
-        // Add the essential metadata in a custom section named "icn-metadata"
-        let custom_section = wasm_encoder::CustomSection {
-            name: Cow::Borrowed("icn-metadata"),
-            data: Cow::Borrowed(metadata_json.as_bytes()),
+                let value_offset = param_offsets.get("value")
+                    .map(|(offset, _)| *offset as i32)
+                    .unwrap_or(0);
+                
+                let value_len = param_offsets.get("value")
+                    .map(|(_, len)| *len as i32)
+                    .unwrap_or(0);
+                
+                self.generate_anchor_data_function(key_offset, key_len, value_offset, value_len)
+            },
+            "mint_token" => {
+                let resource_type = dsl_input.get("resource_type")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
+                
+                let recipient_offset = param_offsets.get("recipient")
+                    .map(|(offset, _)| *offset as i32)
+                    .unwrap_or(0);
+                
+                let recipient_len = param_offsets.get("recipient")
+                    .map(|(_, len)| *len as i32)
+                    .unwrap_or(0);
+                
+                let amount = dsl_input.get("amount")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
+                
+                self.generate_mint_token_function(resource_type, recipient_offset, recipient_len, amount)
+            },
+            "transfer_resource" => {
+                let from_offset = param_offsets.get("from")
+                    .map(|(offset, _)| *offset as i32)
+                    .unwrap_or(0);
+                
+                let from_len = param_offsets.get("from")
+                    .map(|(_, len)| *len as i32)
+                    .unwrap_or(0);
+                
+                let to_offset = param_offsets.get("to")
+                    .map(|(offset, _)| *offset as i32)
+                    .unwrap_or(0);
+                
+                let to_len = param_offsets.get("to")
+                    .map(|(_, len)| *len as i32)
+                    .unwrap_or(0);
+                
+                let resource_type = dsl_input.get("resource_type")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
+                
+                let amount = dsl_input.get("amount")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
+                
+                self.generate_transfer_resource_function(
+                    from_offset, from_len, 
+                    to_offset, to_len,
+                    resource_type, amount
+                )
+            },
+            _ => {
+                // Default function that just logs and returns success
+                self.generate_default_function(&action)
+            }
         };
-        module.section(&custom_section);
         
-        // Add CCL config and DSL input in custom sections if debug info is enabled
+        // Add the invoke function to code section
+        code_section.function(&invoke_func);
+        
+        // Add code section to module
+        module.section(&code_section);
+        
+        // Add metadata if enabled
         if options.include_debug_info {
-            // Serialize CCL config and DSL input to JSON
+            // Create metadata info
+            let metadata = self.create_metadata(ccl_config, dsl_input, options)?;
+            let metadata_json = serde_json::to_string(&metadata)
+                .map_err(|e| CompilerError::General(format!("Failed to serialize metadata: {}", e)))?;
+            
+            // Add custom section with metadata
+            let custom_section = wasm_encoder::CustomSection {
+                name: std::borrow::Cow::Borrowed("icn-ccl-metadata"),
+                data: std::borrow::Cow::Borrowed(metadata_json.as_bytes()),
+            };
+            module.section(&custom_section);
+            
+            // Also add the raw CCL config and DSL input for debugging
             let ccl_json = serde_json::to_string(ccl_config)
                 .map_err(|e| CompilerError::General(format!("Failed to serialize CCL config: {}", e)))?;
             let dsl_json = serde_json::to_string(dsl_input)
@@ -1859,21 +923,400 @@ impl CclCompiler {
                 
             // Add CCL config in a custom section
             let ccl_section = wasm_encoder::CustomSection {
-                name: Cow::Borrowed("icn-ccl-config"),
-                data: Cow::Borrowed(ccl_json.as_bytes()),
+                name: std::borrow::Cow::Borrowed("icn-ccl-config"),
+                data: std::borrow::Cow::Borrowed(ccl_json.as_bytes()),
             };
             module.section(&ccl_section);
             
             // Add DSL input in a custom section
             let dsl_section = wasm_encoder::CustomSection {
-                name: Cow::Borrowed("icn-dsl-input"),
-                data: Cow::Borrowed(dsl_json.as_bytes()),
+                name: std::borrow::Cow::Borrowed("icn-dsl-input"),
+                data: std::borrow::Cow::Borrowed(dsl_json.as_bytes()),
             };
             module.section(&dsl_section);
         }
         
-        // Finalize and return the WASM module bytes
+        // Return the compiled WASM module
         Ok(module.finish())
+    }
+    
+    /// Generate a WASM function body for the log_caller_info action
+    fn generate_log_caller_info_function(&self) -> wasm_encoder::Function {
+        let mut func = wasm_encoder::Function::new([
+            // Local variables: 
+            // Local 0: Return value
+            // Local 1: Temporary variable for results
+            // Local 2: String length
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+        ]);
+        
+        // Initialize return value to 0 (success)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Call host_get_caller_did to get the caller's DID
+        func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Output buffer
+        func.instruction(&wasm_encoder::Instruction::I32Const(100)); // Buffer size
+        func.instruction(&wasm_encoder::Instruction::Call(4)); // host_get_caller_did
+        func.instruction(&wasm_encoder::Instruction::LocalSet(2)); // Save the returned length
+        
+        // Check if we got a valid result (length > 0)
+        func.instruction(&wasm_encoder::Instruction::LocalGet(2));
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::I32GtS());
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Log the DID
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level INFO
+        func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // DID buffer
+        func.instruction(&wasm_encoder::Instruction::LocalGet(2)); // DID length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // host_log_message
+        
+        // End if
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // Call host_get_caller_scope to get the caller's scope
+        func.instruction(&wasm_encoder::Instruction::Call(5)); // host_get_caller_scope
+        func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Save the result
+        
+        // Log the scope value
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level INFO
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Debug message
+        func.instruction(&wasm_encoder::Instruction::I32Const(20)); // Message length (approximate)
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // host_log_message
+        
+        // Return success
+        func.instruction(&wasm_encoder::Instruction::LocalGet(0));
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        func
+    }
+    
+    /// Generate a WASM function body for the perform_metered_action action
+    fn generate_perform_metered_action_function(&self, resource_type: i32, amount: i32) -> wasm_encoder::Function {
+        let mut func = wasm_encoder::Function::new([
+            // Local variables: 
+            // Local 0: Return value
+            // Local 1: Result of authorization check
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+        ]);
+        
+        // Initialize return value to -1 (error by default)
+        func.instruction(&wasm_encoder::Instruction::I32Const(-1));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Log start of metered action
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level INFO
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Debug message
+        func.instruction(&wasm_encoder::Instruction::I32Const(20)); // Message length (approximate)
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // host_log_message
+        
+        // Check resource authorization
+        func.instruction(&wasm_encoder::Instruction::I32Const(resource_type)); // Resource type
+        func.instruction(&wasm_encoder::Instruction::I32Const(amount)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(6)); // host_check_resource_authorization
+        
+        // Store the result in local 1
+        func.instruction(&wasm_encoder::Instruction::LocalSet(1));
+        
+        // Check if authorized (value in local 1)
+        func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+        
+        // If-else block
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // If branch (authorized)
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Success message
+        func.instruction(&wasm_encoder::Instruction::I32Const(30)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // Record resource usage
+        func.instruction(&wasm_encoder::Instruction::I32Const(resource_type)); // Resource type
+        func.instruction(&wasm_encoder::Instruction::I32Const(amount)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(7)); // Call host_record_resource_usage
+        
+        // Set return value to success (0)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Else branch (not authorized)
+        func.instruction(&wasm_encoder::Instruction::Else);
+        
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Error message
+        func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // End if-else
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // Return status
+        func.instruction(&wasm_encoder::Instruction::LocalGet(0));
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        func
+    }
+    
+    /// Generate a WASM function body for the anchor_data action
+    fn generate_anchor_data_function(&self, key_offset: i32, key_len: i32, value_offset: i32, value_len: i32) -> wasm_encoder::Function {
+        let mut func = wasm_encoder::Function::new([
+            // Local variables: 
+            // Local 0: Return value
+            // Local 1: Result of anchor operation
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+        ]);
+        
+        // Initialize return value to -1 (error by default)
+        func.instruction(&wasm_encoder::Instruction::I32Const(-1));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Log start of anchor operation
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level INFO
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Debug message
+        func.instruction(&wasm_encoder::Instruction::I32Const(20)); // Message length (approximate)
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // host_log_message
+        
+        // First check authorization for DAG anchoring (compute resource)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Resource type (Compute)
+        func.instruction(&wasm_encoder::Instruction::I32Const(100)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(6)); // host_check_resource_authorization
+        
+        // If authorization check passes
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Anchor to DAG
+        func.instruction(&wasm_encoder::Instruction::I32Const(key_offset)); // Key pointer
+        func.instruction(&wasm_encoder::Instruction::I32Const(key_len)); // Key length
+        func.instruction(&wasm_encoder::Instruction::I32Const(value_offset)); // Value pointer
+        func.instruction(&wasm_encoder::Instruction::I32Const(value_len)); // Value length
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Parent pointer (none)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Parent count (none)
+        func.instruction(&wasm_encoder::Instruction::Call(8)); // host_anchor_to_dag
+        func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store result
+        
+        // Check if anchor succeeded (result > 0)
+        func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::I32GtS());
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Success branch
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Success message
+        func.instruction(&wasm_encoder::Instruction::I32Const(30)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // Record resource usage
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Resource type (Compute)
+        func.instruction(&wasm_encoder::Instruction::I32Const(50)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(7)); // Call host_record_resource_usage
+        
+        // Set return value to success (0)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Else branch (anchor failed)
+        func.instruction(&wasm_encoder::Instruction::Else);
+        
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Error message
+        func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // End if-else (anchor result)
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // End if (authorization check)
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // Return status
+        func.instruction(&wasm_encoder::Instruction::LocalGet(0));
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        func
+    }
+    
+    /// Generate a WASM function body for the mint_token action
+    fn generate_mint_token_function(&self, resource_type: i32, recipient_offset: i32, recipient_len: i32, amount: i32) -> wasm_encoder::Function {
+        let mut func = wasm_encoder::Function::new([
+            // Local variables: 
+            // Local 0: Return value
+            // Local 1: Result of mint operation
+            // Local 2: Caller scope (to verify Guardian status)
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+        ]);
+        
+        // Initialize return value to -1 (error by default)
+        func.instruction(&wasm_encoder::Instruction::I32Const(-1));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Get caller scope to check if Guardian
+        func.instruction(&wasm_encoder::Instruction::Call(5)); // host_get_caller_scope
+        func.instruction(&wasm_encoder::Instruction::LocalSet(2));
+        
+        // Check if caller has Guardian scope (scope value is 3)
+        func.instruction(&wasm_encoder::Instruction::LocalGet(2));
+        func.instruction(&wasm_encoder::Instruction::I32Const(3));
+        func.instruction(&wasm_encoder::Instruction::I32Eq());
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Caller is Guardian, proceed with mint operation
+        func.instruction(&wasm_encoder::Instruction::I32Const(resource_type)); // Resource type
+        func.instruction(&wasm_encoder::Instruction::I32Const(recipient_offset)); // Recipient pointer
+        func.instruction(&wasm_encoder::Instruction::I32Const(recipient_len)); // Recipient length
+        func.instruction(&wasm_encoder::Instruction::I32Const(amount)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(9)); // host_mint_token
+        func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store result
+        
+        // Check if mint succeeded (result > 0)
+        func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::I32GtS());
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Success branch
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Success message
+        func.instruction(&wasm_encoder::Instruction::I32Const(30)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // Set return value to success (0)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Else branch (mint failed)
+        func.instruction(&wasm_encoder::Instruction::Else);
+        
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Error message
+        func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // End if-else (mint result)
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // Else branch (not a Guardian)
+        func.instruction(&wasm_encoder::Instruction::Else);
+        
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Error message
+        func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // End if-else (Guardian check)
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // Return status
+        func.instruction(&wasm_encoder::Instruction::LocalGet(0));
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        func
+    }
+    
+    /// Generate a WASM function body for the transfer_resource action
+    fn generate_transfer_resource_function(&self, from_offset: i32, from_len: i32, to_offset: i32, to_len: i32, resource_type: i32, amount: i32) -> wasm_encoder::Function {
+        let mut func = wasm_encoder::Function::new([
+            // Local variables: 
+            // Local 0: Return value
+            // Local 1: Result of transfer operation
+            wasm_encoder::ValType::I32,
+            wasm_encoder::ValType::I32,
+        ]);
+        
+        // Initialize return value to -1 (error by default)
+        func.instruction(&wasm_encoder::Instruction::I32Const(-1));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // First check authorization for resource usage
+        func.instruction(&wasm_encoder::Instruction::I32Const(resource_type)); // Resource type
+        func.instruction(&wasm_encoder::Instruction::I32Const(amount)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(6)); // host_check_resource_authorization
+        
+        // If authorization check passes
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Perform the transfer
+        func.instruction(&wasm_encoder::Instruction::I32Const(from_offset)); // From pointer
+        func.instruction(&wasm_encoder::Instruction::I32Const(from_len)); // From length
+        func.instruction(&wasm_encoder::Instruction::I32Const(to_offset)); // To pointer
+        func.instruction(&wasm_encoder::Instruction::I32Const(to_len)); // To length
+        func.instruction(&wasm_encoder::Instruction::I32Const(resource_type)); // Resource type
+        func.instruction(&wasm_encoder::Instruction::I32Const(amount)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(10)); // host_transfer_resource
+        func.instruction(&wasm_encoder::Instruction::LocalSet(1)); // Store result
+        
+        // Check if transfer succeeded (result > 0)
+        func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::I32GtS());
+        func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+        
+        // Success branch
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Success message
+        func.instruction(&wasm_encoder::Instruction::I32Const(30)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // Record resource usage
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Resource type (Compute)
+        func.instruction(&wasm_encoder::Instruction::I32Const(20)); // Amount
+        func.instruction(&wasm_encoder::Instruction::Call(7)); // Call host_record_resource_usage
+        
+        // Set return value to success (0)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Else branch (transfer failed)
+        func.instruction(&wasm_encoder::Instruction::Else);
+        
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Error message
+        func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Message length
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // End if-else (transfer result)
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // End if (authorization check)
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        // Return status
+        func.instruction(&wasm_encoder::Instruction::LocalGet(0));
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        func
+    }
+    
+    /// Generate a WASM function body for the default (fallback) function
+    fn generate_default_function(&self, action: &str) -> wasm_encoder::Function {
+        let mut func = wasm_encoder::Function::new([
+            // Local variables: 
+            // Local 0: Return value
+            wasm_encoder::ValType::I32,
+        ]);
+        
+        // Initialize return value to 0 (success)
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Log that we're executing the action
+        func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level INFO
+        func.instruction(&wasm_encoder::Instruction::I32Const(0)); // Debug message
+        func.instruction(&wasm_encoder::Instruction::I32Const(20)); // Message length (approximate)
+        func.instruction(&wasm_encoder::Instruction::Call(0)); // host_log_message
+        
+        // Return success
+        func.instruction(&wasm_encoder::Instruction::LocalGet(0));
+        func.instruction(&wasm_encoder::Instruction::End);
+        
+        func
     }
 
     /// Generate a more complex WASM module with actual business logic
