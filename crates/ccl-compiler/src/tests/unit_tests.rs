@@ -46,7 +46,7 @@ fn test_validate_dsl_for_template() {
     let dsl_input = create_test_dsl_input();
 
     // Test valid input
-    let result = compiler.validate_dsl_for_template(&ccl_config, &dsl_input);
+    let result = compiler.validate_dsl_for_template(&ccl_config, &dsl_input, false);
     assert!(result.is_ok(), "Valid DSL input should pass validation");
 
     // Test invalid input (missing required field)
@@ -56,8 +56,12 @@ fn test_validate_dsl_for_template() {
         "name": "John Doe",
         "reason": "Wants to join the cooperative"
     });
-    let result = compiler.validate_dsl_for_template(&ccl_config, &invalid_input);
+    let result = compiler.validate_dsl_for_template(&ccl_config, &invalid_input, false);
     assert!(result.is_err(), "Invalid DSL input should fail validation");
+
+    // But with skip_strict_validation=true, it should pass
+    let result = compiler.validate_dsl_for_template(&ccl_config, &invalid_input, true);
+    assert!(result.is_ok(), "Expected validation to succeed with skip_strict_validation=true");
 }
 
 #[test]

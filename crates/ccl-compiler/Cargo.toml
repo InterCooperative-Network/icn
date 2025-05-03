@@ -13,7 +13,7 @@ icn-identity = { path = "../identity" }
 icn-economics = { path = "../economics" }
 
 # WASM compilation
-wasm-encoder = "0.25.0"
+wasm-encoder = "0.31"
 wasmtime = "12.0.2"
 
 # Schema validation
@@ -40,6 +40,7 @@ tera = { version = "1.19", optional = true }
 icn-core-vm = { path = "../core-vm" }
 icn-storage = { path = "../storage" }
 tempfile = "3.8"
+wasmparser = "0.116"
 
 [features]
 default = []

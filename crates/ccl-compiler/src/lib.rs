@@ -210,7 +210,7 @@ impl CclCompiler {
             Ok(action) => action,
             Err(_) => {
                 // If we can't extract action, we'll do basic validation
-                self.validate_dsl_for_template(ccl_config, dsl_input)?;
+                self.validate_dsl_for_template(ccl_config, dsl_input, !options.validate_schema)?;
                 // Default action for metadata
                 "unknown".to_string()
             }
@@ -221,7 +221,7 @@ impl CclCompiler {
             self.validate_against_schema(template_type, &action, dsl_input, options.schema_path.as_deref())?;
         } else {
             // Still do basic structural validation
-            self.validate_dsl_for_template(ccl_config, dsl_input)?;
+            self.validate_dsl_for_template(ccl_config, dsl_input, true)?;
         }
 
         // Generate WASM using the appropriate backend
@@ -302,6 +302,7 @@ impl CclCompiler {
         &self,
         ccl_config: &GovernanceConfig,
         dsl_input: &JsonValue,
+        skip_strict_validation: bool,
     ) -> CompilerResult<()> {
         // Extract template type and version
         let template_type = &ccl_config.template_type;
@@ -324,6 +325,11 @@ impl CclCompiler {
                     return Err(CompilerError::DslError(
                         "DSL input for cooperative bylaws must contain 'action' field".to_string(),
                     ));
+                }
+
+                // Skip strict action validation when requested
+                if skip_strict_validation {
+                    return Ok(());
                 }
 
                 // Specific checks based on action type
@@ -370,6 +376,11 @@ impl CclCompiler {
                     ));
                 }
 
+                // Skip strict action validation when requested
+                if skip_strict_validation {
+                    return Ok(());
+                }
+
                 // Specific checks based on action type
                 let action = dsl_obj.get("action").unwrap().as_str().unwrap_or("");
                 match action {
@@ -401,10 +412,12 @@ impl CclCompiler {
             }
             // Add more template type validations as needed
             _ => {
-                return Err(CompilerError::ValidationError(format!(
-                    "Unsupported template type: {}:{}",
-                    template_type, template_version
-                )));
+                if !skip_strict_validation {
+                    return Err(CompilerError::ValidationError(format!(
+                        "Unsupported template type: {}:{}",
+                        template_type, template_version
+                    )));
+                }
             }
         }
 
@@ -475,111 +488,208 @@ impl CclCompiler {
         dsl_input: &JsonValue,
         options: &CompilationOptions,
     ) -> CompilerResult<Vec<u8>> {
-        // Serialize the CCL config and DSL input to JSON
-        let ccl_json = serde_json::to_string(ccl_config)
-            .map_err(|e| CompilerError::General(format!("Failed to serialize CCL config: {}", e)))?;
-        let dsl_json = serde_json::to_string(dsl_input)
-            .map_err(|e| CompilerError::General(format!("Failed to serialize DSL input: {}", e)))?;
-
+        use std::borrow::Cow;
+        
+        // Step 1: Extract key information from inputs
+        let template_type = &ccl_config.template_type;
+        let template_version = &ccl_config.template_version;
+        
+        // Extract action from DSL input (with fallback)
+        let action = self.extract_action_from_dsl(dsl_input)
+            .unwrap_or_else(|_| "unknown".to_string());
+        
         // Create metadata
         let metadata = self.create_metadata(ccl_config, dsl_input, options)?;
         let metadata_json = serde_json::to_string(&metadata)
             .map_err(|e| CompilerError::General(format!("Failed to serialize metadata: {}", e)))?;
-
-        // Create a new WASM module
+        
+        // Step 2: Create a new WASM module
         let mut module = Module::new();
-
-        // Define the type section (function signatures)
+        
+        // Step 3: Define type section - function signatures
         let mut types = TypeSection::new();
-        // Define type for _start function: () -> ()
+        
+        // Type 0: () -> () for _start function
         types.function(vec![], vec![]);
-        // Define type for host_log_message: (i32, i32, i32) -> ()
+        
+        // Type 1: (i32, i32, i32) -> () for host_log_message function
+        // Parameters: (log_level, message_ptr, message_len)
         types.function(vec![ValType::I32, ValType::I32, ValType::I32], vec![]);
-        // Define type for invoke function: (i32, i32) -> i32
+        
+        // Type 2: (i32, i32) -> i32 for invoke function
+        // Parameters: (params_ptr, params_len), Returns: status code
         types.function(vec![ValType::I32, ValType::I32], vec![ValType::I32]);
+        
+        // Type 3: (i32, i32, i32, i32) -> i32 for host_storage_get function
+        // Parameters: (key_ptr, key_len, value_ptr, value_len), Returns: result code
+        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        
+        // Type 4: (i32, i32, i32, i32) -> i32 for host_storage_put function
+        // Parameters: (key_ptr, key_len, value_ptr, value_len), Returns: result code
+        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        
         module.section(&types);
-
-        // Define the import section (host functions)
+        
+        // Step 4: Define import section - host functions
         let mut imports = ImportSection::new();
-        // Import the host_log_message function - use EntityType::Function with correct type index
+        
+        // Import host_log_message from env module
         imports.import("env", "host_log_message", EntityType::Function(1));
+        
+        // Import storage functions from env module
+        imports.import("env", "host_storage_get", EntityType::Function(3));
+        imports.import("env", "host_storage_put", EntityType::Function(4));
+        
         module.section(&imports);
-
-        // Define the function section (internal functions)
+        
+        // Step 5: Define function section - internal functions
         let mut functions = FunctionSection::new();
+        
         // _start function with type 0
         functions.function(0);
+        
         // invoke function with type 2
         functions.function(2);
+        
         module.section(&functions);
-
-        // Define the export section
+        
+        // Step 6: Define memory section if needed (using default for now)
+        let default_mem_limits = MemoryLimits::default();
+        let memory_limits = options.memory_limits.as_ref().unwrap_or(&default_mem_limits);
+        let mut memory = wasm_encoder::MemorySection::new();
+        memory.memory(wasm_encoder::MemoryType {
+            minimum: memory_limits.min_pages as u64,
+            maximum: memory_limits.max_pages.map(|pages| pages as u64),
+            memory64: false,
+            shared: false,
+        });
+        module.section(&memory);
+        
+        // Step 7: Define export section
         let mut exports = ExportSection::new();
+        
+        // Export memory
+        exports.export("memory", wasm_encoder::ExportKind::Memory, 0);
+        
         // Export _start function
-        exports.export("_start", wasm_encoder::ExportKind::Func, 0);
+        exports.export("_start", wasm_encoder::ExportKind::Func, 2); // Index 2 including imported functions
+        
         // Export invoke function
-        exports.export("invoke", wasm_encoder::ExportKind::Func, 1);
+        exports.export("invoke", wasm_encoder::ExportKind::Func, 3); // Index 3 including imported functions
+        
         module.section(&exports);
-
-        // Define the code section (function bodies)
-        let mut code = CodeSection::new();
-
-        // _start function body - log CCL template info
+        
+        // Step 8: Define data section for static strings
+        let mut data_section = wasm_encoder::DataSection::new();
+        
+        // Create template info string for logging
         let template_info = format!(
-            "CCL template: {}:{}",
-            ccl_config.template_type, ccl_config.template_version
+            "CCL template: {}:{} - Action: {}",
+            template_type, template_version, action
         );
         let template_info_bytes = template_info.as_bytes();
-
-        // Create _start function body with simple log message
+        
+        // Add template info to data section at offset 1024
+        data_section.active(
+            0, // Memory index
+            &wasm_encoder::ConstExpr::i32_const(1024), // Offset in memory
+            template_info_bytes.iter().copied(), // Data bytes - copied to ensure we have actual u8 values
+        );
+        
+        module.section(&data_section);
+        
+        // Step 9: Define code section - function bodies
+        let mut code = CodeSection::new();
+        
+        // Create _start function body
+        // This function logs the template info on module initialization
         let mut start_func = wasm_encoder::Function::new(vec![]);
         
-        // Define template info as constant byte array in linear memory
-        // - Push log level (1 = INFO)
-        start_func.instruction(&wasm_encoder::Instruction::I32Const(1));
-        // - Push pointer to message (constant for simplicity)
-        start_func.instruction(&wasm_encoder::Instruction::I32Const(1024));
-        // - Push message length
-        start_func.instruction(&wasm_encoder::Instruction::I32Const(template_info_bytes.len() as i32));
-        // - Call host_log_message
-        start_func.instruction(&wasm_encoder::Instruction::Call(0));
-        // - End function
+        // Log message at INFO level (1)
+        start_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        start_func.instruction(&wasm_encoder::Instruction::I32Const(1024)); // Pointer to message
+        start_func.instruction(&wasm_encoder::Instruction::I32Const(template_info_bytes.len() as i32)); // Message length
+        start_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message (first imported function)
         start_func.instruction(&wasm_encoder::Instruction::End);
-        code.function(&start_func);
-
-        // invoke function body - return simple status code based on action
-        let mut invoke_func = wasm_encoder::Function::new(vec![]);
         
-        // For now, just return 0 (success)
+        code.function(&start_func);
+        
+        // Create invoke function body
+        // This function is called by the runtime to execute the governance action
+        let mut invoke_func = wasm_encoder::Function::new(vec![
+            // Local variables - format is (count, type)
+            (1, wasm_encoder::ValType::I32), // Local 0: Status code
+        ]);
+        
+        // Store default return value (success = 0)
         invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        
+        // Log that we're starting execution
+        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1024)); // Pointer to message
+        invoke_func.instruction(&wasm_encoder::Instruction::I32Const(template_info_bytes.len() as i32)); // Message length
+        invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+        
+        // Add simple execution logic based on action type
+        // In a real implementation, this would contain action-specific logic
+        if action == "propose_membership" {
+            // Logic for propose_membership action
+            // For this example, just return success (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        } else if action == "propose_budget" {
+            // Logic for propose_budget action
+            // For this example, just return success (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        } else {
+            // Default logic for unknown actions
+            // Return "not implemented" status (1)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        }
+        
+        // Return the status code from local 0
+        invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(0));
         invoke_func.instruction(&wasm_encoder::Instruction::End);
+        
         code.function(&invoke_func);
-
+        
         module.section(&code);
-
-        // Add a custom section with metadata
+        
+        // Step 10: Add custom sections for metadata
+        
+        // Add the essential metadata in a custom section named "icn-metadata"
         let custom_section = wasm_encoder::CustomSection {
-            name: "icn-metadata",
-            data: metadata_json.as_bytes(),
+            name: Cow::Borrowed("icn-metadata"),
+            data: Cow::Borrowed(metadata_json.as_bytes()),
         };
         module.section(&custom_section);
-
-        // Add CCL config in a custom section for reference
+        
+        // Add CCL config and DSL input in custom sections if debug info is enabled
         if options.include_debug_info {
+            // Serialize CCL config and DSL input to JSON
+            let ccl_json = serde_json::to_string(ccl_config)
+                .map_err(|e| CompilerError::General(format!("Failed to serialize CCL config: {}", e)))?;
+            let dsl_json = serde_json::to_string(dsl_input)
+                .map_err(|e| CompilerError::General(format!("Failed to serialize DSL input: {}", e)))?;
+                
+            // Add CCL config in a custom section
             let ccl_section = wasm_encoder::CustomSection {
-                name: "icn-ccl-config",
-                data: ccl_json.as_bytes(),
+                name: Cow::Borrowed("icn-ccl-config"),
+                data: Cow::Borrowed(ccl_json.as_bytes()),
             };
             module.section(&ccl_section);
             
-            // Add DSL input in a custom section for reference
+            // Add DSL input in a custom section
             let dsl_section = wasm_encoder::CustomSection {
-                name: "icn-dsl-input",
-                data: dsl_json.as_bytes(),
+                name: Cow::Borrowed("icn-dsl-input"),
+                data: Cow::Borrowed(dsl_json.as_bytes()),
             };
             module.section(&dsl_section);
         }
-
+        
         // Finalize and return the WASM module bytes
         Ok(module.finish())
     }

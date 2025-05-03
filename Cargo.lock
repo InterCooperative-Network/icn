@@ -3196,7 +3196,8 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
- "wasm-encoder 0.25.0",
+ "wasm-encoder 0.31.1",
+ "wasmparser 0.116.1",
  "wasmtime 12.0.2",
 ]
 
@@ -9307,15 +9308,6 @@ dependencies = [
 
 [[package]]
 name = "wasm-encoder"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eff853c4f09eec94d76af527eddad4e9de13b11d6286a1ef7134bc30135a2b7"
-dependencies = [
- "leb128",
-]
-
-[[package]]
-name = "wasm-encoder"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41763f20eafed1399fff1afb466496d3a959f58241436cfdc17e3f5ca954de16"
@@ -9606,6 +9598,16 @@ name = "wasmparser"
 version = "0.110.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dfcdb72d96f01e6c85b6bf20102e7423bdbaad5c337301bab2bbf253d26413c"
+dependencies = [
+ "indexmap 2.9.0",
+ "semver 1.0.26",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.116.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a58e28b80dd8340cb07b8242ae654756161f6fc8d0038123d679b7b99964fa50"
 dependencies = [
  "indexmap 2.9.0",
  "semver 1.0.26",
