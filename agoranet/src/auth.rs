@@ -30,8 +30,8 @@ pub struct UserClaims {
 #[derive(Debug, Clone)]
 pub struct AuthUser(pub UserClaims);
 
-// Auth middleware implementation
-pub async fn auth_middleware<B>(
+// Rename the auth_middleware to did_auth_middleware
+pub async fn did_auth_middleware<B>(
     mut req: Request<B>,
     next: Next,
 ) -> Result<Response, StatusCode> 
@@ -111,4 +111,32 @@ pub async fn verify_token(
     Extension(AuthUser(user)): Extension<AuthUser>,
 ) -> String {
     format!("Token valid for DID: {}", user.did)
+}
+
+// Define the permission enum
+#[derive(Debug, Clone, PartialEq)]
+pub enum Permission {
+    Read,
+    PostMessage,
+    ModerateContent,
+    ReactToMessage,
+    CreateThread,
+    DeleteThread,
+    AnchorDag,
+}
+
+// Define DidAuth type
+#[derive(Debug, Clone)]
+pub struct DidAuth(pub String);
+
+// Check if a user has a specific permission
+pub async fn check_permission(
+    did: &str,
+    permission: Permission,
+    federation_id: Option<&str>,
+    state: &AppState,
+) -> Result<bool, StatusCode> {
+    // For now, all authenticated users have all permissions
+    // In a real implementation, this would check against credentials
+    Ok(true)
 } 
