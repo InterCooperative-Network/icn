@@ -47,21 +47,95 @@ pub struct DagNodeResponse {
     pub size: usize,
 }
 
-/// Debug query response for federation status
+/// Response for the federation status endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FederationStatusResponse {
+    /// Current node role (genesis, validator, observer, etc.)
+    pub node_role: String,
+    
+    /// Node ID (DID)
+    pub node_id: String,
+    
+    /// Timestamp of node startup
+    pub startup_time: chrono::DateTime<chrono::Utc>,
+    
     /// Current epoch number
     pub current_epoch: u64,
+    
+    /// DAG participation summary
+    pub dag_participation: DagParticipationSummary,
+    
+    /// Active mandates
+    pub active_mandates: Vec<ActiveMandate>,
+    
     /// Node count in the current trust bundle
     pub node_count: usize,
+    
     /// Connected peer count
     pub connected_peers: usize,
+    
     /// Validator count
     pub validator_count: usize,
+    
     /// Guardian count
     pub guardian_count: usize,
+    
     /// Observer count
     pub observer_count: usize,
+}
+
+/// Summary of DAG participation by this node
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DagParticipationSummary {
+    /// Total nodes submitted by this node
+    pub nodes_submitted: usize,
+    
+    /// Number of nodes validated
+    pub nodes_validated: usize,
+    
+    /// Latest node timestamp
+    pub latest_node_timestamp: chrono::DateTime<chrono::Utc>,
+    
+    /// Last submitted node CID
+    pub last_submitted_node: String,
+}
+
+/// Active mandate information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveMandate {
+    /// Mandate ID
+    pub id: String,
+    
+    /// Scope affected by the mandate
+    pub scope: String,
+    
+    /// Action being performed
+    pub action: String,
+    
+    /// Guardian that issued the mandate
+    pub guardian: String,
+    
+    /// Timestamp when the mandate was issued
+    pub issued_at: chrono::DateTime<chrono::Utc>,
+    
+    /// Quorum achieved for this mandate
+    pub quorum_achieved: bool,
+}
+
+/// Enhanced health response including federation metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthResponse {
+    /// Overall status of the service
+    pub status: String,
+    
+    /// Federation health metrics
+    pub federation: crate::health::FederationHealth,
+    
+    /// API version
+    pub api_version: String,
+    
+    /// Runtime version
+    pub runtime_version: String,
 }
 
 /// Debug API trait defining the operations available for testing and diagnostics
@@ -81,6 +155,9 @@ pub trait DebugApi: Send + Sync {
     
     /// Get the current trust bundle
     async fn query_current_trust_bundle(&self) -> FederationResult<Option<TrustBundle>>;
+    
+    /// Get complete health status
+    async fn query_health(&self) -> FederationResult<HealthResponse>;
 }
 
 #[cfg(all(feature = "testing", feature = "axum"))]

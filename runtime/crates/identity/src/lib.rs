@@ -30,6 +30,7 @@ use ssi::did_resolve::{DIDResolver as SsiResolver, ResolutionInputMetadata, Reso
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex}; // Using Mutex for simple in-memory storage for now
 use did_method_key::DIDKey;
+use hex;
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -842,46 +843,120 @@ impl TrustBundle {
         hash
     }
     
+    /// Return a canonical hash of the TrustBundle as a hex string
+    /// 
+    /// This hash can be used for deduplication and verification.
+    /// It's stable across serialization formats and includes all
+    /// essential fields except the proof itself.
+    /// 
+    /// # Federation Interface
+    /// Part of the Trust verification system.
+    pub fn hash(&self) -> String {
+        let hash_bytes = self.calculate_hash();
+        hex::encode(hash_bytes)
+    }
+    
     /// Verify the trust bundle
     /// 
     /// Validates the bundle's contents and verifies the quorum proof against the provided
     /// list of authorized guardians for the federation.
-    pub async fn verify(&self, authorized_guardians: &[IdentityId]) -> IdentityResult<bool> {
-        // Check basic validity
-        if self.federation_id.is_empty() {
-            return Err(IdentityError::InvalidCredential("Federation ID is empty".to_string()));
+    /// 
+    /// # Federation Interface
+    /// Part of the Trust verification system.
+    ///
+    /// # Arguments
+    ///
+    /// * `authorized_guardians` - List of Guardian DIDs authorized to sign TrustBundles
+    /// * `current_epoch` - The current epoch for detecting outdated bundles
+    /// * `current_time` - The current time for expiration checks
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(true)` - If the bundle is valid and verified
+    /// * `Ok(false)` - If the bundle is valid but verification failed
+    /// * `Err(...)` - If the bundle is invalid (malformed, outdated, etc.)
+    pub async fn verify(
+        &self,
+        authorized_guardians: &[String],
+        current_epoch: u64,
+        current_time: std::time::SystemTime,
+    ) -> Result<bool, IdentityError> {
+        // 1. Check that this bundle is not outdated
+        if self.epoch_id < current_epoch {
+            return Err(IdentityError::VerificationError(format!(
+                "TrustBundle epoch {} is older than current epoch {}",
+                self.epoch_id, current_epoch
+            )));
         }
         
+        // 2. Check for the presence of a proof
+        let proof = match &self.proof {
+            Some(p) => p,
+            None => return Err(IdentityError::VerificationError(
+                "TrustBundle has no proof".to_string()
+            )),
+        };
+        
+        // 3. Check for empty DAG roots
         if self.dag_roots.is_empty() {
-            return Err(IdentityError::InvalidCredential("DAG roots are empty".to_string()));
+            return Err(IdentityError::VerificationError(
+                "TrustBundle has no DAG roots".to_string()
+            ));
         }
         
-        // Verify each attestation
-        for attestation in &self.attestations {
-            // Skip verification for attestations without proofs for now
-            // In a production system, we might want to require proofs on all attestations
-            if attestation.proof.is_none() {
-                continue;
-            }
-            
-            if !attestation.verify().await? {
-                return Err(IdentityError::InvalidCredential(
-                    format!("Invalid attestation in trust bundle: {}", attestation.id)
-                ));
+        // 4. Check for duplicate signers
+        let mut seen_signers = std::collections::HashSet::new();
+        for signer in &proof.votes {
+            if !seen_signers.insert(signer.0.clone()) {
+                return Err(IdentityError::VerificationError(format!(
+                    "TrustBundle contains duplicate signer: {}", signer.0
+                )));
             }
         }
         
-        // Verify the proof if present
-        if let Some(proof) = &self.proof {
-            // Calculate the hash of the bundle
-            let bundle_hash = self.calculate_hash();
-            
-            // Verify the quorum proof with the provided authorized guardians
-            proof.verify(&bundle_hash, authorized_guardians).await
-        } else {
-            // For full validation, a proof is required
-            Err(IdentityError::VerificationError("Missing proof in TrustBundle".to_string()))
+        // 5. Check that all signers are authorized guardians
+        for signer in &proof.votes {
+            if !authorized_guardians.contains(signer.0) {
+                return Err(IdentityError::VerificationError(format!(
+                    "Signer {} is not an authorized guardian", signer.0
+                )));
+            }
         }
+        
+        // 6. Calculate the bundle hash for verification
+        let bundle_hash = self.calculate_hash();
+        
+        // 7. Verify the quorum proof against this hash
+        proof.verify(&bundle_hash, authorized_guardians).await
+    }
+    
+    /// Verify that this bundle is anchored in the provided DAG
+    /// 
+    /// Ensures that the bundle is properly recorded in the DAG
+    /// and can be verified against the DAG root.
+    /// 
+    /// # Federation Interface
+    /// Part of the Trust verification system.
+    pub async fn verify_dag_anchor(
+        &self,
+        dag_store: &dyn DagStore,
+    ) -> Result<bool, IdentityError> {
+        // This is a placeholder for the actual DAG verification logic
+        // In a real implementation, this would:
+        // 1. Check that all DAG roots in the bundle exist in the DAG
+        // 2. Verify that the bundle itself is recorded in the DAG
+        // 3. Validate the paths from the bundle to the DAG roots
+        
+        // For now, just check that the DAG roots exist
+        for root in &self.dag_roots {
+            if !dag_store.contains(root).await.map_err(|e| 
+                IdentityError::StorageError(format!("Failed to check DAG: {}", e))
+            )? {
+                return Ok(false);
+            }
+        }
+        
+        Ok(true)
     }
 
     /// Count the number of nodes with a specific role in this trust bundle

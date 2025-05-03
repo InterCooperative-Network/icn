@@ -47,6 +47,50 @@ pub struct FederationHealth {
     
     /// Last error message (if any)
     pub last_error: Option<String>,
+    
+    /// DAG anchor information
+    pub dag_anchor: DagAnchorStatus,
+    
+    /// TrustBundle status information
+    pub trust_bundle_status: TrustBundleStatus,
+}
+
+/// DAG anchor status information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DagAnchorStatus {
+    /// Latest DAG anchor CID (head)
+    pub head_cid: String,
+    
+    /// Timestamp of the latest anchor
+    pub timestamp: std::time::SystemTime,
+    
+    /// Number of DAG nodes since last epoch
+    pub node_count_since_epoch: usize,
+    
+    /// Is the DAG consistent with the TrustBundle?
+    pub consistent_with_trust_bundle: bool,
+}
+
+/// TrustBundle status information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustBundleStatus {
+    /// Current epoch number
+    pub epoch: u64,
+    
+    /// Timestamp when this epoch was created
+    pub created_at: std::time::SystemTime,
+    
+    /// Number of nodes in the bundle
+    pub node_count: usize,
+    
+    /// Number of valid signatures on the bundle
+    pub signature_count: usize,
+    
+    /// Time until next expected epoch (seconds, if known)
+    pub time_to_next_epoch: Option<u64>,
+    
+    /// Is this node a signer on the current bundle?
+    pub is_signer: bool,
 }
 
 /// Blob replication status
@@ -63,6 +107,28 @@ pub struct ReplicationStatus {
     
     /// Blobs with failed replication
     pub failed: usize,
+    
+    /// Overall replication completion percentage (0-100)
+    pub completion_percentage: u8,
+    
+    /// Blobs with health issues
+    pub health_issues: Vec<BlobHealthIssue>,
+}
+
+/// Health issue with a specific blob
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlobHealthIssue {
+    /// Blob CID
+    pub cid: String,
+    
+    /// Issue type
+    pub issue_type: String,
+    
+    /// Detailed description
+    pub description: String,
+    
+    /// Timestamp when the issue was detected
+    pub detected_at: std::time::SystemTime,
 }
 
 /// Quorum health metrics
@@ -85,6 +151,15 @@ pub struct QuorumHealth {
     
     /// Required quorum size
     pub required_quorum: usize,
+    
+    /// Percentage of quorum achieved (0-100)
+    pub quorum_percentage: u8,
+    
+    /// Connected nodes that are part of the TrustBundle
+    pub connected_trust_nodes: usize,
+    
+    /// Nodes that should be connected but aren't
+    pub missing_nodes: Vec<String>,
 }
 
 /// Federation diagnostic report with detailed status
@@ -169,6 +244,8 @@ pub async fn get_federation_health(
                     fully_replicated: 0,
                     in_progress: 0,
                     failed: 0,
+                    completion_percentage: 0,
+                    health_issues: Vec::new(),
                 },
                 time_since_sync: 0,
                 quorum_health: QuorumHealth {
@@ -178,8 +255,25 @@ pub async fn get_federation_health(
                     guardian_count: 0,
                     observer_count: 0,
                     required_quorum: 0,
+                    quorum_percentage: 0,
+                    connected_trust_nodes: 0,
+                    missing_nodes: Vec::new(),
                 },
                 last_error: Some("No trust bundle available".to_string()),
+                dag_anchor: DagAnchorStatus {
+                    head_cid: String::new(),
+                    timestamp: SystemTime::now(),
+                    node_count_since_epoch: 0,
+                    consistent_with_trust_bundle: false,
+                },
+                trust_bundle_status: TrustBundleStatus {
+                    epoch: 0,
+                    created_at: SystemTime::now(),
+                    node_count: 0,
+                    signature_count: 0,
+                    time_to_next_epoch: None,
+                    is_signer: false,
+                },
             });
         }
     };
@@ -213,6 +307,8 @@ pub async fn get_federation_health(
             fully_replicated: 90, // Placeholder
             in_progress: 8,   // Placeholder
             failed: 2,        // Placeholder
+            completion_percentage: 80, // Placeholder
+            health_issues: Vec::new(), // Placeholder
         },
         time_since_sync,
         quorum_health: QuorumHealth {
@@ -222,8 +318,25 @@ pub async fn get_federation_health(
             guardian_count,
             observer_count,
             required_quorum,
+            quorum_percentage: 80, // Placeholder
+            connected_trust_nodes: 3, // Placeholder
+            missing_nodes: Vec::new(), // Placeholder
         },
         last_error: None,
+        dag_anchor: DagAnchorStatus {
+            head_cid: trust_bundle.dag_roots[0].to_string(), // Placeholder
+            timestamp: SystemTime::now(), // Placeholder
+            node_count_since_epoch: 100, // Placeholder
+            consistent_with_trust_bundle: true, // Placeholder
+        },
+        trust_bundle_status: TrustBundleStatus {
+            epoch: trust_bundle.epoch_id,
+            created_at: SystemTime::now(), // Placeholder
+            node_count: trust_bundle.attestations.len(), // Placeholder
+            signature_count: 3, // Placeholder
+            time_to_next_epoch: None, // Placeholder
+            is_signer: true, // Placeholder
+        },
     };
     
     Ok(health)
@@ -307,6 +420,8 @@ mod tests {
                 fully_replicated: 90,
                 in_progress: 8,
                 failed: 2,
+                completion_percentage: 80,
+                health_issues: Vec::new(),
             },
             time_since_sync: 60,
             quorum_health: QuorumHealth {
@@ -316,8 +431,25 @@ mod tests {
                 guardian_count: 2,
                 observer_count: 2,
                 required_quorum: 2,
+                quorum_percentage: 80,
+                connected_trust_nodes: 3,
+                missing_nodes: Vec::new(),
             },
             last_error: None,
+            dag_anchor: DagAnchorStatus {
+                head_cid: "CID_of_latest_anchor".to_string(),
+                timestamp: SystemTime::now(),
+                node_count_since_epoch: 100,
+                consistent_with_trust_bundle: true,
+            },
+            trust_bundle_status: TrustBundleStatus {
+                epoch: 42,
+                created_at: SystemTime::now(),
+                node_count: 100,
+                signature_count: 3,
+                time_to_next_epoch: None,
+                is_signer: true,
+            },
         };
         
         // Serialize to JSON to verify structure

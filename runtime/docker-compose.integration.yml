@@ -21,6 +21,9 @@ services:
       - ICN_CONFIG_FILE=/etc/icn-runtime/runtime-config-genesis.toml
       - ICN_LOG_FORMAT=json
       - ICN_NODE_ROLE=genesis
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=60
+      - ICN_BLOB_MIN_REPLICATION=3
+      - ICN_HEALTH_CHECK_INTERVAL=30
     networks:
       - icn-network
     restart: unless-stopped
@@ -53,6 +56,9 @@ services:
       - ICN_LOG_FORMAT=json
       - ICN_NODE_ROLE=validator
       - ICN_BOOTSTRAP_PEER=/ip4/icn-runtime-genesis/tcp/4001
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=60
+      - ICN_BLOB_MIN_REPLICATION=3
+      - ICN_HEALTH_CHECK_INTERVAL=30
     networks:
       - icn-network
     depends_on:
@@ -88,6 +94,9 @@ services:
       - ICN_LOG_FORMAT=json
       - ICN_NODE_ROLE=validator
       - ICN_BOOTSTRAP_PEER=/ip4/icn-runtime-genesis/tcp/4001
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=60
+      - ICN_BLOB_MIN_REPLICATION=3
+      - ICN_HEALTH_CHECK_INTERVAL=30
     networks:
       - icn-network
     depends_on:
@@ -123,6 +132,9 @@ services:
       - ICN_LOG_FORMAT=json
       - ICN_NODE_ROLE=guardian
       - ICN_BOOTSTRAP_PEER=/ip4/icn-runtime-genesis/tcp/4001
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=60
+      - ICN_BLOB_MIN_REPLICATION=3
+      - ICN_HEALTH_CHECK_INTERVAL=30
     networks:
       - icn-network
     depends_on:
@@ -158,6 +170,9 @@ services:
       - ICN_LOG_FORMAT=json
       - ICN_NODE_ROLE=observer
       - ICN_BOOTSTRAP_PEER=/ip4/icn-runtime-genesis/tcp/4001
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=60
+      - ICN_BLOB_MIN_REPLICATION=2
+      - ICN_HEALTH_CHECK_INTERVAL=30
     networks:
       - icn-network
     depends_on:
@@ -171,6 +186,85 @@ services:
       retries: 3
       start_period: 30s
     stop_grace_period: 10s
+
+  # Misconfigured node with outdated TrustBundle
+  icn-runtime-outdated:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icn-runtime-outdated
+    volumes:
+      - ./config:/etc/icn-runtime:ro
+      - ./data/outdated:/var/lib/icn-runtime
+      - ./logs/outdated:/var/log/icn-runtime
+      # Mount a fixed older trustbundle for testing
+      - ./test/fixtures/outdated-trust-bundle.json:/var/lib/icn-runtime/trustbundle_fixed.json:ro
+    ports:
+      - "8085:8080"  # HTTP API
+      - "4006:4001"  # libp2p/Federation
+      - "8095:8090"  # WebSocket for events
+      - "9095:9090"  # Metrics
+    environment:
+      - RUST_LOG=debug
+      - ICN_CONFIG_FILE=/etc/icn-runtime/runtime-config-validator.toml
+      - ICN_LOG_FORMAT=json
+      - ICN_NODE_ROLE=validator
+      - ICN_BOOTSTRAP_PEER=/ip4/icn-runtime-genesis/tcp/4001
+      # Misconfiguration: disabled trust bundle sync
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=0
+      - ICN_USE_FIXED_TRUSTBUNDLE=true
+      - ICN_FIXED_TRUSTBUNDLE_PATH=/var/lib/icn-runtime/trustbundle_fixed.json
+      - ICN_BLOB_MIN_REPLICATION=1
+      - ICN_HEALTH_CHECK_INTERVAL=30
+    networks:
+      - icn-network
+    depends_on:
+      icn-runtime-genesis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 10s
+
+  # Rejoin test node - designed to test federation rejoining
+  icn-runtime-rejoin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icn-runtime-rejoin
+    volumes:
+      - ./config:/etc/icn-runtime:ro
+      - ./data/rejoin:/var/lib/icn-runtime
+      - ./logs/rejoin:/var/log/icn-runtime
+    ports:
+      - "8086:8080"  # HTTP API
+      - "4007:4001"  # libp2p/Federation
+      - "8096:8090"  # WebSocket for events
+      - "9096:9090"  # Metrics
+    environment:
+      - RUST_LOG=debug
+      - ICN_CONFIG_FILE=/etc/icn-runtime/runtime-config-validator.toml
+      - ICN_LOG_FORMAT=json
+      - ICN_NODE_ROLE=validator
+      - ICN_BOOTSTRAP_PEER=/ip4/icn-runtime-genesis/tcp/4001
+      - ICN_FEDERATION_TRUST_SYNC_INTERVAL=60
+      # Accelerated sync for testing node rejoins
+      - ICN_FEDERATION_CATCHUP_BATCH_SIZE=50
+      - ICN_FEDERATION_CATCHUP_MAX_CONCURRENT=5
+      - ICN_BLOB_MIN_REPLICATION=3
+      - ICN_HEALTH_CHECK_INTERVAL=10
+    networks:
+      - icn-network
+    depends_on:
+      icn-runtime-genesis:
+        condition: service_healthy
+    # Start with the container down - it will be manually started to test rejoining
+    profiles:
+      - manual
 
   # AgoraNet service
   agoranet:
@@ -259,6 +353,39 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+
+  # Test harness for running integration tests
+  integration-test:
+    build:
+      context: ./tests
+      dockerfile: Dockerfile.test
+    container_name: integration-test
+    environment:
+      - TEST_BOOTSTRAP_NODE=http://icn-runtime-genesis:8080
+      - TEST_VALIDATOR_NODE=http://icn-runtime-validator1:8080
+      - TEST_GUARDIAN_NODE=http://icn-runtime-guardian:8080
+      - TEST_OBSERVER_NODE=http://icn-runtime-observer:8080
+      - TEST_OUTDATED_NODE=http://icn-runtime-outdated:8080
+      - TEST_REJOIN_NODE=http://icn-runtime-rejoin:8080
+      - RUST_LOG=debug
+    volumes:
+      - ./tests:/app/tests
+      - ./test-results:/app/test-results
+    networks:
+      - icn-network
+    depends_on:
+      icn-runtime-genesis:
+        condition: service_healthy
+      icn-runtime-validator1:
+        condition: service_healthy
+      icn-runtime-guardian:
+        condition: service_healthy
+      icn-runtime-observer:
+        condition: service_healthy
+      icn-runtime-outdated:
+        condition: service_healthy
+    profiles:
+      - test
 
 networks:
   icn-network:
