@@ -13,8 +13,10 @@ mod network;
 // Export key structures
 pub use dag::{DagNode, DagNodeMetadata, DagThread};
 pub use error::{WalletError, WalletResult};
-pub use time::convert_time;
 pub use network::NodeSubmissionResponse;
+
+// Export time utilities
+pub use time::{system_time_to_datetime, datetime_to_system_time};
 
 #[cfg(test)]
 mod tests {
@@ -27,8 +29,8 @@ mod tests {
     #[test]
     fn test_time_conversions() {
         let now_system = SystemTime::now();
-        let now_dt: DateTime<Utc> = now_system.into();
-        let back_to_system: SystemTime = now_dt.into();
+        let now_dt = system_time_to_datetime(now_system);
+        let back_to_system = datetime_to_system_time(now_dt);
 
         // Allow for minor precision loss in conversion
         let diff = now_system.duration_since(back_to_system)

@@ -19,21 +19,28 @@ where
     system_time.into()
 }
 
-/// Convert from SystemTime to DateTime<Utc>
+/// Convert a SystemTime to DateTime<Utc>
 pub fn system_time_to_datetime(time: SystemTime) -> DateTime<Utc> {
+    // Get duration since epoch, default to 0 if time is before epoch
     let duration = time.duration_since(UNIX_EPOCH).unwrap_or_default();
     let seconds = duration.as_secs() as i64;
     let nanos = duration.subsec_nanos();
+    
+    // Use timestamp_opt which returns a chrono::LocalResult
     match Utc.timestamp_opt(seconds, nanos) {
         chrono::LocalResult::Single(dt) => dt,
-        _ => Utc::now() // Fallback if conversion fails
+        // Default to current time if something went wrong
+        _ => Utc::now() 
     }
 }
 
-/// Convert from DateTime<Utc> to SystemTime
+/// Convert a DateTime<Utc> to SystemTime
 pub fn datetime_to_system_time(dt: DateTime<Utc>) -> SystemTime {
-    let duration = Duration::from_secs(dt.timestamp() as u64)
+    // Create duration using timestamp components
+    let duration = Duration::from_secs(dt.timestamp().max(0) as u64) // Ensure non-negative
         + Duration::from_nanos(dt.timestamp_subsec_nanos() as u64);
+    
+    // Add to UNIX_EPOCH
     UNIX_EPOCH + duration
 }
 
@@ -53,19 +60,47 @@ impl From<DateTimeWrapper> for SystemTime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::SystemTime;
 
     #[test]
-    fn test_system_time_to_datetime_conversion() {
+    fn test_time_roundtrip_conversion() {
+        // Test current time
         let now_system = SystemTime::now();
         let now_dt = system_time_to_datetime(now_system);
         let back_to_system = datetime_to_system_time(now_dt);
 
-        // Allow for minor precision loss in conversion
+        // Calculate difference, accounting for either direction
         let diff = now_system.duration_since(back_to_system)
             .or_else(|_| back_to_system.duration_since(now_system))
             .unwrap_or_default();
         
+        // Allow small precision loss in conversion 
         assert!(diff.as_millis() < 2, "Time conversion should be nearly lossless");
+    }
+
+    #[test]
+    fn test_epoch_time_conversion() {
+        // Test with UNIX_EPOCH
+        let epoch_dt = system_time_to_datetime(UNIX_EPOCH);
+        assert_eq!(epoch_dt.timestamp(), 0);
+        assert_eq!(epoch_dt.timestamp_subsec_nanos(), 0);
+
+        let epoch_time = datetime_to_system_time(Utc.timestamp_opt(0, 0).unwrap());
+        assert_eq!(
+            epoch_time.duration_since(UNIX_EPOCH).unwrap().as_nanos(),
+            0
+        );
+    }
+
+    #[test]
+    fn test_negative_timestamp_handling() {
+        // Test with pre-epoch time (1960)
+        // Should handle gracefully without panics
+        if let Some(pre_epoch) = Utc.timestamp_opt(-315619200, 0).single() { // ~ 1960-01-01
+            let system_time = datetime_to_system_time(pre_epoch);
+            // Should convert to epoch or later
+            assert!(system_time >= UNIX_EPOCH);
+        }
     }
 
     #[test]

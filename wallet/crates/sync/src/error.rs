@@ -1,5 +1,6 @@
 use thiserror::Error;
 use std::io;
+use wallet_types::WalletError;
 
 #[derive(Error, Debug)]
 pub enum SyncError {
@@ -38,6 +39,9 @@ pub enum SyncError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+    
+    #[error("Wallet error: {0}")]
+    WalletError(#[from] WalletError),
 }
 
 // Implement a conversion from backoff::Error<SyncError> to SyncError
@@ -46,6 +50,27 @@ impl From<backoff::Error<SyncError>> for SyncError {
         match err {
             backoff::Error::Permanent(e) => e,
             backoff::Error::Transient { err, .. } => err,
+        }
+    }
+}
+
+// Add conversion to WalletError
+impl From<SyncError> for WalletError {
+    fn from(err: SyncError) -> Self {
+        match err {
+            SyncError::Network(msg) => WalletError::ConnectionError(msg),
+            SyncError::Io(e) => WalletError::IoError(e),
+            SyncError::Serialization(e) => WalletError::SerializationError(e.to_string()),
+            SyncError::Dag(msg) => WalletError::DagError(msg),
+            SyncError::Validation(msg) => WalletError::ValidationError(msg),
+            SyncError::Authentication(msg) => WalletError::AuthenticationError(msg),
+            SyncError::Federation(msg) => WalletError::GenericError(format!("Federation error: {}", msg)),
+            SyncError::NodeSubmission(msg) => WalletError::GenericError(format!("Node submission error: {}", msg)),
+            SyncError::NodeNotFound(id) => WalletError::ResourceNotFound(format!("Node not found: {}", id)),
+            SyncError::Request(e) => WalletError::ConnectionError(e.to_string()),
+            SyncError::BackoffError => WalletError::TimeoutError("Operation failed after retries".to_string()),
+            SyncError::Internal(msg) => WalletError::GenericError(format!("Internal error: {}", msg)),
+            SyncError::WalletError(e) => e,
         }
     }
 }

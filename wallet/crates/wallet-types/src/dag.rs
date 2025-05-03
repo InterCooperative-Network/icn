@@ -305,4 +305,141 @@ pub mod runtime_compat {
             },
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::SystemTime;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn test_dag_node_creation() {
+        let node = DagNode {
+            cid: "test-cid".to_string(),
+            parents: vec!["parent1".to_string(), "parent2".to_string()],
+            issuer: "did:icn:test".to_string(),
+            timestamp: SystemTime::now(),
+            signature: vec![1, 2, 3, 4],
+            payload: vec![10, 20, 30, 40, 50],
+            metadata: DagNodeMetadata {
+                sequence: Some(1),
+                scope: Some("test".to_string()),
+            },
+        };
+
+        assert_eq!(node.cid, "test-cid");
+        assert_eq!(node.parents.len(), 2);
+        assert_eq!(node.issuer, "did:icn:test");
+        assert_eq!(node.metadata.sequence, Some(1));
+        assert_eq!(node.payload, vec![10, 20, 30, 40, 50]);
+    }
+
+    #[test]
+    fn test_dag_node_serialization_deserialization() {
+        let original = DagNode {
+            cid: "test-cid".to_string(),
+            parents: vec!["parent1".to_string()],
+            issuer: "did:icn:test".to_string(),
+            timestamp: SystemTime::now(),
+            signature: vec![1, 2, 3, 4],
+            payload: vec![10, 20, 30, 40, 50],
+            metadata: DagNodeMetadata {
+                sequence: Some(1),
+                scope: Some("test".to_string()),
+            },
+        };
+
+        // Serialize to JSON
+        let serialized = serde_json::to_string(&original).expect("Serialization failed");
+        
+        // Deserialize back to DagNode
+        let deserialized: DagNode = serde_json::from_str(&serialized).expect("Deserialization failed");
+        
+        // Assert fields match
+        assert_eq!(original.cid, deserialized.cid);
+        assert_eq!(original.parents, deserialized.parents);
+        assert_eq!(original.issuer, deserialized.issuer);
+        assert_eq!(original.signature, deserialized.signature);
+        assert_eq!(original.payload, deserialized.payload);
+        assert_eq!(original.metadata.sequence, deserialized.metadata.sequence);
+        assert_eq!(original.metadata.scope, deserialized.metadata.scope);
+    }
+
+    #[test]
+    fn test_json_serialization() {
+        // Test JSON payload handling
+        let json_value = json!({
+            "name": "Test Node",
+            "values": [1, 2, 3],
+            "nested": {
+                "key": "value"
+            }
+        });
+
+        let json_bytes = serde_json::to_vec(&json_value).expect("JSON serialization failed");
+        
+        let node = DagNode {
+            cid: "json-test".to_string(),
+            parents: vec![],
+            issuer: "did:icn:test".to_string(),
+            timestamp: SystemTime::now(),
+            signature: vec![1, 2, 3, 4],
+            payload: json_bytes.clone(),
+            metadata: DagNodeMetadata::default(),
+        };
+
+        // Verify payload can be parsed as JSON
+        let payload_json = node.payload_as_json().expect("JSON parsing failed");
+        assert_eq!(payload_json["name"], "Test Node");
+        assert_eq!(payload_json["values"], json!([1, 2, 3]));
+        assert_eq!(payload_json["nested"]["key"], "value");
+        
+        // Test round-trip serialization
+        let serialized = serde_json::to_string(&node).expect("Serialization failed");
+        let deserialized: DagNode = serde_json::from_str(&serialized).expect("Deserialization failed");
+        
+        assert_eq!(node.payload, deserialized.payload);
+        // Verify the JSON is still valid after round trip
+        let payload_json2 = deserialized.payload_as_json().expect("JSON parsing failed");
+        assert_eq!(payload_json, payload_json2);
+    }
+
+    #[test]
+    fn test_binary_data_handling() {
+        // Test with arbitrary binary data (not valid JSON or UTF-8)
+        let binary_data = vec![
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, // JPEG header
+            0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48,
+            0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 
+            // Random binary data follows
+            0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0
+        ];
+        
+        let node = DagNode {
+            cid: "binary-test".to_string(),
+            parents: vec![],
+            issuer: "did:icn:test".to_string(),
+            timestamp: SystemTime::now(),
+            signature: vec![9, 8, 7, 6, 5],
+            payload: binary_data.clone(),
+            metadata: DagNodeMetadata {
+                sequence: Some(42),
+                scope: Some("binary-test".to_string()),
+            },
+        };
+        
+        // Serialize the node (with binary data)
+        let serialized = serde_json::to_string(&node).expect("Serialization failed");
+        
+        // Deserialize
+        let deserialized: DagNode = serde_json::from_str(&serialized).expect("Deserialization failed");
+        
+        // Verify binary content is preserved exactly
+        assert_eq!(binary_data, deserialized.payload);
+        
+        // JSON parsing of binary data should fail
+        let result = deserialized.payload_as_json();
+        assert!(result.is_err(), "Binary data should not parse as valid JSON");
+    }
 } 

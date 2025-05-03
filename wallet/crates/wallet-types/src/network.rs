@@ -106,4 +106,104 @@ impl NodeSubmissionResponse {
         self.block_number = Some(block_number);
         self
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::SystemTime;
+
+    #[test]
+    fn test_node_submission_response_creation() {
+        let now = SystemTime::now();
+        
+        // Test success response creation
+        let success = NodeSubmissionResponse::success("test-id".to_string(), now);
+        assert_eq!(success.id, "test-id");
+        assert_eq!(success.timestamp, now);
+        assert!(success.is_success());
+        assert!(!success.is_failed());
+        assert!(!success.is_pending());
+        assert!(success.error.is_none());
+        
+        // Test failed response creation
+        let failed = NodeSubmissionResponse::failed("failed-id".to_string(), "Test error".to_string());
+        assert_eq!(failed.id, "failed-id");
+        assert!(failed.is_failed());
+        assert!(!failed.is_success());
+        assert!(!failed.is_pending());
+        assert_eq!(failed.error, Some("Test error".to_string()));
+        
+        // Test pending response creation
+        let pending = NodeSubmissionResponse::pending("pending-id".to_string());
+        assert_eq!(pending.id, "pending-id");
+        assert!(pending.is_pending());
+        assert!(!pending.is_success());
+        assert!(!pending.is_failed());
+    }
+
+    #[test]
+    fn test_node_submission_response_with_modifiers() {
+        let response = NodeSubmissionResponse::success("test-id".to_string(), SystemTime::now())
+            .with_block_number(12345)
+            .with_metadata("key1", "value1")
+            .with_metadata("key2", "value2");
+        
+        assert_eq!(response.block_number, Some(12345));
+        assert_eq!(response.metadata.len(), 2);
+        assert_eq!(response.metadata.get("key1"), Some(&"value1".to_string()));
+        assert_eq!(response.metadata.get("key2"), Some(&"value2".to_string()));
+    }
+
+    #[test]
+    fn test_node_submission_response_serialization() {
+        let now = SystemTime::now();
+        
+        let original = NodeSubmissionResponse {
+            id: "test-id".to_string(),
+            timestamp: now,
+            block_number: Some(42),
+            status: RequestStatus::Success,
+            error: None,
+            metadata: {
+                let mut map = HashMap::new();
+                map.insert("key1".to_string(), "value1".to_string());
+                map
+            },
+        };
+        
+        // Serialize to JSON string
+        let serialized = serde_json::to_string(&original).expect("Serialization failed");
+        
+        // Deserialize back
+        let deserialized: NodeSubmissionResponse = serde_json::from_str(&serialized)
+            .expect("Deserialization failed");
+        
+        // Check fields
+        assert_eq!(original.id, deserialized.id);
+        assert_eq!(original.block_number, deserialized.block_number);
+        assert_eq!(original.status, deserialized.status);
+        assert_eq!(original.error, deserialized.error);
+        assert_eq!(original.metadata.len(), deserialized.metadata.len());
+        assert_eq!(original.metadata.get("key1"), deserialized.metadata.get("key1"));
+    }
+
+    #[test]
+    fn test_request_status_defaults() {
+        // Test default status is Pending
+        let status: RequestStatus = Default::default();
+        assert_eq!(status, RequestStatus::Pending);
+        
+        // Test with default status in response
+        let response = NodeSubmissionResponse {
+            id: "default-test".to_string(),
+            timestamp: SystemTime::now(),
+            block_number: None,
+            status: Default::default(),
+            error: None,
+            metadata: HashMap::new(),
+        };
+        
+        assert!(response.is_pending());
+    }
 } 
