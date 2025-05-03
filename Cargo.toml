@@ -9,8 +9,8 @@ members = [
     "wallet/crates/*"
 ]
 exclude = [
-    "agoranet",
-    "wallet/crates/wallet-ffi"
+    # No need to exclude agoranet since it's already included as a member
+    "wallet/crates/ffi"  # Exclude FFI crate if it needs special handling
 ]
 
 [workspace.dependencies]
@@ -28,7 +28,7 @@ clap = { version = "4.4", features = ["derive"] }
 
 # Network and storage
 libp2p = "0.53"
-multihash = { version = "0.16.3", features = ["sha2"] }
+multihash = { version = "0.18.1", features = ["sha2"] } # Updated to 0.18.1 per fix-wallet-sync.md
 cid = { version = "0.10.1", features = ["serde"] }
 
 # IPLD related dependencies
@@ -43,6 +43,13 @@ ipld-core = "0.3"
 # Using ssi 0.7 with features that are available
 ssi = { version = "0.7", features = ["ed25519", "rsa"] }
 did-method-key = "0.2"
+ed25519-dalek = "1.0"
+sha2 = "0.10"
+base64 = "0.13"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.3", features = ["v4", "serde"] }
+reqwest = { version = "0.11", features = ["json"] }
 
 # Runtime-specific dependencies
 wasmer = "3.1"
