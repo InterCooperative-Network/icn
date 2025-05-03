@@ -8,6 +8,68 @@ use wallet_agent::governance::Guardian;
 use wallet_agent::agoranet::AgoraNetClient;
 use wallet_sync::client::SyncClient;
 use crate::error::{ApiResult, ApiError};
+use wallet_core::store::LocalWalletStore;
+use wallet_agent::queue::ActionQueue;
+
+/// The shared application state
+pub struct AppState<S: LocalWalletStore> {
+    /// The store implementation
+    pub store: S,
+    /// Configuration for the application
+    pub config: AppConfig,
+}
+
+/// Configuration for the application
+#[derive(Clone, Debug)]
+pub struct AppConfig {
+    /// The base URL for the federation API
+    pub federation_url: String,
+    /// The path to the wallet data directory
+    pub data_dir: String,
+    /// Whether to auto-sync with the federation
+    pub auto_sync: bool,
+    /// The sync interval in seconds
+    pub sync_interval: u64,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            federation_url: "https://federation.example.com/api".to_string(),
+            data_dir: "./wallet-data".to_string(),
+            auto_sync: true,
+            sync_interval: 60,
+        }
+    }
+}
+
+impl<S: LocalWalletStore> AppState<S> {
+    /// Create a new AppState with the given store and config
+    pub fn new(store: S, config: AppConfig) -> Self {
+        Self {
+            store,
+            config,
+        }
+    }
+    
+    /// Create a new AppState with the given store and default config
+    pub fn with_store(store: S) -> Self {
+        Self {
+            store,
+            config: AppConfig::default(),
+        }
+    }
+    
+    /// Get an action queue using this state's store
+    pub fn action_queue(&self) -> ActionQueue<S> {
+        ActionQueue::new(self.store.clone())
+    }
+    
+    /// Create a sync client using this state's config
+    pub fn sync_client(&self) -> SyncClient {
+        SyncClient::new(&self.config.federation_url)
+    }
+}
 
 pub struct AppState {
     pub identities: RwLock<HashMap<String, IdentityWallet>>,

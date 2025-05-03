@@ -1,30 +1,65 @@
 # ICN Wallet
 
-A mobile-first wallet for the Intercooperative Network (ICN) that enables secure identity management, credential handling, and governance participation.
-
-## Features
-
-- **Identity Management**: Create and manage scoped DIDs with Ed25519 keypairs
-- **Credential Handling**: Issue, verify, and selectively disclose verifiable credentials
-- **Governance Participation**: Sign proposals and participate in votes offline
-- **DAG Synchronization**: Sync TrustBundles and Guardian mandates from federated peers
-- **Mobile-First Design**: API-focused architecture suitable for mobile integration
+A mobile-first light client wallet for verifiable governance and economic participation in federated DAG systems.
 
 ## Architecture
 
-The project is structured as a workspace with the following crates:
+The wallet is organized into several crates:
 
-- **wallet-core**: Core identity and cryptography functionality
-- **wallet-agent**: Proposal handling and credential management
-- **wallet-sync**: DAG synchronization with federation
-- **wallet-ui-api**: Frontend integration layer
-- **cli**: Command-line interface for development and debugging
+### wallet-core
+
+Core cryptographic and data structures including:
+- DID (Decentralized Identity) management
+- Verifiable Credentials handling
+- Merkle tree and CID utilities
+- DAG data structures
+- Storage abstractions
+
+### wallet-agent
+
+Local wallet agent that:
+- Maintains a queue of pending actions (proposals, votes, anchors)
+- Handles signing of payloads
+- Maintains local DAG state
+- Works offline-first with serialization to disk
+
+### wallet-sync
+
+Sync adapter for communicating with the federation:
+- Fetches DAG receipts
+- Retrieves trust bundles
+- Handles anchoring data
+- Provides REST and libp2p connectivity
+
+### wallet-ui-api
+
+API layer for interacting with the wallet from user interfaces:
+- Exposes REST endpoints for wallet operations
+- Manages wallet state
+- Provides identity, credential, and DAG operations
+
+### cli
+
+Command line interface for wallet operations:
+- Identity management
+- Credential issuance and verification
+- Action queue management
+- DAG operations
+- API server control
+
+## Key Features
+
+- **Offline-first**: All operations can be queued locally and synchronized later
+- **Mobile-compatible**: Light client designed for resource-constrained environments
+- **DAG verification**: Verify and participate in DAG-based governance
+- **DID & VC support**: Full W3C standards compatibility
+- **Pluggable storage**: Flexible backend storage options
 
 ## Getting Started
 
 ### Prerequisites
 
-- Rust 1.75+ (2021 edition)
+- Rust 1.74 or later
 - Cargo
 
 ### Building
@@ -33,64 +68,59 @@ The project is structured as a workspace with the following crates:
 cargo build --release
 ```
 
-### Using the CLI
+### Running the CLI
+
+Create a new identity:
+```bash
+cargo run --bin icn-wallet-cli identity create --scope personal
+```
+
+List identities:
+```bash
+cargo run --bin icn-wallet-cli identity list
+```
+
+Issue a credential:
+```bash
+cargo run --bin icn-wallet-cli credential issue --issuer did:icn:abc123 --subject '{"name":"Alice","role":"Admin"}' --types Membership,Admin
+```
+
+Queue an action:
+```bash
+cargo run --bin icn-wallet-cli action queue --creator did:icn:abc123 --action-type proposal --payload '{"title":"New proposal","content":"Proposal content"}'
+```
+
+Start the API server:
+```bash
+cargo run --bin icn-wallet-cli serve --addr 127.0.0.1:3000
+```
+
+## API Usage
+
+Once the API server is running, you can interact with it using REST:
 
 ```bash
-# Create a new identity
-cargo run --bin icn-wallet-cli -- create --scope personal
+# List identities
+curl http://localhost:3000/api/identities
 
-# Sign a proposal
-cargo run --bin icn-wallet-cli -- sign -i /path/to/identity.json -p governance -c /path/to/proposal.json
+# Create identity
+curl -X POST http://localhost:3000/api/identities -H "Content-Type: application/json" -d '{"scope":"personal"}'
 
-# Sync from federation
-cargo run --bin icn-wallet-cli -- sync -i /path/to/identity.json -v
+# Issue credential
+curl -X POST http://localhost:3000/api/credentials -H "Content-Type: application/json" -d '{"issuer_did":"did:icn:abc123","subject_data":{"name":"Alice"},"credential_types":["Membership"]}'
 
-# Start the API server
-cargo run --bin icn-wallet-cli -- serve
+# Queue action
+curl -X POST http://localhost:3000/api/actions -H "Content-Type: application/json" -d '{"creator_did":"did:icn:abc123","action_type":"proposal","payload":{"title":"My Proposal"}}'
 ```
 
-### API Endpoints
+## Mobile Integration
 
-#### Identity Management
-- `GET /api/did/list` - List all identities
-- `GET /api/did/:id` - Get specific identity
-- `POST /api/did/create` - Create new identity
-- `POST /api/did/activate/:id` - Set active identity
+The wallet is designed to be integrated with mobile applications through the wallet-ui-api. You can:
 
-#### Proposal Handling
-- `POST /api/proposal/sign` - Sign a proposal
-- `GET /api/actions/:action_type` - List actions by type
-
-#### Credential Management
-- `POST /api/vc/verify` - Verify a credential
-
-#### Synchronization
-- `POST /api/sync/dag` - Sync TrustBundles from federation
-
-#### Governance
-- `POST /api/governance/appeal/:mandate_id` - Appeal a mandate
-
-## Development
-
-### Running Tests
-
-```bash
-cargo test
-```
-
-### Project Structure
-
-```
-icn-wallet/
-├── crates/
-│   ├── wallet-core/      # Core identity and cryptography
-│   ├── wallet-agent/     # Proposal handling and governance
-│   ├── wallet-sync/      # DAG synchronization
-│   └── wallet-ui-api/    # Frontend API
-├── cli/                  # Command-line interface
-└── examples/             # Usage examples
-```
+1. Build native libraries using the wallet components
+2. Access the API server from a mobile app
+3. Use the crates directly in a Rust mobile SDK
 
 ## License
 
-This project is licensed under [LICENSE TBD]
+[MIT License](LICENSE)
