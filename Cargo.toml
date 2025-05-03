@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "agoranet",
+    "runtime",
+    "wallet",
+    "runtime/crates/*",
+    "wallet/crates/*"
+]
