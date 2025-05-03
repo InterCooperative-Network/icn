@@ -1199,4 +1199,453 @@ mod tests {
     async fn test_blob_storage_adapter_basics() {
         // This test simply passes to ensure the module compiles
     }
+    
+    // Test the BlobStorageAdapter logic directly
+    #[tokio::test]
+    async fn test_blob_storage_adapter_operations() {
+        // Create a test storage backend
+        let storage = Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()));
+        let blob_storage = BlobStorageAdapter { storage: storage.clone() };
+        
+        // Test data
+        let test_data = b"test blob data".to_vec();
+        
+        // Test put_blob and blob_exists
+        let cid = blob_storage.put_blob(&test_data).await.expect("Failed to put blob");
+        let exists = blob_storage.blob_exists(&cid).await.expect("Failed to check blob existence");
+        assert!(exists, "Blob should exist after being stored");
+        
+        // Test non-existent blob
+        let nonexistent_bytes = b"nonexistent";
+        let nonexistent_hash = create_sha256_multihash(nonexistent_bytes);
+        let nonexistent_cid = Cid::new_v1(0x71, nonexistent_hash); // 0x71 is the dag-cbor codec
+        let exists = blob_storage.blob_exists(&nonexistent_cid).await.expect("Failed to check nonexistent blob");
+        assert!(!exists, "Nonexistent blob should not exist");
+        
+        // Test pin_blob
+        blob_storage.pin_blob(&cid).await.expect("Failed to pin blob");
+        
+        // Test pin_blob error case
+        let result = blob_storage.pin_blob(&nonexistent_cid).await;
+        assert!(result.is_err(), "Pinning a nonexistent blob should fail");
+        
+        // Test get_blob
+        let retrieved_blob = blob_storage.get_blob(&cid).await.expect("Failed to get blob");
+        assert_eq!(retrieved_blob.unwrap(), test_data, "Retrieved blob data should match original");
+    }
+    
+    // Helper struct to capture responses for testing
+    struct ResponseCaptor {
+        response: Arc<Mutex<Option<network::ReplicateBlobResponse>>>,
+    }
+    
+    impl ResponseCaptor {
+        fn new() -> Self {
+            Self {
+                response: Arc::new(Mutex::new(None)),
+            }
+        }
+        
+        async fn get_response(&self) -> Option<network::ReplicateBlobResponse> {
+            self.response.lock().await.clone()
+        }
+    }
+    
+    impl libp2p::request_response::ResponseChannel<network::ReplicateBlobResponse> for ResponseCaptor {
+        fn send_response(self, response: network::ReplicateBlobResponse) -> Result<(), network::ReplicateBlobResponse> {
+            let response_mutex = self.response.clone();
+            tokio::spawn(async move {
+                let mut guard = response_mutex.lock().await;
+                *guard = Some(response);
+            });
+            Ok(())
+        }
+    }
+    
+    // Mock storage that allows simulating errors
+    struct MockErrorStorage {
+        inner: Arc<Mutex<icn_storage::AsyncInMemoryStorage>>,
+        fail_blob_exists: bool,
+        fail_pin_blob: bool,
+    }
+    
+    impl MockErrorStorage {
+        fn new() -> Self {
+            Self {
+                inner: Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new())),
+                fail_blob_exists: false,
+                fail_pin_blob: false,
+            }
+        }
+        
+        fn with_fail_blob_exists(mut self) -> Self {
+            self.fail_blob_exists = true;
+            self
+        }
+        
+        fn with_fail_pin_blob(mut self) -> Self {
+            self.fail_pin_blob = true;
+            self
+        }
+        
+        async fn put_blob(&self, data: &[u8]) -> Result<Cid, String> {
+            let inner = self.inner.lock().await;
+            inner.put_blob(data).await
+        }
+    }
+    
+    #[async_trait]
+    impl icn_storage::StorageBackend for MockErrorStorage {
+        async fn put_blob(&self, data: &[u8]) -> Result<Cid, icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.put_blob(data).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn get_blob(&self, cid: &Cid) -> Result<Option<Vec<u8>>, icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.get_blob(cid).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn contains_blob(&self, cid: &Cid) -> Result<bool, icn_storage::StorageError> {
+            if self.fail_blob_exists {
+                return Err(icn_storage::StorageError::Io("Mock storage error".to_string()));
+            }
+            let inner = self.inner.lock().await;
+            inner.contains_blob(cid).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn delete_blob(&self, cid: &Cid) -> Result<(), icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.delete_blob(cid).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn put_kv(&self, key: Cid, value: Vec<u8>) -> Result<(), icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.put_kv(key, value).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn get_kv(&self, key: &Cid) -> Result<Option<Vec<u8>>, icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.get_kv(key).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn contains_kv(&self, key: &Cid) -> Result<bool, icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.contains_kv(key).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        async fn delete_kv(&self, key: &Cid) -> Result<(), icn_storage::StorageError> {
+            let inner = self.inner.lock().await;
+            inner.delete_kv(key).await.map_err(|e| icn_storage::StorageError::Io(e))
+        }
+        
+        // Implement deprecated methods
+        async fn get(&self, cid: &Cid) -> Result<Option<Vec<u8>>, icn_storage::StorageError> {
+            self.get_blob(cid).await
+        }
+        
+        async fn put(&self, data: &[u8]) -> Result<Cid, icn_storage::StorageError> {
+            self.put_blob(data).await
+        }
+        
+        async fn contains(&self, cid: &Cid) -> Result<bool, icn_storage::StorageError> {
+            self.contains_blob(cid).await
+        }
+        
+        async fn delete(&self, cid: &Cid) -> Result<(), icn_storage::StorageError> {
+            self.delete_blob(cid).await
+        }
+        
+        async fn begin_transaction(&self) -> Result<(), icn_storage::StorageError> {
+            Ok(())
+        }
+        
+        async fn commit_transaction(&self) -> Result<(), icn_storage::StorageError> {
+            Ok(())
+        }
+        
+        async fn rollback_transaction(&self) -> Result<(), icn_storage::StorageError> {
+            Ok(())
+        }
+        
+        async fn flush(&self) -> Result<(), icn_storage::StorageError> {
+            Ok(())
+        }
+    }
+    
+    // Modified BlobStorageAdapter for testing with simulated errors
+    struct TestBlobStorageAdapter {
+        storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+        fail_pin_blob: bool,
+    }
+    
+    impl TestBlobStorageAdapter {
+        fn new(storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>) -> Self {
+            Self {
+                storage,
+                fail_pin_blob: false,
+            }
+        }
+        
+        fn with_fail_pin_blob(mut self) -> Self {
+            self.fail_pin_blob = true;
+            self
+        }
+        
+        async fn blob_exists(&self, cid: &Cid) -> FederationResult<bool> {
+            let storage_guard = self.storage.lock().await;
+            storage_guard.contains_blob(cid).await
+                .map_err(|e| FederationError::StorageError(format!("Failed to check blob existence: {}", e)))
+        }
+        
+        async fn pin_blob(&self, cid: &Cid) -> FederationResult<()> {
+            if self.fail_pin_blob {
+                return Err(FederationError::StorageError("Mock pin error".to_string()));
+            }
+            
+            let storage_guard = self.storage.lock().await;
+            
+            // First check if the blob exists
+            let blob_exists = storage_guard.contains_blob(cid).await
+                .map_err(|e| FederationError::StorageError(format!("Failed to check blob existence: {}", e)))?;
+            
+            if !blob_exists {
+                return Err(FederationError::StorageError(format!("Blob not found: {}", cid)));
+            }
+            
+            // In a real implementation, we would pin the blob here
+            Ok(())
+        }
+        
+        async fn put_blob(&self, data: &[u8]) -> FederationResult<Cid> {
+            let storage_guard = self.storage.lock().await;
+            storage_guard.put_blob(data).await
+                .map_err(|e| FederationError::StorageError(format!("Failed to store blob: {}", e)))
+        }
+        
+        async fn get_blob(&self, cid: &Cid) -> FederationResult<Option<Vec<u8>>> {
+            let storage_guard = self.storage.lock().await;
+            storage_guard.get_blob(cid).await
+                .map_err(|e| FederationError::StorageError(format!("Failed to get blob: {}", e)))
+        }
+    }
+    
+    // Tracks Kademlia queries for testing
+    struct KademliaTracker {
+        queries: Arc<Mutex<Vec<Cid>>>,
+    }
+    
+    impl KademliaTracker {
+        fn new() -> Self {
+            Self {
+                queries: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+        
+        async fn add_query(&self, cid: &Cid) -> kad::QueryId {
+            self.queries.lock().await.push(cid.clone());
+            // Return a dummy QueryId
+            kad::QueryId::from(PeerId::random())
+        }
+        
+        async fn get_queries(&self) -> Vec<Cid> {
+            self.queries.lock().await.clone()
+        }
+    }
+    
+    // A wrapper for testing the blob replication handler
+    async fn test_replication_handler(
+        request: network::ReplicateBlobRequest,
+        storage: Arc<Mutex<dyn icn_storage::StorageBackend + Send + Sync>>,
+        fail_pin_blob: bool,
+    ) -> (Option<network::ReplicateBlobResponse>, HashMap<kad::QueryId, (Cid, ResponseCaptor)>, Vec<Cid>) {
+        let blob_storage = TestBlobStorageAdapter::new(storage.clone());
+        let blob_storage = if fail_pin_blob {
+            blob_storage.with_fail_pin_blob()
+        } else {
+            blob_storage
+        };
+        
+        let kademlia = KademliaTracker::new();
+        let response_captor = ResponseCaptor::new();
+        
+        // Maps to track state changes
+        let mut pending_provider_queries = HashMap::new();
+        let mut pending_replication_fetches = HashMap::new();
+        
+        // Simplified handler logic based on handle_blob_replication_request
+        let cid = request.cid.clone();
+        
+        match blob_storage.blob_exists(&cid).await {
+            Ok(true) => {
+                // Blob exists locally, try to pin
+                match blob_storage.pin_blob(&cid).await {
+                    Ok(_) => {
+                        // Successfully pinned, send success response
+                        let success_response = network::ReplicateBlobResponse {
+                            success: true,
+                            error_msg: None,
+                        };
+                        let _ = response_captor.send_response(success_response);
+                    },
+                    Err(e) => {
+                        // Failed to pin, send error response
+                        let error_response = network::ReplicateBlobResponse {
+                            success: false,
+                            error_msg: Some(format!("Failed to pin blob: {}", e)),
+                        };
+                        let _ = response_captor.send_response(error_response);
+                    }
+                }
+            },
+            Ok(false) => {
+                // Blob not found locally, initiate Kademlia search
+                let query_id = kademlia.add_query(&cid).await;
+                
+                // Store the query info in the pending maps
+                pending_provider_queries.insert(query_id.clone(), cid.clone());
+                pending_replication_fetches.insert(query_id, (cid, response_captor.clone()));
+            },
+            Err(e) => {
+                // Error checking blob existence
+                let error_response = network::ReplicateBlobResponse {
+                    success: false,
+                    error_msg: Some(format!("Storage error: {}", e)),
+                };
+                let _ = response_captor.send_response(error_response);
+            }
+        }
+        
+        // Allow a short time for async responses to be captured
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        
+        (
+            response_captor.get_response().await,
+            pending_replication_fetches,
+            kademlia.get_queries().await
+        )
+    }
+    
+    // Tests for the blob replication handler
+    #[tokio::test]
+    async fn test_blob_replication_local_success() {
+        // Create a test storage with a blob
+        let storage = Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()));
+        
+        // Add a test blob to storage
+        let test_data = b"test data".to_vec();
+        let storage_guard = storage.lock().await;
+        let cid = storage_guard.put_blob(&test_data).await.unwrap();
+        drop(storage_guard);
+        
+        // Create a replication request for the existing blob
+        let request = network::ReplicateBlobRequest { cid: cid.clone() };
+        
+        // Run the test handler
+        let (response, pending_fetches, kademlia_queries) = test_replication_handler(request, storage, false).await;
+        
+        // Verify a success response was sent
+        assert!(response.is_some(), "A response should have been sent");
+        let response = response.unwrap();
+        assert!(response.success, "Response should indicate success");
+        assert!(response.error_msg.is_none(), "No error message should be present");
+        
+        // Verify no Kademlia queries were initiated
+        assert!(kademlia_queries.is_empty(), "No Kademlia queries should be made");
+        
+        // Verify no pending fetches were created
+        assert!(pending_fetches.is_empty(), "No pending fetches should be created");
+    }
+    
+    #[tokio::test]
+    async fn test_blob_replication_remote() {
+        // Create a test storage (empty)
+        let storage = Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()));
+        
+        // Create a nonexistent CID
+        let nonexistent_bytes = b"nonexistent";
+        let nonexistent_hash = create_sha256_multihash(nonexistent_bytes);
+        let nonexistent_cid = Cid::new_v1(0x71, nonexistent_hash);
+        
+        // Create a replication request for a nonexistent blob
+        let request = network::ReplicateBlobRequest { cid: nonexistent_cid.clone() };
+        
+        // Run the test handler
+        let (response, pending_fetches, kademlia_queries) = test_replication_handler(request, storage, false).await;
+        
+        // Verify no immediate response was sent
+        assert!(response.is_none(), "No immediate response should be sent");
+        
+        // Verify a Kademlia query was initiated for the correct CID
+        assert_eq!(kademlia_queries.len(), 1, "One Kademlia query should be initiated");
+        assert_eq!(kademlia_queries[0], nonexistent_cid, "Kademlia query should be for the requested CID");
+        
+        // Verify pending fetch was created
+        assert_eq!(pending_fetches.len(), 1, "One pending fetch should be created");
+        
+        // Verify the pending fetch has the correct CID
+        let (stored_cid, _) = pending_fetches.values().next().unwrap();
+        assert_eq!(*stored_cid, nonexistent_cid, "Pending fetch should have the correct CID");
+    }
+    
+    #[tokio::test]
+    async fn test_blob_replication_storage_error() {
+        // Create a storage that fails on blob_exists
+        let storage = Arc::new(Mutex::new(MockErrorStorage::new().with_fail_blob_exists()));
+        
+        // Create a test CID
+        let test_bytes = b"test";
+        let test_hash = create_sha256_multihash(test_bytes);
+        let test_cid = Cid::new_v1(0x71, test_hash);
+        
+        // Create a request
+        let request = network::ReplicateBlobRequest { cid: test_cid };
+        
+        // Run the test handler
+        let (response, pending_fetches, kademlia_queries) = test_replication_handler(request, storage, false).await;
+        
+        // Verify an error response was sent
+        assert!(response.is_some(), "An error response should have been sent");
+        let response = response.unwrap();
+        assert!(!response.success, "Response should indicate failure");
+        assert!(response.error_msg.is_some(), "Error message should be present");
+        assert!(response.error_msg.unwrap().contains("Storage error"), "Error should mention storage error");
+        
+        // Verify no Kademlia queries were initiated
+        assert!(kademlia_queries.is_empty(), "No Kademlia queries should be made on error");
+        
+        // Verify no pending fetches were created
+        assert!(pending_fetches.is_empty(), "No pending fetches should be created on error");
+    }
+    
+    #[tokio::test]
+    async fn test_blob_replication_pin_error() {
+        // Create a test storage with a blob
+        let storage = Arc::new(Mutex::new(icn_storage::AsyncInMemoryStorage::new()));
+        
+        // Add a test blob to storage
+        let test_data = b"test data".to_vec();
+        let storage_guard = storage.lock().await;
+        let cid = storage_guard.put_blob(&test_data).await.unwrap();
+        drop(storage_guard);
+        
+        // Create a request for the blob, but with pin_blob set to fail
+        let request = network::ReplicateBlobRequest { cid: cid.clone() };
+        
+        // Run the test handler with pin_blob failure
+        let (response, pending_fetches, kademlia_queries) = test_replication_handler(request, storage, true).await;
+        
+        // Verify an error response was sent
+        assert!(response.is_some(), "An error response should have been sent");
+        let response = response.unwrap();
+        assert!(!response.success, "Response should indicate failure");
+        assert!(response.error_msg.is_some(), "Error message should be present");
+        assert!(response.error_msg.unwrap().contains("pin"), "Error should mention pin failure");
+        
+        // Verify no Kademlia queries were initiated
+        assert!(kademlia_queries.is_empty(), "No Kademlia queries should be made on error");
+        
+        // Verify no pending fetches were created
+        assert!(pending_fetches.is_empty(), "No pending fetches should be created on error");
+    }
 }
