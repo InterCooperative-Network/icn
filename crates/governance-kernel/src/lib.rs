@@ -15,6 +15,9 @@ use icn_storage::{StorageBackend};
 use icn_identity::{IdentityId, IdentityScope, VerifiableCredential};
 use icn_core_vm::IdentityContext;
 use tokio::sync::Mutex;
+use uuid::Uuid;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod ast;
 pub mod parser;
@@ -150,6 +153,42 @@ pub struct Vote {
     pub timestamp: i64,
 }
 
+/// Role Assignment Credential for verifiable role-based permissions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleAssignmentCredential {
+    /// Standard VC fields
+    pub issuer: IdentityId,            // Who issued this role assignment (typically a guardian)
+    pub subject: IdentityId,           // Who received the role
+    pub issuance_date: i64,            // When the role was assigned
+    pub expiration_date: Option<i64>,  // Optional expiration
+
+    /// Role-specific fields
+    pub scope_id: String,              // The scope context for this role (e.g., cooperative ID)
+    pub scope_type: IdentityScope,     // Type of scope (Cooperative, Community, etc.)
+    pub roles: Vec<String>,            // Assigned roles
+    
+    /// Proof
+    pub proof: SignatureProof,        // Cryptographic proof of the credential
+}
+
+/// Signature proof for a credential
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignatureProof {
+    pub signature_type: String,       // e.g., "Ed25519Signature2020"
+    pub signature_value: String,      // Base64-encoded signature
+    pub created: i64,                 // When the signature was created
+    pub verification_method: String,  // The public key ID used to verify
+    pub purpose: String,              // e.g., "assertionMethod"
+}
+
+/// Options for role assignment
+#[derive(Debug, Clone, Default)]
+pub struct RoleAssignmentOptions {
+    pub expiration_days: Option<i64>,
+    pub scope_type: Option<IdentityScope>,
+    pub store_in_dag: bool,
+}
+
 /// Governance kernel implementation
 pub struct GovernanceKernel<S> {
     storage: Arc<Mutex<S>>,
@@ -219,8 +258,8 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
             // Check if there are roles defined in the governance config
             if let Some(governance) = &config.governance {
                 if let Some(defined_roles) = &governance.roles {
-                    // Get the roles assigned to this identity
-                    let assigned_role_names = self.get_assigned_roles(caller_id, scope_id).await?;
+                    // Get the verified roles assigned to this identity
+                    let assigned_role_names = self.get_verified_roles(caller_id, scope_id).await?;
                     
                     // If no roles are assigned, the caller doesn't have permission
                     if assigned_role_names.is_empty() {
@@ -546,51 +585,250 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
         }
     }
 
-    /// Assign roles to an identity within a specific scope
-    pub async fn assign_roles(&self, identity_id: &IdentityId, scope_id: &str, roles: Vec<String>) -> Result<(), GovernanceError> {
-        // Create a key for storing role assignments
-        let key_str = format!("governance::roles::{}::{}", scope_id, identity_id.0);
-        let key_cid = self.create_key_cid(&key_str)?;
+    /// Assign roles to an identity with verifiable credentials
+    pub async fn assign_roles(
+        &self,
+        subject_id: &IdentityId,
+        scope_id: &str,
+        roles: Vec<String>,
+        options: Option<RoleAssignmentOptions>,
+    ) -> Result<String, GovernanceError> {
+        // Get the default options or use provided ones
+        let options = options.unwrap_or_default();
         
-        // Serialize the roles
-        let roles_bytes = serde_json::to_vec(&roles)
-            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize roles: {}", e)))?;
+        // Get the governance config to ensure roles exist
+        let config_opt = self.load_governance_config(scope_id).await?;
+        let config = config_opt.ok_or_else(|| {
+            GovernanceError::InvalidProposal(format!("No governance config found for scope {}", scope_id))
+        })?;
         
-        // Store the roles in storage
-        let mut storage = self.storage.lock().await;
-        storage.put_kv(key_cid, roles_bytes)
-            .await
-            .map_err(|e| GovernanceError::StorageError(e.to_string()))?;
+        // Validate that all roles exist in the governance config
+        if let Some(governance) = &config.governance {
+            if let Some(defined_roles) = &governance.roles {
+                for role in &roles {
+                    if !defined_roles.iter().any(|r| &r.name == role) {
+                        return Err(GovernanceError::InvalidProposal(
+                            format!("Role '{}' does not exist in governance config", role)
+                        ));
+                    }
+                }
+            } else {
+                return Err(GovernanceError::InvalidProposal(
+                    "No roles defined in governance config".to_string()
+                ));
+            }
+        } else {
+            return Err(GovernanceError::InvalidProposal(
+                "Governance structure not defined in config".to_string()
+            ));
+        }
         
-        Ok(())
+        // Create a unique credential ID
+        let credential_id = format!("credential:role:{}:{}:{}", 
+            scope_id, subject_id.0, Uuid::new_v4());
+        
+        // Create the role assignment credential
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+            
+        let expiration = options.expiration_days.map(|days| now + (days * 86400));
+        
+        let mut credential = RoleAssignmentCredential {
+            issuer: IdentityId(self.identity.did().to_string()),
+            subject: subject_id.clone(),
+            issuance_date: now,
+            expiration_date: expiration,
+            scope_id: scope_id.to_string(),
+            scope_type: options.scope_type.unwrap_or(IdentityScope::Cooperative),
+            roles: roles.clone(),
+            proof: SignatureProof {
+                signature_type: "Ed25519Signature2020".to_string(),
+                signature_value: String::new(), // Will be filled after signing
+                created: now,
+                verification_method: format!("{}#keys-1", self.identity.did()),
+                purpose: "assertionMethod".to_string(),
+            },
+        };
+        
+        // Create canonical representation for signing (without the signature)
+        // For signing, we remove the signature_value to get a stable representation
+        let mut signing_credential = credential.clone();
+        signing_credential.proof.signature_value = String::new();
+        
+        let canonical = serde_json::to_string(&signing_credential)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize credential for signing: {}", e)))?;
+            
+        let canonical_hash = Sha256::digest(canonical.as_bytes());
+        
+        // Sign the credential using the kernel's identity
+        let signature = self.identity.keypair().sign(canonical_hash.as_slice())
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to sign credential: {}", e)))?;
+        
+        // Update the proof with the signature
+        credential.proof.signature_value = BASE64.encode(signature);
+        
+        // Serialize the credential for storage
+        let credential_bytes = serde_json::to_vec(&credential)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize credential: {}", e)))?;
+        
+        // Store the credential
+        let storage_key = format!("role_credential::{}::{}::{}", 
+            scope_id, subject_id.0, credential_id);
+        let key_cid = self.create_key_cid(&storage_key)?;
+        
+        let storage = self.storage.lock().await;
+        storage.put_kv(key_cid, credential_bytes).await
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to store credential: {}", e)))?;
+        
+        // Update the role index for efficient retrieval
+        let index_key = format!("role_index::{}::{}", scope_id, subject_id.0);
+        let index_cid = self.create_key_cid(&index_key)?;
+        
+        // Get existing credential IDs from index or create new
+        let mut credential_ids = match storage.get_kv(&index_cid).await {
+            Ok(Some(bytes)) => {
+                serde_json::from_slice::<Vec<String>>(&bytes)
+                    .unwrap_or_default()
+            },
+            _ => Vec::new(),
+        };
+        
+        // Add the new credential ID to the index
+        credential_ids.push(credential_id.clone());
+        
+        // Store the updated index
+        let index_bytes = serde_json::to_vec(&credential_ids)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize index: {}", e)))?;
+            
+        storage.put_kv(index_cid, index_bytes).await
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to store index: {}", e)))?;
+        
+        // Optional: Store in DAG for immutability
+        if options.store_in_dag {
+            // TODO: Implement DAG storage integration
+            // This would involve creating a DAG node with:
+            // - operation_type: "RoleAssignment"
+            // - payload: credential_id or hash of credential
+            // - timestamp: now
+            // - previous: [previous relevant node]
+            // And then storing it in the DAG system
+        }
+        
+        // Return the credential ID
+        Ok(credential_id)
     }
 
-    /// Get the roles assigned to an identity within a specific scope
-    pub async fn get_assigned_roles(&self, identity_id: &IdentityId, scope_id: &str) -> Result<Vec<String>, GovernanceError> {
-        // Create the key for retrieving role assignments
-        let key_str = format!("governance::roles::{}::{}", scope_id, identity_id.0);
-        let key_cid = self.create_key_cid(&key_str)?;
+    /// Get the verified assigned roles for an identity within a scope
+    pub async fn get_verified_roles(&self, identity_id: &IdentityId, scope_id: &str) -> Result<Vec<String>, GovernanceError> {
+        // Get the index of credential IDs for this identity and scope
+        let index_key = format!("role_index::{}::{}", scope_id, identity_id.0);
+        let index_cid = self.create_key_cid(&index_key)?;
         
-        // Get the storage lock
         let storage = self.storage.lock().await;
+        let credential_ids = match storage.get_kv(&index_cid).await {
+            Ok(Some(bytes)) => {
+                serde_json::from_slice::<Vec<String>>(&bytes)
+                    .map_err(|e| GovernanceError::StorageError(format!("Failed to deserialize role index: {}", e)))?
+            },
+            _ => Vec::new(),
+        };
         
-        // Try to load the role assignments
-        match storage.get_kv(&key_cid).await {
-            Ok(Some(roles_bytes)) => {
-                // Deserialize the roles
-                let roles: Vec<String> = serde_json::from_slice(&roles_bytes)
-                    .map_err(|e| GovernanceError::StorageError(format!("Failed to deserialize roles: {}", e)))?;
-                
-                Ok(roles)
-            },
-            Ok(None) => {
-                // No roles assigned
-                Ok(Vec::new())
-            },
-            Err(e) => {
-                // Storage error
-                Err(GovernanceError::StorageError(format!("Failed to load role assignments: {}", e)))
+        if credential_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        
+        // Collect all valid roles from all valid credentials
+        let mut verified_roles = Vec::new();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+            
+        for credential_id in credential_ids {
+            // Retrieve the credential
+            let storage_key = format!("role_credential::{}::{}::{}", 
+                scope_id, identity_id.0, credential_id);
+            let key_cid = self.create_key_cid(&storage_key)?;
+            
+            if let Ok(Some(bytes)) = storage.get_kv(&key_cid).await {
+                if let Ok(credential) = serde_json::from_slice::<RoleAssignmentCredential>(&bytes) {
+                    // Check expiration
+                    if let Some(expiration) = credential.expiration_date {
+                        if expiration < now {
+                            // Skip expired credentials
+                            continue;
+                        }
+                    }
+                    
+                    // Verify the credential signature
+                    if self.verify_credential_signature(&credential).await? {
+                        // If signature is valid, add roles to the verified list
+                        verified_roles.extend(credential.roles);
+                    }
+                }
             }
+        }
+        
+        // De-duplicate roles
+        verified_roles.sort();
+        verified_roles.dedup();
+        
+        Ok(verified_roles)
+    }
+    
+    /// Verify a role assignment credential's signature
+    async fn verify_credential_signature(&self, credential: &RoleAssignmentCredential) -> Result<bool, GovernanceError> {
+        // Get the issuer's identity information to verify the signature
+        let issuer_id = &credential.issuer;
+        
+        // In a production system, this would involve:
+        // 1. Retrieve the issuer's public key from a trusted source
+        // 2. Verify that the issuer has the authority to issue role credentials
+        
+        // For now, we'll do a simpler verification using our local identity service:
+        let identity_service = self.identity.clone();
+        
+        // Create canonical representation for verification (without the signature)
+        let mut verification_credential = credential.clone();
+        let signature_value = verification_credential.proof.signature_value.clone();
+        verification_credential.proof.signature_value = String::new();
+        
+        let canonical = serde_json::to_string(&verification_credential)
+            .map_err(|e| GovernanceError::StorageError(format!("Failed to serialize credential for verification: {}", e)))?;
+            
+        let canonical_hash = Sha256::digest(canonical.as_bytes());
+        
+        // Decode the signature
+        let signature = BASE64.decode(&signature_value)
+            .map_err(|e| GovernanceError::InvalidProposal(format!("Invalid signature encoding: {}", e)))?;
+            
+        // Verify the signature using the issuer's public key
+        // In a real implementation, you'd retrieve the issuer's public key from a trusted registry
+        // For now, we're using a simplified approach
+        if identity_service.did() == issuer_id.0 {
+            // If we are the issuer, verify with our own keypair
+            match identity_service.keypair().sign(canonical_hash.as_slice()) {
+                Ok(our_signature) => {
+                    // In a real implementation, we would cryptographically verify
+                    // For now, we'll compare our signature with the stored one
+                    Ok(our_signature == signature)
+                },
+                Err(e) => Err(GovernanceError::StorageError(format!("Signature verification failed: {}", e)))
+            }
+        } else {
+            // For external issuers, we would need to retrieve their public key
+            // This is a placeholder for now - in a real implementation, you would:
+            // 1. Retrieve the issuer's DID Document
+            // 2. Extract the verification method referenced in proof.verification_method
+            // 3. Use that public key to verify the signature
+            
+            // TODO: Implement proper external issuer verification
+            // For now, only accept credentials issued by this governance kernel instance
+            Err(GovernanceError::InvalidProposal(
+                format!("Currently only supporting self-issued credentials, got {}", issuer_id.0)
+            ))
         }
     }
 
@@ -631,6 +869,11 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
             .map_err(|e| GovernanceError::EventEmissionError(e))?;
         
         Ok(())
+    }
+
+    /// Get the assigned roles for an identity within a scope (for backward compatibility)
+    pub async fn get_assigned_roles(&self, identity_id: &IdentityId, scope_id: &str) -> Result<Vec<String>, GovernanceError> {
+        self.get_verified_roles(identity_id, scope_id).await
     }
 }
 
@@ -1491,6 +1734,7 @@ impl CclInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_identity::IdentityId;
     
     #[test]
     fn test_proposal_calculate_id() {
@@ -1510,5 +1754,56 @@ mod tests {
         };
         
         assert_eq!(proposal.calculate_id(), "proposal:test-proposal");
+    }
+    
+    #[test]
+    fn test_role_assignment_structs() {
+        // Test that our role assignment credential structures are defined correctly
+        println!("Testing role assignment credential structures");
+        
+        // Create test credential
+        let credential = RoleAssignmentCredential {
+            issuer: IdentityId("did:icn:test:issuer".to_string()),
+            subject: IdentityId("did:icn:test:subject".to_string()),
+            issuance_date: 1625097600, // Example timestamp
+            expiration_date: Some(1656633600), // Example timestamp one year later
+            scope_id: "test-scope".to_string(),
+            scope_type: IdentityScope::Cooperative,
+            roles: vec!["admin".to_string(), "member".to_string()],
+            proof: SignatureProof {
+                signature_type: "Ed25519Signature2020".to_string(),
+                signature_value: "test-signature".to_string(),
+                created: 1625097600,
+                verification_method: "did:icn:test:issuer#keys-1".to_string(),
+                purpose: "assertionMethod".to_string(),
+            },
+        };
+        
+        // Test that the fields are accessible
+        assert_eq!(credential.issuer.0, "did:icn:test:issuer");
+        assert_eq!(credential.subject.0, "did:icn:test:subject");
+        assert_eq!(credential.roles.len(), 2);
+        assert!(credential.roles.contains(&"admin".to_string()));
+        assert!(credential.roles.contains(&"member".to_string()));
+        assert_eq!(credential.proof.signature_type, "Ed25519Signature2020");
+        
+        // Test assignment options
+        let options = RoleAssignmentOptions {
+            expiration_days: Some(365),
+            scope_type: Some(IdentityScope::Cooperative),
+            store_in_dag: true,
+        };
+        
+        assert_eq!(options.expiration_days, Some(365));
+        assert_eq!(options.scope_type, Some(IdentityScope::Cooperative));
+        assert!(options.store_in_dag);
+        
+        // Test default options
+        let default_options = RoleAssignmentOptions::default();
+        assert_eq!(default_options.expiration_days, None);
+        assert_eq!(default_options.scope_type, None);
+        assert!(!default_options.store_in_dag);
+        
+        println!("Role assignment credential structures test passed");
     }
 } 

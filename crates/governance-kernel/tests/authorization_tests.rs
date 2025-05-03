@@ -120,7 +120,7 @@ async fn test_unauthorized_proposal_creation() {
     kernel.store_governance_config(scope_id, config).await.unwrap();
     
     // Assign the admin role to admin_id
-    kernel.assign_roles(&admin_id, scope_id, vec!["admin".to_string()]).await.unwrap();
+    kernel.assign_roles(&admin_id, scope_id, vec!["admin".to_string()], None).await.unwrap();
     
     // Create a test proposal as a user without permissions
     let user_proposal = create_test_proposal(&user_id, scope_id);
@@ -159,8 +159,8 @@ async fn test_unauthorized_vote() {
     kernel.store_governance_config(scope_id, config).await.unwrap();
     
     // Assign roles
-    kernel.assign_roles(&admin_id, scope_id, vec!["admin".to_string()]).await.unwrap();
-    kernel.assign_roles(&voter_id, scope_id, vec!["voter".to_string()]).await.unwrap();
+    kernel.assign_roles(&admin_id, scope_id, vec!["admin".to_string()], None).await.unwrap();
+    kernel.assign_roles(&voter_id, scope_id, vec!["voter".to_string()], None).await.unwrap();
     
     // Create a proposal as admin
     let admin_proposal = create_test_proposal(&admin_id, scope_id);
@@ -220,7 +220,7 @@ async fn test_permission_inheritance() {
     kernel.store_governance_config(scope_id, config).await.unwrap();
     
     // Assign multiple roles to admin
-    kernel.assign_roles(&admin_id, scope_id, vec!["admin".to_string(), "voter".to_string()]).await.unwrap();
+    kernel.assign_roles(&admin_id, scope_id, vec!["admin".to_string(), "voter".to_string()], None).await.unwrap();
     
     // Create a test proposal
     let proposal = create_test_proposal(&admin_id, scope_id);
@@ -253,7 +253,7 @@ async fn test_role_assignment() {
     
     // Assign roles to a user
     let roles = vec!["custom_role".to_string(), "another_role".to_string()];
-    kernel.assign_roles(&user_id, scope_id, roles.clone()).await.unwrap();
+    kernel.assign_roles(&user_id, scope_id, roles.clone(), None).await.unwrap();
     
     // Get the roles assigned to the user
     let assigned_roles = kernel.get_assigned_roles(&user_id, scope_id).await.unwrap();
@@ -265,7 +265,7 @@ async fn test_role_assignment() {
     
     // Update the roles
     let new_roles = vec!["new_role".to_string()];
-    kernel.assign_roles(&user_id, scope_id, new_roles.clone()).await.unwrap();
+    kernel.assign_roles(&user_id, scope_id, new_roles.clone(), None).await.unwrap();
     
     // Get the updated roles
     let updated_roles = kernel.get_assigned_roles(&user_id, scope_id).await.unwrap();
