@@ -92,6 +92,70 @@ pub enum AgentError {
     /// Sync error
     #[error("Sync error: {0}")]
     SyncError(String),
+    
+    /// Network error
+    #[error("Network error: {0}")]
+    NetworkError(String),
+    
+    /// Thread conflict
+    #[error("Thread conflict: {0}")]
+    ThreadConflict(String),
+    
+    /// Authorization error
+    #[error("Authorization error: {0}")]
+    AuthorizationError(String),
+    
+    /// Auth error
+    #[error("Auth error: {0}")]
+    AuthError(String),
+    
+    /// Wallet core error
+    #[error("Wallet core error: {0}")]
+    WalletCoreError(String),
+    
+    /// Invalid input
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+    
+    /// Task error
+    #[error("Task error: {0}")]
+    TaskError(String),
+    
+    /// Other error
+    #[error("Other error: {0}")]
+    Other(String),
+}
+
+impl From<wallet_core::error::WalletError> for AgentError {
+    fn from(err: wallet_core::error::WalletError) -> Self {
+        AgentError::WalletCoreError(err.to_string())
+    }
+}
+
+impl From<tokio::task::JoinError> for AgentError {
+    fn from(err: tokio::task::JoinError) -> Self {
+        AgentError::TaskError(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for AgentError {
+    fn from(err: serde_json::Error) -> Self {
+        AgentError::SerializationError(err.to_string())
+    }
+}
+
+impl From<reqwest::Error> for AgentError {
+    fn from(err: reqwest::Error) -> Self {
+        if err.is_connect() {
+            AgentError::ConnectionError(err.to_string())
+        } else if err.is_timeout() {
+            AgentError::NetworkError(format!("Request timed out: {}", err))
+        } else if err.is_decode() {
+            AgentError::SerializationError(format!("Failed to decode response: {}", err))
+        } else {
+            AgentError::Other(err.to_string())
+        }
+    }
 }
 
 pub type AgentResult<T> = Result<T, AgentError>; 

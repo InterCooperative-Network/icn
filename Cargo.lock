@@ -107,13 +107,16 @@ version = "0.1.0"
 dependencies = [
  "actix-rt",
  "axum",
+ "base64 0.21.7",
  "chrono",
  "dotenv",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
  "sqlx",
+ "thiserror 1.0.69",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

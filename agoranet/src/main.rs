@@ -1,12 +1,14 @@
 use axum::{
     routing::get,
     Router,
+    middleware::from_fn as middleware_fn,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 mod routes;
+mod auth;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,9 +22,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let pool = Arc::new(pool);
 
+    // Public routes (no auth required)
+    let public_routes = Router::new()
+        .route("/health", get(|| async { "ok" }));
+
+    // Protected API routes (auth required)
+    let api_routes = Router::new()
+        .nest("/threads", routes::threads::routes())
+        .route("/auth/verify", get(auth::verify_token))
+        .layer(middleware_fn(auth::auth_middleware));
+
+    // Main app with all routes
     let app = Router::new()
-        .route("/health", get(|| async { "ok" }))
-        .merge(routes::threads::routes())
+        .merge(public_routes)
+        .nest("/api", api_routes)
         .with_state(pool);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "3001".to_string());
