@@ -1,3 +1,9 @@
+[package]
+name = "icn-runtime-root"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
 [workspace]
 members = [
     "crates/core-vm",
@@ -14,22 +20,20 @@ members = [
 ]
 resolver = "2"
 
+# Dependencies are now inherited from the root workspace
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Additional crate-specific dependencies not in root workspace
 [workspace.dependencies]
-clap = { version = "4.4", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-anyhow = "1.0"
-tracing = "0.1"
-tracing-subscriber = "0.3"
 wasmer = "3.1"
 wasmer-wasi = "3.1"
-libp2p = "0.53"
-multihash = { version = "0.16.3", features = ["sha2"] }
-cid = { version = "0.10.1", features = ["serde"] }
 did-method-key = "0.2"
 hashbrown = "0.14"
 merkle-cbt = "0.3"
-async-trait = "0.1"
-libipld-core = "0.13.1"
-futures = "0.3" 
+libipld-core = "0.13.1" 
