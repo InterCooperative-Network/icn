@@ -43,4 +43,19 @@ icn-dag = { path = "../crates/dag" }
 
 [[bin]]
 name = "covm"
-path = "covm.rs" 
+path = "covm.rs"
+
+[dev-dependencies]
+# For testing
+tempfile = "3.8"
+assert_fs = "1.0"
+predicates = "2.1"
+icn-ccl-compiler = { path = "../crates/ccl-compiler" }
+
+[[test]]
+name = "entity_creation_test"
+path = "tests/entity_creation_test.rs"
+
+[[test]]
+name = "ccl_entity_creation_test"
+path = "tests/ccl_entity_creation_test.rs" 

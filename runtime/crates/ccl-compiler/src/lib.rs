@@ -606,6 +606,28 @@ impl CclCompiler {
         // Parameters: (content_ptr, content_len, parents_ptr, parents_count, result_ptr, result_capacity), Returns: result length or error code
         types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
         
+        // Type 10: (i32, i32, i32, i32, i32, i32, i32, i32) -> i32 for host_create_sub_dag function
+        // Parameters: (parent_did_ptr, parent_did_len, genesis_payload_ptr, genesis_payload_len, entity_type_ptr, entity_type_len, did_out_ptr, did_out_max_len),
+        // Returns: length of result DID or error code
+        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        
+        // Type 11: (i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) -> i32 for host_store_node function
+        // Parameters: (entity_did_ptr, entity_did_len, payload_ptr, payload_len, parents_ptr_ptr, parents_count, parents_lens_ptr, 
+        //              signature_ptr, signature_len, metadata_ptr, metadata_len, cid_out_ptr, cid_out_max_len)
+        // Returns: length of CID bytes or error code
+        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, 
+                            ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        
+        // Type 12: (i32, i32, i32, i32, i32, i32) -> i32 for host_get_node function
+        // Parameters: (entity_did_ptr, entity_did_len, cid_ptr, cid_len, node_out_ptr, node_out_max_len)
+        // Returns: length of node bytes or error code
+        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        
+        // Type 13: (i32, i32, i32, i32) -> i32 for host_contains_node function
+        // Parameters: (entity_did_ptr, entity_did_len, cid_ptr, cid_len)
+        // Returns: 1 if node exists, 0 if it doesn't, or negative error code
+        types.function(vec![ValType::I32, ValType::I32, ValType::I32, ValType::I32], vec![ValType::I32]);
+        
         module.section(&types);
         
         // Step 4: Define import section - host functions
@@ -633,6 +655,21 @@ impl CclCompiler {
         // Import DAG functions for anchor_data action
         if action == "anchor_data" {
             imports.import("env", "host_anchor_to_dag", EntityType::Function(9));
+        }
+        
+        // Import host functions for entity creation
+        if action == "create_cooperative" || action == "create_community" {
+            imports.import("env", "host_create_sub_dag", EntityType::Function(10));
+        }
+        
+        // Import host functions for DAG node management
+        if action == "store_dag_node" {
+            imports.import("env", "host_store_node", EntityType::Function(11));
+        }
+        
+        if action == "get_dag_node" {
+            imports.import("env", "host_get_node", EntityType::Function(12));
+            imports.import("env", "host_contains_node", EntityType::Function(13));
         }
         
         module.section(&imports);
@@ -876,6 +913,264 @@ impl CclCompiler {
                 0, // Memory index
                 &wasm_encoder::ConstExpr::i32_const(8192), // Offset for data buffer
                 vec![0; 1024].iter().copied(), // 1024 bytes of zeros
+            );
+        }
+        
+        // Add data section for entity creation actions (after the anchor_data action section, around line 777)
+        if action == "create_cooperative" || action == "create_community" {
+            // Add message strings to data section
+            let entity_created_msg = "Entity created successfully. DID: ";
+            let entity_failed_msg = "Entity creation failed";
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(5100), // Offset for success message
+                entity_created_msg.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(5150), // Offset for failure message
+                entity_failed_msg.as_bytes().iter().copied(),
+            );
+            
+            // Extract parent_did from DSL input
+            let parent_did = dsl_input.get("parent_did")
+                .and_then(|p| p.as_str())
+                .unwrap_or("did:icn:federation"); // Default to federation DID if not specified
+            
+            // Store parent_did at offset 5200
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(5200), // Offset for parent_did
+                parent_did.as_bytes().iter().copied(),
+            );
+            
+            // Extract genesis_payload from DSL input or create default
+            let genesis_payload_bytes = if let Some(payload) = dsl_input.get("genesis_payload") {
+                // Serialize to CBOR
+                let ipld_value = convert_json_to_ipld(payload)?;
+                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?
+            } else {
+                // Create a default payload with name and description
+                let entity_name = dsl_input.get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or(if action == "create_cooperative" { "New Cooperative" } else { "New Community" });
+                
+                let description = dsl_input.get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("Created via CCL");
+                
+                let now = chrono::Utc::now().timestamp();
+                
+                let default_payload = serde_json::json!({
+                    "name": entity_name,
+                    "description": description,
+                    "created_at": now,
+                    "created_by": options.caller_did.clone().unwrap_or_default()
+                });
+                
+                let ipld_value = convert_json_to_ipld(&default_payload)?;
+                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                    .map_err(|e| CompilerError::DslError(format!("Failed to encode default payload as CBOR: {}", e)))?
+            };
+            
+            // Store genesis_payload at offset 5500
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(5500), // Offset for genesis_payload
+                genesis_payload_bytes.iter().copied(),
+            );
+            
+            // Set entity_type based on action
+            let entity_type = if action == "create_cooperative" { "Cooperative" } else { "Community" };
+            
+            // Store entity_type at offset 5800
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(5800), // Offset for entity_type
+                entity_type.as_bytes().iter().copied(),
+            );
+            
+            // Create buffer for output DID at offset 6100
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(6100), // Offset for output DID
+                vec![0; 100].iter().copied(), // 100 bytes for DID
+            );
+        }
+        
+        if action == "store_dag_node" {
+            // Add message strings
+            let node_stored_msg = "Node stored successfully. CID: ";
+            let node_failed_msg = "Node storage failed";
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(6200), // Offset for success message
+                node_stored_msg.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(6250), // Offset for failure message
+                node_failed_msg.as_bytes().iter().copied(),
+            );
+            
+            // Extract entity_did from DSL input
+            let entity_did = dsl_input.get("entity_did")
+                .and_then(|p| p.as_str())
+                .unwrap_or(""); // No default, will be a runtime error if not provided
+            
+            // Store entity_did at offset 6300
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(6300), // Offset for entity_did
+                entity_did.as_bytes().iter().copied(),
+            );
+            
+            // Extract payload from DSL input
+            if let Some(payload) = dsl_input.get("payload") {
+                // Serialize to CBOR
+                let ipld_value = convert_json_to_ipld(payload)?;
+                let payload_bytes = libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?;
+                
+                // Store payload at offset 6400
+                data_section.active(
+                    0, // Memory index
+                    &wasm_encoder::ConstExpr::i32_const(6400), // Offset for payload
+                    payload_bytes.iter().copied(),
+                );
+            } else {
+                return Err(CompilerError::DslError("store_dag_node requires payload field".to_string()));
+            }
+            
+            // Extract parent CIDs if present
+            let parents = dsl_input.get("parents").and_then(|p| p.as_array()).cloned().unwrap_or_default();
+            let parent_cids: Vec<String> = parents.iter()
+                .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                .collect();
+            
+            // Store parent CIDs at sequential offsets starting at 6500
+            for (i, cid_str) in parent_cids.iter().enumerate() {
+                let offset = 6500 + (i * 100); // Assume each CID gets 100 bytes of space
+                data_section.active(
+                    0, // Memory index
+                    &wasm_encoder::ConstExpr::i32_const(offset as i32),
+                    cid_str.as_bytes().iter().copied(),
+                );
+            }
+            
+            // Store pointers to parent CIDs at 7500
+            // This is an array of 32-bit pointers to each parent CID string
+            let mut parent_ptrs = Vec::new();
+            for i in 0..parent_cids.len() {
+                // Convert each offset to little-endian bytes
+                let ptr = (6500 + (i * 100)) as u32;
+                parent_ptrs.extend_from_slice(&ptr.to_le_bytes());
+            }
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(7500), // Offset for parent pointers array
+                parent_ptrs.iter().copied(),
+            );
+            
+            // Store lengths of parent CIDs at 7600
+            let mut parent_lens = Vec::new();
+            for cid_str in &parent_cids {
+                // Convert each length to little-endian bytes
+                let len = cid_str.len() as u32;
+                parent_lens.extend_from_slice(&len.to_le_bytes());
+            }
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(7600), // Offset for parent lengths array
+                parent_lens.iter().copied(),
+            );
+            
+            // Create empty/dummy signature at 7700
+            // In a real implementation, this would be generated by the calling client
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(7700), // Offset for signature
+                vec![0; 64].iter().copied(), // 64 bytes placeholder signature
+            );
+            
+            // Create default metadata at 7800
+            let metadata = serde_json::json!({
+                "timestamp": chrono::Utc::now().timestamp() as u64,
+                "sequence": 1,
+                "scope": entity_did,
+            });
+            
+            let ipld_value = convert_json_to_ipld(&metadata)?;
+            let metadata_bytes = libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                .map_err(|e| CompilerError::DslError(format!("Failed to encode metadata as CBOR: {}", e)))?;
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(7800), // Offset for metadata
+                metadata_bytes.iter().copied(),
+            );
+            
+            // Create buffer for output CID at offset 7900
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(7900), // Offset for output CID
+                vec![0; 100].iter().copied(), // 100 bytes for CID
+            );
+        }
+        
+        if action == "get_dag_node" {
+            // Add message strings
+            let node_found_msg = "Node found. CID: ";
+            let node_not_found_msg = "Node not found";
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(8000), // Offset for found message
+                node_found_msg.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(8050), // Offset for not found message
+                node_not_found_msg.as_bytes().iter().copied(),
+            );
+            
+            // Extract entity_did from DSL input
+            let entity_did = dsl_input.get("entity_did")
+                .and_then(|p| p.as_str())
+                .unwrap_or(""); // No default, will be a runtime error if not provided
+            
+            // Store entity_did at offset 8100
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(8100), // Offset for entity_did
+                entity_did.as_bytes().iter().copied(),
+            );
+            
+            // Extract CID from DSL input
+            let cid_str = dsl_input.get("cid")
+                .and_then(|c| c.as_str())
+                .unwrap_or(""); // No default, will be a runtime error if not provided
+            
+            // Store CID at offset 8200
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(8200), // Offset for CID
+                cid_str.as_bytes().iter().copied(),
+            );
+            
+            // Create buffer for output node at offset 8300
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(8300), // Offset for output node
+                vec![0; 1024].iter().copied(), // 1024 bytes for node (adjust as needed)
             );
         }
         
@@ -1226,6 +1521,315 @@ impl CclCompiler {
             
             // End if
             invoke_func.instruction(&wasm_encoder::Instruction::End);
+        } else if action == "create_cooperative" || action == "create_community" {
+            // Get parameters for create_sub_dag call
+            // Parent DID pointer and length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5200)); // parent_did pointer
+            let parent_did = dsl_input.get("parent_did")
+                .and_then(|p| p.as_str())
+                .unwrap_or("did:icn:federation");
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(parent_did.len() as i32)); // parent_did length
+            
+            // Genesis payload pointer and length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5500)); // genesis_payload pointer
+            
+            // Calculate payload length
+            let genesis_payload_bytes = if let Some(payload) = dsl_input.get("genesis_payload") {
+                let ipld_value = convert_json_to_ipld(payload)?;
+                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?
+            } else {
+                // Calculate length for default payload (already stored in data section)
+                let entity_name = dsl_input.get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or(if action == "create_cooperative" { "New Cooperative" } else { "New Community" });
+                
+                let description = dsl_input.get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("Created via CCL");
+                
+                let now = chrono::Utc::now().timestamp();
+                
+                let default_payload = serde_json::json!({
+                    "name": entity_name,
+                    "description": description,
+                    "created_at": now,
+                    "created_by": options.caller_did.clone().unwrap_or_default()
+                });
+                
+                let ipld_value = convert_json_to_ipld(&default_payload)?;
+                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                    .map_err(|e| CompilerError::DslError(format!("Failed to encode default payload as CBOR: {}", e)))?
+            };
+            
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(genesis_payload_bytes.len() as i32)); // genesis_payload length
+            
+            // Entity type pointer and length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5800)); // entity_type pointer
+            let entity_type = if action == "create_cooperative" { "Cooperative" } else { "Community" };
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_type.len() as i32)); // entity_type length
+            
+            // Output DID buffer pointer and max length
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6100)); // output DID pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // max output DID length
+            
+            // Call host_create_sub_dag
+            let import_index = imports.count() - 1; // Get the index of the last imported function
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(import_index));
+            
+            // Store result in local 1
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
+            
+            // Check if creation was successful (result > 0)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32GtS); // result > 0
+            
+            // If-else block
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // If branch (success)
+            // Log success message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5100)); // Success message
+            let success_msg = "Entity created successfully. DID: ";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(success_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Log the created DID
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6100)); // DID buffer
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1)); // DID length from result
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set success status (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // Else branch (creation failed)
+            invoke_func.instruction(&wasm_encoder::Instruction::Else);
+            
+            // Log failure message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(5150)); // Failure message
+            let failure_msg = "Entity creation failed";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(failure_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set return value to error (1)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // End if
+            invoke_func.instruction(&wasm_encoder::Instruction::End);
+            
+        } else if action == "store_dag_node" {
+            // Parameters for host_store_node
+            // entity_did_ptr, entity_did_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6300)); // entity_did pointer
+            let entity_did = dsl_input.get("entity_did")
+                .and_then(|p| p.as_str())
+                .unwrap_or(""); // No default, will be a runtime error if not provided
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_did.len() as i32)); // entity_did length
+            
+            // payload_ptr, payload_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6400)); // payload pointer
+            // Calculate payload length (already computed when adding to data section)
+            let payload_bytes = if let Some(payload) = dsl_input.get("payload") {
+                let ipld_value = convert_json_to_ipld(payload)?;
+                libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                    .map_err(|e| CompilerError::DslError(format!("Failed to encode payload as CBOR: {}", e)))?;
+            } else {
+                return Err(CompilerError::DslError("store_dag_node requires payload field".to_string()));
+            };
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(payload_bytes.len() as i32)); // payload length
+            
+            // parents_cids_ptr_ptr, parents_cids_count
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7500)); // parents pointers array
+            let parents = dsl_input.get("parents").and_then(|p| p.as_array()).cloned().unwrap_or_default();
+            let parent_cids: Vec<String> = parents.iter()
+                .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                .collect();
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(parent_cids.len() as i32)); // parents count
+            
+            // parent_cid_lens_ptr
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7600)); // parents lengths array
+            
+            // signature_ptr, signature_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7700)); // signature pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(64)); // signature length (64 bytes placeholder)
+            
+            // metadata_ptr, metadata_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7800)); // metadata pointer
+            // Calculate metadata length (already computed when adding to data section)
+            let metadata = serde_json::json!({
+                "timestamp": chrono::Utc::now().timestamp() as u64,
+                "sequence": 1,
+                "scope": entity_did
+            });
+            let ipld_value = convert_json_to_ipld(&metadata)?;
+            let metadata_bytes = libipld_dagcbor::DagCborCodec.encode(&ipld_value)
+                .map_err(|e| CompilerError::DslError(format!("Failed to encode metadata as CBOR: {}", e)))?;
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(metadata_bytes.len() as i32)); // metadata length
+            
+            // cid_out_ptr, cid_out_max_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(7900)); // output CID pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(100)); // max output CID length
+            
+            // Call host_store_node
+            let import_index = imports.count() - 1; // Get the index of the last imported function
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(import_index));
+            
+            // Store result in local 1
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
+            
+            // Check if storage was successful (result > 0)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32GtS); // result > 0
+            
+            // If-else block
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // If branch (success)
+            // Log success message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6200)); // Success message
+            let success_msg = "Node stored successfully. CID: ";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(success_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set success status (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // Else branch (storage failed)
+            invoke_func.instruction(&wasm_encoder::Instruction::Else);
+            
+            // Log failure message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(6250)); // Failure message
+            let failure_msg = "Node storage failed";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(failure_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set failure status (already default, but being explicit)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // End if/else
+            invoke_func.instruction(&wasm_encoder::Instruction::End);
+            
+        } else if action == "get_dag_node" {
+            // First, check if the node exists using host_contains_node
+            // entity_did_ptr, entity_did_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8100)); // entity_did pointer
+            let entity_did = dsl_input.get("entity_did")
+                .and_then(|p| p.as_str())
+                .unwrap_or(""); // No default, will be a runtime error if not provided
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_did.len() as i32)); // entity_did length
+            
+            // cid_ptr, cid_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8200)); // CID pointer
+            let cid_str = dsl_input.get("cid")
+                .and_then(|c| c.as_str())
+                .unwrap_or(""); // No default, will be a runtime error if not provided
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(cid_str.len() as i32)); // CID length
+            
+            // Call host_contains_node
+            let contains_index = imports.count() - 1; // Get the index of the host_contains_node function
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(contains_index));
+            
+            // Store result in local 1
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(1));
+            
+            // Check if node exists (result == 1)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Eq); // result == 1
+            
+            // If-else block
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // If branch (node exists), call host_get_node
+            // entity_did_ptr, entity_did_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8100)); // entity_did pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(entity_did.len() as i32)); // entity_did length
+            
+            // cid_ptr, cid_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8200)); // CID pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(cid_str.len() as i32)); // CID length
+            
+            // node_out_ptr, node_out_max_len
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8300)); // output node pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1024)); // max output node length
+            
+            // Call host_get_node
+            let get_node_index = contains_index - 1; // Get the index of the host_get_node function
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(get_node_index));
+            
+            // Store result in local 2
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(2));
+            
+            // Check if retrieval was successful (result > 0)
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalGet(2));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32GtS); // result > 0
+            
+            // If-else block
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // If branch (retrieval success)
+            // Log success message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8000)); // Success message
+            let success_msg = "Node found. CID: ";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(success_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Log the CID
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8200)); // CID pointer
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(cid_str.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set success status (0)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // Else branch (retrieval failed)
+            invoke_func.instruction(&wasm_encoder::Instruction::Else);
+            
+            // Log failure message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8050)); // Failure message
+            let failure_msg = "Node not found";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(failure_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set failure status
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // End inner if/else
+            invoke_func.instruction(&wasm_encoder::Instruction::End);
+            
+            // Else branch (node doesn't exist)
+            invoke_func.instruction(&wasm_encoder::Instruction::Else);
+            
+            // Log "Node not found" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(8050)); // Not found message
+            let not_found_msg = "Node not found";
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(not_found_msg.len() as i32));
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Set failure status
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // End outer if/else
+            invoke_func.instruction(&wasm_encoder::Instruction::End);
         }
         
         // Return the status code from local 0
@@ -1290,5 +1894,37 @@ impl CclCompiler {
         Err(CompilerError::General(
             "Templated WASM generation not yet implemented".to_string(),
         ))
+    }
+}
+
+/// Helper function to convert JSON to IPLD
+fn convert_json_to_ipld(json: &serde_json::Value) -> CompilerResult<libipld::Ipld> {
+    match json {
+        serde_json::Value::Null => Ok(libipld::Ipld::Null),
+        serde_json::Value::Bool(b) => Ok(libipld::Ipld::Bool(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(libipld::Ipld::Integer(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(libipld::Ipld::Float(f))
+            } else {
+                Err(CompilerError::DslError(format!("Unsupported number format: {}", n)))
+            }
+        },
+        serde_json::Value::String(s) => Ok(libipld::Ipld::String(s.clone())),
+        serde_json::Value::Array(arr) => {
+            let mut ipld_array = Vec::new();
+            for item in arr {
+                ipld_array.push(convert_json_to_ipld(item)?);
+            }
+            Ok(libipld::Ipld::List(ipld_array))
+        },
+        serde_json::Value::Object(obj) => {
+            let mut ipld_map = std::collections::BTreeMap::new();
+            for (key, value) in obj {
+                ipld_map.insert(key.clone(), convert_json_to_ipld(value)?);
+            }
+            Ok(libipld::Ipld::Map(ipld_map))
+        }
     }
 } 

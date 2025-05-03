@@ -11,6 +11,7 @@ license = "Apache-2.0 OR MIT"
 icn-governance-kernel = { path = "../governance-kernel" }
 icn-identity = { path = "../identity" }
 icn-economics = { path = "../economics" }
+icn-dag = { path = "../dag" }
 
 # WASM compilation
 wasm-encoder = "0.31"
@@ -18,6 +19,14 @@ wasmtime = "12.0.2"
 
 # Schema validation
 jsonschema = "0.17"
+
+# IPLD & DAG-CBOR serialization
+libipld = { version = "0.16", features = ["derive"] }
+libipld-dagcbor = "0.16"
+cid = "0.10"
+
+# Date and time
+chrono = "0.4"
 
 # Utilities
 serde = { version = "1.0", features = ["derive"] }
