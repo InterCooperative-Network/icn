@@ -353,6 +353,18 @@ impl CclCompiler {
                     "log_caller_info" => {
                         // This action doesn't require additional fields
                     }
+                    "perform_metered_action" => {
+                        if !dsl_obj.contains_key("resource_type") {
+                            return Err(CompilerError::DslError(
+                                "perform_metered_action requires 'resource_type' field".to_string(),
+                            ));
+                        }
+                        if !dsl_obj.contains_key("amount") {
+                            return Err(CompilerError::DslError(
+                                "perform_metered_action requires 'amount' field".to_string(),
+                            ));
+                        }
+                    }
                     // Add more action-specific validations as needed
                     _ => {
                         return Err(CompilerError::DslError(format!(
@@ -573,6 +585,14 @@ impl CclCompiler {
         // Type 6: () -> i32 for host_get_caller_scope function
         // No parameters, Returns: scope as integer
         types.function(vec![], vec![ValType::I32]);
+
+        // Type 7: (i32, i64) -> i32 for host_check_resource_authorization function
+        // Parameters: (resource_type, amount), Returns: authorization status
+        types.function(vec![ValType::I32, ValType::I64], vec![ValType::I32]);
+        
+        // Type 8: (i32, i64) -> () for host_record_resource_usage function
+        // Parameters: (resource_type, amount), Returns: nothing
+        types.function(vec![ValType::I32, ValType::I64], vec![]);
         
         module.section(&types);
         
@@ -590,6 +610,12 @@ impl CclCompiler {
         if action == "log_caller_info" {
             imports.import("env", "host_get_caller_did", EntityType::Function(5));
             imports.import("env", "host_get_caller_scope", EntityType::Function(6));
+        }
+        
+        // Import economic functions for perform_metered_action
+        if action == "perform_metered_action" {
+            imports.import("env", "host_check_resource_authorization", EntityType::Function(7));
+            imports.import("env", "host_record_resource_usage", EntityType::Function(8));
         }
         
         module.section(&imports);
@@ -695,6 +721,39 @@ impl CclCompiler {
                 0, // Memory index
                 &wasm_encoder::ConstExpr::i32_const(9000), // Offset for caller DID buffer
                 vec![0; 100].iter().copied(), // 100 bytes of zeros
+            );
+        }
+        
+        // Add message strings for perform_metered_action action
+        if action == "perform_metered_action" {
+            let checking_resource_msg = "Checking resource:";
+            let authorized_msg = "Authorized";
+            let not_authorized_msg = "NOT Authorized";
+            let recording_usage_msg = "Recording usage:";
+            
+            // Add message strings to data section
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(2000), // Offset for checking_resource_msg
+                checking_resource_msg.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(2050), // Offset for authorized_msg
+                authorized_msg.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(2100), // Offset for not_authorized_msg
+                not_authorized_msg.as_bytes().iter().copied(),
+            );
+            
+            data_section.active(
+                0, // Memory index
+                &wasm_encoder::ConstExpr::i32_const(2150), // Offset for recording_usage_msg
+                recording_usage_msg.as_bytes().iter().copied(),
             );
         }
         
@@ -904,6 +963,86 @@ impl CclCompiler {
             // For this example, just return success (0)
             invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
             invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+        } else if action == "perform_metered_action" {
+            // Extract resource type and amount from the DSL input
+            let resource_type = dsl_input.get("resource_type")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0); // Default to Compute (0) if not specified
+            
+            let amount = dsl_input.get("amount")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(1); // Default to 1 if not specified
+            
+            // Log "Checking resource:" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2000)); // Checking resource message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(17)); // Length of "Checking resource:"
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Call host_check_resource_authorization with resource_type and amount
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(resource_type as i32)); // resource_type
+            invoke_func.instruction(&wasm_encoder::Instruction::I64Const(amount as i64)); // amount
+            
+            // Calculate the correct index for the host function
+            let check_auth_index = if action == "log_caller_info" {
+                // If log_caller_info action imports are present
+                5
+            } else {
+                // Otherwise, it's at index 2 (after log_message, storage_get, storage_put)
+                2
+            };
+            
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(check_auth_index));
+            
+            // Check the result (1 = authorized, 0 = not authorized)
+            // If result is not equal to 0 (i.e., it's 1 for authorized)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Ne);
+            
+            // Branch if authorized
+            invoke_func.instruction(&wasm_encoder::Instruction::If(wasm_encoder::BlockType::Empty));
+            
+            // Log "Authorized" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2050)); // Authorized message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(10)); // Length of "Authorized"
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Log "Recording usage:" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2150)); // Recording usage message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(16)); // Length of "Recording usage:"
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Call host_record_resource_usage with resource_type and amount
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(resource_type as i32)); // resource_type
+            invoke_func.instruction(&wasm_encoder::Instruction::I64Const(amount as i64)); // amount
+            
+            // Calculate the function index for host_record_resource_usage
+            let record_usage_index = check_auth_index + 1; // It comes right after host_check_resource_authorization
+            
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(record_usage_index));
+            
+            // Return success (1 = authorized and recorded)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // Else branch (not authorized)
+            invoke_func.instruction(&wasm_encoder::Instruction::Else);
+            
+            // Log "NOT Authorized" message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(1)); // Log level (INFO)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(2100)); // NOT Authorized message
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(14)); // Length of "NOT Authorized"
+            invoke_func.instruction(&wasm_encoder::Instruction::Call(0)); // Call host_log_message
+            
+            // Return failure (0 = not authorized)
+            invoke_func.instruction(&wasm_encoder::Instruction::I32Const(0));
+            invoke_func.instruction(&wasm_encoder::Instruction::LocalSet(0));
+            
+            // End if
+            invoke_func.instruction(&wasm_encoder::Instruction::End);
+            
         } else {
             // Default logic for unknown actions
             // Return "not implemented" status (1) - already set as default
