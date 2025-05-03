@@ -20,9 +20,10 @@ use wallet_core::dag::{DagThread, DagNode, CachedDagThreadInfo as CoreCachedDagT
 use wallet_core::error::{WalletError as CoreWalletError, WalletResult};
 use wallet_core::identity::IdentityWallet;
 use wallet_core::store::file::FileStore;
-use wallet_agent::action::{Action, ActionRecord, ActionStatus as CoreActionStatus};
-use wallet_agent::processor::ActionProcessor;
-use wallet_sync::sync_manager::{SyncManager, SyncManagerConfig, NetworkStatus};
+use wallet_agent::{ActionQueue, PendingAction};
+use wallet_agent::{ActionProcessor, ProcessingStatus, ThreadConflict, ConflictResolutionStrategy};
+use wallet_types::action::{ActionStatus as CoreActionStatus, ActionType};
+use wallet_types::network::{NetworkStatus, NodeSubmissionResponse};
 use wallet_sync::trust::TrustBundleValidator;
 use wallet_agent::governance::TrustBundle;
 

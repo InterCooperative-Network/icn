@@ -1,8 +1,10 @@
 use serde::{Serialize, Deserialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use wallet_core::identity::IdentityWallet;
 use crate::error::{AgentResult, AgentError};
-use crate::queue::{ProposalQueue, ActionType};
+use chrono::{DateTime, Utc};
+use crate::queue::ProposalQueue;
+use wallet_types::action::ActionType;
 use crate::agoranet::AgoraNetClient;
 use uuid::Uuid;
 use std::path::{Path, PathBuf};
@@ -102,17 +104,17 @@ impl Guardian {
     }
     
     pub fn appeal_mandate(&self, mandate_id: &str, reason: String) -> AgentResult<String> {
-        let appeal = serde_json::json!({
-            "mandate_id": mandate_id,
+        let appeal_payload = serde_json::json!({
+            "proposal_id": mandate_id,
             "reason": reason,
-            "timestamp": chrono::Utc::now().timestamp(),
-            "appealer": self.identity.did.to_string(),
+            "appeal_date": chrono::Utc::now().to_rfc3339(),
+            "status": "pending"
         });
         
-        let action = self.queue.queue_action(ActionType::Appeal, appeal)?;
-        let signed_action = self.queue.sign_action(&action.id)?;
+        // For now, we'll treat appeals as a type of proposal
+        let action = self.queue.queue_action(ActionType::Proposal, appeal_payload)?;
         
-        Ok(signed_action.id)
+        Ok(action.id)
     }
     
     pub fn verify_trust_bundle(&self, bundle: &TrustBundle) -> AgentResult<bool> {

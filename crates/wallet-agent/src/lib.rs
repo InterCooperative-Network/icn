@@ -10,5 +10,6 @@ mod tests {
 }
 
 pub use error::{AgentError, AgentResult};
-pub use queue::{ActionQueue, PendingAction};
+pub use queue::{ActionQueue, PendingAction, QueuedAction};
 pub use processor::{ActionProcessor, ProcessingStatus, ThreadConflict, ConflictResolutionStrategy};
+pub use wallet_types::action::{ActionStatus, ActionType};

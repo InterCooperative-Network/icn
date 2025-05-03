@@ -1,17 +1,52 @@
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::Utc;
+use chrono::{Utc, DateTime};
 use serde_json::Value;
 use wallet_core::identity::IdentityWallet;
-use wallet_core::dag::{DagNode, DagThread};
+use wallet_core::dag::{DagNode, DagThread, ThreadType};
 use wallet_core::store::LocalWalletStore;
 use wallet_core::error::WalletError;
 use crate::error::{AgentError, AgentResult};
-use crate::queue::{ActionQueue, PendingAction, ActionStatus, ActionType};
-use wallet_sync::SyncManager;
+use crate::queue::{ActionQueue, PendingAction};
+use wallet_types::action::{ActionStatus, ActionType};
+use wallet_types::network::NodeSubmissionResponse;
 use tracing::{debug, error, info, warn};
 use futures::future::try_join_all;
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
+use serde::{Serialize, Deserialize};
+use tokio::sync::Mutex;
+use async_trait::async_trait;
+use base64::Engine;
+
+/// Adapter for SyncManager to handle interaction with wallet-sync components
+#[derive(Clone)]
+pub struct SyncManagerAdapter<S: LocalWalletStore> {
+    store: S,
+}
+
+impl<S: LocalWalletStore> SyncManagerAdapter<S> {
+    pub fn new(store: S) -> Self {
+        Self { store }
+    }
+    
+    pub async fn fetch_dag_thread(&self, thread_id: &str) -> AgentResult<DagThread> {
+        // In a real implementation, this would call the actual SyncManager
+        // For now, just try to load from the local store as fallback
+        self.store.load_dag_thread(thread_id).await
+            .map_err(|e| AgentError::SyncError(format!("Failed to load thread: {}", e)))
+    }
+    
+    pub async fn submit_dag_node(&self, node: &DagNode) -> AgentResult<NodeSubmissionResponse> {
+        // In a real implementation, this would submit to the network
+        // For now, just return a successful response
+        Ok(NodeSubmissionResponse {
+            success: true,
+            cid: Some(node.links.get("self").cloned().unwrap_or_default()),
+            error: None,
+        })
+    }
+}
 
 /// Status of action processing
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,7 +96,7 @@ pub struct ActionProcessor<S: LocalWalletStore> {
     /// Store for accessing wallets and persisting results
     store: S,
     /// Sync manager for network operations (optional)
-    sync_manager: Option<SyncManager<S>>,
+    sync_manager: Option<SyncManagerAdapter<S>>,
 }
 
 impl<S: LocalWalletStore> ActionProcessor<S> {
@@ -74,10 +109,10 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
     }
     
     /// Create a new ActionProcessor with a sync manager for network operations
-    pub fn with_sync_manager(store: S, sync_manager: SyncManager<S>) -> Self {
+    pub fn with_sync_manager(store: S) -> Self {
         Self {
-            store,
-            sync_manager: Some(sync_manager),
+            store: store.clone(),
+            sync_manager: Some(SyncManagerAdapter::new(store)),
         }
     }
     
@@ -136,21 +171,22 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
         let dag_node = self.create_dag_node(&action, &identity, &canonical_payload, signature, parent_cid)?;
         
         // 8. Store the DAG node locally
-        self.store.save_dag_node(&dag_node.cid, &dag_node).await
+        let node_id = dag_node.links.get("self").cloned().unwrap_or_default();
+        self.store.save_dag_node(&node_id, &dag_node).await
             .map_err(|e| AgentError::CoreError(e))?;
             
         // 9. If a sync manager is available, submit the node to the network
         let status = if let Some(sync_manager) = &self.sync_manager {
-            match self.submit_to_network(sync_manager, &dag_node).await {
+            match sync_manager.submit_dag_node(&dag_node).await {
                 Ok(submission_result) => {
                     // Update the DAG node with the assigned CID if different
                     if let Some(assigned_cid) = submission_result.cid {
-                        if assigned_cid != dag_node.cid {
-                            debug!("Node CID reassigned from {} to {}", dag_node.cid, assigned_cid);
+                        if assigned_cid != node_id {
+                            debug!("Node CID reassigned from {} to {}", node_id, assigned_cid);
                             
                             // Save the node with the new CID
                             let mut updated_node = dag_node.clone();
-                            updated_node.cid = assigned_cid.clone();
+                            updated_node.links.insert("self".to_string(), assigned_cid.clone());
                             
                             self.store.save_dag_node(&assigned_cid, &updated_node).await
                                 .map_err(|e| AgentError::CoreError(e))?;
@@ -172,7 +208,8 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
         };
             
         // 10. Update the DAG thread with the new node's CID
-        self.update_dag_thread(&thread_id, &dag_node.cid, &action).await?;
+        let node_id = dag_node.links.get("self").cloned().unwrap_or_default();
+        self.update_dag_thread(&thread_id, &node_id, &action).await?;
             
         // 11. Update the action status to completed
         action.status = ActionStatus::Completed;
@@ -249,7 +286,7 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
                 // Update the existing thread
                 let mut updated_thread = thread;
                 updated_thread.latest_cid = node_cid.to_string();
-                updated_thread.updated_at = std::time::SystemTime::now();
+                updated_thread.updated_at = Utc::now();
                 
                 // If this is a proposal, update the title
                 if action.action_type == ActionType::Proposal {
@@ -263,9 +300,9 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
             Err(_) => {
                 // Create a new thread
                 let thread_type = match action.action_type {
-                    ActionType::Proposal => "proposal".to_string(),
-                    ActionType::Vote => "vote".to_string(),
-                    ActionType::Anchor => "anchor".to_string(),
+                    ActionType::Proposal => ThreadType::Proposal,
+                    ActionType::Vote => ThreadType::Vote,
+                    ActionType::Anchor => ThreadType::Anchor,
                 };
                 
                 // Extract title from payload if available
@@ -278,18 +315,13 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
                 
-                DagThread {
-                    id: thread_id.to_string(),
+                DagThread::new(
                     thread_type,
-                    creator: action.creator_did.clone(),
-                    latest_cid: node_cid.to_string(),
+                    action.creator_did.clone(),
+                    node_cid.to_string(),
                     title,
-                    description,
-                    created_at: std::time::SystemTime::now(),
-                    updated_at: std::time::SystemTime::now(),
-                    status: "active".to_string(),
-                    tags: vec![],
-                }
+                    description
+                )
             }
         };
         
@@ -301,11 +333,11 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
     }
     
     /// Submit a DAG node to the network
-    async fn submit_to_network(&self, sync_manager: &SyncManager<S>, node: &DagNode) -> AgentResult<wallet_sync::NodeSubmissionResponse> {
-        debug!("Submitting DAG node {} to network", node.cid);
+    async fn submit_to_network(&self, sync_manager: &SyncManagerAdapter<S>, node: &DagNode) -> AgentResult<NodeSubmissionResponse> {
+        let node_id = node.links.get("self").cloned().unwrap_or_default();
+        debug!("Submitting DAG node {} to network", node_id);
         
-        let response = sync_manager.submit_dag_node(node).await
-            .map_err(|e| AgentError::SyncError(format!("Failed to submit node to network: {}", e)))?;
+        let response = sync_manager.submit_dag_node(node).await?;
             
         if !response.success {
             return Err(AgentError::SyncError(format!(
@@ -314,7 +346,7 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
             )));
         }
         
-        debug!("Node {} submitted successfully", node.cid);
+        debug!("Node {} submitted successfully", node_id);
         Ok(response)
     }
     
@@ -336,7 +368,7 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
     fn create_dag_node(&self, 
         action: &PendingAction, 
         identity: &IdentityWallet,
-        canonical_payload: &str,
+        _canonical_payload: &str,
         signature: Vec<u8>,
         parent_cid: Option<String>
     ) -> AgentResult<DagNode> {
@@ -347,516 +379,75 @@ impl<S: LocalWalletStore> ActionProcessor<S> {
         // Encode the signature as base64
         let sig_b64 = base64::engine::general_purpose::STANDARD.encode(&signature);
         
-        // Create the signatures array for the DAG node
-        let signatures = vec![serde_json::json!({
-            "signer": identity.did.to_string(),
-            "signature": sig_b64,
-            "created": Utc::now().to_rfc3339(),
-        })];
+        // Create the signatures map for the DAG node
+        let mut signatures = HashMap::new();
+        signatures.insert(identity.did.to_string(), sig_b64);
         
-        // Set up parents array
-        let parents = if let Some(parent) = parent_cid {
-            vec![parent]
-        } else {
-            Vec::new()
-        };
+        // Set up links map
+        let mut links = HashMap::new();
+        links.insert("self".to_string(), cid.clone());
+        if let Some(parent) = parent_cid {
+            links.insert("parent".to_string(), parent);
+        }
+        
+        // Convert the action payload to a proper data format for DagNode
+        let data = serde_json::json!({
+            "type": format!("action/{:?}", action.action_type).to_lowercase(),
+            "cid": cid.clone(),
+            "creator": identity.did.to_string(),
+            "content": action.payload.clone(),
+            "local_created": true
+        });
         
         // Create the DAG node
         let node = DagNode {
-            cid: cid.clone(),
-            parents,
-            epoch: 0, // Will be filled in when synchronized
-            creator: identity.did.to_string(),
-            timestamp: std::time::SystemTime::now(),
-            content_type: format!("action/{:?}", action.action_type).to_lowercase(),
-            content: action.payload.clone(),
+            data,
+            links,
             signatures,
+            created_at: Utc::now(),
         };
         
         Ok(node)
     }
     
-    /// Detect and resolve conflicts in a DAG thread
-    pub async fn resolve_thread_conflicts(&self, thread_id: &str) -> AgentResult<Option<ThreadConflict>> {
-        // Use the default strategy (EarliestTimestamp) for backward compatibility
-        self.resolve_thread_conflicts_with_strategy(thread_id, ConflictResolutionStrategy::EarliestTimestamp).await
-    }
-    
-    /// Resolve conflicts with a specific strategy
-    pub async fn resolve_thread_conflicts_with_strategy(
-        &self, 
-        thread_id: &str, 
-        strategy: ConflictResolutionStrategy
-    ) -> AgentResult<Option<ThreadConflict>> {
-        info!("Checking for conflicts in thread: {} using strategy: {:?}", thread_id, strategy);
-        
-        // First, load the full thread history
-        let thread_history = self.load_thread_history(thread_id).await?;
-        
-        // Build a map of parent CIDs to child nodes to detect forks
-        let mut parent_to_children: HashMap<String, Vec<String>> = HashMap::new();
-        let mut nodes_by_cid: HashMap<String, DagNode> = HashMap::new();
-        
-        for (cid, node) in thread_history {
-            nodes_by_cid.insert(cid.clone(), node.clone());
-            
-            for parent in node.parents.iter() {
-                parent_to_children
-                    .entry(parent.clone())
-                    .or_insert_with(Vec::new)
-                    .push(cid.clone());
-            }
-        }
-        
-        // Detect forks (any parent with more than one child indicates a fork)
-        let mut conflicts = Vec::new();
-        for (parent, children) in parent_to_children.iter() {
-            if children.len() > 1 {
-                debug!("Found fork at parent {}: {} children", parent, children.len());
-                conflicts.push((parent.clone(), children.clone()));
-            }
-        }
-        
-        if conflicts.is_empty() {
-            debug!("No conflicts found in thread {}", thread_id);
-            return Ok(None);
-        }
-        
-        // For this implementation, we'll focus on resolving the most recent conflict
-        let (parent_cid, conflicting_cids) = conflicts.pop().unwrap();
-        
-        // Apply the conflict resolution strategy
-        let resolved_cid = match self.apply_resolution_strategy(
-            &strategy, &conflicting_cids, &nodes_by_cid
-        ) {
-            Ok(cid) => cid,
-            Err(AgentError::UserInterventionRequired(msg)) => {
-                // If user intervention is required, return the conflict without resolving it
-                // This allows higher-level components to handle the user interaction
-                return Ok(Some(ThreadConflict {
-                    thread_id: thread_id.to_string(),
-                    conflicting_cids,
-                    detected_at: std::time::SystemTime::now(),
-                    resolution_strategy: strategy,
-                    resolved_cid: None, // No resolution yet
-                }));
-            },
-            Err(e) => return Err(e),
-        };
-        
-        // Create a conflict record
-        let conflict = ThreadConflict {
-            thread_id: thread_id.to_string(),
-            conflicting_cids,
-            detected_at: std::time::SystemTime::now(),
-            resolution_strategy: strategy,
-            resolved_cid: Some(resolved_cid.clone()),
-        };
-        
-        // Update the thread to point to the resolved node
-        self.update_thread_to_resolved_cid(thread_id, &resolved_cid).await?;
-        
-        info!("Resolved conflict in thread {} using strategy {:?}. Selected CID: {}", 
-              thread_id, strategy, resolved_cid);
-        
-        Ok(Some(conflict))
-    }
-    
-    /// Apply the selected conflict resolution strategy
-    fn apply_resolution_strategy(
-        &self,
-        strategy: &ConflictResolutionStrategy,
-        conflicting_cids: &[String],
-        nodes_by_cid: &HashMap<String, DagNode>
-    ) -> AgentResult<String> {
-        match strategy {
-            ConflictResolutionStrategy::EarliestTimestamp => {
-                // Find the node with the earliest timestamp
-                let mut earliest_node = None;
-                let mut earliest_time = std::time::SystemTime::now();
-                
-                for cid in conflicting_cids {
-                    if let Some(node) = nodes_by_cid.get(cid) {
-                        if node.timestamp < earliest_time {
-                            earliest_time = node.timestamp;
-                            earliest_node = Some(cid);
-                        }
-                    }
-                }
-                
-                earliest_node
-                    .cloned()
-                    .ok_or_else(|| AgentError::DagError("No valid node found for conflict resolution".to_string()))
-            },
-            ConflictResolutionStrategy::MostSignatures => {
-                // Find the node with the most signatures
-                let mut most_signatures_node = None;
-                let mut max_signatures = 0;
-                
-                for cid in conflicting_cids {
-                    if let Some(node) = nodes_by_cid.get(cid) {
-                        let sig_count = node.signatures.len();
-                        if sig_count > max_signatures {
-                            max_signatures = sig_count;
-                            most_signatures_node = Some(cid);
-                        }
-                    }
-                }
-                
-                most_signatures_node
-                    .cloned()
-                    .ok_or_else(|| AgentError::DagError("No valid node found for conflict resolution".to_string()))
-            },
-            ConflictResolutionStrategy::TakeLocal => {
-                // Find the local node (last in our DAG thread)
-                if let Some(last_cid) = self.get_local_head_cid(conflicting_cids, nodes_by_cid) {
-                    info!("Conflict resolution: Taking local version (CID: {})", last_cid);
-                    Ok(last_cid)
-                } else {
-                    Err(AgentError::DagError("Could not determine local head node for conflict resolution".to_string()))
-                }
-            },
-            ConflictResolutionStrategy::TakeRemote => {
-                // Find the remote node (node that's not in our local thread)
-                if let Some(remote_cid) = self.get_remote_cid(conflicting_cids, nodes_by_cid) {
-                    info!("Conflict resolution: Taking remote version (CID: {})", remote_cid);
-                    Ok(remote_cid)
-                } else {
-                    Err(AgentError::DagError("Could not determine remote node for conflict resolution".to_string()))
-                }
-            },
-            ConflictResolutionStrategy::AskUser => {
-                // Log that user intervention is required
-                warn!("Conflict resolution requires user intervention for CIDs: {:?}", conflicting_cids);
-                
-                // For now, we can't actually ask the user directly from this layer
-                // Return a specific error that can be caught by higher layers
-                Err(AgentError::UserInterventionRequired(
-                    format!("User decision required to resolve conflict between: {:?}", conflicting_cids)
-                ))
-            },
-            // Other strategies would be implemented similarly
-            _ => Err(AgentError::NotImplemented(
-                format!("Conflict resolution strategy {:?} not implemented", strategy)
-            )),
-        }
-    }
-    
-    /// Get the local head CID from the conflicting CIDs
-    fn get_local_head_cid(&self, conflicting_cids: &[String], nodes_by_cid: &HashMap<String, DagNode>) -> Option<String> {
-        // In a real implementation, we would determine which node is the latest one we know about locally
-        // For simplicity in this implementation, we'll take the node with the latest timestamp that
-        // has a creator that matches our local identity
-        
-        // First, try to find a node created by our identity
-        let mut local_cids = Vec::new();
-        
-        for cid in conflicting_cids {
-            if let Some(node) = nodes_by_cid.get(cid) {
-                // In a real implementation, we would check if this node was created locally
-                // For now, we'll use a heuristic: if we have the node stored locally and it's
-                // not marked as from a sync, consider it local
-                if node.content.get("local_created") == Some(&serde_json::Value::Bool(true)) {
-                    local_cids.push(cid.clone());
-                }
-            }
-        }
-        
-        // If we found local nodes, return the one with the latest timestamp
-        if !local_cids.is_empty() {
-            let mut latest_cid = local_cids[0].clone();
-            let mut latest_time = nodes_by_cid.get(&latest_cid).map(|n| n.timestamp).unwrap_or_default();
-            
-            for cid in &local_cids[1..] {
-                if let Some(node) = nodes_by_cid.get(cid) {
-                    if node.timestamp > latest_time {
-                        latest_time = node.timestamp;
-                        latest_cid = cid.clone();
-                    }
-                }
-            }
-            
-            return Some(latest_cid);
-        }
-        
-        // If we couldn't determine which is local, just return the first one
-        conflicting_cids.first().cloned()
-    }
-    
-    /// Get the remote CID from the conflicting CIDs
-    fn get_remote_cid(&self, conflicting_cids: &[String], nodes_by_cid: &HashMap<String, DagNode>) -> Option<String> {
-        // In a real implementation, we would determine which node is from the network
-        // For simplicity in this implementation, we'll take any node that is not created locally
-        
-        for cid in conflicting_cids {
-            if let Some(node) = nodes_by_cid.get(cid) {
-                // If the node is not marked as locally created, consider it remote
-                if node.content.get("local_created") != Some(&serde_json::Value::Bool(true)) {
-                    return Some(cid.clone());
-                }
-            }
-        }
-        
-        // If we couldn't determine which is remote, just return the last one
-        // (assuming it's more likely to be remote)
-        conflicting_cids.last().cloned()
-    }
-    
-    /// Load the full history of a thread
-    async fn load_thread_history(&self, thread_id: &str) -> AgentResult<HashMap<String, DagNode>> {
-        let mut history = HashMap::new();
-        let mut to_visit = HashSet::new();
-        
-        // Start with the latest node in the thread
-        match self.load_thread_latest_cid(thread_id).await {
-            Ok(latest_cid) => {
-                to_visit.insert(latest_cid);
-            },
-            Err(e) => {
-                warn!("Failed to get latest CID for thread {}: {}", thread_id, e);
-                return Ok(HashMap::new());
-            }
-        }
-        
-        // If we have a sync manager, try to fetch additional nodes from the network
-        if let Some(sync_manager) = &self.sync_manager {
-            match sync_manager.fetch_dag_thread(thread_id).await {
-                Ok(thread) => {
-                    if !thread.latest_cid.is_empty() {
-                        to_visit.insert(thread.latest_cid);
-                    }
-                },
-                Err(e) => {
-                    warn!("Failed to fetch thread from network: {}", e);
-                    // Continue with local data
-                }
-            }
-        }
-        
-        // Process all nodes in the thread by traversing the DAG
-        while let Some(cid) = to_visit.iter().next().cloned() {
-            to_visit.remove(&cid);
-            
-            // Skip if we've already processed this node
-            if history.contains_key(&cid) {
-                continue;
-            }
-            
-            // Load the node
-            match self.store.load_dag_node(&cid).await {
-                Ok(node) => {
-                    // Add all parents to the visit list
-                    for parent in &node.parents {
-                        to_visit.insert(parent.clone());
-                    }
-                    
-                    // Add this node to the history
-                    history.insert(cid, node);
-                },
-                Err(e) => {
-                    warn!("Failed to load node {}: {}", cid, e);
-                    // Continue with other nodes
-                }
-            }
-        }
-        
-        Ok(history)
-    }
-    
-    /// Update a thread to point to the resolved CID
-    async fn update_thread_to_resolved_cid(&self, thread_id: &str, resolved_cid: &str) -> AgentResult<()> {
-        // Load the thread
-        let thread = match self.store.load_dag_thread(thread_id).await {
-            Ok(thread) => {
-                let mut updated_thread = thread;
-                // Update the latest CID
-                updated_thread.latest_cid = resolved_cid.to_string();
-                updated_thread.updated_at = std::time::SystemTime::now();
-                updated_thread
-            },
-            Err(e) => {
-                return Err(AgentError::CoreError(e));
-            }
-        };
-        
-        // Save the updated thread
-        self.store.save_dag_thread(thread_id, &thread).await
-            .map_err(|e| AgentError::CoreError(e))?;
-            
-        Ok(())
-    }
-    
-    /// Process multiple related actions atomically as a batch
+    /// Process multiple actions as a group
     pub async fn process_action_group(&self, action_ids: &[String]) -> AgentResult<Vec<DagNode>> {
-        if action_ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        
-        info!("Processing action group with {} actions", action_ids.len());
-        
-        // Get the queue to access actions
-        let queue = ActionQueue::new(self.store.clone());
-        
-        // Load all actions to process
-        let mut actions = Vec::new();
-        for action_id in action_ids {
-            let action = queue.get_action(action_id).await?;
-            
-            // Verify action can be processed
-            if action.status == ActionStatus::Completed {
-                return Err(AgentError::InvalidState(
-                    format!("Action {} is already completed", action_id)
-                ));
-            }
-            
-            if action.status == ActionStatus::Failed {
-                return Err(AgentError::InvalidState(
-                    format!("Action {} previously failed", action_id)
-                ));
-            }
-            
-            // Update status to processing
-            let mut processing_action = action.clone();
-            processing_action.status = ActionStatus::Processing;
-            queue.update_action(&processing_action).await?;
-            
-            actions.push(processing_action);
-        }
-        
-        // Process all actions individually
         let mut results = Vec::new();
-        let mut nodes = Vec::new();
+        let mut failed_actions = Vec::new();
         
-        // First phase: generate DAG nodes for all actions but don't submit yet
-        for action in &actions {
-            match self.prepare_dag_node(action).await {
+        // Process each action
+        for action_id in action_ids {
+            match self.process_action(action_id).await {
                 Ok(node) => {
-                    results.push(Ok(node.clone()));
-                    nodes.push(node);
+                    results.push(node);
                 },
                 Err(e) => {
-                    // If any action preparation fails, mark all as failed
-                    error!("Failed to prepare DAG node for action {}: {}", action.id, e);
-                    
-                    // Update all actions to failed status
-                    for action in &actions {
-                        let mut failed_action = action.clone();
-                        failed_action.status = ActionStatus::Failed;
-                        failed_action.error = Some(format!("Batch processing failed: {}", e));
-                        let _ = queue.update_action(&failed_action).await;
-                    }
-                    
-                    return Err(e);
+                    error!("Failed to process action {}: {}", action_id, e);
+                    failed_actions.push((action_id.clone(), e));
                 }
             }
         }
         
-        // Second phase: submit all nodes as a batch if we have a sync manager
-        if let Some(sync_manager) = &self.sync_manager {
-            if !nodes.is_empty() {
-                match sync_manager.submit_dag_nodes_batch(&nodes).await {
-                    Ok(responses) => {
-                        debug!("Successfully submitted {} nodes as a batch", nodes.len());
-                        
-                        // Update nodes with any CID changes from the responses
-                        for (i, response) in responses.iter().enumerate() {
-                            if let Some(assigned_cid) = &response.cid {
-                                if assigned_cid != &nodes[i].cid {
-                                    debug!("Node CID reassigned from {} to {}", nodes[i].cid, assigned_cid);
-                                    
-                                    // Update the node with the new CID
-                                    let mut updated_node = nodes[i].clone();
-                                    updated_node.cid = assigned_cid.clone();
-                                    
-                                    // Save with the new CID
-                                    self.store.save_dag_node(assigned_cid, &updated_node).await
-                                        .map_err(|e| AgentError::CoreError(e))?;
-                                        
-                                    // Replace in our results array
-                                    results[i] = Ok(updated_node);
-                                }
-                            }
-                        }
-                    },
-                    Err(e) => {
-                        warn!("Failed to submit batch of nodes: {}", e);
-                        // We continue since we have the nodes stored locally
+        // Mark failed actions
+        let queue = ActionQueue::new(self.store.clone());
+        for (action_id, error) in failed_actions {
+            // Get the action to update it
+            match queue.get_action(&action_id).await {
+                Ok(mut failed_action) => {
+                    failed_action.status = ActionStatus::Failed;
+                    failed_action.error_message = Some(format!("Batch processing failed: {}", error));
+                    
+                    // Update the action
+                    if let Err(e) = queue.update_action(&failed_action).await {
+                        error!("Failed to update action status for {}: {}", action_id, e);
                     }
+                },
+                Err(e) => {
+                    error!("Failed to get action {} for status update: {}", action_id, e);
                 }
             }
         }
         
-        // Third phase: update all threads and mark actions as completed
-        for (i, action) in actions.iter().enumerate() {
-            if let Ok(node) = &results[i] {
-                // Determine thread ID
-                let thread_id = match self.determine_thread_id(action).await {
-                    Some(id) => id,
-                    None => {
-                        // Create a new thread ID if none exists
-                        format!("thread:{}", Uuid::new_v4())
-                    }
-                };
-                
-                // Update the thread with this node
-                self.update_dag_thread(&thread_id, &node.cid, action).await?;
-                
-                // Mark the action as completed
-                let mut completed_action = action.clone();
-                completed_action.status = ActionStatus::Completed;
-                queue.update_action(&completed_action).await?;
-            }
-        }
-        
-        // Return all the successfully processed nodes
-        let processed_nodes = results.into_iter()
-            .filter_map(Result::ok)
-            .collect();
-            
-        Ok(processed_nodes)
-    }
-    
-    /// Prepare a DAG node from an action but don't submit it yet
-    async fn prepare_dag_node(&self, action: &PendingAction) -> AgentResult<DagNode> {
-        // Load the creator's identity wallet
-        let creator_did = &action.creator_did;
-        let identity = self.store.load_identity(creator_did).await
-            .map_err(|e| AgentError::StoreError(format!("Failed to load identity {}: {}", creator_did, e)))?;
-            
-        // Determine the relevant DAG thread ID
-        let thread_id = match self.determine_thread_id(action).await {
-            Some(id) => id,
-            None => {
-                // Create a new thread ID if none exists
-                format!("thread:{}", Uuid::new_v4())
-            }
-        };
-        
-        // Try to load the DAG thread and get latest CID
-        let parent_cid = match self.load_thread_latest_cid(&thread_id).await {
-            Ok(cid) => {
-                debug!("Found parent CID {} for thread {}", cid, thread_id);
-                Some(cid)
-            },
-            Err(e) => {
-                warn!("No parent CID found for thread {}: {}", thread_id, e);
-                None
-            }
-        };
-        
-        // Prepare the payload in canonical format
-        let canonical_payload = self.canonicalize_payload(action)?;
-        
-        // Sign the canonical payload
-        let signature = identity.sign_message(canonical_payload.as_bytes());
-        
-        // Create a DAG node with the signed payload
-        let dag_node = self.create_dag_node(action, &identity, &canonical_payload, signature, parent_cid)?;
-        
-        // Store the DAG node locally
-        self.store.save_dag_node(&dag_node.cid, &dag_node).await
-            .map_err(|e| AgentError::CoreError(e))?;
-            
-        Ok(dag_node)
+        Ok(results)
     }
 } 

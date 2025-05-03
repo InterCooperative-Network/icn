@@ -766,4 +766,3 @@ impl SyncClient {
         Ok(false)
     }
 } 
-} 

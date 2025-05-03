@@ -1,20 +1,18 @@
 namespace wallet {
-    // Error types
     [Error]
     enum WalletError {
-        "StoreError", // Error related to storage operations
-        "SyncError", // Error related to network synchronization
-        "ValidationError", // Error related to validation failures
-        "NotFound", // Resource not found
-        "ConfigError", // Configuration error
-        "CryptoError", // Cryptographic operation error
-        "SerializationError", // Serialization/deserialization error
-        "InvalidInput", // Invalid input data
-        "Unauthorized", // Unauthorized operation
-        "UnknownError" // Other/unknown errors
+        "StoreError",
+        "SyncError", 
+        "ValidationError",
+        "NotFound",
+        "ConfigError",
+        "CryptoError",
+        "SerializationError",
+        "InvalidInput",
+        "Unauthorized",
+        "UnknownError"
     };
 
-    // Enums
     enum SyncStatus {
         "Idle",
         "Syncing",
@@ -37,120 +35,15 @@ namespace wallet {
         "Custom"
     };
 
-    // Dictionaries for complex objects
-    dictionary IdentityInfo {
-        string id;
-        string display_name;
-        string created_at;
-        boolean is_active;
-    };
-
-    dictionary IdentityDetails {
-        string id;
-        string display_name;
-        string created_at;
-        boolean is_active;
-        sequence<string> credential_ids;
-        record<DOMString, DOMString> metadata;
-    };
-
-    dictionary TrustBundleInfo {
-        string id;
-        u64 epoch;
-        boolean is_active;
-        sequence<string> guardians;
-        u32 threshold;
-    };
-
-    dictionary CachedDagThreadInfo {
-        string thread_id;
-        DagThreadType thread_type;
-        sequence<string> node_cids;
-        string head_cid;
-        string tail_cid;
-        string last_updated;
-        record<DOMString, DOMString> metadata;
-    };
-
-    dictionary ActionInfo {
-        string id;
-        string creator_id;
-        string action_type;
-        string created_at;
-        ActionStatus status;
-        string? error_message;
-        record<DOMString, DOMString> payload;
-    };
-
-    dictionary SyncStatusInfo {
-        SyncStatus status;
-        u64? last_sync_timestamp;
-        boolean is_connected;
-        string? error_message;
-        u64 pending_actions;
-    };
-
     dictionary WalletConfig {
         string storage_path;
-        sequence<string> federation_urls;
-        u64 sync_interval_seconds;
-        boolean auto_sync_on_startup;
     };
 
-    // Main interface
+    // Minimal API for testing
     interface WalletApi {
-        // Constructor - initializes a new wallet with optional configuration
         [Throws=WalletError]
         constructor(WalletConfig? config = null);
 
-        // Identity management
-        [Throws=WalletError]
-        string create_identity(string scope, record<DOMString, DOMString> metadata);
-
-        [Throws=WalletError]
-        sequence<IdentityInfo> list_identities();
-
-        [Throws=WalletError]
-        IdentityDetails get_identity(string id);
-
-        [Throws=WalletError]
-        boolean delete_identity(string id);
-
-        // Action management
-        [Throws=WalletError]
-        string queue_action(string creator_id, string type, record<DOMString, DOMString> payload);
-
-        [Throws=WalletError]
-        void process_action(string action_id);
-
-        [Throws=WalletError]
-        sequence<ActionInfo> list_actions(ActionStatus? status = null);
-
-        [Throws=WalletError]
-        ActionInfo get_action_status(string action_id);
-
-        // Sync management
-        [Throws=WalletError]
-        void trigger_sync();
-
-        [Throws=WalletError]
-        SyncStatusInfo get_sync_status();
-
-        // Trust bundles
-        [Throws=WalletError]
-        sequence<TrustBundleInfo> list_trust_bundles();
-
-        [Throws=WalletError]
-        TrustBundleInfo? get_trust_bundle(string id);
-
-        // DAG thread operations
-        [Throws=WalletError]
-        sequence<string> list_dag_threads();
-
-        [Throws=WalletError]
-        CachedDagThreadInfo? get_dag_thread_cache(string thread_id);
-
-        // Configuration
         [Throws=WalletError]
         WalletConfig get_config();
 

@@ -3,7 +3,10 @@ use serde_json::Value;
 use reqwest::{Client as HttpClient, StatusCode};
 use crate::error::{AgentResult, AgentError};
 use wallet_core::identity::IdentityWallet;
-use wallet_core::credential::VerifiableCredential;
+use wallet_core::dag::DagNode;
+use wallet_core::dag::ThreadType;
+use wallet_core::vc::VerifiableCredential;
+use wallet_types::network::NodeSubmissionResponse;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
@@ -11,6 +14,8 @@ use std::time::{Duration, Instant};
 use backoff::ExponentialBackoff;
 use async_trait::async_trait;
 use tracing::{info, warn, error, debug};
+use uuid::Uuid;
+use tokio::time::sleep;
 
 const DEFAULT_AGORANET_URL: &str = "https://agoranet.icn.network/api";
 const DEFAULT_CACHE_TTL_SECS: u64 = 300; // 5 minutes
@@ -226,66 +231,58 @@ impl AgoraNetClient {
         // Execute request with retry logic
         let url = format!("{}/threads", self.base_url);
         
-        // Use a backoff strategy for retries
+        // Configure backoff strategy
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(30)),
-            max_interval: Duration::from_secs(5),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         };
         
         // Lock to prevent multiple retry-heavy operations from running concurrently
         // which could overload the server or trigger rate limits
         let _lock = self.connectivity_lock.lock().await;
         
-        let result = backoff::future::retry(backoff, || async {
-            match self.http_client.get(&url)
+        // Retry with exponential backoff
+        let result = async {
+            let response = self.http_client.get(&url)
                 .query(&query_params)
                 .header("Authorization", format!("DID {}", self.identity.did))
-                .send().await
-            {
-                Ok(response) => {
-                    let context = format!("fetching threads (proposal_id={:?}, topic={:?})", proposal_id, topic);
-                    match self.handle_api_response::<Vec<ThreadSummary>>(response, &context).await {
-                        Ok(threads) => Ok(threads),
-                        Err(e) => {
-                            // These errors shouldn't be retried
-                            if matches!(e, 
-                                AgentError::AuthenticationError(_) | 
-                                AgentError::PermissionError(_) | 
-                                AgentError::ResourceNotFound(_)
-                            ) {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                            // These might be temporary and should be retried
-                            else if matches!(e,
-                                AgentError::ServerError(_) |
-                                AgentError::RateLimitExceeded(_) |
-                                AgentError::GovernanceError(_)
-                            ) {
-                                Err(backoff::Error::Transient(e))
-                            }
-                            // Others we'll consider permanent for now
-                            else {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                        }
-                    }
-                },
-                Err(e) => {
+                .send()
+                .await
+                .map_err(|e| {
                     if e.is_timeout() || e.is_connect() {
-                        warn!("Network error fetching threads, will retry: {}", e);
-                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
-                            "Network error fetching threads: {}", e
-                        ))))
+                        backoff::Error::transient(e)
                     } else {
-                        error!("Request error fetching threads: {}", e);
-                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
-                            "Request error fetching threads: {}", e
-                        ))))
+                        backoff::Error::permanent(e)
+                    }
+                })?;
+                
+            // Check status code
+            if !response.status().is_success() {
+                // Handle different error status codes
+                match response.status() {
+                    StatusCode::FORBIDDEN | 
+                    StatusCode::UNAUTHORIZED | 
+                    StatusCode::NOT_FOUND |
+                    StatusCode::TOO_MANY_REQUESTS | 
+                    StatusCode::INTERNAL_SERVER_ERROR => {
+                        return Err(backoff::Error::permanent(self.handle_api_response::<Vec<ThreadSummary>>(response, "fetching threads").await?));
+                    },
+                    _ => {
+                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
+                            "Network error fetching threads: {}", response.status()
+                        ))));
                     }
                 }
             }
-        }).await;
+            
+            // Try to parse the response as a list of thread info
+            let threads: Vec<ThreadSummary> = response.json().await
+                .map_err(|e| backoff::Error::permanent(AgentError::SerializationError(format!(
+                    "Failed to deserialize thread list: {}", e
+                ))))?;
+                
+            Ok(threads)
+        }.await;
         
         match result {
             Ok(threads) => {
@@ -318,64 +315,56 @@ impl AgoraNetClient {
         // Execute request with retry logic
         let url = format!("{}/threads/{}", self.base_url, thread_id);
         
-        // Use a backoff strategy for retries
+        // Configure backoff strategy
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(30)),
-            max_interval: Duration::from_secs(5),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         };
         
         // Lock to prevent multiple retry-heavy operations
         let _lock = self.connectivity_lock.lock().await;
         
-        let result = backoff::future::retry(backoff, || async {
-            match self.http_client.get(&url)
+        // Retry with exponential backoff
+        let result = async {
+            let response = self.http_client.get(&url)
                 .header("Authorization", format!("DID {}", self.identity.did))
-                .send().await
-            {
-                Ok(response) => {
-                    let context = format!("fetching thread details for ID {}", thread_id);
-                    match self.handle_api_response::<ThreadDetail>(response, &context).await {
-                        Ok(thread) => Ok(thread),
-                        Err(e) => {
-                            // These errors shouldn't be retried
-                            if matches!(e, 
-                                AgentError::AuthenticationError(_) | 
-                                AgentError::PermissionError(_) | 
-                                AgentError::ResourceNotFound(_)
-                            ) {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                            // These might be temporary and should be retried
-                            else if matches!(e,
-                                AgentError::ServerError(_) |
-                                AgentError::RateLimitExceeded(_) |
-                                AgentError::GovernanceError(_)
-                            ) {
-                                Err(backoff::Error::Transient(e))
-                            }
-                            // Others we'll consider permanent for now
-                            else {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                        }
-                    }
-                },
-                Err(e) => {
+                .send()
+                .await
+                .map_err(|e| {
                     if e.is_timeout() || e.is_connect() {
-                        warn!("Network error fetching thread details, will retry: {}", e);
-                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
-                            "Network error fetching thread details: {}", e
-                        ))))
+                        backoff::Error::transient(e)
                     } else {
-                        error!("Request error fetching thread details: {}", e);
-                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
-                            "Request error fetching thread details: {}", e
-                        ))))
+                        backoff::Error::permanent(e)
+                    }
+                })?;
+                
+            // Check status code
+            if !response.status().is_success() {
+                // Handle different error status codes
+                match response.status() {
+                    StatusCode::FORBIDDEN | 
+                    StatusCode::UNAUTHORIZED | 
+                    StatusCode::NOT_FOUND |
+                    StatusCode::TOO_MANY_REQUESTS | 
+                    StatusCode::INTERNAL_SERVER_ERROR => {
+                        return Err(backoff::Error::permanent(self.handle_api_response::<ThreadDetail>(response, "fetching thread details").await?));
+                    },
+                    _ => {
+                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
+                            "Network error fetching thread details: {}", response.status()
+                        ))));
                     }
                 }
             }
-        }).await;
+            
+            // Try to parse the response as thread details
+            let thread: ThreadDetail = response.json().await
+                .map_err(|e| backoff::Error::permanent(AgentError::SerializationError(format!(
+                    "Failed to deserialize thread details: {}", e
+                ))))?;
+                
+            Ok(thread)
+        }.await;
         
         match result {
             Ok(thread) => {
@@ -417,66 +406,58 @@ impl AgoraNetClient {
         // Execute request with retry logic
         let url = format!("{}/threads/credential-link", self.base_url);
         
-        // Use a backoff strategy for retries
+        // Configure backoff strategy
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(30)),
-            max_interval: Duration::from_secs(5),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         };
         
         // Lock to prevent multiple retry-heavy operations
         let _lock = self.connectivity_lock.lock().await;
         
-        let result = backoff::future::retry(backoff, || async {
-            match self.http_client.post(&url)
+        // Retry with exponential backoff
+        let result = async {
+            let response = self.http_client.post(&url)
                 .header("Authorization", format!("DID {}", self.identity.did))
                 .header("X-Signature", signature_b64.clone())
                 .json(&request)
-                .send().await
-            {
-                Ok(response) => {
-                    let context = format!("linking credential to thread {}", thread_id);
-                    match self.handle_api_response::<CredentialLink>(response, &context).await {
-                        Ok(link) => Ok(link),
-                        Err(e) => {
-                            // These errors shouldn't be retried
-                            if matches!(e, 
-                                AgentError::AuthenticationError(_) | 
-                                AgentError::PermissionError(_) | 
-                                AgentError::ResourceNotFound(_)
-                            ) {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                            // These might be temporary and should be retried
-                            else if matches!(e,
-                                AgentError::ServerError(_) |
-                                AgentError::RateLimitExceeded(_) |
-                                AgentError::GovernanceError(_)
-                            ) {
-                                Err(backoff::Error::Transient(e))
-                            }
-                            // Others we'll consider permanent for now
-                            else {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                        }
-                    }
-                },
-                Err(e) => {
+                .send()
+                .await
+                .map_err(|e| {
                     if e.is_timeout() || e.is_connect() {
-                        warn!("Network error linking credential, will retry: {}", e);
-                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
-                            "Network error linking credential: {}", e
-                        ))))
+                        backoff::Error::transient(e)
                     } else {
-                        error!("Request error linking credential: {}", e);
-                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
-                            "Request error linking credential: {}", e
-                        ))))
+                        backoff::Error::permanent(e)
+                    }
+                })?;
+                
+            // Check status code
+            if !response.status().is_success() {
+                // Handle different error status codes
+                match response.status() {
+                    StatusCode::FORBIDDEN | 
+                    StatusCode::UNAUTHORIZED | 
+                    StatusCode::NOT_FOUND |
+                    StatusCode::TOO_MANY_REQUESTS | 
+                    StatusCode::INTERNAL_SERVER_ERROR => {
+                        return Err(backoff::Error::permanent(self.handle_api_response::<CredentialLink>(response, "linking credential").await?));
+                    },
+                    _ => {
+                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
+                            "Network error linking credential: {}", response.status()
+                        ))));
                     }
                 }
             }
-        }).await;
+            
+            // Try to parse the response as a credential link
+            let link: CredentialLink = response.json().await
+                .map_err(|e| backoff::Error::permanent(AgentError::SerializationError(format!(
+                    "Failed to deserialize credential link: {}", e
+                ))))?;
+                
+            Ok(link)
+        }.await;
         
         match result {
             Ok(link) => {
@@ -505,64 +486,56 @@ impl AgoraNetClient {
         // Execute request with retry logic
         let url = format!("{}/threads/{}/credential-links", self.base_url, thread_id);
         
-        // Use a backoff strategy for retries
+        // Configure backoff strategy
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(30)),
-            max_interval: Duration::from_secs(5),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         };
         
         // Lock to prevent multiple retry-heavy operations
         let _lock = self.connectivity_lock.lock().await;
         
-        let result = backoff::future::retry(backoff, || async {
-            match self.http_client.get(&url)
+        // Retry with exponential backoff
+        let result = async {
+            let response = self.http_client.get(&url)
                 .header("Authorization", format!("DID {}", self.identity.did))
-                .send().await
-            {
-                Ok(response) => {
-                    let context = format!("fetching credential links for thread {}", thread_id);
-                    match self.handle_api_response::<Vec<CredentialLink>>(response, &context).await {
-                        Ok(links) => Ok(links),
-                        Err(e) => {
-                            // These errors shouldn't be retried
-                            if matches!(e, 
-                                AgentError::AuthenticationError(_) | 
-                                AgentError::PermissionError(_) | 
-                                AgentError::ResourceNotFound(_)
-                            ) {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                            // These might be temporary and should be retried
-                            else if matches!(e,
-                                AgentError::ServerError(_) |
-                                AgentError::RateLimitExceeded(_) |
-                                AgentError::GovernanceError(_)
-                            ) {
-                                Err(backoff::Error::Transient(e))
-                            }
-                            // Others we'll consider permanent for now
-                            else {
-                                Err(backoff::Error::Permanent(e))
-                            }
-                        }
-                    }
-                },
-                Err(e) => {
+                .send()
+                .await
+                .map_err(|e| {
                     if e.is_timeout() || e.is_connect() {
-                        warn!("Network error fetching credential links, will retry: {}", e);
-                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
-                            "Network error fetching credential links: {}", e
-                        ))))
+                        backoff::Error::transient(e)
                     } else {
-                        error!("Request error fetching credential links: {}", e);
-                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
-                            "Request error fetching credential links: {}", e
-                        ))))
+                        backoff::Error::permanent(e)
+                    }
+                })?;
+                
+            // Check status code
+            if !response.status().is_success() {
+                // Handle different error status codes
+                match response.status() {
+                    StatusCode::FORBIDDEN | 
+                    StatusCode::UNAUTHORIZED | 
+                    StatusCode::NOT_FOUND |
+                    StatusCode::TOO_MANY_REQUESTS | 
+                    StatusCode::INTERNAL_SERVER_ERROR => {
+                        return Err(backoff::Error::permanent(self.handle_api_response::<Vec<CredentialLink>>(response, "fetching credential links").await?));
+                    },
+                    _ => {
+                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
+                            "Network error fetching credential links: {}", response.status()
+                        ))));
                     }
                 }
             }
-        }).await;
+            
+            // Try to parse the response as a list of credential links
+            let links: Vec<CredentialLink> = response.json().await
+                .map_err(|e| backoff::Error::permanent(AgentError::SerializationError(format!(
+                    "Failed to deserialize credential links: {}", e
+                ))))?;
+                
+            Ok(links)
+        }.await;
         
         match result {
             Ok(links) => {
@@ -591,56 +564,51 @@ impl AgoraNetClient {
         // Execute request with retry logic
         let url = format!("{}/proposals/{}/events", self.base_url, proposal_id);
         
-        // Use a backoff strategy for retries
+        // Configure backoff strategy
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(30)),
-            max_interval: Duration::from_secs(5),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         };
         
         // Lock to prevent multiple retry-heavy operations
         let _lock = self.connectivity_lock.lock().await;
         
-        let result = backoff::future::retry(backoff, || async {
-            match self.http_client.post(&url)
+        // Retry with exponential backoff
+        let result = async {
+            let response = self.http_client.post(&url)
                 .header("Authorization", format!("DID {}", self.identity.did))
                 .json(&payload)
-                .send().await
-            {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        Ok(())
-                    } else {
-                        let context = format!("notifying about event {} for proposal {}", event_type, proposal_id);
-                        let error = match response.text().await {
-                            Ok(text) => AgentError::GovernanceError(format!("Failed to notify AgoraNet: {} - {}", response.status(), text)),
-                            Err(_) => AgentError::GovernanceError(format!("Failed to notify AgoraNet: {}", response.status())),
-                        };
-                        
-                        if response.status() == StatusCode::TOO_MANY_REQUESTS || response.status().as_u16() >= 500 {
-                            warn!("Retryable error when notifying AgoraNet: {}", error);
-                            Err(backoff::Error::Transient(error))
-                        } else {
-                            error!("Non-retryable error when notifying AgoraNet: {}", error);
-                            Err(backoff::Error::Permanent(error))
-                        }
-                    }
-                },
-                Err(e) => {
+                .send()
+                .await
+                .map_err(|e| {
                     if e.is_timeout() || e.is_connect() {
-                        warn!("Network error notifying AgoraNet, will retry: {}", e);
-                        Err(backoff::Error::Transient(AgentError::ConnectionError(format!(
-                            "Network error notifying AgoraNet: {}", e
-                        ))))
+                        backoff::Error::transient(e)
                     } else {
-                        error!("Request error notifying AgoraNet: {}", e);
-                        Err(backoff::Error::Permanent(AgentError::ConnectionError(format!(
-                            "Request error notifying AgoraNet: {}", e
-                        ))))
+                        backoff::Error::permanent(e)
+                    }
+                })?;
+                
+            // Check status code
+            if !response.status().is_success() {
+                // Handle different error status codes
+                match response.status() {
+                    StatusCode::FORBIDDEN | 
+                    StatusCode::UNAUTHORIZED | 
+                    StatusCode::NOT_FOUND |
+                    StatusCode::TOO_MANY_REQUESTS | 
+                    StatusCode::INTERNAL_SERVER_ERROR => {
+                        return Err(backoff::Error::permanent(self.handle_api_response::<()>(response, "notifying about event").await?));
+                    },
+                    _ => {
+                        return Err(backoff::Error::transient(AgentError::ConnectionError(format!(
+                            "Network error notifying AgoraNet: {}", response.status()
+                        ))));
                     }
                 }
             }
-        }).await;
+            
+            Ok(())
+        }.await;
         
         match result {
             Ok(()) => {
@@ -706,6 +674,24 @@ impl AgoraNetClient {
                 warn!("AgoraNet connection check failed: {}", e);
                 Ok(false)
             }
+        }
+    }
+
+    /// Handle error responses from the AgoraNet API
+    async fn handle_error_response<T>(&self, response: reqwest::Response) -> AgentResult<T> {
+        let status = response.status();
+        let error_message = match response.text().await {
+            Ok(text) => text,
+            Err(_) => format!("Unknown error (status {})", status),
+        };
+        
+        match status {
+            StatusCode::UNAUTHORIZED => Err(AgentError::AuthenticationError(error_message)),
+            StatusCode::FORBIDDEN => Err(AgentError::PermissionError(error_message)),
+            StatusCode::NOT_FOUND => Err(AgentError::ResourceNotFound(error_message)),
+            StatusCode::TOO_MANY_REQUESTS => Err(AgentError::RateLimitExceeded(error_message)),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(AgentError::ServerError(error_message)),
+            _ => Err(AgentError::GovernanceError(error_message)),
         }
     }
 } 

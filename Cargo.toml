@@ -5,7 +5,7 @@ members = [
   "crates/wallet-agent",
   "crates/wallet-sync",
   "crates/wallet-ui-api",
-  "crates/wallet-ffi",
+  # "crates/wallet-ffi", # Temporarily disabled until we fix other crates
   "crates/wallet-types",
   "cli"
 ]

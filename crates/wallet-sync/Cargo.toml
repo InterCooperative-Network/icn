@@ -23,6 +23,7 @@ tracing = "0.1"
 async-trait = "0.1"
 backoff = { version = "0.4", features = ["futures", "tokio"] }
 toml = "0.8"
+md5 = "0.7"
 
 [dev-dependencies]
 mockito = "1.2"

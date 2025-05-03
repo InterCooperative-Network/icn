@@ -64,6 +64,34 @@ pub enum AgentError {
     /// User intervention required
     #[error("User intervention required: {0}")]
     UserInterventionRequired(String),
+    
+    /// Connection error
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
+    
+    /// Permission error
+    #[error("Permission error: {0}")]
+    PermissionError(String),
+    
+    /// Resource not found
+    #[error("Resource not found: {0}")]
+    ResourceNotFound(String),
+    
+    /// Server error
+    #[error("Server error: {0}")]
+    ServerError(String),
+    
+    /// Rate limit exceeded
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
+    
+    /// Governance error
+    #[error("Governance error: {0}")]
+    GovernanceError(String),
+    
+    /// Sync error
+    #[error("Sync error: {0}")]
+    SyncError(String),
 }
 
 pub type AgentResult<T> = Result<T, AgentError>; 

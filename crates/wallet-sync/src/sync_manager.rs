@@ -184,9 +184,9 @@ impl MockDagHeaderData {
     }
 }
 
-/// Network status information for monitoring connectivity
+/// Mock network status for internal use only
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NetworkStatus {
+pub struct SyncNetworkStatus {
     /// Connection status to federation nodes
     pub is_connected: bool,
     /// Latency to primary federation node in milliseconds
@@ -201,6 +201,21 @@ pub struct NetworkStatus {
     pub successful_operations: usize,
     /// Number of failed operations
     pub failed_operations: usize,
+}
+
+impl SyncNetworkStatus {
+    /// Convert to the public NetworkStatus type
+    pub fn to_network_status(&self) -> wallet_types::network::NetworkStatus {
+        wallet_types::network::NetworkStatus {
+            is_connected: self.is_connected,
+            primary_node_latency: self.primary_node_latency,
+            last_successful_sync: self.last_successful_sync,
+            pending_submissions: self.pending_submissions,
+            active_federation_url: self.active_federation_url.clone(),
+            successful_operations: self.successful_operations,
+            failed_operations: self.failed_operations,
+        }
+    }
 }
 
 /// The SyncManager coordinates synchronization with federation nodes
@@ -942,7 +957,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
     }
     
     /// Get current network status
-    pub async fn get_network_status(&self) -> SyncResult<NetworkStatus> {
+    pub async fn get_network_status(&self) -> SyncResult<wallet_types::network::NetworkStatus> {
         if self.config.federation_urls.is_empty() {
             return Err(SyncError::ConfigurationError("No federation URLs configured".to_string()));
         }
@@ -970,7 +985,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         };
         
         // Create the status
-        let status = NetworkStatus {
+        let status = wallet_types::network::NetworkStatus {
             is_connected,
             primary_node_latency,
             last_successful_sync,

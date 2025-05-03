@@ -32,6 +32,23 @@ pub struct PendingAction {
     pub error_message: Option<String>,
 }
 
+/// A queued action that can be signed and submitted
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueuedAction {
+    /// Unique ID for this action
+    pub id: String,
+    /// The type of action
+    pub action_type: ActionType,
+    /// The payload for this action
+    pub payload: Value,
+    /// When this action was created (Unix timestamp)
+    pub created_at: i64,
+    /// Whether this action has been signed
+    pub signed: bool,
+    /// The signature for this action (base64 encoded)
+    pub signature: Option<String>,
+}
+
 /// Manager for handling pending actions
 pub struct ActionQueue<S: LocalWalletStore> {
     store: S,
@@ -83,7 +100,7 @@ impl<S: LocalWalletStore> ActionQueue<S> {
             })?;
             
         // Convert from DAG node to PendingAction
-        let action: PendingAction = serde_json::from_value(node.content.clone())
+        let action: PendingAction = serde_json::from_value(node.data.clone())
             .map_err(|e| AgentError::SerializationError(format!("Failed to deserialize action: {}", e)))?;
             
         Ok(action)
@@ -94,16 +111,20 @@ impl<S: LocalWalletStore> ActionQueue<S> {
         // Convert the action to a DAG node for storage
         let cid = format!("action:{}", action.id);
         
+        // Create the node data
+        let data = serde_json::to_value(action)
+            .map_err(|e| AgentError::SerializationError(format!("Failed to serialize action: {}", e)))?;
+        
+        // Create links map
+        let mut links = std::collections::HashMap::new();
+        links.insert("self".to_string(), cid.clone());
+        
+        // Create the DAG node
         let node = DagNode {
-            cid: cid.clone(),
-            parents: vec![],
-            epoch: 0,
-            creator: "system".to_string(),
-            timestamp: std::time::SystemTime::now(),
-            content_type: "pending_action".to_string(),
-            content: serde_json::to_value(action)
-                .map_err(|e| AgentError::SerializationError(format!("Failed to serialize action: {}", e)))?,
-            signatures: vec![],
+            data,
+            links,
+            signatures: std::collections::HashMap::new(),
+            created_at: Utc::now(),
         };
         
         // Save the node to the store
@@ -120,7 +141,7 @@ impl<S: LocalWalletStore> ActionQueue<S> {
     }
     
     /// List all actions with an optional filter by type
-    pub async fn list_actions(&self, action_type: Option<ActionType>) -> AgentResult<Vec<PendingAction>> {
+    pub async fn list_actions(&self, _action_type: Option<ActionType>) -> AgentResult<Vec<PendingAction>> {
         // Not implemented yet - would need support in LocalWalletStore to list nodes by content type
         // For now, return empty list
         Ok(vec![])
