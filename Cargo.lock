@@ -9678,6 +9678,7 @@ dependencies = [
  "chrono",
  "cid 0.10.1",
  "futures",
+ "hex",
  "md5",
  "mockito",
  "multihash 0.16.3",

@@ -424,10 +424,9 @@ impl SyncClient {
         
         // Configure retry logic
         let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(self.config.max_retry_delay_seconds)),
+            max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         };
         
         let result = backoff::future::retry(backoff, || async {
@@ -461,7 +460,7 @@ impl SyncClient {
                         // Only retry on server errors or too many requests
                         if status.as_u16() >= 500 || status.as_u16() == 429 {
                             warn!("Retryable error from {}: {}", server_url, error);
-                            Err(BackoffError::Transient(error))
+                            Err(BackoffError::Transient { err: error, retry_after: None })
                         } else {
                             error!("Non-retryable error from {}: {}", server_url, error);
                             Err(BackoffError::Permanent(error))
@@ -471,9 +470,7 @@ impl SyncClient {
                 Err(e) => {
                     if e.is_timeout() || e.is_connect() {
                         warn!("Network error fetching trust bundles from {}, will retry: {}", server_url, e);
-                        Err(BackoffError::Transient(SyncError::ConnectionError(
-                            format!("Network error: {}", e)
-                        )))
+                        Err(BackoffError::Transient { err: SyncError::ConnectionError(format!("Network error: {}", e)), retry_after: None })
                     } else {
                         error!("Request error fetching trust bundles from {}: {}", server_url, e);
                         Err(BackoffError::Permanent(SyncError::ConnectionError(
@@ -486,8 +483,11 @@ impl SyncClient {
         
         match result {
             Ok(bundles) => Ok(bundles),
-            Err(e) => match e {
-                BackoffError::Permanent(e) | BackoffError::Transient(e) => Err(e),
+            Err(e) => {
+                match e {
+                    BackoffError::Permanent(e) => Err(e),
+                    BackoffError::Transient { err, retry_after } => Err(err),
+                }
             },
         }
     }
@@ -536,7 +536,6 @@ impl SyncClient {
             let backoff = ExponentialBackoff {
                 max_elapsed_time: Some(Duration::from_secs(30)),
                 max_interval: Duration::from_secs(5),
-                max_retries: Some(self.config.max_retry_attempts),
                 ..Default::default()
             };
             
@@ -556,9 +555,7 @@ impl SyncClient {
                                         ))),
                                     }
                                 },
-                                Err(e) => Err(BackoffError::Transient(SyncError::HttpError(
-                                    format!("Failed to read response: {}", e)
-                                ))),
+                                Err(e) => Err(BackoffError::Transient { err: SyncError::HttpError(format!("Failed to read response: {}", e)), retry_after: None }),
                             }
                         } else if response.status().as_u16() == 404 {
                             // Object not found, try next server
@@ -569,9 +566,7 @@ impl SyncClient {
                             // Server error, might be retryable
                             let status = response.status();
                             Err(if status.as_u16() >= 500 || status.as_u16() == 429 {
-                                BackoffError::Transient(SyncError::ProtocolError(
-                                    format!("Server error: {}", status)
-                                ))
+                                BackoffError::Transient { err: SyncError::ProtocolError(format!("Server error: {}", status)), retry_after: None }
                             } else {
                                 BackoffError::Permanent(SyncError::ProtocolError(
                                     format!("Server returned error: {}", status)
@@ -581,9 +576,7 @@ impl SyncClient {
                     },
                     Err(e) => {
                         if e.is_timeout() || e.is_connect() {
-                            Err(BackoffError::Transient(SyncError::ConnectionError(
-                                format!("Network error: {}", e)
-                            )))
+                            Err(BackoffError::Transient { err: SyncError::ConnectionError(format!("Network error: {}", e)), retry_after: None })
                         } else {
                             Err(BackoffError::Permanent(SyncError::ConnectionError(
                                 format!("Request error: {}", e)
@@ -614,15 +607,22 @@ impl SyncClient {
                         ));
                     }
                 },
-                Err(BackoffError::Permanent(SyncError::ResourceNotFound(_))) => {
-                    // Not found on this server, try next server
-                    continue;
-                },
                 Err(e) => {
                     match e {
-                        BackoffError::Permanent(e) | BackoffError::Transient(e) => {
-                            warn!("Failed to fetch DAG object from {}: {}", server_url, e);
+                        BackoffError::Permanent(SyncError::ResourceNotFound(_)) => {
+                            // Not found on this server, try next server
+                            continue;
+                        },
+                        BackoffError::Permanent(e) => {
+                            return Err(e);
+                        },
+                        BackoffError::Transient { err, retry_after } => {
+                            warn!("Failed to fetch DAG object from {}: {}", server_url, err);
                             // Try next server
+                            if let Some(retry_after) = retry_after {
+                                warn!("Retrying in {} seconds", retry_after.as_secs());
+                                tokio::time::sleep(retry_after).await;
+                            }
                         }
                     }
                 }

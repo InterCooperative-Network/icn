@@ -25,8 +25,9 @@ impl TrustBundleValidator {
             return Ok(false);
         }
         
-        // Threshold must make sense
-        if bundle.threshold == 0 || bundle.threshold > bundle.guardians.len() {
+        // Fix threshold comparison
+        let guardians_count: u32 = bundle.guardians.len().try_into().unwrap_or(u32::MAX);
+        if bundle.threshold == 0 || bundle.threshold > guardians_count {
             return Ok(false);
         }
         

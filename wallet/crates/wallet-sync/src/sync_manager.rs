@@ -124,16 +124,21 @@ impl MockTrustBundleData {
     
     /// Convert to a trust bundle
     pub fn to_trust_bundle(&self) -> TrustBundle {
-        // This is a simplified mock conversion
         TrustBundle {
             id: self.federation_id.clone(),
-            version: self.version,
             epoch: self.epoch,
+            threshold: 2, // Default threshold
             guardians: self.guardians.clone(),
-            signatures: vec![],
-            created_at: SystemTime::now(),
-            valid_until: SystemTime::now() + Duration::from_secs(86400 * 30), // 30 days
-            parameters: self.parameters.clone(),
+            active: true,
+            federation_id: self.federation_id.clone(),
+            members: vec![], // Changed from HashMap to Vec
+            policies: HashMap::new(),
+            metadata: HashMap::new(),
+            version: self.version as u32, // Convert u64 to u32
+            signatures: HashMap::new(),
+            valid_until: Some(SystemTime::now() + Duration::from_secs(86400 * 30)), // 30 days
+            created_at: chrono::Utc::now(), // Add created_at field
+            links: HashMap::new(), // Add links field
         }
     }
 }
@@ -170,16 +175,18 @@ impl MockDagHeaderData {
     
     /// Convert to a DAG node
     pub fn to_dag_node(&self) -> DagNode {
-        // This is a simplified mock conversion
         DagNode {
-            cid: self.cid.clone(),
-            parents: self.parents.clone(),
-            epoch: self.epoch,
-            creator: self.creator.clone(),
-            timestamp: self.timestamp,
-            content_type: self.node_type.clone(),
-            content: serde_json::json!({}),
-            signatures: vec![],
+            data: serde_json::Value::from(serde_json::to_string(&self).unwrap_or_default()),
+            links: {
+                let mut links = HashMap::new();
+                links.insert("self".to_string(), self.cid.clone());
+                for (i, parent) in self.parents.iter().enumerate() {
+                    links.insert(format!("parent_{}", i), parent.clone());
+                }
+                links
+            },
+            signatures: HashMap::new(),
+            created_at: chrono::Utc::now(),
         }
     }
 }
@@ -207,19 +214,27 @@ impl SyncNetworkStatus {
     /// Convert to the public NetworkStatus type
     pub fn to_network_status(&self) -> wallet_types::network::NetworkStatus {
         wallet_types::network::NetworkStatus {
-            is_connected: self.is_connected,
-            primary_node_latency: self.primary_node_latency,
-            last_successful_sync: self.last_successful_sync,
-            pending_submissions: self.pending_submissions,
-            active_federation_url: self.active_federation_url.clone(),
-            successful_operations: self.successful_operations,
-            failed_operations: self.failed_operations,
+            online: self.is_connected,
+            network_type: "federation".to_string(),
+            peer_count: 1, // Placeholder
+            block_height: 0, // Placeholder
+            latency_ms: self.primary_node_latency.unwrap_or(0),
+            sync_percent: 100, // Placeholder
+            metadata: {
+                let mut map = HashMap::new();
+                map.insert("active_url".to_string(), self.active_federation_url.clone());
+                map.insert("pending_submissions".to_string(), self.pending_submissions.to_string());
+                if let Some(last_sync) = self.last_successful_sync {
+                    map.insert("last_sync".to_string(), format!("{:?}", last_sync));
+                }
+                map
+            },
         }
     }
 }
 
 /// The SyncManager coordinates synchronization with federation nodes
-pub struct SyncManager<S: LocalWalletStore> {
+pub struct SyncManager<S: LocalWalletStore + 'static> {
     /// The identity used for authentication
     identity: IdentityWallet,
     /// HTTP client for network communication
@@ -236,7 +251,7 @@ pub struct SyncManager<S: LocalWalletStore> {
     sync_lock: Arc<Mutex<()>>,
 }
 
-impl<S: LocalWalletStore> SyncManager<S> {
+impl<S: LocalWalletStore + 'static> SyncManager<S> {
     /// Create a new SyncManager
     pub fn new(identity: IdentityWallet, store: S, config: Option<SyncManagerConfig>) -> Self {
         let config = config.unwrap_or_default();
@@ -403,7 +418,17 @@ impl<S: LocalWalletStore> SyncManager<S> {
         for header in dag_headers {
             // Convert to a DAG node
             let node = header.to_dag_node();
-            let cid = node.cid.clone();
+            let cid = node.links.get("self").unwrap_or(&String::new()).clone();
+            let parents = node.links.iter()
+                .filter_map(|(k, v)| {
+                    if k.starts_with("parent_") {
+                        Some(v.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<String>>();
+            let timestamp = chrono::Utc::now().timestamp();
             
             // Store the node
             self.store.save_dag_node(&cid, &node).await
@@ -431,7 +456,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn fetch_latest_trust_bundle(&self, federation_url: &str) -> SyncResult<TrustBundle> {
         // Check network status first
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, skipping bundle fetching");
             return Err(SyncError::Offline("Network is offline, can't fetch trust bundle".to_string()));
         }
@@ -444,7 +469,6 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
             ..ExponentialBackoff::default()
         };
         
@@ -463,7 +487,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 .map_err(|e| {
                     let error = SyncError::ConnectionError(format!("Failed to fetch trust bundle: {}", e));
                     // Map network errors to backoff::Error::Transient for retry
-                    backoff::Error::transient(error)
+                    backoff::Error::Transient { err: error, retry_after: None }
                 })?;
                 
             // Check status code
@@ -476,9 +500,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 
                 // Only retry on server errors (5xx)
                 if status.is_server_error() {
-                    return Err(backoff::Error::transient(error));
+                    return Err(backoff::Error::Transient { err: error, retry_after: None });
                 } else {
-                    return Err(backoff::Error::permanent(error));
+                    return Err(backoff::Error::Permanent(error));
                 }
             }
             
@@ -486,7 +510,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
             let bundle: TrustBundle = response.json().await
                 .map_err(|e| {
                     let error = SyncError::SerializationError(format!("Failed to parse trust bundle: {}", e));
-                    backoff::Error::permanent(error)
+                    backoff::Error::Permanent(error)
                 })?;
                 
             Ok(bundle)
@@ -495,7 +519,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         match result {
             Ok(bundle) => Ok(bundle),
             Err(backoff::Error::Permanent(e)) => Err(e),
-            Err(backoff::Error::Transient { error, .. }) => Err(error),
+            Err(backoff::Error::Transient { err, .. }) => Err(err),
         }
     }
     
@@ -503,7 +527,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn fetch_trust_bundle_by_epoch(&self, federation_url: &str, epoch: u64) -> SyncResult<TrustBundle> {
         // Check network status first
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, skipping bundle fetching");
             return Err(SyncError::Offline("Network is offline, can't fetch trust bundle".to_string()));
         }
@@ -516,7 +540,6 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
             ..ExponentialBackoff::default()
         };
         
@@ -535,7 +558,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 .map_err(|e| {
                     let error = SyncError::ConnectionError(format!("Failed to fetch trust bundle: {}", e));
                     // Map network errors to backoff::Error::Transient for retry
-                    backoff::Error::transient(error)
+                    backoff::Error::Transient { err: error, retry_after: None }
                 })?;
                 
             // Check status code
@@ -552,9 +575,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 
                 // Only retry on server errors (5xx)
                 if status.is_server_error() {
-                    return Err(backoff::Error::transient(error));
+                    return Err(backoff::Error::Transient { err: error, retry_after: None });
                 } else {
-                    return Err(backoff::Error::permanent(error));
+                    return Err(backoff::Error::Permanent(error));
                 }
             }
             
@@ -564,7 +587,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                     let error = SyncError::SerializationError(
                         format!("Failed to parse trust bundle for epoch {}: {}", epoch, e)
                     );
-                    backoff::Error::permanent(error)
+                    backoff::Error::Permanent(error)
                 })?;
                 
             Ok(bundle)
@@ -573,7 +596,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         match result {
             Ok(bundle) => Ok(bundle),
             Err(backoff::Error::Permanent(e)) => Err(e),
-            Err(backoff::Error::Transient { error, .. }) => Err(error),
+            Err(backoff::Error::Transient { err, .. }) => Err(err),
         }
     }
     
@@ -581,7 +604,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn fetch_dag_node(&self, cid: &str) -> SyncResult<DagNode> {
         // Check network status first
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, skipping DAG node fetching");
             return Err(SyncError::Offline("Network is offline, can't fetch DAG node".to_string()));
         }
@@ -603,7 +626,6 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
             ..ExponentialBackoff::default()
         };
         
@@ -622,7 +644,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 .map_err(|e| {
                     let error = SyncError::ConnectionError(format!("Failed to fetch DAG node: {}", e));
                     // Map network errors to backoff::Error::Transient for retry
-                    backoff::Error::transient(error)
+                    backoff::Error::Transient { err: error, retry_after: None }
                 })?;
                 
             // Check status code
@@ -639,9 +661,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 
                 // Only retry on server errors (5xx)
                 if status.is_server_error() {
-                    return Err(backoff::Error::transient(error));
+                    return Err(backoff::Error::Transient { err: error, retry_after: None });
                 } else {
-                    return Err(backoff::Error::permanent(error));
+                    return Err(backoff::Error::Permanent(error));
                 }
             }
             
@@ -651,7 +673,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                     let error = SyncError::SerializationError(
                         format!("Failed to parse DAG node with CID {}: {}", cid, e)
                     );
-                    backoff::Error::permanent(error)
+                    backoff::Error::Permanent(error)
                 })?;
                 
             Ok(node)
@@ -660,7 +682,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let node = match result {
             Ok(node) => node,
             Err(backoff::Error::Permanent(e)) => return Err(e),
-            Err(backoff::Error::Transient { error, .. }) => return Err(error),
+            Err(backoff::Error::Transient { err, .. }) => return Err(err),
         };
         
         // Cache the node locally
@@ -692,10 +714,10 @@ impl<S: LocalWalletStore> SyncManager<S> {
                     Ok(mut cache) => {
                         if cache.node_cids.contains(parent_cid) {
                             // This node belongs to this thread, add it to the cache
-                            cache.add_node(&node.cid);
+                            cache.add_node(&node.links.get("self").unwrap_or(&String::new()).clone());
                             self.store.save_dag_thread_cache(&thread_id, &cache).await
                                 .map_err(|e| SyncError::CoreError(e))?;
-                            debug!("Added node {} to thread cache {}", node.cid, thread_id);
+                            debug!("Added node {} to thread cache {}", node.links.get("self").unwrap_or(&String::new()).clone(), thread_id);
                             return Ok(());
                         }
                     },
@@ -705,18 +727,18 @@ impl<S: LocalWalletStore> SyncManager<S> {
             
             // If we get here, we couldn't find an existing thread for this node
             // We could create a new thread, but for now we'll just log a warning
-            warn!("Could not find a thread for node with CID {} (parent: {})", node.cid, parent_cid);
+            warn!("Could not find a thread for node with CID {} (parent: {})", node.links.get("self").unwrap_or(&String::new()).clone(), parent_cid);
         } else {
             // This might be a root node of a new thread
             // For simplicity, create a new thread for it
             let thread_id = format!("thread-{}", uuid::Uuid::new_v4());
             let thread_type = wallet_core::dag::ThreadType::Custom("unknown".to_string());
-            let cache = wallet_core::dag::CachedDagThreadInfo::new(&thread_id, thread_type, &node.cid);
+            let cache = wallet_core::dag::CachedDagThreadInfo::new(&thread_id, thread_type, &node.links.get("self").unwrap_or(&String::new()).clone());
             
             self.store.save_dag_thread_cache(&thread_id, &cache).await
                 .map_err(|e| SyncError::CoreError(e))?;
                 
-            debug!("Created new thread cache {} for root node {}", thread_id, node.cid);
+            debug!("Created new thread cache {} for root node {}", thread_id, node.links.get("self").unwrap_or(&String::new()).clone());
         }
         
         Ok(())
@@ -726,7 +748,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn fetch_dag_thread_info(&self, thread_id: &str) -> SyncResult<DagThread> {
         // Check network status first
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, skipping thread fetching");
             return Err(SyncError::Offline("Network is offline, can't fetch thread info".to_string()));
         }
@@ -748,7 +770,6 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
             ..ExponentialBackoff::default()
         };
         
@@ -767,7 +788,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 .map_err(|e| {
                     let error = SyncError::ConnectionError(format!("Failed to fetch thread info: {}", e));
                     // Map network errors to backoff::Error::Transient for retry
-                    backoff::Error::transient(error)
+                    backoff::Error::Transient { err: error, retry_after: None }
                 })?;
                 
             // Check status code
@@ -784,9 +805,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 
                 // Only retry on server errors (5xx)
                 if status.is_server_error() {
-                    return Err(backoff::Error::transient(error));
+                    return Err(backoff::Error::Transient { err: error, retry_after: None });
                 } else {
-                    return Err(backoff::Error::permanent(error));
+                    return Err(backoff::Error::Permanent(error));
                 }
             }
             
@@ -796,7 +817,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                     let error = SyncError::SerializationError(
                         format!("Failed to parse thread with ID {}: {}", thread_id, e)
                     );
-                    backoff::Error::permanent(error)
+                    backoff::Error::Permanent(error)
                 })?;
                 
             Ok(thread)
@@ -805,7 +826,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let thread = match result {
             Ok(thread) => thread,
             Err(backoff::Error::Permanent(e)) => return Err(e),
-            Err(backoff::Error::Transient { error, .. }) => return Err(error),
+            Err(backoff::Error::Transient { err, .. }) => return Err(err),
         };
         
         // Save the thread to local storage
@@ -841,7 +862,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn sync_trust_bundles(&self, federation_url: &str) -> SyncResult<Vec<TrustBundle>> {
         // Check network status
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, skipping trust bundle sync");
             return Err(SyncError::Offline("Network is offline, can't sync trust bundles".to_string()));
         }
@@ -907,15 +928,14 @@ impl<S: LocalWalletStore> SyncManager<S> {
         
         // We'll use a DagNode to store the bundle for now
         let node = DagNode {
-            cid: format!("bundle:{}", bundle_id),
-            parents: vec![],
-            epoch: bundle.epoch,
-            creator: "system".to_string(),
-            timestamp: SystemTime::now(),
-            content_type: "trust_bundle".to_string(),
-            content: serde_json::from_str(&bundle_json)
-                .map_err(|e| SyncError::SerializationError(format!("Failed to parse bundle JSON: {}", e)))?,
-            signatures: vec![],
+            data: serde_json::Value::from(serde_json::to_string(&bundle).unwrap_or_default()),
+            links: {
+                let mut links = HashMap::new();
+                links.insert("self".to_string(), bundle_id.clone());
+                links
+            },
+            signatures: HashMap::new(),
+            created_at: chrono::Utc::now(),
         };
         
         // Store as a DAG node
@@ -986,13 +1006,21 @@ impl<S: LocalWalletStore> SyncManager<S> {
         
         // Create the status
         let status = wallet_types::network::NetworkStatus {
-            is_connected,
-            primary_node_latency,
-            last_successful_sync,
-            pending_submissions: 0, // This would need tracking of pending submissions
-            active_federation_url: active_url.clone(),
-            successful_operations: 0, // This would need a counter in the sync manager
-            failed_operations: 0,    // This would need a counter in the sync manager
+            online: is_connected,
+            network_type: "federation".to_string(),
+            peer_count: 1, // Placeholder
+            block_height: 0, // Placeholder
+            latency_ms: primary_node_latency.unwrap_or(0),
+            sync_percent: 100, // Placeholder
+            metadata: {
+                let mut map = HashMap::new();
+                map.insert("active_url".to_string(), active_url.clone());
+                map.insert("pending_submissions".to_string(), self.config.federation_urls.len().to_string());
+                if let Some(last_sync) = last_successful_sync {
+                    map.insert("last_sync".to_string(), format!("{:?}", last_sync));
+                }
+                map
+            },
         };
         
         Ok(status)
@@ -1028,15 +1056,18 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn submit_dag_nodes_batch(&self, nodes: &[DagNode]) -> SyncResult<Vec<NodeSubmissionResponse>> {
         // Check network status first
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, queueing DAG nodes batch submission for later");
             // In a real implementation, we would queue the nodes for later submission
             
             // Create a response for each node to indicate they are queued
             return Ok(nodes.iter().map(|_| NodeSubmissionResponse {
                 success: false,
-                cid: None,
+                id: String::new(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                block_number: None,
                 error: Some("Network is offline, submission queued for later".to_string()),
+                data: HashMap::new(),
             }).collect());
         }
 
@@ -1054,7 +1085,6 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
             ..ExponentialBackoff::default()
         };
         
@@ -1073,7 +1103,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 .await
                 .map_err(|e| {
                     let error = SyncError::ConnectionError(format!("Failed to batch submit DAG nodes: {}", e));
-                    backoff::Error::transient(error)
+                    backoff::Error::Transient { err: error, retry_after: None }
                 })?;
                 
             // Check status code
@@ -1086,9 +1116,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 
                 // Only retry on server errors (5xx)
                 if status.is_server_error() {
-                    return Err(backoff::Error::transient(error));
+                    return Err(backoff::Error::Transient { err: error, retry_after: None });
                 } else {
-                    return Err(backoff::Error::permanent(error));
+                    return Err(backoff::Error::Permanent(error));
                 }
             }
             
@@ -1098,7 +1128,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                     let error = SyncError::SerializationError(format!(
                         "Failed to parse batch submission responses: {}", e
                     ));
-                    backoff::Error::permanent(error)
+                    backoff::Error::Permanent(error)
                 })?;
                 
             Ok(submission_responses)
@@ -1107,7 +1137,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         match result {
             Ok(responses) => Ok(responses),
             Err(backoff::Error::Permanent(e)) => Err(e),
-            Err(backoff::Error::Transient { error, .. }) => Err(error),
+            Err(backoff::Error::Transient { err, .. }) => Err(err),
         }
     }
     
@@ -1115,13 +1145,16 @@ impl<S: LocalWalletStore> SyncManager<S> {
     pub async fn submit_dag_node(&self, node: &DagNode) -> SyncResult<NodeSubmissionResponse> {
         // Check network status first
         let network_status = self.get_network_status().await?;
-        if !network_status.is_connected {
+        if !network_status.online {
             info!("Network is offline, queueing DAG node submission for later");
             // In a real implementation, we would queue the node for later submission
             return Ok(NodeSubmissionResponse {
                 success: false,
-                cid: None,
+                id: String::new(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                block_number: None,
                 error: Some("Network is offline, submission queued for later".to_string()),
+                data: HashMap::new(),
             });
         }
 
@@ -1144,7 +1177,6 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let backoff = ExponentialBackoff {
             max_elapsed_time: Some(Duration::from_secs(60)),
             max_interval: Duration::from_secs(10),
-            max_retries: Some(self.config.max_retry_attempts),
             ..ExponentialBackoff::default()
         };
         
@@ -1164,7 +1196,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 .map_err(|e| {
                     let error = SyncError::ConnectionError(format!("Failed to submit DAG node: {}", e));
                     // Map network errors to backoff::Error::Transient for retry
-                    backoff::Error::transient(error)
+                    backoff::Error::Transient { err: error, retry_after: None }
                 })?;
                 
             // Check status code
@@ -1177,9 +1209,9 @@ impl<S: LocalWalletStore> SyncManager<S> {
                 
                 // Only retry on server errors (5xx)
                 if status.is_server_error() {
-                    return Err(backoff::Error::transient(error));
+                    return Err(backoff::Error::Transient { err: error, retry_after: None });
                 } else {
-                    return Err(backoff::Error::permanent(error));
+                    return Err(backoff::Error::Permanent(error));
                 }
             }
             
@@ -1187,7 +1219,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
             let submission_response: NodeSubmissionResponse = response.json().await
                 .map_err(|e| {
                     let error = SyncError::SerializationError(format!("Failed to parse submission response: {}", e));
-                    backoff::Error::permanent(error)
+                    backoff::Error::Permanent(error)
                 })?;
                 
             Ok(submission_response)
@@ -1196,16 +1228,16 @@ impl<S: LocalWalletStore> SyncManager<S> {
         let response = match result {
             Ok(response) => response,
             Err(backoff::Error::Permanent(e)) => return Err(e),
-            Err(backoff::Error::Transient { error, .. }) => return Err(error),
+            Err(backoff::Error::Transient { err, .. }) => return Err(err),
         };
         
         // If submission was successful and we got a CID, update local cache
-        if response.success && response.cid.is_some() {
-            let cid = response.cid.as_ref().unwrap();
+        if response.success && !response.id.is_empty() {
+            let cid = &response.id;
             
             // Save the node with the assigned CID
             let mut node_copy = node.clone();
-            node_copy.cid = cid.clone();
+            node_copy.links.insert("self".to_string(), cid.clone());
             self.store.save_dag_node(cid, &node_copy).await
                 .map_err(|e| SyncError::CoreError(e))?;
                 
@@ -1332,13 +1364,11 @@ impl<S: LocalWalletStore> SyncManager<S> {
         // Enhanced validations:
         
         // 1. Check timestamp is not in the future
-        let now = std::time::SystemTime::now();
-        if let Ok(duration) = bundle.created_at.duration_since(now) {
-            if duration.as_secs() > 60 {  // Allow 1 minute clock skew
-                return Err(SyncError::ValidationError(
-                    format!("Trust bundle has a future timestamp: {:?}", bundle.created_at)
-                ));
-            }
+        let now_plus_1min = chrono::Utc::now() + chrono::Duration::seconds(60);
+        if bundle.created_at > now_plus_1min {  // Allow 1 minute clock skew
+            return Err(SyncError::ValidationError(
+                format!("Trust bundle has a future timestamp: {:?}", bundle.created_at)
+            ));
         }
         
         // 2. Check threshold is reasonable based on guardian count
@@ -1350,6 +1380,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         
         // 3. Check expiration if set
         if let Some(expires_at) = bundle.valid_until {
+            let now = std::time::SystemTime::now();
             if expires_at < now {
                 return Err(SyncError::ValidationError(
                     format!("Trust bundle has expired at {:?}", expires_at)
@@ -1366,31 +1397,30 @@ impl<S: LocalWalletStore> SyncManager<S> {
     // Add a validation method for DAG nodes
     fn validate_dag_node(&self, node: &DagNode, expected_cid: Option<&str>) -> SyncResult<()> {
         // 1. Basic structural validation
-        if node.cid.is_empty() {
+        if node.links.is_empty() {
             return Err(SyncError::ValidationError("DAG node missing CID".to_string()));
         }
         
         // 2. Verify CID if provided
         if let Some(cid) = expected_cid {
-            if node.cid != cid {
+            if node.links.get("self").unwrap_or(&String::new()) != cid {
                 return Err(SyncError::ValidationError(
-                    format!("CID mismatch: expected {}, got {}", cid, node.cid)
+                    format!("CID mismatch: expected {}, got {}", cid, node.links.get("self").unwrap_or(&String::new()).clone())
                 ));
             }
         }
         
         // 3. Check timestamp is reasonable
-        let now = std::time::SystemTime::now();
-        if let Ok(duration) = node.timestamp.duration_since(now) {
-            if duration.as_secs() > 60 {  // Allow 1 minute clock skew
-                return Err(SyncError::ValidationError(
-                    format!("DAG node has a future timestamp: {:?}", node.timestamp)
-                ));
-            }
+        // Check if created_at is in the future (with a 1 minute allowance for clock skew)
+        let now_plus_1min = chrono::Utc::now() + chrono::Duration::seconds(60);
+        if node.created_at > now_plus_1min {
+            return Err(SyncError::ValidationError(
+                format!("DAG node has a future timestamp: {:?}", node.created_at)
+            ));
         }
         
         // 4. Check parent references (must be valid CIDs)
-        for parent in &node.parents {
+        for parent in node.links.values() {
             if parent.is_empty() {
                 return Err(SyncError::ValidationError("Empty parent CID reference".to_string()));
             }
@@ -1404,7 +1434,7 @@ impl<S: LocalWalletStore> SyncManager<S> {
         }
         
         // 6. Verify creator exists and is authorized (in real impl)
-        if node.creator.is_empty() {
+        if node.links.get("creator").unwrap_or(&String::new()).is_empty() {
             return Err(SyncError::ValidationError("DAG node missing creator".to_string()));
         }
         
