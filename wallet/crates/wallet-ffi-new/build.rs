@@ -1,13 +1,14 @@
 use std::fs;
+use std::io::Write;
 
 fn main() {
     // Tell Cargo to re-run this build script if the UDL file changes
-    println!("cargo:rerun-if-changed=src/wallet.udl");
+    println!("cargo:rerun-if-changed=src/minimal.udl");
     println!("cargo:rerun-if-env-changed=UNIFFI_TESTS_DISABLE_EXTENSIONS");
 
     // Create the UDL content manually - simplest possible form that works
-    let udl_content = "namespace wallet {};";
-    let udl_path = "src/wallet.udl";
+    let udl_content = "namespace wallet_minimal {};";
+    let udl_path = "src/minimal.udl";
     
     // Write the UDL content to the file
     fs::write(udl_path, udl_content).expect("Failed to write UDL file");

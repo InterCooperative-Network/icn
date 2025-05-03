@@ -1,0 +1,16 @@
+[package]
+name = "wallet-ffi-new"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal Foreign Function Interface for the ICN Wallet Core"
+
+[lib]
+name = "wallet_ffi_new"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+uniffi = { version = "0.25.0" }
+thiserror = "1.0"
+
+[build-dependencies]
+uniffi_build = { version = "0.25.0", features = ["builtin-bindgen"] }

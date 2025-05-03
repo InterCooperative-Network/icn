@@ -1,9 +1,1 @@
-namespace wallet {
-    dictionary WalletConfig {
-        string api_url;
-    };
-
-    interface WalletApi {
-        WalletApi();
-    };
-}; 
+namespace wallet {};

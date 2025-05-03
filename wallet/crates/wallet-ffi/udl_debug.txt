@@ -1,0 +1,29 @@
+UDL Content:
+namespace wallet {
+    [Error]
+    enum WalletError {
+        StoreError,
+        SyncError, 
+        ValidationError,
+        NotFound,
+        ConfigError,
+        CryptoError,
+        SerializationError,
+        InvalidInput,
+        Unauthorized,
+        UnknownError
+    };
+
+    dictionary WalletConfig {
+        string storage_path;
+    };
+
+    interface WalletApi {
+        [Throws=WalletError]
+        constructor(WalletConfig? config);
+        
+        [Throws=WalletError]
+        WalletConfig get_config();
+    };
+};
+
