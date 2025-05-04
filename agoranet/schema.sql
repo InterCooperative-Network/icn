@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS threads (
     federation_id TEXT,
     topic_type TEXT NOT NULL DEFAULT 'general',
     proposal_ref TEXT,
+    proposal_cid TEXT,
     dag_ref TEXT,
+    signature_cid TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     metadata JSONB
@@ -19,7 +21,8 @@ CREATE TABLE IF NOT EXISTS messages (
     author_did TEXT NOT NULL,
     content TEXT NOT NULL,
     reply_to UUID REFERENCES messages(id) ON DELETE SET NULL,
-    signature TEXT,
+    signature_cid TEXT,
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
     dag_ref TEXT,
     dag_anchored BOOLEAN NOT NULL DEFAULT FALSE,
     credential_refs TEXT[],
@@ -58,7 +61,7 @@ CREATE TABLE IF NOT EXISTS credentials (
     holder_did TEXT NOT NULL,
     issuer_did TEXT NOT NULL,
     credential_type TEXT NOT NULL,
-    credential_hash TEXT NOT NULL,
+    credential_hash TEXT NOT NULL UNIQUE,
     content JSONB NOT NULL,
     valid_from TIMESTAMP WITH TIME ZONE NOT NULL,
     valid_until TIMESTAMP WITH TIME ZONE,
@@ -86,6 +89,16 @@ CREATE TABLE IF NOT EXISTS reactions (
     reaction_type TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(message_id, author_did, reaction_type)
+);
+
+-- Create credential_links table
+CREATE TABLE IF NOT EXISTS credential_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    credential_cid TEXT NOT NULL,
+    linked_by TEXT NOT NULL,
+    signer_did TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indices

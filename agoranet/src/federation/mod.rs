@@ -31,8 +31,18 @@ pub enum FederationError {
     #[error("Storage error: {0}")]
     Storage(String),
     
-    #[error("Unexpected error: {0}")]
+    #[error("Compatibility error: {0}")]
+    Compatibility(String),
+    
+    #[error("Other error: {0}")]
     Other(String),
+}
+
+// Implement From<StorageError> for FederationError
+impl From<StorageError> for FederationError {
+    fn from(err: StorageError) -> Self {
+        FederationError::Storage(err.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, FederationError>;

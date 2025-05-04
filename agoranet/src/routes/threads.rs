@@ -156,6 +156,7 @@ async fn get_thread(
 }
 
 // Link a proposal to a thread
+#[axum::debug_handler]
 async fn link_proposal(
     Path(thread_id): Path<String>,
     State(pool): State<Arc<PgPool>>,

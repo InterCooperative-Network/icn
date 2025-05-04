@@ -62,10 +62,11 @@ fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
 pub struct AsyncInMemoryStorage {
     blobs: Arc<RwLock<HashMap<String, Vec<u8>>>>,
     kv_store: Arc<RwLock<HashMap<String, Vec<u8>>>>,
-    transactions: Arc<Mutex<HashMap<tokio::task::JoinHandle<()>, ()>>>, // Placeholder
+    // transactions: Arc<Mutex<HashMap<tokio::task::JoinHandle<()>, ()>>>, // Placeholder - unused
 }
 
 impl AsyncInMemoryStorage {
+    /// Creates a new, empty instance of AsyncInMemoryStorage.
     pub fn new() -> Self {
         Default::default()
     }

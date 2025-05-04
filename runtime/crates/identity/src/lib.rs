@@ -11,6 +11,10 @@ Verifiable Credentials, TrustBundles, and ZK disclosure.
 - TrustBundles for federation anchoring
 */
 
+pub mod did;
+pub mod error;
+pub mod keypair;
+
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chrono::{DateTime, Utc};
@@ -31,6 +35,11 @@ use std::sync::{Arc, Mutex}; // Using Mutex for simple in-memory storage for now
 use did_method_key::DIDKey;
 use hex;
 use icn_common::DagStore;
+use ssi::vc::CredentialSchema;
+use ssi::ldp::LinkedDataProofOptions;
+use crate::error::{IdentityError, IdentityResult};
+use crate::keypair::{KeyPair, KeyType, Signature};
+use crate::did::{IdentityId, DidDocument, VerificationMethod};
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -415,32 +424,47 @@ pub async fn generate_did_key() -> Result<(String, JWK)> {
     Ok((did_key_str, keypair_jwk))
 }
 
-/// Represents a verifiable credential
+/// Define LinkedDataProof locally
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct VerifiableCredential {
-    /// The ID of this credential
-    pub id: String,
-    
-    /// The type(s) of this credential
+pub struct LinkedDataProof {
     #[serde(rename = "type")]
-    pub credential_type: Vec<String>,
-    
-    /// The issuer of this credential
-    pub issuer: String,
-    
-    /// The issuance date of this credential
-    pub issuanceDate: String,
-    
-    /// The subject of this credential
-    pub credentialSubject: serde_json::Value,
-    
-    /// The proof of this credential (optional - for future JWS/ZK proofs)
+    pub type_: String,
+    pub created: String,
+    #[serde(rename = "verificationMethod")]
+    pub verification_method: String,
+    #[serde(rename = "proofPurpose")]
+    pub proof_purpose: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<serde_json::Value>,
-    
-    /// The expiration date of this credential (optional)
+    pub jws: Option<String>,
+}
+
+/// Define CredentialSchema locally (as specified in W3C VC Data Model)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CredentialSchema {
+   pub id: String, // URI identifying the schema
+   #[serde(rename = "type")]
+   pub type_: String, // e.g., "JsonSchemaValidator2018"
+   // Add other fields if needed based on usage
+}
+
+/// Represents a Verifiable Credential.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(non_snake_case)] 
+pub struct VerifiableCredential {
+    #[serde(rename = "@context")]
+    pub context: serde_json::Value,
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_: Vec<String>,
+    pub issuer: String,
+    pub issuanceDate: String,
+    pub credentialSubject: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")] 
+    pub proof: Option<LinkedDataProof>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expirationDate: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credentialSchema: Option<CredentialSchema>,
 }
 
 impl VerifiableCredential {
@@ -451,29 +475,28 @@ impl VerifiableCredential {
         subject_id: &IdentityId,
         claims: serde_json::Value,
     ) -> Self {
-        // Create a subject with id and claims
+        let now: DateTime<Utc> = Utc::now();
+        let issuance_date = now.to_rfc3339();
+        
         let mut subject_map = serde_json::Map::new();
         subject_map.insert("id".to_string(), serde_json::Value::String(subject_id.0.clone()));
         
-        // Add all claims to the subject
         if let serde_json::Value::Object(claims_map) = claims {
             for (key, value) in claims_map {
                 subject_map.insert(key, value);
             }
         }
-        
-        // Current timestamp in ISO 8601 format
-        let now: DateTime<Utc> = Utc::now();
-        let issuance_date = now.to_rfc3339();
-        
+
         Self {
+            context: serde_json::json!(vec!["https://www.w3.org/2018/credentials/v1"]),
             id: format!("urn:uuid:{}", Uuid::new_v4()),
-            credential_type: types,
+            type_: types,
             issuer: issuer.0.clone(),
             issuanceDate: issuance_date,
             credentialSubject: serde_json::Value::Object(subject_map),
             proof: None,
             expirationDate: None,
+            credentialSchema: None,
         }
     }
     
@@ -1031,46 +1054,34 @@ pub struct AnchorSubject {
     pub mandate: Option<String>,
 }
 
-/// Represents an anchor credential
+/// Representation of an Anchor credential specifically.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(non_snake_case)] // Allow non-snake case for standard VC fields
 pub struct AnchorCredential {
-    /// The ID of this anchor credential
+    #[serde(rename = "@context")]
+    pub context: serde_json::Value,
     pub id: String,
-    
-    /// The issuer of this anchor credential
+    #[serde(rename = "type")]
+    pub type_: Vec<String>,
     pub issuer: String,
-    
-    /// The issuance date of this anchor credential
     pub issuanceDate: String,
-    
-    /// The subject of this anchor credential
     pub credentialSubject: AnchorSubject,
-    
-    /// The proof of this anchor credential (optional - for future JWS/ZK proofs)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<serde_json::Value>,
+    pub proof: Option<LinkedDataProof>,
 }
 
 impl AnchorCredential {
     /// Create a new anchor credential
-    pub fn new(
-        issuer: &IdentityId,
-        epoch_id: u64,
-        trust_bundle_cid: Cid,
-        mandate: Option<String>,
-    ) -> Self {
-        // Current timestamp in ISO 8601 format
+    pub fn new(issuer: IdentityId, subject: AnchorSubject) -> Self {
         let now: DateTime<Utc> = Utc::now();
-        
+        let issuance_date = now.to_rfc3339();
         Self {
+            context: serde_json::json!(vec!["https://www.w3.org/2018/credentials/v1", "https://icn.network/credentials/anchor/v1"]),
             id: format!("urn:uuid:{}", Uuid::new_v4()),
-            issuer: issuer.0.clone(),
-            issuanceDate: now.to_rfc3339(),
-            credentialSubject: AnchorSubject {
-                epoch_id,
-                trust_bundle_cid,
-                mandate,
-            },
+            type_: vec!["VerifiableCredential".to_string(), "AnchorCredential".to_string()],
+            issuer: issuer.0,
+            issuanceDate: issuance_date,
+            credentialSubject: subject,
             proof: None,
         }
     }

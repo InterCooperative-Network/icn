@@ -15,8 +15,6 @@ This is the top-level crate that composes the wallet functionality from its comp
 // use icn_wallet_sync as sync; // Temporarily disabled
 use wallet_identity as identity;
 use wallet_storage as storage;
-use wallet_actions as actions;
-use wallet_api as api;
 
 pub mod error {
     //! Error types for the wallet

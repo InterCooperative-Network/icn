@@ -5,6 +5,7 @@ use crate::federation::Federation;
 use crate::services::ServiceRegistry;
 
 /// Shared application state across all routes and services
+#[derive(Clone)]
 pub struct AppState {
     /// Database connection pool
     pub db_pool: Arc<Pool<Postgres>>,

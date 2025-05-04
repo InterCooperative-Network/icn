@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.7.9"
+axum = { version = "0.7.9", features = ["macros"] }
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "chrono", "uuid", "json", "runtime-tokio-native-tls", "migrate"] }
 tower = "0.4"
@@ -24,7 +24,7 @@ validator = { version = "0.16", features = ["derive"] }
 anyhow = "1.0"
 sha2 = "0.10"
 hmac = "0.12"
-libp2p = { version = "0.55.0", features = ["gossipsub", "tcp", "yamux", "noise"] }
+libp2p = { version = "0.55.0", features = ["gossipsub", "tcp", "yamux", "noise", "tokio"] }
 axum-extra = "0.10.1"
 tokio-stream = "0.1.17"
 

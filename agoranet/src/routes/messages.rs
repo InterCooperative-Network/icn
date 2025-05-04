@@ -135,8 +135,8 @@ async fn get_message(
     }
 }
 
-// Create a new message in a thread
-async fn create_message(
+#[axum::debug_handler]
+pub async fn create_message(
     State(state): State<Arc<AppState>>,
     Path(thread_id): Path<String>,
     auth: DidAuth,
@@ -190,8 +190,8 @@ async fn create_message(
     }
 }
 
-// Delete a message
-async fn delete_message(
+#[axum::debug_handler]
+pub async fn delete_message(
     State(state): State<Arc<AppState>>,
     Path((thread_id, message_id)): Path<(String, String)>,
     auth: DidAuth,
@@ -258,8 +258,8 @@ async fn list_reactions(
     }
 }
 
-// Add a reaction to a message
-async fn add_reaction(
+#[axum::debug_handler]
+pub async fn add_reaction(
     State(state): State<Arc<AppState>>,
     Path(message_id): Path<String>,
     auth: DidAuth,
@@ -300,8 +300,8 @@ async fn add_reaction(
     }
 }
 
-// Remove a reaction from a message
-async fn remove_reaction(
+#[axum::debug_handler]
+pub async fn remove_reaction(
     State(state): State<Arc<AppState>>,
     Path((message_id, reaction_type)): Path<(String, String)>,
     auth: DidAuth,

@@ -87,16 +87,18 @@ pub mod message {
     use chrono::{DateTime, Utc};
     use uuid::Uuid;
     use sqlx::FromRow;
+    use std::collections::HashMap;
 
-    #[derive(Debug, Serialize, Deserialize, FromRow)]
+    #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
     pub struct Message {
         pub id: Uuid,
         pub thread_id: Uuid,
-        pub author_did: Option<String>,
+        pub author_did: String,
         pub content: String,
         pub reply_to: Option<Uuid>,
+        pub signature_cid: Option<String>,
         pub is_system: bool,
-        pub metadata: Option<String>,
+        pub metadata: Option<sqlx::types::JsonValue>,
         pub created_at: DateTime<Utc>,
     }
     

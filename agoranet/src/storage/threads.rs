@@ -2,13 +2,14 @@ use sqlx::PgPool;
 use crate::types::thread::Thread;
 use super::{Result, StorageError};
 use uuid::Uuid;
+use std::sync::Arc;
 
 pub struct ThreadRepository {
-    pool: PgPool,
+    pool: Arc<PgPool>,
 }
 
 impl ThreadRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
     }
 

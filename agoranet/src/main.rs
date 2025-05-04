@@ -8,6 +8,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tokio::net::TcpListener;
 
 mod routes;
 mod models;
@@ -81,16 +82,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(public_routes)
         .nest("/api", api_routes)
         .layer(cors)
-        .with_state(state);
+        .with_state(state.clone());
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
     let port = port.parse::<u16>()?;
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("AgoraNet running on {}", addr);
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    // Create a TcpListener
+    let listener = TcpListener::bind(addr).await?;
+    
+    // Serve the app using the listener
+    axum::serve(listener, app.into_make_service()).await?;
 
     Ok(())
 } 

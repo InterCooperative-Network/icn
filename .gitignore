@@ -86,3 +86,4 @@ yarn.lock
 /agoranet/health_check/target/
 /runtime/health_check/target/
 /wallet-agent/health_check/target/
+.sqlx/
