@@ -12,7 +12,8 @@ members = [
 # Temporarily excluded components with issues
 exclude = [
     "wallet/crates/wallet-sync",
-    "agoranet"
+    "agoranet",
+    "runtime/crates/agoranet-integration"
 ]
 
 [workspace.dependencies]

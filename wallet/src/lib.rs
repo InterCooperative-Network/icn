@@ -6,13 +6,13 @@ Mobile-first agent for identity, credentials, and DAG participation.
 This is the top-level crate that composes the wallet functionality from its component crates:
 - wallet-identity: For DID and VC support
 - wallet-storage: For secure credential and key storage
-- wallet-sync: For DAG synchronization with the runtime mesh
+- icn-wallet-sync: For DAG synchronization with the runtime mesh
 - wallet-actions: For DAG operations and proposal management
 - wallet-api: For application-facing interfaces
 
 */
 
-use wallet_sync as sync;
+use icn_wallet_sync as sync;
 use wallet_identity as identity;
 use wallet_storage as storage;
 use wallet_actions as actions;
@@ -26,7 +26,7 @@ pub mod error {
     #[derive(Error, Debug)]
     pub enum WalletError {
         #[error("Synchronization error: {0}")]
-        Sync(#[from] wallet_sync::error::SyncError),
+        Sync(#[from] sync::federation::FederationSyncError),
 
         #[error("Identity error: {0}")]
         Identity(String),
@@ -36,25 +36,34 @@ pub mod error {
 
         #[error("Internal error: {0}")]
         Internal(String),
+        
+        #[error("Compatibility error: {0}")]
+        Compatibility(#[from] sync::compat::CompatError),
     }
 }
 
 pub use error::WalletError;
+use sync::WalletSync;
 
 /// The main wallet struct that provides access to all wallet functionality
 pub struct Wallet {
-    // These will be added as the crates are implemented
+    sync_manager: WalletSync,
 }
 
 impl Wallet {
     /// Create a new wallet instance
-    pub fn new() -> Result<Self, WalletError> {
-        Ok(Wallet {})
+    pub fn new(storage_manager: storage::StorageManager) -> Result<Self, WalletError> {
+        let storage = storage_manager.data_storage();
+        let sync_manager = WalletSync::new(storage.clone());
+        
+        Ok(Wallet {
+            sync_manager,
+        })
     }
     
     /// Get the sync module
-    pub fn sync(&self) -> &sync::SyncManager {
-        unimplemented!("Sync manager not yet initialized")
+    pub fn sync(&self) -> &WalletSync {
+        &self.sync_manager
     }
     
     /// Get the identity module
