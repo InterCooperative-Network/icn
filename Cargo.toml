@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "runtime",
     "runtime/crates/*",
+    "runtime/cli",
     "wallet",
     "wallet/crates/*",
     "agoranet",
@@ -14,7 +15,6 @@ members = [
 # Temporarily excluded components with issues
 exclude = [
     "frontend/*",
-    "wallet/crates/sync",
     "runtime/crates/agoranet-integration",
     # Exclude duplicate crates - prefer the unified "icn-" prefixed versions in wallet/crates
     "runtime/crates/wallet-agent",    # Duplicate of wallet/crates/wallet-agent (icn-wallet-agent)

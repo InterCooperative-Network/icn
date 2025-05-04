@@ -48,12 +48,10 @@ jobs:
               MATCH_COUNT=$(echo "$MATCHES" | wc -l)
               
               if [ "$MATCH_COUNT" -gt 1 ]; then
-                echo "Warning: Found multiple crates matching pattern '$PATTERN':"
+                echo "Error: Found multiple crates matching pattern '$PATTERN':"
                 echo "$MATCHES"
-                echo "Please verify these are not duplicate implementations."
-                
-                # This is a warning, not an error (yet)
-                # Add exit 1 here to fail the build if this should be enforced
+                echo "These are likely duplicate implementations that should be consolidated."
+                exit 1
               fi
             fi
           done
@@ -64,12 +62,10 @@ jobs:
           NESTED_WORKSPACES=$(find . -not -path "./target/*" -not -path "./$ROOT_WORKSPACE" -name Cargo.toml -type f -exec grep -l "^\[workspace\]" {} \;)
           
           if [ -n "$NESTED_WORKSPACES" ]; then
-            echo "Warning: Found nested workspace definitions which may cause build issues:"
+            echo "Error: Found nested workspace definitions which cause build issues:"
             echo "$NESTED_WORKSPACES"
-            echo "Consider flattening to a single workspace for better compatibility."
-            
-            # This is a warning, not an error (yet) to allow gradual transition
-            # Add exit 1 here to fail the build if this should be enforced
+            echo "All workspaces must be consolidated into the root Cargo.toml."
+            exit 1
           else
             echo "No nested workspaces found."
           fi
