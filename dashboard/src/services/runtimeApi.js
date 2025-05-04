@@ -62,6 +62,37 @@ export const proposalApi = {
   async executeProposal(id) {
     const response = await runtimeClient.post(`/proposals/${id}/execute`);
     return response.data;
+  },
+
+  /**
+   * Get voting configuration for a proposal
+   * @param {string} id - Proposal ID
+   * @returns {Promise<Object>} Voting configuration including quorum, threshold, etc.
+   */
+  async getVotingConfig(id) {
+    const response = await runtimeClient.get(`/proposals/${id}/voting-config`);
+    return response.data;
+  },
+
+  /**
+   * Submit a vote for a proposal
+   * @param {string} id - Proposal ID
+   * @param {Object} voteData - Vote data including vote choice and signature
+   * @returns {Promise<Object>} Vote submission result
+   */
+  async submitVote(id, voteData) {
+    const response = await runtimeClient.post(`/proposals/${id}/votes`, voteData);
+    return response.data;
+  },
+
+  /**
+   * Get current votes for a proposal
+   * @param {string} id - Proposal ID
+   * @returns {Promise<Object>} Vote tallies and individual votes
+   */
+  async getVotes(id) {
+    const response = await runtimeClient.get(`/proposals/${id}/votes`);
+    return response.data;
   }
 };
 
@@ -84,6 +115,27 @@ export const dagApi = {
    */
   async submitNode(nodeData) {
     const response = await runtimeClient.post('/dag', nodeData);
+    return response.data;
+  },
+
+  /**
+   * Get latest DAG anchors
+   * @param {string} since - Optional CID to get anchors since a specific point
+   * @returns {Promise<Object>} Latest DAG anchors and updates
+   */
+  async getAnchors(since = null) {
+    const params = since ? { since } : {};
+    const response = await runtimeClient.get('/dag/anchors', { params });
+    return response.data;
+  },
+
+  /**
+   * Get DAG history for a specific proposal
+   * @param {string} proposalId - Proposal ID
+   * @returns {Promise<Array>} DAG history related to the proposal
+   */
+  async getProposalDagHistory(proposalId) {
+    const response = await runtimeClient.get(`/dag/history/${proposalId}`);
     return response.data;
   }
 };
@@ -122,6 +174,33 @@ export const credentialApi = {
       receipt: receiptJwt
     });
     return response.data;
+  },
+
+  /**
+   * Poll for a receipt until it becomes available
+   * @param {string} proposalId - Proposal ID
+   * @param {number} timeout - Timeout in milliseconds
+   * @param {number} interval - Polling interval in milliseconds
+   * @returns {Promise<Object>} Receipt when available
+   */
+  async pollForReceipt(proposalId, timeout = 30000, interval = 2000) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      try {
+        const receipts = await this.getReceiptsForProposal(proposalId);
+        if (receipts && receipts.length > 0) {
+          return receipts[0];
+        }
+      } catch (error) {
+        console.error('Error polling for receipt:', error);
+      }
+      
+      // Wait for the interval before trying again
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    
+    throw new Error('Receipt polling timed out');
   }
 };
 

@@ -10,6 +10,7 @@ import {
   Bars3Icon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import DagSyncStatus from './DagSyncStatus';
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -123,6 +124,13 @@ export default function Layout({ children }) {
               <h1 className="text-2xl font-semibold text-gray-900">
                 {navigation.find(item => item.current)?.name || 'AgoraNet Dashboard'}
               </h1>
+              
+              {/* DAG Sync Status */}
+              {isAuthenticated && (
+                <div className="ml-4">
+                  <DagSyncStatus />
+                </div>
+              )}
             </div>
             <div className="flex items-center">
               {!isAuthenticated && (

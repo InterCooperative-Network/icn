@@ -5,9 +5,11 @@ import {
   XCircleIcon, 
   ClockIcon,
   DocumentTextIcon,
-  ArrowTopRightOnSquareIcon 
+  ArrowTopRightOnSquareIcon,
+  BellAlertIcon
 } from '@heroicons/react/24/outline';
 import { useCredentials } from '../contexts/CredentialContext';
+import { useDagSync } from '../contexts/DagSyncContext';
 import CredentialScopeSelector from './CredentialScopeSelector';
 
 // Proposal status badges
@@ -52,6 +54,7 @@ const StatusBadge = ({ status }) => {
 
 export default function ProposalList({ proposals, isLoading, error, onFilterChange }) {
   const { federationId, hasPermission } = useCredentials();
+  const { updatedProposals, clearUpdatedProposal } = useDagSync();
   const [selectedScope, setSelectedScope] = useState(federationId || 'all');
   const [creatorFilter, setCreatorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -78,6 +81,18 @@ export default function ProposalList({ proposals, isLoading, error, onFilterChan
       creatorDid: filterType === 'creator' ? value : creatorFilter,
       status: filterType === 'status' ? value : statusFilter,
     });
+  };
+  
+  // Check if a proposal is in the updated list
+  const isProposalUpdated = (proposalId) => {
+    return updatedProposals.some(p => p.id === proposalId);
+  };
+  
+  // Clear highlight when clicking a proposal
+  const handleProposalClick = (proposalId) => {
+    if (isProposalUpdated(proposalId)) {
+      clearUpdatedProposal(proposalId);
+    }
   };
   
   // Placeholder for empty state
@@ -125,6 +140,16 @@ export default function ProposalList({ proposals, isLoading, error, onFilterChan
   
   return (
     <div>
+      {/* Updates indicator */}
+      {updatedProposals.length > 0 && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-md p-3 flex items-center">
+          <BellAlertIcon className="h-5 w-5 text-yellow-500 mr-2" />
+          <span className="text-yellow-700">
+            {updatedProposals.length} proposal(s) have been updated via recent DAG anchoring
+          </span>
+        </div>
+      )}
+      
       {/* Filters */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
@@ -173,45 +198,58 @@ export default function ProposalList({ proposals, isLoading, error, onFilterChan
       {/* Proposals List */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
-          {proposals.map((proposal) => (
-            <li key={proposal.id}>
-              <Link to={`/proposals/${proposal.id}`} className="block hover:bg-gray-50">
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="truncate">
-                      <div className="flex text-sm">
-                        <p className="font-medium text-agora-blue truncate">{proposal.title}</p>
-                      </div>
-                      <div className="mt-2 flex">
-                        <div className="flex items-center text-sm text-gray-500">
-                          <p>
-                            Created by: {proposal.creatorDid?.substring(0, 16)}...
-                          </p>
+          {proposals.map((proposal) => {
+            const isUpdated = isProposalUpdated(proposal.id);
+            return (
+              <li key={proposal.id} className={isUpdated ? "bg-yellow-50" : undefined}>
+                <Link 
+                  to={`/proposals/${proposal.id}`} 
+                  className="block hover:bg-gray-50"
+                  onClick={() => handleProposalClick(proposal.id)}
+                >
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <div className="truncate">
+                        <div className="flex text-sm">
+                          <p className="font-medium text-agora-blue truncate">{proposal.title}</p>
+                          {isUpdated && (
+                            <span className="ml-2 flex items-center text-yellow-600">
+                              <BellAlertIcon className="h-4 w-4 mr-1" />
+                              Updated
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 flex">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <p>
+                              Created by: {proposal.creatorDid?.substring(0, 16)}...
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="ml-2 flex-shrink-0 flex flex-col items-end">
-                      <StatusBadge status={proposal.status} />
-                      
-                      {proposal.threadId && (
-                        <div className="mt-2 flex items-center text-sm text-gray-500">
-                          <span className="mr-1">Thread:</span>
-                          <a 
-                            href={`/threads/${proposal.threadId}`}
-                            className="text-agora-blue hover:underline flex items-center"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {proposal.threadId.substring(0, 8)}...
-                            <ArrowTopRightOnSquareIcon className="h-4 w-4 ml-1" />
-                          </a>
-                        </div>
-                      )}
+                      <div className="ml-2 flex-shrink-0 flex flex-col items-end">
+                        <StatusBadge status={proposal.status} />
+                        
+                        {proposal.threadId && (
+                          <div className="mt-2 flex items-center text-sm text-gray-500">
+                            <span className="mr-1">Thread:</span>
+                            <a 
+                              href={`/threads/${proposal.threadId}`}
+                              className="text-agora-blue hover:underline flex items-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {proposal.threadId.substring(0, 8)}...
+                              <ArrowTopRightOnSquareIcon className="h-4 w-4 ml-1" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
