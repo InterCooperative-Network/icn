@@ -12,7 +12,9 @@ icn/
 ├── runtime/             # Core Rust logic for federation governance, execution, DAG, economics, and storage
 ├── scripts/             # Utility scripts for development, testing, and deployment
 ├── tools/               # Standalone tools and utilities
-└── wallet/              # Mobile-first identity and sync agent
+├── wallet/              # Mobile-first identity and sync agent
+├── Cargo.toml           # Workspace configuration
+└── README.md            # Project overview
 ```
 
 ## Core Component Details
@@ -32,7 +34,7 @@ runtime/
 │   ├── federation/      # Federation management
 │   ├── governance-kernel/ # Governance mechanisms
 │   └── storage/         # Storage implementations
-├── docs/                # Runtime-specific documentation
+├── devnet/              # Development network configuration
 ├── examples/            # Example code and applications 
 ├── tests/               # Integration and unit tests
 └── config/              # Configuration templates and examples
@@ -55,7 +57,6 @@ wallet/
 │   ├── wallet-core/     # Core wallet functionality
 │   ├── wallet-ffi/      # FFI implementation for mobile platforms
 │   └── wallet-types/    # Type definitions
-├── docs/                # Wallet-specific documentation
 ├── examples/            # Example code for wallet usage
 └── src/                 # Wallet crate root source
 ```
@@ -98,6 +99,7 @@ Utility scripts for development, testing, and deployment.
 
 ```
 scripts/
+├── restructure_repo.sh  # Monorepo restructuring script
 ├── deployment/          # Deployment scripts
 ├── development/         # Development utilities
 └── testing/             # Testing scripts
@@ -111,6 +113,7 @@ Central documentation repository.
 docs/
 ├── REPO_STRUCTURE.md          # This document
 ├── MIGRATION_PLAN.md          # Migration plan for restructuring
+├── restructuring-summary.md   # Summary of restructuring process
 ├── runtime/                   # Runtime-specific documentation
 ├── wallet/                    # Wallet-specific documentation
 └── agoranet/                  # Agoranet-specific documentation
@@ -128,7 +131,7 @@ docs/
 
 The monorepo uses Cargo workspaces to manage the Rust crates. The top-level Cargo.toml defines the workspace and common dependencies, while individual components have their own Cargo.toml files for component-specific dependencies.
 
-The frontend applications use npm/yarn for dependency management.
+The frontend applications use npm/yarn for dependency management and are excluded from the Cargo workspace.
 
 ## Guidelines for Future Development
 
@@ -152,4 +155,9 @@ The frontend applications use npm/yarn for dependency management.
 4. **Testing**:
    - Place unit tests alongside code
    - Place integration tests in dedicated test directories
-   - Ensure cross-module tests validate component relationships 
+   - Ensure cross-module tests validate component relationships
+
+5. **Documentation**:
+   - Keep high-level documentation in the docs/ directory
+   - Maintain component-specific documentation within each component
+   - Update documentation when making significant changes to the codebase 

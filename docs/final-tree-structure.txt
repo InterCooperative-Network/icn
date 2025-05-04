@@ -1,0 +1,79 @@
+icn/
+├── agoranet/
+│   ├── crates/
+│   │   └── agoranet-api/
+│   ├── migrations/
+│   ├── src/
+│   └── Cargo.toml
+├── docs/
+│   ├── agoranet/
+│   ├── runtime/
+│   │   ├── SECURITY_REVIEW.md
+│   │   └── wasmtime-upgrade-summary.md
+│   ├── wallet/
+│   ├── expected-tree-output.txt
+│   ├── final-tree-structure.txt
+│   ├── MIGRATION_PLAN.md
+│   ├── REPO_STRUCTURE.md
+│   └── restructuring-summary.md
+├── frontend/
+│   ├── agoranet-dashboard/
+│   │   ├── node_modules/
+│   │   ├── package.json
+│   │   └── src/
+│   └── dashboard/
+│       ├── node_modules/
+│       ├── package.json
+│       └── src/
+├── runtime/
+│   ├── bin/
+│   ├── config/
+│   ├── crates/
+│   │   ├── common/
+│   │   ├── core-vm/
+│   │   ├── dag/
+│   │   ├── economics/
+│   │   ├── federation/
+│   │   ├── governance-kernel/
+│   │   └── storage/
+│   ├── devnet/
+│   ├── examples/
+│   ├── tests/
+│   └── Cargo.toml
+├── scripts/
+│   ├── deployment/
+│   ├── development/
+│   │   └── generate_llm_dump.sh
+│   ├── restructure_repo.sh
+│   └── testing/
+│       ├── monitor_integration.sh
+│       ├── run_integration_node.sh
+│       ├── run_integration_tests.sh
+│       └── run_stress_tests.sh
+├── tools/
+│   ├── health_check/
+│   │   ├── src/
+│   │   │   └── main.rs
+│   │   └── Cargo.toml
+│   └── icn-verifier/
+│       ├── src/
+│       └── Cargo.toml
+├── wallet/
+│   ├── crates/
+│   │   ├── actions/
+│   │   ├── api/
+│   │   ├── ffi/
+│   │   ├── identity/
+│   │   ├── storage/
+│   │   ├── sync/
+│   │   ├── wallet-agent/
+│   │   ├── wallet-core/
+│   │   ├── wallet-ffi/
+│   │   └── wallet-types/
+│   ├── examples/
+│   ├── src/
+│   └── Cargo.toml
+├── .gitignore
+├── Cargo.lock
+├── Cargo.toml
+└── README.md 
