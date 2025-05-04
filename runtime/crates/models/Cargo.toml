@@ -1,0 +1,22 @@
+[package]
+name = "icn-models"
+version = "0.1.0"
+edition = "2021"
+description = "Shared data models for the ICN Runtime"
+
+[dependencies]
+# Core dependencies from workspace
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+
+# IPLD and content-addressing
+cid = { workspace = true }
+multihash = { workspace = true }
+libipld = { workspace = true }
+
+# ICN dependencies
+icn-common = { path = "../common" }
+icn-identity = { path = "../identity" }

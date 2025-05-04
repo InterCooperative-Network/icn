@@ -13,3 +13,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
+
+[workspace]
+members = [
+    "crates/*",
+    "bin",
+]
