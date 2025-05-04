@@ -7,11 +7,8 @@
  * - Credential management and verification
  */
 
-use std::sync::Arc;
-use serde::{Serialize, Deserialize};
 use reqwest::Client;
 use thiserror::Error;
-use async_trait::async_trait;
 
 #[derive(Error, Debug)]
 pub enum WalletAgentError {

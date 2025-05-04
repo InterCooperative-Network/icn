@@ -11,9 +11,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-icn-wallet-sync = { path = "../wallet-sync" }
-icn-dag = { path = "../../runtime/crates/dag" }
-icn-storage = { path = "../storage" }
-icn-identity = { path = "../identity" }
+# icn-wallet-sync = { path = "../sync" } # Temporarily disabled due to exclusion
+icn-dag = { path = "../../../runtime/crates/dag" }
+wallet-storage = { path = "../storage" }
+wallet-identity = { path = "../identity" }
 async-trait = { workspace = true }
 chrono = { workspace = true } 

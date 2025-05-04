@@ -24,7 +24,7 @@ dictionary Receipt {
 dictionary Filter {
     string? scope;
     string? outcome;
-    long? since;
+    u64? since;
     string? proposal_prefix;
-    long? limit;
+    u64? limit;
 }; 

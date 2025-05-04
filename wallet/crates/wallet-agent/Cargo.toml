@@ -12,7 +12,7 @@ thiserror = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-icn-wallet-sync = { path = "../sync" }
+# icn-wallet-sync = { path = "../sync" } # Temporarily disabled due to exclusion
 icn-wallet-core = { path = "../wallet-core" }
 icn-dag = { path = "../../../runtime/crates/dag" }
 chrono = { workspace = true }

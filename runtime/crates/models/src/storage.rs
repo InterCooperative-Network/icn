@@ -118,17 +118,17 @@ pub trait BasicStorageManager: Send + Sync {
 pub trait DagStorageManager: BasicStorageManager {
     /// Stores the genesis node for a *new* entity DAG.
     /// Creates the entity storage space if it doesn't exist.
-    async fn store_new_dag_root(
+    async fn store_new_dag_root<B: DagNodeBuilder + Send + Sync>(
         &self,
         entity_did: &str,
-        node_builder: &dyn DagNodeBuilder,
+        node_builder: B,
     ) -> crate::Result<(Cid, DagNode)>;
 
     /// Stores a regular (non-genesis) DAG node for an existing entity.
-    async fn store_node(
+    async fn store_node<B: DagNodeBuilder + Send + Sync>(
         &self,
         entity_did: &str,
-        node_builder: &dyn DagNodeBuilder,
+        node_builder: B,
     ) -> crate::Result<(Cid, DagNode)>;
 
     /// Retrieves a DAG node by its CID from a specific entity's DAG.
@@ -141,9 +141,10 @@ pub trait DagStorageManager: BasicStorageManager {
     async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> crate::Result<Option<Vec<u8>>>;
 
     /// Stores multiple nodes for an entity in a single batch operation.
-    async fn store_nodes_batch(
+    /// Note: This requires the builder type B to be Clone + Send + Sync.
+    async fn store_nodes_batch<B: DagNodeBuilder + Clone + Send + Sync>(
         &self,
         entity_did: &str,
-        node_builders: Vec<&dyn DagNodeBuilder>,
+        node_builders: Vec<B>,
     ) -> crate::Result<Vec<(Cid, DagNode)>>;
 } 

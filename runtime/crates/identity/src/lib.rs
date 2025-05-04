@@ -15,7 +15,6 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use cid::Cid;
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sha2::{Sha256, Digest};

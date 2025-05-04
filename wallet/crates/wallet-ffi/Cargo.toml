@@ -15,7 +15,7 @@ thiserror = "1.0"
 uniffi = { version = "0.24", features = ["cli"] }
 icn-wallet-agent = { path = "../wallet-agent" }
 icn-wallet-core = { path = "../wallet-core" }
-icn-wallet-sync = { path = "../wallet-sync" }
+# icn-wallet-sync = { path = "../sync" } # Temporarily disabled due to exclusion
 chrono = { version = "0.4", features = ["serde"] }
 
 [build-dependencies]
