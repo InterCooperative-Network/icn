@@ -5,9 +5,9 @@
 The Intercooperative Network (ICN) Trust Model defines how entities establish, maintain, and verify trust relationships in a federated context. The model is designed to support cooperative governance while balancing the need for federation autonomy with cross-federation verification and coordination.
 
 > **Related Documentation:**
-> - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall system architecture
-> - [DAG_STRUCTURE.md](DAG_STRUCTURE.md) - DAG implementation details
-> - [FEDERATION_BOOTSTRAP.md](FEDERATION_BOOTSTRAP.md) - Federation initialization
+> - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Overall system architecture
+> - [DAG_STRUCTURE.md](docs/DAG_STRUCTURE.md) - DAG implementation details
+> - [FEDERATION_BOOTSTRAP.md](docs/FEDERATION_BOOTSTRAP.md) - Federation initialization
 
 ## Core Principles
 
@@ -993,8 +993,8 @@ The trust system includes protections against denial of service:
 
 ## References
 
-- [ICN Architecture](ARCHITECTURE.md) - Overall system architecture
-- [DAG Structure](DAG_STRUCTURE.md) - DAG implementation details
+- [ICN Architecture](docs/ARCHITECTURE.md) - Overall system architecture
+- [DAG Structure](docs/DAG_STRUCTURE.md) - DAG implementation details
 - [W3C DID Specification](https://www.w3.org/TR/did-core/) - DID standard
 - [W3C VC Data Model](https://www.w3.org/TR/vc-data-model/) - Verifiable Credentials standard
 - [ZKProof Standards](https://zkproof.org/papers/) - ZK Proof standards

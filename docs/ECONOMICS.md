@@ -5,10 +5,10 @@
 This document specifies the economic layer of the Intercooperative Network (ICN), defining the token system that enables resource metering, scoped incentives, and verifiable execution across federations. The ICN economic system is designed to facilitate cooperative economic activity while preventing speculation, ensuring resource availability, and maintaining cryptographic verifiability.
 
 > **Related Documentation:**
-> - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall system architecture
-> - [DAG_STRUCTURE.md](DAG_STRUCTURE.md) - DAG implementation details
-> - [GOVERNANCE_SYSTEM.md](GOVERNANCE_SYSTEM.md) - Governance mechanisms
-> - [TRUST_MODEL.md](TRUST_MODEL.md) - Trust model and federation relationships
+> - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Overall system architecture
+> - [DAG_STRUCTURE.md](docs/DAG_STRUCTURE.md) - DAG implementation details
+> - [GOVERNANCE_SYSTEM.md](docs/GOVERNANCE_SYSTEM.md) - Governance mechanisms
+> - [TRUST_MODEL.md](docs/TRUST_MODEL.md) - Trust model and federation relationships
 
 ## Economic Model Overview
 

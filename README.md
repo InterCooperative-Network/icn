@@ -59,6 +59,18 @@ The ICN system consists of several key components:
 
 Please refer to the documentation in `docs/` for more detailed information.
 
+## Documentation
+
+For detailed information about ICN, refer to these documents:
+
+- [Architecture Overview](docs/ARCHITECTURE.md) - System architecture and components
+- [DAG Structure](docs/DAG_STRUCTURE.md) - Technical details of the DAG implementation
+- [Governance System](docs/GOVERNANCE_SYSTEM.md) - Federation governance mechanisms
+- [Economic System](docs/ECONOMICS.md) - Token economics and resource metering
+- [Security](docs/SECURITY.md) - Security model and threat mitigations
+- [Trust Model](docs/TRUST_MODEL.md) - Trust relationships and federation design
+- [Integration Guide](docs/INTEGRATION_GUIDE.md) - Guide for developers and federation operators
+
 ## Contributing
 
 1. Fork the repository

@@ -618,10 +618,10 @@ Current technical limitations include:
 
 ## References
 
-- [ICN Architecture](ARCHITECTURE.md) - Overview of the entire ICN system architecture
-- [Federation Bootstrap Protocol](FEDERATION_BOOTSTRAP.md) - Details on federation initialization
-- [CCL Language Specification](CCL_SPEC.md) - Cooperative Coordination Language specification
-- [Wallet Integration Guide](WALLET_INTEGRATION.md) - Guide for wallet developers
+- [ICN Architecture](docs/ARCHITECTURE.md) - Overview of the entire ICN system architecture
+- [Federation Bootstrap Protocol](docs/FEDERATION_BOOTSTRAP.md) - Details on federation initialization
+- [CCL Language Specification](docs/CCL_SPEC.md) - Cooperative Coordination Language specification
+- [Wallet Integration Guide](docs/WALLET_INTEGRATION.md) - Guide for wallet developers
 
 ---
 

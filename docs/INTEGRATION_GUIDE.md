@@ -29,11 +29,11 @@ ICN integration typically focuses on one or more of these objectives:
 ### Related Documentation
 
 For deeper understanding of specific subsystems, refer to:
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Complete system architecture
-- [GOVERNANCE_SYSTEM.md](GOVERNANCE_SYSTEM.md) - Governance mechanisms
-- [ECONOMICS.md](ECONOMICS.md) - Economic system specification
-- [SECURITY.md](SECURITY.md) - Security model and threat mitigations
-- [DAG_STRUCTURE.md](DAG_STRUCTURE.md) - DAG implementation details
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Complete system architecture
+- [GOVERNANCE_SYSTEM.md](docs/GOVERNANCE_SYSTEM.md) - Governance mechanisms
+- [ECONOMICS.md](docs/ECONOMICS.md) - Economic system specification
+- [SECURITY.md](docs/SECURITY.md) - Security model and threat mitigations
+- [DAG_STRUCTURE.md](docs/DAG_STRUCTURE.md) - DAG implementation details
 
 ## 2. Prerequisites
 
@@ -1104,7 +1104,7 @@ pub fn configure_security_monitoring(
 }
 ```
 
-For more detailed security documentation, refer to [SECURITY.md](SECURITY.md).
+For more detailed security documentation, refer to [SECURITY.md](docs/SECURITY.md).
 
 ## 10. Sample Flows
 

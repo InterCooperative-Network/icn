@@ -127,7 +127,7 @@ This project is currently in early development. See the [roadmap](docs/ROADMAP.m
 
 ## Contributing
 
-We welcome contributions from everyone who shares our vision of democratic, cooperative technology. Please see our [contribution guidelines](CONTRIBUTING.md) for more information.
+We welcome contributions from everyone who shares our vision of democratic, cooperative technology. Please see our [contribution guidelines](docs/CONTRIBUTING.md) for more information.
 
 ## License
 

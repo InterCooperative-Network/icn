@@ -5,10 +5,10 @@
 This document specifies the governance mechanisms of the Intercooperative Network (ICN), defining how proposals are created, deliberated upon, voted on, executed, and anchored into the system's state. The ICN governance system is designed to support cooperative decision-making across multiple federations while maintaining cryptographic verifiability, appropriate participation scopes, and clear accountability.
 
 > **Related Documentation:**
-> - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall system architecture
-> - [DAG_STRUCTURE.md](DAG_STRUCTURE.md) - DAG implementation details
-> - [TRUST_MODEL.md](TRUST_MODEL.md) - Trust model and federation relationships
-> - [CCL_SPEC.md](CCL_SPEC.md) - Cooperative Coordination Language specification
+> - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Overall system architecture
+> - [DAG_STRUCTURE.md](docs/DAG_STRUCTURE.md) - DAG implementation details
+> - [TRUST_MODEL.md](docs/TRUST_MODEL.md) - Trust model and federation relationships
+> - [CCL_SPEC.md](docs/CCL_SPEC.md) - Cooperative Coordination Language specification
 
 ## Governance Lifecycle Overview
 
@@ -689,7 +689,7 @@ pub struct GuardianRole {
 
 ### Role Assignment and Revocation
 
-Roles are assigned through credential issuance and can be revoked through standard credential revocation mechanisms as defined in [TRUST_MODEL.md](TRUST_MODEL.md).
+Roles are assigned through credential issuance and can be revoked through standard credential revocation mechanisms as defined in [TRUST_MODEL.md](docs/TRUST_MODEL.md).
 
 ```rust
 pub fn assign_governance_role(

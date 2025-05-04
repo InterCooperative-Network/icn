@@ -5,11 +5,11 @@
 This document specifies the security model of the Intercooperative Network (ICN), detailing the threat mitigations, cryptographic foundations, isolation mechanisms, and safeguards that protect the integrity of the system. The ICN security architecture is designed to support decentralized governance while maintaining high assurance and resilience against various attack vectors.
 
 > **Related Documentation:**
-> - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall system architecture
-> - [DAG_STRUCTURE.md](DAG_STRUCTURE.md) - DAG implementation details
-> - [GOVERNANCE_SYSTEM.md](GOVERNANCE_SYSTEM.md) - Governance mechanisms
-> - [ECONOMICS.md](ECONOMICS.md) - Economic system specification
-> - [TRUST_MODEL.md](TRUST_MODEL.md) - Trust model and federation relationships
+> - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Overall system architecture
+> - [DAG_STRUCTURE.md](docs/DAG_STRUCTURE.md) - DAG implementation details
+> - [GOVERNANCE_SYSTEM.md](docs/GOVERNANCE_SYSTEM.md) - Governance mechanisms
+> - [ECONOMICS.md](docs/ECONOMICS.md) - Economic system specification
+> - [TRUST_MODEL.md](docs/TRUST_MODEL.md) - Trust model and federation relationships
 
 ## Threat Model
 
