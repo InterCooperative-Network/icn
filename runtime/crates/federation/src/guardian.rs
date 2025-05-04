@@ -216,7 +216,7 @@ pub mod initialization {
         // Base claims
         let mut claims = serde_json::Map::new();
         claims.insert("role".to_string(), serde_json::Value::String("Guardian".to_string()));
-        claims.insert("scope".to_string(), serde_json::Value::String(IdentityScope::Guardian.to_string()));
+        claims.insert("scope".to_string(), serde_json::Value::String("Guardian".to_string()));
         
         // Add additional claims if provided
         if let Some(additional) = additional_claims {

@@ -3504,6 +3504,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "ssi-jwk 0.1.2",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.4.13",

@@ -46,10 +46,12 @@ use uuid::Uuid;
 // Workspace crate imports
 use icn_common::DagStore;
 
-// Crate-internal imports (from declared modules)
-use crate::did::{IdentityId};
+// Types used directly in this module (not re-exported)
 use crate::error::{IdentityError, IdentityResult};
-use crate::keypair::{KeyPair, Signature};
+
+// Re-export essential types for external use
+pub use crate::did::IdentityId;
+pub use crate::keypair::{KeyPair, Signature};
 
 /// Simple DID resolver trait that will be expanded later
 pub trait SimpleDIDResolver {
@@ -1045,9 +1047,4 @@ mod tests {
 
     // TODO: Update other tests (sign/verify, VC, TrustBundle) to use the new manager
     // and proper crypto operations. The existing tests are likely broken now.
-}
-
-// Re-export essential types for external use
-pub use crate::did::IdentityId;
-pub use crate::keypair::{KeyPair, Signature};
-pub use ssi_jwk::JWK; 
+} 

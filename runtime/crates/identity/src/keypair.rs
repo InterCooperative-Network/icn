@@ -21,6 +21,7 @@ impl Signature {
 /// Keypair type used for operations (abstraction over the actual implementation)
 // Note: This is a simplified placeholder. A real implementation would likely
 // wrap a specific cryptographic key type (e.g., ed25519_dalek::Keypair or a JWK).
+#[derive(Debug, Clone)]
 pub struct KeyPair {
     /// The private key bytes
     private_key: Vec<u8>,
@@ -62,3 +63,5 @@ pub enum KeyType {
     // ... other key types ...
 }
 */
+
+// Make types public for external use

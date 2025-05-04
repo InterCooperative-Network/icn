@@ -55,3 +55,5 @@ pub struct DidDocument {
    // ... other DID document fields like authentication, assertionMethod etc.
 }
 */
+
+// Make IdentityId public for external use
