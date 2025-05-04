@@ -274,4 +274,115 @@ pub fn system_time_to_datetime(time: SystemTime) -> CompatResult<DateTime<Utc>> 
 /// Helper function to convert datetime to system time
 pub fn datetime_to_system_time(dt: DateTime<Utc>) -> SystemTime {
     UNIX_EPOCH + std::time::Duration::from_secs(dt.timestamp() as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Helper function to create a test RuntimeDagNode
+    fn create_test_runtime_node() -> RuntimeDagNode {
+        let cid = cid::Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
+        let parent_cid = cid::Cid::try_from("bafkreiaxnnnb7qz6drrbababuirxx54hlzkrl2yxekizxr6gpceiqdu4i").unwrap();
+        
+        let metadata = DagNodeMetadata {
+            timestamp: 1683123456,
+            sequence: Some(42),
+            scope: Some("test-scope".to_string()),
+        };
+        
+        let mut map = BTreeMap::new();
+        map.insert("key".to_string(), Ipld::String("value".to_string()));
+        
+        RuntimeDagNode {
+            cid,
+            parents: vec![parent_cid],
+            issuer: IdentityId::new("did:icn:test".to_string()),
+            signature: vec![1, 2, 3, 4],
+            payload: Ipld::Map(map),
+            metadata,
+        }
+    }
+
+    // Helper function to create a test WalletDagNode
+    fn create_test_wallet_node() -> WalletDagNode {
+        WalletDagNode {
+            cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".to_string(),
+            parents: vec!["bafkreiaxnnnb7qz6drrbababuirxx54hlzkrl2yxekizxr6gpceiqdu4i".to_string()],
+            issuer: "did:icn:test".to_string(),
+            timestamp: UNIX_EPOCH + std::time::Duration::from_secs(1683123456),
+            signature: vec![1, 2, 3, 4],
+            payload: r#"{"key":"value"}"#.as_bytes().to_vec(),
+            metadata: WalletDagNodeMetadata {
+                sequence: Some(42),
+                scope: Some("test-scope".to_string()),
+            },
+        }
+    }
+
+    #[test]
+    fn test_runtime_to_wallet_conversion() {
+        let runtime_node = create_test_runtime_node();
+        let wallet_node = runtime_to_wallet(&runtime_node).unwrap();
+        
+        assert_eq!(wallet_node.cid, runtime_node.cid.to_string());
+        assert_eq!(wallet_node.parents.len(), runtime_node.parents.len());
+        assert_eq!(wallet_node.parents[0], runtime_node.parents[0].to_string());
+        assert_eq!(wallet_node.issuer, runtime_node.issuer.to_string());
+        assert_eq!(wallet_node.signature, runtime_node.signature);
+        assert_eq!(wallet_node.metadata.sequence, runtime_node.metadata.sequence);
+        assert_eq!(wallet_node.metadata.scope, runtime_node.metadata.scope);
+    }
+
+    #[test]
+    fn test_wallet_to_runtime_conversion() {
+        let wallet_node = create_test_wallet_node();
+        let runtime_node = wallet_to_runtime(&wallet_node).unwrap();
+        
+        assert_eq!(runtime_node.cid.to_string(), wallet_node.cid);
+        assert_eq!(runtime_node.parents.len(), wallet_node.parents.len());
+        assert_eq!(runtime_node.parents[0].to_string(), wallet_node.parents[0]);
+        assert_eq!(runtime_node.issuer.to_string(), wallet_node.issuer);
+        assert_eq!(runtime_node.signature, wallet_node.signature);
+        assert_eq!(runtime_node.metadata.sequence, wallet_node.metadata.sequence);
+        assert_eq!(runtime_node.metadata.scope, wallet_node.metadata.scope);
+    }
+
+    #[test]
+    fn test_legacy_conversions() {
+        let wallet_node = create_test_wallet_node();
+        
+        // Convert to legacy format
+        let legacy_node = wallet_to_legacy(&wallet_node).unwrap();
+        
+        // Then back to wallet format
+        let converted_wallet_node = legacy_to_wallet(&legacy_node).unwrap();
+        
+        // Verify key properties were preserved
+        assert_eq!(converted_wallet_node.cid, wallet_node.cid);
+        assert_eq!(converted_wallet_node.parents, wallet_node.parents);
+        assert_eq!(converted_wallet_node.issuer, wallet_node.issuer);
+        assert_eq!(converted_wallet_node.timestamp, wallet_node.timestamp);
+        assert_eq!(converted_wallet_node.payload, wallet_node.payload);
+        assert_eq!(converted_wallet_node.metadata.sequence, wallet_node.metadata.sequence);
+        assert_eq!(converted_wallet_node.metadata.scope, wallet_node.metadata.scope);
+        // Note: signature is not preserved in legacy format
+    }
+
+    #[test]
+    fn test_datetime_conversions() {
+        let now = SystemTime::now();
+        let datetime = system_time_to_datetime(now).unwrap();
+        let converted_time = datetime_to_system_time(datetime);
+        
+        // Due to precision loss, we compare with a small epsilon
+        let diff = now.duration_since(converted_time).unwrap_or_else(|_| {
+            converted_time.duration_since(now).unwrap()
+        });
+        
+        // Allow 1 second difference due to precision issues
+        assert!(diff.as_secs() <= 1, "Time conversion difference too large: {:?}", diff);
+    }
 } 

@@ -5,7 +5,8 @@ members = [
     "runtime",
     "wallet",
     "runtime/crates/*",
-    "wallet/crates/*"
+    "wallet/crates/*",
+    "crates/*"
 ]
 
 # Temporarily excluded components with issues

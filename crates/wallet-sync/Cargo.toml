@@ -1,3 +1,9 @@
+[package]
+name = "icn-wallet-sync"
+version = "0.1.0"
+description = "ICN Wallet Synchronization Module"
+edition = "2021"
+
 [dependencies]
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -5,10 +11,12 @@ tracing = "0.1"
 icn-dag = { path = "../dag" }
 icn-identity = { path = "../identity" }
 icn-storage = { path = "../storage" }
-icn-core-vm = { path = "../core-vm" }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.11", features = ["json"] }
 thiserror = "1.0"
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time"] }
-serde_json = "1.0" 
+serde_json = "1.0"
+libipld = { workspace = true }
+cid = { workspace = true }
+serde_bytes = "0.11" 
