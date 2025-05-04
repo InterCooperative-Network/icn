@@ -1,0 +1,19 @@
+[package]
+name = "icn-wallet-core"
+version = "0.1.0"
+edition = "2021"
+description = "ICN Wallet Core Library for Receipt Verification and DAG Replay"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+tracing = "0.1"
+icn-wallet-sync = { path = "../wallet-sync" }
+icn-dag = { path = "../dag" }
+icn-storage = { path = "../storage" }
+icn-identity = { path = "../identity" }
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] } 
