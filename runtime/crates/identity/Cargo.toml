@@ -23,6 +23,7 @@ uuid = { version = "1.4", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 bs58 = "0.5"
 base64 = "0.21"
+hex = "0.4"
 
 # W3C DID/VC standards and JWS implementation
 ssi = { workspace = true }

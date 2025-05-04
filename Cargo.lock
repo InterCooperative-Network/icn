@@ -1404,7 +1404,7 @@ dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
  "cranelift-frontend",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "smallvec",
  "wasmparser 0.110.0",
@@ -3360,6 +3360,7 @@ dependencies = [
  "chrono",
  "cid 0.10.1",
  "did-method-key",
+ "hex",
  "multihash 0.16.3",
  "rand 0.8.5",
  "serde",
@@ -3392,13 +3393,17 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "cid 0.10.1",
  "futures",
- "hashbrown 0.14.5",
  "icn-identity",
+ "itertools 0.12.1",
+ "libipld",
  "multihash 0.16.3",
+ "once_cell",
  "rocksdb",
  "serde",
+ "serde_bytes",
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
@@ -3782,6 +3787,15 @@ name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -5871,7 +5885,7 @@ checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
 dependencies = [
  "difflib",
  "float-cmp",
- "itertools",
+ "itertools 0.10.5",
  "normalize-line-endings",
  "predicates-core",
  "regex",
@@ -6074,7 +6088,7 @@ dependencies = [
  "cfg-if",
  "cmake",
  "heck 0.4.1",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "multimap",
@@ -6093,7 +6107,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
