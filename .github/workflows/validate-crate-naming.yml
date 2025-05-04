@@ -9,22 +9,26 @@ on:
 jobs:
   validate-naming:
     runs-on: ubuntu-latest
+    name: Validate Crate Structure
     steps:
       - uses: actions/checkout@v3
       
       - name: Validate directory/package name consistency
         run: |
+          echo "::group::Checking directory/package name consistency"
           chmod +x ./scripts/validate_crate_naming.sh
           ./scripts/validate_crate_naming.sh 1
+          echo "::endgroup::"
         
       - name: Check for duplicate crates
         run: |
+          echo "::group::Checking for duplicate crate names"
           # Find all Cargo.toml files that define a package
           PACKAGES=$(find . -name "Cargo.toml" -exec grep -l "^\[package\]" {} \;)
           
           # Extract package names and check for duplicates
           echo "Checking for duplicate crate names..."
-          PKG_NAMES=()
+          declare -A PKG_MAP
           DUPLICATES=0
           
           for cargo_file in $PACKAGES; do
@@ -38,15 +42,14 @@ jobs:
             
             if [ -n "$PKG_NAME" ]; then
               # Check if we've seen this name before
-              for existing in "${PKG_NAMES[@]}"; do
-                if [ "$existing" = "$PKG_NAME" ]; then
-                  echo "ERROR: Duplicate package name '$PKG_NAME' found in $cargo_file"
-                  DUPLICATES=1
-                fi
-              done
-              
-              # Add to the list
-              PKG_NAMES+=("$PKG_NAME")
+              if [ -n "${PKG_MAP[$PKG_NAME]}" ]; then
+                echo "ERROR: Duplicate package name '$PKG_NAME' found in:"
+                echo "  - ${PKG_MAP[$PKG_NAME]}"
+                echo "  - $cargo_file"
+                DUPLICATES=1
+              else
+                PKG_MAP[$PKG_NAME]="$cargo_file"
+              fi
             fi
           done
           
@@ -55,4 +58,38 @@ jobs:
             exit 1
           else
             echo "No duplicate package names found."
-          fi 
+          fi
+          echo "::endgroup::"
+
+      - name: Validate ICN naming prefix
+        run: |
+          echo "::group::Checking for ICN naming prefix"
+          # Check if all wallet crates start with icn-wallet- prefix
+          INVALID_NAMES=0
+          
+          for cargo_file in $(find ./wallet/crates -name "Cargo.toml"); do
+            PKG_NAME=$(grep '^name *= *' "$cargo_file" | head -1 | sed -E 's/name *= *"([^"]+)"/\1/')
+            
+            if [[ ! "$PKG_NAME" =~ ^icn-wallet- ]]; then
+              echo "ERROR: Package $PKG_NAME in $cargo_file doesn't follow the icn-wallet-* naming convention"
+              INVALID_NAMES=1
+            fi
+          done
+          
+          # Check if all runtime crates start with icn- prefix
+          for cargo_file in $(find ./runtime/crates -name "Cargo.toml"); do
+            PKG_NAME=$(grep '^name *= *' "$cargo_file" | head -1 | sed -E 's/name *= *"([^"]+)"/\1/')
+            
+            if [[ ! "$PKG_NAME" =~ ^icn- ]]; then
+              echo "ERROR: Package $PKG_NAME in $cargo_file doesn't follow the icn-* naming convention"
+              INVALID_NAMES=1
+            fi
+          done
+          
+          if [ "$INVALID_NAMES" -eq 1 ]; then
+            echo "Invalid package names found! All wallet crates should be prefixed with icn-wallet- and all runtime crates with icn-"
+            exit 1
+          else
+            echo "All package names follow the naming conventions."
+          fi
+          echo "::endgroup::" 
