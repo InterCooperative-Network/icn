@@ -44,6 +44,18 @@ pub enum FederationError {
     #[error("Epoch error: {0}")]
     EpochError(String),
     
+    /// Error with cryptographic operations
+    #[error("Crypto error: {0}")]
+    CryptoError(String),
+    
+    /// Error when a resource is not found
+    #[error("Not found: {0}")]
+    NotFound(String),
+    
+    /// Error during validation of data or operations
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+    
     /// Any other error
     #[error("Other error: {0}")]
     Other(String),

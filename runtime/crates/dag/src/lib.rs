@@ -19,7 +19,7 @@ use sha2::{Sha256, Digest};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use std::sync::{Arc, Mutex};
-use icn_storage::StorageBackend;
+use icn_models::storage::StorageBackend;
 use anyhow::Result;
 
 pub mod audit;

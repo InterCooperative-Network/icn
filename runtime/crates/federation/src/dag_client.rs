@@ -3,7 +3,12 @@ use chrono::{DateTime, Utc};
 use crate::error::{FederationError, FederationResult};
 use crate::recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, GuardianSuccessionEvent, MetadataUpdateEvent, DisasterRecoveryAnchor};
 use crate::dag_anchor::GenesisAnchor;
+use crate::genesis::FederationMetadata;
+use crate::guardian::{GuardianQuorumConfig, QuorumType};
 use async_trait::async_trait;
+use std::collections::HashMap;
+use icn_identity::Signature;
+use cid;
 
 /// Represents an event that can be anchored in the DAG
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,7 +40,7 @@ impl FederationDagEvent {
     /// Get the event timestamp
     pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
-            FederationDagEvent::Genesis(e) => e.timestamp,
+            FederationDagEvent::Genesis(e) => e.issued_at,
             FederationDagEvent::KeyRotation(e) => e.base.timestamp,
             FederationDagEvent::GuardianSuccession(e) => e.base.timestamp,
             FederationDagEvent::MetadataUpdate(e) => e.base.timestamp,
@@ -110,10 +115,19 @@ pub trait DagClient {
 }
 
 /// In-memory DAG client implementation for testing
-#[derive(Default, Debug)]
+#[derive(Clone)]
 pub struct InMemoryDagClient {
-    events: std::collections::HashMap<String, FederationDagNode>,
-    federation_events: std::collections::HashMap<String, Vec<String>>,
+    events: HashMap<String, FederationDagNode>,
+    federation_events: HashMap<String, Vec<String>>,
+}
+
+impl Default for InMemoryDagClient {
+    fn default() -> Self {
+        Self {
+            events: HashMap::new(),
+            federation_events: HashMap::new(),
+        }
+    }
 }
 
 #[async_trait]
@@ -305,8 +319,8 @@ mod tests {
             federation_did: "did:key:z6MkTestFederation".to_string(),
             trust_bundle_cid: "bafy_bundle_123".to_string(),
             dag_root_cid: "bafy_dag_root_123".to_string(),
-            timestamp: Utc::now(),
-            signature: Signature(vec![1, 2, 3, 4]),
+            issued_at: Utc::now(),
+            anchor_signature: Signature(vec![1, 2, 3, 4]),
         });
         
         // Store the event
@@ -360,8 +374,8 @@ mod tests {
             federation_did: federation_did.clone(),
             trust_bundle_cid: "bafy_bundle_123".to_string(),
             dag_root_cid: "bafy_dag_root_123".to_string(),
-            timestamp: Utc::now(),
-            signature: Signature(vec![1, 2, 3, 4]),
+            issued_at: Utc::now(),
+            anchor_signature: Signature(vec![1, 2, 3, 4]),
         });
         
         let genesis_cid = client.store_event(genesis.clone()).await.unwrap();
@@ -392,13 +406,20 @@ mod tests {
                 timestamp: Utc::now(),
                 signatures: vec![Signature(vec![13, 14, 15, 16])],
             },
-            updated_metadata: crate::genesis::FederationMetadata {
+            updated_metadata: FederationMetadata {
                 federation_did: federation_did.clone(),
                 name: "Updated Federation".to_string(),
                 description: Some("Federation with updated metadata".to_string()),
                 created_at: Utc::now(),
                 initial_policies: vec![],
                 initial_members: vec![],
+                guardian_quorum: GuardianQuorumConfig {
+                    quorum_type: QuorumType::Majority,
+                    guardians: vec!["did:key:guardian1".to_string(), "did:key:guardian2".to_string()],
+                    threshold: 1,
+                },
+                genesis_cid: cid::Cid::default(),
+                additional_metadata: Some(serde_json::json!({"test": "metadata"})),
             },
         });
         

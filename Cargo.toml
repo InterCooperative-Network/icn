@@ -65,7 +65,7 @@ merkle-cbt = "0.3"
 backoff = { version = "0.4.0", features = ["tokio", "futures"] }
 
 # Additional commonly used dependencies
-base64 = { version = "0.21", features = ["std", "engine"] }
+base64 = { version = "0.21.7", features = ["std"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.3", features = ["v4", "serde"] }
 rand = "0.8"

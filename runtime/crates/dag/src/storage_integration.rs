@@ -27,6 +27,7 @@ use tokio::sync::RwLock as AsyncRwLock;
 use futures::future::join_all;
 use anyhow::Context;
 use crate::codec::DagCborCodec;
+use icn_models::storage::{StorageBackend, StorageResult};
 
 /// Number of nodes to fetch in parallel when traversing the DAG
 const PARALLEL_FETCH_LIMIT: usize = 16;

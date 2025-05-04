@@ -11,6 +11,7 @@ use crate::error::SyncError;
 use crate::DagNode;
 use serde_json::Value;
 use serde::{Serialize, Deserialize};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 /// Legacy DagNode structure for compatibility with older APIs
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,7 +107,7 @@ pub fn current_to_legacy(current: &DagNode) -> LegacyDagNode {
             Value::String(s.to_string())
         } else {
             // Fallback to base64
-            Value::String(base64::encode(&current.content))
+            Value::String(STANDARD.encode(&current.content))
         }
     };
     

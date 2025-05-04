@@ -14,6 +14,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use futures::stream::{self, StreamExt};
 use tracing::{debug, warn};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use crate::{DagNodeMetadata, create_sha256_multihash, IdentityId};
+use libipld::ipld;
 
 /// Error types for DAG queries
 #[derive(Debug, Error)]
@@ -531,7 +534,7 @@ fn ipld_to_json(ipld: &libipld::Ipld) -> Value {
         libipld::Ipld::String(s) => Value::String(s.clone()),
         libipld::Ipld::Bytes(b) => {
             // Convert bytes to base64 string for JSON
-            let encoded = base64::encode(b);
+            let encoded = STANDARD.encode(b);
             Value::String(encoded)
         },
         libipld::Ipld::List(list) => {
@@ -634,11 +637,11 @@ fn order_nodes(
                     },
                     (Some(Value::String(a_str)), Some(Value::String(b_str))) => {
                         // Compare as strings
-                        if ascending { a_str.cmp(b_str) } else { b_str.cmp(a_str) }
+                        if ascending { a_str.cmp(&b_str) } else { b_str.cmp(&a_str) }
                     },
                     (Some(Value::Bool(a_bool)), Some(Value::Bool(b_bool))) => {
                         // Compare as booleans
-                        if ascending { a_bool.cmp(b_bool) } else { b_bool.cmp(a_bool) }
+                        if ascending { a_bool.cmp(&b_bool) } else { b_bool.cmp(&a_bool) }
                     },
                     // Handle cases where one or both values are missing or not comparable
                     (Some(_), None) => if ascending { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater },
@@ -666,7 +669,8 @@ impl<T> Pipe<T> for T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DagNode, DagNodeMetadata};
+    use crate::{DagNode, DagNodeMetadata, create_sha256_multihash, IdentityId};
+    use libipld::ipld;
     use std::collections::HashMap;
     
     // Mock node loader for testing
@@ -689,7 +693,7 @@ mod tests {
         let node = Arc::new(DagNode {
             payload,
             parents,
-            issuer: crate::IdentityId(issuer.to_string()),
+            issuer: IdentityId(issuer.to_string()),
             signature: vec![1, 2, 3, 4],
             metadata: DagNodeMetadata::with_timestamp(1000).with_sequence(1),
         });
