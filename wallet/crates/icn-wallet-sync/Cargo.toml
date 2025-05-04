@@ -6,7 +6,7 @@ description = "ICN Wallet synchronization module"
 
 [dependencies]
 # Core wallet components
-icn-wallet-types = { path = "../wallet-types" }
+icn-wallet-types = { path = "../icn-wallet-types" }
 
 # Async and futures
 tokio = { workspace = true }

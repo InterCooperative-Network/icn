@@ -42,7 +42,7 @@ icn-federation = { path = "../crates/federation" }
 icn-dag = { path = "../crates/dag" }
 
 # Wallet components
-icn-wallet-types = { path = "../../wallet/crates/wallet-types" }
+icn-wallet-types = { path = "../../wallet/crates/icn-wallet-types" }
 
 [[bin]]
 name = "covm"

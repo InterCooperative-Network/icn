@@ -24,8 +24,8 @@ base64 = { workspace = true }
 aes-gcm = "0.10"
 url = "2.3"
 
-icn-wallet-agent = { path = "../../wallet/crates/wallet-agent" }
-icn-wallet-core = { path = "../../wallet/crates/wallet-core" }
+icn-wallet-agent = { path = "../../wallet/crates/icn-wallet-agent" }
+icn-wallet-core = { path = "../../wallet/crates/icn-wallet-core" }
 icn-dag = { path = "../../runtime/crates/dag" }
 
 [dev-dependencies]

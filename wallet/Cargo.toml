@@ -18,8 +18,8 @@ clap = { version = "4.5", features = ["derive"] }
 rand = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.3", features = ["v4", "serde"] }
-icn-wallet-sync = { path = "./crates/icn-sync" }
-icn-wallet-storage = { path = "./crates/icn-storage" }
-icn-wallet-identity = { path = "./crates/icn-identity" }
-icn-wallet-actions = { path = "./crates/icn-actions" }
-icn-wallet-api = { path = "./crates/icn-api" }
+icn-wallet-sync = { path = "./crates/icn-wallet-sync" }
+icn-wallet-storage = { path = "./crates/icn-wallet-storage" }
+icn-wallet-identity = { path = "./crates/icn-wallet-identity" }
+icn-wallet-actions = { path = "./crates/icn-wallet-actions" }
+icn-wallet-api = { path = "./crates/icn-wallet-api" }

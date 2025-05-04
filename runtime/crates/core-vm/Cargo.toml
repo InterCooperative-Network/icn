@@ -10,7 +10,7 @@ icn-identity = { path = "../identity" }
 icn-storage = { path = "../storage" }
 icn-dag = { path = "../dag" }
 icn-economics = { path = "../economics" }
-icn-wallet-sync = { path = "../../../wallet/crates/sync" }
+icn-wallet-sync = { path = "../../../wallet/crates/icn-wallet-sync" }
 wasmtime = "12.0.2"
 thiserror = { workspace = true }
 tracing = { workspace = true }
