@@ -478,41 +478,39 @@ fn host_record_resource_usage_wrapper(
 /// Wrapper for host_anchor_to_dag
 fn host_anchor_to_dag_wrapper(
     mut caller: Caller<'_, ConcreteHostEnvironment>,
-    key_ptr: i32,
-    key_len: i32,
-    value_ptr: i32,
-    value_len: i32,
+    ptr: i32,
+    len: i32,
 ) -> Result<i32, Trap> {
-    debug!(key_ptr, key_len, value_ptr, value_len, "host_anchor_to_dag called");
+    debug!(ptr, len, "host_anchor_to_dag called");
     
-    // Get the key from memory
-    let key = read_string_from_memory(&mut caller, key_ptr, key_len)
-        .map_err(|e| Trap::throw(format!("Failed to read key from memory: {}", e)))?;
+    // Read the anchor payload from memory
+    let anchor_bytes = match safe_read_bytes(&caller, ptr as u32, len as u32) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
     
-    // Get the value from memory
-    let value = read_bytes_from_memory(&mut caller, value_ptr, value_len)
-        .map_err(|e| Trap::throw(format!("Failed to read value from memory: {}", e)))?;
+    // Convert bytes to string (assuming JSON or similar text format)
+    let anchor_str = match String::from_utf8(anchor_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Invalid UTF-8 in anchor payload: {}", e);
+            return Ok(map_abi_error_to_wasm(anyhow::anyhow!("Invalid UTF-8 in anchor payload")));
+        }
+    };
     
-    // Get host environment
-    let host_env = caller.data();
+    // Record compute cost for this operation
+    let env = caller.data();
+    if let Err(e) = env.record_compute_usage(100 + (len as u64) / 10) {
+        return Ok(map_vm_error_to_wasm(e));
+    }
     
-    // Get tokio runtime
+    // Call the host environment to anchor the data
     let handle = tokio::runtime::Handle::current();
     
-    // Anchor the data to the DAG
-    let cid = handle.block_on(async {
-        host_env.anchor_to_dag(&key, value).await
-            .map_err(|e| Trap::throw(format!("Failed to anchor data to DAG: {}", e)))
-    })?;
-    
-    // Store the last anchor CID in the host environment
-    host_env.set_last_anchor_cid(cid.clone());
-    
-    // Write the CID to memory
-    let cid_offset = write_string_to_memory(&mut caller, &cid)
-        .map_err(|e| Trap::throw(format!("Failed to write CID to memory: {}", e)))?;
-    
-    Ok(cid_offset)
+    match handle.block_on(env.anchor_metadata_to_dag(&anchor_str)) {
+        Ok(_) => Ok(0), // Success
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
+    }
 }
 
 /// Wrapper for host_mint_token

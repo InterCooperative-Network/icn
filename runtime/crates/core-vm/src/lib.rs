@@ -882,6 +882,57 @@ impl ConcreteHostEnvironment {
             Err(e) => Err(InternalHostError::Other(format!("Failed to check node existence: {}", e))),
         }
     }
+
+    /// Anchors metadata to the DAG
+    /// This is a specialized function for WASM modules to anchor metadata
+    /// like governance receipts, economic actions, or verifiable messages
+    pub async fn anchor_metadata_to_dag(&self, anchor_json: &str) -> Result<(), InternalHostError> {
+        // Parse the JSON payload
+        let payload = serde_json::from_str::<serde_json::Value>(anchor_json)
+            .map_err(|e| InternalHostError::InvalidInput(format!("Invalid JSON payload: {}", e)))?;
+        
+        // Extract important metadata fields if they exist
+        let anchor_type = payload["type"].as_str().unwrap_or("generic");
+        let scope = payload["scope"].as_str().unwrap_or("unknown");
+        
+        // Create a unique key for this anchor
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| InternalHostError::Other(format!("Failed to get timestamp: {}", e)))?
+            .as_secs();
+        
+        let key = format!("{}:{}:{}", scope, anchor_type, timestamp);
+        
+        // Record compute usage
+        self.record_compute_usage(500)?;
+        
+        // Record storage usage (approximate size of the payload)
+        let payload_size = anchor_json.len() as u64;
+        self.record_storage_usage(payload_size)?;
+        
+        // Create enriched metadata
+        let enriched_payload = serde_json::json!({
+            "original": payload,
+            "metadata": {
+                "anchored_by": self.caller_did(),
+                "timestamp": timestamp,
+                "anchor_type": anchor_type,
+                "scope": scope
+            }
+        });
+        
+        // Serialize the enriched payload
+        let data = serde_json::to_vec(&enriched_payload)
+            .map_err(|e| InternalHostError::CodecError(format!("Failed to serialize enriched payload: {}", e)))?;
+        
+        // Anchor the data using the existing method
+        let cid = self.anchor_to_dag(&key, data).await?;
+        
+        // Store the CID as the last anchor CID
+        self.set_last_anchor_cid(cid);
+        
+        Ok(())
+    }
 }
 
 /// Represents the result of a VM execution
@@ -961,19 +1012,46 @@ pub async fn execute_wasm(
             
             let outcome = if code == 0 { "Success" } else { "Failure" };
             
-            // If we have a proposal ID, issue an execution receipt credential
-            if let (Some(pid), Some(scope)) = (proposal_id, federation_scope) {
-                if let Err(e) = issue_execution_receipt(
-                    &host_env,
-                    pid,
-                    outcome,
-                    resource_usage.clone(),
-                    &host_env.get_last_anchor_cid().unwrap_or_default(),
-                    scope,
-                    None,
-                ).await {
-                    tracing::warn!(error = %e, "Failed to issue execution receipt");
-                }
+            // Generate an execution ID if we don't have a proposal ID
+            let execution_id = proposal_id.unwrap_or_else(|| {
+                // Generate a unique ID for this execution
+                uuid::Uuid::new_v4().to_string()
+            });
+            
+            // Determine federation scope with fallback
+            let scope = federation_scope.unwrap_or("default");
+            
+            // Issue an execution receipt credential
+            if let Err(e) = issue_execution_receipt(
+                &host_env,
+                &execution_id,
+                outcome,
+                resource_usage.clone(),
+                &host_env.get_last_anchor_cid().unwrap_or_default(),
+                scope,
+                None,
+            ).await {
+                tracing::warn!(error = %e, "Failed to issue execution receipt");
+            }
+            
+            // Create and anchor an additional simplified execution receipt in JSON format
+            let receipt_json = serde_json::json!({
+                "type": "ExecutionReceipt",
+                "scope": scope,
+                "execution_id": execution_id,
+                "issuer": host_env.caller_did(),
+                "outcome": outcome,
+                "timestamp": chrono::Utc::now().timestamp(),
+                "resource_usage": resource_usage.iter()
+                    .map(|(k, v)| (format!("{:?}", k), v))
+                    .collect::<HashMap<String, &u64>>(),
+                "code": code
+            });
+            
+            // Anchor the simplified receipt to make it available to other contracts
+            let receipt_str = serde_json::to_string(&receipt_json).unwrap_or_default();
+            if let Err(e) = host_env.anchor_metadata_to_dag(&receipt_str).await {
+                tracing::warn!(error = %e, "Failed to anchor simplified execution receipt");
             }
             
             Ok(VmExecutionResult {
@@ -985,22 +1063,49 @@ pub async fn execute_wasm(
         Err(e) => {
             let error_message = e.to_string();
             
-            // If we have a proposal ID, issue an execution receipt credential for the failure
-            if let (Some(pid), Some(scope)) = (proposal_id, federation_scope) {
-                if let Err(e) = issue_execution_receipt(
-                    &host_env,
-                    pid,
-                    "Error",
-                    resource_usage.clone(),
-                    &host_env.get_last_anchor_cid().unwrap_or_default(),
-                    scope,
-                    None,
-                ).await {
-                    tracing::warn!(error = %e, "Failed to issue execution receipt for error");
-                }
+            // Generate an execution ID if we don't have a proposal ID
+            let execution_id = proposal_id.unwrap_or_else(|| {
+                // Generate a unique ID for this execution
+                uuid::Uuid::new_v4().to_string()
+            });
+            
+            // Determine federation scope with fallback
+            let scope = federation_scope.unwrap_or("default");
+            
+            // Issue an execution receipt credential for the failure
+            if let Err(e) = issue_execution_receipt(
+                &host_env,
+                &execution_id,
+                "Error",
+                resource_usage.clone(),
+                &host_env.get_last_anchor_cid().unwrap_or_default(),
+                scope,
+                None,
+            ).await {
+                tracing::warn!(error = %e, "Failed to issue execution receipt for error");
             }
             
-            Err(VmError::ExecutionFailed(error_message))
+            // Create and anchor a simplified error receipt as well
+            let error_receipt = serde_json::json!({
+                "type": "ExecutionReceipt",
+                "scope": scope,
+                "execution_id": execution_id,
+                "issuer": host_env.caller_did(),
+                "outcome": "Error",
+                "timestamp": chrono::Utc::now().timestamp(),
+                "resource_usage": resource_usage.iter()
+                    .map(|(k, v)| (format!("{:?}", k), v))
+                    .collect::<HashMap<String, &u64>>(),
+                "error": error_message
+            });
+            
+            // Anchor the error receipt
+            let receipt_str = serde_json::to_string(&error_receipt).unwrap_or_default();
+            if let Err(e) = host_env.anchor_metadata_to_dag(&receipt_str).await {
+                tracing::warn!(error = %e, "Failed to anchor simplified error receipt");
+            }
+            
+            Err(VmError::ExecutionError(error_message))
         }
     };
     

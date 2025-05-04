@@ -170,6 +170,76 @@ const DAG_TEST_WAT: &str = r#"
 )
 "#;
 
+// WAT module for testing DAG metadata anchoring
+const ANCHOR_METADATA_WAT: &str = r#"
+(module
+  ;; Import host functions
+  (import "env" "host_anchor_to_dag" (func $host_anchor_to_dag (param i32 i32) (result i32)))
+  (import "env" "host_log" (func $host_log (param i32 i32) (result i32)))
+  
+  ;; Memory
+  (memory (export "memory") 1)
+  
+  ;; Test metadata payload - a JSON string
+  (data (i32.const 1024) "{\"type\":\"receipt\",\"scope\":\"cooperative\",\"action\":\"vote\",\"details\":{\"proposal\":\"123\",\"vote\":\"approve\"}}")
+  
+  ;; Helper to calculate string length
+  (func $strlen (param $ptr i32) (result i32)
+    (local $len i32)
+    (local $char i32)
+    
+    (local.set $len (i32.const 0))
+    
+    (block $done
+      (loop $loop
+        ;; Load byte from memory
+        (local.set $char (i32.load8_u (i32.add (local.get $ptr) (local.get $len))))
+        
+        ;; If byte is 0, break
+        (br_if $done (i32.eqz (local.get $char)))
+        
+        ;; Increment length and continue
+        (local.set $len (i32.add (local.get $len) (i32.const 1)))
+        (br $loop)
+      )
+    )
+    
+    (local.get $len)
+  )
+  
+  ;; Main entry point
+  (func (export "execute") (result i32)
+    (local $payload_ptr i32)
+    (local $payload_len i32)
+    (local $result i32)
+    
+    ;; Set payload pointer
+    (local.set $payload_ptr (i32.const 1024))
+    
+    ;; Calculate payload length
+    (local.set $payload_len (call $strlen (local.get $payload_ptr)))
+    
+    ;; Log the payload
+    (call $host_log 
+      (local.get $payload_ptr)
+      (local.get $payload_len)
+    )
+    (drop) ;; Ignore result
+    
+    ;; Anchor metadata to DAG
+    (local.set $result
+      (call $host_anchor_to_dag
+        (local.get $payload_ptr)
+        (local.get $payload_len)
+      )
+    )
+    
+    ;; Return result (0 for success)
+    (local.get $result)
+  )
+)
+"#;
+
 #[tokio::test]
 async fn test_dag_storage_integration() -> Result<()> {
     // Create the test environment
@@ -232,6 +302,34 @@ async fn test_dag_node_roundtrip() -> Result<()> {
     assert_eq!(retrieved_node.issuer, node.issuer, "Issuer should match");
     assert_eq!(retrieved_node.payload, node.payload, "Payload should match");
     assert_eq!(retrieved_node.metadata.timestamp, node.metadata.timestamp, "Timestamp should match");
+    
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_anchor_metadata_to_dag() -> Result<()> {
+    // Create the test environment
+    let host_env = create_test_environment();
+    
+    // Compile the WebAssembly module
+    let engine = Engine::default();
+    let module = Module::new(&engine, ANCHOR_METADATA_WAT)?;
+    
+    // Execute the WASM module
+    let result = execute_wasm(
+        module.as_ref().unwrap(), 
+        None, // Use default context
+        &host_env,
+        None, // No proposal ID
+        None, // No federation scope
+    ).await?;
+    
+    // Check the result
+    assert_eq!(result.code, 0, "Execution should succeed");
+    
+    // Verify that an anchor CID was created
+    assert!(host_env.get_last_anchor_cid().is_some(), 
+           "An anchor CID should have been created");
     
     Ok(())
 } 
