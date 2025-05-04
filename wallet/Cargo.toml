@@ -1,40 +1,15 @@
 [package]
-name = "icn-wallet"
+name = "icn-wallet-root"
 version = "0.1.0"
 edition = "2021"
-description = "ICN Wallet - mobile-first agent for identity, credentials, and DAG interaction"
+publish = false
 
-# Dependencies for the wallet root package
+# Wallet package dependencies
 [dependencies]
-# Core wallet dependencies
-wallet-sync = { path = "crates/sync" }
-wallet-identity = { path = "crates/identity" }
-wallet-storage = { path = "crates/storage" }
-wallet-actions = { path = "crates/actions" }
-wallet-api = { path = "crates/api" }
-
-# Common dependencies
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-
-# Optional FFI bindings
-# wallet-ffi = { path = "crates/ffi", optional = true }
-
-[features]
-default = []
-mobile = []
-desktop = []
-# ffi = ["dep:wallet-ffi"]
-
-# Keep the optimization profiles
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-strip = true
-
-[profile.dev.package."*"]
-opt-level = 2 
+tracing-subscriber = { workspace = true }
+futures = { workspace = true }

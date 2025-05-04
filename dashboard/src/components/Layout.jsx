@@ -10,8 +10,6 @@ import {
   Bars3Icon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import DagSyncStatus from './DagSyncStatus';
-
 export default function Layout({ children }) {
   const location = useLocation();
   const { isAuthenticated, userDid, federationId, clearCredentials } = useCredentials();

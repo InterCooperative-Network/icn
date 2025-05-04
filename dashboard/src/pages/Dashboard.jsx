@@ -6,13 +6,17 @@ import {
   XCircleIcon,
   ClockIcon,
   ChatBubbleLeftRightIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  LinkIcon,
+  BellAlertIcon
 } from '@heroicons/react/24/outline';
 import { proposalApi } from '../services/runtimeApi';
 import { useCredentials } from '../contexts/CredentialContext';
+import { useDagSync } from '../contexts/DagSyncContext';
 
 export default function Dashboard() {
   const { isAuthenticated, userDid, federationId } = useCredentials();
+  const { latestAnchor, updatedProposals, lastSyncTime } = useDagSync();
   const [stats, setStats] = useState({
     totalProposals: 0,
     executedProposals: 0,
@@ -64,7 +68,23 @@ export default function Dashboard() {
     }
     
     fetchDashboardData();
-  }, [isAuthenticated, federationId]);
+    
+    // Refresh data when updatedProposals changes
+    if (updatedProposals.length > 0) {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated, federationId, updatedProposals]);
+
+  // Format the time ago
+  const getTimeAgo = () => {
+    if (!lastSyncTime) return 'Never';
+    
+    const seconds = Math.floor((new Date() - lastSyncTime) / 1000);
+    
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
+  };
 
   if (loading) {
     return (
@@ -96,6 +116,76 @@ export default function Dashboard() {
             : 'View and manage federation proposals, deliberation threads, and execution receipts'}
         </p>
       </div>
+      
+      {/* Real-time updates banner */}
+      {updatedProposals.length > 0 && (
+        <div className="mb-8 bg-yellow-50 border border-yellow-100 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <BellAlertIcon className="h-5 w-5 text-yellow-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">Recent Updates Detected</h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>
+                  {updatedProposals.length} proposal(s) have been updated through DAG anchoring.
+                </p>
+                {updatedProposals.length > 0 && (
+                  <ul className="mt-1 list-disc list-inside">
+                    {updatedProposals.slice(0, 3).map(proposal => (
+                      <li key={proposal.id}>
+                        <Link 
+                          to={`/proposals/${proposal.id}`} 
+                          className="hover:underline text-yellow-900"
+                        >
+                          {proposal.title || proposal.id}
+                        </Link>
+                      </li>
+                    ))}
+                    {updatedProposals.length > 3 && (
+                      <li>
+                        <Link 
+                          to="/proposals" 
+                          className="hover:underline text-yellow-900"
+                        >
+                          ... and {updatedProposals.length - 3} more
+                        </Link>
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* DAG Anchor Info */}
+      {isAuthenticated && latestAnchor && (
+        <div className="mb-8 bg-white shadow overflow-hidden sm:rounded-md p-4">
+          <div className="flex items-center border-b border-gray-200 pb-3">
+            <LinkIcon className="h-5 w-5 text-agora-blue mr-2" />
+            <span className="font-medium text-gray-700">Current DAG Anchor</span>
+            <span className="ml-auto text-xs text-gray-500">Last synced: {getTimeAgo()}</span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-gray-500">CID</div>
+              <div className="font-mono text-sm truncate">{latestAnchor.cid}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Timestamp</div>
+              <div className="text-sm">
+                {latestAnchor.timestamp ? new Date(latestAnchor.timestamp).toLocaleString() : 'Unknown'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Height</div>
+              <div className="text-sm">{latestAnchor.height || 'Unknown'}</div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Stats cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -195,47 +285,56 @@ export default function Dashboard() {
               </div>
             </li>
           ) : (
-            recentProposals.map(proposal => (
-              <li key={proposal.id} className="hover:bg-gray-50">
-                <Link to={`/proposals/${proposal.id}`} className="block">
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="truncate">
-                        <div className="flex">
-                          <p className="text-sm font-medium text-agora-blue truncate">{proposal.title}</p>
-                        </div>
-                        <div className="mt-2 flex">
-                          <div className="flex items-center text-sm text-gray-500">
-                            <p>
-                              {proposal.createdAt 
-                                ? new Date(proposal.createdAt).toLocaleDateString() 
-                                : 'Unknown date'}
-                            </p>
+            recentProposals.map(proposal => {
+              const isUpdated = updatedProposals.some(p => p.id === proposal.id);
+              return (
+                <li key={proposal.id} className={isUpdated ? "hover:bg-gray-50 bg-yellow-50" : "hover:bg-gray-50"}>
+                  <Link to={`/proposals/${proposal.id}`} className="block">
+                    <div className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div className="truncate">
+                          <div className="flex">
+                            <p className="text-sm font-medium text-agora-blue truncate">{proposal.title}</p>
+                            {isUpdated && (
+                              <span className="ml-2 flex items-center text-yellow-600 text-xs">
+                                <BellAlertIcon className="h-4 w-4 mr-1" />
+                                Updated
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 flex">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <p>
+                                {proposal.createdAt 
+                                  ? new Date(proposal.createdAt).toLocaleDateString() 
+                                  : 'Unknown date'}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div>
-                        {proposal.status === 'executed' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-green-100 text-green-800">
-                            Executed
-                          </span>
-                        )}
-                        {proposal.status === 'active' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800">
-                            Active
-                          </span>
-                        )}
-                        {proposal.status === 'rejected' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-red-100 text-red-800">
-                            Rejected
-                          </span>
-                        )}
+                        <div>
+                          {proposal.status === 'executed' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-green-100 text-green-800">
+                              Executed
+                            </span>
+                          )}
+                          {proposal.status === 'active' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800">
+                              Active
+                            </span>
+                          )}
+                          {proposal.status === 'rejected' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-red-100 text-red-800">
+                              Rejected
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </li>
-            ))
+                  </Link>
+                </li>
+              );
+            })
           )}
         </ul>
       </div>
