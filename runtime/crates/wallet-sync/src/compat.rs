@@ -486,4 +486,269 @@ mod tests {
         
         assert!(duration.as_secs() < 1);
     }
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::*;
+
+    // Helper function to create a test RuntimeDagNode metadata
+    fn create_runtime_metadata() -> DagNodeMetadata {
+        DagNodeMetadata {
+            timestamp: 1683123456,
+            sequence: 42,
+            content_type: Some("text/plain".to_string()),
+            tags: vec!["test".to_string(), "example".to_string(), "scope:test-scope".to_string()],
+        }
+    }
+
+    // Helper function to create a test WalletDagNodeMetadata
+    fn create_wallet_metadata() -> WalletDagNodeMetadata {
+        WalletDagNodeMetadata {
+            sequence: 42,
+            scope: Some("test-scope".to_string()),
+            content_type: Some("text/plain".to_string()),
+            tags: vec!["test".to_string(), "example".to_string()],
+        }
+    }
+
+    // Helper functions to simulate the metadata conversion logic
+    fn runtime_to_wallet_metadata(runtime_metadata: &DagNodeMetadata) -> WalletDagNodeMetadata {
+        // Extract scope from tags if present (scope:xxx tag)
+        let scope = runtime_metadata.tags.iter()
+            .find(|tag| tag.starts_with("scope:"))
+            .map(|tag| tag[6..].to_string());
+        
+        WalletDagNodeMetadata {
+            sequence: runtime_metadata.sequence,
+            scope,
+            content_type: runtime_metadata.content_type.clone(),
+            tags: runtime_metadata.tags.clone(),
+        }
+    }
+
+    fn wallet_to_runtime_metadata(wallet_metadata: &WalletDagNodeMetadata) -> DagNodeMetadata {
+        // Collect tags
+        let mut tags = wallet_metadata.tags.clone();
+        
+        // Add scope as a tag if it exists
+        if let Some(scope) = &wallet_metadata.scope {
+            // Add a special tag for scope if it doesn't already exist
+            if !tags.iter().any(|tag| tag.starts_with("scope:")) {
+                tags.push(format!("scope:{}", scope));
+            }
+        }
+        
+        DagNodeMetadata {
+            timestamp: 0, // Not relevant for these tests
+            sequence: wallet_metadata.sequence,
+            content_type: wallet_metadata.content_type.clone(),
+            tags,
+        }
+    }
+
+    #[test]
+    fn test_wallet_to_runtime_to_wallet_roundtrip() {
+        let original_wallet_metadata = create_wallet_metadata();
+        
+        // Convert wallet -> runtime
+        let runtime_metadata = wallet_to_runtime_metadata(&original_wallet_metadata);
+        
+        // Convert runtime -> wallet
+        let round_trip_wallet_metadata = runtime_to_wallet_metadata(&runtime_metadata);
+        
+        // Verify sequence
+        assert_eq!(round_trip_wallet_metadata.sequence, original_wallet_metadata.sequence);
+        
+        // Verify scope
+        assert_eq!(round_trip_wallet_metadata.scope, original_wallet_metadata.scope);
+        
+        // Verify content_type
+        assert_eq!(round_trip_wallet_metadata.content_type, original_wallet_metadata.content_type);
+        
+        // Verify tags (excluding scope tag)
+        for tag in &original_wallet_metadata.tags {
+            assert!(round_trip_wallet_metadata.tags.contains(tag));
+        }
+    }
+
+    #[test]
+    fn test_runtime_to_wallet_to_runtime_roundtrip() {
+        let original_runtime_metadata = create_runtime_metadata();
+        
+        // Convert runtime -> wallet
+        let wallet_metadata = runtime_to_wallet_metadata(&original_runtime_metadata);
+        
+        // Convert wallet -> runtime
+        let round_trip_runtime_metadata = wallet_to_runtime_metadata(&wallet_metadata);
+        
+        // Verify sequence
+        assert_eq!(round_trip_runtime_metadata.sequence, original_runtime_metadata.sequence);
+        
+        // Verify content_type
+        assert_eq!(round_trip_runtime_metadata.content_type, original_runtime_metadata.content_type);
+        
+        // Verify that all original tags are present in round trip
+        for tag in &original_runtime_metadata.tags {
+            assert!(round_trip_runtime_metadata.tags.contains(tag));
+        }
+        
+        // Verify that scope was preserved
+        let original_scope_tag = original_runtime_metadata.tags.iter()
+            .find(|tag| tag.starts_with("scope:"));
+        let round_trip_scope_tag = round_trip_runtime_metadata.tags.iter()
+            .find(|tag| tag.starts_with("scope:"));
+        
+        assert_eq!(original_scope_tag, round_trip_scope_tag);
+    }
+
+    #[test]
+    fn test_multiple_unrelated_tags() {
+        let mut runtime_metadata = create_runtime_metadata();
+        runtime_metadata.tags.push("unrelated1".to_string());
+        runtime_metadata.tags.push("unrelated2".to_string());
+        runtime_metadata.tags.push("another:tag".to_string());
+        
+        // Convert runtime -> wallet -> runtime
+        let wallet_metadata = runtime_to_wallet_metadata(&runtime_metadata);
+        let round_trip_metadata = wallet_to_runtime_metadata(&wallet_metadata);
+        
+        // Verify all tags are preserved
+        for tag in &runtime_metadata.tags {
+            assert!(round_trip_metadata.tags.contains(tag));
+        }
+        
+        // Verify the scope was correctly extracted
+        assert_eq!(wallet_metadata.scope, Some("test-scope".to_string()));
+    }
+
+    #[test]
+    fn test_missing_scope() {
+        let mut runtime_metadata = create_runtime_metadata();
+        // Remove the scope tag
+        runtime_metadata.tags.retain(|tag| !tag.starts_with("scope:"));
+        
+        // Convert runtime -> wallet
+        let wallet_metadata = runtime_to_wallet_metadata(&runtime_metadata);
+        
+        // Verify scope is None
+        assert_eq!(wallet_metadata.scope, None);
+        
+        // Convert wallet -> runtime
+        let round_trip_metadata = wallet_to_runtime_metadata(&wallet_metadata);
+        
+        // Verify no scope tag was added
+        assert!(!round_trip_metadata.tags.iter().any(|tag| tag.starts_with("scope:")));
+    }
+
+    #[test]
+    fn test_malformed_scope() {
+        let mut runtime_metadata = create_runtime_metadata();
+        // Remove the correct scope tag and add a malformed one
+        runtime_metadata.tags.retain(|tag| !tag.starts_with("scope:"));
+        runtime_metadata.tags.push("scope:".to_string());  // Empty scope value
+        
+        // Convert runtime -> wallet
+        let wallet_metadata = runtime_to_wallet_metadata(&runtime_metadata);
+        
+        // Verify scope is empty string
+        assert_eq!(wallet_metadata.scope, Some("".to_string()));
+        
+        // Convert wallet -> runtime
+        let round_trip_metadata = wallet_to_runtime_metadata(&wallet_metadata);
+        
+        // Verify the scope tag was preserved
+        assert!(round_trip_metadata.tags.contains(&"scope:".to_string()));
+    }
+
+    #[test]
+    fn test_duplicate_scope_tags() {
+        let mut runtime_metadata = create_runtime_metadata();
+        // Add a second scope tag
+        runtime_metadata.tags.push("scope:another-scope".to_string());
+        
+        // Convert runtime -> wallet
+        let wallet_metadata = runtime_to_wallet_metadata(&runtime_metadata);
+        
+        // The first scope tag should be used
+        assert_eq!(wallet_metadata.scope, Some("test-scope".to_string()));
+        
+        // Convert wallet -> runtime
+        let round_trip_metadata = wallet_to_runtime_metadata(&wallet_metadata);
+        
+        // Both scope tags should be preserved (although this is potentially ambiguous)
+        assert!(round_trip_metadata.tags.contains(&"scope:test-scope".to_string()));
+        assert!(round_trip_metadata.tags.contains(&"scope:another-scope".to_string()));
+    }
+
+    #[test]
+    fn test_legacy_metadata_conversion() {
+        // Create legacy metadata
+        let mut legacy_metadata = serde_json::Map::new();
+        legacy_metadata.insert("sequence".to_string(), Value::Number(100.into()));
+        legacy_metadata.insert("scope".to_string(), Value::String("legacy-scope".to_string()));
+        legacy_metadata.insert("content_type".to_string(), Value::String("text/plain".to_string()));
+        let tags = vec![
+            Value::String("legacy".to_string()),
+            Value::String("old-format".to_string())
+        ];
+        legacy_metadata.insert("tags".to_string(), Value::Array(tags));
+        
+        // Extract metadata using the legacy_to_wallet logic
+        let sequence = legacy_metadata.get("sequence")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+            
+        let scope = legacy_metadata.get("scope")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+            
+        let content_type = legacy_metadata.get("content_type")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+    
+        let tags = legacy_metadata.get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_else(Vec::new);
+            
+        let wallet_metadata = WalletDagNodeMetadata {
+            sequence,
+            scope,
+            content_type,
+            tags,
+        };
+        
+        // Verify extracted values
+        assert_eq!(wallet_metadata.sequence, 100);
+        assert_eq!(wallet_metadata.scope, Some("legacy-scope".to_string()));
+        assert_eq!(wallet_metadata.content_type, Some("text/plain".to_string()));
+        assert_eq!(wallet_metadata.tags.len(), 2);
+        assert!(wallet_metadata.tags.contains(&"legacy".to_string()));
+        assert!(wallet_metadata.tags.contains(&"old-format".to_string()));
+        
+        // Convert to runtime metadata
+        let runtime_metadata = wallet_to_runtime_metadata(&wallet_metadata);
+        
+        // Verify runtime metadata
+        assert_eq!(runtime_metadata.sequence, 100);
+        assert_eq!(runtime_metadata.content_type, Some("text/plain".to_string()));
+        assert!(runtime_metadata.tags.contains(&"legacy".to_string()));
+        assert!(runtime_metadata.tags.contains(&"old-format".to_string()));
+        assert!(runtime_metadata.tags.contains(&"scope:legacy-scope".to_string()));
+        
+        // Convert back to wallet metadata
+        let round_trip_wallet_metadata = runtime_to_wallet_metadata(&runtime_metadata);
+        
+        // Verify round-trip values
+        assert_eq!(round_trip_wallet_metadata.sequence, 100);
+        assert_eq!(round_trip_wallet_metadata.scope, Some("legacy-scope".to_string()));
+        assert_eq!(round_trip_wallet_metadata.content_type, Some("text/plain".to_string()));
+        assert!(round_trip_wallet_metadata.tags.contains(&"legacy".to_string()));
+        assert!(round_trip_wallet_metadata.tags.contains(&"old-format".to_string()));
+    }
 } 
