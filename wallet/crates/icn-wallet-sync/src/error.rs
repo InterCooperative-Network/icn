@@ -1,6 +1,6 @@
 use thiserror::Error;
 use std::io;
-use icn_wallet_types::error::WalletError;
+use icn_wallet_types::SharedError;
 
 #[derive(Error, Debug)]
 pub enum SyncError {
@@ -44,7 +44,7 @@ pub enum SyncError {
     Internal(String),
     
     #[error("Wallet error: {0}")]
-    WalletError(#[from] WalletError),
+    WalletError(#[from] SharedError),
 }
 
 // Implement a conversion from backoff::Error<SyncError> to SyncError
@@ -57,23 +57,23 @@ impl From<backoff::Error<SyncError>> for SyncError {
     }
 }
 
-// Add conversion to WalletError
-impl From<SyncError> for WalletError {
+// Add conversion to SharedError
+impl From<SyncError> for SharedError {
     fn from(err: SyncError) -> Self {
         match err {
-            SyncError::Network(msg) => WalletError::ConnectionError(msg),
-            SyncError::Io(e) => WalletError::IoError(e),
-            SyncError::Serialization(e) => WalletError::SerializationError(e.to_string()),
-            SyncError::Api(msg) => WalletError::ConnectionError(msg),
-            SyncError::Dag(msg) => WalletError::DagError(msg),
-            SyncError::Validation(msg) => WalletError::ValidationError(msg),
-            SyncError::Authentication(msg) => WalletError::AuthenticationError(msg),
-            SyncError::Federation(msg) => WalletError::GenericError(format!("Federation error: {}", msg)),
-            SyncError::NodeSubmission(msg) => WalletError::GenericError(format!("Node submission error: {}", msg)),
-            SyncError::NodeNotFound(id) => WalletError::ResourceNotFound(format!("Node not found: {}", id)),
-            SyncError::Request(e) => WalletError::ConnectionError(e.to_string()),
-            SyncError::BackoffError => WalletError::TimeoutError("Operation failed after retries".to_string()),
-            SyncError::Internal(msg) => WalletError::GenericError(format!("Internal error: {}", msg)),
+            SyncError::Network(msg) => SharedError::ConnectionError(msg),
+            SyncError::Io(e) => SharedError::IoError(e),
+            SyncError::Serialization(e) => SharedError::SerializationError(e.to_string()),
+            SyncError::Api(msg) => SharedError::ConnectionError(msg),
+            SyncError::Dag(msg) => SharedError::GenericError(format!("DAG error: {}", msg)),
+            SyncError::Validation(msg) => SharedError::ValidationError(msg),
+            SyncError::Authentication(msg) => SharedError::AuthenticationError(msg),
+            SyncError::Federation(msg) => SharedError::GenericError(format!("Federation error: {}", msg)),
+            SyncError::NodeSubmission(msg) => SharedError::GenericError(format!("Node submission error: {}", msg)),
+            SyncError::NodeNotFound(id) => SharedError::ResourceNotFound(format!("Node not found: {}", id)),
+            SyncError::Request(e) => SharedError::ConnectionError(e.to_string()),
+            SyncError::BackoffError => SharedError::TimeoutError("Operation failed after retries".to_string()),
+            SyncError::Internal(msg) => SharedError::GenericError(format!("Internal error: {}", msg)),
             SyncError::WalletError(e) => e,
         }
     }

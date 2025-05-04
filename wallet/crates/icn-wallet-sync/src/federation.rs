@@ -13,6 +13,7 @@ use tokio::sync::{Mutex, broadcast};
 use tokio::time::sleep;
 use tracing::{debug, info, error, warn};
 use reqwest::Url;
+use tokio::sync::broadcast::error::TryRecvError;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use futures::Stream;
@@ -61,10 +62,11 @@ impl Stream for TrustBundleSubscription {
     type Item = TrustBundle;
     
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.receiver).poll_recv(cx) {
-            Poll::Ready(Ok(bundle)) => Poll::Ready(Some(bundle)),
-            Poll::Ready(Err(_)) => Poll::Ready(None), // Channel closed
-            Poll::Pending => Poll::Pending,
+        // Manual implementation for poll_recv
+        match self.receiver.try_recv() {
+            Ok(bundle) => Poll::Ready(Some(bundle)),
+            Err(TryRecvError::Empty) => Poll::Pending,
+            Err(_) => Poll::Ready(None),
         }
     }
 }
@@ -306,8 +308,8 @@ impl FederationSyncClient {
         };
         
         // Check if the issuer is trusted
-        if !bundle.trusted_dids.contains(&node.issuer) {
-            return Err(SyncError::Validation(format!("Issuer {} is not trusted", node.issuer)));
+        if !bundle.trusted_dids.contains(&node.creator) {
+            return Err(SyncError::Validation(format!("Issuer {} is not trusted", node.creator)));
         }
         
         // In a real implementation, we would verify the signature against the issuer's public key

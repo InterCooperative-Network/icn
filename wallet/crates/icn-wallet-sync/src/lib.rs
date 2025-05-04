@@ -56,6 +56,10 @@ pub struct DagNode {
 }
 
 impl DagNode {
+    // Helper method for compatibility
+    pub fn content_as_json(&self) -> Result<Value, serde_json::Error> {
+        serde_json::from_slice(&self.content)
+    }
     // Add helper methods for compatibility
     pub fn payload_as_json(&self) -> Result<Value, serde_json::Error> {
         serde_json::from_slice(&self.content)

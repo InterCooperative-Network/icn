@@ -10,7 +10,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use futures::Stream;
 use tracing::{debug, error, info, warn};
-use icn_wallet_types::WalletResult;
+use crate::WalletResult;
 
 use crate::{SyncClient, error::SyncError, DagNode, DagNodeMetadata};
 
@@ -74,7 +74,7 @@ impl TrustBundle {
     /// Convert to a DAG node
     pub fn to_dag_node(&self) -> Result<DagNode, SyncError> {
         // Convert to JSON
-        let value = serde_json::to_value(self)
+        let value = serde_json::to_value(&*self)
             .map_err(|e| SyncError::Serialization(e))?;
         
         // Serialize to bytes for CID generation and payload
@@ -91,10 +91,10 @@ impl TrustBundle {
         let node = DagNode {
             cid: cid.clone(),
             parents: Vec::new(),
-            issuer: self.issuer.clone(),
+            creator: self.issuer.clone(),
             timestamp: self.created_at,
-            signature: self.signature.clone().unwrap_or_default().into_bytes(),
-            payload: json_bytes,
+            signatures: vec![],
+            content: json_bytes, content_type: "application/json".to_string(),
             metadata: DagNodeMetadata {
                 sequence: Some(self.epoch),
                 scope: Some("federation".to_string()),
@@ -110,7 +110,7 @@ impl TrustBundle {
         self.id = String::new();
         
         // Convert to JSON
-        let value = serde_json::to_value(self)
+        let value = serde_json::to_value(&*self)
             .map_err(|e| SyncError::Serialization(e))?;
         
         // Serialize to bytes for CID generation
@@ -200,7 +200,7 @@ impl TrustManager {
         let node = self.client.get_node(bundle_id).await?;
         
         // Parse the payload as JSON
-        let payload_json = node.payload_as_json()
+        let payload_json = node.content_as_json()
             .map_err(|e| SyncError::Serialization(e))?;
         
         // Convert to TrustBundle
@@ -222,8 +222,8 @@ impl TrustManager {
         };
         
         // Check if the issuer is trusted
-        if !bundle.trusted_dids.contains(&node.issuer) {
-            return Err(SyncError::Validation(format!("Issuer {} is not trusted", node.issuer)));
+        if !bundle.trusted_dids.contains(&node.creator) {
+            return Err(SyncError::Validation(format!("Issuer {} is not trusted", node.creator)));
         }
         
         // In a real implementation, we would verify the signature
