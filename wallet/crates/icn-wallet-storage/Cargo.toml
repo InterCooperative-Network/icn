@@ -1,0 +1,25 @@
+[package]
+name = "icn-wallet-storage"
+version = "0.1.0"
+edition = "2021"
+description = "Storage management for the ICN Wallet"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Workspace dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+chrono = { workspace = true }
+
+# Cryptography for secure storage and hashing
+aes-gcm = "0.10.3"
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8" 

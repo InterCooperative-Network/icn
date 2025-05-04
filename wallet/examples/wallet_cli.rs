@@ -1,7 +1,7 @@
 use anyhow::{Result, Context};
 use clap::{Parser, Subcommand};
 use icn_wallet_root::{Wallet, WalletError};
-use wallet_storage::StorageManager;
+use icn_wallet_storage::StorageManager;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};

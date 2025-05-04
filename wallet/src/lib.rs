@@ -13,8 +13,8 @@ This is the top-level crate that composes the wallet functionality from its comp
 */
 
 // use icn_wallet_sync as sync; // Temporarily disabled
-use wallet_identity as identity;
-use wallet_storage as storage;
+use icn_wallet_identity as identity;
+use icn_wallet_storage as storage;
 
 pub mod error {
     //! Error types for the wallet

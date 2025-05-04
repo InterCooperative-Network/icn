@@ -1,0 +1,58 @@
+name: Validate Crate Naming
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate-naming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Validate directory/package name consistency
+        run: |
+          chmod +x ./scripts/validate_crate_naming.sh
+          ./scripts/validate_crate_naming.sh 1
+        
+      - name: Check for duplicate crates
+        run: |
+          # Find all Cargo.toml files that define a package
+          PACKAGES=$(find . -name "Cargo.toml" -exec grep -l "^\[package\]" {} \;)
+          
+          # Extract package names and check for duplicates
+          echo "Checking for duplicate crate names..."
+          PKG_NAMES=()
+          DUPLICATES=0
+          
+          for cargo_file in $PACKAGES; do
+            # Skip workspace root
+            if [ "$cargo_file" = "./Cargo.toml" ]; then
+              continue
+            fi
+            
+            # Extract package name
+            PKG_NAME=$(grep '^name *= *' "$cargo_file" | head -1 | sed -E 's/name *= *"([^"]+)"/\1/')
+            
+            if [ -n "$PKG_NAME" ]; then
+              # Check if we've seen this name before
+              for existing in "${PKG_NAMES[@]}"; do
+                if [ "$existing" = "$PKG_NAME" ]; then
+                  echo "ERROR: Duplicate package name '$PKG_NAME' found in $cargo_file"
+                  DUPLICATES=1
+                fi
+              done
+              
+              # Add to the list
+              PKG_NAMES+=("$PKG_NAME")
+            fi
+          done
+          
+          if [ "$DUPLICATES" -eq 1 ]; then
+            echo "Duplicate package names found! This will cause compilation issues."
+            exit 1
+          else
+            echo "No duplicate package names found."
+          fi 
