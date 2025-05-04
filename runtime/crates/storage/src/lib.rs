@@ -19,8 +19,6 @@ storage backend trait and distributed blob storage primitives.
 mod tests;
 
 use async_trait::async_trait;
-use cid::Cid;
-use futures::lock::Mutex;
 use std::collections::{HashMap, HashSet};
 use sha2::{Sha256, Digest};
 use std::sync::Arc;
@@ -31,10 +29,21 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tracing;
 use uuid::Uuid;
 use anyhow::{anyhow, Context, Result};
+use futures::lock::Mutex;
 
-// Local crate imports using proper path notation
-#[cfg(any(feature = "with-dag", test))]
-pub use icn_dag::{DagNode, DagNodeBuilder, codec::DagCborCodec};
+// Import types from models crate
+use icn_models::{
+    Cid, 
+    DagNode, 
+    DagNodeBuilder, 
+    DagNodeMetadata,
+    StorageBackend,
+    StorageError,
+    StorageResult,
+    BasicStorageManager,
+    DagStorageManager,
+};
+
 use libipld::codec::Codec;
 
 // Conditional RocksDB imports
@@ -52,272 +61,242 @@ fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
     cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
 }
 
-/// Errors that can occur during storage operations
-#[derive(Debug, Error)]
-pub enum StorageError {
-    #[error("Key not found: {0}")]
-    KeyNotFound(String),
-    
-    #[error("Serialization failed: {0}")]
-    SerializationFailed(String),
-    
-    #[error("Deserialization failed: {0}")]
-    DeserializationFailed(String),
-    
-    #[error("Blob not found: {0}")]
-    BlobNotFound(String),
-    
-    #[error("Invalid CID: {0}")]
-    InvalidCid(String),
-    
-    #[error("I/O error: {0}")]
-    IoError(String),
-    
-    #[error("Transaction failed: {0}")]
-    TransactionFailed(String),
-    
-    #[error("Async operation failed: {0}")]
-    AsyncError(String),
-    
-    #[error("Operation not supported: {0}")]
-    NotSupported(String),
-    
-    #[error("Blob too large: {0} bytes (max: {1} bytes)")]
-    BlobTooLarge(u64, u64),
-    
-    #[error("Failed to pin blob: {0}")]
-    PinningFailed(String),
-    
-    #[error("Replication failed: {0}")]
-    ReplicationFailed(String),
+/// Thread-safe, async in-memory implementation of StorageBackend
+pub struct AsyncInMemoryStorage {
+    data: Arc<Mutex<HashMap<Cid, Vec<u8>>>>,
+    transaction: Arc<Mutex<Option<HashMap<Cid, Option<Vec<u8>>>>>>,
 }
 
-/// Result type for storage operations
-pub type StorageResult<T> = Result<T, StorageError>;
+impl AsyncInMemoryStorage {
+    /// Create a new async in-memory storage backend
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(Mutex::new(HashMap::new())),
+            transaction: Arc::new(Mutex::new(None)),
+        }
+    }
+}
 
-/// A storage backend represents a persistent store for content-addressed data.
-/// 
-/// Implementations of this trait provide basic CRUD operations for content-addressed
-/// storage (blobs) and key-value storage. The difference is that in content-addressed
-/// storage, the key (CID) is derived from the content itself, while in key-value
-/// storage, the key is provided by the caller.
-/// 
-/// This trait is meant to be implemented by different storage technologies
-/// (in-memory, local file system, distributed storage, etc.)
 #[async_trait]
-pub trait StorageBackend: Send + Sync {
-    /// Get a value by CID (deprecated, use get_blob or get_kv)
-    #[deprecated(since = "0.2.0", note = "use get_blob or get_kv instead")]
-    async fn get(&self, key: &Cid) -> StorageResult<Option<Vec<u8>>>;
-    
-    /// Put a value and return its CID (deprecated, use put_blob or put_kv)
-    #[deprecated(since = "0.2.0", note = "use put_blob or put_kv instead")]
-    async fn put(&self, value: &[u8]) -> StorageResult<Cid>;
-    
-    /// Check if a CID exists in storage (deprecated, use contains_blob or contains_kv)
-    #[deprecated(since = "0.2.0", note = "use contains_blob or contains_kv instead")]
-    async fn contains(&self, key: &Cid) -> StorageResult<bool>;
-    
-    /// Delete a value by CID (deprecated, use delete_blob or delete_kv)
-    #[deprecated(since = "0.2.0", note = "use delete_blob or delete_kv instead")]
-    async fn delete(&self, key: &Cid) -> StorageResult<()>;
-    
-    /// Start a transaction
-    async fn begin_transaction(&self) -> StorageResult<()>;
-    
-    /// Commit a transaction
-    async fn commit_transaction(&self) -> StorageResult<()>;
-    
-    /// Rollback a transaction
-    async fn rollback_transaction(&self) -> StorageResult<()>;
-    
-    /// Flush changes to persistent storage
-    async fn flush(&self) -> StorageResult<()>;
-    
-    /// List all CIDs in storage
-    async fn list_all(&self) -> StorageResult<Vec<Cid>> {
-        Err(StorageError::NotSupported("list_all operation not implemented for this backend".to_string()))
+impl StorageBackend for AsyncInMemoryStorage {
+    // Implementation of StorageBackend trait
+    // ...existing implementation...
+}
+
+/// Thread-safe in-memory implementation of StorageManager for testing
+pub struct MemoryStorageManager {
+    blobs: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    nodes: Arc<Mutex<HashMap<String, HashMap<String, Vec<u8>>>>>,
+}
+
+impl MemoryStorageManager {
+    /// Create a new in-memory storage manager
+    pub fn new() -> Self {
+        Self {
+            blobs: Arc::new(Mutex::new(HashMap::new())),
+            nodes: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
     
-    /// --- Blob Methods (Content-Addressed) ---
+    /// Helper function to generate a blob key from a CID
+    fn blob_key(cid: &Cid) -> String {
+        cid.to_string()
+    }
     
-    /// Store a blob and return its content CID
-    /// This method calculates a CID based on the content of the value
-    async fn put_blob(&self, value_bytes: &[u8]) -> StorageResult<Cid>;
-    
-    /// Retrieve a blob by its content CID
-    async fn get_blob(&self, content_cid: &Cid) -> StorageResult<Option<Vec<u8>>>;
-    
-    /// Check if a blob exists by its content CID
-    async fn contains_blob(&self, content_cid: &Cid) -> StorageResult<bool>;
-    
-    /// Delete a blob by its content CID
-    async fn delete_blob(&self, content_cid: &Cid) -> StorageResult<()>;
-    
-    /// --- Key-Value Methods (Key-Addressed) ---
-    
-    /// Store a value using a specific key CID
-    /// The key CID is provided by the caller and used directly as the key
-    async fn put_kv(&self, key_cid: Cid, value_bytes: Vec<u8>) -> StorageResult<()>;
-    
-    /// Retrieve a value using its key CID
-    async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>>;
-    
-    /// Check if a key exists
-    async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool>;
-    
-    /// Delete a value by its key CID
-    async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()>;
+    /// Helper function to generate node keys from a DID and CID
+    fn node_key(did: &str, cid: &Cid) -> (String, String) {
+        (did.to_string(), cid.to_string())
+    }
 }
 
-/// A trait for managing storage that is independent of DAG-specific functionality
-#[async_trait]
-pub trait BasicStorageManager: Send + Sync {
-    /// Stores a binary blob and returns its content-addressed CID.
-    async fn store_blob(&self, data: &[u8]) -> Result<Cid>;
-
-    /// Retrieves a binary blob by its CID.
-    async fn get_blob(&self, cid: &Cid) -> Result<Option<Vec<u8>>>;
-    
-    /// Checks if a blob exists
-    async fn contains_blob(&self, cid: &Cid) -> Result<bool>;
-    
-    /// Creates a new namespace for entity storage
-    async fn create_namespace(&self, namespace: &str) -> Result<()>;
-    
-    /// Checks if a namespace exists
-    async fn namespace_exists(&self, namespace: &str) -> Result<bool>;
-    
-    /// Stores data in a specific namespace with a key
-    async fn store_in_namespace(&self, namespace: &str, key: &str, data: &[u8]) -> Result<()>;
-    
-    /// Retrieves data from a namespace by key
-    async fn get_from_namespace(&self, namespace: &str, key: &str) -> Result<Option<Vec<u8>>>;
-    
-    /// Checks if a key exists in a namespace
-    async fn contains_in_namespace(&self, namespace: &str, key: &str) -> Result<bool>;
+impl Default for MemoryStorageManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-/// A storage manager provides higher-level operations for managing DAG nodes 
-/// with entity isolation.
-/// 
-/// This trait builds on top of StorageBackend to provide entity-specific storage
-/// for DAG nodes. It allows for organizing data by entity (identified by a DID),
-/// and provides methods for storing, retrieving, and querying DAG nodes within 
-/// each entity's namespace.
-/// 
-/// Implementations should ensure that data from different entities is properly
-/// isolated, and that operations on one entity's data don't affect other entities.
+// Implement BasicStorageManager for MemoryStorageManager
 #[async_trait]
-pub trait StorageManager: Send + Sync {
-    /// Stores the genesis node for a *new* entity DAG.
-    /// Calculates the node's CID and persists it within the entity's designated storage area.
-    /// Creates the entity storage space if it doesn't exist.
-    /// Returns the CID and the persisted DagNode.
+impl BasicStorageManager for MemoryStorageManager {
+    async fn store_blob(&self, data: &[u8]) -> Result<Cid> {
+        // Hash the data to create a CID
+        let mh = create_sha256_multihash(data);
+        let cid = Cid::new_v1(0x55, mh); // 0x55 is the multicodec code for raw binary
+        
+        // Store the blob
+        let key = Self::blob_key(&cid);
+        let mut blobs = self.blobs.lock().await;
+        blobs.insert(key, data.to_vec());
+        
+        Ok(cid)
+    }
+    
+    async fn get_blob(&self, cid: &Cid) -> Result<Option<Vec<u8>>> {
+        let key = Self::blob_key(cid);
+        let blobs = self.blobs.lock().await;
+        Ok(blobs.get(&key).cloned())
+    }
+    
+    async fn contains_blob(&self, cid: &Cid) -> Result<bool> {
+        let key = Self::blob_key(cid);
+        let blobs = self.blobs.lock().await;
+        Ok(blobs.contains_key(&key))
+    }
+    
+    async fn create_namespace(&self, namespace: &str) -> Result<()> {
+        let mut nodes = self.nodes.lock().await;
+        if !nodes.contains_key(namespace) {
+            nodes.insert(namespace.to_string(), HashMap::new());
+        }
+        Ok(())
+    }
+    
+    async fn namespace_exists(&self, namespace: &str) -> Result<bool> {
+        let nodes = self.nodes.lock().await;
+        Ok(nodes.contains_key(namespace))
+    }
+    
+    async fn store_in_namespace(&self, namespace: &str, key: &str, data: &[u8]) -> Result<()> {
+        let mut nodes = self.nodes.lock().await;
+        if let Some(ns) = nodes.get_mut(namespace) {
+            ns.insert(key.to_string(), data.to_vec());
+            Ok(())
+        } else {
+            Err(anyhow!("Namespace does not exist: {}", namespace))
+        }
+    }
+    
+    async fn get_from_namespace(&self, namespace: &str, key: &str) -> Result<Option<Vec<u8>>> {
+        let nodes = self.nodes.lock().await;
+        if let Some(ns) = nodes.get(namespace) {
+            Ok(ns.get(key).cloned())
+        } else {
+            Ok(None)
+        }
+    }
+    
+    async fn contains_in_namespace(&self, namespace: &str, key: &str) -> Result<bool> {
+        let nodes = self.nodes.lock().await;
+        if let Some(ns) = nodes.get(namespace) {
+            Ok(ns.contains_key(key))
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+// Implement DagStorageManager for MemoryStorageManager
+#[async_trait]
+impl DagStorageManager for MemoryStorageManager {
     async fn store_new_dag_root(
         &self,
         entity_did: &str,
-        node_builder: DagNodeBuilder,
-    ) -> Result<(Cid, DagNode)>;
-
-    /// Stores a regular (non-genesis) DAG node for an existing entity.
-    /// Calculates the node's CID and persists it within the entity's storage area.
-    /// Returns the CID and the persisted DagNode.
-    /// Assumes the entity's storage space already exists.
+        node_builder: &dyn DagNodeBuilder,
+    ) -> Result<(Cid, DagNode)> {
+        // Generate the node
+        let node = node_builder.build()?;
+        let cid = node.cid;
+        
+        // Store it using store_blob
+        let serialized = icn_models::dag_storage_codec().encode(&node)?;
+        let _ = self.store_blob(&serialized).await?;
+        
+        // Store in entity's namespace
+        let (did_key, node_key) = Self::node_key(entity_did, &cid);
+        
+        // Create entity namespace if it doesn't exist
+        let mut nodes = self.nodes.lock().await;
+        if !nodes.contains_key(&did_key) {
+            nodes.insert(did_key.clone(), HashMap::new());
+        }
+        
+        // Add node to entity namespace
+        if let Some(entity_nodes) = nodes.get_mut(&did_key) {
+            entity_nodes.insert(node_key, serialized);
+        }
+        
+        Ok((cid, node))
+    }
+    
     async fn store_node(
         &self,
         entity_did: &str,
-        node_builder: DagNodeBuilder,
-    ) -> Result<(Cid, DagNode)>;
-
-    /// Retrieves a DAG node by its CID from a specific entity's DAG storage.
-    async fn get_node(&self, entity_did: &str, cid: &Cid) -> Result<Option<DagNode>>;
-
-    /// Checks if a DAG node exists within a specific entity's DAG storage.
-    async fn contains_node(&self, entity_did: &str, cid: &Cid) -> Result<bool>;
-
-    /// Retrieves the bytes of a DAG node by its CID from a specific entity's DAG.
-    /// Useful if the caller wants to handle deserialization themselves.
-    async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>>;
-
-    /// Stores multiple nodes for an entity in a single batch operation.
-    /// This is more efficient than calling store_node repeatedly.
+        node_builder: &dyn DagNodeBuilder,
+    ) -> Result<(Cid, DagNode)> {
+        // Generate the node
+        let node = node_builder.build()?;
+        let cid = node.cid;
+        
+        // Serialize the node
+        let serialized = icn_models::dag_storage_codec().encode(&node)?;
+        
+        // Store the raw blob
+        let _ = self.store_blob(&serialized).await?;
+        
+        // Get entity namespace keys
+        let (did_key, node_key) = Self::node_key(entity_did, &cid);
+        
+        // Store in entity namespace
+        let mut nodes = self.nodes.lock().await;
+        if let Some(entity_nodes) = nodes.get_mut(&did_key) {
+            entity_nodes.insert(node_key, serialized);
+        } else {
+            return Err(anyhow!("Entity namespace does not exist: {}", entity_did));
+        }
+        
+        Ok((cid, node))
+    }
+    
+    async fn get_node(&self, entity_did: &str, cid: &Cid) -> Result<Option<DagNode>> {
+        // Get serialized bytes
+        if let Some(bytes) = self.get_node_bytes(entity_did, cid).await? {
+            // Deserialize
+            let node = icn_models::dag_storage_codec().decode::<DagNode>(&bytes)?;
+            Ok(Some(node))
+        } else {
+            Ok(None)
+        }
+    }
+    
+    async fn contains_node(&self, entity_did: &str, cid: &Cid) -> Result<bool> {
+        let (did_key, node_key) = Self::node_key(entity_did, cid);
+        let nodes = self.nodes.lock().await;
+        
+        if let Some(entity_nodes) = nodes.get(&did_key) {
+            Ok(entity_nodes.contains_key(&node_key))
+        } else {
+            Ok(false)
+        }
+    }
+    
+    async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>> {
+        let (did_key, node_key) = Self::node_key(entity_did, cid);
+        let nodes = self.nodes.lock().await;
+        
+        if let Some(entity_nodes) = nodes.get(&did_key) {
+            Ok(entity_nodes.get(&node_key).cloned())
+        } else {
+            Ok(None)
+        }
+    }
+    
     async fn store_nodes_batch(
         &self,
         entity_did: &str,
-        node_builders: Vec<DagNodeBuilder>,
-    ) -> Result<Vec<(Cid, DagNode)>>;
-
-    /// Stores a binary blob and returns its content-addressed CID.
-    /// This is an internal utility method primarily used by the DAG storage methods.
-    async fn store_blob(&self, data: &[u8]) -> Result<Cid>;
-
-    /// Retrieves a binary blob by its CID.
-    /// This is an internal utility method primarily used by the DAG storage methods.
-    async fn get_blob(&self, cid: &Cid) -> Result<Option<Vec<u8>>>;
-}
-
-// The DagStorageManager trait is conditionally defined when the dag feature is available
-#[cfg(any(feature = "with-dag", test))]
-pub mod dag_storage {
-    use super::*;
-    
-    /// A storage manager provides higher-level operations for managing DAG nodes 
-    /// with entity isolation.
-    /// 
-    /// This trait builds on top of BasicStorageManager to provide entity-specific storage
-    /// for DAG nodes. It allows for organizing data by entity (identified by a DID),
-    /// and provides methods for storing, retrieving, and querying DAG nodes within 
-    /// each entity's namespace.
-    /// 
-    /// Implementations should ensure that data from different entities is properly
-    /// isolated, and that operations on one entity's data don't affect other entities.
-    #[async_trait]
-    pub trait DagStorageManager: BasicStorageManager {
-        /// Stores the genesis node for a *new* entity DAG.
-        /// Calculates the node's CID and persists it within the entity's designated storage area.
-        /// Creates the entity storage space if it doesn't exist.
-        /// Returns the CID and the persisted DagNode.
-        async fn store_new_dag_root(
-            &self,
-            entity_did: &str,
-            node_builder: super::DagNodeBuilder,
-        ) -> Result<(Cid, super::DagNode)>;
-    
-        /// Stores a regular (non-genesis) DAG node for an existing entity.
-        /// Calculates the node's CID and persists it within the entity's storage area.
-        /// Returns the CID and the persisted DagNode.
-        /// Assumes the entity's storage space already exists.
-        async fn store_node(
-            &self,
-            entity_did: &str,
-            node_builder: super::DagNodeBuilder,
-        ) -> Result<(Cid, super::DagNode)>;
-    
-        /// Retrieves a DAG node by its CID from a specific entity's DAG storage.
-        async fn get_node(&self, entity_did: &str, cid: &Cid) -> Result<Option<super::DagNode>>;
-    
-        /// Checks if a DAG node exists within a specific entity's DAG storage.
-        async fn contains_node(&self, entity_did: &str, cid: &Cid) -> Result<bool>;
-    
-        /// Retrieves the bytes of a DAG node by its CID from a specific entity's DAG.
-        /// Useful if the caller wants to handle deserialization themselves.
-        async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>>;
-    
-        /// Stores multiple nodes for an entity in a single batch operation.
-        /// This is more efficient than calling store_node repeatedly.
-        async fn store_nodes_batch(
-            &self,
-            entity_did: &str,
-            node_builders: Vec<super::DagNodeBuilder>,
-        ) -> Result<Vec<(Cid, super::DagNode)>>;
+        node_builders: Vec<&dyn DagNodeBuilder>,
+    ) -> Result<Vec<(Cid, DagNode)>> {
+        let mut results = Vec::new();
+        
+        for builder in node_builders {
+            let (cid, node) = self.store_node(entity_did, builder).await?;
+            results.push((cid, node));
+        }
+        
+        Ok(results)
     }
 }
 
 // More code, implementations, etc.
-
-// Thread-safe, async in-memory implementation of StorageBackend
-// [AsyncInMemoryStorage implementation...]
 
 // RocksDB implementation (conditionally compiled)
 #[cfg(feature = "rocksdb-storage")]
@@ -449,167 +428,6 @@ mod rocksdb_storage {
             let cf = self.get_or_create_cf_handle("blobs")?;
             Ok(self.db.get_cf(&cf, cid.to_bytes())?)
         }
-    }
-}
-
-/// Thread-safe in-memory implementation of StorageManager for testing
-pub struct MemoryStorageManager {
-    blobs: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-    nodes: Arc<Mutex<HashMap<String, HashMap<String, Vec<u8>>>>>,
-}
-
-impl MemoryStorageManager {
-    /// Create a new in-memory storage manager
-    pub fn new() -> Self {
-        Self {
-            blobs: Arc::new(Mutex::new(HashMap::new())),
-            nodes: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-    
-    /// Helper function to generate a blob key from a CID
-    fn blob_key(cid: &Cid) -> String {
-        cid.to_string()
-    }
-    
-    /// Helper function to generate node keys from a DID and CID
-    fn node_key(did: &str, cid: &Cid) -> (String, String) {
-        (did.to_string(), cid.to_string())
-    }
-}
-
-#[async_trait]
-impl StorageManager for MemoryStorageManager {
-    async fn store_new_dag_root(
-        &self,
-        entity_did: &str,
-        node_builder: DagNodeBuilder,
-    ) -> Result<(Cid, DagNode)> {
-        // Generate the node
-        let node = node_builder.build()?;
-        let cid = node.cid;
-        
-        // Store it using store_blob
-        let serialized = DagCborCodec.encode(&node)?;
-        let _ = self.store_blob(&serialized).await?;
-        
-        // Store in entity's namespace
-        let (did_key, node_key) = Self::node_key(entity_did, &cid);
-        
-        // Create entity namespace if it doesn't exist
-        let mut nodes = self.nodes.lock().await;
-        if !nodes.contains_key(&did_key) {
-            nodes.insert(did_key.clone(), HashMap::new());
-        }
-        
-        // Add node to entity namespace
-        if let Some(entity_nodes) = nodes.get_mut(&did_key) {
-            entity_nodes.insert(node_key, serialized);
-        }
-        
-        Ok((cid, node))
-    }
-    
-    async fn store_node(
-        &self,
-        entity_did: &str,
-        node_builder: DagNodeBuilder,
-    ) -> Result<(Cid, DagNode)> {
-        // Generate the node
-        let node = node_builder.build()?;
-        let cid = node.cid;
-        
-        // Serialize the node
-        let serialized = DagCborCodec.encode(&node)?;
-        
-        // Store the raw blob
-        let _ = self.store_blob(&serialized).await?;
-        
-        // Get entity namespace keys
-        let (did_key, node_key) = Self::node_key(entity_did, &cid);
-        
-        // Store in entity namespace
-        let mut nodes = self.nodes.lock().await;
-        if let Some(entity_nodes) = nodes.get_mut(&did_key) {
-            entity_nodes.insert(node_key, serialized);
-        } else {
-            return Err(anyhow!("Entity namespace does not exist: {}", entity_did));
-        }
-        
-        Ok((cid, node))
-    }
-    
-    async fn get_node(&self, entity_did: &str, cid: &Cid) -> Result<Option<DagNode>> {
-        // Get serialized bytes
-        if let Some(bytes) = self.get_node_bytes(entity_did, cid).await? {
-            // Deserialize
-            let node = DagCborCodec.decode::<DagNode>(&bytes)?;
-            Ok(Some(node))
-        } else {
-            Ok(None)
-        }
-    }
-    
-    async fn contains_node(&self, entity_did: &str, cid: &Cid) -> Result<bool> {
-        let (did_key, node_key) = Self::node_key(entity_did, cid);
-        let nodes = self.nodes.lock().await;
-        
-        if let Some(entity_nodes) = nodes.get(&did_key) {
-            Ok(entity_nodes.contains_key(&node_key))
-        } else {
-            Ok(false)
-        }
-    }
-    
-    async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>> {
-        let (did_key, node_key) = Self::node_key(entity_did, cid);
-        let nodes = self.nodes.lock().await;
-        
-        if let Some(entity_nodes) = nodes.get(&did_key) {
-            Ok(entity_nodes.get(&node_key).cloned())
-        } else {
-            Ok(None)
-        }
-    }
-    
-    async fn store_nodes_batch(
-        &self,
-        entity_did: &str,
-        node_builders: Vec<DagNodeBuilder>,
-    ) -> Result<Vec<(Cid, DagNode)>> {
-        let mut results = Vec::new();
-        
-        for builder in node_builders {
-            let (cid, node) = self.store_node(entity_did, builder).await?;
-            results.push((cid, node));
-        }
-        
-        Ok(results)
-    }
-    
-    async fn store_blob(&self, data: &[u8]) -> Result<Cid> {
-        // Hash the data to create a CID
-        let mh = create_sha256_multihash(data);
-        let cid = Cid::new_v1(0x55, mh); // 0x55 is the multicodec code for raw binary
-        
-        // Store the blob
-        let key = Self::blob_key(&cid);
-        let mut blobs = self.blobs.lock().await;
-        blobs.insert(key, data.to_vec());
-        
-        Ok(cid)
-    }
-    
-    async fn get_blob(&self, cid: &Cid) -> Result<Option<Vec<u8>>> {
-        let key = Self::blob_key(cid);
-        let blobs = self.blobs.lock().await;
-        Ok(blobs.get(&key).cloned())
-    }
-}
-
-impl Default for MemoryStorageManager {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

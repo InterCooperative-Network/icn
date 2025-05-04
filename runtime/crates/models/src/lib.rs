@@ -16,6 +16,13 @@ pub use cid::Cid;
 pub mod dag;
 pub mod storage;
 
+#[cfg(test)]
+mod tests;
+
+// Re-export common types for ease of use
+pub use dag::{DagNode, DagNodeBuilder, DagNodeMetadata, DagType, DagCodec, dag_storage_codec};
+pub use storage::{StorageBackend, StorageError, StorageResult, BasicStorageManager, DagStorageManager};
+
 /// Result type for operations that can fail
 pub type Result<T> = anyhow::Result<T>;
 

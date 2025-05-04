@@ -95,4 +95,26 @@ pub trait DagCodec {
     
     /// Decode bytes to a DAG node
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> crate::Result<T>;
+}
+
+/// Default implementation of DagCodec using CBOR
+pub struct DagCborCodec;
+
+impl DagCodec for DagCborCodec {
+    fn encode<T: Serialize>(&self, node: &T) -> crate::Result<Vec<u8>> {
+        let bytes = serde_ipld_dagcbor::to_vec(node)
+            .map_err(|e| crate::ModelError::SerializationError(e.to_string()))?;
+        Ok(bytes)
+    }
+    
+    fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> crate::Result<T> {
+        let value = serde_ipld_dagcbor::from_slice(bytes)
+            .map_err(|e| crate::ModelError::DeserializationError(e.to_string()))?;
+        Ok(value)
+    }
+}
+
+/// Get a default codec implementation for DAG storage
+pub fn dag_storage_codec() -> impl DagCodec {
+    DagCborCodec
 } 
