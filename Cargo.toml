@@ -16,13 +16,12 @@ exclude = [
     "frontend/*",
     "wallet/crates/sync",
     "runtime/crates/agoranet-integration",
-    # Exclude duplicate or empty directories
-    "runtime/crates/icn-verifier",
-    "runtime/crates/wallet-agent",
-    "runtime/crates/wallet-core",
-    "runtime/crates/wallet-ffi",
-    "runtime/crates/wallet-sync",
-    "wallet/crates/ffi",
+    # Exclude duplicate crates - prefer the unified "icn-" prefixed versions in wallet/crates
+    "runtime/crates/wallet-agent",    # Duplicate of wallet/crates/wallet-agent (icn-wallet-agent)
+    "runtime/crates/wallet-core",     # Duplicate of wallet/crates/wallet-core (icn-wallet-core)
+    "runtime/crates/wallet-ffi",      # Duplicate of wallet/crates/wallet-ffi (icn-wallet-ffi)
+    "runtime/crates/wallet-sync",     # Duplicate of wallet/crates/sync (not enabled yet)
+    "wallet/crates/ffi",              # Old path now renamed to wallet-ffi
 ]
 
 [workspace.dependencies]

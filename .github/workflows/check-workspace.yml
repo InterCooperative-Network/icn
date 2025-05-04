@@ -35,6 +35,45 @@ jobs:
             echo "No duplicate crate names found."
           fi
       
+      - name: Enhanced check for potential duplicate crates (different names but same purpose)
+        run: |
+          # Define patterns for similar crates
+          PATTERNS=("wallet-" "icn-wallet")
+          
+          for PATTERN in "${PATTERNS[@]}"; do
+            echo "Checking for potential duplicates with pattern '$PATTERN'..."
+            MATCHES=$(find . -name Cargo.toml -type f -exec grep -l "name\s*=\s*\".*$PATTERN" {} \; | sort)
+            
+            if [ -n "$MATCHES" ]; then
+              MATCH_COUNT=$(echo "$MATCHES" | wc -l)
+              
+              if [ "$MATCH_COUNT" -gt 1 ]; then
+                echo "Warning: Found multiple crates matching pattern '$PATTERN':"
+                echo "$MATCHES"
+                echo "Please verify these are not duplicate implementations."
+                
+                # This is a warning, not an error (yet)
+                # Add exit 1 here to fail the build if this should be enforced
+              fi
+            fi
+          done
+      
+      - name: Check for nested workspaces
+        run: |
+          ROOT_WORKSPACE=$(grep -l "^\[workspace\]" Cargo.toml)
+          NESTED_WORKSPACES=$(find . -not -path "./target/*" -not -path "./$ROOT_WORKSPACE" -name Cargo.toml -type f -exec grep -l "^\[workspace\]" {} \;)
+          
+          if [ -n "$NESTED_WORKSPACES" ]; then
+            echo "Warning: Found nested workspace definitions which may cause build issues:"
+            echo "$NESTED_WORKSPACES"
+            echo "Consider flattening to a single workspace for better compatibility."
+            
+            # This is a warning, not an error (yet) to allow gradual transition
+            # Add exit 1 here to fail the build if this should be enforced
+          else
+            echo "No nested workspaces found."
+          fi
+      
       - name: Run cargo check
         uses: actions-rs/cargo@v1
         with:
@@ -51,4 +90,10 @@ jobs:
         run: cargo install cargo-audit --locked
       
       - name: Run cargo-audit
-        run: cargo audit 
+        run: cargo audit
+      
+      - name: Install cargo-hack
+        run: cargo install cargo-hack --locked
+      
+      - name: Check all feature combinations
+        run: cargo hack check --each-feature --no-dev-deps --workspace 
