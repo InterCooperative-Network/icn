@@ -1,0 +1,12 @@
+[package]
+name = "health_check"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { workspace = true }
+dotenv = { workspace = true }
+serde = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true } 

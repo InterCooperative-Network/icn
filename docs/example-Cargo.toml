@@ -1,18 +1,24 @@
 [workspace]
 resolver = "2"
 members = [
+    # Core components
     "runtime",
     "wallet",
-    "icn-verifier",
-    "wallet-agent",
-    "wallet-core",
-    "wallet-ffi"
+    "agoranet",
+    
+    # Individual crates
+    "runtime/crates/*",
+    "wallet/crates/*",
+    "agoranet/crates/*",
+    
+    # Tools
+    "tools/health_check",
+    "tools/icn-verifier"
 ]
 
 # Temporarily excluded components with issues
 exclude = [
-    "wallet/crates/wallet-sync",
-    "agoranet",
+    "wallet/crates/sync",
     "runtime/crates/agoranet-integration"
 ]
 
@@ -65,15 +71,8 @@ sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "m
 dotenv = "0.15.0"
 tokio-stream = "0.1"
 
-[package]
-name = "health_check"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-axum = { workspace = true }
-dotenv = { workspace = true }
-serde = { workspace = true }
-sqlx = { workspace = true }
-tokio = { workspace = true }
-tokio-stream = { workspace = true }
+# Web and frontend integration
+tower = "0.4"
+tower-http = { version = "0.4", features = ["trace", "cors"] }
+hyper = { version = "0.14", features = ["full"] }
+url = "2.3" 
