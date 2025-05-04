@@ -7,12 +7,17 @@
 pub mod compat;
 pub mod federation;
 pub mod credentials;
+pub mod export;
 
 pub use credentials::{CredentialStore as InternalCredentialStore, CredentialManager, CredentialError, CredentialResult};
 pub use federation::{
     FederationSyncClient, FederationSyncClientConfig, FederationEndpoint,
     CredentialStore as FederationCredentialStore, CredentialNotifier,
-    MemoryCredentialStore, SyncCredentialType, FederationSyncError
+    MemoryCredentialStore, SyncCredentialType, FederationSyncError,
+    VerifiableCredential, ExportFormat, verify_execution_receipt
+};
+pub use export::{
+    export_receipts_to_file, import_receipts_from_file, ExportError
 };
 pub use compat::{
     WalletDagNode, WalletDagNodeMetadata, CompatError, CompatResult,

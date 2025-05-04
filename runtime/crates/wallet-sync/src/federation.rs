@@ -400,6 +400,182 @@ where
     ) -> Result<Option<String>, FederationSyncError> {
         self.store.get_credential(credential_id).await
     }
+
+    /// Retrieves execution receipts from a federation node
+    pub async fn fetch_execution_receipts(
+        &self,
+        federation_id: &str,
+        scope: &str,
+        since: Option<i64>,
+    ) -> Result<Vec<VerifiableCredential>, FederationSyncError> {
+        // Find the endpoint for the given federation ID
+        let endpoint = self.config.endpoints.iter()
+            .find(|e| e.federation_id == federation_id)
+            .ok_or_else(|| FederationSyncError::ConfigurationError(
+                format!("No endpoint configured for federation: {}", federation_id)
+            ))?;
+        
+        // Construct the request URL
+        let mut url = format!("{}/dag/receipts?scope={}", endpoint.base_url, scope);
+        
+        // Add optional timestamp filter
+        if let Some(timestamp) = since {
+            url.push_str(&format!("&since={}", timestamp));
+        }
+        
+        debug!("Fetching execution receipts from: {}", url);
+        
+        // Create request with optional authentication
+        let mut request = self.http_client.get(&url);
+        if let Some(token) = &endpoint.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+        
+        // Execute request
+        let response = request.send().await?;
+        
+        // Handle errors
+        if !response.status().is_success() {
+            return Err(FederationSyncError::HttpError(
+                reqwest::Error::from(response.error_for_status().unwrap_err())
+            ));
+        }
+        
+        // Parse response
+        let receipts: Vec<VerifiableCredential> = response.json().await?;
+        
+        // Optionally verify receipts
+        if self.config.verify_credentials {
+            let mut verified_receipts = Vec::new();
+            for receipt in receipts {
+                if verify_execution_receipt(&receipt) {
+                    verified_receipts.push(receipt);
+                } else {
+                    warn!("Skipping unverified receipt: {}", receipt.id);
+                }
+            }
+            Ok(verified_receipts)
+        } else {
+            Ok(receipts)
+        }
+    }
+}
+
+/// Verifies an execution receipt credential
+pub fn verify_execution_receipt(receipt: &VerifiableCredential) -> bool {
+    // Basic verification:
+    
+    // 1. Check if it's an ExecutionReceipt type
+    if !receipt.types.iter().any(|t| t == "ExecutionReceipt") {
+        return false;
+    }
+    
+    // 2. Verify it has required fields
+    if receipt.issuer.is_empty() || receipt.issuance_date.is_empty() {
+        return false;
+    }
+    
+    // 3. Verify the subject has required fields
+    let subject = &receipt.credential_subject;
+    if !subject.is_object() 
+        || subject["id"].as_str().is_none() 
+        || subject["proposal_id"].as_str().is_none() 
+        || subject["outcome"].as_str().is_none() {
+        return false;
+    }
+    
+    // 4. Verify proof if available
+    if let Some(proof) = &receipt.proof {
+        // In a real implementation, you would verify the proof cryptographically
+        // For now, just check if it has the required fields
+        if !proof.is_object() 
+            || proof["type"].as_str().is_none() 
+            || proof["created"].as_str().is_none() 
+            || proof["proofValue"].as_str().is_none() {
+            return false;
+        }
+    }
+    
+    true
+}
+
+/// Exports receipts to various formats
+pub fn export_receipts(
+    receipts: &[VerifiableCredential], 
+    format: ExportFormat
+) -> Result<String, FederationSyncError> {
+    match format {
+        ExportFormat::Json => {
+            // Export as JSON array
+            serde_json::to_string_pretty(receipts)
+                .map_err(|e| FederationSyncError::ParseError(
+                    format!("Failed to serialize receipts to JSON: {}", e)
+                ))
+        },
+        ExportFormat::Csv => {
+            // Export as CSV
+            let mut csv = String::new();
+            
+            // Write header
+            csv.push_str("id,issuer,issuance_date,proposal_id,outcome,federation_scope\n");
+            
+            // Write rows
+            for receipt in receipts {
+                let subject = &receipt.credential_subject;
+                let proposal_id = subject["proposal_id"].as_str().unwrap_or("");
+                let outcome = subject["outcome"].as_str().unwrap_or("");
+                let federation_scope = subject["federation_scope"].as_str().unwrap_or("");
+                
+                csv.push_str(&format!(
+                    "{},{},{},{},{},{}\n",
+                    receipt.id,
+                    receipt.issuer,
+                    receipt.issuance_date,
+                    proposal_id,
+                    outcome,
+                    federation_scope
+                ));
+            }
+            
+            Ok(csv)
+        },
+        ExportFormat::SignedBundle => {
+            // Create a signed bundle
+            let bundle = SignedReceiptBundle {
+                receipts: receipts.to_vec(),
+                timestamp: Utc::now().to_rfc3339(),
+                signature: None, // In a real implementation, sign the bundle
+            };
+            
+            serde_json::to_string_pretty(&bundle)
+                .map_err(|e| FederationSyncError::ParseError(
+                    format!("Failed to serialize receipt bundle: {}", e)
+                ))
+        }
+    }
+}
+
+/// Format for exporting receipts
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    /// JSON format
+    Json,
+    /// CSV format
+    Csv,
+    /// Signed bundle format
+    SignedBundle,
+}
+
+/// A signed bundle of receipts for export/import
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedReceiptBundle {
+    /// Collection of receipts
+    pub receipts: Vec<VerifiableCredential>,
+    /// Timestamp of bundle creation
+    pub timestamp: String,
+    /// Optional signature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// Synchronize credentials from a federation endpoint

@@ -19,4 +19,9 @@ tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time"] }
 serde_json = "1.0"
 libipld = { workspace = true }
 cid = { workspace = true }
-serde_bytes = "0.11" 
+serde_bytes = "0.11"
+
+[dev-dependencies]
+mockito = "1.0"
+tempfile = "3.3"
+tokio-test = "0.4" 
