@@ -23,7 +23,7 @@ use thiserror::Error;
 use tracing::*;
 use icn_identity::{KeyPair, IdentityScope, IdentityManager, IdentityError, IdentityId as IcnIdentityId, JWK};
 use icn_storage::{StorageManager, StorageError};
-use icn_dag::{DagNodeBuilder, DagNode, codec::DagCborCodec};
+use icn_models::{DagNodeBuilder, DagNode, DagStorageManager, Cid};
 use libipld::{Ipld, ipld, codec::Codec};
 use anyhow::{anyhow, Result};
 use std::sync::RwLock;
@@ -244,6 +244,9 @@ pub struct ConcreteHostEnvironment {
     
     /// The last DAG anchor CID created during execution
     last_anchor_cid: RwLock<Option<String>>,
+    
+    /// DAG storage manager for WASM host ABI functions
+    pub dag_storage: Arc<dyn DagStorageManager + Send + Sync>,
 }
 
 impl ConcreteHostEnvironment {
@@ -253,6 +256,7 @@ impl ConcreteHostEnvironment {
         storage_manager: Arc<dyn StorageManager>,
         identity_manager: Arc<dyn IdentityManager>,
         parent_federation_did: Option<String>,
+        dag_storage: Arc<dyn DagStorageManager + Send + Sync>,
     ) -> Self {
         Self {
             vm_context,
@@ -263,6 +267,7 @@ impl ConcreteHostEnvironment {
             last_created_entity_info: None, // Initialize as None
             resource_usage: RwLock::new(HashMap::new()),
             last_anchor_cid: RwLock::new(None),
+            dag_storage,
         }
     }
     
@@ -795,6 +800,87 @@ impl ConcreteHostEnvironment {
         info!(key = %key, value_len = %value.len(), "Storing key-value pair");
         
         Ok(())
+    }
+
+    /// Store a DAG node using the DagStorageManager
+    pub async fn store_node(&self, node: DagNode) -> Result<(), InternalHostError> {
+        // Record base compute cost for storing a node
+        self.record_compute_usage(500)?;
+        
+        // Get the entity DID - here we use the caller's DID as the entity owner
+        let entity_did = self.vm_context.caller_did();
+        
+        // Ensure we don't try to store a node with mismatched issuer
+        if entity_did != node.issuer.to_string() {
+            return Err(InternalHostError::Other(format!(
+                "Node issuer ({}) must match caller's DID ({})",
+                node.issuer, entity_did
+            )));
+        }
+        
+        // Create a node builder from the existing node
+        // This is a bit inefficient since we're converting to a builder and back,
+        // but follows the current DagStorageManager interface
+        let builder = DagNodeBuilder::new()
+            .with_issuer(node.issuer.to_string())
+            .with_parents(node.parents.clone())
+            .with_metadata(node.metadata.clone())
+            .with_payload(node.payload.clone())
+            .with_signature(node.signature.clone());
+        
+        // Store the node using the DAG storage manager
+        match self.dag_storage.store_node(entity_did, &builder).await {
+            Ok(_) => {
+                // Record storage cost based on node size
+                // For simplicity, we'll use a rough estimate - in a real implementation,
+                // we might want to serialize the node to get exact byte count
+                let estimated_size = 256 + node.signature.len() as u64; // Base size + signature
+                self.record_storage_usage(estimated_size)?;
+                Ok(())
+            },
+            Err(e) => Err(InternalHostError::Other(format!("Failed to store node: {}", e))),
+        }
+    }
+    
+    /// Retrieve a DAG node by its CID
+    pub async fn get_node(&self, cid: &Cid) -> Result<Option<DagNode>, InternalHostError> {
+        // Record base compute cost for retrieving a node
+        self.record_compute_usage(200)?;
+        
+        // Get the entity DID - here we use the caller's DID 
+        let entity_did = self.vm_context.caller_did();
+        
+        // Retrieve the node using the DAG storage manager
+        match self.dag_storage.get_node(entity_did, cid).await {
+            Ok(node_opt) => {
+                if let Some(ref node) = node_opt {
+                    // Record network cost based on node size
+                    let estimated_size = 256 + node.signature.len() as u64;
+                    self.record_network_usage(estimated_size)?;
+                }
+                Ok(node_opt)
+            },
+            Err(e) => Err(InternalHostError::Other(format!("Failed to retrieve node: {}", e))),
+        }
+    }
+    
+    /// Check if a DAG node exists by its CID
+    pub async fn contains_node(&self, cid: &Cid) -> Result<bool, InternalHostError> {
+        // Record base compute cost for checking node existence
+        self.record_compute_usage(100)?;
+        
+        // Get the entity DID - here we use the caller's DID
+        let entity_did = self.vm_context.caller_did();
+        
+        // Check if the node exists using the DAG storage manager
+        match self.dag_storage.contains_node(entity_did, cid).await {
+            Ok(exists) => {
+                // Minimal network cost for boolean result
+                self.record_network_usage(4)?;
+                Ok(exists)
+            },
+            Err(e) => Err(InternalHostError::Other(format!("Failed to check node existence: {}", e))),
+        }
     }
 }
 

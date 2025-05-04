@@ -21,6 +21,8 @@ use icn_storage::StorageError;
 use cid::Cid;
 use std::convert::TryInto;
 use std::io::Cursor;
+use icn_models::dag_storage_codec;
+use icn_models::DagNode;
 
 /// Maximum allowed length for a key or value in bytes
 const MAX_STRING_LENGTH: usize = 1024 * 1024; // 1 MB
@@ -707,7 +709,139 @@ fn host_transfer_resource_wrapper(
     }
 }
 
-/// Register all host functions with a wasmtime::Linker
+/// Wrapper for host_store_node ABI function
+fn host_store_dag_node_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>, 
+    ptr: u32, 
+    len: u32
+) -> Result<i32, Trap> {
+    debug!("host_store_dag_node called with ptr: {}, len: {}", ptr, len);
+    
+    // Read the serialized DagNode from WASM memory
+    let node_bytes = match safe_read_bytes(&caller, ptr, len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Record compute cost for this operation
+    if let Err(code) = check_compute(&caller, 1000 + (node_bytes.len() as u64) / 10) {
+        return Ok(code);
+    }
+    
+    // Deserialize the node
+    let node: DagNode = match dag_storage_codec().decode(&node_bytes) {
+        Ok(node) => node,
+        Err(e) => {
+            error!("Failed to deserialize DagNode: {}", e);
+            return Ok(-4); // Codec error
+        }
+    };
+    
+    // Call the host environment to store the node
+    let env = caller.data();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.store_node(node)) {
+        Ok(_) => Ok(0), // Success
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
+    }
+}
+
+/// Wrapper for host_get_node ABI function
+fn host_get_dag_node_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>, 
+    cid_ptr: u32, 
+    cid_len: u32, 
+    result_ptr: u32
+) -> Result<i32, Trap> {
+    debug!("host_get_dag_node called with cid_ptr: {}, cid_len: {}", cid_ptr, cid_len);
+    
+    // Read the CID bytes from WASM memory
+    let cid_bytes = match safe_read_bytes(&caller, cid_ptr, cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Record compute cost for this operation
+    if let Err(code) = check_compute(&caller, 500) {
+        return Ok(code);
+    }
+    
+    // Parse the CID
+    let cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Call the host environment to get the node
+    let env = caller.data();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.get_node(&cid)) {
+        Ok(Some(node)) => {
+            // Serialize the node
+            let node_bytes = match dag_storage_codec().encode(&node) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    error!("Failed to serialize DagNode: {}", e);
+                    return Ok(-4); // Codec error
+                }
+            };
+            
+            // Write the serialized node to WASM memory
+            match safe_write_bytes(&mut caller, &node_bytes, result_ptr, node_bytes.len() as u32) {
+                Ok(_) => Ok(node_bytes.len() as i32), // Return the number of bytes written
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        },
+        Ok(None) => Ok(0), // Node not found
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
+    }
+}
+
+/// Wrapper for host_contains_node ABI function
+fn host_contains_dag_node_wrapper(
+    caller: Caller<'_, ConcreteHostEnvironment>, 
+    cid_ptr: u32, 
+    cid_len: u32
+) -> Result<i32, Trap> {
+    debug!("host_contains_dag_node called with cid_ptr: {}, cid_len: {}", cid_ptr, cid_len);
+    
+    // Read the CID bytes from WASM memory
+    let cid_bytes = match safe_read_bytes(&caller, cid_ptr, cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Record compute cost for this operation
+    if let Err(code) = check_compute(&caller, 200) {
+        return Ok(code);
+    }
+    
+    // Parse the CID
+    let cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Call the host environment to check if the node exists
+    let env = caller.data();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.contains_node(&cid)) {
+        Ok(true) => Ok(1), // Node exists
+        Ok(false) => Ok(0), // Node doesn't exist
+        Err(e) => Ok(map_internal_error_to_wasm(e)),
+    }
+}
+
+/// Register all host functions
 pub fn register_host_functions(
     linker: &mut wasmtime::Linker<ConcreteHostEnvironment>,
 ) -> Result<(), VmError> {
@@ -881,19 +1015,19 @@ pub fn register_host_functions(
     linker.func_wrap(
         "env",
         "host_store_node",
-        host_store_node_wrapper,
+        host_store_dag_node_wrapper,
     ).map_err(|e| VmError::InitializationError(format!("Failed to register host_store_node: {}", e)))?;
 
     linker.func_wrap(
         "env",
         "host_get_node",
-        host_get_node_wrapper,
+        host_get_dag_node_wrapper,
     ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_node: {}", e)))?;
 
     linker.func_wrap(
         "env",
         "host_contains_node",
-        host_contains_node_wrapper,
+        host_contains_dag_node_wrapper,
     ).map_err(|e| VmError::InitializationError(format!("Failed to register host_contains_node: {}", e)))?;
 
     // Register the enhanced economic/resource functions
