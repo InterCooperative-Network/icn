@@ -19,17 +19,20 @@ multihash = { workspace = true }
 icn-common = { path = "../common" }
 
 # Other required dependencies
-did-method-key = "0.2"
+did-method-key = "0.3"
 rand = "0.8"
 sha2 = "0.10"
-uuid = { version = "1.4", features = ["v4"] }
+uuid = { version = "1.3", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 bs58 = "0.5"
 base64 = "0.21"
 hex = "0.4"
 
 # W3C DID/VC standards and JWS implementation
-ssi = { workspace = true }
+ssi = { version = "0.7", features = ["ed25519"] }
+ssi-jws = "0.1"
+ssi-jwk = "0.3"
+ssi-dids = "0.1"
 
 # W3C DID/VC standards - simplify for now as we're implementing our own
 # ssi = { version = "0.7", default-features = false, features = ["vc", "jwk", "did"] }
