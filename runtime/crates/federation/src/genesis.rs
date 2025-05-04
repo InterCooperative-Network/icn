@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use cid::Cid;
 use chrono::{DateTime, Utc};
-use icn_identity::{IdentityId, TrustBundle, VerifiableCredential, Signature};
+use icn_identity::{IdentityId, TrustBundle, VerifiableCredential, Signature, QuorumProof};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use sha2::{Digest, Sha256};
 
 use crate::error::{FederationResult, FederationError};
 use crate::guardian::{GuardianQuorumConfig, Guardian};
@@ -56,6 +57,57 @@ pub struct FederationEstablishmentCredential {
     
     /// Guardian signatures attesting to the legitimacy of this federation
     pub guardian_signatures: Vec<(IdentityId, String)>,
+}
+
+/// Represents a Genesis Trust Bundle encapsulating federation genesis state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisTrustBundle {
+    /// CID of the federation metadata (calculated deterministically)
+    pub federation_metadata_cid: String,
+    
+    /// The federation establishment credential
+    pub federation_establishment_credential: FederationEstablishmentCredential,
+    
+    /// Credentials for all guardians
+    pub guardian_credentials: Vec<VerifiableCredential>,
+    
+    /// Quorum proof for the bundle
+    pub quorum_proof: QuorumProof,
+    
+    /// When the bundle was issued
+    pub issued_at: DateTime<Utc>,
+}
+
+impl GenesisTrustBundle {
+    /// Create a new genesis trust bundle
+    pub fn new(
+        federation_metadata_cid: String,
+        federation_establishment_credential: FederationEstablishmentCredential,
+        guardian_credentials: Vec<VerifiableCredential>,
+        quorum_proof: QuorumProof,
+    ) -> Self {
+        Self {
+            federation_metadata_cid,
+            federation_establishment_credential,
+            guardian_credentials,
+            quorum_proof,
+            issued_at: Utc::now(),
+        }
+    }
+    
+    /// Convert the trust bundle to an anchor payload for DAG integration
+    pub fn to_anchor_payload(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "FederationGenesisTrustBundle",
+            "version": "1.0",
+            "federation_metadata_cid": self.federation_metadata_cid,
+            "federation_did": self.federation_establishment_credential.metadata.federation_did,
+            "federation_name": self.federation_establishment_credential.metadata.name,
+            "issued_at": self.issued_at,
+            "guardian_count": self.guardian_credentials.len(),
+            "quorum_type": self.federation_establishment_credential.metadata.guardian_quorum.quorum_type,
+        })
+    }
 }
 
 /// Functions for federation bootstrap
@@ -235,6 +287,173 @@ pub mod bootstrap {
     }
 }
 
+/// Functions for creating and verifying trust bundles
+pub mod trustbundle {
+    use super::*;
+    use cid::multihash::{Multihash, MultihashDigest};
+    
+    /// Calculate CID from federation metadata
+    pub fn calculate_metadata_cid(metadata: &FederationMetadata) -> FederationResult<String> {
+        let canonical_json = serde_json::to_vec(metadata)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize metadata: {}", e)))?;
+        
+        // Hash the metadata with SHA-256
+        let metadata_hash = Sha256::digest(&canonical_json);
+        
+        // Create a multihash
+        let mh = Multihash::wrap(0x12, &metadata_hash)
+            .map_err(|_| FederationError::CidError("Failed to create multihash".to_string()))?;
+        
+        // Create a CID v1 with dag-json codec (0x0129)
+        let cid = Cid::new_v1(0x0129, mh);
+        
+        Ok(cid.to_string())
+    }
+    
+    /// Create a genesis trust bundle
+    pub async fn create_trust_bundle(
+        metadata: &FederationMetadata,
+        establishment_credential: FederationEstablishmentCredential,
+        guardian_credentials: Vec<VerifiableCredential>,
+        guardians: &[Guardian],
+    ) -> FederationResult<GenesisTrustBundle> {
+        // Calculate federation metadata CID
+        let metadata_cid = calculate_metadata_cid(metadata)?;
+        
+        // Serialize the entire bundle for signing
+        let bundle_data = serde_json::json!({
+            "metadata_cid": metadata_cid,
+            "establishment_credential": establishment_credential,
+            "guardian_credentials": guardian_credentials,
+            "timestamp": Utc::now().to_rfc3339(),
+        });
+        
+        let bundle_bytes = serde_json::to_vec(&bundle_data)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize bundle data: {}", e)))?;
+        
+        // Create quorum proof for the bundle
+        let quorum_proof = decisions::create_quorum_proof(
+            &bundle_bytes,
+            guardians,
+            &metadata.guardian_quorum,
+        ).await?;
+        
+        // Create the genesis trust bundle
+        let trust_bundle = GenesisTrustBundle::new(
+            metadata_cid,
+            establishment_credential,
+            guardian_credentials,
+            quorum_proof,
+        );
+        
+        Ok(trust_bundle)
+    }
+    
+    /// Verify a genesis trust bundle
+    pub async fn verify_trust_bundle(
+        bundle: &GenesisTrustBundle,
+        authorized_guardian_dids: &[String], 
+    ) -> FederationResult<bool> {
+        // 1. Verify the quorum proof
+        let bundle_data = serde_json::json!({
+            "metadata_cid": bundle.federation_metadata_cid,
+            "establishment_credential": bundle.federation_establishment_credential,
+            "guardian_credentials": bundle.guardian_credentials,
+            "timestamp": bundle.issued_at.to_rfc3339(),
+        });
+        
+        let bundle_bytes = serde_json::to_vec(&bundle_data)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize bundle: {}", e)))?;
+        
+        // Manually verify each signature in the quorum proof
+        for (signer_did, signature) in &bundle.quorum_proof.votes {
+            // Verify the signer is authorized
+            if !authorized_guardian_dids.contains(&signer_did.0) {
+                return Err(FederationError::VerificationError(
+                    format!("Unauthorized guardian signature in quorum proof: {}", signer_did.0)
+                ));
+            }
+            
+            // Verify the signature
+            let sig_valid = icn_identity::verify_signature(&bundle_bytes, signature, signer_did)
+                .map_err(|e| FederationError::VerificationError(format!("Signature verification error: {}", e)))?;
+                
+            if !sig_valid {
+                return Err(FederationError::VerificationError(
+                    format!("Invalid signature in quorum proof from guardian: {}", signer_did.0)
+                ));
+            }
+        }
+        
+        // 2. Recalculate and verify the metadata CID
+        let recalculated_cid = calculate_metadata_cid(&bundle.federation_establishment_credential.metadata)?;
+        
+        if recalculated_cid != bundle.federation_metadata_cid {
+            return Err(FederationError::VerificationError(
+                format!("Metadata CID mismatch: {} vs {}", 
+                    recalculated_cid, bundle.federation_metadata_cid)
+            ));
+        }
+        
+        // 3. Verify the establishment credential signatures
+        for (guardian_did, signature_b64) in &bundle.federation_establishment_credential.guardian_signatures {
+            // Check that the guardian is authorized
+            if !authorized_guardian_dids.contains(&guardian_did.0) {
+                return Err(FederationError::VerificationError(
+                    format!("Unauthorized guardian signature: {}", guardian_did.0)
+                ));
+            }
+            
+            // Verify the guardian signature on the metadata
+            let metadata_bytes = serde_json::to_vec(&bundle.federation_establishment_credential.metadata)
+                .map_err(|e| FederationError::SerializationError(format!("Failed to serialize metadata: {}", e)))?;
+            
+            // Decode the signature
+            let signature_bytes = URL_SAFE_NO_PAD.decode(signature_b64)
+                .map_err(|e| FederationError::SerializationError(format!("Failed to decode signature: {}", e)))?;
+            
+            let signature = Signature(signature_bytes);
+            
+            // Verify the signature (this will use the identity crate's verify_signature function)
+            let sig_valid = icn_identity::verify_signature(&metadata_bytes, &signature, guardian_did)
+                .map_err(|e| FederationError::VerificationError(format!("Signature verification error: {}", e)))?;
+                
+            if !sig_valid {
+                return Err(FederationError::VerificationError(
+                    format!("Invalid signature from guardian: {}", guardian_did.0)
+                ));
+            }
+        }
+        
+        // 4. Verify all guardians have credentials
+        let guardian_dids_in_metadata: Vec<String> = bundle.federation_establishment_credential
+            .metadata.guardian_quorum.guardians.clone();
+        
+        let guardian_dids_with_credentials: Vec<String> = bundle.guardian_credentials.iter()
+            .filter_map(|cred| {
+                if let serde_json::Value::Object(subject) = &cred.credentialSubject {
+                    if let Some(serde_json::Value::String(id)) = subject.get("id") {
+                        return Some(id.clone());
+                    }
+                }
+                None
+            })
+            .collect();
+        
+        // All guardians listed in metadata should have credentials
+        for did in &guardian_dids_in_metadata {
+            if !guardian_dids_with_credentials.contains(did) {
+                return Err(FederationError::VerificationError(
+                    format!("Guardian {} has no credential in bundle", did)
+                ));
+            }
+        }
+        
+        // All verification checks passed
+        Ok(true)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380,5 +599,95 @@ mod tests {
         
         // The hash should be different
         assert_ne!(hash1, hash4, "Metadata hashes should be different when member order changes");
+    }
+    
+    #[tokio::test]
+    async fn test_genesis_trust_bundle_creation_and_verification() {
+        // Create guardians with a majority quorum
+        let (guardians, quorum_config) = initialization::initialize_guardian_set(3, QuorumType::Majority).await.unwrap();
+        
+        // Create guardian credentials
+        let federation_did = "did:key:z6MkFederation123".to_string();
+        let mut guardians_with_credentials = guardians.clone();
+        let guardian_credentials = initialization::create_guardian_credentials(
+            &mut guardians_with_credentials,
+            &federation_did,
+        ).await.unwrap();
+        
+        let guardian_credentials_vec: Vec<VerifiableCredential> = guardian_credentials.iter()
+            .map(|gc| gc.credential.clone())
+            .collect();
+        
+        // Initialize federation
+        let name = "Test Federation".to_string();
+        let description = Some("A federation for testing trust bundles".to_string());
+        let initial_policies = Vec::new(); 
+        let initial_members = Vec::new();
+        
+        let result = bootstrap::initialize_federation(
+            name.clone(),
+            description.clone(),
+            &guardians_with_credentials,
+            quorum_config.clone(),
+            initial_policies,
+            initial_members,
+        ).await;
+        
+        assert!(result.is_ok(), "Federation creation failed: {:?}", result.err());
+        
+        let (metadata, establishment_credential, _) = result.unwrap();
+        
+        // Create genesis trust bundle
+        let trust_bundle_result = trustbundle::create_trust_bundle(
+            &metadata,
+            establishment_credential,
+            guardian_credentials_vec,
+            &guardians_with_credentials,
+        ).await;
+        
+        assert!(trust_bundle_result.is_ok(), "Trust bundle creation failed: {:?}", trust_bundle_result.err());
+        
+        let trust_bundle = trust_bundle_result.unwrap();
+        
+        // Verify the CID matches what we expect
+        let calculated_cid = trustbundle::calculate_metadata_cid(&metadata).unwrap();
+        assert_eq!(calculated_cid, trust_bundle.federation_metadata_cid, "Metadata CID mismatch");
+        
+        // Verify trust bundle
+        let authorized_guardian_dids: Vec<String> = guardians_with_credentials.iter()
+            .map(|g| g.did.0.clone())
+            .collect();
+            
+        let verify_result = trustbundle::verify_trust_bundle(&trust_bundle, &authorized_guardian_dids).await;
+        assert!(verify_result.is_ok(), "Trust bundle verification failed: {:?}", verify_result.err());
+        assert!(verify_result.unwrap(), "Trust bundle should be valid");
+        
+        // Test failure case: invalid quorum proof (modify the quorum proof)
+        let mut invalid_bundle = trust_bundle.clone();
+        // Create a completely invalid signature with random bytes
+        let invalid_signature = Signature(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+        if !invalid_bundle.quorum_proof.votes.is_empty() {
+            println!("Original signature: {:?}", invalid_bundle.quorum_proof.votes[0].1.0);
+            invalid_bundle.quorum_proof.votes[0].1 = invalid_signature.clone();
+            println!("Replaced with invalid signature: {:?}", invalid_signature.0);
+            
+            let verify_invalid_result = trustbundle::verify_trust_bundle(&invalid_bundle, &authorized_guardian_dids).await;
+            println!("Verification result: {:?}", verify_invalid_result);
+            assert!(verify_invalid_result.is_err(), "Trust bundle with invalid quorum proof should fail verification");
+        }
+        
+        // Test failure case: mismatched metadata CID
+        let mut mismatched_cid_bundle = trust_bundle.clone();
+        mismatched_cid_bundle.federation_metadata_cid = "bafybeiewqfa23eceefwqgwegwwegwegwegwegweg".to_string(); // Invalid CID
+        
+        let verify_mismatched_result = trustbundle::verify_trust_bundle(&mismatched_cid_bundle, &authorized_guardian_dids).await;
+        assert!(verify_mismatched_result.is_err(), "Trust bundle with mismatched CID should not verify");
+        
+        // Verify the bundle can be converted to an anchor payload
+        let anchor_payload = trust_bundle.to_anchor_payload();
+        assert!(anchor_payload.is_object(), "Anchor payload should be a JSON object");
+        assert!(anchor_payload.get("federation_did").is_some(), "Anchor payload should include federation DID");
+        assert!(anchor_payload.get("federation_metadata_cid").is_some(), "Anchor payload should include metadata CID");
     }
 } 

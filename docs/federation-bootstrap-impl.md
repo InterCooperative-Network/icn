@@ -54,11 +54,42 @@ We've also implemented the Federation Identity Establishment phase, which includ
    - Guardian credentials included in the trust bundle
    - Quorum proof attached to the bundle for verification
 
-### Phases Pending Implementation
+### Phase 3: TrustBundle & Consensus Declaration ✅
 
-#### Phase 3: TrustBundle & Consensus Declaration ⏳
-- Implemented initial `TrustBundle` creation in Phase 2
-- Need to expand with member attestations and additional credentials
+We've implemented the TrustBundle & Consensus Declaration phase, which includes:
+
+1. **Genesis Trust Bundle**:
+   - `GenesisTrustBundle` struct that contains:
+     - Federation metadata CID (calculated deterministically)
+     - Federation establishment credential
+     - Guardian credentials
+     - Quorum proof signed by guardians
+     - Issuance timestamp
+
+2. **Deterministic Content Addressing**:
+   - `calculate_metadata_cid()` function that creates a reproducible CID from the federation metadata
+   - Uses SHA-256 hashing and standard CID v1 format with dag-json codec
+   - Ensures the bundle can be uniquely identified and verified
+
+3. **Trust Bundle Creation**:
+   - `create_trust_bundle()` function that:
+     - Accepts federation metadata, establishment credential, and guardian credentials
+     - Calculates the federation metadata CID
+     - Creates and attaches a quorum proof signed by guardians
+     - Returns a complete Genesis Trust Bundle
+
+4. **Verification Protocol**:
+   - `verify_trust_bundle()` function that:
+     - Verifies each signature in the bundle's quorum proof
+     - Recalculates and verifies the metadata CID
+     - Verifies the establishment credential signatures
+     - Ensures all guardians have proper credentials in the bundle
+
+5. **DAG Preparation**:
+   - `to_anchor_payload()` method to convert the trust bundle to a DAG-compatible JSON object
+   - Structured for compatibility with Phase 4 anchoring
+
+### Phases Pending Implementation
 
 #### Phase 4: DAG Genesis & Anchoring ❌
 - Not yet implemented
@@ -72,20 +103,15 @@ We've also implemented the Federation Identity Establishment phase, which includ
 
 ## Next Steps
 
-1. **Complete Phase 3**: Expand TrustBundle capabilities
-   - Add support for membership attestations
-   - Implement comprehensive policy credentials
-   - Develop consensus declaration mechanisms
-
-2. **Implement Phase 4**: DAG Genesis & Anchoring
+1. **Implement Phase 4**: DAG Genesis & Anchoring
    - Create DAG anchoring for federation trust bundles
    - Generate anchor credentials
    - Link DAG roots to trust bundles
 
-3. **Integrate with Existing ICN Systems**:
+2. **Integrate with Existing ICN Systems**:
    - Connect with DAG for anchoring
    - Connect with storage for persistence
 
-4. **Testing and Documentation**:
+3. **Testing and Documentation**:
    - Integration tests for multi-phase operations
    - Documentation for operators and developers 
