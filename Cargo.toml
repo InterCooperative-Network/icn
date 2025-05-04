@@ -1,12 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "agoranet",
     "runtime",
     "wallet",
     "runtime/crates/*",
-    "wallet/crates/*",
-    "crates/*"
+    "wallet/crates/*"
 ]
 
 # Temporarily excluded components with issues

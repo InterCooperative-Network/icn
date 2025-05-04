@@ -16,6 +16,6 @@ futures = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4.5", features = ["derive"] }
 rand = "0.8"
-icn-wallet-sync = { path = "../crates/wallet-sync" }
+icn-wallet-sync = { path = "../runtime/crates/wallet-sync" }
 wallet-storage = { path = "./crates/storage" }
 wallet-identity = { path = "./crates/identity" }

@@ -1,9 +1,0 @@
-[package]
-name = "icn-core-vm-stub"
-version = "0.1.0"
-description = "Stub package for icn-core-vm - use the one in runtime/crates/core-vm instead"
-edition = "2021"
-
-[dependencies]
-icn-wallet-sync = { path = "../wallet-sync" }
-# Add other required dependencies 
