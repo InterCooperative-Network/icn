@@ -17,6 +17,9 @@ tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros", "fs
 async-trait = { workspace = true }
 futures = { workspace = true }
 
+# Add dependency to common crate
+icn-common = { path = "../common" }
+
 # Add dependency to libipld
 libipld = { workspace = true }
 

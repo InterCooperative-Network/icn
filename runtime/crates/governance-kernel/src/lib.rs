@@ -116,6 +116,9 @@ pub struct Proposal {
     
     /// Compiled WASM for this proposal (if applicable)
     pub wasm_bytes: Option<Vec<u8>>,
+    
+    /// Link to AgoraNet thread ID for deliberation
+    pub thread_id: Option<String>,
 }
 
 impl Proposal {
@@ -579,6 +582,7 @@ impl<S: StorageBackend + Send + Sync + 'static> GovernanceKernel<S> {
                 votes_abstain: 0,
                 ccl_code: None,
                 wasm_bytes: None,
+                thread_id: None,
             };
             
             Ok(proposal)
@@ -1751,6 +1755,7 @@ mod tests {
             votes_abstain: 0,
             ccl_code: None,
             wasm_bytes: None,
+            thread_id: None,
         };
         
         assert_eq!(proposal.calculate_id(), "proposal:test-proposal");

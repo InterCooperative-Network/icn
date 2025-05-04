@@ -1,0 +1,20 @@
+[package]
+name = "icn-common"
+version = "0.1.0"
+edition = "2021"
+description = "Common types and traits for the ICN Runtime components"
+
+[dependencies]
+# Core dependencies from workspace
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true, features = ["serde-codec"] }
+multihash = { workspace = true }
+
+# Other dependencies
+hex = "0.4"
+sha2 = "0.10" 

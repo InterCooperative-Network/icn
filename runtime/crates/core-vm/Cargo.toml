@@ -5,6 +5,7 @@ edition = "2021"
 description = "Secure WASM Virtual Machine Runtime for the ICN"
 
 [dependencies]
+icn-common = { path = "../common" }
 icn-identity = { path = "../identity" }
 icn-storage = { path = "../storage" }
 icn-dag = { path = "../dag" }

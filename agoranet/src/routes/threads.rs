@@ -30,6 +30,12 @@ pub struct CreateThreadRequest {
     pub proposal_cid: Option<String>,
 }
 
+// Link proposal request model
+#[derive(Debug, Deserialize)]
+pub struct LinkProposalRequest {
+    pub proposal_cid: String,
+}
+
 // Response models
 #[derive(Debug, Serialize)]
 pub struct ThreadResponse {
@@ -47,6 +53,7 @@ pub fn routes() -> Router<Arc<PgPool>> {
         .route("/", get(list_threads))
         .route("/", post(create_thread))
         .route("/:id", get(get_thread))
+        .route("/:id/link_proposal", post(link_proposal))
 }
 
 // Route handlers
@@ -146,4 +153,45 @@ async fn get_thread(
         updated_at: thread.updated_at,
         creator_did: thread.creator_did,
     }))
+}
+
+// Link a proposal to a thread
+async fn link_proposal(
+    Path(thread_id): Path<String>,
+    State(pool): State<Arc<PgPool>>,
+    Json(request): Json<LinkProposalRequest>,
+    Extension(auth_user): Extension<AuthUser>,
+) -> Result<StatusCode, StatusCode> {
+    // Check if the thread exists
+    let thread_result = sqlx::query_as!(
+        Thread,
+        "SELECT id, title, proposal_cid, created_at, updated_at, creator_did, signature_cid FROM threads WHERE id = $1",
+        thread_id
+    )
+    .fetch_optional(pool.as_ref())
+    .await
+    .map_err(|e| {
+        eprintln!("Database error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if thread_result.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Update the thread with the proposal CID
+    sqlx::query!(
+        "UPDATE threads SET proposal_cid = $1, updated_at = $2 WHERE id = $3",
+        request.proposal_cid,
+        Utc::now(),
+        thread_id
+    )
+    .execute(pool.as_ref())
+    .await
+    .map_err(|e| {
+        eprintln!("Database error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(StatusCode::OK)
 } 

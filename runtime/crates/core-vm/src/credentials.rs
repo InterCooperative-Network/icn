@@ -44,6 +44,8 @@ pub struct ExecutionReceiptSubject {
     pub federation_scope: String,
     /// Timestamp of the execution
     pub execution_timestamp: DateTime<Utc>,
+    /// Optional AgoraNet thread ID associated with this proposal
+    pub thread_id: Option<String>,
 }
 
 /// A W3C Verifiable Credential
@@ -97,6 +99,7 @@ pub async fn issue_execution_receipt(
     resource_usage: HashMap<ResourceType, u64>,
     dag_anchor_cid: &str,
     federation_scope: &str,
+    thread_id: Option<String>,
 ) -> Result<String, InternalHostError> {
     // Create a map of resource types to usage amounts with string keys
     let resource_map: HashMap<String, u64> = resource_usage.iter()
@@ -112,6 +115,7 @@ pub async fn issue_execution_receipt(
         dag_anchor: dag_anchor_cid.to_string(),
         federation_scope: federation_scope.to_string(),
         execution_timestamp: Utc::now(),
+        thread_id,
     };
     
     // Create the credential

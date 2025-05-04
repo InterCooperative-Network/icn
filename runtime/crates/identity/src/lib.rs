@@ -31,19 +31,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex}; // Using Mutex for simple in-memory storage for now
 use did_method_key::DIDKey;
 use hex;
-
-/// The DagStore trait defines methods for interacting with a DAG storage system.
-#[async_trait]
-pub trait DagStore: Send + Sync {
-    /// Checks if a CID exists in the DAG store.
-    async fn contains(&self, cid: &Cid) -> Result<bool, String>;
-    
-    /// Retrieves data associated with a CID from the DAG store.
-    async fn get(&self, cid: &Cid) -> Result<Option<Vec<u8>>, String>;
-    
-    /// Stores data in the DAG store and returns the resulting CID.
-    async fn put(&self, data: &[u8]) -> Result<Cid, String>;
-}
+use icn_common::DagStore;
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

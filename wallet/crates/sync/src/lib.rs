@@ -119,6 +119,45 @@ impl SyncClient {
         
         Ok(node)
     }
+    
+    /// Extract thread_id from Execution Receipt credential
+    pub fn extract_thread_id_from_credential(&self, credential_json: &Value) -> Option<String> {
+        credential_json
+            .get("credentialSubject")
+            .and_then(|subject| subject.get("thread_id"))
+            .and_then(|thread_id| thread_id.as_str())
+            .map(|s| s.to_string())
+    }
+    
+    /// Sync updated proposals with AgoraNet thread links
+    pub async fn sync_proposal_with_thread(&self, proposal_id: &str) -> Result<Option<String>, SyncError> {
+        // First get the proposal node
+        let proposal_node = self.get_node(proposal_id).await?;
+        
+        // Check if the proposal has a credential
+        if let Some(credential_refs) = proposal_node.metadata.get("credentials") {
+            if let Some(credential_list) = credential_refs.as_array() {
+                // Iterate through credentials to find execution receipts
+                for cred_ref in credential_list {
+                    if let Some(cred_id) = cred_ref.as_str() {
+                        // Get the credential node
+                        let credential_node = self.get_node(cred_id).await?;
+                        
+                        // Parse the credential JSON
+                        if let Ok(credential_json) = serde_json::from_slice::<Value>(&credential_node.data) {
+                            // Check if it's an execution receipt with thread_id
+                            if let Some(thread_id) = self.extract_thread_id_from_credential(&credential_json) {
+                                return Ok(Some(thread_id));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // No thread_id found
+        Ok(None)
+    }
 }
 
 /// Synchronization service for handling wallet data synchronization

@@ -3161,6 +3161,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.10.1",
+ "hex",
+ "multihash 0.16.3",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "icn-core-vm"
 version = "0.1.0"
 dependencies = [
@@ -3169,6 +3185,7 @@ dependencies = [
  "chrono",
  "cid 0.10.1",
  "futures",
+ "icn-common",
  "icn-dag",
  "icn-economics",
  "icn-identity",
@@ -3234,6 +3251,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.10.1",
+ "icn-common",
  "icn-identity",
  "icn-storage",
  "libipld",
@@ -3361,6 +3379,7 @@ dependencies = [
  "cid 0.10.1",
  "did-method-key",
  "hex",
+ "icn-common",
  "multihash 0.16.3",
  "rand 0.8.5",
  "serde",
@@ -3396,6 +3415,7 @@ dependencies = [
  "chrono",
  "cid 0.10.1",
  "futures",
+ "icn-common",
  "icn-identity",
  "itertools 0.12.1",
  "libipld",
@@ -8983,6 +9003,16 @@ version = "0.1.0"
 [[package]]
 name = "wallet-api"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "wallet-types",
+]
 
 [[package]]
 name = "wallet-ffi"

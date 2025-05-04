@@ -6,6 +6,7 @@ description = "DAG objects, Merkle anchoring, and Lineage for the ICN Runtime"
 
 [dependencies]
 icn-identity = { path = "../identity" }
+icn-common = { path = "../common" }
 merkle-cbt = { workspace = true }
 multihash = { workspace = true }
 cid = { workspace = true }

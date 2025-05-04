@@ -884,6 +884,7 @@ pub async fn execute_wasm(
                     resource_usage.clone(),
                     &host_env.get_last_anchor_cid().unwrap_or_default(),
                     scope,
+                    None,
                 ).await {
                     tracing::warn!(error = %e, "Failed to issue execution receipt");
                 }
@@ -907,6 +908,7 @@ pub async fn execute_wasm(
                     resource_usage.clone(),
                     &host_env.get_last_anchor_cid().unwrap_or_default(),
                     scope,
+                    None,
                 ).await {
                     tracing::warn!(error = %e, "Failed to issue execution receipt for error");
                 }
