@@ -1,0 +1,54 @@
+name: Workspace Integrity Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  check-workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      - name: Check for duplicate crate names
+        run: |
+          # Extract all package names
+          PACKAGES=$(find . -name Cargo.toml -type f -exec grep -l "^name\s*=" {} \; | xargs grep "^name\s*=" | sed 's/.*name\s*=\s*"\([^"]*\)".*/\1/' | sort)
+          
+          # Check for duplicates
+          DUPLICATES=$(echo "$PACKAGES" | sort | uniq -d)
+          
+          if [ -n "$DUPLICATES" ]; then
+            echo "Error: Found duplicate crate names:"
+            echo "$DUPLICATES"
+            exit 1
+          else
+            echo "No duplicate crate names found."
+          fi
+      
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --workspace --all-targets
+      
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      
+      - name: Run cargo-deny
+        run: cargo deny check licenses sources
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      
+      - name: Run cargo-audit
+        run: cargo audit 

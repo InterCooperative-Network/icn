@@ -2,30 +2,11 @@
 resolver = "2"
 members = [
     "runtime",
-    "runtime/crates/common",
-    "runtime/crates/core-vm",
-    "runtime/crates/dag",
-    "runtime/crates/economics",
-    "runtime/crates/execution-tools",
-    "runtime/crates/federation",
-    "runtime/crates/governance-kernel",
-    "runtime/crates/identity", # icn-identity
-    "runtime/crates/models",
-    "runtime/crates/storage", # icn-storage
-    "runtime/crates/ccl-compiler",
+    "runtime/crates/*",
     "wallet",
-    "wallet/crates/actions",
-    "wallet/crates/api",
-    "wallet/crates/identity", # wallet-identity
-    "wallet/crates/storage", # wallet-storage
-    "wallet/crates/wallet-agent",
-    "wallet/crates/wallet-core",
-    "wallet/crates/wallet-ffi", # icn-wallet-ffi
-    "wallet/crates/wallet-types",
-    # Note: wallet/crates/sync excluded below
-    # Note: wallet/crates/ffi seems invalid/empty
+    "wallet/crates/*",
     "agoranet",
-    "agoranet/crates/agoranet-api",
+    "agoranet/crates/*",
     "tools/health_check",
     "tools/icn-verifier",
 ]
@@ -35,7 +16,7 @@ exclude = [
     "frontend/*",
     "wallet/crates/sync",
     "runtime/crates/agoranet-integration",
-    # Exclude potential leftover/empty directories
+    # Exclude duplicate or empty directories
     "runtime/crates/icn-verifier",
     "runtime/crates/wallet-agent",
     "runtime/crates/wallet-core",

@@ -1,5 +1,3 @@
-
-=======
 # Backup files
 *.bak
 build/
@@ -68,13 +66,7 @@ yarn.lock
 /wallet/target/
 /wallet-agent/target/
 /wallet/target/
-/wallet-agent/target/
-/wallet/target/
-/wallet-agent/target/
-/wallet/target/
 /agoranet/target/
-/wallet-agent/target/
-/wallet/target/
 /wallet-agent/target/
 /wallet/target/
 /wallet-agent/target/
@@ -87,3 +79,10 @@ yarn.lock
 /runtime/health_check/target/
 /wallet-agent/health_check/target/
 .sqlx/
+
+# Ignore sensitive key files
+wallet/.keys/*.json
+wallet/.keys/*.meta.json
+
+# Path to store secure credentials outside of repository
+secrets/

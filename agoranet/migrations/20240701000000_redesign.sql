@@ -1,9 +1,10 @@
--- Drop existing tables if they exist
-DROP TABLE IF EXISTS reactions CASCADE;
-DROP TABLE IF EXISTS credential_links CASCADE;
-DROP TABLE IF EXISTS verified_credentials CASCADE;
-DROP TABLE IF EXISTS messages CASCADE;
-DROP TABLE IF EXISTS threads CASCADE;
+-- Safe migration that doesn't drop existing data
+-- Create backup tables if needed (uncomment for production)
+-- SELECT 'CREATE TABLE reactions_backup AS SELECT * FROM reactions' WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'reactions');
+-- SELECT 'CREATE TABLE credential_links_backup AS SELECT * FROM credential_links' WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'credential_links');
+-- SELECT 'CREATE TABLE verified_credentials_backup AS SELECT * FROM verified_credentials' WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'verified_credentials');
+-- SELECT 'CREATE TABLE messages_backup AS SELECT * FROM messages' WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages');
+-- SELECT 'CREATE TABLE threads_backup AS SELECT * FROM threads' WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'threads');
 
 -- Create threads table with new fields
 CREATE TABLE IF NOT EXISTS threads (
