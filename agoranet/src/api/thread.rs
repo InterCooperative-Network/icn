@@ -1,7 +1,13 @@
-use actix_web::{post, get, web, HttpResponse, Responder};
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use std::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use crate::models::thread::{Thread, ThreadStatus};
 use crate::database::Database;
 
@@ -24,44 +30,6 @@ pub struct CreateThreadRequest {
     
     /// Optional tags for the thread
     pub tags: Option<Vec<String>>,
-}
-
-/// Create a new thread
-#[post("/threads")]
-pub async fn create_thread(
-    db: web::Data<Mutex<Database>>,
-    req: web::Json<CreateThreadRequest>,
-) -> impl Responder {
-    let mut db = db.lock().unwrap();
-    
-    // Generate a unique ID for the thread
-    let thread_id = Uuid::new_v4().to_string();
-    
-    // Create the new thread
-    let mut thread = Thread::new(
-        thread_id,
-        req.title.clone(),
-        req.content.clone(),
-        req.author_did.clone(),
-        req.proposal_id.clone(),
-    );
-    
-    // Add optional fields
-    if let Some(federation_id) = &req.federation_id {
-        thread.federation_id = Some(federation_id.clone());
-    }
-    
-    if let Some(tags) = &req.tags {
-        for tag in tags {
-            thread.add_tag(tag.clone());
-        }
-    }
-    
-    // Store the thread
-    db.threads.push(thread.clone());
-    
-    // Return the created thread
-    HttpResponse::Created().json(thread)
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,13 +65,51 @@ pub struct GetThreadsQuery {
     pub limit: Option<usize>,
 }
 
+// Route handlers
+
+/// Create a new thread
+async fn create_thread(
+    State(db): State<Arc<Mutex<Database>>>,
+    Json(req): Json<CreateThreadRequest>,
+) -> Result<Json<Thread>, StatusCode> {
+    let mut db = db.lock().await;
+    
+    // Generate a unique ID for the thread
+    let thread_id = Uuid::new_v4().to_string();
+    
+    // Create the new thread
+    let mut thread = Thread::new(
+        thread_id,
+        req.title.clone(),
+        req.content.clone(),
+        req.author_did.clone(),
+        req.proposal_id.clone(),
+    );
+    
+    // Add optional fields
+    if let Some(federation_id) = &req.federation_id {
+        thread.federation_id = Some(federation_id.clone());
+    }
+    
+    if let Some(tags) = &req.tags {
+        for tag in tags {
+            thread.add_tag(tag.clone());
+        }
+    }
+    
+    // Store the thread
+    db.threads.push(thread.clone());
+    
+    // Return the created thread
+    Ok(Json(thread))
+}
+
 /// Get threads with optional filtering
-#[get("/threads")]
-pub async fn get_threads(
-    db: web::Data<Mutex<Database>>,
-    query: web::Query<GetThreadsQuery>,
-) -> impl Responder {
-    let db = db.lock().unwrap();
+async fn get_threads(
+    State(db): State<Arc<Mutex<Database>>>,
+    Query(query): Query<GetThreadsQuery>,
+) -> Result<Json<Vec<Thread>>, StatusCode> {
+    let db = db.lock().await;
     
     // Filter threads based on query parameters
     let filtered_threads: Vec<Thread> = db.threads.iter()
@@ -197,30 +203,27 @@ pub async fn get_threads(
         .collect::<Vec<_>>();
     
     // Return threads
-    HttpResponse::Ok().json(paginated_threads)
+    Ok(Json(paginated_threads))
 }
 
 /// Get a specific thread by ID
-#[get("/threads/{thread_id}")]
-pub async fn get_thread(
-    db: web::Data<Mutex<Database>>,
-    path: web::Path<String>,
-) -> impl Responder {
-    let thread_id = path.into_inner();
-    let db = db.lock().unwrap();
+async fn get_thread(
+    State(db): State<Arc<Mutex<Database>>>,
+    Path(thread_id): Path<String>,
+) -> Result<Json<Thread>, StatusCode> {
+    let db = db.lock().await;
     
     // Find the thread
     match db.threads.iter().find(|t| t.id == thread_id) {
-        Some(thread) => HttpResponse::Ok().json(thread),
-        None => HttpResponse::NotFound().json(serde_json::json!({
-            "error": "Thread not found"
-        }))
+        Some(thread) => Ok(Json(thread.clone())),
+        None => Err(StatusCode::NOT_FOUND)
     }
 }
 
-/// Register thread API routes
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(create_thread)
-       .service(get_threads)
-       .service(get_thread);
+// Router configuration
+pub fn routes() -> Router<Arc<Mutex<Database>>> {
+    Router::new()
+        .route("/threads", post(create_thread))
+        .route("/threads", get(get_threads))
+        .route("/threads/:thread_id", get(get_thread))
 } 

@@ -1,7 +1,0 @@
-[package]
-name = "icn-wallet-actions"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-# Add dependencies here if needed 

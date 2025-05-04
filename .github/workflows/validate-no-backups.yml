@@ -1,0 +1,29 @@
+name: Validate No Backup Directories
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  check-for-backups:
+    runs-on: ubuntu-latest
+    name: Ensure No Backup Directories Exist
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check for backup directories
+        run: |
+          echo "::group::Checking for backup directories"
+          BACKUP_DIRS=$(find . -type d -name "*backup*" -not -path "*/\.*" | grep -v "node_modules" || true)
+          
+          if [ -n "$BACKUP_DIRS" ]; then
+            echo "ERROR: Found backup directories that should be removed:"
+            echo "$BACKUP_DIRS"
+            echo "Please remove these directories before committing."
+            exit 1
+          else
+            echo "No backup directories found. Good!"
+          fi
+          echo "::endgroup::" 

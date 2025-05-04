@@ -27,11 +27,6 @@ members = [
 # Temporarily excluded components with issues
 exclude = [
     "frontend/*",
-    "runtime/crates/wallet-agent",
-    "runtime/crates/wallet-core",
-    "runtime/crates/wallet-ffi",
-    "runtime/crates/wallet-sync",
-    "wallet/crates/ffi",              # Old path now renamed to wallet-ffi
 ]
 
 [workspace.dependencies]
