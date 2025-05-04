@@ -15,6 +15,7 @@ pub mod guardian;
 pub mod dag_anchor;
 pub mod receipt;
 pub mod recovery;
+pub mod dag_client;
 
 // Re-export core structs
 pub use genesis::FederationMetadata;
@@ -31,3 +32,7 @@ pub use recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent,
 pub use recovery::recovery::{create_key_rotation_event, create_guardian_succession_event, 
                            create_disaster_recovery_anchor, create_metadata_update_event,
                            verify_recovery_event, anchor_recovery_event};
+
+// Re-export DAG client types and functions
+pub use dag_client::{FederationDagEvent, FederationDagNode, DagClient, InMemoryDagClient, FederationReplayEngine};
+pub use dag_client::validation::{validate_event_chain, validate_event};
