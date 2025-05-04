@@ -1,0 +1,13 @@
+[package]
+name = "icn-wallet-sync"
+version = "0.1.0"
+description = "ICN Wallet Synchronization Module"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tracing = "0.1"
+icn-dag = { path = "../dag" }
+icn-identity = { path = "../identity" }
+icn-storage = { path = "../storage" } 

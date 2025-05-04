@@ -29,22 +29,16 @@ services:
       - ICN_METRICS=true
     networks:
       - icn-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   # Second federation node
   federation-node-1:
     image: icn-runtime:latest
     container_name: icn-federation-node1
     depends_on:
-      federation-node-genesis:
-        condition: service_healthy
+      - federation-node-genesis
     command: >
       sh -c "
+        sleep 10 && 
         icn-runtime daemon --federation --node-id 'did:icn:federation:node1' 
         --join-federation http://federation-node-genesis:9000 
         --trust-bundle /config/trust_bundle.json"
@@ -60,22 +54,16 @@ services:
       - ICN_METRICS=true
     networks:
       - icn-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   # Third federation node
   federation-node-2:
     image: icn-runtime:latest
     container_name: icn-federation-node2
     depends_on:
-      federation-node-genesis:
-        condition: service_healthy
+      - federation-node-genesis
     command: >
       sh -c "
+        sleep 15 && 
         icn-runtime daemon --federation --node-id 'did:icn:federation:node2' 
         --join-federation http://federation-node-genesis:9000 
         --trust-bundle /config/trust_bundle.json"
@@ -91,12 +79,6 @@ services:
       - ICN_METRICS=true
     networks:
       - icn-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   # Prometheus for metrics collection
   prometheus:
@@ -117,8 +99,6 @@ services:
       - icn-network
     depends_on:
       - federation-node-genesis
-      - federation-node-1
-      - federation-node-2
 
   # Grafana for visualization
   grafana:

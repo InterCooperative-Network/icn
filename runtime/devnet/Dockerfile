@@ -1,4 +1,4 @@
-FROM rust:1.71-slim-bullseye as builder
+FROM rust:latest as builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN apt-get update && \
 COPY . .
 
 # Build the ICN Runtime
-RUN cargo build --release -p icn-runtime-cli
+RUN cargo build --release -p icn-covm
 
 # Runtime stage
 FROM debian:bullseye-slim
@@ -32,7 +32,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the built binary
-COPY --from=builder /app/target/release/icn-runtime /usr/local/bin/
+COPY --from=builder /app/target/release/covm /usr/local/bin/icn-runtime
 
 # Create directories
 RUN mkdir -p /data /config
