@@ -15,31 +15,39 @@ pub mod did;
 pub mod error;
 pub mod keypair;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine;
-use chrono::{DateTime, Utc};
-use cid::Cid;
-use serde::{Deserialize, Serialize};
-use serde_json;
-use sha2::{Sha256, Digest};
+// Standard library imports
+use std::collections::HashMap;
 use std::fmt;
-use thiserror::Error;
-use uuid::Uuid;
+use std::str::FromStr;
+
+// External crate imports
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ssi::jwk::JWK;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use bs58; // Needed for DID key decoding
+use chrono::{DateTime, Utc};
+use cid::Cid;
+use did_method_key::DIDKey;
+// Note: ed25519_dalek might not be directly used if relying solely on ssi::jwk for keys
+use hex;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use sha2::{Digest, Sha256};
 use ssi::did::DIDMethod;
 use ssi::did_resolve::{DIDResolver as SsiResolver, ResolutionInputMetadata, ResolutionMetadata, DocumentMetadata};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex}; // Using Mutex for simple in-memory storage for now
-use did_method_key::DIDKey;
-use hex;
+use ssi::jwk::{Params, JWK}; // Import Params enum
+use std::sync::{Arc, Mutex};
+use thiserror::Error;
+use uuid::Uuid;
+
+// Workspace crate imports
 use icn_common::DagStore;
-use ssi::vc::CredentialSchema;
-use ssi::ldp::LinkedDataProofOptions;
+
+// Crate-internal imports (from declared modules)
+use crate::did::{DidDocument, IdentityId, VerificationMethod};
 use crate::error::{IdentityError, IdentityResult};
 use crate::keypair::{KeyPair, KeyType, Signature};
-use crate::did::{IdentityId, DidDocument, VerificationMethod};
 
 /// Represents an identity ID (DID)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -1,7 +1,8 @@
 use axum::{
+    async_trait,
     body::Body,
-    extract::Extension,
-    http::{Request, StatusCode, header::AUTHORIZATION},
+    extract::{FromRequestParts, Extension, State},
+    http::{Request, StatusCode, header::AUTHORIZATION, request::Parts},
     middleware::Next,
     response::Response,
 };
@@ -129,6 +130,25 @@ pub enum Permission {
 // Define DidAuth type
 #[derive(Debug, Clone)]
 pub struct DidAuth(pub String);
+
+// Implement FromRequestParts for DidAuth
+#[async_trait]
+impl<S> FromRequestParts<S> for DidAuth
+where
+    S: Send + Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // Extract AuthUser from request extensions (inserted by middleware)
+        let Extension(AuthUser(user_claims)) = parts
+            .extensions
+            .get::<Extension<AuthUser>>()
+            .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?; // Should be inserted by middleware
+
+        Ok(DidAuth(user_claims.did.clone()))
+    }
+}
 
 // Check if a user has a specific permission
 pub async fn check_permission(

@@ -2,13 +2,14 @@ use sqlx::PgPool;
 use crate::types::message::Message;
 use super::{Result, StorageError};
 use uuid::Uuid;
+use std::sync::Arc;
 
 pub struct MessageRepository {
-    pool: PgPool,
+    pool: Arc<PgPool>,
 }
 
 impl MessageRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
     }
     

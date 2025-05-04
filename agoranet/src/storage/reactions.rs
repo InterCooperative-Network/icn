@@ -2,13 +2,14 @@ use sqlx::PgPool;
 use crate::types::reaction::Reaction;
 use super::{Result, StorageError};
 use uuid::Uuid;
+use std::sync::Arc;
 
 pub struct ReactionRepository {
-    pool: PgPool,
+    pool: Arc<PgPool>,
 }
 
 impl ReactionRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
     }
     

@@ -3,13 +3,14 @@ use crate::types::credential::CredentialLink;
 use crate::routes::credentials::CredentialLinkRequest;
 use super::{Result, StorageError};
 use uuid::Uuid;
+use std::sync::Arc;
 
 pub struct CredentialLinkRepository {
-    pool: PgPool,
+    pool: Arc<PgPool>,
 }
 
 impl CredentialLinkRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
     }
 
