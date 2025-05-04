@@ -385,7 +385,7 @@ fn host_check_resource_authorization_wrapper(
     debug!(resource_type, amount, "host_check_resource_authorization called");
     
     if amount < 0 {
-        return Err(Trap::new("Amount cannot be negative"));
+        return Err(Trap::throw("Amount cannot be negative"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -394,7 +394,7 @@ fn host_check_resource_authorization_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Get host environment
@@ -402,7 +402,7 @@ fn host_check_resource_authorization_wrapper(
     
     // Check if the caller has authorization for this resource usage
     let authorized = env.check_resource_authorization(res_type, amount as u64)
-        .map_err(|e| Trap::new(format!("Resource authorization check failed: {}", e)))?;
+        .map_err(|e| Trap::throw(format!("Resource authorization check failed: {}", e)))?;
     
     // Return 1 for authorized, 0 for not authorized
     Ok(if authorized { 1 } else { 0 })
@@ -417,7 +417,7 @@ fn host_record_resource_usage_wrapper(
     debug!(resource_type, amount, "host_record_resource_usage called");
     
     if amount < 0 {
-        return Err(Trap::new("Amount cannot be negative"));
+        return Err(Trap::throw("Amount cannot be negative"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -426,7 +426,7 @@ fn host_record_resource_usage_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Get host environment and record usage
@@ -434,13 +434,13 @@ fn host_record_resource_usage_wrapper(
     
     // Record the usage
     env.record_resource_usage(res_type, amount as u64)
-        .map_err(|e| Trap::new(format!("Resource usage recording failed: {}", e)))?;
+        .map_err(|e| Trap::throw(format!("Resource usage recording failed: {}", e)))?;
     
     // Also anchor the usage to DAG for governance tracking
     // Get current timestamp
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+        .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
         .as_secs();
     
     // Anchor the usage record to DAG (asynchronously, don't block)
@@ -485,11 +485,11 @@ fn host_anchor_to_dag_wrapper(
     
     // Get the key from memory
     let key = read_string_from_memory(&mut caller, key_ptr, key_len)
-        .map_err(|e| Trap::new(format!("Failed to read key from memory: {}", e)))?;
+        .map_err(|e| Trap::throw(format!("Failed to read key from memory: {}", e)))?;
     
     // Get the value from memory
     let value = read_bytes_from_memory(&mut caller, value_ptr, value_len)
-        .map_err(|e| Trap::new(format!("Failed to read value from memory: {}", e)))?;
+        .map_err(|e| Trap::throw(format!("Failed to read value from memory: {}", e)))?;
     
     // Get host environment
     let host_env = caller.data();
@@ -500,7 +500,7 @@ fn host_anchor_to_dag_wrapper(
     // Anchor the data to the DAG
     let cid = handle.block_on(async {
         host_env.anchor_to_dag(&key, value).await
-            .map_err(|e| Trap::new(format!("Failed to anchor data to DAG: {}", e)))
+            .map_err(|e| Trap::throw(format!("Failed to anchor data to DAG: {}", e)))
     })?;
     
     // Store the last anchor CID in the host environment
@@ -508,7 +508,7 @@ fn host_anchor_to_dag_wrapper(
     
     // Write the CID to memory
     let cid_offset = write_string_to_memory(&mut caller, &cid)
-        .map_err(|e| Trap::new(format!("Failed to write CID to memory: {}", e)))?;
+        .map_err(|e| Trap::throw(format!("Failed to write CID to memory: {}", e)))?;
     
     Ok(cid_offset)
 }
@@ -524,7 +524,7 @@ fn host_mint_token_wrapper(
     debug!(resource_type, amount, "host_mint_token called");
     
     if amount <= 0 {
-        return Err(Trap::new("Amount must be positive"));
+        return Err(Trap::throw("Amount must be positive"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -533,13 +533,13 @@ fn host_mint_token_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Read recipient DID from memory
     let recipient_did = match read_memory_string(&mut caller, recipient_ptr, recipient_len) {
         Ok(did) => did,
-        Err(e) => return Err(Trap::new(format!("Failed to read recipient DID: {}", e))),
+        Err(e) => return Err(Trap::throw(format!("Failed to read recipient DID: {}", e))),
     };
     
     // Get host environment
@@ -569,7 +569,7 @@ fn host_mint_token_wrapper(
                 "amount": amount,
                 "timestamp": std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                    .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
                     .as_secs(),
                 "issuer": env.caller_did().to_string()
             });
@@ -587,7 +587,7 @@ fn host_mint_token_wrapper(
             // Attempt to anchor the mint operation to DAG
             let dag_key = format!("token_mint:{}:{}", recipient_did, std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
                 .as_secs());
                 
             if let Err(e) = handle.block_on(env.anchor_to_dag(&dag_key, mint_bytes)) {
@@ -617,7 +617,7 @@ fn host_transfer_resource_wrapper(
     debug!(resource_type, amount, "host_transfer_resource called");
     
     if amount <= 0 {
-        return Err(Trap::new("Amount must be positive"));
+        return Err(Trap::throw("Amount must be positive"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -626,18 +626,18 @@ fn host_transfer_resource_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::new(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Read from/to DIDs from memory
     let from_did = match read_memory_string(&mut caller, from_ptr, from_len) {
         Ok(did) => did,
-        Err(e) => return Err(Trap::new(format!("Failed to read from DID: {}", e))),
+        Err(e) => return Err(Trap::throw(format!("Failed to read from DID: {}", e))),
     };
     
     let to_did = match read_memory_string(&mut caller, to_ptr, to_len) {
         Ok(did) => did,
-        Err(e) => return Err(Trap::new(format!("Failed to read to DID: {}", e))),
+        Err(e) => return Err(Trap::throw(format!("Failed to read to DID: {}", e))),
     };
     
     // Get host environment
@@ -672,7 +672,7 @@ fn host_transfer_resource_wrapper(
                 "amount": amount,
                 "timestamp": std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                    .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
                     .as_secs(),
                 "authorized_by": env.caller_did().to_string()
             });
@@ -690,7 +690,7 @@ fn host_transfer_resource_wrapper(
             // Attempt to anchor the transfer operation to DAG
             let dag_key = format!("resource_transfer:{}:{}", from_did, std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
+                .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
                 .as_secs());
                 
             if let Err(e) = handle.block_on(env.anchor_to_dag(&dag_key, transfer_bytes)) {
