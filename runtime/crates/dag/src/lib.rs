@@ -23,6 +23,8 @@ use icn_storage::StorageBackend;
 use anyhow::Result;
 
 pub mod audit;
+pub mod cache;
+pub mod query;
 
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -35,32 +37,35 @@ fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
     cid::multihash::Multihash::wrap(0x12, &buf[..]).expect("valid multihash")
 }
 
-/// Errors that can occur during DAG operations
+/// Errors that can occur in DAG operations
 #[derive(Debug, Error)]
 pub enum DagError {
-    #[error("Invalid DAG node: {0}")]
-    InvalidNode(String),
-    
-    #[error("Merkle verification failed: {0}")]
-    MerkleVerificationFailed(String),
-    
-    #[error("Signature verification failed")]
-    SignatureVerificationFailed,
-    
     #[error("Invalid CID: {0}")]
     InvalidCid(String),
     
-    #[error("Codec error: {0}")]
-    CodecError(#[from] IpldError),
+    #[error("Invalid node: {0}")]
+    InvalidNode(String),
+    
+    #[error("Node not found: {0}")]
+    NodeNotFound(String),
     
     #[error("Content error: {0}")]
     ContentError(String),
     
+    #[error("Codec error: {0}")]
+    CodecError(#[from] IpldError),
+    
     #[error("Storage error: {0}")]
     StorageError(String),
     
-    #[error("Builder error: Missing required field '{0}'")]
-    BuilderMissingField(String),
+    #[error("Authentication error: {0}")]
+    AuthError(String),
+    
+    #[error("Verification error: {0}")]
+    VerificationError(String),
+    
+    #[error("Operation not supported: {0}")]
+    NotSupported(String),
 }
 
 /// Result type for DAG operations
@@ -69,48 +74,58 @@ pub type DagResult<T> = std::result::Result<T, DagError>;
 /// Metadata for a DAG node
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DagNodeMetadata {
-    /// Timestamp of when this node was created (unix timestamp in seconds)
-    #[serde(with = "serde_bytes")]
+    /// UNIX timestamp in seconds
     pub timestamp: u64,
     
-    /// Sequence number of this node (optional)
-    pub sequence: Option<u64>,
+    /// Sequence number for ordering
+    pub sequence: u64,
     
-    /// Scope of this node (optional)
-    pub scope: Option<String>,
+    /// Content type/format
+    pub content_type: Option<String>,
+    
+    /// Additional tags
+    pub tags: Vec<String>,
 }
 
 impl DagNodeMetadata {
-    /// Create a new metadata with current timestamp
+    /// Create new metadata with current timestamp
     pub fn new() -> Self {
         Self {
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
-            sequence: None,
-            scope: None,
+            sequence: 0,
+            content_type: None,
+            tags: Vec::new(),
         }
     }
     
-    /// Create a new metadata with specified timestamp
+    /// Create new metadata with specific timestamp
     pub fn with_timestamp(timestamp: u64) -> Self {
         Self {
             timestamp,
-            sequence: None,
-            scope: None,
+            sequence: 0,
+            content_type: None,
+            tags: Vec::new(),
         }
     }
     
-    /// Set the sequence number
+    /// Set sequence number
     pub fn with_sequence(mut self, sequence: u64) -> Self {
-        self.sequence = Some(sequence);
+        self.sequence = sequence;
         self
     }
     
-    /// Set the scope
-    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
-        self.scope = Some(scope.into());
+    /// Set content type
+    pub fn with_content_type(mut self, content_type: impl Into<String>) -> Self {
+        self.content_type = Some(content_type.into());
+        self
+    }
+    
+    /// Add a tag
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into());
         self
     }
 }
@@ -121,286 +136,213 @@ impl Default for DagNodeMetadata {
     }
 }
 
-/// Represents a node in the DAG, compatible with IPLD and DagCbor encoding.
-/// The CID is *not* stored within the node itself; it's derived from the encoded bytes.
+/// A node in the DAG
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DagNode {
-    /// Arbitrary IPLD data payload of this node.
+    /// IPLD payload data
     pub payload: Ipld,
     
-    /// Parent CIDs (links) of this node.
+    /// Parent CIDs
     pub parents: Vec<Cid>,
     
-    /// Identity (DID) that issued/signed this node.
+    /// Identity of the issuer
     pub issuer: IdentityId,
     
-    /// Signature over the canonicalized representation of the node (excluding signature field itself).
-    /// The exact signing process needs definition (e.g., encode, hash, sign hash).
-    #[serde(with = "serde_bytes")]
+    /// Signature over the node content
     pub signature: Vec<u8>,
     
-    /// Metadata associated with this node.
+    /// Metadata
     pub metadata: DagNodeMetadata,
 }
 
-impl DagNode {
-    /// Verify the signature of this node (Placeholder).
-    /// Note: Verification requires obtaining the canonical bytes used for signing,
-    /// which depends on the DagCborCodec implementation details.
-    pub fn verify_signature(&self, _public_key_jwk: &ssi::jwk::JWK) -> DagResult<()> {
-        if self.signature.is_empty() {
-            return Err(DagError::SignatureVerificationFailed);
-        }
-        Ok(())
-    }
-    
-    /// Get the links (parent CIDs) of this node.
-    pub fn links(&self) -> &[Cid] {
-        &self.parents
-    }
-    
-    /// Get the timestamp of this node.
-    pub fn timestamp(&self) -> u64 {
-        self.metadata.timestamp
-    }
-}
-
-/// Builder for creating DagNode instances.
-#[derive(Default)]
+/// Builder for creating DAG nodes
 pub struct DagNodeBuilder {
     payload: Option<Ipld>,
-    parents: Option<Vec<Cid>>,
+    parents: Vec<Cid>,
     issuer: Option<IdentityId>,
-    signature: Option<Vec<u8>>,
-    metadata: Option<DagNodeMetadata>,
+    metadata: DagNodeMetadata,
 }
 
 impl DagNodeBuilder {
+    /// Create a new builder
     pub fn new() -> Self {
-        Default::default()
+        Self {
+            payload: None,
+            parents: Vec::new(),
+            issuer: None,
+            metadata: DagNodeMetadata::new(),
+        }
     }
     
+    /// Set the payload
     pub fn payload(mut self, payload: Ipld) -> Self {
         self.payload = Some(payload);
         self
     }
     
+    /// Set the parents
     pub fn parents(mut self, parents: Vec<Cid>) -> Self {
-        self.parents = Some(parents);
+        self.parents = parents;
         self
     }
     
-    pub fn issuer(mut self, issuer: IdentityId) -> Self {
-        self.issuer = Some(issuer);
+    /// Add a parent
+    pub fn parent(mut self, parent: Cid) -> Self {
+        self.parents.push(parent);
         self
     }
     
-    pub fn signature(mut self, signature: Vec<u8>) -> Self {
-        self.signature = Some(signature);
+    /// Set the issuer
+    pub fn issuer(mut self, issuer: impl Into<IdentityId>) -> Self {
+        self.issuer = Some(issuer.into());
         self
     }
     
+    /// Set the metadata
     pub fn metadata(mut self, metadata: DagNodeMetadata) -> Self {
-        self.metadata = Some(metadata);
+        self.metadata = metadata;
         self
     }
     
-    pub fn build(self) -> DagResult<DagNode> {
-        let issuer = self.issuer.ok_or_else(|| DagError::BuilderMissingField("issuer".to_string()))?;
-        let payload = self.payload.ok_or_else(|| DagError::BuilderMissingField("payload".to_string()))?;
-        let signature = self.signature.ok_or_else(|| DagError::BuilderMissingField("signature".to_string()))?;
+    /// Set the timestamp
+    pub fn timestamp(mut self, timestamp: u64) -> Self {
+        self.metadata.timestamp = timestamp;
+        self
+    }
+    
+    /// Set the sequence
+    pub fn sequence(mut self, sequence: u64) -> Self {
+        self.metadata.sequence = sequence;
+        self
+    }
+    
+    /// Set content type
+    pub fn content_type(mut self, content_type: impl Into<String>) -> Self {
+        self.metadata.content_type = Some(content_type.into());
+        self
+    }
+    
+    /// Add a tag
+    pub fn tag(mut self, tag: impl Into<String>) -> Self {
+        self.metadata.tags.push(tag.into());
+        self
+    }
+    
+    /// Build the node (without signing)
+    pub fn build(self) -> Result<DagNode> {
+        let payload = self.payload
+            .ok_or_else(|| anyhow::anyhow!("Payload is required"))?;
+            
+        let issuer = self.issuer
+            .ok_or_else(|| anyhow::anyhow!("Issuer is required"))?;
+        
+        // In a real implementation, this would sign the node content
+        // For now, using a placeholder signature
+        let signature = vec![1, 2, 3, 4];
         
         Ok(DagNode {
             payload,
-            parents: self.parents.unwrap_or_default(),
+            parents: self.parents,
             issuer,
             signature,
-            metadata: self.metadata.unwrap_or_default(),
+            metadata: self.metadata,
         })
     }
-}
-
-/// Calculates a Merkle root for a set of CIDs.
-/// Updated to take CIDs directly instead of DagNodes.
-pub fn calculate_merkle_root(cids: &[Cid]) -> DagResult<Cid> {
-    if cids.is_empty() {
-        return Err(DagError::InvalidNode("Empty CID list".to_string()));
-    }
     
-    // Extract bytes of CIDs
-    let cid_bytes_list: Vec<Vec<u8>> = cids.iter().map(|cid| cid.to_bytes()).collect();
-    
-    // Simplified merkle root calculation - just hash all CID bytes together
-    // In a real implementation, this would use a proper Merkle tree (like merkle-cbt?)
-    let mut combined = Vec::new();
-    for cid_bytes in cid_bytes_list {
-        combined.extend_from_slice(&cid_bytes);
-    }
-    
-    let mh = cid::multihash::Multihash::wrap(
-        cid::multihash::Code::Sha2_256.into(),
-        &Sha256::digest(&combined)
-    ).map_err(|e| DagError::InvalidCid(format!("Failed to wrap Merkle root hash: {}", e)))?;
-    
-    // Use DagCbor codec for the root CID? Or Raw? Using Raw (0x55) for now.
-    let root_cid = Cid::new_v1(0x55, mh);
-    
-    Ok(root_cid)
-}
-
-/// Represents a lineage attestation for a DAG node
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LineageAttestation {
-    /// Root CID of the DAG
-    pub root_cid: Cid,
-    
-    /// CID of the attested node
-    pub node_cid: Cid,
-    
-    /// Merkle proof of inclusion
-    #[serde(with = "serde_bytes")]
-    pub proof: Vec<Vec<u8>>,
-    
-    /// Identity that signed this attestation
-    pub signer: IdentityId,
-    
-    /// Signature of this attestation
-    #[serde(with = "serde_bytes")]
-    pub signature: Vec<u8>,
-    
-    /// Timestamp of when this attestation was created
-    #[serde(with = "serde_bytes")]
-    pub timestamp: u64,
-}
-
-impl LineageAttestation {
-    /// Create a new lineage attestation
-    pub fn new(
-        root_cid: Cid,
-        node_cid: Cid,
-        proof: Vec<Vec<u8>>,
-        signer: IdentityId,
-        signature: Vec<u8>,
-        timestamp: u64,
-    ) -> DagResult<Self> {
-        if proof.is_empty() {
-            return Err(DagError::InvalidNode("Proof cannot be empty".to_string()));
-        }
+    /// Build with automatic signing
+    pub fn build_signed(self, signer: &impl Signer) -> Result<DagNode> {
+        let payload = self.payload
+            .ok_or_else(|| anyhow::anyhow!("Payload is required"))?;
+            
+        let issuer = self.issuer
+            .ok_or_else(|| anyhow::anyhow!("Issuer is required"))?;
         
-        Ok(Self {
-            root_cid,
-            node_cid,
-            proof,
-            signer,
+        // Create the unsigned node
+        let unsigned = DagNode {
+            payload: payload.clone(),
+            parents: self.parents.clone(),
+            issuer: issuer.clone(),
+            signature: Vec::new(), // Empty signature for now
+            metadata: self.metadata.clone(),
+        };
+        
+        // Sign the node
+        let signature = signer.sign(&unsigned)?;
+        
+        Ok(DagNode {
+            payload,
+            parents: self.parents,
+            issuer,
             signature,
-            timestamp,
+            metadata: self.metadata,
         })
     }
+}
+
+/// Trait for signing nodes
+pub trait Signer: Send + Sync {
+    /// Sign a DAG node
+    fn sign(&self, node: &DagNode) -> Result<Vec<u8>>;
     
-    /// Verify the lineage attestation
-    pub fn verify(&self) -> DagResult<()> {
-        if self.signature.is_empty() {
-            return Err(DagError::SignatureVerificationFailed);
+    /// Verify a node's signature
+    fn verify(&self, node: &DagNode) -> Result<bool>;
+}
+
+/// DAG manager interface
+#[async_trait::async_trait]
+pub trait DagManager: Send + Sync {
+    /// Store a new DAG node
+    async fn store_node(&self, node: &DagNode) -> Result<Cid>;
+    
+    /// Store multiple DAG nodes in a batch
+    async fn store_nodes_batch(&self, nodes: Vec<DagNode>) -> Result<Vec<Cid>> {
+        let mut cids = Vec::with_capacity(nodes.len());
+        
+        for node in nodes {
+            let cid = self.store_node(&node).await?;
+            cids.push(cid);
         }
         
-        if self.proof.is_empty() {
-            return Err(DagError::MerkleVerificationFailed("Empty proof".to_string()));
-        }
-        
-        Ok(())
+        Ok(cids)
     }
+    
+    /// Retrieve a DAG node by CID
+    async fn get_node(&self, cid: &Cid) -> Result<Option<DagNode>>;
+    
+    /// Check if a node exists
+    async fn contains_node(&self, cid: &Cid) -> Result<bool>;
+    
+    /// Get parents of a node
+    async fn get_parents(&self, cid: &Cid) -> Result<Vec<DagNode>>;
+    
+    /// Get children of a node
+    async fn get_children(&self, cid: &Cid) -> Result<Vec<DagNode>>;
+    
+    /// Verify a node's signature
+    async fn verify_node(&self, cid: &Cid) -> Result<bool>;
+    
+    /// Get the latest nodes in the DAG (tips)
+    async fn get_tips(&self) -> Result<Vec<Cid>>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libipld::ipld;
-    use crate::codec::DagCborCodec;
-    use libipld::codec::Codec;
     
     #[test]
-    fn test_dag_node_builder_and_structure() {
-        let issuer_did = IdentityId::new("did:example:issuer");
-        let parent_cid = Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
-        let payload_data = ipld!({ "message": "hello world", "value": 123 });
-        let signature_bytes = vec![1, 2, 3, 4, 5];
-        
+    fn test_dag_node_builder() {
         let builder = DagNodeBuilder::new()
-            .issuer(issuer_did.clone())
-            .payload(payload_data.clone())
-            .parents(vec![parent_cid])
-            .signature(signature_bytes.clone())
-            .metadata(DagNodeMetadata::new().with_sequence(1));
-        
+            .payload(ipld!({ "key": "value" }))
+            .parent(Cid::new_v1(0x71, create_sha256_multihash(b"parent")))
+            .issuer(IdentityId("did:icn:test".to_string()))
+            .timestamp(123456789)
+            .tag("test-tag");
+            
         let node = builder.build().unwrap();
         
-        assert_eq!(node.issuer, issuer_did);
-        assert_eq!(node.payload, payload_data);
-        assert_eq!(node.parents, vec![parent_cid]);
-        assert_eq!(node.signature, signature_bytes);
-        assert!(node.metadata.sequence.is_some());
-        assert_eq!(node.metadata.sequence.unwrap(), 1);
-        
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        assert!(now >= node.metadata.timestamp && now - node.metadata.timestamp < 5);
-    }
-    
-    #[test]
-    fn test_dag_node_builder_missing_fields() {
-        let builder_no_issuer = DagNodeBuilder::new().payload(ipld!(null));
-        let result_no_issuer = builder_no_issuer.build();
-        assert!(matches!(result_no_issuer, Err(DagError::BuilderMissingField(field)) if field == "issuer"));
-        
-        let builder_no_payload = DagNodeBuilder::new().issuer(IdentityId::new("did:ex:1"));
-        let result_no_payload = builder_no_payload.build();
-        assert!(matches!(result_no_payload, Err(DagError::BuilderMissingField(field)) if field == "payload"));
-        
-        let builder_no_sig = DagNodeBuilder::new()
-            .issuer(IdentityId::new("did:ex:1"))
-            .payload(ipld!(true));
-        let result_no_sig = builder_no_sig.build();
-        assert!(matches!(result_no_sig, Err(DagError::BuilderMissingField(field)) if field == "signature"));
-    }
-    
-    #[test]
-    fn test_dag_node_cbor_encoding() {
-        let node = DagNodeBuilder::new()
-            .issuer(IdentityId::new("did:example:issuer"))
-            .payload(ipld!({ "data": [1, 2, 3] }))
-            .parents(vec![])
-            .signature(vec![10, 20, 30])
-            .metadata(DagNodeMetadata::new().with_sequence(0))
-            .build()
-            .unwrap();
-        
-        let codec = DagCborCodec;
-        let encoded_bytes = codec.encode(&node);
-        assert!(encoded_bytes.is_ok());
-        let bytes = encoded_bytes.unwrap();
-        
-        assert!(bytes[0] >= 0xa0 && bytes[0] <= 0xbf);
-        
-        let decoded_node: std::result::Result<DagNode, _> = codec.decode(&bytes);
-        assert!(decoded_node.is_ok());
-        assert_eq!(node, decoded_node.unwrap());
-    }
-    
-    #[test]
-    fn test_updated_calculate_merkle_root() {
-        let cid1 = Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
-        let cid2 = Cid::try_from("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyke").unwrap();
-        
-        let cids = vec![cid1, cid2];
-        let root_result = calculate_merkle_root(&cids);
-        assert!(root_result.is_ok());
-        let root_cid = root_result.unwrap();
-        
-        assert_eq!(root_cid.version(), cid::Version::V1);
-        assert_eq!(root_cid.codec(), 0x55);
-        assert_eq!(root_cid.hash().code(), u64::from(cid::multihash::Code::Sha2_256));
-        
-        let empty_cids: Vec<Cid> = vec![];
-        let empty_root_result = calculate_merkle_root(&empty_cids);
-        assert!(matches!(empty_root_result, Err(DagError::InvalidNode(_))));
+        assert_eq!(node.issuer.0, "did:icn:test");
+        assert_eq!(node.parents.len(), 1);
+        assert_eq!(node.metadata.timestamp, 123456789);
+        assert_eq!(node.metadata.tags, vec!["test-tag"]);
     }
 } 

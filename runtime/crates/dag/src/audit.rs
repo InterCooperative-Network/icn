@@ -1,517 +1,675 @@
 /*!
-# DAG Audit Verification
+# DAG Audit System
 
-This module provides tools for verifying DAG consistency and ensuring replay integrity.
-It provides a systematic way to verify all nodes from genesis to tip, checking:
-1. CID validity and integrity
-2. Signature correctness
-3. Resource balance consistency
-4. Credential hash verification
+Provides audit logging for DAG operations to ensure traceability and security.
 */
 
-use crate::{DagError, DagNode, DagResult};
+use crate::DagNode;
 use cid::Cid;
-use icn_storage::StorageBackend;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
-use std::time::Instant;
 use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
+use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, VecDeque};
+use thiserror::Error;
+use tokio::sync::broadcast;
+use tracing::{info, warn, debug, error};
 
-/// State of a DAG verification process
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerificationState {
-    /// Total nodes processed
-    pub nodes_processed: usize,
+/// Maximum number of audit records to keep in memory
+const MAX_AUDIT_RECORDS: usize = 10000;
+
+/// Error types for audit operations
+#[derive(Debug, Error)]
+pub enum AuditError {
+    #[error("Failed to record audit event: {0}")]
+    RecordingFailed(String),
     
-    /// Valid nodes count
-    pub valid_nodes: usize,
+    #[error("Storage error: {0}")]
+    StorageError(String),
     
-    /// Invalid nodes count
-    pub invalid_nodes: usize,
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
     
-    /// Orphaned nodes (no parent or unreachable from genesis)
-    pub orphaned_nodes: usize,
-    
-    /// Missing dependency nodes
-    pub missing_deps: usize,
-    
-    /// Map of entity DIDs to their verification state
-    pub entity_states: HashMap<String, EntityVerificationState>,
-    
-    /// Current verification progress (0.0 - 1.0)
-    pub progress: f64,
-    
-    /// Merkle root chain of verification
-    pub verification_chain: Vec<String>,
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
-/// Verification state for a specific entity
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityVerificationState {
-    /// Entity DID
-    pub entity_id: String,
+/// Result type for audit operations
+pub type AuditResult<T> = Result<T, AuditError>;
+
+/// Describes the type of operation being audited
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AuditAction {
+    /// Node creation or addition
+    NodeCreated,
     
-    /// Resource balances
-    pub resource_balances: HashMap<String, i64>,
+    /// Node content verified (e.g., signature check)
+    NodeVerified,
     
-    /// Credential hashes
-    pub credential_hashes: HashSet<String>,
+    /// Node read operation
+    NodeRead,
     
-    /// Number of nodes processed for this entity
-    pub nodes_processed: usize,
+    /// Node data or metadata queried
+    NodeQueried,
+    
+    /// Anchor to DAG root
+    DagAnchor,
+    
+    /// Merkle proof verification
+    MerkleVerification,
+    
+    /// Lineage attestation creation
+    AttestationCreated,
+    
+    /// Federation sync operation
+    FederationSync,
+    
+    /// Security-related operation
+    SecurityEvent,
+    
+    /// Custom event type with string descriptor
+    Custom(String),
 }
 
-/// Verification report output format
+/// Detailed audit record for a DAG operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerificationReport {
-    /// Overall verification success
+pub struct AuditRecord {
+    /// Unique identifier for this audit record
+    pub id: String,
+    
+    /// Timestamp of when this operation occurred
+    pub timestamp: DateTime<Utc>,
+    
+    /// The DID that performed the operation
+    pub actor_did: String,
+    
+    /// The action performed
+    pub action: AuditAction,
+    
+    /// CID of the node affected, if applicable
+    pub node_cid: Option<Cid>,
+    
+    /// Entity DID this operation applies to
+    pub entity_did: Option<String>,
+    
+    /// Success/failure status
     pub success: bool,
     
-    /// Verification state
-    pub state: VerificationState,
+    /// Error message if the operation failed
+    pub error_message: Option<String>,
     
-    /// List of error details if any
-    pub errors: Vec<VerificationError>,
+    /// Additional context as JSON string
+    pub context: Option<String>,
     
-    /// Verifiable Merkle root of the entire verification
-    pub merkle_root: String,
+    /// Source information (e.g., IP address, client info)
+    pub source_info: Option<String>,
     
-    /// Time taken for verification
-    pub time_elapsed_ms: u64,
-    
-    /// Historical anchors in chronological order
-    pub chronological_anchors: Vec<ChronologicalAnchor>,
+    /// Request ID for correlation
+    pub request_id: Option<String>,
 }
 
-/// Details of an anchor in chronological order
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChronologicalAnchor {
-    /// Anchor CID
-    pub cid: String,
-    
-    /// Timestamp
-    pub timestamp: u64,
-    
-    /// Entity DID
-    pub entity_id: String,
-    
-    /// Short description of content
-    pub description: String,
+impl AuditRecord {
+    /// Create a new audit record builder
+    pub fn builder() -> AuditRecordBuilder {
+        AuditRecordBuilder::new()
+    }
 }
 
-/// Verification error details
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerificationError {
-    /// Error type
-    pub error_type: VerificationErrorType,
-    
-    /// Entity ID
-    pub entity_id: Option<String>,
-    
-    /// CID of problematic node
-    pub node_cid: Option<String>,
-    
-    /// Error message
-    pub message: String,
+/// Builder for creating AuditRecord instances
+pub struct AuditRecordBuilder {
+    actor_did: Option<String>,
+    action: Option<AuditAction>,
+    node_cid: Option<Cid>,
+    entity_did: Option<String>,
+    success: Option<bool>,
+    error_message: Option<String>,
+    context: Option<String>,
+    source_info: Option<String>,
+    request_id: Option<String>,
 }
 
-/// Types of verification errors
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum VerificationErrorType {
-    /// Invalid CID or CID hash mismatch
-    InvalidCid,
-    
-    /// Invalid signature
-    InvalidSignature,
-    
-    /// Invalid parent reference
-    InvalidParent,
-    
-    /// Invalid resource balance
-    InvalidResourceBalance,
-    
-    /// Invalid credential hash
-    InvalidCredentialHash,
-    
-    /// Missing node
-    MissingNode,
-    
-    /// Orphaned node (unreachable from genesis)
-    OrphanedNode,
-    
-    /// General verification error
-    Other,
-}
-
-/// Verifier for DAG consistency and replay assurance
-pub struct DAGAuditVerifier<S: StorageBackend> {
-    /// Storage backend
-    storage: Arc<Mutex<S>>,
-    
-    /// Current verification state
-    state: VerificationState,
-    
-    /// Errors encountered during verification
-    errors: Vec<VerificationError>,
-    
-    /// Genesis CIDs for each entity
-    genesis_cids: HashMap<String, Cid>,
-    
-    /// Set of all processed CIDs
-    processed_cids: HashSet<Cid>,
-    
-    /// Chronological anchors
-    chronological_anchors: Vec<ChronologicalAnchor>,
-}
-
-impl<S: StorageBackend> DAGAuditVerifier<S> {
-    /// Create a new DAG audit verifier
-    pub fn new(storage: Arc<Mutex<S>>) -> Self {
+impl AuditRecordBuilder {
+    /// Create a new builder
+    pub fn new() -> Self {
         Self {
-            storage,
-            state: VerificationState {
-                nodes_processed: 0,
-                valid_nodes: 0,
-                invalid_nodes: 0,
-                orphaned_nodes: 0,
-                missing_deps: 0,
-                entity_states: HashMap::new(),
-                progress: 0.0,
-                verification_chain: Vec::new(),
-            },
-            errors: Vec::new(),
-            genesis_cids: HashMap::new(),
-            processed_cids: HashSet::new(),
-            chronological_anchors: Vec::new(),
+            actor_did: None,
+            action: None,
+            node_cid: None,
+            entity_did: None,
+            success: Some(true), // Default to success
+            error_message: None,
+            context: None,
+            source_info: None,
+            request_id: None,
         }
     }
     
-    /// Verify a single entity's DAG from genesis to tip
-    pub async fn verify_entity_dag(&mut self, entity_id: &str) -> DagResult<VerificationReport> {
-        info!("Starting verification for entity: {}", entity_id);
-        let start = Instant::now();
+    /// Set the actor DID
+    pub fn actor(mut self, actor_did: impl Into<String>) -> Self {
+        self.actor_did = Some(actor_did.into());
+        self
+    }
+    
+    /// Set the action
+    pub fn action(mut self, action: AuditAction) -> Self {
+        self.action = Some(action);
+        self
+    }
+    
+    /// Set the node CID
+    pub fn node(mut self, cid: Cid) -> Self {
+        self.node_cid = Some(cid);
+        self
+    }
+    
+    /// Set the entity DID
+    pub fn entity(mut self, entity_did: impl Into<String>) -> Self {
+        self.entity_did = Some(entity_did.into());
+        self
+    }
+    
+    /// Set success status
+    pub fn success(mut self, success: bool) -> Self {
+        self.success = Some(success);
+        self
+    }
+    
+    /// Set error message
+    pub fn error(mut self, error_message: impl Into<String>) -> Self {
+        self.error_message = Some(error_message.into());
+        self.success = Some(false); // Setting error implies failure
+        self
+    }
+    
+    /// Set context
+    pub fn context<T: Serialize>(mut self, context: &T) -> Self {
+        if let Ok(json) = serde_json::to_string(context) {
+            self.context = Some(json);
+        }
+        self
+    }
+    
+    /// Set source info
+    pub fn source(mut self, source_info: impl Into<String>) -> Self {
+        self.source_info = Some(source_info.into());
+        self
+    }
+    
+    /// Set request ID
+    pub fn request_id(mut self, request_id: impl Into<String>) -> Self {
+        self.request_id = Some(request_id.into());
+        self
+    }
+    
+    /// Build the audit record
+    pub fn build(self) -> AuditResult<AuditRecord> {
+        let id = uuid::Uuid::new_v4().to_string();
         
-        // Find genesis CID for this entity
-        self.find_genesis_cid(entity_id).await?;
+        Ok(AuditRecord {
+            id,
+            timestamp: Utc::now(),
+            actor_did: self.actor_did
+                .ok_or_else(|| AuditError::RecordingFailed("Actor DID is required".to_string()))?,
+            action: self.action
+                .ok_or_else(|| AuditError::RecordingFailed("Action is required".to_string()))?,
+            node_cid: self.node_cid,
+            entity_did: self.entity_did,
+            success: self.success.unwrap_or(true),
+            error_message: self.error_message,
+            context: self.context,
+            source_info: self.source_info,
+            request_id: self.request_id,
+        })
+    }
+}
+
+/// Interface for audit logging systems
+#[async_trait::async_trait]
+pub trait AuditLogger: Send + Sync {
+    /// Record an audit event
+    async fn record(&self, record: AuditRecord) -> AuditResult<()>;
+    
+    /// Get audit records for a specific entity
+    async fn get_records_for_entity(&self, entity_did: &str, limit: usize) -> AuditResult<Vec<AuditRecord>>;
+    
+    /// Get audit records for a specific node
+    async fn get_records_for_node(&self, node_cid: &Cid, limit: usize) -> AuditResult<Vec<AuditRecord>>;
+    
+    /// Get audit records for a specific actor
+    async fn get_records_for_actor(&self, actor_did: &str, limit: usize) -> AuditResult<Vec<AuditRecord>>;
+    
+    /// Get all audit records
+    async fn get_all_records(&self, limit: usize) -> AuditResult<Vec<AuditRecord>>;
+    
+    /// Subscribe to audit events
+    fn subscribe(&self) -> AuditResult<broadcast::Receiver<AuditRecord>>;
+}
+
+/// In-memory implementation of AuditLogger
+pub struct InMemoryAuditLogger {
+    /// In-memory store of all audit records
+    records: Mutex<VecDeque<AuditRecord>>,
+    
+    /// Index by entity DID
+    entity_index: Mutex<HashMap<String, Vec<usize>>>,
+    
+    /// Index by node CID
+    node_index: Mutex<HashMap<Cid, Vec<usize>>>,
+    
+    /// Index by actor DID
+    actor_index: Mutex<HashMap<String, Vec<usize>>>,
+    
+    /// Broadcast channel for subscribers
+    event_sender: broadcast::Sender<AuditRecord>,
+}
+
+impl InMemoryAuditLogger {
+    /// Create a new in-memory audit logger
+    pub fn new() -> Self {
+        let (sender, _) = broadcast::channel(100);
         
-        // Initialize entity state
-        self.state.entity_states.insert(entity_id.to_string(), EntityVerificationState {
-            entity_id: entity_id.to_string(),
-            resource_balances: HashMap::new(),
-            credential_hashes: HashSet::new(),
-            nodes_processed: 0,
-        });
+        Self {
+            records: Mutex::new(VecDeque::with_capacity(MAX_AUDIT_RECORDS)),
+            entity_index: Mutex::new(HashMap::new()),
+            node_index: Mutex::new(HashMap::new()),
+            actor_index: Mutex::new(HashMap::new()),
+            event_sender: sender,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl AuditLogger for InMemoryAuditLogger {
+    async fn record(&self, record: AuditRecord) -> AuditResult<()> {
+        // Clone for logging and broadcasting
+        let record_clone = record.clone();
         
-        // Start BFS traversal from genesis
-        let genesis_cid = self.genesis_cids.get(entity_id)
-            .ok_or_else(|| DagError::InvalidNode(format!("No genesis node found for entity {}", entity_id)))?;
-        
-        let mut queue = VecDeque::new();
-        queue.push_back(*genesis_cid);
-        
-        let mut visited = HashSet::new();
-        visited.insert(*genesis_cid);
-        
-        while let Some(current_cid) = queue.pop_front() {
-            // Process current node
-            match self.process_node(entity_id, &current_cid).await {
-                Ok(node) => {
-                    // Add all children to queue
-                    for child_cid in self.get_children(entity_id, &current_cid).await? {
-                        if !visited.contains(&child_cid) {
-                            visited.insert(child_cid);
-                            queue.push_back(child_cid);
-                        }
-                    }
-                    
-                    // Update verification chain
-                    self.update_verification_chain(&current_cid);
-                    
-                    // Add to chronological anchors
-                    self.add_chronological_anchor(entity_id, &node, &current_cid);
+        // Log the event using tracing
+        match &record.action {
+            AuditAction::SecurityEvent => {
+                if record.success {
+                    info!(
+                        actor = %record.actor_did,
+                        node = ?record.node_cid,
+                        entity = ?record.entity_did,
+                        request_id = ?record.request_id,
+                        "Security event: success"
+                    );
+                } else {
+                    warn!(
+                        actor = %record.actor_did,
+                        node = ?record.node_cid,
+                        entity = ?record.entity_did,
+                        request_id = ?record.request_id,
+                        error = ?record.error_message,
+                        "Security event: failure"
+                    );
                 }
-                Err(e) => {
-                    self.record_error(VerificationErrorType::Other, Some(entity_id), Some(current_cid.to_string()), 
-                        format!("Failed to process node: {}", e));
+            },
+            _ => {
+                if record.success {
+                    debug!(
+                        action = ?record.action,
+                        actor = %record.actor_did,
+                        node = ?record.node_cid,
+                        entity = ?record.entity_did,
+                        "DAG operation: success"
+                    );
+                } else {
+                    warn!(
+                        action = ?record.action,
+                        actor = %record.actor_did,
+                        node = ?record.node_cid,
+                        entity = ?record.entity_did,
+                        error = ?record.error_message,
+                        "DAG operation: failure"
+                    );
                 }
+            }
+        }
+        
+        // Store the record
+        let mut records = self.records.lock().unwrap();
+        
+        // Add to indices
+        let index = records.len();
+        
+        if let Some(entity_did) = &record.entity_did {
+            let mut entity_index = self.entity_index.lock().unwrap();
+            entity_index.entry(entity_did.clone()).or_default().push(index);
+        }
+        
+        if let Some(node_cid) = &record.node_cid {
+            let mut node_index = self.node_index.lock().unwrap();
+            node_index.entry(*node_cid).or_default().push(index);
+        }
+        
+        let mut actor_index = self.actor_index.lock().unwrap();
+        actor_index.entry(record.actor_did.clone()).or_default().push(index);
+        
+        // Add to records
+        records.push_back(record);
+        
+        // Keep records within size limit
+        if records.len() > MAX_AUDIT_RECORDS {
+            records.pop_front();
+            
+            // Adjust indices (this is inefficient but simple; a more complex solution would use a different data structure)
+            let mut entity_index = self.entity_index.lock().unwrap();
+            let mut node_index = self.node_index.lock().unwrap();
+            let mut actor_index = self.actor_index.lock().unwrap();
+            
+            for indices in entity_index.values_mut() {
+                *indices = indices.iter().filter_map(|&i| if i > 0 { Some(i - 1) } else { None }).collect();
             }
             
-            // Update progress
-            self.state.progress = self.state.valid_nodes as f64 / 
-                (self.state.valid_nodes + queue.len() as usize) as f64;
-        }
-        
-        // Check for orphaned nodes (reachable from any node but not from genesis)
-        self.find_orphaned_nodes(entity_id).await?;
-        
-        // Generate verification report
-        let report = VerificationReport {
-            success: self.errors.is_empty(),
-            state: self.state.clone(),
-            errors: self.errors.clone(),
-            merkle_root: self.compute_verification_merkle_root(),
-            time_elapsed_ms: start.elapsed().as_millis() as u64,
-            chronological_anchors: self.get_sorted_chronological_anchors(),
-        };
-        
-        info!("Verification completed for entity {} in {}ms: {} nodes processed, {} valid, {} invalid, {} orphaned",
-            entity_id, report.time_elapsed_ms, self.state.nodes_processed, 
-            self.state.valid_nodes, self.state.invalid_nodes, self.state.orphaned_nodes);
-        
-        Ok(report)
-    }
-    
-    /// Verify all entities' DAGs from genesis to tip
-    pub async fn verify_all_entities(&mut self) -> DagResult<VerificationReport> {
-        info!("Starting verification for all entities");
-        let start = Instant::now();
-        
-        // Get all entity IDs
-        let entity_ids = self.get_all_entity_ids().await?;
-        
-        // Verify each entity
-        for entity_id in entity_ids {
-            self.verify_entity_dag(&entity_id).await?;
-        }
-        
-        // Generate verification report
-        let report = VerificationReport {
-            success: self.errors.is_empty(),
-            state: self.state.clone(),
-            errors: self.errors.clone(),
-            merkle_root: self.compute_verification_merkle_root(),
-            time_elapsed_ms: start.elapsed().as_millis() as u64,
-            chronological_anchors: self.get_sorted_chronological_anchors(),
-        };
-        
-        info!("Verification completed for all entities in {}ms: {} nodes processed, {} valid, {} invalid, {} orphaned",
-            report.time_elapsed_ms, self.state.nodes_processed, 
-            self.state.valid_nodes, self.state.invalid_nodes, self.state.orphaned_nodes);
-        
-        Ok(report)
-    }
-    
-    // Implementation helpers
-    
-    /// Find the genesis CID for an entity
-    async fn find_genesis_cid(&mut self, entity_id: &str) -> DagResult<Cid> {
-        // In a real implementation, this would look up the genesis CID from storage
-        // or derive it from the entity's ID
-        let storage = self.storage.lock().unwrap();
-        // This would be implemented in the storage backend
-        // For now, returning a placeholder error
-        Err(DagError::ContentError("Genesis CID lookup not implemented".to_string()))
-    }
-    
-    /// Process a single node
-    async fn process_node(&mut self, entity_id: &str, cid: &Cid) -> DagResult<DagNode> {
-        // 1. Retrieve node
-        let storage = self.storage.lock().unwrap();
-        let node_bytes = storage.get(&cid.to_bytes())
-            .await
-            .map_err(|e| DagError::StorageError(format!("Failed to retrieve node: {}", e)))?
-            .ok_or_else(|| DagError::InvalidCid(format!("Node not found for CID: {}", cid)))?;
-        
-        // 2. Decode node
-        let node: DagNode = serde_json::from_slice(&node_bytes)
-            .map_err(|e| DagError::CodecError(e.into()))?;
-        
-        // 3. Verify CID
-        self.verify_cid(cid, &node_bytes)?;
-        
-        // 4. Verify parents
-        self.verify_parents(entity_id, &node)?;
-        
-        // 5. Verify signature
-        self.verify_signature(entity_id, &node)?;
-        
-        // 6. Update entity state
-        self.update_entity_state(entity_id, &node)?;
-        
-        // 7. Update verification state
-        self.state.nodes_processed += 1;
-        self.state.valid_nodes += 1;
-        
-        if let Some(entity_state) = self.state.entity_states.get_mut(entity_id) {
-            entity_state.nodes_processed += 1;
-        }
-        
-        // 8. Mark as processed
-        self.processed_cids.insert(*cid);
-        
-        Ok(node)
-    }
-    
-    /// Verify CID matches node content
-    fn verify_cid(&self, cid: &Cid, node_bytes: &[u8]) -> DagResult<()> {
-        // In a real implementation, this would compute the CID from node_bytes
-        // and verify it matches the expected CID
-        // For now, we'll assume it's valid
-        Ok(())
-    }
-    
-    /// Verify parent nodes
-    fn verify_parents(&self, entity_id: &str, node: &DagNode) -> DagResult<()> {
-        for parent_cid in &node.parents {
-            if !self.processed_cids.contains(parent_cid) {
-                self.record_error(
-                    VerificationErrorType::InvalidParent,
-                    Some(entity_id),
-                    Some(parent_cid.to_string()),
-                    format!("Parent CID not processed: {}", parent_cid)
-                );
-                return Err(DagError::InvalidNode(format!("Parent CID not processed: {}", parent_cid)));
+            for indices in node_index.values_mut() {
+                *indices = indices.iter().filter_map(|&i| if i > 0 { Some(i - 1) } else { None }).collect();
+            }
+            
+            for indices in actor_index.values_mut() {
+                *indices = indices.iter().filter_map(|&i| if i > 0 { Some(i - 1) } else { None }).collect();
             }
         }
-        Ok(())
-    }
-    
-    /// Verify node signature
-    fn verify_signature(&self, entity_id: &str, node: &DagNode) -> DagResult<()> {
-        // In a real implementation, this would verify the signature
-        // For now, we'll assume it's valid
-        Ok(())
-    }
-    
-    /// Update entity state based on node content
-    fn update_entity_state(&mut self, entity_id: &str, node: &DagNode) -> DagResult<()> {
-        // Update resource balances and credential hashes based on node content
-        // This is application-specific and would need proper implementation
-        // For now, we'll just return Ok
-        Ok(())
-    }
-    
-    /// Get children of a node
-    async fn get_children(&self, entity_id: &str, cid: &Cid) -> DagResult<Vec<Cid>> {
-        // In a real implementation, this would query the storage backend for nodes
-        // that reference this CID as a parent
-        // For now, returning an empty vec
-        Ok(Vec::new())
-    }
-    
-    /// Find orphaned nodes
-    async fn find_orphaned_nodes(&mut self, entity_id: &str) -> DagResult<()> {
-        // In a real implementation, this would find nodes that are not reachable
-        // from genesis but exist in storage
-        // For now, we'll just return Ok
-        Ok(())
-    }
-    
-    /// Get all entity IDs
-    async fn get_all_entity_ids(&self) -> DagResult<Vec<String>> {
-        // In a real implementation, this would query the storage backend for all
-        // entity IDs
-        // For now, returning an empty vec
-        Ok(Vec::new())
-    }
-    
-    /// Update verification chain with new CID
-    fn update_verification_chain(&mut self, cid: &Cid) {
-        self.state.verification_chain.push(cid.to_string());
-    }
-    
-    /// Compute Merkle root of verification chain
-    fn compute_verification_merkle_root(&self) -> String {
-        // In a real implementation, this would compute a Merkle root of all
-        // verified CIDs
-        // For now, returning a placeholder
-        "merkle-root-not-implemented".to_string()
-    }
-    
-    /// Add chronological anchor
-    fn add_chronological_anchor(&mut self, entity_id: &str, node: &DagNode, cid: &Cid) {
-        // Extract timestamp from node metadata
-        let timestamp = node.metadata.timestamp;
         
-        // Extract a short description from the payload
-        let description = match &node.payload {
-            crate::Ipld::String(s) => s.clone(),
-            crate::Ipld::Map(m) => m.get("description")
-                .and_then(|v| match v {
-                    crate::Ipld::String(s) => Some(s.clone()),
-                    _ => None,
-                })
-                .unwrap_or_else(|| "Unknown".to_string()),
-            _ => "Unknown".to_string(),
+        // Broadcast the event to subscribers
+        let _ = self.event_sender.send(record_clone); // Ignore errors if no receivers
+        
+        Ok(())
+    }
+    
+    async fn get_records_for_entity(&self, entity_did: &str, limit: usize) -> AuditResult<Vec<AuditRecord>> {
+        let entity_index = self.entity_index.lock().unwrap();
+        let records = self.records.lock().unwrap();
+        
+        let indices = match entity_index.get(entity_did) {
+            Some(idx) => idx,
+            None => return Ok(Vec::new()),
         };
         
-        self.chronological_anchors.push(ChronologicalAnchor {
-            cid: cid.to_string(),
-            timestamp,
-            entity_id: entity_id.to_string(),
-            description,
-        });
+        let result = indices.iter()
+            .filter_map(|&i| records.get(i).cloned())
+            .take(limit)
+            .collect();
+        
+        Ok(result)
     }
     
-    /// Get sorted chronological anchors
-    fn get_sorted_chronological_anchors(&self) -> Vec<ChronologicalAnchor> {
-        let mut anchors = self.chronological_anchors.clone();
-        anchors.sort_by_key(|a| a.timestamp);
-        anchors
+    async fn get_records_for_node(&self, node_cid: &Cid, limit: usize) -> AuditResult<Vec<AuditRecord>> {
+        let node_index = self.node_index.lock().unwrap();
+        let records = self.records.lock().unwrap();
+        
+        let indices = match node_index.get(node_cid) {
+            Some(idx) => idx,
+            None => return Ok(Vec::new()),
+        };
+        
+        let result = indices.iter()
+            .filter_map(|&i| records.get(i).cloned())
+            .take(limit)
+            .collect();
+        
+        Ok(result)
     }
     
-    /// Record a verification error
-    fn record_error(&mut self, 
-        error_type: VerificationErrorType, 
-        entity_id: Option<&str>, 
-        node_cid: Option<String>, 
-        message: String
-    ) {
-        self.state.invalid_nodes += 1;
+    async fn get_records_for_actor(&self, actor_did: &str, limit: usize) -> AuditResult<Vec<AuditRecord>> {
+        let actor_index = self.actor_index.lock().unwrap();
+        let records = self.records.lock().unwrap();
         
-        if error_type == VerificationErrorType::OrphanedNode {
-            self.state.orphaned_nodes += 1;
-        } else if error_type == VerificationErrorType::MissingNode {
-            self.state.missing_deps += 1;
-        }
+        let indices = match actor_index.get(actor_did) {
+            Some(idx) => idx,
+            None => return Ok(Vec::new()),
+        };
         
-        self.errors.push(VerificationError {
-            error_type,
-            entity_id: entity_id.map(|s| s.to_string()),
-            node_cid,
-            message,
-        });
+        let result = indices.iter()
+            .filter_map(|&i| records.get(i).cloned())
+            .take(limit)
+            .collect();
         
-        error!(
-            error_type = ?error_type,
-            entity_id = entity_id.unwrap_or("unknown"),
-            node_cid = node_cid.as_deref().unwrap_or("unknown"),
-            message = message,
-            "DAG verification error"
-        );
+        Ok(result)
+    }
+    
+    async fn get_all_records(&self, limit: usize) -> AuditResult<Vec<AuditRecord>> {
+        let records = self.records.lock().unwrap();
+        let result = records.iter().take(limit).cloned().collect();
+        Ok(result)
+    }
+    
+    fn subscribe(&self) -> AuditResult<broadcast::Receiver<AuditRecord>> {
+        Ok(self.event_sender.subscribe())
     }
 }
 
-// CLI report formatter
-pub fn format_report_for_cli(report: &VerificationReport) -> String {
-    let mut output = String::new();
-    
-    output.push_str(&format!("=== DAG VERIFICATION REPORT ===\n"));
-    output.push_str(&format!("Success: {}\n", report.success));
-    output.push_str(&format!("Time: {}ms\n", report.time_elapsed_ms));
-    output.push_str(&format!("Nodes processed: {}\n", report.state.nodes_processed));
-    output.push_str(&format!("Valid nodes: {}\n", report.state.valid_nodes));
-    output.push_str(&format!("Invalid nodes: {}\n", report.state.invalid_nodes));
-    output.push_str(&format!("Orphaned nodes: {}\n", report.state.orphaned_nodes));
-    output.push_str(&format!("Missing dependencies: {}\n", report.state.missing_deps));
-    output.push_str(&format!("Merkle root: {}\n", report.merkle_root));
-    
-    if !report.errors.is_empty() {
-        output.push_str("\n=== ERRORS ===\n");
-        for (i, error) in report.errors.iter().enumerate() {
-            output.push_str(&format!("{}. {:?}: {}\n", 
-                i + 1, error.error_type, error.message));
+/// Audit log wrapper for DAG operations
+/// This provides a convenient way to log DAG operations with proper context
+pub struct AuditedOperation<'a, T: AuditLogger> {
+    logger: &'a T,
+    builder: AuditRecordBuilder,
+}
+
+impl<'a, T: AuditLogger> AuditedOperation<'a, T> {
+    /// Create a new audited operation
+    pub fn new(logger: &'a T, action: AuditAction, actor_did: impl Into<String>) -> Self {
+        Self {
+            logger,
+            builder: AuditRecord::builder()
+                .action(action)
+                .actor(actor_did),
         }
     }
     
-    if !report.chronological_anchors.is_empty() {
-        output.push_str("\n=== CHRONOLOGICAL ANCHORS (FIRST 10) ===\n");
-        for (i, anchor) in report.chronological_anchors.iter().take(10).enumerate() {
-            output.push_str(&format!("{}. [{}] {}: {}\n", 
-                i + 1, anchor.timestamp, anchor.entity_id, anchor.description));
-        }
+    /// Set the node CID
+    pub fn with_node(mut self, cid: Cid) -> Self {
+        self.builder = self.builder.node(cid);
+        self
     }
     
-    output
+    /// Set the entity DID
+    pub fn with_entity(mut self, entity_did: impl Into<String>) -> Self {
+        self.builder = self.builder.entity(entity_did);
+        self
+    }
+    
+    /// Set context
+    pub fn with_context<C: Serialize>(mut self, context: &C) -> Self {
+        self.builder = self.builder.context(context);
+        self
+    }
+    
+    /// Set source info
+    pub fn with_source(mut self, source_info: impl Into<String>) -> Self {
+        self.builder = self.builder.source(source_info);
+        self
+    }
+    
+    /// Set request ID
+    pub fn with_request_id(mut self, request_id: impl Into<String>) -> Self {
+        self.builder = self.builder.request_id(request_id);
+        self
+    }
+    
+    /// Execute the operation and record the result
+    pub async fn execute<F, R, E>(self, operation: F) -> Result<R, E>
+    where
+        F: FnOnce() -> Result<R, E>,
+        E: std::fmt::Display,
+    {
+        // Execute the operation
+        let result = operation();
+        
+        // Build the audit record based on the result
+        let record = match &result {
+            Ok(_) => self.builder.success(true).build(),
+            Err(e) => self.builder.success(false).error(e.to_string()).build(),
+        };
+        
+        // Record the audit event
+        if let Ok(record) = record {
+            let _ = self.logger.record(record).await; // Ignore errors in audit logging
+        }
+        
+        // Return the original result
+        result
+    }
+    
+    /// Execute an async operation and record the result
+    pub async fn execute_async<F, R, E>(self, operation: F) -> Result<R, E>
+    where
+        F: std::future::Future<Output = Result<R, E>>,
+        E: std::fmt::Display,
+    {
+        // Execute the operation
+        let result = operation.await;
+        
+        // Build the audit record based on the result
+        let record = match &result {
+            Ok(_) => self.builder.success(true).build(),
+            Err(e) => self.builder.success(false).error(e.to_string()).build(),
+        };
+        
+        // Record the audit event
+        if let Ok(record) = record {
+            let _ = self.logger.record(record).await; // Ignore errors in audit logging
+        }
+        
+        // Return the original result
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::runtime::Runtime;
+    
+    #[test]
+    fn test_audit_record_builder() {
+        let record = AuditRecord::builder()
+            .actor("did:icn:alice")
+            .action(AuditAction::NodeCreated)
+            .entity("did:icn:coop1")
+            .build()
+            .unwrap();
+        
+        assert_eq!(record.actor_did, "did:icn:alice");
+        assert!(matches!(record.action, AuditAction::NodeCreated));
+        assert_eq!(record.entity_did, Some("did:icn:coop1".to_string()));
+        assert!(record.success);
+        assert!(record.error_message.is_none());
+    }
+    
+    #[test]
+    fn test_audit_record_with_error() {
+        let record = AuditRecord::builder()
+            .actor("did:icn:alice")
+            .action(AuditAction::NodeVerified)
+            .error("Signature verification failed")
+            .build()
+            .unwrap();
+        
+        assert_eq!(record.actor_did, "did:icn:alice");
+        assert!(matches!(record.action, AuditAction::NodeVerified));
+        assert!(!record.success);
+        assert_eq!(record.error_message, Some("Signature verification failed".to_string()));
+    }
+    
+    #[test]
+    fn test_inmemory_audit_logger() {
+        let rt = Runtime::new().unwrap();
+        
+        rt.block_on(async {
+            let logger = InMemoryAuditLogger::new();
+            
+            // Record some events
+            let record1 = AuditRecord::builder()
+                .actor("did:icn:alice")
+                .action(AuditAction::NodeCreated)
+                .entity("did:icn:coop1")
+                .node(Cid::new_v1(0x71, cid::multihash::Code::Sha2_256.digest(b"node1")))
+                .build()
+                .unwrap();
+                
+            let record2 = AuditRecord::builder()
+                .actor("did:icn:bob")
+                .action(AuditAction::NodeRead)
+                .entity("did:icn:coop1")
+                .node(Cid::new_v1(0x71, cid::multihash::Code::Sha2_256.digest(b"node1")))
+                .build()
+                .unwrap();
+                
+            let record3 = AuditRecord::builder()
+                .actor("did:icn:alice")
+                .action(AuditAction::NodeCreated)
+                .entity("did:icn:coop2")
+                .node(Cid::new_v1(0x71, cid::multihash::Code::Sha2_256.digest(b"node2")))
+                .build()
+                .unwrap();
+            
+            // Store records
+            logger.record(record1).await.unwrap();
+            logger.record(record2).await.unwrap();
+            logger.record(record3).await.unwrap();
+            
+            // Test queries
+            let all_records = logger.get_all_records(10).await.unwrap();
+            assert_eq!(all_records.len(), 3);
+            
+            let alice_records = logger.get_records_for_actor("did:icn:alice", 10).await.unwrap();
+            assert_eq!(alice_records.len(), 2);
+            
+            let coop1_records = logger.get_records_for_entity("did:icn:coop1", 10).await.unwrap();
+            assert_eq!(coop1_records.len(), 2);
+            
+            let node1_cid = Cid::new_v1(0x71, cid::multihash::Code::Sha2_256.digest(b"node1"));
+            let node1_records = logger.get_records_for_node(&node1_cid, 10).await.unwrap();
+            assert_eq!(node1_records.len(), 2);
+        });
+    }
+    
+    #[test]
+    fn test_audited_operation() {
+        let rt = Runtime::new().unwrap();
+        
+        rt.block_on(async {
+            let logger = InMemoryAuditLogger::new();
+            
+            // Test successful operation
+            let result: Result<i32, String> = AuditedOperation::new(
+                &logger, 
+                AuditAction::NodeCreated,
+                "did:icn:alice"
+            )
+            .with_entity("did:icn:coop1")
+            .execute(|| Ok(42))
+            .await;
+            
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), 42);
+            
+            // Test failed operation
+            let result: Result<i32, String> = AuditedOperation::new(
+                &logger, 
+                AuditAction::NodeVerified,
+                "did:icn:alice"
+            )
+            .with_entity("did:icn:coop1")
+            .execute(|| Err("Verification failed".to_string()))
+            .await;
+            
+            assert!(result.is_err());
+            assert_eq!(result.unwrap_err(), "Verification failed");
+            
+            // Check that both operations were recorded
+            let all_records = logger.get_all_records(10).await.unwrap();
+            assert_eq!(all_records.len(), 2);
+            
+            // First record should be success
+            assert!(all_records[0].success);
+            assert!(matches!(all_records[0].action, AuditAction::NodeCreated));
+            
+            // Second record should be failure
+            assert!(!all_records[1].success);
+            assert!(matches!(all_records[1].action, AuditAction::NodeVerified));
+            assert_eq!(all_records[1].error_message, Some("Verification failed".to_string()));
+        });
+    }
 } 

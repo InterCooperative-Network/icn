@@ -1277,6 +1277,14 @@ pub trait StorageManager: Send + Sync {
     /// Useful if the caller wants to handle deserialization.
     async fn get_node_bytes(&self, entity_did: &str, cid: &Cid) -> Result<Option<Vec<u8>>>;
 
+    /// Stores multiple nodes for an entity in a single batch operation.
+    /// This is more efficient than calling store_node repeatedly.
+    async fn store_nodes_batch(
+        &self,
+        entity_did: &str,
+        node_builders: Vec<DagNodeBuilder>,
+    ) -> Result<Vec<(Cid, DagNode)>>;
+
     // Potentially add methods for listing nodes, iterating, etc., within a specific entity's CF.
 }
 
@@ -1461,6 +1469,47 @@ impl StorageManager for RocksDBStorageManager {
             Ok(None) => Ok(None),
             Err(e) => Err(anyhow!("Failed to get node {} from CF '{}': {}", cid, entity_did, e)),
         }
+    }
+
+    async fn store_nodes_batch(
+        &self,
+        entity_did: &str,
+        node_builders: Vec<DagNodeBuilder>,
+    ) -> Result<Vec<(Cid, DagNode)>> {
+        if node_builders.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Get Column Family Handle (expect it to exist)
+        let cf = self.db.cf_handle(entity_did)
+            .ok_or_else(|| anyhow!("Column family '{}' not found for batch operation", entity_did))?;
+
+        let mut batch = WriteBatch::default();
+        let mut results = Vec::with_capacity(node_builders.len());
+        
+        for builder in node_builders {
+            // Build the node
+            let node = builder.build()?;
+            
+            // Encode the node to bytes
+            let node_bytes = DagCborCodec.encode(&node)?;
+            
+            // Calculate the CID
+            let cid = Cid::new_v1(DagCborCodec.into(), cid::multihash::Code::Sha2_256.digest(&node_bytes));
+            
+            // Add to batch
+            batch.put_cf(&cf, cid.to_bytes(), &node_bytes);
+            
+            // Add to results
+            results.push((cid, node));
+        }
+        
+        // Write the entire batch at once
+        self.db.write(batch)
+            .map_err(|e| anyhow!("Failed to write batch for entity '{}': {}", entity_did, e))?;
+        
+        tracing::debug!(entity_did=%entity_did, count=%results.len(), "Stored batch of DAG nodes");
+        Ok(results)
     }
 }
 
