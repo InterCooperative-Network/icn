@@ -12,7 +12,14 @@ document.
 pub mod error;
 pub mod genesis;
 pub mod guardian;
+pub mod dag_anchor;
+pub mod receipt;
 
 // Re-export core structs
 pub use genesis::FederationMetadata;
 pub use guardian::{Guardian, GuardianCredential, GuardianQuorumConfig, QuorumType};
+pub use dag_anchor::GenesisAnchor;
+pub use receipt::{FederationReceipt, MinimalFederationReceipt};
+
+// Re-export receipt verification functions
+pub use receipt::verification::{generate_federation_receipt, verify_federation_receipt, verify_minimal_receipt};

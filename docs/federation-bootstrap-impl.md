@@ -89,24 +89,75 @@ We've implemented the TrustBundle & Consensus Declaration phase, which includes:
    - `to_anchor_payload()` method to convert the trust bundle to a DAG-compatible JSON object
    - Structured for compatibility with Phase 4 anchoring
 
+### Phase 4: DAG Genesis & Anchoring ✅
+
+We've implemented the DAG Genesis & Anchoring phase, which includes:
+
+1. **Genesis Anchor**:
+   - `GenesisAnchor` struct that includes:
+     - DAG root CID (Merkle root of the trust bundle)
+     - Trust bundle CID reference
+     - Federation DID
+     - Issuance timestamp
+     - Anchor signature from the federation
+
+2. **DAG Anchoring**:
+   - `create_genesis_anchor()` function that:
+     - Calculates the Merkle root of the trust bundle
+     - Signs the anchor data with the federation keypair 
+     - Creates a complete genesis anchor for DAG insertion
+
+3. **Anchor Verification**:
+   - `verify_genesis_anchor()` function that:
+     - Verifies the anchor signature against the federation DID
+     - Recalculates and validates the Merkle root
+     - Ensures integrity between the anchor and trust bundle
+
+4. **DAG Integration**:
+   - `calculate_merkle_root()` to generate consistent content identifiers
+   - `to_dag_payload()` method to produce a standardized DAG node format
+   - Support for DAG-specific metadata and payload structuring
+
 ### Phases Pending Implementation
 
-#### Phase 4: DAG Genesis & Anchoring ❌
-- Not yet implemented
-- Requires integration with the DAG crate
+#### Phase 5: Receipt & Verification Protocol ✅
+We've implemented the Receipt & Verification Protocol phase, which includes:
 
-#### Phase 5: Receipt & Verification Protocol ❌
-- Not yet implemented
+1. **Federation Receipt**:
+   - `FederationReceipt` struct that contains:
+     - Federation DID
+     - Anchor CID and trust bundle CID
+     - Verification timestamp
+     - Verifier DID and signature
+   - `MinimalFederationReceipt` for selective disclosure 
+
+2. **Receipt Generation**:
+   - `generate_federation_receipt()` function that:
+     - Verifies the genesis anchor and trust bundle
+     - Creates a receipt with verification metadata
+     - Signs the receipt with the verifier's keypair
+
+3. **Verification Protocol**:
+   - `verify_federation_receipt()` function that:
+     - Checks the verification timestamp for freshness
+     - Verifies the verifier's signature
+     - Confirms consistency with the anchor and trust bundle
+     - Validates the complete verification chain
+
+4. **Selective Disclosure**:
+   - Support for minimal receipts with limited information
+   - `to_minimal_receipt()` method for creating redacted receipts
+   - `verify_minimal_receipt()` for validating minimal receipts
 
 #### Phase 6: Key Recovery & Continuity ❌
 - Not yet implemented
 
 ## Next Steps
 
-1. **Implement Phase 4**: DAG Genesis & Anchoring
-   - Create DAG anchoring for federation trust bundles
-   - Generate anchor credentials
-   - Link DAG roots to trust bundles
+1. **Implement Phase 6**: Key Recovery & Continuity
+   - Define procedures for federation key rotation
+   - Implement guardian succession mechanisms
+   - Develop disaster recovery anchoring
 
 2. **Integrate with Existing ICN Systems**:
    - Connect with DAG for anchoring
