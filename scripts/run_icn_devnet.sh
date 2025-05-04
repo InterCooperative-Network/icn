@@ -2,16 +2,17 @@
 set -Eeuo pipefail
 ###############################################
 #  ICN DEV‑NET ONE‑SHOT SPIN‑UP SCRIPT        #
-#  – Runtime (CoVM v3)                        #
+#  – Runtime (CoVM v3)                        #
 #  – AgoraNet                                 #
-#  – Wallet CLI follower                      #
 ###############################################
 
 REPOROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$REPOROOT"
+cd "$REPOROOT/.."
 
-echo "🔧 1. Building workspace …"
-cargo build --release
+echo "🔧 1. Building runtime components …"
+cd runtime
+cargo build --release -p icn-covm
+cd ..
 
 echo "💾 2. Launching Postgres for AgoraNet …"
 # Stop and remove existing container if it exists
@@ -32,7 +33,7 @@ popd >/dev/null
 echo "🌱 4. Generating federation genesis & booting runtime …"
 pushd runtime >/dev/null
 # Create a genesis TrustBundle & DAG root
-cargo run --release -p icn-runtime-cli -- \
+./target/release/covm \
      federation genesis --name dev-federation \
      --output genesis_trustbundle.json
 
@@ -40,7 +41,7 @@ cargo run --release -p icn-runtime-cli -- \
 # Kill existing process if any using the port
 lsof -ti:7000 | xargs kill -9 >/dev/null 2>&1 || true
 lsof -ti:7001 | xargs kill -9 >/dev/null 2>&1 || true
-cargo run --release -p icn-runtime-cli -- \
+./target/release/covm \
      node start --config ./config/runtime-config-integration.toml \
      --genesis genesis_trustbundle.json --http 0.0.0.0:7000 --grpc 0.0.0.0:7001 \
      > ../runtime.log 2>&1 &
@@ -65,27 +66,20 @@ echo "   ↳ agoranet PID: $AGORANET_PID (logs → agoranet.log)"
 # Wait a moment for AgoraNet to be ready
 sleep 2
 
-echo "🔑 6. Booting wallet follower (prints DAG updates) …"
-pushd wallet >/dev/null
-# Remove previous wallet file if exists
-rm -f dev_wallet.json
-cargo run --release -p wallet-cli -- \
-     init --did dev_wallet --output dev_wallet.json
-
 # Trap SIGINT (Ctrl+C) to kill background processes
 trap 'echo "🛑 Shutting down background processes..."; kill $RUNTIME_PID $AGORANET_PID; exit' INT
 
-cargo run --release -p wallet-sync -- \
-     follow --runtime http://localhost:7000 \
-            --agoranet http://localhost:3001 \
-            --wallet dev_wallet.json
-# Note: The script will block here until Ctrl+C is pressed
-popd >/dev/null
-
-# This part might not be reached if Ctrl+C is used to stop the follower
 echo ""
-echo "✅ ICN dev‑net was live!"
+echo "✅ ICN dev‑net is now live!"
 echo "   • Runtime API  : http://localhost:7000"
 echo "   • AgoraNet API : http://localhost:3001"
 echo ""
-echo "Runtime PID ($RUNTIME_PID) and AgoraNet PID ($AGORANET_PID) should have been terminated." 
+echo "Press Ctrl+C to stop the devnet servers."
+
+# Wait for Ctrl+C
+wait
+
+# This part might not be reached if Ctrl+C is used to stop the servers
+echo ""
+echo "✅ ICN dev‑net was stopped."
+echo "Runtime PID ($RUNTIME_PID) and AgoraNet PID ($AGORANET_PID) have been terminated." 

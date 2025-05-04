@@ -57,3 +57,4 @@ Thumbs.db
 >>>>>>> wallet/main
 # Wallet-specific untracked dirs/scripts
 yarn.lock
+/target/

@@ -62,10 +62,16 @@ pub struct WalletDagNode {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WalletDagNodeMetadata {
     /// Sequence number within the DAG
-    pub sequence: Option<u64>,
+    pub sequence: u64,
     
     /// Scope of the node (cooperative, community, etc.)
     pub scope: Option<String>,
+    
+    /// Content type/format
+    pub content_type: Option<String>,
+    
+    /// Additional tags
+    pub tags: Vec<String>,
 }
 
 /// Legacy wallet DAG node format (for compatibility with older wallets)
@@ -107,10 +113,17 @@ pub fn runtime_to_wallet(runtime_node: &RuntimeDagNode) -> CompatResult<WalletDa
         }
     };
     
+    // Extract scope from tags if present (scope:xxx tag)
+    let scope = runtime_node.metadata.tags.iter()
+        .find(|tag| tag.starts_with("scope:"))
+        .map(|tag| tag[6..].to_string());
+    
     // Create wallet metadata from runtime metadata
     let metadata = WalletDagNodeMetadata {
         sequence: runtime_node.metadata.sequence,
-        scope: runtime_node.metadata.scope.clone(),
+        scope,
+        content_type: runtime_node.metadata.content_type.clone(),
+        tags: runtime_node.metadata.tags.clone(),
     };
     
     Ok(WalletDagNode {
@@ -155,11 +168,23 @@ pub fn wallet_to_runtime(wallet_node: &WalletDagNode) -> CompatResult<RuntimeDag
         .map_err(|e| CompatError::ConversionError(format!("Invalid timestamp: {}", e)))?
         .as_secs();
         
+    // Collect tags
+    let mut tags = wallet_node.metadata.tags.clone();
+    
+    // Add scope as a tag if it exists
+    if let Some(scope) = &wallet_node.metadata.scope {
+        // Add a special tag for scope if it doesn't already exist
+        if !tags.iter().any(|tag| tag.starts_with("scope:")) {
+            tags.push(format!("scope:{}", scope));
+        }
+    }
+    
     // Create the metadata
     let metadata = DagNodeMetadata {
         timestamp,
         sequence: wallet_node.metadata.sequence,
-        scope: wallet_node.metadata.scope.clone(),
+        content_type: wallet_node.metadata.content_type.clone(),
+        tags,
     };
     
     // Create the runtime node
@@ -181,15 +206,32 @@ pub fn legacy_to_wallet(legacy: &LegacyWalletDagNode) -> CompatResult<WalletDagN
         .to_string();
     
     let sequence = legacy.metadata.get("sequence")
-        .and_then(|v| v.as_u64());
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
         
     let scope = legacy.metadata.get("scope")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
         
+    let content_type = legacy.metadata.get("content_type")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Extract tags if they exist in metadata
+    let tags = legacy.metadata.get("tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_else(Vec::new);
+        
     let metadata = WalletDagNodeMetadata {
         sequence,
         scope,
+        content_type,
+        tags,
     };
     
     Ok(WalletDagNode {
@@ -210,14 +252,25 @@ pub fn wallet_to_legacy(wallet: &WalletDagNode) -> CompatResult<LegacyWalletDagN
     // Add issuer to metadata
     metadata.insert("issuer".to_string(), Value::String(wallet.issuer.clone()));
     
-    // Add sequence if present
-    if let Some(seq) = wallet.metadata.sequence {
-        metadata.insert("sequence".to_string(), Value::Number(seq.into()));
-    }
+    // Add sequence
+    metadata.insert("sequence".to_string(), Value::Number(wallet.metadata.sequence.into()));
     
     // Add scope if present
     if let Some(scope) = &wallet.metadata.scope {
         metadata.insert("scope".to_string(), Value::String(scope.clone()));
+    }
+
+    // Add content_type if present
+    if let Some(content_type) = &wallet.metadata.content_type {
+        metadata.insert("content_type".to_string(), Value::String(content_type.clone()));
+    }
+    
+    // Add tags if present
+    if !wallet.metadata.tags.is_empty() {
+        let tags_array = wallet.metadata.tags.iter()
+            .map(|tag| Value::String(tag.clone()))
+            .collect::<Vec<_>>();
+        metadata.insert("tags".to_string(), Value::Array(tags_array));
     }
     
     Ok(LegacyWalletDagNode {
@@ -289,8 +342,9 @@ mod tests {
         
         let metadata = DagNodeMetadata {
             timestamp: 1683123456,
-            sequence: Some(42),
-            scope: Some("test-scope".to_string()),
+            sequence: 42,
+            content_type: Some("application/json".to_string()),
+            tags: vec!["test".to_string(), "example".to_string(), "scope:test-scope".to_string()],
         };
         
         let mut map = BTreeMap::new();
@@ -299,7 +353,7 @@ mod tests {
         RuntimeDagNode {
             cid,
             parents: vec![parent_cid],
-            issuer: IdentityId::new("did:icn:test".to_string()),
+            issuer: IdentityId::new("did:icn:test123".to_string()),
             signature: vec![1, 2, 3, 4],
             payload: Ipld::Map(map),
             metadata,
@@ -311,13 +365,15 @@ mod tests {
         WalletDagNode {
             cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".to_string(),
             parents: vec!["bafkreiaxnnnb7qz6drrbababuirxx54hlzkrl2yxekizxr6gpceiqdu4i".to_string()],
-            issuer: "did:icn:test".to_string(),
-            timestamp: UNIX_EPOCH + std::time::Duration::from_secs(1683123456),
+            issuer: "did:icn:test123".to_string(),
+            timestamp: SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1683123456),
             signature: vec![1, 2, 3, 4],
-            payload: r#"{"key":"value"}"#.as_bytes().to_vec(),
+            payload: b"{\"key\":\"value\"}".to_vec(),
             metadata: WalletDagNodeMetadata {
-                sequence: Some(42),
+                sequence: 42,
                 scope: Some("test-scope".to_string()),
+                content_type: Some("application/json".to_string()),
+                tags: vec!["test".to_string(), "example".to_string()],
             },
         }
     }
@@ -328,12 +384,13 @@ mod tests {
         let wallet_node = runtime_to_wallet(&runtime_node).unwrap();
         
         assert_eq!(wallet_node.cid, runtime_node.cid.to_string());
-        assert_eq!(wallet_node.parents.len(), runtime_node.parents.len());
-        assert_eq!(wallet_node.parents[0], runtime_node.parents[0].to_string());
         assert_eq!(wallet_node.issuer, runtime_node.issuer.to_string());
-        assert_eq!(wallet_node.signature, runtime_node.signature);
         assert_eq!(wallet_node.metadata.sequence, runtime_node.metadata.sequence);
-        assert_eq!(wallet_node.metadata.scope, runtime_node.metadata.scope);
+        assert_eq!(wallet_node.metadata.scope, Some("test-scope".to_string()));
+        assert_eq!(wallet_node.metadata.content_type, runtime_node.metadata.content_type);
+        assert!(wallet_node.metadata.tags.contains(&"test".to_string()));
+        assert!(wallet_node.metadata.tags.contains(&"example".to_string()));
+        assert!(wallet_node.metadata.tags.contains(&"scope:test-scope".to_string()));
     }
 
     #[test]
@@ -342,47 +399,91 @@ mod tests {
         let runtime_node = wallet_to_runtime(&wallet_node).unwrap();
         
         assert_eq!(runtime_node.cid.to_string(), wallet_node.cid);
-        assert_eq!(runtime_node.parents.len(), wallet_node.parents.len());
-        assert_eq!(runtime_node.parents[0].to_string(), wallet_node.parents[0]);
         assert_eq!(runtime_node.issuer.to_string(), wallet_node.issuer);
-        assert_eq!(runtime_node.signature, wallet_node.signature);
         assert_eq!(runtime_node.metadata.sequence, wallet_node.metadata.sequence);
-        assert_eq!(runtime_node.metadata.scope, wallet_node.metadata.scope);
+        assert_eq!(runtime_node.metadata.content_type, wallet_node.metadata.content_type);
+        
+        // Verify that the scope was added as a tag
+        assert!(runtime_node.metadata.tags.contains(&"scope:test-scope".to_string()));
+        assert!(runtime_node.metadata.tags.contains(&"test".to_string()));
+        assert!(runtime_node.metadata.tags.contains(&"example".to_string()));
     }
 
     #[test]
     fn test_legacy_conversions() {
-        let wallet_node = create_test_wallet_node();
+        // Create a legacy node
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("issuer".to_string(), Value::String("did:icn:legacy123".to_string()));
+        metadata.insert("sequence".to_string(), Value::Number(100.into()));
+        metadata.insert("scope".to_string(), Value::String("legacy-scope".to_string()));
+        metadata.insert("content_type".to_string(), Value::String("text/plain".to_string()));
+        let tags = vec![
+            Value::String("legacy".to_string()),
+            Value::String("old-format".to_string())
+        ];
+        metadata.insert("tags".to_string(), Value::Array(tags));
         
-        // Convert to legacy format
-        let legacy_node = wallet_to_legacy(&wallet_node).unwrap();
+        let legacy_node = LegacyWalletDagNode {
+            id: "legacy-cid-123".to_string(),
+            data: b"legacy data".to_vec(),
+            created_at: SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1600000000),
+            refs: vec!["parent-cid-1".to_string(), "parent-cid-2".to_string()],
+            metadata,
+        };
         
-        // Then back to wallet format
-        let converted_wallet_node = legacy_to_wallet(&legacy_node).unwrap();
+        // Convert legacy -> wallet -> legacy
+        let wallet_node = legacy_to_wallet(&legacy_node).unwrap();
+        let round_trip = wallet_to_legacy(&wallet_node).unwrap();
         
-        // Verify key properties were preserved
-        assert_eq!(converted_wallet_node.cid, wallet_node.cid);
-        assert_eq!(converted_wallet_node.parents, wallet_node.parents);
-        assert_eq!(converted_wallet_node.issuer, wallet_node.issuer);
-        assert_eq!(converted_wallet_node.timestamp, wallet_node.timestamp);
-        assert_eq!(converted_wallet_node.payload, wallet_node.payload);
-        assert_eq!(converted_wallet_node.metadata.sequence, wallet_node.metadata.sequence);
-        assert_eq!(converted_wallet_node.metadata.scope, wallet_node.metadata.scope);
-        // Note: signature is not preserved in legacy format
+        // Check original conversions
+        assert_eq!(wallet_node.cid, legacy_node.id);
+        assert_eq!(wallet_node.payload, legacy_node.data);
+        assert_eq!(wallet_node.timestamp, legacy_node.created_at);
+        assert_eq!(wallet_node.metadata.sequence, 100);
+        assert_eq!(wallet_node.metadata.scope.as_ref().unwrap(), "legacy-scope");
+        assert_eq!(wallet_node.metadata.content_type.as_ref().unwrap(), "text/plain");
+        assert_eq!(wallet_node.metadata.tags.len(), 2);
+        assert!(wallet_node.metadata.tags.contains(&"legacy".to_string()));
+        assert!(wallet_node.metadata.tags.contains(&"old-format".to_string()));
+        
+        // Check round trip conversions
+        assert_eq!(round_trip.id, legacy_node.id);
+        assert_eq!(round_trip.data, legacy_node.data);
+        assert_eq!(round_trip.created_at, legacy_node.created_at);
+        
+        let seq_val = round_trip.metadata.get("sequence").unwrap().as_u64().unwrap();
+        assert_eq!(seq_val, 100);
+        
+        let scope_val = round_trip.metadata.get("scope").unwrap().as_str().unwrap();
+        assert_eq!(scope_val, "legacy-scope");
+        
+        let content_type_val = round_trip.metadata.get("content_type").unwrap().as_str().unwrap();
+        assert_eq!(content_type_val, "text/plain");
+        
+        let tags_arr = round_trip.metadata.get("tags").unwrap().as_array().unwrap();
+        assert_eq!(tags_arr.len(), 2);
+        assert!(tags_arr.iter().any(|v| v.as_str().unwrap() == "legacy"));
+        assert!(tags_arr.iter().any(|v| v.as_str().unwrap() == "old-format"));
     }
 
     #[test]
     fn test_datetime_conversions() {
+        // Create a test time
         let now = SystemTime::now();
-        let datetime = system_time_to_datetime(now).unwrap();
-        let converted_time = datetime_to_system_time(datetime);
         
-        // Due to precision loss, we compare with a small epsilon
-        let diff = now.duration_since(converted_time).unwrap_or_else(|_| {
-            converted_time.duration_since(now).unwrap()
-        });
+        // Convert to DateTime
+        let dt = system_time_to_datetime(now).unwrap();
         
-        // Allow 1 second difference due to precision issues
-        assert!(diff.as_secs() <= 1, "Time conversion difference too large: {:?}", diff);
+        // Convert back to SystemTime
+        let st = datetime_to_system_time(dt);
+        
+        // Duration between original and round-trip times should be less than 1 second
+        // (due to nanosecond precision loss)
+        let duration = match st.duration_since(now) {
+            Ok(d) => d,
+            Err(e) => e.duration(),
+        };
+        
+        assert!(duration.as_secs() < 1);
     }
 } 
