@@ -10,9 +10,9 @@ REPOROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPOROOT/.."
 
 echo "🔧 1. Building runtime components …"
-cd runtime
-cargo build --release -p icn-covm
-cd ..
+cd runtime/cli
+cargo build --release
+cd ../..
 
 echo "💾 2. Launching Postgres for AgoraNet …"
 # Stop and remove existing container if it exists
