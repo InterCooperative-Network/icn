@@ -3107,6 +3107,7 @@ name = "icn-wallet-root"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "futures",
  "icn-wallet-sync",
@@ -3117,6 +3118,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "wallet-identity",
  "wallet-storage",
 ]
