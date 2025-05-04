@@ -839,6 +839,72 @@ fn host_contains_dag_node_wrapper(
     }
 }
 
+/// Wrapper for host_get_execution_receipts ABI function
+fn host_get_execution_receipts_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>, 
+    scope_ptr: i32, 
+    scope_len: i32,
+    timestamp_ptr: i32,
+    result_ptr: i32,
+    result_max_len: i32
+) -> Result<i32, Trap> {
+    debug!("host_get_execution_receipts called with scope_ptr: {}, scope_len: {}", scope_ptr, scope_len);
+    
+    // Read the scope string from WASM memory
+    let scope = match safe_read_string(&caller, scope_ptr as u32, scope_len as u32) {
+        Ok(s) => s,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Check if we have a timestamp filter
+    let timestamp_opt = if timestamp_ptr != 0 {
+        match safe_read_bytes(&caller, timestamp_ptr as u32, 8) {
+            Ok(bytes) => {
+                if bytes.len() == 8 {
+                    let timestamp_bytes: [u8; 8] = match bytes.try_into() {
+                        Ok(arr) => arr,
+                        Err(_) => return Ok(map_abi_error_to_wasm(anyhow!("Failed to convert timestamp bytes"))),
+                    };
+                    Some(i64::from_le_bytes(timestamp_bytes))
+                } else {
+                    return Ok(map_abi_error_to_wasm(anyhow!("Invalid timestamp length")));
+                }
+            },
+            Err(e) => return Ok(map_abi_error_to_wasm(e)),
+        }
+    } else {
+        None
+    };
+    
+    // Record compute cost for this operation
+    let env = caller.data();
+    if let Err(e) = env.record_compute_usage(200 + (scope_len as u64) / 10) {
+        return Ok(map_vm_error_to_wasm(e));
+    }
+    
+    // Get the tokio runtime handle
+    let handle = tokio::runtime::Handle::current();
+    
+    // Call the method to get simplified execution receipts
+    let result = handle.block_on(
+        crate::credentials::get_simplified_execution_receipts(env, &scope, timestamp_opt)
+    );
+    
+    match result {
+        Ok(json_string) => {
+            // Write the result to WASM memory
+            match safe_write_string(&mut caller, &json_string, result_ptr as u32, result_max_len as u32) {
+                Ok(len) => Ok(len),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        },
+        Err(e) => {
+            error!("Failed to get execution receipts: {}", e);
+            Ok(-1) // Error code for credential retrieval failure
+        }
+    }
+}
+
 /// Register all host functions
 pub fn register_host_functions(
     linker: &mut wasmtime::Linker<ConcreteHostEnvironment>,
@@ -1061,6 +1127,13 @@ pub fn register_host_functions(
         "host_transfer_resource",
         host_transfer_resource_wrapper,
     ).map_err(|e| VmError::InitializationError(format!("Failed to register host_transfer_resource: {}", e)))?;
+
+    // Register execution receipts function
+    linker.func_wrap(
+        "env",
+        "host_get_execution_receipts",
+        host_get_execution_receipts_wrapper,
+    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_execution_receipts: {}", e)))?;
 
     Ok(())
 } 

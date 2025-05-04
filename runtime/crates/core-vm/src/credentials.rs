@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use uuid::Uuid;
+use thiserror::Error;
 
 /// Type of credential being issued
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +90,25 @@ pub struct CredentialProof {
     pub proof_purpose: String,
     /// The signature value
     pub proof_value: String,
+}
+
+/// Error type for credential operations
+#[derive(Error, Debug)]
+pub enum CredentialError {
+    #[error("Storage error: {0}")]
+    StorageError(String),
+    
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+    
+    #[error("Invalid credential format: {0}")]
+    InvalidFormat(String),
+    
+    #[error("Not found")]
+    NotFound,
+    
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
 /// Issues an execution receipt credential for a proposal execution
@@ -200,4 +220,102 @@ pub async fn issue_proposal_outcome_credential(
     // Implementation similar to execution receipt
     // For now, we'll focus on the execution receipt as requested
     unimplemented!("Proposal outcome credential issuance not implemented yet")
+}
+
+/// Retrieves execution receipts by scope and optional timestamp
+pub async fn get_execution_receipts(
+    host_env: &ConcreteHostEnvironment,
+    scope: &str,
+    since_timestamp: Option<i64>,
+) -> Result<Vec<VerifiableCredential<ExecutionReceiptSubject>>, CredentialError> {
+    // Get the storage manager
+    let storage_manager = host_env.storage_manager()
+        .map_err(|e| CredentialError::StorageError(format!("Failed to get storage manager: {}", e)))?;
+    
+    // Build the prefix for querying
+    let prefix = format!("credential:execution_receipt");
+    
+    // Query all credentials that match the prefix pattern
+    // In a real implementation, this would use a more efficient index-based query
+    let mut receipts = Vec::new();
+    
+    // Get all keys that match the prefix
+    // This is a simplified implementation - in a real system you'd use a proper query
+    // against an indexed store
+    let credentials = storage_manager.list_anchors(&prefix)
+        .await
+        .map_err(|e| CredentialError::StorageError(format!("Failed to list anchors: {}", e)))?;
+    
+    // Process each credential
+    for (key, data) in credentials {
+        // Parse the credential
+        let credential: VerifiableCredential<ExecutionReceiptSubject> = serde_json::from_slice(&data)
+            .map_err(|e| CredentialError::SerializationError(format!("Failed to deserialize credential: {}", e)))?;
+        
+        // Check scope
+        if credential.credential_subject.federation_scope != scope {
+            continue;
+        }
+        
+        // Check timestamp if provided
+        if let Some(since) = since_timestamp {
+            let cred_time = credential.credential_subject.execution_timestamp
+                .timestamp();
+            
+            if cred_time < since {
+                continue;
+            }
+        }
+        
+        // Add to results
+        receipts.push(credential);
+    }
+    
+    Ok(receipts)
+}
+
+/// Retrieves simplified execution receipts by scope and optional timestamp
+/// Returns JSON format for easy consumption by WASM modules
+pub async fn get_simplified_execution_receipts(
+    host_env: &ConcreteHostEnvironment,
+    scope: &str,
+    since_timestamp: Option<i64>,
+) -> Result<String, CredentialError> {
+    // Get the storage manager
+    let storage_manager = host_env.storage_manager()
+        .map_err(|e| CredentialError::StorageError(format!("Failed to get storage manager: {}", e)))?;
+    
+    // Build the prefix for querying
+    let prefix = format!("{}:ExecutionReceipt", scope);
+    
+    // Query all receipts that match the prefix pattern
+    let mut receipts = Vec::new();
+    
+    // Get all keys that match the prefix
+    let anchored_data = storage_manager.list_anchors(&prefix)
+        .await
+        .map_err(|e| CredentialError::StorageError(format!("Failed to list anchors: {}", e)))?;
+    
+    // Process each receipt
+    for (_, data) in anchored_data {
+        // Parse the receipt
+        let receipt: serde_json::Value = serde_json::from_slice(&data)
+            .map_err(|e| CredentialError::SerializationError(format!("Failed to deserialize receipt: {}", e)))?;
+        
+        // Check timestamp if provided
+        if let Some(since) = since_timestamp {
+            if let Some(timestamp) = receipt["timestamp"].as_i64() {
+                if timestamp < since {
+                    continue;
+                }
+            }
+        }
+        
+        // Add to results
+        receipts.push(receipt);
+    }
+    
+    // Serialize to JSON
+    serde_json::to_string(&receipts)
+        .map_err(|e| CredentialError::SerializationError(format!("Failed to serialize receipts: {}", e)))
 } 
