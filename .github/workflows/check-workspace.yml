@@ -92,4 +92,18 @@ jobs:
         run: cargo install cargo-hack --locked
       
       - name: Check all feature combinations
-        run: cargo hack check --each-feature --no-dev-deps --workspace 
+        run: cargo hack check --each-feature --no-dev-deps --workspace
+      
+      - name: Run security review scripts
+        run: |
+          # Runtime security review
+          if [ -f "scripts/validate_repo_structure.sh" ]; then
+            echo "Running repository structure validation..."
+            bash scripts/validate_repo_structure.sh
+          fi
+          
+          # Run stress tests if available
+          if [ -f "scripts/run_stress_tests.sh" ]; then
+            echo "Running stress tests..."
+            bash scripts/run_stress_tests.sh --ci-mode
+          fi 

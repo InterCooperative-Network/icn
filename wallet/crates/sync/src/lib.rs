@@ -28,13 +28,9 @@ pub use federation::{FederationSyncClient, TrustBundleSubscription, FederationNo
 pub use compat::{LegacyDagNode, legacy_to_current, current_to_legacy, parse_dag_node_json};
 
 // Re-export wallet-types
-pub use wallet_types::{
-    DagNode, 
-    DagNodeMetadata, 
-    DagThread,
-    NodeSubmissionResponse,
-    WalletError, 
-    WalletResult,
+pub use icn_wallet_types::{
+    DagNode, DagNodeMetadata, FederationInfo, NodeId, NodeSubmissionResponse, PagedResponse,
+    PaginationParams, ThreadInfo, WalletConfig, WalletResult,
 };
 
 /// Synchronization client for interacting with ICN nodes

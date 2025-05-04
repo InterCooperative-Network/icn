@@ -5,7 +5,7 @@ use icn_federation::{FederationManager, FederationManagerConfig};
 use icn_identity::{IdentityId, IdentityScope, KeyPair};
 use icn_storage::AsyncInMemoryStorage;
 use icn_execution_tools::derive_authorizations;
-use wallet_types::{DagNode, DagNodeMetadata, WalletResult};
+use icn_wallet_types::{DagNode, DagNodeMetadata, WalletResult};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::time::Duration;

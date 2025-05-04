@@ -4,9 +4,15 @@ use std::collections::HashMap;
 use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use std::str::FromStr;
+use std::fmt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use futures::Stream;
+use tracing::{debug, error, info, warn};
+use icn_wallet_types::WalletResult;
 
 use crate::{SyncClient, error::SyncError, DagNode, DagNodeMetadata};
-use wallet_types::WalletResult;
 
 /// Trust bundle containing verified DIDs and credentials
 #[derive(Debug, Clone, Serialize, Deserialize)]

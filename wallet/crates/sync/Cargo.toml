@@ -23,7 +23,7 @@ serde_json = { workspace = true }
 
 # Network and HTTP
 reqwest = { workspace = true }
-backoff = { workspace = true }
+backoff = { workspace = true, features = ["futures"] }
 
 # Crypto and hashes
 cid = { workspace = true }

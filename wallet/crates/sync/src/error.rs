@@ -1,6 +1,6 @@
 use thiserror::Error;
 use std::io;
-use wallet_types::WalletError;
+use icn_wallet_types::WalletError;
 
 #[derive(Error, Debug)]
 pub enum SyncError {

@@ -1,5 +1,5 @@
 [package]
-name = "wallet-identity"
+name = "icn-wallet-identity"
 version = "0.1.0"
 edition = "2021"
 description = "Identity management for the ICN Wallet"

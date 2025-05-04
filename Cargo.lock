@@ -731,7 +731,6 @@ dependencies = [
  "instant",
  "pin-project-lite",
  "rand 0.8.5",
- "tokio",
 ]
 
 [[package]]
@@ -3665,6 +3664,7 @@ dependencies = [
  "icn-governance-kernel",
  "icn-identity",
  "icn-storage",
+ "icn-wallet-types",
  "libipld",
  "multihash 0.16.3",
  "predicates 2.1.5",
@@ -3678,7 +3678,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "wallet-types",
  "wasmer-wasi",
 ]
 
@@ -3936,6 +3935,10 @@ name = "icn-verifier-runtime"
 version = "0.1.0"
 
 [[package]]
+name = "icn-wallet-actions"
+version = "0.1.0"
+
+[[package]]
 name = "icn-wallet-agent"
 version = "0.1.0"
 dependencies = [
@@ -3946,6 +3949,7 @@ dependencies = [
  "clap",
  "icn-dag",
  "icn-wallet-core",
+ "icn-wallet-sync",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -3957,6 +3961,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-wallet-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "icn-wallet-types",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-wallet-core"
 version = "0.1.0"
 dependencies = [
@@ -3964,13 +3982,14 @@ dependencies = [
  "async-trait",
  "chrono",
  "icn-dag",
+ "icn-wallet-identity",
+ "icn-wallet-storage",
+ "icn-wallet-sync",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "wallet-identity",
- "wallet-storage",
 ]
 
 [[package]]
@@ -3981,6 +4000,7 @@ dependencies = [
  "chrono",
  "icn-wallet-agent",
  "icn-wallet-core",
+ "icn-wallet-sync",
  "serde",
  "serde_json",
  "tempfile",
@@ -3994,8 +4014,24 @@ name = "icn-wallet-ffi-old"
 version = "0.1.0"
 
 [[package]]
-name = "icn-wallet-ffi-runtime"
+name = "icn-wallet-identity"
 version = "0.1.0"
+dependencies = [
+ "base64 0.21.7",
+ "chrono",
+ "ed25519-dalek 1.0.1",
+ "getrandom 0.2.16",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "icn-wallet-root"
@@ -4005,6 +4041,11 @@ dependencies = [
  "chrono",
  "clap",
  "futures",
+ "icn-wallet-actions",
+ "icn-wallet-api",
+ "icn-wallet-identity",
+ "icn-wallet-storage",
+ "icn-wallet-sync",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -4013,34 +4054,59 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "wallet-actions",
- "wallet-api",
- "wallet-identity",
- "wallet-storage",
+]
+
+[[package]]
+name = "icn-wallet-storage"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "async-trait",
+ "chrono",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]
 name = "icn-wallet-sync"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
+ "backoff",
  "chrono",
  "cid 0.10.1",
- "icn-dag",
- "icn-identity",
- "icn-storage",
- "libipld",
+ "futures",
+ "hex",
+ "icn-wallet-types",
  "mockito",
+ "multihash 0.16.3",
  "reqwest",
  "serde",
- "serde_bytes",
  "serde_json",
- "tempfile",
+ "sha2 0.10.9",
+ "test-log",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "icn-wallet-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -10715,105 +10781,6 @@ checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
 dependencies = [
  "same-file",
  "winapi-util",
-]
-
-[[package]]
-name = "wallet-actions"
-version = "0.1.0"
-
-[[package]]
-name = "wallet-agent"
-version = "0.1.0"
-
-[[package]]
-name = "wallet-api"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "wallet-types",
-]
-
-[[package]]
-name = "wallet-core"
-version = "0.1.0"
-
-[[package]]
-name = "wallet-identity"
-version = "0.1.0"
-dependencies = [
- "base64 0.21.7",
- "chrono",
- "ed25519-dalek 1.0.1",
- "getrandom 0.2.16",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "wallet-storage"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "async-trait",
- "chrono",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "tracing",
-]
-
-[[package]]
-name = "wallet-sync"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "backoff",
- "chrono",
- "cid 0.10.1",
- "futures",
- "hex",
- "mockito",
- "multihash 0.16.3",
- "reqwest",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "test-log",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "tracing",
- "uuid",
- "wallet-types",
-]
-
-[[package]]
-name = "wallet-types"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
 ]
 
 [[package]]

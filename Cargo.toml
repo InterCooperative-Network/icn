@@ -2,7 +2,19 @@
 resolver = "2"
 members = [
     "runtime",
-    "runtime/crates/*",
+    "runtime/crates/common",
+    "runtime/crates/core-vm",
+    "runtime/crates/dag",
+    "runtime/crates/economics",
+    "runtime/crates/federation",
+    "runtime/crates/governance-kernel",
+    "runtime/crates/identity",
+    "runtime/crates/storage",
+    "runtime/crates/ccl-compiler",
+    "runtime/crates/execution-tools",
+    "runtime/crates/agoranet-integration",
+    "runtime/crates/models",
+    "runtime/crates/icn-verifier",
     "runtime/cli",
     "wallet",
     "wallet/crates/*",
@@ -15,12 +27,10 @@ members = [
 # Temporarily excluded components with issues
 exclude = [
     "frontend/*",
-    "runtime/crates/agoranet-integration",
-    # Exclude duplicate crates - prefer the unified "icn-" prefixed versions in wallet/crates
-    "runtime/crates/wallet-agent",    # Duplicate of wallet/crates/wallet-agent (icn-wallet-agent)
-    "runtime/crates/wallet-core",     # Duplicate of wallet/crates/wallet-core (icn-wallet-core)
-    "runtime/crates/wallet-ffi",      # Duplicate of wallet/crates/wallet-ffi (icn-wallet-ffi)
-    "runtime/crates/wallet-sync",     # Duplicate of wallet/crates/sync (not enabled yet)
+    "runtime/crates/wallet-agent",
+    "runtime/crates/wallet-core",
+    "runtime/crates/wallet-ffi",
+    "runtime/crates/wallet-sync",
     "wallet/crates/ffi",              # Old path now renamed to wallet-ffi
 ]
 
