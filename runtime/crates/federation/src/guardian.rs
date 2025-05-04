@@ -3,8 +3,9 @@ use cid::Cid;
 use chrono::{DateTime, Utc};
 use icn_identity::{
     IdentityId, VerifiableCredential, KeyPair, Signature,
-    QuorumConfig, QuorumProof, generate_did_key, sign_credential, JWK, IdentityScope
+    QuorumConfig, QuorumProof, IdentityScope
 };
+use ssi_jwk::JWK;
 
 use crate::error::{FederationError, FederationResult};
 use uuid::Uuid;
@@ -141,8 +142,7 @@ pub struct GuardianCredential {
 pub mod initialization {
     use super::*;
     use icn_identity::{
-        generate_did_key, sign_credential, JWK,
-        VerifiableCredential, IdentityScope
+        generate_did_key, sign_credential, VerifiableCredential
     };
     use uuid::Uuid;
     use std::collections::HashMap;
@@ -296,9 +296,86 @@ pub mod decisions {
         guardians: &[Guardian],
         config: &GuardianQuorumConfig,
     ) -> FederationResult<QuorumProof> {
-        // This will be implemented in the next step
-        // For now, return a placeholder error
-        Err(FederationError::BootstrapError("Quorum proof creation not yet implemented".to_string()))
+        // Convert guardian quorum config to identity crate's QuorumConfig
+        let quorum_config = config.to_quorum_config();
+        
+        // Collect signatures from available guardians
+        let mut votes = Vec::new();
+        
+        for guardian in guardians {
+            // Skip guardians without keypairs
+            if guardian.keypair.is_none() {
+                continue;
+            }
+            
+            // Sign the action data with this guardian's key
+            match guardian.sign(action_data) {
+                Ok(signature) => {
+                    // Add the signature to the votes
+                    votes.push((guardian.did.clone(), signature));
+                },
+                Err(e) => {
+                    // Log the error but continue with other guardians
+                    tracing::warn!("Guardian {} failed to sign: {}", guardian.did.0, e);
+                }
+            }
+        }
+        
+        // Check if we have enough votes
+        let total_guardians = config.guardians.len();
+        
+        // Simple validation based on quorum type
+        match &config.quorum_type {
+            QuorumType::Majority => {
+                let majority = (total_guardians / 2) + 1;
+                if votes.len() < majority {
+                    return Err(FederationError::VerificationError(format!(
+                        "Not enough votes: got {}, need {} for majority",
+                        votes.len(), majority
+                    )));
+                }
+            },
+            QuorumType::Threshold(threshold) => {
+                let threshold_percentage = *threshold as f32 / 100.0;
+                let threshold_count = (total_guardians as f32 * threshold_percentage).ceil() as usize;
+                if votes.len() < threshold_count {
+                    return Err(FederationError::VerificationError(format!(
+                        "Not enough votes: got {}, need {} for {}% threshold",
+                        votes.len(), threshold_count, threshold
+                    )));
+                }
+            },
+            QuorumType::Unanimous => {
+                if votes.len() < total_guardians {
+                    return Err(FederationError::VerificationError(format!(
+                        "Not enough votes: got {}, need {} for unanimous approval",
+                        votes.len(), total_guardians
+                    )));
+                }
+            },
+            QuorumType::Weighted(weights, required) => {
+                // Calculate total accumulated weight
+                let mut total_weight = 0u32;
+                for (did, signature) in &votes {
+                    if let Some((_, weight)) = weights.iter().find(|(guardian_did, _)| guardian_did == &did.0) {
+                        total_weight += weight;
+                    }
+                }
+                
+                if total_weight < *required {
+                    return Err(FederationError::VerificationError(format!(
+                        "Not enough weight: got {}, need {} for weighted approval",
+                        total_weight, required
+                    )));
+                }
+            }
+        }
+        
+        // Create the quorum proof
+        Ok(QuorumProof {
+            votes,
+            config: quorum_config,
+        })
     }
     
     /// Verify a guardian quorum proof
@@ -313,5 +390,83 @@ pub mod decisions {
         // Use the identity crate's verification
         proof.verify(content_hash, &guardian_dids).await
             .map_err(|e| FederationError::VerificationError(format!("Failed to verify quorum proof: {}", e)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::guardian::initialization::initialize_guardian_set;
+    use crate::guardian::decisions::create_quorum_proof;
+
+    #[tokio::test]
+    async fn test_initialize_guardian_set() {
+        // Create 3 guardians with majority quorum
+        let result = initialize_guardian_set(3, QuorumType::Majority).await;
+        assert!(result.is_ok(), "Failed to initialize guardian set: {:?}", result.err());
+        
+        let (guardians, config) = result.unwrap();
+        
+        // Check guardians
+        assert_eq!(guardians.len(), 3, "Should have 3 guardians");
+        for guardian in &guardians {
+            assert!(guardian.keypair.is_some(), "Guardian should have a keypair");
+            assert!(guardian.did.0.starts_with("did:key:"), "Guardian should have a DID");
+        }
+        
+        // Check quorum config
+        assert_eq!(config.guardians.len(), 3, "Config should have 3 guardians");
+        assert!(matches!(config.quorum_type, QuorumType::Majority), "Quorum type should be Majority");
+    }
+    
+    #[tokio::test]
+    async fn test_guardian_quorum_signing() {
+        // Create 5 guardians with 60% threshold
+        let result = initialize_guardian_set(5, QuorumType::Threshold(60)).await;
+        assert!(result.is_ok());
+        
+        let (guardians, config) = result.unwrap();
+        
+        // Test data to sign
+        let test_data = b"test federation action";
+        
+        // Create quorum proof with 3 guardians (60% of 5)
+        let guardian_subset = &guardians[0..3];
+        let proof_result = create_quorum_proof(test_data, guardian_subset, &config).await;
+        assert!(proof_result.is_ok(), "Failed to create quorum proof: {:?}", proof_result.err());
+        
+        let proof = proof_result.unwrap();
+        
+        // Check proof
+        assert_eq!(proof.votes.len(), 3, "Should have 3 votes");
+        
+        // Use the decisions module to verify the proof
+        let verify_result = decisions::verify_quorum_proof(&proof, test_data, &config).await;
+        assert!(verify_result.is_ok(), "Failed to verify quorum proof: {:?}", verify_result.err());
+        assert!(verify_result.unwrap(), "Quorum proof verification should succeed");
+    }
+    
+    #[tokio::test]
+    async fn test_quorum_proof_insufficient_votes() {
+        // Create 5 guardians with 80% threshold
+        let result = initialize_guardian_set(5, QuorumType::Threshold(80)).await;
+        assert!(result.is_ok());
+        
+        let (guardians, config) = result.unwrap();
+        
+        // Test data to sign
+        let test_data = b"test federation action";
+        
+        // Try to create quorum proof with only 3 guardians (60% of 5, below the 80% threshold)
+        let guardian_subset = &guardians[0..3];
+        let proof_result = create_quorum_proof(test_data, guardian_subset, &config).await;
+        
+        // Should fail due to insufficient votes
+        assert!(proof_result.is_err(), "Should fail with insufficient votes");
+        if let Err(FederationError::VerificationError(msg)) = proof_result {
+            assert!(msg.contains("Not enough votes"), "Error should mention insufficient votes");
+        } else {
+            panic!("Expected VerificationError, got: {:?}", proof_result);
+        }
     }
 } 

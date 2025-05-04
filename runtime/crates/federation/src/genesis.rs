@@ -53,9 +53,9 @@ pub struct FederationEstablishmentCredential {
 pub mod bootstrap {
     use super::*;
     use icn_identity::{
-        Guardian, GuardianCredential, VerifiableCredential,
-        QuorumConfig, QuorumProof
+        IdentityId, VerifiableCredential, QuorumConfig, QuorumProof
     };
+    use crate::guardian::Guardian;
     use crate::error::FederationError;
     
     /// Initialize a new federation with the given guardians and configuration

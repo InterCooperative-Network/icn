@@ -1045,4 +1045,9 @@ mod tests {
 
     // TODO: Update other tests (sign/verify, VC, TrustBundle) to use the new manager
     // and proper crypto operations. The existing tests are likely broken now.
-} 
+}
+
+// Re-export essential types for external use
+pub use crate::did::IdentityId;
+pub use crate::keypair::{KeyPair, Signature};
+pub use ssi_jwk::JWK; 
