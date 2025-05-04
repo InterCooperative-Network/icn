@@ -39,6 +39,7 @@ rocksdb = { version = "0.21", default-features = false, features = ["multi-threa
 
 [dev-dependencies] 
 tempfile = "3.9.0"
+rand = "0.8.5"
 
 [features]
 default = ["memory-storage"]
