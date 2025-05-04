@@ -10,7 +10,6 @@ use std::time::SystemTime;
 use crate::error::SyncError;
 use crate::DagNode;
 use serde_json::Value;
-use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// Legacy DagNode structure for compatibility with older APIs

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
-use serde_json::Value;
 use chrono::{DateTime, Utc};
 
 use crate::error::SyncError;

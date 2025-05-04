@@ -7,19 +7,15 @@
 
 use crate::{SyncClient, error::SyncError, TrustBundle, DagNode};
 use std::sync::Arc;
-use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::{Mutex, broadcast};
 use tokio::time::sleep;
-use tracing::{debug, info, error, warn};
-use reqwest::Url;
+use tracing::{debug, warn};
 use tokio::sync::broadcast::error::TryRecvError;
 use serde::{Serialize, Deserialize};
-use serde_json::Value;
 use futures::Stream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use futures::stream::StreamExt;
 
 /// Federation node address for connection
 #[derive(Debug, Clone)]

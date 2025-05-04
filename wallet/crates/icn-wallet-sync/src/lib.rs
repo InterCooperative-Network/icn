@@ -1,17 +1,10 @@
 use std::time::SystemTime;
-use std::str::FromStr;
-use std::fmt;
-use std::sync::Arc;
 
-use async_trait::async_trait;
-use tracing::{debug, error, info, warn};
-use chrono::{DateTime, Utc};
+use tracing::warn;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use uuid::Uuid;
 use reqwest::Client;
-use tokio::sync::Mutex;
-use backoff::{ExponentialBackoff, backoff::Backoff};
+use backoff::ExponentialBackoff;
 use futures::future::TryFutureExt;
 use backoff::future::retry_notify;
 
@@ -230,7 +223,7 @@ impl SyncService {
     
     /// Submit a node with automatic retries
     pub async fn submit_node_with_retry(&self, node: &DagNode) -> Result<NodeSubmissionResponse, SyncError> {
-        let mut backoff = self.backoff.clone();
+        let backoff = self.backoff.clone();
         let client = self.client.clone();
         let node = node.clone();
         
