@@ -1,0 +1,32 @@
+# ICN Federation Bootstrap Nodes Configuration
+# 
+# This file defines the bootstrap nodes used by the federation for discovery.
+# Each node must have at least addr, name, and federation_id fields.
+# Optional fields include node_did and fingerprint for verification.
+
+[[bootstrap_nodes]]
+addr = "/ip4/54.165.32.146/tcp/4001/p2p/QmeLw3P7f1eTXMgMAW9VhvXgvCYrv7VypnEmqw7VJU4pYH"
+name = "ICN Main Federation Node 1"
+federation_id = "icn-main"
+node_did = "did:icn:yK7vdAzCXPP3DZSz2oMKWGU4YUV9GQ4xVfDZnNKj5Y7"
+fingerprint = "sha256:f83d6d68965a13d5760b4609fe97c38f2f34a0ad7702c31dfbfda4addaf27638"
+
+[[bootstrap_nodes]]
+addr = "/ip4/18.234.5.123/tcp/4001/p2p/QmW2omCZZN41xYWsuCjgYKcCTHfcGqKbW2Z8MByLRh4XYo"
+name = "ICN Main Federation Node 2"
+federation_id = "icn-main"
+node_did = "did:icn:CUSuoVkNBm8YSAaeJX6qeNpLRqYr3xpVKFEP5SbL9CW"
+fingerprint = "sha256:46c2a7fc88e0f31fff09cca3e848592730f2f3eb4d6595dbe4735bd81b64672b"
+
+[[bootstrap_nodes]]
+addr = "/ip4/13.52.78.243/tcp/4001/p2p/QmTAvajLNS98Qbm4QoS8zRNY4RRcgeFYQvQYW5RxHKQRqq"
+name = "ICN Test Federation Node"
+federation_id = "icn-test"
+node_did = "did:icn:GbXuJSdG3vbwK5DVuaBUfQeVXd6FnKv5QrLtKrFJ9aP"
+fingerprint = "sha256:fc90a7b1f4d4c2eca56b39684f8e3de02a1d894ce9d54598f73b5e49e3d6cfea"
+
+# Development/local nodes - used during testing
+[[bootstrap_nodes]]
+addr = "/ip4/127.0.0.1/tcp/4001/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N"
+name = "Local Dev Node"
+federation_id = "dev" 

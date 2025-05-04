@@ -10,204 +10,280 @@ use tokio::task::JoinHandle;
 use tokio::time::{Duration, interval};
 use uuid::Uuid;
 use super::FederationError;
+use sqlx::{Pool, Postgres};
+use tracing::{info, warn, error, debug};
+use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
+use tokio::sync::{mpsc};
 
 type Result<T> = std::result::Result<T, FederationError>;
 
-/// Engine for thread and credential link synchronization
+/// The SyncEngine handles synchronization of threads and messages
+/// between federation nodes
 pub struct SyncEngine {
-    /// Reference to the network layer
+    /// Database connection pool
+    db_pool: Arc<Pool<Postgres>>,
+    
+    /// Network interface for peer communication
     network: Arc<RwLock<FederationNetwork>>,
     
-    /// Database connection pool
-    db_pool: PgPool,
+    /// Synchronization queue for outgoing messages
+    sync_queue_tx: mpsc::Sender<SyncTask>,
     
-    /// Thread repository
-    thread_repo: ThreadRepository,
+    /// Flag indicating if sync is enabled
+    enabled: bool,
+}
+
+/// Sync task types handled by the sync engine
+#[derive(Debug)]
+enum SyncTask {
+    /// Synchronize a thread and its messages
+    Thread(ThreadMessage),
     
-    /// Credential link repository
-    link_repo: CredentialLinkRepository,
-    
-    /// Handle for the background sync task
-    sync_task: Option<JoinHandle<()>>,
-    
-    /// Whether the sync engine is running
-    running: bool,
+    /// Synchronize a single message
+    Message(Message),
 }
 
 impl SyncEngine {
-    /// Create a new sync engine
-    pub fn new(network: Arc<RwLock<FederationNetwork>>, db_pool: PgPool) -> Self {
-        let thread_repo = ThreadRepository::new(db_pool.clone());
-        let link_repo = CredentialLinkRepository::new(db_pool.clone());
+    /// Create a new SyncEngine
+    pub fn new(
+        db_pool: Arc<Pool<Postgres>>,
+        network: Arc<RwLock<FederationNetwork>>,
+        enabled: bool,
+    ) -> Self {
+        let (sync_queue_tx, mut sync_queue_rx) = mpsc::channel::<SyncTask>(100);
         
-        Self {
-            network,
-            db_pool,
-            thread_repo,
-            link_repo,
-            sync_task: None,
-            running: false,
-        }
-    }
-    
-    /// Start the sync engine
-    pub async fn start(&mut self) -> Result<()> {
-        if self.running {
-            return Ok(());
-        }
-        
-        self.running = true;
-        
-        // Clone components for use in the task
-        let network = self.network.clone();
-        let thread_repo = ThreadRepository::new(self.db_pool.clone());
-        let link_repo = CredentialLinkRepository::new(self.db_pool.clone());
-        
-        // Spawn the background task for event handling
-        let task = tokio::spawn(async move {
-            let mut event_interval = interval(Duration::from_secs(5));
-            
-            loop {
-                tokio::select! {
-                    _ = event_interval.tick() => {
-                        // Regular background sync tasks
+        // Spawn a worker task to process the sync queue
+        let db_pool_clone = db_pool.clone();
+        let network_clone = network.clone();
+        tokio::spawn(async move {
+            while let Some(task) = sync_queue_rx.recv().await {
+                let result = match task {
+                    SyncTask::Thread(thread) => {
+                        debug!("Processing thread sync task for thread {}", thread.id);
+                        Self::process_thread_sync(db_pool_clone.clone(), network_clone.clone(), thread).await
+                    },
+                    SyncTask::Message(message) => {
+                        debug!("Processing message sync task for message {}", message.id);
+                        Self::process_message_sync(db_pool_clone.clone(), network_clone.clone(), message).await
                     }
-                    
-                    // Handle network events
-                    Some(event) = async {
-                        let mut net = network.write().await;
-                        net.next_event().await
-                    } => {
-                        if let crate::federation::network::NetworkEvent::Message { peer_id, topic, data } = event {
-                            match topic {
-                                NetworkTopic::ThreadAnnounce => {
-                                    if let Ok(msg) = SyncMessage::from_bytes(&data) {
-                                        if let SyncMessage::Thread(thread_msg) = msg {
-                                            // Handle thread announcement
-                                            let _ = handle_thread_announcement(
-                                                &thread_repo, 
-                                                &thread_msg
-                                            ).await;
-                                        }
-                                    }
-                                }
-                                NetworkTopic::CredentialLinkAnnounce => {
-                                    if let Ok(msg) = SyncMessage::from_bytes(&data) {
-                                        if let SyncMessage::CredentialLink(link_msg) = msg {
-                                            // Handle credential link announcement
-                                            let _ = handle_credential_link_announcement(
-                                                &link_repo, 
-                                                &link_msg
-                                            ).await;
-                                        }
-                                    }
-                                }
-                                NetworkTopic::ThreadSyncRequest => {
-                                    if let Ok(msg) = SyncMessage::from_bytes(&data) {
-                                        if let SyncMessage::SyncRequest(req_msg) = msg {
-                                            // Handle thread sync request
-                                            let _ = handle_thread_sync_request(
-                                                &thread_repo,
-                                                &link_repo,
-                                                &network,
-                                                &req_msg,
-                                                &peer_id
-                                            ).await;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                };
+                
+                if let Err(e) = result {
+                    error!("Error processing sync task: {:?}", e);
                 }
             }
         });
         
-        self.sync_task = Some(task);
-        
-        Ok(())
+        Self {
+            db_pool,
+            network,
+            sync_queue_tx,
+            enabled,
+        }
     }
     
-    /// Stop the sync engine
-    pub async fn stop(&mut self) -> Result<()> {
-        if !self.running {
+    /// Sync a thread with federation nodes
+    pub async fn sync_thread(&self, thread: ThreadMessage) -> Result<()> {
+        if !self.enabled {
             return Ok(());
         }
         
-        if let Some(task) = self.sync_task.take() {
-            task.abort();
-            let _ = task.await;
+        // Queue the thread sync task
+        self.sync_queue_tx.send(SyncTask::Thread(thread)).await
+            .map_err(|e| FederationError::ThreadSync(format!("Failed to queue thread sync: {}", e)))?;
+            
+        Ok(())
+    }
+    
+    /// Sync a message with federation nodes
+    pub async fn sync_message(&self, message: Message) -> Result<()> {
+        if !self.enabled {
+            return Ok(());
         }
         
-        self.running = false;
-        
-        Ok(())
-    }
-    
-    /// Announce a new thread to the federation
-    pub async fn announce_thread(&self, thread_id: &str) -> Result<()> {
-        // Get thread from storage
-        let thread_uuid = Uuid::parse_str(thread_id)
-            .map_err(|_| FederationError::Other("Invalid thread ID format".to_string()))?;
-        
-        let thread = self.thread_repo.get_thread(thread_uuid).await?;
-        
-        // Create thread message
-        let thread_msg = ThreadMessage::new(
-            thread.id.to_string(),
-            thread.title.clone(),
-            thread.proposal_cid.clone(),
-            "did:icn:local".to_string(), // TODO: Use actual local DID
-        );
-        
-        // Create sync message
-        let sync_msg = SyncMessage::Thread(thread_msg);
-        let data = sync_msg.to_bytes()
-            .map_err(|e| FederationError::Serialization(e.to_string()))?;
-        
-        // Publish to the network
-        let mut network = self.network.write().await;
-        network.publish(NetworkTopic::ThreadAnnounce, data).await
-            .map_err(|e| FederationError::Network(e.to_string()))?;
-        
-        Ok(())
-    }
-    
-    /// Announce a new credential link to the federation
-    pub async fn announce_credential_link(&self, thread_id: &str, link_id: &str) -> Result<()> {
-        // Get thread UUID
-        let thread_uuid = Uuid::parse_str(thread_id)
-            .map_err(|_| FederationError::Other("Invalid thread ID format".to_string()))?;
+        // Queue the message sync task
+        self.sync_queue_tx.send(SyncTask::Message(message)).await
+            .map_err(|e| FederationError::ThreadSync(format!("Failed to queue message sync: {}", e)))?;
             
-        // Get link UUID
-        let link_uuid = Uuid::parse_str(link_id)
-            .map_err(|_| FederationError::Other("Invalid link ID format".to_string()))?;
+        Ok(())
+    }
+    
+    /// Process a thread sync task
+    async fn process_thread_sync(
+        db_pool: Arc<Pool<Postgres>>,
+        network: Arc<RwLock<FederationNetwork>>,
+        thread: ThreadMessage
+    ) -> Result<()> {
+        // Create the sync message
+        let sync_message = SyncMessage::Thread(thread.clone());
         
-        // Retrieve all links for the thread
-        let links = self.link_repo.get_links_for_thread(thread_uuid).await?;
+        // Get connected peers
+        let peers = {
+            let network = network.read().await;
+            network.get_connected_peers().await
+        };
         
-        // Find the specific link
-        let link = links.into_iter()
-            .find(|l| l.id == link_uuid)
-            .ok_or_else(|| FederationError::Other("Credential link not found".to_string()))?;
+        if peers.is_empty() {
+            warn!("No connected peers for thread sync");
+            return Ok(());
+        }
         
-        // Create credential link message
-        let link_msg = CredentialLinkMessage::new(
-            link.id.to_string(),
-            link.thread_id.to_string(),
-            link.credential_cid.clone(),
-            link.linked_by.clone(),
-        );
+        // Broadcast to all peers
+        for peer in peers {
+            debug!("Sending thread {} sync to peer {}", thread.id, peer);
+            let network = network.write().await;
+            if let Err(e) = network.send_message(&peer, &sync_message).await {
+                error!("Failed to sync thread {} with peer {}: {:?}", thread.id, peer, e);
+            }
+        }
         
-        // Create sync message
-        let sync_msg = SyncMessage::CredentialLink(link_msg);
-        let data = sync_msg.to_bytes()
-            .map_err(|e| FederationError::Serialization(e.to_string()))?;
+        Ok(())
+    }
+    
+    /// Process a message sync task
+    async fn process_message_sync(
+        db_pool: Arc<Pool<Postgres>>,
+        network: Arc<RwLock<FederationNetwork>>,
+        message: Message
+    ) -> Result<()> {
+        // Create the sync message
+        let sync_message = SyncMessage::Message(message.clone());
         
-        // Publish to the network
-        let mut network = self.network.write().await;
-        network.publish(NetworkTopic::CredentialLinkAnnounce, data).await
-            .map_err(|e| FederationError::Network(e.to_string()))?;
+        // Get connected peers
+        let peers = {
+            let network = network.read().await;
+            network.get_connected_peers().await
+        };
+        
+        if peers.is_empty() {
+            warn!("No connected peers for message sync");
+            return Ok(());
+        }
+        
+        // Broadcast to all peers
+        for peer in peers {
+            debug!("Sending message {} sync to peer {}", message.id, peer);
+            let network = network.write().await;
+            if let Err(e) = network.send_message(&peer, &sync_message).await {
+                error!("Failed to sync message {} with peer {}: {:?}", message.id, peer, e);
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Handle an incoming sync message from a peer
+    pub async fn handle_sync_message(&self, peer_id: &str, sync_message: SyncMessage) -> Result<()> {
+        match sync_message {
+            SyncMessage::Thread(thread) => {
+                info!("Received thread sync for thread {} from peer {}", thread.id, peer_id);
+                self.handle_thread_sync(thread).await?;
+            },
+            SyncMessage::Message(message) => {
+                info!("Received message sync for message {} from peer {}", message.id, peer_id);
+                self.handle_message_sync(message).await?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Handle an incoming thread sync
+    async fn handle_thread_sync(&self, thread: ThreadMessage) -> Result<()> {
+        // Check if we already have this thread
+        let exists = sqlx::query!("SELECT COUNT(*) FROM threads WHERE id = $1", thread.id)
+            .fetch_one(self.db_pool.as_ref())
+            .await?
+            .count
+            .unwrap_or(0) > 0;
+            
+        if exists {
+            // Update existing thread
+            sqlx::query!(
+                "UPDATE threads SET 
+                title = $1, 
+                creator_did = $2, 
+                topic_type = $3, 
+                federation_id = $4, 
+                metadata = $5,
+                updated_at = NOW()
+                WHERE id = $6",
+                thread.title,
+                thread.creator_did,
+                thread.topic_type,
+                thread.federation_id,
+                thread.metadata,
+                thread.id
+            )
+            .execute(self.db_pool.as_ref())
+            .await?;
+        } else {
+            // Create new thread
+            sqlx::query!(
+                "INSERT INTO threads 
+                (id, title, creator_did, topic_type, federation_id, metadata, created_at, updated_at) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())",
+                thread.id,
+                thread.title,
+                thread.creator_did,
+                thread.topic_type,
+                thread.federation_id,
+                thread.metadata
+            )
+            .execute(self.db_pool.as_ref())
+            .await?;
+        }
+        
+        // Process all messages in the thread
+        for message in thread.messages {
+            self.handle_message_sync(message).await?;
+        }
+        
+        Ok(())
+    }
+    
+    /// Handle an incoming message sync
+    async fn handle_message_sync(&self, message: Message) -> Result<()> {
+        // Check if thread exists
+        let thread_exists = sqlx::query!("SELECT COUNT(*) FROM threads WHERE id = $1", message.thread_id)
+            .fetch_one(self.db_pool.as_ref())
+            .await?
+            .count
+            .unwrap_or(0) > 0;
+            
+        if !thread_exists {
+            return Err(FederationError::ThreadSync(
+                format!("Thread {} for message {} not found", message.thread_id, message.id)
+            ));
+        }
+        
+        // Check if we already have this message
+        let exists = sqlx::query!("SELECT COUNT(*) FROM messages WHERE id = $1", message.id)
+            .fetch_one(self.db_pool.as_ref())
+            .await?
+            .count
+            .unwrap_or(0) > 0;
+            
+        if !exists {
+            // Create new message
+            sqlx::query!(
+                "INSERT INTO messages 
+                (id, thread_id, author_did, content, reply_to, signature, created_at) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW())",
+                message.id,
+                message.thread_id,
+                message.author_did,
+                message.content,
+                message.reply_to,
+                message.signature,
+            )
+            .execute(self.db_pool.as_ref())
+            .await?;
+            
+            info!("Synced new message {} in thread {}", message.id, message.thread_id);
+        }
         
         Ok(())
     }

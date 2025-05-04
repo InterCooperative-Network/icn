@@ -1,7 +1,14 @@
-use actix_web::{post, get, web, HttpResponse, Responder};
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use std::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use chrono::Utc;
 use crate::models::thread::Thread;
 use crate::database::Database;
 
@@ -90,12 +97,11 @@ pub struct GetCredentialLinksResponse {
 /// 
 /// This endpoint allows users to link their verifiable credentials to discussion threads,
 /// providing cryptographic proof of their participation in governance processes.
-#[post("/api/threads/credential-link")]
-pub async fn link_credential(
-    db: web::Data<Mutex<Database>>,
-    req: web::Json<CredentialLinkRequest>,
-) -> impl Responder {
-    let mut db = db.lock().unwrap();
+async fn link_credential(
+    State(db): State<Arc<Mutex<Database>>>,
+    Json(req): Json<CredentialLinkRequest>,
+) -> Result<Json<CredentialLinkResponse>, StatusCode> {
+    let mut db = db.lock().await;
     
     // Find the thread by ID or proposal ID
     let thread_id = match &req.thread_id {
@@ -105,9 +111,7 @@ pub async fn link_credential(
             match db.threads.iter().find(|t| t.proposal_id == Some(req.proposal_id.clone())) {
                 Some(thread) => thread.id.clone(),
                 None => {
-                    return HttpResponse::NotFound().json(serde_json::json!({
-                        "error": "Thread not found for the given proposal ID"
-                    }));
+                    return Err(StatusCode::NOT_FOUND);
                 }
             }
         }
@@ -115,9 +119,7 @@ pub async fn link_credential(
     
     // Ensure the thread exists
     if !db.threads.iter().any(|t| t.id == thread_id) {
-        return HttpResponse::NotFound().json(serde_json::json!({
-            "error": "Thread not found"
-        }));
+        return Err(StatusCode::NOT_FOUND);
     }
     
     // Create the link
@@ -129,7 +131,7 @@ pub async fn link_credential(
         subject_did: req.subject_did.clone(),
         credential_type: req.credential_type.clone(),
         thread_id: thread_id.clone(),
-        created_at: chrono::Utc::now().to_rfc3339(),
+        created_at: Utc::now().to_rfc3339(),
         metadata: req.metadata.clone(),
     };
     
@@ -139,21 +141,20 @@ pub async fn link_credential(
     // Generate thread URL
     let thread_url = format!("/threads/{}", thread_id);
     
-    HttpResponse::Created().json(CredentialLinkResponse {
+    Ok(Json(CredentialLinkResponse {
         linked_credential,
         thread_url,
-    })
+    }))
 }
 
 /// Get credentials linked to a thread
 /// 
 /// Retrieves all credentials linked to a specific thread, proposal, or DID.
-#[get("/api/threads/credential-links")]
-pub async fn get_credential_links(
-    db: web::Data<Mutex<Database>>,
-    query: web::Query<GetCredentialLinksRequest>,
-) -> impl Responder {
-    let db = db.lock().unwrap();
+async fn get_credential_links(
+    State(db): State<Arc<Mutex<Database>>>,
+    Query(query): Query<GetCredentialLinksRequest>,
+) -> Result<Json<GetCredentialLinksResponse>, StatusCode> {
+    let db = db.lock().await;
     
     // Filter credential links based on query parameters
     let linked_credentials: Vec<LinkedCredential> = db.credential_links.iter()
@@ -184,13 +185,14 @@ pub async fn get_credential_links(
         .cloned()
         .collect();
     
-    HttpResponse::Ok().json(GetCredentialLinksResponse {
+    Ok(Json(GetCredentialLinksResponse {
         linked_credentials,
-    })
+    }))
 }
 
-/// Register credential linking routes
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(link_credential)
-       .service(get_credential_links);
+// Router configuration
+pub fn routes() -> Router<Arc<Mutex<Database>>> {
+    Router::new()
+        .route("/api/threads/credential-link", post(link_credential))
+        .route("/api/threads/credential-links", get(get_credential_links))
 } 
