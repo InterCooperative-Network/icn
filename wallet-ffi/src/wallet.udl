@@ -1,0 +1,30 @@
+namespace icn_wallet {
+    // Receipt management
+    sequence<Receipt> import_receipts_from_file(string path);
+    sequence<Receipt> filter_receipts(sequence<Receipt> receipts, Filter filter);
+    string share_receipts(sequence<Receipt> receipts, string format, string path, boolean include_proofs);
+    
+    // Federation sharing
+    string share_encrypted_receipts(sequence<Receipt> receipts, string federation_url, string federation_key, string sender_did);
+    
+    // Verification
+    boolean verify_receipt(Receipt receipt);
+};
+
+dictionary Receipt {
+    string id;
+    string proposal_id;
+    string outcome;
+    string? dag_anchor;
+    string federation_scope;
+    string issuance_date;
+    string issuer;
+};
+
+dictionary Filter {
+    string? scope;
+    string? outcome;
+    long? since;
+    string? proposal_prefix;
+    long? limit;
+}; 

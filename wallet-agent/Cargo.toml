@@ -15,4 +15,9 @@ tracing = "0.1"
 icn-wallet-sync = { path = "../wallet-sync" }
 icn-wallet-core = { path = "../wallet-core" }
 icn-dag = { path = "../dag" }
-chrono = { version = "0.4", features = ["serde"] } 
+chrono = { version = "0.4", features = ["serde"] }
+x25519-dalek = "2.0"
+rand = "0.8"
+base64 = "0.21"
+aes-gcm = "0.10"
+url = "2.3" 

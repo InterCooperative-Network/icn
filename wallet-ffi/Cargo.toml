@@ -1,0 +1,26 @@
+[package]
+name = "icn-wallet-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "FFI interface for ICN wallet functionality"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+uniffi = { version = "0.24", features = ["cli"] }
+icn-wallet-agent = { path = "../wallet-agent" }
+icn-wallet-core = { path = "../wallet-core" }
+icn-wallet-sync = { path = "../wallet-sync" }
+chrono = { version = "0.4", features = ["serde"] }
+
+[build-dependencies]
+uniffi = { version = "0.24", features = ["build"] }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+tempfile = "3.3" 
