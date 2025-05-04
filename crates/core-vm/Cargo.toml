@@ -1,0 +1,2 @@
+[dependencies]
+icn-wallet-sync = { path = "../wallet-sync" } 

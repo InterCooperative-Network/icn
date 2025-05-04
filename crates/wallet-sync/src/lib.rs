@@ -4,18 +4,21 @@
  * Synchronization and communication between wallet and ICN nodes.
  */
 
-pub mod compat;
+pub mod credentials;
 pub mod federation;
+pub mod compat;
 
+pub use credentials::{CredentialStore, CredentialManager};
+pub use federation::{
+    FederationSyncClient, FederationSyncClientConfig, FederationEndpoint,
+    CredentialStore as FederationCredentialStore, CredentialNotifier,
+    MemoryCredentialStore, SyncCredentialType
+};
 pub use compat::{
     WalletDagNode, WalletDagNodeMetadata, CompatError,
     runtime_to_wallet, wallet_to_runtime,
     legacy_to_wallet, wallet_to_legacy,
     system_time_to_datetime, datetime_to_system_time
-};
-pub use federation::{
-    FederationSyncClient, FederationSyncClientConfig, FederationEndpoint,
-    CredentialStore, MemoryCredentialStore, SyncCredentialType
 };
 
 use anyhow::Result;

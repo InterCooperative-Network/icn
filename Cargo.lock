@@ -3249,10 +3249,20 @@ name = "icn-wallet-sync"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "chrono",
+ "cid 0.10.1",
+ "icn-core-vm",
  "icn-dag",
  "icn-identity",
  "icn-storage",
+ "libipld",
+ "reqwest",
  "serde",
+ "serde_bytes",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
  "tracing",
 ]
 

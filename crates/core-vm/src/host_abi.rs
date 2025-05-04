@@ -1,0 +1,1 @@
+return Err(Trap::throw("Amount cannot be negative")); 
