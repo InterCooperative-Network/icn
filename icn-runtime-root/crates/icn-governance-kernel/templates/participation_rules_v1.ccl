@@ -1,0 +1,123 @@
+/**
+ * Participation Rules Template
+ * 
+ * This template defines rules for participation in governance.
+ */
+participation_rules {
+    "name": "",
+    "description": "",
+    "version": "1.0",
+    
+    "eligibility": {
+        "membership_duration_days": 30,  // Minimum days as member before participation
+        "activity_requirements": [
+            {
+                "type": "meeting_attendance",
+                "period_days": 90,
+                "minimum_count": 2
+            },
+            {
+                "type": "contribution",
+                "period_days": 180,
+                "minimum_count": 1
+            }
+        ]
+    },
+    
+    "voting_rights": {
+        "eligible_roles": [          // Roles that can vote
+            "member", 
+            "steward"
+        ],
+        "delegation_allowed": true,  // Whether vote delegation is permitted
+        "delegation_rules": {
+            "max_delegations_per_member": 3,
+            "max_votes_per_delegate": 5
+        }
+    },
+    
+    "proposal_rights": {
+        "eligible_roles": [          // Roles that can propose
+            "member",
+            "steward"
+        ],
+        "endorsement_requirements": {
+            "required": true,
+            "min_endorsers": 2,
+            "endorser_qualifications": "active_member"
+        },
+        "frequency_limits": {
+            "max_active_proposals_per_member": 3,
+            "cooldown_period_days": 7
+        }
+    },
+    
+    "discussion_rules": {
+        "moderation": {
+            "approach": "community",  // Options: community, elected_moderators, algorithmic
+            "cool_down_period_hours": 24
+        },
+        "minimum_discussion_period_days": 3,
+        "structured_feedback": {
+            "required_sections": [
+                "concerns",
+                "alternatives",
+                "support"
+            ]
+        }
+    },
+    
+    "decision_making": {
+        "methods": [
+            {
+                "name": "consent",
+                "description": "Proceed if no principled objections",
+                "blocking_allowed": true,
+                "blocking_requirements": {
+                    "must_provide_alternative": true,
+                    "max_blocks_per_period": 3,
+                    "period_days": 90
+                }
+            },
+            {
+                "name": "majority_vote",
+                "description": "Proceed if majority approves",
+                "required_majority": 0.5,
+                "abstention_handling": "exclude_from_count"
+            }
+        ],
+        
+        "method_selection": {
+            "default": "consent",
+            "criteria": [
+                {
+                    "category": "resource_allocation",
+                    "method": "majority_vote"
+                },
+                {
+                    "category": "governance_change",
+                    "method": "consent"
+                }
+            ]
+        }
+    },
+    
+    "accountability": {
+        "review_period_days": 90,
+        "participation_metrics": [
+            "proposal_authorship",
+            "vote_participation",
+            "discussion_contribution",
+            "implementation_involvement"
+        ],
+        "transparency_requirements": {
+            "voting_record": "public",
+            "discussion_contributions": "public",
+            "objection_statements": "public"
+        },
+        "inactivity_handling": {
+            "inactive_threshold_days": 180,
+            "inactive_process": "notification_then_restriction"
+        }
+    }
+} 

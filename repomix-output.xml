@@ -293,10 +293,10 @@ runtime/
         error.rs
         errors.rs
         genesis.rs
-        guardian.rs
         health.rs
         lib.rs
         network.rs
+        quorum.rs
         receipt.rs
         recovery.rs
         replication.rs
@@ -497,7 +497,13 @@ scripts/
   validate_repo_structure.sh
   verify_build.sh
 src/
+  dag_client.rs
+  error.rs
+  genesis.rs
+  lib.rs
   main.rs
+  quorum.rs
+  recovery.rs
 tests/
   federation_lifecycle.rs
 tools/
@@ -47241,10 +47247,10 @@ mod tests {
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use crate::error::{FederationError, FederationResult};
-use crate::recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, GuardianSuccessionEvent, MetadataUpdateEvent, DisasterRecoveryAnchor};
+use crate::recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, SuccessionEvent, MetadataUpdateEvent, DisasterRecoveryAnchor};
 use crate::dag_anchor::GenesisAnchor;
 use crate::genesis::FederationMetadata;
-use crate::guardian::{GuardianQuorumConfig, QuorumType};
+use crate::quorum::{SignerQuorumConfig, QuorumType};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use icn_identity::Signature;
@@ -47257,8 +47263,8 @@ pub enum FederationDagEvent {
     Genesis(GenesisAnchor),
     /// Key rotation event
     KeyRotation(FederationKeyRotationEvent),
-    /// Guardian succession event
-    GuardianSuccession(GuardianSuccessionEvent),
+    /// Succession event
+    Succession(SuccessionEvent),
     /// Metadata update event
     MetadataUpdate(MetadataUpdateEvent),
     /// Disaster recovery event
@@ -47271,7 +47277,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(e) => &e.federation_did,
             FederationDagEvent::KeyRotation(e) => &e.base.federation_did,
-            FederationDagEvent::GuardianSuccession(e) => &e.base.federation_did,
+            FederationDagEvent::Succession(e) => &e.base.federation_did,
             FederationDagEvent::MetadataUpdate(e) => &e.base.federation_did,
             FederationDagEvent::DisasterRecovery(e) => &e.base.federation_did,
         }
@@ -47282,7 +47288,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(e) => e.issued_at,
             FederationDagEvent::KeyRotation(e) => e.base.timestamp,
-            FederationDagEvent::GuardianSuccession(e) => e.base.timestamp,
+            FederationDagEvent::Succession(e) => e.base.timestamp,
             FederationDagEvent::MetadataUpdate(e) => e.base.timestamp,
             FederationDagEvent::DisasterRecovery(e) => e.base.timestamp,
         }
@@ -47293,7 +47299,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(_) => None, // Genesis has no previous
             FederationDagEvent::KeyRotation(e) => e.base.previous_event_cid.as_ref(),
-            FederationDagEvent::GuardianSuccession(e) => e.base.previous_event_cid.as_ref(),
+            FederationDagEvent::Succession(e) => e.base.previous_event_cid.as_ref(),
             FederationDagEvent::MetadataUpdate(e) => e.base.previous_event_cid.as_ref(),
             FederationDagEvent::DisasterRecovery(e) => e.base.previous_event_cid.as_ref(),
         }
@@ -47304,7 +47310,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(_) => 0, // Genesis is always sequence 0
             FederationDagEvent::KeyRotation(e) => e.base.sequence_number,
-            FederationDagEvent::GuardianSuccession(e) => e.base.sequence_number,
+            FederationDagEvent::Succession(e) => e.base.sequence_number,
             FederationDagEvent::MetadataUpdate(e) => e.base.sequence_number,
             FederationDagEvent::DisasterRecovery(e) => e.base.sequence_number,
         }
@@ -47315,7 +47321,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(_) => "genesis",
             FederationDagEvent::KeyRotation(_) => "key_rotation",
-            FederationDagEvent::GuardianSuccession(_) => "guardian_succession",
+            FederationDagEvent::Succession(_) => "succession",
             FederationDagEvent::MetadataUpdate(_) => "metadata_update",
             FederationDagEvent::DisasterRecovery(_) => "disaster_recovery",
         }
@@ -47452,7 +47458,7 @@ impl DagClient for InMemoryDagClient {
         let prefix = match event {
             FederationDagEvent::Genesis(_) => "bafy_genesis",
             FederationDagEvent::KeyRotation(_) => "bafy_key_rotation",
-            FederationDagEvent::GuardianSuccession(_) => "bafy_guardian",
+            FederationDagEvent::Succession(_) => "bafy_succession",
             FederationDagEvent::MetadataUpdate(_) => "bafy_metadata",
             FederationDagEvent::DisasterRecovery(_) => "bafy_recovery",
         };
@@ -47656,7 +47662,8 @@ mod tests {
                 guardian_quorum: GuardianQuorumConfig {
                     quorum_type: QuorumType::Majority,
                     guardians: vec!["did:key:guardian1".to_string(), "did:key:guardian2".to_string()],
-                    threshold: 1,
+                    min_wait_time_seconds: None,
+                    additional_requirements: None,
                 },
                 genesis_cid: cid::Cid::default(),
                 additional_metadata: Some(serde_json::json!({"test": "metadata"})),
@@ -48470,8 +48477,8 @@ use base64::Engine;
 use sha2::{Digest, Sha256};
 
 use crate::error::{FederationResult, FederationError};
-use crate::guardian::{GuardianQuorumConfig, Guardian};
-use crate::guardian::decisions;
+use crate::quorum::SignerQuorumConfig;
+use crate::quorum::decisions;
 
 /// Metadata about a federation entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48497,8 +48504,12 @@ pub struct FederationMetadata {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub initial_members: Vec<String>,
     
-    /// Guardian quorum configuration for this federation
-    pub guardian_quorum: GuardianQuorumConfig,
+    /// Initial signers of the federation (DIDs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub initial_signers: Vec<String>,
+    
+    /// Quorum configuration for this federation
+    pub quorum_config: SignerQuorumConfig,
     
     /// Genesis DAG CID where this federation was anchored
     pub genesis_cid: Cid,
@@ -48568,7 +48579,7 @@ impl GenesisTrustBundle {
             "federation_name": self.federation_establishment_credential.metadata.name,
             "issued_at": self.issued_at,
             "guardian_count": self.guardian_credentials.len(),
-            "quorum_type": self.federation_establishment_credential.metadata.guardian_quorum.quorum_type,
+            "quorum_type": self.federation_establishment_credential.metadata.quorum_config.quorum_type,
         })
     }
 }
@@ -48587,7 +48598,7 @@ pub mod bootstrap {
         name: String,
         description: Option<String>,
         guardians: &[Guardian],
-        quorum_config: GuardianQuorumConfig,
+        quorum_config: SignerQuorumConfig,
         initial_policies: Vec<VerifiableCredential>,
         initial_members: Vec<IdentityId>,
     ) -> FederationResult<(FederationMetadata, FederationEstablishmentCredential, TrustBundle)> {
@@ -48608,7 +48619,8 @@ pub mod bootstrap {
             created_at: Utc::now(),
             initial_policies,
             initial_members: member_dids,
-            guardian_quorum: quorum_config.clone(),
+            initial_signers: Vec::new(),
+            quorum_config: quorum_config.clone(),
             genesis_cid: Cid::default(), // Will be set later in Phase 4
             additional_metadata: None,
         };
@@ -48667,7 +48679,7 @@ pub mod bootstrap {
         let quorum_proof = decisions::create_quorum_proof(
             &metadata_bytes,
             guardians,
-            &metadata.guardian_quorum,
+            &metadata.quorum_config,
         ).await?;
         
         // If no credentials provided, create a federation establishment credential
@@ -48729,8 +48741,8 @@ pub mod bootstrap {
             hasher.update(member.as_bytes());
         }
         
-        // Hash the guardian quorum configuration
-        let quorum_bytes = serde_json::to_vec(&metadata.guardian_quorum).unwrap_or_default();
+        // Hash the quorum configuration
+        let quorum_bytes = serde_json::to_vec(&metadata.quorum_config).unwrap_or_default();
         hasher.update(&quorum_bytes);
         
         // Hash the genesis CID
@@ -48798,7 +48810,7 @@ pub mod trustbundle {
         let quorum_proof = decisions::create_quorum_proof(
             &bundle_bytes,
             guardians,
-            &metadata.guardian_quorum,
+            &metadata.quorum_config,
         ).await?;
         
         // Create the genesis trust bundle
@@ -48890,7 +48902,7 @@ pub mod trustbundle {
         
         // 4. Verify all guardians have credentials
         let guardian_dids_in_metadata: Vec<String> = bundle.federation_establishment_credential
-            .metadata.guardian_quorum.guardians.clone();
+            .metadata.quorum_config.guardians.clone();
         
         let guardian_dids_with_credentials: Vec<String> = bundle.guardian_credentials.iter()
             .filter_map(|cred| {
@@ -49024,7 +49036,8 @@ mod tests {
                 "did:key:z6MkMember1".to_string(),
                 "did:key:z6MkMember2".to_string(),
             ],
-            guardian_quorum: GuardianQuorumConfig::new_majority(vec![
+            initial_signers: Vec::new(),
+            quorum_config: SignerQuorumConfig::new_majority(vec![
                 "did:key:z6MkGuardian1".to_string(),
                 "did:key:z6MkGuardian2".to_string(),
                 "did:key:z6MkGuardian3".to_string(),
@@ -49152,481 +49165,6 @@ mod tests {
         assert!(anchor_payload.is_object(), "Anchor payload should be a JSON object");
         assert!(anchor_payload.get("federation_did").is_some(), "Anchor payload should include federation DID");
         assert!(anchor_payload.get("federation_metadata_cid").is_some(), "Anchor payload should include metadata CID");
-    }
-}
-</file>
-
-<file path="runtime/crates/federation/src/guardian.rs">
-use serde::{Deserialize, Serialize};
-use cid::Cid;
-use chrono::{DateTime, Utc};
-use icn_identity::{
-    IdentityId, VerifiableCredential, KeyPair, Signature,
-    QuorumConfig, QuorumProof, IdentityScope
-};
-use ssi_jwk::JWK;
-
-use crate::error::{FederationError, FederationResult};
-use uuid::Uuid;
-use std::collections::HashMap;
-
-/// Type of quorum required for guardian decisions
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum QuorumType {
-    /// Simple majority (>50%)
-    Majority,
-    
-    /// Specific threshold (percentage 0-100)
-    Threshold(u8),
-    
-    /// Unanimous agreement required
-    Unanimous,
-    
-    /// Weighted voting (Guardian ID, Weight), Required Total
-    Weighted(Vec<(String, u32)>, u32),
-}
-
-/// Configuration for guardian quorum decisions
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardianQuorumConfig {
-    /// List of authorized guardian DIDs
-    pub guardians: Vec<String>,
-    
-    /// Type of quorum required for decisions
-    pub quorum_type: QuorumType,
-    
-    /// Minimum wait time before executing decisions (if applicable)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_wait_time_seconds: Option<u64>,
-    
-    /// Additional requirements or constraints on quorum
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub additional_requirements: Option<serde_json::Value>,
-}
-
-impl GuardianQuorumConfig {
-    /// Create a new majority-based quorum configuration
-    pub fn new_majority(guardians: Vec<String>) -> Self {
-        Self {
-            guardians,
-            quorum_type: QuorumType::Majority,
-            min_wait_time_seconds: None,
-            additional_requirements: None,
-        }
-    }
-    
-    /// Create a new threshold-based quorum configuration
-    pub fn new_threshold(guardians: Vec<String>, threshold_percentage: u8) -> Self {
-        // Ensure threshold is in valid range
-        let threshold = threshold_percentage.min(100);
-        
-        Self {
-            guardians,
-            quorum_type: QuorumType::Threshold(threshold),
-            min_wait_time_seconds: None,
-            additional_requirements: None,
-        }
-    }
-    
-    /// Create a new unanimous quorum configuration
-    pub fn new_unanimous(guardians: Vec<String>) -> Self {
-        Self {
-            guardians,
-            quorum_type: QuorumType::Unanimous,
-            min_wait_time_seconds: None,
-            additional_requirements: None,
-        }
-    }
-    
-    /// Convert to an identity crate QuorumConfig
-    pub fn to_quorum_config(&self) -> QuorumConfig {
-        match &self.quorum_type {
-            QuorumType::Majority => QuorumConfig::Majority,
-            QuorumType::Threshold(threshold) => QuorumConfig::Threshold(*threshold),
-            QuorumType::Unanimous => QuorumConfig::Threshold(100), // Unanimous is 100% threshold
-            QuorumType::Weighted(weights, required) => {
-                // Convert string DIDs to IdentityId
-                let weighted_votes = weights.iter()
-                    .map(|(did, weight)| (IdentityId(did.clone()), *weight))
-                    .collect();
-                
-                QuorumConfig::Weighted(weighted_votes, *required)
-            }
-        }
-    }
-}
-
-/// Represents a Guardian for federation governance
-#[derive(Debug, Clone)]
-pub struct Guardian {
-    /// The guardian's DID
-    pub did: IdentityId,
-    
-    /// The guardian's keypair
-    pub keypair: Option<KeyPair>,
-    
-    /// The guardian's credential
-    pub credential: Option<GuardianCredential>,
-}
-
-impl Guardian {
-    /// Create a new guardian with the given DID and keypair
-    pub fn new(did: IdentityId, keypair: Option<KeyPair>) -> Self {
-        Self {
-            did,
-            keypair,
-            credential: None,
-        }
-    }
-    
-    /// Sign a message using this guardian's keypair
-    pub fn sign(&self, message: &[u8]) -> FederationResult<Signature> {
-        if let Some(keypair) = &self.keypair {
-            icn_identity::sign_message(message, keypair)
-                .map_err(|e| FederationError::VerificationError(format!("Failed to sign message: {}", e)))
-        } else {
-            Err(FederationError::GuardianError("Guardian has no keypair available for signing".to_string()))
-        }
-    }
-}
-
-/// Represents a Guardian role credential
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardianCredential {
-    /// The credential
-    pub credential: VerifiableCredential,
-}
-
-/// Functions for guardian initialization and management
-pub mod initialization {
-    use super::*;
-    use icn_identity::{
-        generate_did_key, sign_credential, VerifiableCredential
-    };
-    use uuid::Uuid;
-    use std::collections::HashMap;
-    
-    /// Generate a new guardian with a fresh keypair
-    pub async fn generate_guardian() -> FederationResult<Guardian> {
-        // Generate a new DID and keypair
-        let (did_str, jwk) = generate_did_key().await
-            .map_err(|e| FederationError::BootstrapError(format!("Failed to generate DID key: {}", e)))?;
-        
-        // Convert to our types
-        let did = IdentityId(did_str);
-        
-        // Create a basic KeyPair (this would need to be enhanced with JWK handling)
-        let keypair = KeyPair::new(Vec::new(), Vec::new()); // Placeholder implementation
-        
-        // Create and return the Guardian
-        Ok(Guardian::new(did, Some(keypair)))
-    }
-    
-    /// Create a guardian from an existing DID and JWK
-    pub fn from_jwk(did: String, jwk: JWK) -> FederationResult<Guardian> {
-        // Create Identity ID
-        let identity_id = IdentityId(did);
-        
-        // Create KeyPair from JWK
-        // Note: In a real implementation, this would properly extract key material from JWK
-        let keypair = KeyPair::new(Vec::new(), Vec::new()); // Placeholder
-        
-        // Return the Guardian
-        Ok(Guardian::new(identity_id, Some(keypair)))
-    }
-    
-    /// Create guardian credentials for each guardian in the set
-    pub async fn create_guardian_credentials(
-        guardians: &mut [Guardian],
-        federation_did: &str,
-    ) -> FederationResult<Vec<GuardianCredential>> {
-        let mut credentials = Vec::with_capacity(guardians.len());
-        let issuer_id = IdentityId(federation_did.to_string());
-        
-        for guardian in guardians {
-            // Create the credential
-            let credential = create_guardian_credential(
-                &guardian.did,
-                &issuer_id,
-                None, // No custom claims for now
-            ).await?;
-            
-            // Store the credential
-            let guardian_credential = GuardianCredential { credential };
-            guardian.credential = Some(guardian_credential.clone());
-            credentials.push(guardian_credential);
-        }
-        
-        Ok(credentials)
-    }
-    
-    /// Create a single guardian credential
-    async fn create_guardian_credential(
-        guardian_did: &IdentityId,
-        issuer_did: &IdentityId,
-        additional_claims: Option<HashMap<String, serde_json::Value>>,
-    ) -> FederationResult<VerifiableCredential> {
-        // Credential types
-        let types = vec![
-            "VerifiableCredential".to_string(),
-            "GuardianCredential".to_string()
-        ];
-        
-        // Base claims
-        let mut claims = serde_json::Map::new();
-        claims.insert("role".to_string(), serde_json::Value::String("Guardian".to_string()));
-        claims.insert("scope".to_string(), serde_json::Value::String("Guardian".to_string()));
-        
-        // Add additional claims if provided
-        if let Some(additional) = additional_claims {
-            for (key, value) in additional {
-                claims.insert(key, value);
-            }
-        }
-        
-        // Create the credential
-        let credential = VerifiableCredential::new(
-            types,
-            issuer_did,
-            guardian_did,
-            serde_json::Value::Object(claims),
-        );
-        
-        // Note: In a full implementation, this would be signed by the issuer
-        // For now, return unsigned credential (real signing would use JWK implementation)
-        Ok(credential)
-    }
-    
-    /// Initialize a set of guardians with a specified quorum configuration
-    pub async fn initialize_guardian_set(
-        count: usize,
-        quorum_type: QuorumType,
-    ) -> FederationResult<(Vec<Guardian>, GuardianQuorumConfig)> {
-        if count == 0 {
-            return Err(FederationError::BootstrapError("Guardian count must be greater than 0".to_string()));
-        }
-        
-        // Generate the specified number of guardians
-        let mut guardians = Vec::with_capacity(count);
-        for _ in 0..count {
-            let guardian = generate_guardian().await?;
-            guardians.push(guardian);
-        }
-        
-        // Extract DIDs for the quorum config
-        let guardian_dids = guardians.iter()
-            .map(|g| g.did.0.clone())
-            .collect::<Vec<_>>();
-        
-        // Create quorum config based on type
-        let quorum_config = match quorum_type {
-            QuorumType::Majority => GuardianQuorumConfig::new_majority(guardian_dids),
-            QuorumType::Threshold(threshold) => GuardianQuorumConfig::new_threshold(guardian_dids, threshold),
-            QuorumType::Unanimous => GuardianQuorumConfig::new_unanimous(guardian_dids),
-            QuorumType::Weighted(_, _) => {
-                // For simplicity, default to equal weights for initial setup
-                let weighted_guardians: Vec<(String, u32)> = guardian_dids.iter()
-                    .map(|did| (did.clone(), 1u32))
-                    .collect();
-                
-                // Set required weight to majority
-                let required = (count as u32 / 2) + 1;
-                
-                GuardianQuorumConfig {
-                    guardians: guardian_dids,
-                    quorum_type: QuorumType::Weighted(weighted_guardians, required),
-                    min_wait_time_seconds: None,
-                    additional_requirements: None,
-                }
-            }
-        };
-        
-        Ok((guardians, quorum_config))
-    }
-}
-
-/// Functions for guardian voting and decisions
-pub mod decisions {
-    use super::*;
-    
-    /// Create a quorum proof for a specific action
-    pub async fn create_quorum_proof(
-        action_data: &[u8],
-        guardians: &[Guardian],
-        config: &GuardianQuorumConfig,
-    ) -> FederationResult<QuorumProof> {
-        // Convert guardian quorum config to identity crate's QuorumConfig
-        let quorum_config = config.to_quorum_config();
-        
-        // Collect signatures from available guardians
-        let mut votes = Vec::new();
-        
-        for guardian in guardians {
-            // Skip guardians without keypairs
-            if guardian.keypair.is_none() {
-                continue;
-            }
-            
-            // Sign the action data with this guardian's key
-            match guardian.sign(action_data) {
-                Ok(signature) => {
-                    // Add the signature to the votes
-                    votes.push((guardian.did.clone(), signature));
-                },
-                Err(e) => {
-                    // Log the error but continue with other guardians
-                    tracing::warn!("Guardian {} failed to sign: {}", guardian.did.0, e);
-                }
-            }
-        }
-        
-        // Check if we have enough votes
-        let total_guardians = config.guardians.len();
-        
-        // Simple validation based on quorum type
-        match &config.quorum_type {
-            QuorumType::Majority => {
-                let majority = (total_guardians / 2) + 1;
-                if votes.len() < majority {
-                    return Err(FederationError::VerificationError(format!(
-                        "Not enough votes: got {}, need {} for majority",
-                        votes.len(), majority
-                    )));
-                }
-            },
-            QuorumType::Threshold(threshold) => {
-                let threshold_percentage = *threshold as f32 / 100.0;
-                let threshold_count = (total_guardians as f32 * threshold_percentage).ceil() as usize;
-                if votes.len() < threshold_count {
-                    return Err(FederationError::VerificationError(format!(
-                        "Not enough votes: got {}, need {} for {}% threshold",
-                        votes.len(), threshold_count, threshold
-                    )));
-                }
-            },
-            QuorumType::Unanimous => {
-                if votes.len() < total_guardians {
-                    return Err(FederationError::VerificationError(format!(
-                        "Not enough votes: got {}, need {} for unanimous approval",
-                        votes.len(), total_guardians
-                    )));
-                }
-            },
-            QuorumType::Weighted(weights, required) => {
-                // Calculate total accumulated weight
-                let mut total_weight = 0u32;
-                for (did, signature) in &votes {
-                    if let Some((_, weight)) = weights.iter().find(|(guardian_did, _)| guardian_did == &did.0) {
-                        total_weight += weight;
-                    }
-                }
-                
-                if total_weight < *required {
-                    return Err(FederationError::VerificationError(format!(
-                        "Not enough weight: got {}, need {} for weighted approval",
-                        total_weight, required
-                    )));
-                }
-            }
-        }
-        
-        // Create the quorum proof
-        Ok(QuorumProof {
-            votes,
-            config: quorum_config,
-        })
-    }
-    
-    /// Verify a guardian quorum proof
-    pub async fn verify_quorum_proof(
-        proof: &QuorumProof,
-        content_hash: &[u8],
-        config: &GuardianQuorumConfig,
-    ) -> FederationResult<bool> {
-        // Convert the guardian list to DIDs
-        let guardian_dids = config.guardians.clone();
-        
-        // Use the identity crate's verification
-        proof.verify(content_hash, &guardian_dids).await
-            .map_err(|e| FederationError::VerificationError(format!("Failed to verify quorum proof: {}", e)))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::guardian::initialization::initialize_guardian_set;
-    use crate::guardian::decisions::create_quorum_proof;
-
-    #[tokio::test]
-    async fn test_initialize_guardian_set() {
-        // Create 3 guardians with majority quorum
-        let result = initialize_guardian_set(3, QuorumType::Majority).await;
-        assert!(result.is_ok(), "Failed to initialize guardian set: {:?}", result.err());
-        
-        let (guardians, config) = result.unwrap();
-        
-        // Check guardians
-        assert_eq!(guardians.len(), 3, "Should have 3 guardians");
-        for guardian in &guardians {
-            assert!(guardian.keypair.is_some(), "Guardian should have a keypair");
-            assert!(guardian.did.0.starts_with("did:key:"), "Guardian should have a DID");
-        }
-        
-        // Check quorum config
-        assert_eq!(config.guardians.len(), 3, "Config should have 3 guardians");
-        assert!(matches!(config.quorum_type, QuorumType::Majority), "Quorum type should be Majority");
-    }
-    
-    #[tokio::test]
-    async fn test_guardian_quorum_signing() {
-        // Create 5 guardians with 60% threshold
-        let result = initialize_guardian_set(5, QuorumType::Threshold(60)).await;
-        assert!(result.is_ok());
-        
-        let (guardians, config) = result.unwrap();
-        
-        // Test data to sign
-        let test_data = b"test federation action";
-        
-        // Create quorum proof with 3 guardians (60% of 5)
-        let guardian_subset = &guardians[0..3];
-        let proof_result = create_quorum_proof(test_data, guardian_subset, &config).await;
-        assert!(proof_result.is_ok(), "Failed to create quorum proof: {:?}", proof_result.err());
-        
-        let proof = proof_result.unwrap();
-        
-        // Check proof
-        assert_eq!(proof.votes.len(), 3, "Should have 3 votes");
-        
-        // Use the decisions module to verify the proof
-        let verify_result = decisions::verify_quorum_proof(&proof, test_data, &config).await;
-        assert!(verify_result.is_ok(), "Failed to verify quorum proof: {:?}", verify_result.err());
-        assert!(verify_result.unwrap(), "Quorum proof verification should succeed");
-    }
-    
-    #[tokio::test]
-    async fn test_quorum_proof_insufficient_votes() {
-        // Create 5 guardians with 80% threshold
-        let result = initialize_guardian_set(5, QuorumType::Threshold(80)).await;
-        assert!(result.is_ok());
-        
-        let (guardians, config) = result.unwrap();
-        
-        // Test data to sign
-        let test_data = b"test federation action";
-        
-        // Try to create quorum proof with only 3 guardians (60% of 5, below the 80% threshold)
-        let guardian_subset = &guardians[0..3];
-        let proof_result = create_quorum_proof(test_data, guardian_subset, &config).await;
-        
-        // Should fail due to insufficient votes
-        assert!(proof_result.is_err(), "Should fail with insufficient votes");
-        if let Err(FederationError::VerificationError(msg)) = proof_result {
-            assert!(msg.contains("Not enough votes"), "Error should mention insufficient votes");
-        } else {
-            panic!("Expected VerificationError, got: {:?}", proof_result);
-        }
     }
 }
 </file>
@@ -49771,14 +49309,14 @@ pub struct QuorumHealth {
     /// Enough validators for quorum? 
     pub has_validator_quorum: bool,
     
-    /// Enough guardians for quorum?
-    pub has_guardian_quorum: bool,
+    /// Enough signers for quorum?
+    pub has_signer_quorum: bool,
     
     /// Validator node count
     pub validator_count: usize,
     
-    /// Guardian node count
-    pub guardian_count: usize,
+    /// Signer node count
+    pub signer_count: usize,
     
     /// Observer node count
     pub observer_count: usize,
@@ -49884,9 +49422,9 @@ pub async fn get_federation_health(
                 time_since_sync: 0,
                 quorum_health: QuorumHealth {
                     has_validator_quorum: false,
-                    has_guardian_quorum: false,
+                    has_signer_quorum: false,
                     validator_count: 0,
-                    guardian_count: 0,
+                    signer_count: 0,
                     observer_count: 0,
                     required_quorum: 0,
                     quorum_percentage: 0,
@@ -49916,7 +49454,7 @@ pub async fn get_federation_health(
     // In a real implementation, this would analyze the trust bundle for roles
     // For now, we'll use placeholder logic
     let validator_count = 3; // Placeholder
-    let guardian_count = 2;  // Placeholder
+    let signer_count = 2;  // Placeholder
     let observer_count = 2;  // Placeholder
     let required_quorum = (validator_count * 2) / 3 + 1;
     
@@ -49947,9 +49485,9 @@ pub async fn get_federation_health(
         time_since_sync,
         quorum_health: QuorumHealth {
             has_validator_quorum: validator_count >= required_quorum,
-            has_guardian_quorum: guardian_count >= 2, // Assuming 2 is the required guardian quorum
+            has_signer_quorum: signer_count >= 2, // Assuming 2 is the required signer quorum
             validator_count,
-            guardian_count,
+            signer_count,
             observer_count,
             required_quorum,
             quorum_percentage: 80, // Placeholder
@@ -50060,9 +49598,9 @@ mod tests {
             time_since_sync: 60,
             quorum_health: QuorumHealth {
                 has_validator_quorum: true,
-                has_guardian_quorum: true,
+                has_signer_quorum: true,
                 validator_count: 3,
-                guardian_count: 2,
+                signer_count: 2,
                 observer_count: 2,
                 required_quorum: 2,
                 quorum_percentage: 80,
@@ -50106,8 +49644,8 @@ mod tests {
 # ICN Federation
 
 This crate implements federation primitives for the Intercooperative Network (ICN),
-including Guardian role management, federation establishment, TrustBundle creation,
-and DAG anchoring.
+including federation establishment, TrustBundle creation, and DAG anchoring
+through a quorum-based verification system.
 
 The implementation follows the specification defined in the Federation Genesis Bootstrap
 document.
@@ -50115,15 +49653,15 @@ document.
 
 pub mod error;
 pub mod genesis;
-pub mod guardian;
+pub mod quorum;
 pub mod dag_anchor;
 pub mod receipt;
 pub mod recovery;
 pub mod dag_client;
 
 // Re-export core structs
-pub use genesis::FederationMetadata;
-pub use guardian::{Guardian, GuardianCredential, GuardianQuorumConfig, QuorumType};
+pub use genesis::{FederationMetadata, FederationEstablishmentCredential, GenesisTrustBundle};
+pub use quorum::{SignerQuorumConfig, QuorumType};
 pub use dag_anchor::GenesisAnchor;
 pub use receipt::{FederationReceipt, MinimalFederationReceipt};
 
@@ -50132,14 +49670,14 @@ pub use receipt::verification::{generate_federation_receipt, verify_federation_r
 
 // Re-export recovery types and functions
 pub use recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, 
-                  GuardianSuccessionEvent, DisasterRecoveryAnchor, MetadataUpdateEvent};
-pub use recovery::recovery::{create_key_rotation_event, create_guardian_succession_event, 
-                           create_disaster_recovery_anchor, create_metadata_update_event,
-                           verify_recovery_event, anchor_recovery_event};
+                 SuccessionEvent, DisasterRecoveryAnchor, MetadataUpdateEvent};
 
 // Re-export DAG client types and functions
 pub use dag_client::{FederationDagEvent, FederationDagNode, DagClient, InMemoryDagClient, FederationReplayEngine};
 pub use dag_client::validation::{validate_event_chain, validate_event};
+
+// Public re-exports
+pub use error::{FederationError, FederationResult};
 </file>
 
 <file path="runtime/crates/federation/src/network.rs">
@@ -50305,6 +49843,305 @@ pub fn create_behaviour(
         blob_replication,
         blob_fetch,
     })
+}
+</file>
+
+<file path="runtime/crates/federation/src/quorum.rs">
+use serde::{Deserialize, Serialize};
+use icn_identity::{
+    IdentityId, VerifiableCredential, QuorumConfig, QuorumProof, Signature
+};
+use cid::Cid;
+use chrono::{DateTime, Utc};
+use icn_identity::{
+    KeyPair, IdentityScope
+};
+use ssi_jwk::JWK;
+
+use crate::error::{FederationError, FederationResult};
+use uuid::Uuid;
+use std::collections::HashMap;
+
+/// Type of quorum required for decisions
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum QuorumType {
+    /// Simple majority (>50%)
+    Majority,
+    
+    /// Specific threshold (percentage 0-100)
+    Threshold(u8),
+    
+    /// Unanimous agreement required
+    Unanimous,
+    
+    /// Weighted voting (DID, Weight), Required Total
+    Weighted(Vec<(String, u32)>, u32),
+}
+
+/// Configuration for quorum decisions (generic signer-based implementation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignerQuorumConfig {
+    /// List of authorized DIDs
+    pub signers: Vec<String>,
+    
+    /// Type of quorum required for decisions
+    pub quorum_type: QuorumType,
+    
+    /// Minimum wait time before executing decisions (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_wait_time_seconds: Option<u64>,
+    
+    /// Additional requirements or constraints on quorum
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_requirements: Option<serde_json::Value>,
+}
+
+impl SignerQuorumConfig {
+    /// Create a new majority-based quorum configuration
+    pub fn new_majority(members: Vec<String>) -> Self {
+        Self {
+            signers: members,
+            quorum_type: QuorumType::Majority,
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+    
+    /// Create a new threshold-based quorum configuration
+    pub fn new_threshold(members: Vec<String>, threshold_percentage: u8) -> Self {
+        // Ensure threshold is in valid range
+        let threshold = threshold_percentage.min(100);
+        
+        Self {
+            signers: members,
+            quorum_type: QuorumType::Threshold(threshold),
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+    
+    /// Create a new unanimous quorum configuration
+    pub fn new_unanimous(members: Vec<String>) -> Self {
+        Self {
+            signers: members,
+            quorum_type: QuorumType::Unanimous,
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+    
+    /// Convert to an identity crate QuorumConfig
+    pub fn to_quorum_config(&self) -> QuorumConfig {
+        match &self.quorum_type {
+            QuorumType::Majority => QuorumConfig::Majority,
+            QuorumType::Threshold(threshold) => QuorumConfig::Threshold(*threshold),
+            QuorumType::Unanimous => QuorumConfig::Threshold(100), // Unanimous is 100% threshold
+            QuorumType::Weighted(weights, required) => {
+                // Convert string DIDs to IdentityId
+                let weighted_votes = weights.iter()
+                    .map(|(did, weight)| (IdentityId(did.clone()), *weight))
+                    .collect();
+                
+                QuorumConfig::Weighted(weighted_votes, *required)
+            }
+        }
+    }
+    
+    /// Get the number of DIDs required for a quorum
+    pub fn required_signatures(&self) -> usize {
+        let total = self.signers.len();
+        
+        match &self.quorum_type {
+            QuorumType::Majority => (total / 2) + 1,
+            QuorumType::Threshold(threshold) => {
+                let threshold_percentage = *threshold as f32 / 100.0;
+                (total as f32 * threshold_percentage).ceil() as usize
+            },
+            QuorumType::Unanimous => total,
+            QuorumType::Weighted(_, required) => *required as usize,
+        }
+    }
+}
+
+/// Functions for quorum initialization and management
+pub mod initialization {
+    use super::*;
+    use icn_identity::{generate_did_key, VerifiableCredential};
+    
+    /// Initialize a quorum configuration based on member DIDs
+    pub fn create_quorum_config(
+        member_dids: Vec<String>,
+        quorum_type: QuorumType,
+    ) -> SignerQuorumConfig {
+        match quorum_type {
+            QuorumType::Majority => SignerQuorumConfig::new_majority(member_dids),
+            QuorumType::Threshold(threshold) => SignerQuorumConfig::new_threshold(member_dids, threshold),
+            QuorumType::Unanimous => SignerQuorumConfig::new_unanimous(member_dids),
+            QuorumType::Weighted(weights, required) => {
+                SignerQuorumConfig {
+                    signers: member_dids,
+                    quorum_type: QuorumType::Weighted(weights, required),
+                    min_wait_time_seconds: None,
+                    additional_requirements: None,
+                }
+            }
+        }
+    }
+    
+    /// Generate a set of test DIDs for quorum configuration
+    pub async fn generate_test_dids(count: usize) -> FederationResult<Vec<String>> {
+        let mut dids = Vec::with_capacity(count);
+        
+        for _ in 0..count {
+            let (did_str, _) = generate_did_key().await
+                .map_err(|e| FederationError::BootstrapError(format!("Failed to generate DID key: {}", e)))?;
+                
+            dids.push(did_str);
+        }
+        
+        Ok(dids)
+    }
+    
+    /// Initialize a quorum configuration for testing
+    pub async fn initialize_test_quorum(
+        count: usize,
+        quorum_type: QuorumType,
+    ) -> FederationResult<SignerQuorumConfig> {
+        if count == 0 {
+            return Err(FederationError::BootstrapError("Member count must be greater than 0".to_string()));
+        }
+        
+        // Generate DIDs
+        let dids = generate_test_dids(count).await?;
+        
+        // Create quorum config based on type
+        Ok(create_quorum_config(dids, quorum_type))
+    }
+}
+
+/// Functions for quorum decisions (generic signer implementation)
+pub mod decisions {
+    use super::*;
+    use icn_identity::{IdentityId, Signature, sign_message, QuorumProof, QuorumConfig};
+    
+    /// Create a quorum proof for a specific action
+    pub async fn create_quorum_proof(
+        action_data: &[u8],
+        signatures: Vec<(IdentityId, Signature)>,
+        config: &SignerQuorumConfig,
+    ) -> FederationResult<QuorumProof> {
+        // Convert signer quorum config to identity crate's QuorumConfig
+        let quorum_config = config.to_quorum_config();
+        
+        // Use the signatures directly
+        let votes = signatures;
+        
+        // Check if we have enough votes
+        let required = config.required_signatures();
+        
+        if votes.len() < required {
+            return Err(FederationError::VerificationError(format!(
+                "Not enough signatures: got {}, need {} for quorum",
+                votes.len(), required
+            )));
+        }
+        
+        // Create the quorum proof
+        Ok(QuorumProof {
+            votes,
+            config: quorum_config,
+        })
+    }
+    
+    /// Verify a quorum proof
+    pub async fn verify_quorum_proof(
+        proof: &QuorumProof,
+        content_hash: &[u8],
+        member_dids: &[String],
+    ) -> FederationResult<bool> {
+        // Use the identity crate's verification with general DID list
+        proof.verify(content_hash, member_dids).await
+            .map_err(|e| FederationError::VerificationError(format!("Failed to verify quorum proof: {}", e)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quorum::initialization::initialize_test_quorum;
+    
+    #[tokio::test]
+    async fn test_initialize_quorum_config() {
+        // Create a majority quorum with 3 members
+        let result = initialize_test_quorum(3, QuorumType::Majority).await;
+        assert!(result.is_ok(), "Failed to initialize quorum config: {:?}", result.err());
+        
+        let config = result.unwrap();
+        
+        // Check config
+        assert_eq!(config.signers.len(), 3, "Config should have 3 members");
+        assert!(matches!(config.quorum_type, QuorumType::Majority), "Quorum type should be Majority");
+        assert_eq!(config.required_signatures(), 2, "A majority of 3 should require 2 signatures");
+    }
+    
+    #[tokio::test]
+    async fn test_quorum_threshold_calculation() {
+        // Create a 60% threshold quorum with 5 members
+        let config = initialize_test_quorum(5, QuorumType::Threshold(60)).await.unwrap();
+        
+        // 60% of 5 should be 3
+        assert_eq!(config.required_signatures(), 3, "A 60% threshold of 5 should require 3 signatures");
+        
+        // Create a 75% threshold quorum with 4 members
+        let config = initialize_test_quorum(4, QuorumType::Threshold(75)).await.unwrap();
+        
+        // 75% of 4 should be 3
+        assert_eq!(config.required_signatures(), 3, "A 75% threshold of 4 should require 3 signatures");
+    }
+    
+    #[tokio::test]
+    async fn test_signatures_calculation() {
+        // Test various quorum types and member counts
+        let test_cases = vec![
+            (3, QuorumType::Majority, 2),         // 3 members, majority = 2
+            (5, QuorumType::Majority, 3),         // 5 members, majority = 3
+            (4, QuorumType::Threshold(75), 3),    // 4 members, 75% = 3
+            (10, QuorumType::Threshold(51), 6),   // 10 members, 51% = 6
+            (3, QuorumType::Unanimous, 3),        // 3 members, unanimous = 3
+        ];
+        
+        for (member_count, quorum_type, expected_sigs) in test_cases {
+            let config = initialize_test_quorum(member_count, quorum_type.clone()).await.unwrap();
+            assert_eq!(
+                config.required_signatures(), 
+                expected_sigs, 
+                "{:?} with {} members should require {} signatures", 
+                quorum_type, member_count, expected_sigs
+            );
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_quorum_config_conversion() {
+        // Test conversion to identity QuorumConfig
+        let config = initialize_test_quorum(5, QuorumType::Majority).await.unwrap();
+        let identity_config = config.to_quorum_config();
+        
+        match identity_config {
+            QuorumConfig::Majority => {} // Success
+            _ => panic!("Expected Majority quorum config"),
+        }
+        
+        let config = initialize_test_quorum(5, QuorumType::Threshold(75)).await.unwrap();
+        let identity_config = config.to_quorum_config();
+        
+        match identity_config {
+            QuorumConfig::Threshold(threshold) => {
+                assert_eq!(threshold, 75, "Threshold should be preserved");
+            }
+            _ => panic!("Expected Threshold quorum config"),
+        }
+    }
 }
 </file>
 
@@ -50734,10 +50571,10 @@ mod tests {
 <file path="runtime/crates/federation/src/recovery.rs">
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use icn_identity::{IdentityId, Signature, KeyPair, verify_signature};
+use icn_identity::{Signature, KeyPair};
 use crate::error::{FederationError, FederationResult};
-use crate::guardian::{Guardian, GuardianQuorumConfig, QuorumType};
-use crate::genesis::{FederationMetadata, bootstrap};
+use crate::quorum::SignerQuorumConfig;
+use crate::genesis::FederationMetadata;
 use crate::dag_anchor::GenesisAnchor;
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -50747,8 +50584,8 @@ use base64::Engine;
 pub enum RecoveryEventType {
     /// Federation key rotation event
     FederationKeyRotation,
-    /// Guardian succession event (add/remove/replace)
-    GuardianSuccession,
+    /// Signer succession event (add/remove/replace)
+    Succession,
     /// Quorum configuration update
     QuorumUpdate,
     /// Disaster recovery event
@@ -50785,37 +50622,39 @@ pub struct FederationKeyRotationEvent {
     pub key_proof: Signature,
 }
 
-/// Serializable version of Guardian for recovery events
+/// Serializable version of Signer for recovery events
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializableGuardian {
-    /// Guardian DID
+pub struct SerializableSigner {
+    /// Signer DID
     pub did: String,
-    /// Guardian Public Key (base64 encoded)
+    /// Signer Public Key (base64 encoded)
     pub public_key: String,
 }
 
-impl From<&Guardian> for SerializableGuardian {
-    fn from(guardian: &Guardian) -> Self {
+// Define a generic Signer type for compatibility
+pub type Signer = icn_identity::IdentityId;
+
+impl From<&Signer> for SerializableSigner {
+    fn from(signer: &Signer) -> Self {
         Self {
-            did: guardian.did.0.clone(),
-            // Since we can't directly access the public key, we'll just use a placeholder
-            // In a real implementation, we would need a method in the Guardian to expose this safely
+            did: signer.0.clone(),
+            // In a real implementation, we would need a method to expose the public key safely
             public_key: "placeholder_key".to_string(),
         }
     }
 }
 
-/// Guardian succession event for adding, removing, or replacing guardians
+/// Succession event for adding, removing, or replacing signers
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardianSuccessionEvent {
+pub struct SuccessionEvent {
     /// Base recovery event data
     pub base: RecoveryEvent,
-    /// Guardians to add (serializable version)
-    pub guardians_to_add: Vec<SerializableGuardian>,
-    /// Guardian DIDs to remove
-    pub guardians_to_remove: Vec<String>,
+    /// Signers to add (serializable version)
+    pub signers_to_add: Vec<SerializableSigner>,
+    /// Signer DIDs to remove
+    pub signers_to_remove: Vec<String>,
     /// Updated quorum configuration (if changed)
-    pub updated_quorum_config: Option<GuardianQuorumConfig>,
+    pub updated_quorum_config: Option<SignerQuorumConfig>,
 }
 
 /// Disaster recovery anchor for federation reconstitution
@@ -50828,7 +50667,7 @@ pub struct DisasterRecoveryAnchor {
     /// New guardian set (serializable version)
     pub new_guardians: Vec<SerializableGuardian>,
     /// New quorum configuration
-    pub new_quorum_config: GuardianQuorumConfig,
+    pub new_quorum_config: SignerQuorumConfig,
     /// Justification for disaster recovery
     pub justification: String,
     /// External attestations from trusted parties
@@ -50868,7 +50707,7 @@ pub mod recovery {
         sequence_number: u64,
         previous_event_cid: Option<String>,
         guardians: &[Guardian],
-        quorum_config: &GuardianQuorumConfig,
+        quorum_config: &SignerQuorumConfig,
     ) -> FederationResult<FederationKeyRotationEvent> {
         // Generate new federation DID from new keypair
         // Since we can't directly access the public key, we'd need a proper method
@@ -50919,13 +50758,13 @@ pub mod recovery {
         previous_event_cid: Option<String>,
         guardians_to_add: Vec<Guardian>,
         guardians_to_remove: Vec<String>,
-        updated_quorum_config: Option<GuardianQuorumConfig>,
+        updated_quorum_config: Option<SignerQuorumConfig>,
         current_guardians: &[Guardian],
-        current_quorum_config: &GuardianQuorumConfig,
-    ) -> FederationResult<GuardianSuccessionEvent> {
+        current_quorum_config: &SignerQuorumConfig,
+    ) -> FederationResult<SuccessionEvent> {
         // Create base recovery event
         let base = RecoveryEvent {
-            event_type: RecoveryEventType::GuardianSuccession,
+            event_type: RecoveryEventType::Succession,
             federation_did: federation_did.to_string(),
             sequence_number,
             previous_event_cid,
@@ -50939,7 +50778,7 @@ pub mod recovery {
             .collect();
         
         // Create the guardian succession event
-        let succession_event = GuardianSuccessionEvent {
+        let succession_event = SuccessionEvent {
             base,
             guardians_to_add: serializable_guardians,
             guardians_to_remove,
@@ -50958,7 +50797,7 @@ pub mod recovery {
         new_federation_did: &str,
         sequence_number: u64,
         new_guardians: Vec<Guardian>,
-        new_quorum_config: GuardianQuorumConfig,
+        new_quorum_config: SignerQuorumConfig,
         justification: String,
         external_attestations: Vec<ExternalAttestation>,
     ) -> FederationResult<DisasterRecoveryAnchor> {
@@ -51000,7 +50839,7 @@ pub mod recovery {
         previous_event_cid: Option<String>,
         updated_metadata: FederationMetadata,
         current_guardians: &[Guardian],
-        current_quorum_config: &GuardianQuorumConfig,
+        current_quorum_config: &SignerQuorumConfig,
     ) -> FederationResult<MetadataUpdateEvent> {
         // Create base recovery event
         let base = RecoveryEvent {
@@ -51028,7 +50867,7 @@ pub mod recovery {
     pub async fn verify_recovery_event(
         event: &RecoveryEvent,
         guardians: &[Guardian],
-        quorum_config: &GuardianQuorumConfig,
+        quorum_config: &SignerQuorumConfig,
     ) -> FederationResult<bool> {
         // Implementation would verify signatures against guardians and quorum
         // For now, just a placeholder
@@ -51151,7 +50990,7 @@ mod tests {
         ];
         
         // Create a new quorum configuration with higher threshold
-        let updated_quorum_config = GuardianQuorumConfig::new(
+        let updated_quorum_config = SignerQuorumConfig::new(
             QuorumType::Threshold(75), // 75% threshold instead of majority
             guardian_dids,
         );
@@ -51173,14 +51012,14 @@ mod tests {
         let succession_event = succession_result.unwrap();
         
         // 7. Verify the event fields
-        assert_eq!(succession_event.base.event_type, RecoveryEventType::GuardianSuccession);
+        assert_eq!(succession_event.base.event_type, RecoveryEventType::Succession);
         assert_eq!(succession_event.base.federation_did, federation_did);
         assert_eq!(succession_event.base.sequence_number, 1);
         assert_eq!(succession_event.base.previous_event_cid, None);
-        assert_eq!(succession_event.guardians_to_add.len(), 1);
-        assert_eq!(succession_event.guardians_to_add[0].did, new_guardian.did.0);
-        assert_eq!(succession_event.guardians_to_remove.len(), 1);
-        assert_eq!(succession_event.guardians_to_remove[0], guardian_to_remove);
+        assert_eq!(succession_event.signers_to_add.len(), 1);
+        assert_eq!(succession_event.signers_to_add[0].did, new_guardian.did.0);
+        assert_eq!(succession_event.signers_to_remove.len(), 1);
+        assert_eq!(succession_event.signers_to_remove[0], guardian_to_remove);
         assert!(succession_event.updated_quorum_config.is_some());
         
         // 8. In a real implementation, we would now:
@@ -78761,6 +78600,1223 @@ if [ $fail_count -gt 0 ]; then
 fi
 </file>
 
+<file path="src/dag_client.rs">
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+use crate::error::{FederationError, FederationResult};
+use crate::recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, SuccessionEvent, MetadataUpdateEvent, DisasterRecoveryAnchor};
+use crate::dag_anchor::GenesisAnchor;
+use crate::genesis::FederationMetadata;
+use crate::quorum::{SignerQuorumConfig, QuorumType};
+use async_trait::async_trait;
+use std::collections::HashMap;
+use icn_identity::Signature;
+use cid;
+
+/// Represents an event that can be anchored in the DAG
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FederationDagEvent {
+    /// Federation genesis event
+    Genesis(GenesisAnchor),
+    /// Key rotation event
+    KeyRotation(FederationKeyRotationEvent),
+    /// Succession event for adding/removing signers
+    Succession(SuccessionEvent),
+    /// Metadata update event
+    MetadataUpdate(MetadataUpdateEvent),
+    /// Disaster recovery event
+    DisasterRecovery(DisasterRecoveryAnchor),
+}
+
+impl FederationDagEvent {
+    /// Get the federation DID for this event
+    pub fn federation_did(&self) -> &str {
+        match self {
+            FederationDagEvent::Genesis(e) => &e.federation_did,
+            FederationDagEvent::KeyRotation(e) => &e.base.federation_did,
+            FederationDagEvent::Succession(e) => &e.base.federation_did,
+            FederationDagEvent::MetadataUpdate(e) => &e.base.federation_did,
+            FederationDagEvent::DisasterRecovery(e) => &e.base.federation_did,
+        }
+    }
+    
+    /// Get the event timestamp
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        match self {
+            FederationDagEvent::Genesis(e) => e.issued_at,
+            FederationDagEvent::KeyRotation(e) => e.base.timestamp,
+            FederationDagEvent::Succession(e) => e.base.timestamp,
+            FederationDagEvent::MetadataUpdate(e) => e.base.timestamp,
+            FederationDagEvent::DisasterRecovery(e) => e.base.timestamp,
+        }
+    }
+    
+    /// Get the previous event CID, if any
+    pub fn previous_cid(&self) -> Option<&String> {
+        match self {
+            FederationDagEvent::Genesis(_) => None, // Genesis has no previous
+            FederationDagEvent::KeyRotation(e) => e.base.previous_event_cid.as_ref(),
+            FederationDagEvent::Succession(e) => e.base.previous_event_cid.as_ref(),
+            FederationDagEvent::MetadataUpdate(e) => e.base.previous_event_cid.as_ref(),
+            FederationDagEvent::DisasterRecovery(e) => e.base.previous_event_cid.as_ref(),
+        }
+    }
+    
+    /// Get the event sequence number
+    pub fn sequence_number(&self) -> u64 {
+        match self {
+            FederationDagEvent::Genesis(_) => 0, // Genesis is always sequence 0
+            FederationDagEvent::KeyRotation(e) => e.base.sequence_number,
+            FederationDagEvent::Succession(e) => e.base.sequence_number,
+            FederationDagEvent::MetadataUpdate(e) => e.base.sequence_number,
+            FederationDagEvent::DisasterRecovery(e) => e.base.sequence_number,
+        }
+    }
+    
+    /// Get the event type
+    pub fn event_type(&self) -> &'static str {
+        match self {
+            FederationDagEvent::Genesis(_) => "genesis",
+            FederationDagEvent::KeyRotation(_) => "key_rotation",
+            FederationDagEvent::Succession(_) => "succession",
+            FederationDagEvent::MetadataUpdate(_) => "metadata_update",
+            FederationDagEvent::DisasterRecovery(_) => "disaster_recovery",
+        }
+    }
+}
+
+/// DAG node for federation events
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationDagNode {
+    /// Content identifier for this node
+    pub cid: String,
+    /// The federation event
+    pub event: FederationDagEvent,
+    /// CID of the previous event in the chain, if any
+    pub previous_cid: Option<String>,
+    /// Timestamp when this node was created
+    pub created_at: DateTime<Utc>,
+}
+
+/// Interface for interacting with the DAG
+#[async_trait]
+pub trait DagClient {
+    /// Store a federation event in the DAG
+    async fn store_event(&self, event: FederationDagEvent) -> FederationResult<String>;
+    
+    /// Retrieve a federation event by CID
+    async fn get_event(&self, cid: &str) -> FederationResult<FederationDagNode>;
+    
+    /// List all events for a federation
+    async fn list_federation_events(&self, federation_did: &str) -> FederationResult<Vec<String>>;
+    
+    /// Verify an event chain
+    async fn verify_event_chain(&self, cid: &str) -> FederationResult<bool>;
+    
+    /// Generate a CID for an event
+    fn generate_cid(&self, event: &FederationDagEvent) -> FederationResult<String>;
+}
+
+/// In-memory DAG client implementation for testing
+#[derive(Clone)]
+pub struct InMemoryDagClient {
+    events: HashMap<String, FederationDagNode>,
+    federation_events: HashMap<String, Vec<String>>,
+}
+
+impl Default for InMemoryDagClient {
+    fn default() -> Self {
+        Self {
+            events: HashMap::new(),
+            federation_events: HashMap::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl DagClient for InMemoryDagClient {
+    async fn store_event(&self, event: FederationDagEvent) -> FederationResult<String> {
+        let mut client = self.clone();
+        let federation_did = event.federation_did().to_string();
+        let cid = client.generate_cid(&event)?;
+        
+        let node = FederationDagNode {
+            cid: cid.clone(),
+            previous_cid: event.previous_cid().cloned(),
+            event,
+            created_at: Utc::now(),
+        };
+        
+        client.events.insert(cid.clone(), node);
+        
+        let events = client.federation_events.entry(federation_did).or_insert_with(Vec::new);
+        events.push(cid.clone());
+        
+        Ok(cid)
+    }
+    
+    async fn get_event(&self, cid: &str) -> FederationResult<FederationDagNode> {
+        self.events.get(cid)
+            .cloned()
+            .ok_or_else(|| FederationError::NotFound(format!("DAG node not found: {}", cid)))
+    }
+    
+    async fn list_federation_events(&self, federation_did: &str) -> FederationResult<Vec<String>> {
+        Ok(self.federation_events.get(federation_did)
+            .cloned()
+            .unwrap_or_default())
+    }
+    
+    async fn verify_event_chain(&self, cid: &str) -> FederationResult<bool> {
+        let node = self.get_event(cid).await?;
+        
+        // Check if this is a genesis event (which has no previous)
+        if let FederationDagEvent::Genesis(_) = node.event {
+            return Ok(true);
+        }
+        
+        // For non-genesis events, verify there's a previous event
+        if let Some(prev_cid) = &node.previous_cid {
+            let prev_node = self.get_event(prev_cid).await?;
+            
+            // Verify sequence ordering
+            if prev_node.event.sequence_number() + 1 != node.event.sequence_number() {
+                return Err(FederationError::ValidationError(
+                    format!("Sequence number mismatch: previous={}, current={}", 
+                            prev_node.event.sequence_number(),
+                            node.event.sequence_number())
+                ));
+            }
+            
+            // Verify federation DID consistency (except for disaster recovery which may change it)
+            if !matches!(node.event, FederationDagEvent::DisasterRecovery(_)) 
+                && prev_node.event.federation_did() != node.event.federation_did() {
+                return Err(FederationError::ValidationError(
+                    format!("Federation DID mismatch: previous={}, current={}", 
+                            prev_node.event.federation_did(),
+                            node.event.federation_did())
+                ));
+            }
+            
+            // Recursively verify the previous node's chain
+            return self.verify_event_chain(prev_cid).await;
+        }
+        
+        // Non-genesis events must have a previous event
+        Err(FederationError::ValidationError(
+            "Non-genesis event missing previous event link".to_string()
+        ))
+    }
+    
+    fn generate_cid(&self, event: &FederationDagEvent) -> FederationResult<String> {
+        // In a real implementation, we would use a proper content addressing system
+        // For this example, we'll just create a mock CID
+        
+        let prefix = match event {
+            FederationDagEvent::Genesis(_) => "bafy_genesis",
+            FederationDagEvent::KeyRotation(_) => "bafy_key_rotation",
+            FederationDagEvent::Succession(_) => "bafy_succession",
+            FederationDagEvent::MetadataUpdate(_) => "bafy_metadata",
+            FederationDagEvent::DisasterRecovery(_) => "bafy_recovery",
+        };
+        
+        let federation = event.federation_did().split(':').last().unwrap_or("unknown");
+        let timestamp = event.timestamp().timestamp();
+        let sequence = event.sequence_number();
+        
+        Ok(format!("{}_{}_{}_{}", prefix, federation, timestamp, sequence))
+    }
+}
+
+/// Simple event replay engine
+pub struct FederationReplayEngine<'a, T: DagClient> {
+    dag_client: &'a T,
+}
+
+impl<'a, T: DagClient> FederationReplayEngine<'a, T> {
+    /// Create a new replay engine with the given DAG client
+    pub fn new(dag_client: &'a T) -> Self {
+        Self { dag_client }
+    }
+    
+    /// Replay all events for a federation
+    pub async fn replay_federation(&self, federation_did: &str) -> FederationResult<Vec<FederationDagEvent>> {
+        let cids = self.dag_client.list_federation_events(federation_did).await?;
+        
+        // Sort events by sequence number
+        let mut events = Vec::new();
+        for cid in cids {
+            let node = self.dag_client.get_event(&cid).await?;
+            events.push(node);
+        }
+        
+        events.sort_by_key(|node| node.event.sequence_number());
+        
+        // Extract just the events
+        let result = events.into_iter().map(|node| node.event).collect();
+        Ok(result)
+    }
+    
+    /// Replay events from a specific CID
+    pub async fn replay_from(&self, cid: &str) -> FederationResult<Vec<FederationDagEvent>> {
+        let mut result = Vec::new();
+        let mut current_cid = cid.to_string();
+        
+        // Verify the event chain first
+        self.dag_client.verify_event_chain(&current_cid).await?;
+        
+        // Collect all events in the chain
+        loop {
+            let node = self.dag_client.get_event(&current_cid).await?;
+            result.push(node.event.clone());
+            
+            if let Some(prev_cid) = node.previous_cid {
+                current_cid = prev_cid;
+            } else {
+                break;
+            }
+        }
+        
+        // Reverse to get chronological order
+        result.reverse();
+        Ok(result)
+    }
+}
+
+/// Validation functions for federation DAG events
+pub mod validation {
+    use super::*;
+    
+    /// Validate a federation event chain
+    pub async fn validate_event_chain<T: DagClient>(
+        dag_client: &T,
+        cid: &str,
+    ) -> FederationResult<bool> {
+        dag_client.verify_event_chain(cid).await
+    }
+    
+    /// Validate a specific federation event
+    pub async fn validate_event<T: DagClient>(
+        dag_client: &T,
+        event: &FederationDagEvent,
+    ) -> FederationResult<bool> {
+        // For now, just a placeholder validation
+        // In a real implementation, we would validate signatures, quorum, etc.
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::recovery::RecoveryEvent;
+    use crate::quorum::{SignerQuorumConfig, QuorumType};
+    use icn_identity::{KeyPair, Signature, IdentityId};
+    use std::sync::Arc;
+    
+    #[tokio::test]
+    async fn test_dag_client_store_and_retrieve() {
+        // Set up an in-memory DAG client
+        let client = InMemoryDagClient::default();
+        
+        // Create a mock genesis event
+        let genesis = FederationDagEvent::Genesis(GenesisAnchor {
+            federation_did: "did:key:z6MkTestFederation".to_string(),
+            trust_bundle_cid: "bafy_bundle_123".to_string(),
+            dag_root_cid: "bafy_dag_root_123".to_string(),
+            issued_at: Utc::now(),
+            anchor_signature: Signature(vec![1, 2, 3, 4]),
+        });
+        
+        // Store the event
+        let genesis_cid = client.store_event(genesis.clone()).await.unwrap();
+        
+        // Create a key rotation event
+        let key_rotation = FederationDagEvent::KeyRotation(FederationKeyRotationEvent {
+            base: RecoveryEvent {
+                event_type: RecoveryEventType::FederationKeyRotation,
+                federation_did: "did:key:z6MkTestFederation".to_string(),
+                sequence_number: 1,
+                previous_event_cid: Some(genesis_cid.clone()),
+                timestamp: Utc::now(),
+                signatures: vec![Signature(vec![5, 6, 7, 8])],
+            },
+            new_federation_did: "did:key:z6MkNewTestFederation".to_string(),
+            key_proof: Signature(vec![9, 10, 11, 12]),
+        });
+        
+        // Store the key rotation event
+        let rotation_cid = client.store_event(key_rotation.clone()).await.unwrap();
+        
+        // Retrieve the events
+        let genesis_node = client.get_event(&genesis_cid).await.unwrap();
+        let rotation_node = client.get_event(&rotation_cid).await.unwrap();
+        
+        // Verify the events were stored correctly
+        assert_eq!(genesis_node.event.federation_did(), "did:key:z6MkTestFederation");
+        assert_eq!(rotation_node.event.federation_did(), "did:key:z6MkTestFederation");
+        assert_eq!(rotation_node.previous_cid, Some(genesis_cid));
+        
+        // Verify the event chain
+        let valid = client.verify_event_chain(&rotation_cid).await.unwrap();
+        assert!(valid, "Event chain validation should succeed");
+        
+        // List all events for the federation
+        let events = client.list_federation_events("did:key:z6MkTestFederation").await.unwrap();
+        assert_eq!(events.len(), 2, "Should have 2 events for the federation");
+    }
+    
+    #[tokio::test]
+    async fn test_replay_engine() {
+        // Set up an in-memory DAG client
+        let client = InMemoryDagClient::default();
+        
+        // Create a federation event chain
+        let federation_did = "did:key:z6MkTestFederation".to_string();
+        
+        // 1. Create a genesis event
+        let genesis = FederationDagEvent::Genesis(GenesisAnchor {
+            federation_did: federation_did.clone(),
+            trust_bundle_cid: "bafy_bundle_123".to_string(),
+            dag_root_cid: "bafy_dag_root_123".to_string(),
+            issued_at: Utc::now(),
+            anchor_signature: Signature(vec![1, 2, 3, 4]),
+        });
+        
+        let genesis_cid = client.store_event(genesis.clone()).await.unwrap();
+        
+        // 2. Create a key rotation event
+        let key_rotation = FederationDagEvent::KeyRotation(FederationKeyRotationEvent {
+            base: RecoveryEvent {
+                event_type: RecoveryEventType::FederationKeyRotation,
+                federation_did: federation_did.clone(),
+                sequence_number: 1,
+                previous_event_cid: Some(genesis_cid.clone()),
+                timestamp: Utc::now(),
+                signatures: vec![Signature(vec![5, 6, 7, 8])],
+            },
+            new_federation_did: "did:key:z6MkNewTestFederation".to_string(),
+            key_proof: Signature(vec![9, 10, 11, 12]),
+        });
+        
+        let rotation_cid = client.store_event(key_rotation.clone()).await.unwrap();
+        
+        // 3. Create a metadata update event
+        let metadata_update = FederationDagEvent::MetadataUpdate(MetadataUpdateEvent {
+            base: RecoveryEvent {
+                event_type: RecoveryEventType::MetadataUpdate,
+                federation_did: federation_did.clone(),
+                sequence_number: 2,
+                previous_event_cid: Some(rotation_cid.clone()),
+                timestamp: Utc::now(),
+                signatures: vec![Signature(vec![13, 14, 15, 16])],
+            },
+            updated_metadata: FederationMetadata {
+                federation_did: federation_did.clone(),
+                name: "Updated Federation".to_string(),
+                description: Some("Federation with updated metadata".to_string()),
+                created_at: Utc::now(),
+                initial_policies: vec![],
+                initial_members: vec![],
+                signer_quorum: SignerQuorumConfig {
+                    signers: vec!["did:key:signer1".to_string(), "did:key:signer2".to_string()],
+                    quorum_type: QuorumType::Majority,
+                    min_wait_time_seconds: None,
+                    additional_requirements: None,
+                },
+                genesis_cid: cid::Cid::default(),
+                additional_metadata: Some(serde_json::json!({"test": "metadata"})),
+            },
+        });
+        
+        let metadata_cid = client.store_event(metadata_update.clone()).await.unwrap();
+        
+        // Create a replay engine
+        let replay_engine = FederationReplayEngine::new(&client);
+        
+        // Replay all events for the federation
+        let events = replay_engine.replay_federation(&federation_did).await.unwrap();
+        assert_eq!(events.len(), 3, "Should replay 3 events");
+        
+        // Verify event order
+        assert_eq!(events[0].sequence_number(), 0);
+        assert_eq!(events[1].sequence_number(), 1);
+        assert_eq!(events[2].sequence_number(), 2);
+        
+        // Replay events from a specific point
+        let partial_events = replay_engine.replay_from(&rotation_cid).await.unwrap();
+        assert_eq!(partial_events.len(), 2, "Should replay 2 events when starting from rotation event");
+        assert_eq!(partial_events[0].sequence_number(), 0);
+        assert_eq!(partial_events[1].sequence_number(), 1);
+    }
+}
+</file>
+
+<file path="src/error.rs">
+use thiserror::Error;
+
+pub type FederationResult<T> = Result<T, FederationError>;
+
+#[derive(Error, Debug)]
+pub enum FederationError {
+    #[error("Cryptographic operation failed: {0}")]
+    CryptoError(String),
+    
+    #[error("Invalid signature: {0}")]
+    SignatureError(String),
+    
+    #[error("Verification error: {0}")]
+    VerificationError(String),
+    
+    #[error("Federation bootstrap error: {0}")]
+    BootstrapError(String),
+    
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+    
+    #[error("CID operation error: {0}")]
+    CidError(String),
+    
+    #[error("DAG operation error: {0}")]
+    DagError(String),
+    
+    #[error("Item not found: {0}")]
+    NotFound(String),
+    
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+    
+    #[error("Quorum not met: {0}")]
+    QuorumError(String),
+    
+    #[error("Federation policy violation: {0}")]
+    PolicyViolation(String),
+    
+    #[error("Storage error: {0}")]
+    StorageError(String),
+    
+    #[error("Network error: {0}")]
+    NetworkError(String),
+    
+    #[error("Unknown error: {0}")]
+    Unknown(String),
+}
+
+impl From<std::io::Error> for FederationError {
+    fn from(err: std::io::Error) -> Self {
+        FederationError::StorageError(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for FederationError {
+    fn from(err: serde_json::Error) -> Self {
+        FederationError::SerializationError(err.to_string())
+    }
+}
+</file>
+
+<file path="src/genesis.rs">
+use serde::{Deserialize, Serialize};
+use cid::Cid;
+use chrono::{DateTime, Utc};
+use icn_identity::{IdentityId, TrustBundle, VerifiableCredential, Signature, QuorumProof};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use sha2::{Digest, Sha256};
+
+use crate::error::{FederationResult, FederationError};
+use crate::quorum::SignerQuorumConfig;
+use crate::quorum::decisions;
+
+/// Metadata about a federation entity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationMetadata {
+    /// The DID of the federation
+    pub federation_did: String,
+    
+    /// Human-readable name of the federation
+    pub name: String,
+    
+    /// Description of this federation's purpose
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    
+    /// When the federation was established
+    pub created_at: DateTime<Utc>,
+    
+    /// Initial policies of the federation
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub initial_policies: Vec<VerifiableCredential>,
+    
+    /// Initial members of the federation (DIDs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub initial_members: Vec<String>,
+    
+    /// Signer quorum configuration for this federation
+    pub signer_quorum: SignerQuorumConfig,
+    
+    /// Genesis DAG CID where this federation was anchored
+    pub genesis_cid: Cid,
+    
+    /// Additional metadata fields as arbitrary JSON
+    /// Can include initial policies and members
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_metadata: Option<serde_json::Value>,
+}
+
+/// Represents a Federation Establishment Credential (FEC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationEstablishmentCredential {
+    /// The federation metadata
+    pub metadata: FederationMetadata,
+    
+    /// The current epoch (initially 0)
+    pub epoch: u64,
+    
+    /// Signatures attesting to the legitimacy of this federation
+    pub signer_signatures: Vec<(IdentityId, String)>,
+}
+
+/// Represents a Genesis Trust Bundle encapsulating federation genesis state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisTrustBundle {
+    /// CID of the federation metadata (calculated deterministically)
+    pub federation_metadata_cid: String,
+    
+    /// The federation establishment credential
+    pub federation_establishment_credential: FederationEstablishmentCredential,
+    
+    /// Credentials for all authorized signers
+    pub signer_credentials: Vec<VerifiableCredential>,
+    
+    /// Quorum proof for the bundle
+    pub quorum_proof: QuorumProof,
+    
+    /// When the bundle was issued
+    pub issued_at: DateTime<Utc>,
+}
+
+impl GenesisTrustBundle {
+    /// Create a new genesis trust bundle
+    pub fn new(
+        federation_metadata_cid: String,
+        federation_establishment_credential: FederationEstablishmentCredential,
+        signer_credentials: Vec<VerifiableCredential>,
+        quorum_proof: QuorumProof,
+    ) -> Self {
+        Self {
+            federation_metadata_cid,
+            federation_establishment_credential,
+            signer_credentials,
+            quorum_proof,
+            issued_at: Utc::now(),
+        }
+    }
+    
+    /// Convert the trust bundle to an anchor payload for DAG integration
+    pub fn to_anchor_payload(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "FederationGenesisTrustBundle",
+            "version": "1.0",
+            "federation_metadata_cid": self.federation_metadata_cid,
+            "federation_did": self.federation_establishment_credential.metadata.federation_did,
+            "federation_name": self.federation_establishment_credential.metadata.name,
+            "issued_at": self.issued_at,
+            "signer_count": self.signer_credentials.len(),
+            "quorum_type": self.federation_establishment_credential.metadata.signer_quorum.quorum_type,
+        })
+    }
+}
+
+/// Functions for federation bootstrap
+pub mod bootstrap {
+    use super::*;
+    use icn_identity::{
+        generate_did_key, VerifiableCredential
+    };
+    use crate::quorum::initialization;
+    use sha2::{Digest, Sha256};
+    
+    /// Initialize a new federation with the given configuration
+    pub async fn initialize_federation(
+        name: String,
+        description: Option<String>,
+        quorum_config: SignerQuorumConfig,
+        initial_policies: Vec<VerifiableCredential>,
+        initial_members: Vec<IdentityId>,
+        signatures: Vec<(IdentityId, Signature)>,
+    ) -> FederationResult<(FederationMetadata, FederationEstablishmentCredential, TrustBundle)> {
+        // 1. Generate a new DID for the federation
+        let (federation_did_str, _federation_jwk) = generate_did_key().await
+            .map_err(|e| FederationError::BootstrapError(format!("Failed to generate federation DID: {}", e)))?;
+        
+        // Extract member DIDs as strings
+        let member_dids = initial_members.iter()
+            .map(|id| id.0.clone())
+            .collect();
+        
+        // 2. Create the federation metadata
+        let federation_metadata = FederationMetadata {
+            federation_did: federation_did_str.clone(),
+            name,
+            description,
+            created_at: Utc::now(),
+            initial_policies,
+            initial_members: member_dids,
+            signer_quorum: quorum_config.clone(),
+            genesis_cid: Cid::default(), // Will be set later in Phase 4
+            additional_metadata: None,
+        };
+        
+        // 3. Serialize the federation metadata for signing
+        let metadata_bytes = serde_json::to_vec(&federation_metadata)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize federation metadata: {}", e)))?;
+        
+        // 4. Use provided signatures
+        let encoded_signatures = signatures.iter()
+            .map(|(id, sig)| (id.clone(), URL_SAFE_NO_PAD.encode(&sig.0)))
+            .collect();
+        
+        // 5. Create the establishment credential
+        let establishment_credential = FederationEstablishmentCredential {
+            metadata: federation_metadata.clone(),
+            epoch: 0, // Initial epoch
+            signer_signatures: encoded_signatures,
+        };
+        
+        // 6. Create signer credentials
+        let signer_credentials = Vec::new(); // Would be filled with actual credentials in a real implementation
+        
+        // 7. Create the trust bundle
+        let trust_bundle = create_trust_bundle(
+            &federation_metadata,
+            signer_credentials,
+            signatures,
+        ).await?;
+        
+        Ok((federation_metadata, establishment_credential, trust_bundle))
+    }
+    
+    /// Create a trust bundle from federation metadata and credentials
+    pub async fn create_trust_bundle(
+        metadata: &FederationMetadata,
+        mut credentials: Vec<VerifiableCredential>,
+        signatures: Vec<(IdentityId, Signature)>,
+    ) -> FederationResult<TrustBundle> {
+        // Serialize the metadata for signing
+        let metadata_bytes = serde_json::to_vec(metadata)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize metadata: {}", e)))?;
+        
+        // Create a quorum proof for the metadata
+        let quorum_proof = crate::quorum::decisions::create_quorum_proof(
+            &metadata_bytes,
+            signatures.clone(),
+            &metadata.signer_quorum,
+        ).await?;
+        
+        // If no credentials provided, create a federation establishment credential
+        if credentials.is_empty() {
+            // Create a establishment credential
+            let federation_vc = VerifiableCredential::new(
+                vec!["VerifiableCredential".to_string(), "FederationEstablishmentCredential".to_string()],
+                &IdentityId(metadata.federation_did.clone()),
+                &IdentityId(metadata.federation_did.clone()),
+                serde_json::json!({
+                    "name": metadata.name,
+                    "federation_did": metadata.federation_did,
+                    "created_at": metadata.created_at.to_rfc3339()
+                }),
+            );
+            
+            credentials.push(federation_vc);
+        }
+        
+        // Create the trust bundle
+        let mut trust_bundle = TrustBundle::new(
+            0, // Initial epoch
+            metadata.federation_did.clone(),
+            Vec::new(), // No DAG roots yet (will be added in Phase 4)
+            credentials,
+        );
+        
+        // Add the quorum proof
+        trust_bundle.proof = Some(quorum_proof);
+        
+        Ok(trust_bundle)
+    }
+    
+    /// Calculate a reproducible hash for the federation metadata
+    pub fn calculate_metadata_hash(metadata: &FederationMetadata) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        
+        // Hash the metadata in a deterministic order
+        hasher.update(metadata.federation_did.as_bytes());
+        hasher.update(metadata.name.as_bytes());
+        
+        if let Some(desc) = &metadata.description {
+            hasher.update(desc.as_bytes());
+        }
+        
+        // Hash the created_at timestamp
+        let created_at_str = metadata.created_at.to_rfc3339();
+        hasher.update(created_at_str.as_bytes());
+        
+        // Hash the initial policies (in order)
+        for policy in &metadata.initial_policies {
+            if let Ok(policy_bytes) = serde_json::to_vec(policy) {
+                hasher.update(&policy_bytes);
+            }
+        }
+        
+        // Hash the initial members (in order)
+        for member in &metadata.initial_members {
+            hasher.update(member.as_bytes());
+        }
+        
+        // Hash the signer quorum configuration
+        let quorum_bytes = serde_json::to_vec(&metadata.signer_quorum).unwrap_or_default();
+        hasher.update(&quorum_bytes);
+        
+        // Hash the genesis CID
+        hasher.update(metadata.genesis_cid.to_bytes());
+        
+        // Hash the additional metadata if present
+        if let Some(additional) = &metadata.additional_metadata {
+            let additional_bytes = serde_json::to_vec(additional).unwrap_or_default();
+            hasher.update(&additional_bytes);
+        }
+        
+        let result = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result);
+        
+        hash
+    }
+}
+
+/// Functions for creating and verifying trust bundles
+pub mod trustbundle {
+    use super::*;
+    use cid::multihash::{Multihash};
+    
+    /// Calculate CID from federation metadata
+    pub fn calculate_metadata_cid(metadata: &FederationMetadata) -> FederationResult<String> {
+        let canonical_json = serde_json::to_vec(metadata)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize metadata: {}", e)))?;
+        
+        // Hash the metadata with SHA-256
+        let metadata_hash = Sha256::digest(&canonical_json);
+        
+        // Create a multihash
+        let mh = Multihash::wrap(0x12, &metadata_hash)
+            .map_err(|_| FederationError::CidError("Failed to create multihash".to_string()))?;
+        
+        // Create a CID v1 with dag-json codec (0x0129)
+        let cid = Cid::new_v1(0x0129, mh);
+        
+        Ok(cid.to_string())
+    }
+    
+    /// Create a genesis trust bundle
+    pub async fn create_trust_bundle(
+        metadata: &FederationMetadata,
+        establishment_credential: FederationEstablishmentCredential,
+        signer_credentials: Vec<VerifiableCredential>,
+        signatures: Vec<(IdentityId, Signature)>,
+    ) -> FederationResult<GenesisTrustBundle> {
+        // Calculate federation metadata CID
+        let metadata_cid = calculate_metadata_cid(metadata)?;
+        
+        // Serialize the entire bundle for signing
+        let bundle_data = serde_json::json!({
+            "metadata_cid": metadata_cid,
+            "establishment_credential": establishment_credential,
+            "signer_credentials": signer_credentials,
+            "timestamp": Utc::now().to_rfc3339(),
+        });
+        
+        let bundle_bytes = serde_json::to_vec(&bundle_data)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize bundle data: {}", e)))?;
+        
+        // Create quorum proof for the bundle
+        let quorum_proof = decisions::create_quorum_proof(
+            &bundle_bytes,
+            signatures,
+            &metadata.signer_quorum,
+        ).await?;
+        
+        // Create the genesis trust bundle
+        let trust_bundle = GenesisTrustBundle::new(
+            metadata_cid,
+            establishment_credential,
+            signer_credentials,
+            quorum_proof,
+        );
+        
+        Ok(trust_bundle)
+    }
+    
+    /// Verify a genesis trust bundle
+    pub async fn verify_trust_bundle(
+        bundle: &GenesisTrustBundle,
+        authorized_signer_dids: &[String], 
+    ) -> FederationResult<bool> {
+        // 1. Verify the quorum proof
+        let bundle_data = serde_json::json!({
+            "metadata_cid": bundle.federation_metadata_cid,
+            "establishment_credential": bundle.federation_establishment_credential,
+            "signer_credentials": bundle.signer_credentials,
+            "timestamp": bundle.issued_at.to_rfc3339(),
+        });
+        
+        let bundle_bytes = serde_json::to_vec(&bundle_data)
+            .map_err(|e| FederationError::SerializationError(format!("Failed to serialize bundle: {}", e)))?;
+        
+        // Manually verify each signature in the quorum proof
+        for (signer_did, signature) in &bundle.quorum_proof.votes {
+            // Verify the signer is authorized
+            if !authorized_signer_dids.contains(&signer_did.0) {
+                return Err(FederationError::VerificationError(
+                    format!("Unauthorized signer signature in quorum proof: {}", signer_did.0)
+                ));
+            }
+            
+            // Verify the signature
+            let sig_valid = icn_identity::verify_signature(&bundle_bytes, signature, signer_did)
+                .map_err(|e| FederationError::VerificationError(format!("Signature verification error: {}", e)))?;
+                
+            if !sig_valid {
+                return Err(FederationError::VerificationError(
+                    format!("Invalid signature in quorum proof from signer: {}", signer_did.0)
+                ));
+            }
+        }
+        
+        // 2. Recalculate and verify the metadata CID
+        let recalculated_cid = calculate_metadata_cid(&bundle.federation_establishment_credential.metadata)?;
+        
+        if recalculated_cid != bundle.federation_metadata_cid {
+            return Err(FederationError::VerificationError(
+                format!("Metadata CID mismatch: {} vs {}", 
+                    recalculated_cid, bundle.federation_metadata_cid)
+            ));
+        }
+        
+        // 3. Verify the establishment credential signatures
+        for (signer_did, signature_b64) in &bundle.federation_establishment_credential.signer_signatures {
+            // Check that the signer is authorized
+            if !authorized_signer_dids.contains(&signer_did.0) {
+                return Err(FederationError::VerificationError(
+                    format!("Unauthorized signer signature: {}", signer_did.0)
+                ));
+            }
+            
+            // Verify the signer signature on the metadata
+            let metadata_bytes = serde_json::to_vec(&bundle.federation_establishment_credential.metadata)
+                .map_err(|e| FederationError::SerializationError(format!("Failed to serialize metadata: {}", e)))?;
+            
+            // Decode the signature
+            let signature_bytes = URL_SAFE_NO_PAD.decode(signature_b64)
+                .map_err(|e| FederationError::SerializationError(format!("Failed to decode signature: {}", e)))?;
+            
+            let signature = Signature(signature_bytes);
+            
+            // Verify the signature (this will use the identity crate's verify_signature function)
+            let sig_valid = icn_identity::verify_signature(&metadata_bytes, &signature, signer_did)
+                .map_err(|e| FederationError::VerificationError(format!("Signature verification error: {}", e)))?;
+                
+            if !sig_valid {
+                return Err(FederationError::VerificationError(
+                    format!("Invalid signature from signer: {}", signer_did.0)
+                ));
+            }
+        }
+        
+        // 4. Verify all signers have credentials
+        let signer_dids_in_metadata: Vec<String> = bundle.federation_establishment_credential
+            .metadata.signer_quorum.signers.clone();
+        
+        let signer_dids_with_credentials: Vec<String> = bundle.signer_credentials.iter()
+            .filter_map(|cred| {
+                if let serde_json::Value::Object(subject) = &cred.credentialSubject {
+                    if let Some(serde_json::Value::String(id)) = subject.get("id") {
+                        return Some(id.clone());
+                    }
+                }
+                None
+            })
+            .collect();
+        
+        // All signers listed in metadata should have credentials
+        for did in &signer_dids_in_metadata {
+            if !signer_dids_with_credentials.contains(did) {
+                return Err(FederationError::VerificationError(
+                    format!("Signer {} has no credential in bundle", did)
+                ));
+            }
+        }
+        
+        // All verification checks passed
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quorum::{initialization, QuorumType};
+    use icn_identity::verify_signature;
+    use chrono::DateTime;
+    use base64::Engine;
+    
+    #[tokio::test]
+    async fn test_federation_creation_with_valid_quorum() {
+        // Create a quorum config with a majority of 3 signers
+        let quorum_config = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // Create test signatures (in a real case these would be from the quorum signers)
+        let test_signatures = vec![
+            (IdentityId("did:key:test1".to_string()), Signature(vec![1, 2, 3])),
+            (IdentityId("did:key:test2".to_string()), Signature(vec![4, 5, 6])),
+        ];
+        
+        // Create a federation with this quorum config
+        let name = "Test Federation".to_string();
+        let description = Some("A federation for testing".to_string());
+        let initial_policies = Vec::new(); // No initial policies for this test
+        let initial_members = Vec::new(); // No initial members for this test
+        
+        let result = bootstrap::initialize_federation(
+            name.clone(),
+            description.clone(),
+            quorum_config,
+            initial_policies,
+            initial_members,
+            test_signatures,
+        ).await;
+        
+        assert!(result.is_ok(), "Federation creation failed: {:?}", result.err());
+        
+        let (metadata, establishment_credential, trust_bundle) = result.unwrap();
+        
+        // Check the federation metadata
+        assert_eq!(metadata.name, name);
+        assert_eq!(metadata.description, description);
+        assert!(metadata.created_at <= Utc::now());
+        
+        // Check the establishment credential
+        assert_eq!(establishment_credential.metadata.name, name);
+        assert_eq!(establishment_credential.epoch, 0);
+        assert!(!establishment_credential.signer_signatures.is_empty());
+        
+        // Check the trust bundle
+        assert_eq!(trust_bundle.epoch_id, 0);
+        assert_eq!(trust_bundle.federation_id, metadata.federation_did);
+        assert!(!trust_bundle.attestations.is_empty());
+        assert!(trust_bundle.proof.is_some());
+    }
+    
+    #[tokio::test]
+    async fn test_establishment_credential_signature_verification() {
+        // Create quorum config
+        let quorum_config = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // Create test signatures
+        let test_signatures = vec![
+            (IdentityId("did:key:test1".to_string()), Signature(vec![1, 2, 3])),
+            (IdentityId("did:key:test2".to_string()), Signature(vec![4, 5, 6])),
+        ];
+        
+        // Create federation and get the establishment credential
+        let result = bootstrap::initialize_federation(
+            "Test Federation".to_string(),
+            Some("A federation for testing".to_string()),
+            quorum_config.clone(),
+            Vec::new(),
+            Vec::new(),
+            test_signatures,
+        ).await.unwrap();
+        
+        let (metadata, establishment_credential, _) = result;
+        
+        // Verify that signatures are present in the establishment credential
+        assert!(!establishment_credential.signer_signatures.is_empty(), "Establishment credential should have signatures");
+    }
+    
+    #[tokio::test]
+    async fn test_federation_metadata_cid_reproducibility() {
+        // Create a metadata object with fixed values
+        let metadata = FederationMetadata {
+            federation_did: "did:key:z6MkTest123".to_string(),
+            name: "Test Federation".to_string(),
+            description: Some("A federation for testing".to_string()),
+            created_at: DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z").unwrap().with_timezone(&Utc),
+            initial_policies: Vec::new(),
+            initial_members: vec![
+                "did:key:z6MkMember1".to_string(),
+                "did:key:z6MkMember2".to_string(),
+            ],
+            signer_quorum: SignerQuorumConfig::new_majority(vec![
+                "did:key:z6MkSigner1".to_string(),
+                "did:key:z6MkSigner2".to_string(),
+                "did:key:z6MkSigner3".to_string(),
+            ]),
+            genesis_cid: Cid::default(),
+            additional_metadata: None,
+        };
+        
+        // Calculate the hash twice
+        let hash1 = bootstrap::calculate_metadata_hash(&metadata);
+        let hash2 = bootstrap::calculate_metadata_hash(&metadata);
+        
+        // The hashes should be identical for identical metadata
+        assert_eq!(hash1, hash2, "Metadata hashes should be the same for identical metadata");
+        
+        // Make a copy with a different field
+        let mut metadata2 = metadata.clone();
+        metadata2.name = "Different Federation".to_string();
+        
+        // Calculate the hash for the modified metadata
+        let hash3 = bootstrap::calculate_metadata_hash(&metadata2);
+        
+        // The hash should be different
+        assert_ne!(hash1, hash3, "Metadata hashes should be different for different metadata");
+        
+        // Make a copy with different members (order matters)
+        let mut metadata3 = metadata.clone();
+        metadata3.initial_members = vec![
+            "did:key:z6MkMember2".to_string(),
+            "did:key:z6MkMember1".to_string(),
+        ];
+        
+        // Calculate the hash for the metadata with different member order
+        let hash4 = bootstrap::calculate_metadata_hash(&metadata3);
+        
+        // The hash should be different
+        assert_ne!(hash1, hash4, "Metadata hashes should be different when member order changes");
+    }
+    
+    #[tokio::test]
+    async fn test_genesis_trust_bundle_creation_and_verification() {
+        // Create quorum configuration
+        let quorum_config = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // Create test signatures
+        let test_signatures = vec![
+            (IdentityId("did:key:test1".to_string()), Signature(vec![1, 2, 3])),
+            (IdentityId("did:key:test2".to_string()), Signature(vec![4, 5, 6])),
+        ];
+        
+        // Create federation DIDs
+        let federation_did = "did:key:z6MkFederation123".to_string();
+        
+        // Create test signer credentials
+        let signer_credentials = vec![
+            VerifiableCredential::new(
+                vec!["VerifiableCredential".to_string(), "SignerCredential".to_string()],
+                &IdentityId(federation_did.clone()),
+                &IdentityId("did:key:test1".to_string()),
+                serde_json::json!({"role": "Federation Signer"}),
+            ),
+            VerifiableCredential::new(
+                vec!["VerifiableCredential".to_string(), "SignerCredential".to_string()],
+                &IdentityId(federation_did.clone()),
+                &IdentityId("did:key:test2".to_string()),
+                serde_json::json!({"role": "Federation Signer"}),
+            ),
+        ];
+        
+        // 1. Initialize federation metadata
+        let metadata = FederationMetadata {
+            federation_did: federation_did.clone(),
+            name: "Test Federation".to_string(),
+            description: Some("A federation for testing trust bundles".to_string()),
+            created_at: Utc::now(),
+            initial_policies: Vec::new(),
+            initial_members: Vec::new(),
+            signer_quorum: quorum_config,
+            genesis_cid: Cid::default(),
+            additional_metadata: None,
+        };
+        
+        // 2. Create establishment credential
+        let establishment_credential = FederationEstablishmentCredential {
+            metadata: metadata.clone(),
+            epoch: 0,
+            signer_signatures: test_signatures.iter()
+                .map(|(id, sig)| (id.clone(), URL_SAFE_NO_PAD.encode(&sig.0)))
+                .collect(),
+        };
+        
+        // 3. Create genesis trust bundle
+        let trust_bundle_result = trustbundle::create_trust_bundle(
+            &metadata,
+            establishment_credential,
+            signer_credentials,
+            test_signatures.clone(),
+        ).await;
+        
+        assert!(trust_bundle_result.is_ok(), "Trust bundle creation failed: {:?}", trust_bundle_result.err());
+        
+        let trust_bundle = trust_bundle_result.unwrap();
+        
+        // 4. Verify the CID matches what we expect
+        let calculated_cid = trustbundle::calculate_metadata_cid(&metadata).unwrap();
+        assert_eq!(calculated_cid, trust_bundle.federation_metadata_cid, "Metadata CID mismatch");
+        
+        // 5. Verify trust bundle
+        let authorized_signer_dids: Vec<String> = test_signatures.iter()
+            .map(|(id, _)| id.0.clone())
+            .collect();
+            
+        let verify_result = trustbundle::verify_trust_bundle(&trust_bundle, &authorized_signer_dids).await;
+        assert!(verify_result.is_ok(), "Trust bundle verification failed: {:?}", verify_result.err());
+        assert!(verify_result.unwrap(), "Trust bundle should be valid");
+    }
+}
+</file>
+
+<file path="src/lib.rs">
+/*!
+# ICN Federation
+
+This crate implements federation primitives for the Intercooperative Network (ICN),
+including signer quorum management, federation establishment, TrustBundle creation,
+and DAG anchoring.
+
+The implementation follows the specification defined in the Federation Genesis Bootstrap
+document.
+*/
+
+pub mod error;
+pub mod genesis;
+pub mod quorum;
+pub mod dag_anchor;
+pub mod receipt;
+pub mod recovery;
+pub mod dag_client;
+
+// Re-export core structs
+pub use genesis::{FederationMetadata, FederationEstablishmentCredential, GenesisTrustBundle};
+pub use quorum::{SignerQuorumConfig, QuorumType};
+pub use dag_anchor::GenesisAnchor;
+pub use receipt::{FederationReceipt, MinimalFederationReceipt};
+
+// Re-export receipt verification functions
+pub use receipt::verification::{generate_federation_receipt, verify_federation_receipt, verify_minimal_receipt};
+
+// Re-export recovery types and functions
+pub use recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, 
+                 SuccessionEvent, DisasterRecoveryAnchor, MetadataUpdateEvent};
+
+// Re-export DAG client types and functions
+pub use dag_client::{FederationDagEvent, FederationDagNode, DagClient, InMemoryDagClient, FederationReplayEngine};
+pub use dag_client::validation::{validate_event_chain, validate_event};
+
+// Public re-exports
+pub use error::{FederationError, FederationResult};
+</file>
+
 <file path="src/main.rs">
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -78856,6 +79912,833 @@ async fn health_handler(
             }))
         },
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+</file>
+
+<file path="src/quorum.rs">
+use serde::{Deserialize, Serialize};
+use icn_identity::{
+    IdentityId, VerifiableCredential, QuorumConfig, QuorumProof, Signature
+};
+
+use crate::error::{FederationError, FederationResult};
+
+/// Type of quorum required for decisions
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum QuorumType {
+    /// Simple majority (>50%)
+    Majority,
+    
+    /// Specific threshold (percentage 0-100)
+    Threshold(u8),
+    
+    /// Unanimous agreement required
+    Unanimous,
+    
+    /// Weighted voting (DID, Weight), Required Total
+    Weighted(Vec<(String, u32)>, u32),
+}
+
+/// Configuration for quorum decisions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignerQuorumConfig {
+    /// List of authorized DIDs
+    pub signers: Vec<String>,
+    
+    /// Type of quorum required for decisions
+    pub quorum_type: QuorumType,
+    
+    /// Minimum wait time before executing decisions (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_wait_time_seconds: Option<u64>,
+    
+    /// Additional requirements or constraints on quorum
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_requirements: Option<serde_json::Value>,
+}
+
+impl SignerQuorumConfig {
+    /// Create a new majority-based quorum configuration
+    pub fn new_majority(members: Vec<String>) -> Self {
+        Self {
+            signers: members,
+            quorum_type: QuorumType::Majority,
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+    
+    /// Create a new threshold-based quorum configuration
+    pub fn new_threshold(members: Vec<String>, threshold_percentage: u8) -> Self {
+        // Ensure threshold is in valid range
+        let threshold = threshold_percentage.min(100);
+        
+        Self {
+            signers: members,
+            quorum_type: QuorumType::Threshold(threshold),
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+    
+    /// Create a new unanimous quorum configuration
+    pub fn new_unanimous(members: Vec<String>) -> Self {
+        Self {
+            signers: members,
+            quorum_type: QuorumType::Unanimous,
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+    
+    /// Convert to an identity crate QuorumConfig
+    pub fn to_quorum_config(&self) -> QuorumConfig {
+        match &self.quorum_type {
+            QuorumType::Majority => QuorumConfig::Majority,
+            QuorumType::Threshold(threshold) => QuorumConfig::Threshold(*threshold),
+            QuorumType::Unanimous => QuorumConfig::Threshold(100), // Unanimous is 100% threshold
+            QuorumType::Weighted(weights, required) => {
+                // Convert string DIDs to IdentityId
+                let weighted_votes = weights.iter()
+                    .map(|(did, weight)| (IdentityId(did.clone()), *weight))
+                    .collect();
+                
+                QuorumConfig::Weighted(weighted_votes, *required)
+            }
+        }
+    }
+    
+    /// Get the number of DIDs required for a quorum
+    pub fn required_signatures(&self) -> usize {
+        let total = self.signers.len();
+        
+        match &self.quorum_type {
+            QuorumType::Majority => (total / 2) + 1,
+            QuorumType::Threshold(threshold) => {
+                let threshold_percentage = *threshold as f32 / 100.0;
+                (total as f32 * threshold_percentage).ceil() as usize
+            },
+            QuorumType::Unanimous => total,
+            QuorumType::Weighted(_, required) => *required as usize,
+        }
+    }
+}
+
+/// Functions for quorum initialization and management
+pub mod initialization {
+    use super::*;
+    use icn_identity::generate_did_key;
+    
+    /// Initialize a quorum configuration based on member DIDs
+    pub fn create_quorum_config(
+        member_dids: Vec<String>,
+        quorum_type: QuorumType,
+    ) -> SignerQuorumConfig {
+        match quorum_type {
+            QuorumType::Majority => SignerQuorumConfig::new_majority(member_dids),
+            QuorumType::Threshold(threshold) => SignerQuorumConfig::new_threshold(member_dids, threshold),
+            QuorumType::Unanimous => SignerQuorumConfig::new_unanimous(member_dids),
+            QuorumType::Weighted(weights, required) => {
+                SignerQuorumConfig {
+                    signers: member_dids,
+                    quorum_type: QuorumType::Weighted(weights, required),
+                    min_wait_time_seconds: None,
+                    additional_requirements: None,
+                }
+            }
+        }
+    }
+    
+    /// Generate a set of test DIDs for quorum configuration
+    pub async fn generate_test_dids(count: usize) -> FederationResult<Vec<String>> {
+        let mut dids = Vec::with_capacity(count);
+        
+        for _ in 0..count {
+            let (did_str, _) = generate_did_key().await
+                .map_err(|e| FederationError::BootstrapError(format!("Failed to generate DID key: {}", e)))?;
+                
+            dids.push(did_str);
+        }
+        
+        Ok(dids)
+    }
+    
+    /// Initialize a quorum configuration for testing
+    pub async fn initialize_test_quorum(
+        count: usize,
+        quorum_type: QuorumType,
+    ) -> FederationResult<SignerQuorumConfig> {
+        if count == 0 {
+            return Err(FederationError::BootstrapError("Member count must be greater than 0".to_string()));
+        }
+        
+        // Generate DIDs
+        let dids = generate_test_dids(count).await?;
+        
+        // Create quorum config based on type
+        Ok(create_quorum_config(dids, quorum_type))
+    }
+}
+
+/// Functions for quorum decisions
+pub mod decisions {
+    use super::*;
+    use icn_identity::{IdentityId, Signature, QuorumProof};
+    
+    /// Create a quorum proof for a specific action
+    pub async fn create_quorum_proof(
+        action_data: &[u8],
+        signatures: Vec<(IdentityId, Signature)>,
+        config: &SignerQuorumConfig,
+    ) -> FederationResult<QuorumProof> {
+        // Convert quorum config to identity crate's QuorumConfig
+        let quorum_config = config.to_quorum_config();
+        
+        // Use the signatures directly
+        let votes = signatures;
+        
+        // Check if we have enough votes
+        let required = config.required_signatures();
+        
+        if votes.len() < required {
+            return Err(FederationError::VerificationError(format!(
+                "Not enough signatures: got {}, need {} for quorum",
+                votes.len(), required
+            )));
+        }
+        
+        // Create the quorum proof
+        Ok(QuorumProof {
+            votes,
+            config: quorum_config,
+        })
+    }
+    
+    /// Verify a quorum proof
+    pub async fn verify_quorum_proof(
+        proof: &QuorumProof,
+        content_hash: &[u8],
+        member_dids: &[String],
+    ) -> FederationResult<bool> {
+        // Use the identity crate's verification with general DID list
+        proof.verify(content_hash, member_dids).await
+            .map_err(|e| FederationError::VerificationError(format!("Failed to verify quorum proof: {}", e)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quorum::initialization::initialize_test_quorum;
+    
+    #[tokio::test]
+    async fn test_initialize_quorum_config() {
+        // Create a majority quorum with 3 members
+        let result = initialize_test_quorum(3, QuorumType::Majority).await;
+        assert!(result.is_ok(), "Failed to initialize quorum config: {:?}", result.err());
+        
+        let config = result.unwrap();
+        
+        // Check config
+        assert_eq!(config.signers.len(), 3, "Config should have 3 members");
+        assert!(matches!(config.quorum_type, QuorumType::Majority), "Quorum type should be Majority");
+        assert_eq!(config.required_signatures(), 2, "A majority of 3 should require 2 signatures");
+    }
+    
+    #[tokio::test]
+    async fn test_quorum_threshold_calculation() {
+        // Create a 60% threshold quorum with 5 members
+        let config = initialize_test_quorum(5, QuorumType::Threshold(60)).await.unwrap();
+        
+        // 60% of 5 should be 3
+        assert_eq!(config.required_signatures(), 3, "A 60% threshold of 5 should require 3 signatures");
+        
+        // Create a 75% threshold quorum with 4 members
+        let config = initialize_test_quorum(4, QuorumType::Threshold(75)).await.unwrap();
+        
+        // 75% of 4 should be 3
+        assert_eq!(config.required_signatures(), 3, "A 75% threshold of 4 should require 3 signatures");
+    }
+    
+    #[tokio::test]
+    async fn test_signatures_calculation() {
+        // Test various quorum types and member counts
+        let test_cases = vec![
+            (3, QuorumType::Majority, 2),         // 3 members, majority = 2
+            (5, QuorumType::Majority, 3),         // 5 members, majority = 3
+            (4, QuorumType::Threshold(75), 3),    // 4 members, 75% = 3
+            (10, QuorumType::Threshold(51), 6),   // 10 members, 51% = 6
+            (3, QuorumType::Unanimous, 3),        // 3 members, unanimous = 3
+        ];
+        
+        for (member_count, quorum_type, expected_sigs) in test_cases {
+            let config = initialize_test_quorum(member_count, quorum_type.clone()).await.unwrap();
+            assert_eq!(
+                config.required_signatures(), 
+                expected_sigs, 
+                "{:?} with {} members should require {} signatures", 
+                quorum_type, member_count, expected_sigs
+            );
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_quorum_config_conversion() {
+        // Test conversion to identity QuorumConfig
+        let config = initialize_test_quorum(5, QuorumType::Majority).await.unwrap();
+        let identity_config = config.to_quorum_config();
+        
+        match identity_config {
+            QuorumConfig::Majority => {} // Success
+            _ => panic!("Expected Majority quorum config"),
+        }
+        
+        let config = initialize_test_quorum(5, QuorumType::Threshold(75)).await.unwrap();
+        let identity_config = config.to_quorum_config();
+        
+        match identity_config {
+            QuorumConfig::Threshold(threshold) => {
+                assert_eq!(threshold, 75, "Threshold should be preserved");
+            }
+            _ => panic!("Expected Threshold quorum config"),
+        }
+    }
+}
+</file>
+
+<file path="src/recovery.rs">
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+use icn_identity::{Signature, KeyPair, IdentityId};
+use crate::error::{FederationError, FederationResult};
+use crate::quorum::SignerQuorumConfig;
+use crate::genesis::FederationMetadata;
+
+/// Represents the type of recovery event
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RecoveryEventType {
+    /// Federation key rotation event
+    FederationKeyRotation,
+    /// Signer succession event (add/remove/replace signers)
+    Succession,
+    /// Quorum configuration update
+    QuorumUpdate,
+    /// Disaster recovery event
+    DisasterRecovery,
+    /// Federation metadata update
+    MetadataUpdate,
+}
+
+/// Base structure for all recovery events
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryEvent {
+    /// Type of recovery event
+    pub event_type: RecoveryEventType,
+    /// Federation DID
+    pub federation_did: String,
+    /// Sequence number of this event
+    pub sequence_number: u64,
+    /// Previous event anchor CID, if any
+    pub previous_event_cid: Option<String>,
+    /// Timestamp of the event
+    pub timestamp: DateTime<Utc>,
+    /// Quorum proof signatures
+    pub signatures: Vec<Signature>,
+}
+
+/// Federation key rotation event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationKeyRotationEvent {
+    /// Base recovery event data
+    pub base: RecoveryEvent,
+    /// New federation DID
+    pub new_federation_did: String,
+    /// Proof of new key ownership
+    pub key_proof: Signature,
+}
+
+/// Serializable version of a DID signer for recovery events
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableSigner {
+    /// Signer DID
+    pub did: String,
+    /// Signer Public Key (base64 encoded)
+    pub public_key: String,
+}
+
+/// Signer succession event for adding, removing, or replacing signers
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuccessionEvent {
+    /// Base recovery event data
+    pub base: RecoveryEvent,
+    /// Signers to add (serializable version)
+    pub signers_to_add: Vec<SerializableSigner>,
+    /// Signer DIDs to remove
+    pub signers_to_remove: Vec<String>,
+    /// Updated quorum configuration (if changed)
+    pub updated_quorum_config: Option<SignerQuorumConfig>,
+}
+
+/// Disaster recovery anchor for federation reconstitution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisasterRecoveryAnchor {
+    /// Base recovery event data
+    pub base: RecoveryEvent,
+    /// New federation DID
+    pub new_federation_did: String,
+    /// New signer set (serializable version)
+    pub new_signers: Vec<SerializableSigner>,
+    /// New quorum configuration
+    pub new_quorum_config: SignerQuorumConfig,
+    /// Justification for disaster recovery
+    pub justification: String,
+    /// External attestations from trusted parties
+    pub external_attestations: Vec<ExternalAttestation>,
+}
+
+/// Attestation from an external trusted party
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalAttestation {
+    /// DID of the attesting party
+    pub attester_did: String,
+    /// Timestamp of attestation
+    pub timestamp: DateTime<Utc>,
+    /// Attestation statement
+    pub statement: String,
+    /// Signature of the attesting party
+    pub signature: Signature,
+}
+
+/// Federation metadata update event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetadataUpdateEvent {
+    /// Base recovery event data
+    pub base: RecoveryEvent,
+    /// Updated federation metadata
+    pub updated_metadata: FederationMetadata,
+}
+
+/// Recovery module functions
+pub mod recovery {
+    use super::*;
+    
+    /// Create a federation key rotation event
+    pub async fn create_key_rotation_event(
+        federation_did: &str,
+        new_keypair: &KeyPair,
+        sequence_number: u64,
+        previous_event_cid: Option<String>,
+        signatures: Vec<(IdentityId, Signature)>,
+        quorum_config: &SignerQuorumConfig,
+    ) -> FederationResult<FederationKeyRotationEvent> {
+        // Generate new federation DID from new keypair
+        // Since we can't directly access the public key, we'd need a proper method
+        // For now, we'll just use a placeholder DID
+        let new_federation_did = format!("did:key:new_federation_{}", sequence_number);
+        
+        // Create the base recovery event
+        let base = RecoveryEvent {
+            event_type: RecoveryEventType::FederationKeyRotation,
+            federation_did: federation_did.to_string(),
+            sequence_number,
+            previous_event_cid,
+            timestamp: Utc::now(),
+            signatures: signatures.iter().map(|(_, sig)| sig.clone()).collect(),
+        };
+        
+        // Create the key rotation event
+        let mut rotation_event = FederationKeyRotationEvent {
+            base,
+            new_federation_did,
+            key_proof: Signature(vec![]),  // Will be filled below
+        };
+        
+        // Generate signature proof with new key
+        let message = format!("Federation key rotation from {} to {} at {}", 
+            federation_did, 
+            rotation_event.new_federation_did,
+            rotation_event.base.timestamp.to_rfc3339()
+        );
+        
+        let key_proof = icn_identity::sign_message(message.as_bytes(), new_keypair)
+            .map_err(|e| FederationError::CryptoError(format!("Failed to sign key proof: {}", e)))?;
+        
+        rotation_event.key_proof = key_proof;
+        
+        Ok(rotation_event)
+    }
+    
+    /// Create a signer succession event
+    pub async fn create_succession_event(
+        federation_did: &str,
+        sequence_number: u64,
+        previous_event_cid: Option<String>,
+        signers_to_add: Vec<SerializableSigner>,
+        signers_to_remove: Vec<String>,
+        updated_quorum_config: Option<SignerQuorumConfig>,
+        signatures: Vec<(IdentityId, Signature)>,
+    ) -> FederationResult<SuccessionEvent> {
+        // Create base recovery event
+        let base = RecoveryEvent {
+            event_type: RecoveryEventType::Succession,
+            federation_did: federation_did.to_string(),
+            sequence_number,
+            previous_event_cid,
+            timestamp: Utc::now(),
+            signatures: signatures.iter().map(|(_, sig)| sig.clone()).collect(),
+        };
+        
+        // Create the succession event
+        let succession_event = SuccessionEvent {
+            base,
+            signers_to_add,
+            signers_to_remove,
+            updated_quorum_config,
+        };
+        
+        Ok(succession_event)
+    }
+    
+    /// Create a disaster recovery anchor
+    pub async fn create_disaster_recovery_anchor(
+        federation_did: &str,
+        new_federation_did: &str,
+        sequence_number: u64,
+        new_signers: Vec<SerializableSigner>,
+        new_quorum_config: SignerQuorumConfig,
+        justification: String,
+        external_attestations: Vec<ExternalAttestation>,
+    ) -> FederationResult<DisasterRecoveryAnchor> {
+        // Create base recovery event
+        let base = RecoveryEvent {
+            event_type: RecoveryEventType::DisasterRecovery,
+            federation_did: federation_did.to_string(),
+            sequence_number,
+            previous_event_cid: None, // Usually a disaster recovery doesn't have a previous event CID
+            timestamp: Utc::now(),
+            signatures: vec![],  // Will be filled with signatures from new signers
+        };
+        
+        // Create the disaster recovery anchor
+        let recovery_anchor = DisasterRecoveryAnchor {
+            base,
+            new_federation_did: new_federation_did.to_string(),
+            new_signers,
+            new_quorum_config,
+            justification,
+            external_attestations,
+        };
+        
+        Ok(recovery_anchor)
+    }
+    
+    /// Create a metadata update event
+    pub async fn create_metadata_update_event(
+        federation_did: &str,
+        sequence_number: u64,
+        previous_event_cid: Option<String>,
+        updated_metadata: FederationMetadata,
+        signatures: Vec<(IdentityId, Signature)>,
+    ) -> FederationResult<MetadataUpdateEvent> {
+        // Create base recovery event
+        let base = RecoveryEvent {
+            event_type: RecoveryEventType::MetadataUpdate,
+            federation_did: federation_did.to_string(),
+            sequence_number,
+            previous_event_cid,
+            timestamp: Utc::now(),
+            signatures: signatures.iter().map(|(_, sig)| sig.clone()).collect(),
+        };
+        
+        // Create the metadata update event
+        let metadata_event = MetadataUpdateEvent {
+            base,
+            updated_metadata,
+        };
+        
+        Ok(metadata_event)
+    }
+    
+    /// Verify a recovery event's signatures against a quorum config
+    pub async fn verify_recovery_event(
+        event: &RecoveryEvent,
+        member_dids: &[String],
+        quorum_config: &SignerQuorumConfig,
+    ) -> FederationResult<bool> {
+        // Implementation would verify signatures against quorum config
+        // For now, just a placeholder
+        Ok(true)
+    }
+    
+    /// Create a DAG anchor for a recovery event
+    pub async fn anchor_recovery_event(
+        _event: &RecoveryEvent,
+        _federation_keypair: &KeyPair,
+    ) -> FederationResult<String> {
+        // Implementation would create a DAG anchor for the event
+        // Return the CID of the anchor
+        Ok("recovery_event_anchor_cid".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quorum::{initialization, QuorumType};
+    
+    #[tokio::test]
+    async fn test_key_rotation() {
+        // 1. Set up test quorum configuration
+        let test_quorum = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // 2. Create federation DID and keypair
+        let federation_did = "did:key:z6MkFederation123".to_string();
+        let federation_keypair = KeyPair::new(vec![1, 2, 3, 4], vec![5, 6, 7, 8, 9]); // Simplified for testing
+        
+        // 3. Create a new keypair for rotation
+        let new_federation_keypair = KeyPair::new(vec![9, 8, 7, 6], vec![5, 4, 3, 2, 1]); // Simplified for testing
+        let new_federation_did = "did:key:z6MkFederationNew456".to_string();
+        
+        // 4. Create test signatures
+        let test_signatures = vec![
+            (IdentityId("did:key:test1".to_string()), Signature(vec![1, 2, 3])),
+            (IdentityId("did:key:test2".to_string()), Signature(vec![4, 5, 6])),
+        ];
+        
+        // 5. Create key rotation event
+        let key_rotation_result = recovery::create_key_rotation_event(
+            &federation_did,
+            &new_federation_keypair,
+            1, // First event
+            None, // No previous event
+            test_signatures,
+            &test_quorum,
+        ).await;
+        
+        assert!(key_rotation_result.is_ok(), "Failed to create key rotation event: {:?}", key_rotation_result.err());
+        
+        let key_rotation_event = key_rotation_result.unwrap();
+        
+        // 6. Verify the event fields
+        assert_eq!(key_rotation_event.base.event_type, RecoveryEventType::FederationKeyRotation);
+        assert_eq!(key_rotation_event.base.federation_did, federation_did);
+        assert_eq!(key_rotation_event.base.sequence_number, 1);
+        assert_eq!(key_rotation_event.base.previous_event_cid, None);
+        
+        // 7. Create a mock anchor CID for this event
+        let anchor_cid = "bafykeyfederation1".to_string();
+        
+        // 8. Create test metadata for subsequent event
+        let test_metadata = FederationMetadata {
+            federation_did: new_federation_did.clone(),
+            name: "Updated Federation".to_string(),
+            description: Some("This federation has a rotated key".to_string()),
+            created_at: Utc::now(),
+            initial_policies: vec![],
+            initial_members: vec![],
+            signer_quorum: test_quorum.clone(),
+            genesis_cid: cid::Cid::default(), 
+            additional_metadata: None,
+        };
+        
+        // 9. Create subsequent event  
+        let subsequent_event_result = recovery::create_metadata_update_event(
+            &new_federation_did, // Using the new federation DID
+            2, // Second event
+            Some(anchor_cid), // Previous event CID
+            test_metadata,
+            test_signatures,
+        ).await;
+        
+        assert!(subsequent_event_result.is_ok(), "Failed to create subsequent event: {:?}", subsequent_event_result.err());
+        
+        let subsequent_event = subsequent_event_result.unwrap();
+        
+        // 10. Verify the subsequent event fields
+        assert_eq!(subsequent_event.base.event_type, RecoveryEventType::MetadataUpdate);
+        assert_eq!(subsequent_event.base.federation_did, new_federation_did);
+        assert_eq!(subsequent_event.base.sequence_number, 2);
+        assert_eq!(subsequent_event.base.previous_event_cid, Some(anchor_cid));
+        assert_eq!(subsequent_event.updated_metadata.federation_did, new_federation_did);
+    }
+    
+    #[tokio::test]
+    async fn test_succession() {
+        // 1. Initialize test quorum
+        let test_quorum = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // 2. Create federation DID
+        let federation_did = "did:key:z6MkFederation123".to_string();
+        
+        // 3. Create test signers to add/remove
+        let signer_to_add = SerializableSigner {
+            did: "did:key:z6MkNewSigner456".to_string(),
+            public_key: "base64encodedpublickey".to_string(),
+        };
+        
+        let signer_to_remove = "did:key:z6MkOldSigner789".to_string();
+        
+        // 4. Create test signatures
+        let test_signatures = vec![
+            (IdentityId("did:key:test1".to_string()), Signature(vec![1, 2, 3])),
+            (IdentityId("did:key:test2".to_string()), Signature(vec![4, 5, 6])),
+        ];
+        
+        // 5. Create a new quorum configuration with higher threshold
+        let updated_quorum_dids = vec![
+            "did:key:z6MkSigner1".to_string(),
+            "did:key:z6MkSigner2".to_string(),
+            "did:key:z6MkNewSigner456".to_string(),
+        ];
+        
+        let updated_quorum = SignerQuorumConfig::new_threshold(updated_quorum_dids, 75);
+        
+        // 6. Create succession event
+        let succession_result = recovery::create_succession_event(
+            &federation_did,
+            1, // First event
+            None, // No previous event
+            vec![signer_to_add], // Add new signer
+            vec![signer_to_remove.clone()], // Remove old signer
+            Some(updated_quorum.clone()), // Update quorum configuration
+            test_signatures,
+        ).await;
+        
+        assert!(succession_result.is_ok(), "Failed to create succession event: {:?}", succession_result.err());
+        
+        let succession_event = succession_result.unwrap();
+        
+        // 7. Verify the event fields
+        assert_eq!(succession_event.base.event_type, RecoveryEventType::Succession);
+        assert_eq!(succession_event.base.federation_did, federation_did);
+        assert_eq!(succession_event.base.sequence_number, 1);
+        assert_eq!(succession_event.base.previous_event_cid, None);
+        assert_eq!(succession_event.signers_to_add.len(), 1);
+        assert_eq!(succession_event.signers_to_add[0].did, "did:key:z6MkNewSigner456");
+        assert_eq!(succession_event.signers_to_remove.len(), 1);
+        assert_eq!(succession_event.signers_to_remove[0], signer_to_remove);
+        assert!(succession_event.updated_quorum_config.is_some());
+    }
+    
+    #[tokio::test]
+    async fn test_disaster_recovery() {
+        // 1. Initialize test quorum
+        let test_quorum = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // 2. Set up federation DIDs
+        let original_federation_did = "did:key:z6MkCompromisedFederation".to_string();
+        let new_federation_did = "did:key:z6MkReconstitutedFederation".to_string();
+        
+        // 3. Create new signers for reconstitution
+        let new_signers = vec![
+            SerializableSigner {
+                did: "did:key:z6MkNewSigner1".to_string(),
+                public_key: "base64encodedpublickey1".to_string(),
+            },
+            SerializableSigner {
+                did: "did:key:z6MkNewSigner2".to_string(),
+                public_key: "base64encodedpublickey2".to_string(),
+            },
+            SerializableSigner {
+                did: "did:key:z6MkNewSigner3".to_string(),
+                public_key: "base64encodedpublickey3".to_string(),
+            },
+        ];
+        
+        // 4. Create a high-security quorum config for the new federation
+        let new_quorum_config = SignerQuorumConfig::new_threshold(
+            new_signers.iter().map(|s| s.did.clone()).collect(),
+            80 // 80% threshold
+        );
+        
+        // 5. Create external attestations
+        let statement = format!(
+            "We attest that the federation {} has been compromised and is being reconstituted as {} with legitimate succession.",
+            original_federation_did, new_federation_did
+        );
+        
+        let external_attestation = ExternalAttestation {
+            attester_did: "did:key:z6MkTrustedAttestor".to_string(),
+            timestamp: Utc::now(),
+            statement,
+            signature: Signature(vec![10, 11, 12]), // Test signature
+        };
+        
+        // 6. Create a justification
+        let justification = "Federation key material was compromised in a security breach. This reconstitution follows the disaster recovery protocol.";
+        
+        // 7. Create disaster recovery anchor
+        let recovery_result = recovery::create_disaster_recovery_anchor(
+            &original_federation_did,
+            &new_federation_did,
+            1, // First event in new chain
+            new_signers.clone(),
+            new_quorum_config.clone(),
+            justification.to_string(),
+            vec![external_attestation],
+        ).await;
+        
+        assert!(recovery_result.is_ok(), "Failed to create disaster recovery anchor: {:?}", recovery_result.err());
+        
+        let recovery_anchor = recovery_result.unwrap();
+        
+        // 8. Verify the recovery anchor fields
+        assert_eq!(recovery_anchor.base.event_type, RecoveryEventType::DisasterRecovery);
+        assert_eq!(recovery_anchor.base.federation_did, original_federation_did);
+        assert_eq!(recovery_anchor.base.sequence_number, 1);
+        assert_eq!(recovery_anchor.new_federation_did, new_federation_did);
+        assert_eq!(recovery_anchor.new_signers.len(), new_signers.len());
+        assert_eq!(recovery_anchor.external_attestations.len(), 1);
+        assert_eq!(recovery_anchor.justification, justification);
+    }
+    
+    #[tokio::test]
+    async fn test_metadata_update() {
+        // 1. Initialize test quorum
+        let test_quorum = initialization::initialize_test_quorum(3, QuorumType::Majority).await.unwrap();
+        
+        // 2. Create federation DID
+        let federation_did = "did:key:z6MkFederation123".to_string();
+        
+        // 3. Create test signatures
+        let test_signatures = vec![
+            (IdentityId("did:key:test1".to_string()), Signature(vec![1, 2, 3])),
+            (IdentityId("did:key:test2".to_string()), Signature(vec![4, 5, 6])),
+        ];
+        
+        // 4. Create test metadata
+        let test_metadata = FederationMetadata {
+            federation_did: federation_did.clone(),
+            name: "Updated Federation Name".to_string(),
+            description: Some("This federation has updated metadata".to_string()),
+            created_at: Utc::now(),
+            initial_policies: vec![],
+            initial_members: vec![],
+            signer_quorum: test_quorum.clone(),
+            genesis_cid: cid::Cid::default(),
+            additional_metadata: None,
+        };
+        
+        // 5. Create metadata update event
+        let update_result = recovery::create_metadata_update_event(
+            &federation_did,
+            1, // First event
+            None, // No previous event
+            test_metadata.clone(),
+            test_signatures.clone(),
+        ).await;
+        
+        assert!(update_result.is_ok(), "Failed to create metadata update event: {:?}", update_result.err());
+        
+        let update_event = update_result.unwrap();
+        
+        // 6. Verify the event fields
+        assert_eq!(update_event.base.event_type, RecoveryEventType::MetadataUpdate);
+        assert_eq!(update_event.base.federation_did, federation_did);
+        assert_eq!(update_event.base.sequence_number, 1);
+        assert_eq!(update_event.base.previous_event_cid, None);
+        assert_eq!(update_event.updated_metadata.name, "Updated Federation Name");
     }
 }
 </file>

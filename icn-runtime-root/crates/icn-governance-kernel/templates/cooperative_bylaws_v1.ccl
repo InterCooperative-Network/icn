@@ -1,0 +1,130 @@
+/**
+ * Cooperative Bylaws Template
+ * 
+ * This template defines the governance structure for a cooperative.
+ */
+coop_bylaws {
+    "name": "",
+    "description": "",
+    "founding_date": "",
+    "mission_statement": "",
+    
+    "governance": {
+        "decision_making": "consent",  // Options: consensus, consent, majority
+        "quorum": 0.5,                // Fraction of members required for quorum
+        "majority": 0.66,             // Required majority for decisions
+        "term_length": 365,           // Days for elected positions
+        
+        "roles": [
+            {
+                "name": "member",
+                "permissions": [
+                    "vote_on_proposals",
+                    "create_proposals",
+                    "join_working_groups"
+                ]
+            },
+            {
+                "name": "steward",
+                "permissions": [
+                    "vote_on_proposals",
+                    "create_proposals",
+                    "join_working_groups",
+                    "manage_working_groups",
+                    "review_proposals"
+                ]
+            }
+        ]
+    },
+    
+    "membership": {
+        "onboarding": {
+            "requires_sponsor": true,
+            "trial_period_days": 90,
+            "requirements": [
+                "Complete orientation",
+                "Attend at least one meeting",
+                "Agree to code of conduct"
+            ]
+        },
+        
+        "dues": {
+            "amount": 0,               // Amount in tokens
+            "frequency": "monthly",    // Options: one-time, monthly, quarterly, annually
+            "variable_options": [
+                {
+                    "amount": 0,
+                    "description": "Financial hardship"
+                },
+                {
+                    "amount": 10,
+                    "description": "Standard membership"
+                },
+                {
+                    "amount": 25,
+                    "description": "Supporting membership"
+                }
+            ]
+        },
+        
+        "offboarding": {
+            "notice_period_days": 30,
+            "max_inactive_days": 180
+        }
+    },
+    
+    "proposals": {
+        "types": [
+            {
+                "name": "governance_change",
+                "quorum_modifier": 1.5,     // Increase quorum requirement
+                "majority_modifier": 1.2,   // Increase majority requirement
+                "discussion_period_days": 14
+            },
+            {
+                "name": "resource_allocation",
+                "quorum_modifier": 1.0,
+                "majority_modifier": 1.0,
+                "discussion_period_days": 7
+            },
+            {
+                "name": "membership_change",
+                "quorum_modifier": 1.0,
+                "majority_modifier": 1.0,
+                "discussion_period_days": 7
+            }
+        ]
+    },
+    
+    "working_groups": {
+        "formation_threshold": 3,      // Minimum members to form a group
+        "dissolution_threshold": 2,    // Below this, group is dissolved
+        "resource_allocation": {
+            "default_budget": 100,     // Default budget allocation
+            "requires_approval": true  // Whether budget changes need approval
+        }
+    },
+    
+    "dispute_resolution": {
+        "process": [
+            "Direct communication",
+            "Facilitated dialogue",
+            "Mediation",
+            "Binding decision by elected committee"
+        ],
+        "committee_size": 3
+    },
+    
+    "economic_model": {
+        "surplus_distribution": "equal",  // Options: equal, proportional, needs-based
+        "compensation_policy": {
+            "hourly_rates": {
+                "standard": 15,
+                "specialized": 20,
+                "coordination": 17
+            },
+            "track_hours": true,
+            "volunteer_options": true
+        }
+    }
+} 

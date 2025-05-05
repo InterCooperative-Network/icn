@@ -86,3 +86,4 @@ wallet/.keys/*.meta.json
 
 # Path to store secure credentials outside of repository
 secrets/
+repomix-output.xml

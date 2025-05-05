@@ -1,0 +1,47 @@
+[package]
+name = "icn-identity"
+version = "0.1.0"
+edition = "2021"
+description = "DIDs, VCs, TrustBundles, Anchors, and ZK for the ICN Runtime"
+
+[dependencies]
+# Use workspace dependencies where available
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true, features = ["serde-codec"] }
+multihash = { workspace = true }
+
+# Common types and utilities
+icn-common = { path = "../common" }
+
+# Other required dependencies
+did-method-key = "0.3"
+rand = "0.8"
+sha2 = "0.10"
+uuid = { version = "1.3", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+bs58 = "0.5"
+base64 = "0.21"
+hex = "0.4"
+
+# W3C DID/VC standards and JWS implementation
+ssi = { version = "0.7", features = ["ed25519"] }
+ssi-jwk = "0.1.2"
+ssi-jws = "0.1.1"
+ssi-dids = "0.1.1"
+ssi-dids-core = "0.1.1"
+
+# W3C DID/VC standards - simplify for now as we're implementing our own
+# ssi = { version = "0.7", default-features = false, features = ["vc", "jwk", "did"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = []
+jwk = []
+signing = [] 

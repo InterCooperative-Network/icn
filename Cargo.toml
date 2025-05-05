@@ -1,25 +1,33 @@
 [workspace]
 resolver = "2"
 members = [
-    "runtime",
-    "runtime/crates/common",
-    "runtime/crates/core-vm",
-    "runtime/crates/dag",
-    "runtime/crates/economics",
-    "runtime/crates/federation",
-    "runtime/crates/governance-kernel",
-    "runtime/crates/identity",
-    "runtime/crates/storage",
-    "runtime/crates/ccl-compiler",
-    "runtime/crates/execution-tools",
-    "runtime/crates/agoranet-integration",
-    "runtime/crates/models",
-    "runtime/crates/icn-verifier",
-    "runtime/cli",
-    "wallet",
-    "wallet/crates/*",
+    "icn-runtime-root",
+    "icn-runtime-root/crates/icn-common",
+    "icn-runtime-root/crates/icn-core-vm",
+    "icn-runtime-root/crates/icn-dag",
+    "icn-runtime-root/crates/icn-economics",
+    "icn-runtime-root/crates/icn-federation",
+    "icn-runtime-root/crates/icn-governance-kernel",
+    "icn-runtime-root/crates/icn-identity",
+    "icn-runtime-root/crates/icn-storage",
+    "icn-runtime-root/crates/icn-ccl-compiler",
+    "icn-runtime-root/crates/icn-execution-tools",
+    "icn-runtime-root/crates/icn-agoranet-integration",
+    "icn-runtime-root/crates/icn-models",
+    "icn-runtime-root/crates/icn-verifier-runtime",
+    "icn-runtime-root/cli",
+    "icn-wallet-root",
+    "icn-wallet-root/crates/icn-wallet-actions",
+    "icn-wallet-root/crates/icn-wallet-agent",
+    "icn-wallet-root/crates/icn-wallet-api",
+    "icn-wallet-root/crates/icn-wallet-core",
+    "icn-wallet-root/crates/icn-wallet-ffi",
+    "icn-wallet-root/crates/icn-wallet-identity",
+    "icn-wallet-root/crates/icn-wallet-storage",
+    "icn-wallet-root/crates/icn-wallet-sync",
+    "icn-wallet-root/crates/icn-wallet-types",
     "agoranet",
-    "agoranet/crates/*",
+    "agoranet/crates/agoranet-api",
     "tools/health_check",
     "tools/icn-verifier",
 ]
@@ -27,6 +35,7 @@ members = [
 # Temporarily excluded components with issues
 exclude = [
     "frontend/*",
+    "icn-runtime-root/crates/icn-core-vm/fuzz", # Fuzz tests have their own setup
 ]
 
 [workspace.dependencies]

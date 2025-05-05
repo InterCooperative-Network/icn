@@ -59,15 +59,31 @@ jobs:
       - name: Check for nested workspaces
         run: |
           ROOT_WORKSPACE=$(grep -l "^\[workspace\]" Cargo.toml)
-          NESTED_WORKSPACES=$(find . -not -path "./target/*" -not -path "./$ROOT_WORKSPACE" -name Cargo.toml -type f -exec grep -l "^\[workspace\]" {} \;)
+          NESTED_WORKSPACES=$(find . -not -path "./target/*" -not -path "./docs/*" -name "Cargo.toml" -type f -exec grep -l "^\[workspace\]" {} \; | grep -v "^./Cargo.toml$")
+          OTHER_WORKSPACE_FILES=$(find . -not -path "./target/*" -not -path "./docs/*" -name "*.toml" -not -name "Cargo.toml" -type f -exec grep -l "^\[workspace\]" {} \;)
+          
+          FOUND_ISSUES=0
           
           if [ -n "$NESTED_WORKSPACES" ]; then
-            echo "Error: Found nested workspace definitions which cause build issues:"
+            echo "Error: Found nested workspace definitions in Cargo.toml files which cause build issues:"
             echo "$NESTED_WORKSPACES"
             echo "All workspaces must be consolidated into the root Cargo.toml."
-            exit 1
+            FOUND_ISSUES=1
           else
-            echo "No nested workspaces found."
+            echo "No nested workspaces found in Cargo.toml files."
+          fi
+          
+          if [ -n "$OTHER_WORKSPACE_FILES" ]; then
+            echo "Error: Found workspace definitions in other .toml files which may cause issues:"
+            echo "$OTHER_WORKSPACE_FILES"
+            echo "All workspaces must be consolidated into the root Cargo.toml."
+            FOUND_ISSUES=1
+          else
+            echo "No workspace definitions found in other .toml files."
+          fi
+          
+          if [ "$FOUND_ISSUES" -eq 1 ]; then
+            exit 1
           fi
       
       - name: Run cargo check
