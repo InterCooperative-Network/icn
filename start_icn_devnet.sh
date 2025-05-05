@@ -6,9 +6,6 @@ set -Eeuo pipefail
 #  – AgoraNet                                 #
 ###############################################
 
-REPOROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$REPOROOT/.."
-
 echo "🔧 1. Building runtime components …"
 cd icn-runtime-root/cli
 cargo build --release
@@ -25,7 +22,6 @@ sleep 4        # give Postgres a moment
 echo "📜 3. Running AgoraNet DB migrations …"
 pushd agoranet >/dev/null
 # Ensure sqlx-cli is installed or available
-# If not installed globally, you might need: cargo install sqlx-cli --no-default-features --features native-tls,postgres
 sqlx database create --database-url 'postgres://icn:icnpass@localhost:5432/agoranet' || true # Create DB if not exists, ignore error if it does
 sqlx migrate run --database-url 'postgres://icn:icnpass@localhost:5432/agoranet'
 popd >/dev/null
@@ -82,4 +78,4 @@ wait
 # This part might not be reached if Ctrl+C is used to stop the servers
 echo ""
 echo "✅ ICN dev‑net was stopped."
-echo "Runtime PID ($RUNTIME_PID) and AgoraNet PID ($AGORANET_PID) have been terminated." 
+echo "Runtime PID ($RUNTIME_PID) and AgoraNet_PID ($AGORANET_PID) have been terminated." 

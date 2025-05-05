@@ -6,7 +6,7 @@ services:
     image: icn-runtime:latest
     build:
       context: ../..
-      dockerfile: runtime/devnet/Dockerfile
+      dockerfile: icn-runtime-root/devnet/Dockerfile
     container_name: icn-federation-genesis
     command: >
       sh -c "
