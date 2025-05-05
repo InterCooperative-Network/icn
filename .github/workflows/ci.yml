@@ -1,0 +1,169 @@
+name: ICN CI Workflow
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  SQLX_OFFLINE: true
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --workspace --all-targets
+      
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --workspace
+      
+      - name: Setup PostgreSQL
+        if: ${{ !env.SQLX_OFFLINE }}
+        uses: Harmon758/postgresql-action@v1
+        with:
+          postgresql version: '14'
+          postgresql db: agoranet
+          postgresql user: postgres
+          postgresql password: postgres
+      
+      - name: Run AgoraNet tests
+        if: ${{ !env.SQLX_OFFLINE }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/agoranet
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p agoranet
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: clippy
+          override: true
+      
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --all-targets -- -D warnings
+
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      - name: Install cargo-audit
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-audit
+          version: latest
+          use-tool-cache: true
+      
+      - name: Install cargo-deny
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-deny
+          version: latest
+          use-tool-cache: true
+      
+      - name: Run cargo-audit
+        uses: actions-rs/cargo@v1
+        with:
+          command: audit
+      
+      - name: Run cargo-deny
+        uses: actions-rs/cargo@v1
+        with:
+          command: deny
+          args: check
+
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    needs: [test, clippy, security]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Build release binaries
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --workspace --release 
