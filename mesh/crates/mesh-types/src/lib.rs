@@ -1,12 +1,14 @@
 use chrono::{DateTime, Utc};
 use cid::Cid;
-use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Export task runner module
 pub mod task_runner;
 pub use task_runner::*;
+
+/// Type alias for DID string
+pub type Did = String;
 
 /// A task intent representing a request to execute a WASM module in the mesh network
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +47,9 @@ pub struct ExecutionReceipt {
     
     /// Content ID pointing to the output data of the computation
     pub output_cid: Cid,
+    
+    /// Raw hash of the output data (for deterministic verification)
+    pub output_hash: Vec<u8>,
     
     /// Amount of computational fuel consumed during execution
     pub fuel_consumed: u64,
@@ -170,75 +175,6 @@ pub struct ReputationSnapshot {
     /// Component scores that make up the total reputation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<HashMap<String, f64>>,
-}
-
-/// Implement VerifiableCredential trait for TaskIntent
-impl icn_identity::VerifiableCredential for TaskIntent {
-    fn get_type(&self) -> String {
-        "MeshTaskIntent".to_string()
-    }
-    
-    fn get_issuer(&self) -> Did {
-        self.publisher_did.clone()
-    }
-    
-    fn get_issuance_date(&self) -> DateTime<Utc> {
-        Utc::now() // In a real implementation, this would be part of the struct
-    }
-    
-    fn get_expiration_date(&self) -> Option<DateTime<Utc>> {
-        Some(self.expiry)
-    }
-    
-    fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self).map_err(|e| e.to_string())
-    }
-}
-
-/// Implement VerifiableCredential trait for ExecutionReceipt
-impl icn_identity::VerifiableCredential for ExecutionReceipt {
-    fn get_type(&self) -> String {
-        "MeshExecutionReceipt".to_string()
-    }
-    
-    fn get_issuer(&self) -> Did {
-        self.worker_did.clone()
-    }
-    
-    fn get_issuance_date(&self) -> DateTime<Utc> {
-        self.timestamp
-    }
-    
-    fn get_expiration_date(&self) -> Option<DateTime<Utc>> {
-        None // Receipts don't expire
-    }
-    
-    fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self).map_err(|e| e.to_string())
-    }
-}
-
-/// Implement VerifiableCredential trait for VerificationReceipt
-impl icn_identity::VerifiableCredential for VerificationReceipt {
-    fn get_type(&self) -> String {
-        "MeshVerificationReceipt".to_string()
-    }
-    
-    fn get_issuer(&self) -> Did {
-        self.verifier_did.clone()
-    }
-    
-    fn get_issuance_date(&self) -> DateTime<Utc> {
-        self.timestamp
-    }
-    
-    fn get_expiration_date(&self) -> Option<DateTime<Utc>> {
-        None // Receipts don't expire
-    }
-    
-    fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self).map_err(|e| e.to_string())
-    }
 }
 
 // Export additional types to make them available for use

@@ -34,6 +34,7 @@ members = [
     "mesh/crates/mesh-types",
     "mesh/crates/mesh-net",
     "mesh/crates/mesh-reputation",
+    "mesh/crates/mesh-escrow",
     "mesh/meshctl",
 ]
 

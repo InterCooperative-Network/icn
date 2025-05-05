@@ -9,6 +9,7 @@ use mesh_types::{
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
@@ -316,6 +317,21 @@ impl ReputationSystem {
                peer_did, new_score, policy.alpha, execution_score, policy.beta, verification_score);
         
         Ok(())
+    }
+    
+    /// Start a background task that applies decay to all reputation scores periodically
+    pub fn start_decay_loop(self: Arc<Self>) {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(86_400)); // Once per day
+            loop {
+                interval.tick().await;
+                if let Err(e) = self.apply_decay().await {
+                    error!("Failed to apply reputation decay: {}", e);
+                } else {
+                    info!("Applied daily reputation decay to all peers");
+                }
+            }
+        });
     }
 }
 

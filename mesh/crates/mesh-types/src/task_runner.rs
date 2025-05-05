@@ -40,6 +40,9 @@ pub struct TaskExecutionResult {
     /// Content ID of the output data
     pub output_cid: Cid,
     
+    /// The actual output data for hashing and verification
+    pub output_data: Option<Vec<u8>>,
+    
     /// Whether the execution was deterministic
     pub deterministic: bool,
     

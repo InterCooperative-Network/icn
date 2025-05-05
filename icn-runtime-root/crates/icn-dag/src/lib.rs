@@ -25,6 +25,7 @@ use anyhow::Result;
 pub mod audit;
 pub mod cache;
 pub mod query;
+pub mod events;
 
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -324,6 +325,8 @@ pub trait DagManager: Send + Sync {
     /// Get the latest nodes in the DAG (tips)
     async fn get_tips(&self) -> Result<Vec<Cid>>;
 }
+
+pub use events::DagEvent;
 
 #[cfg(test)]
 mod tests {

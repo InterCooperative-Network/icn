@@ -1,8 +1,8 @@
 [package]
-name = "mesh-net"
+name = "mesh-escrow"
 version = "0.1.0"
 edition = "2021"
-description = "Networking layer for ICN Mesh Compute overlay"
+description = "Token escrow and reward payout system for ICN Mesh Compute overlay"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
@@ -14,20 +14,15 @@ chrono = { workspace = true, features = ["serde"] }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-
-# Networking
-libp2p = { version = "0.52", features = ["tokio", "gossipsub", "kad", "identify", "noise", "yamux", "mdns"] }
-
-# WASM execution
-wasmtime = "12.0.2"
-
-# Hashing
-blake3 = "1.5"
+thiserror = { workspace = true }
+uuid = { version = "1.4", features = ["v4", "serde"] }
 
 # ICN dependencies
 mesh-types = { path = "../mesh-types" }
-icn-identity = { path = "../../../icn-runtime-root/crates/icn-identity" }
+mesh-reputation = { path = "../mesh-reputation" }
 icn-common = { path = "../../../icn-runtime-root/crates/icn-common" }
+icn-identity = { path = "../../../icn-runtime-root/crates/icn-identity" }
+icn-dag = { path = "../../../icn-runtime-root/crates/icn-dag" }
 
 # Content addressing
 cid = { workspace = true }

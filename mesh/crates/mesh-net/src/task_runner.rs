@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use blake3::Hasher;
 use chrono::Utc;
 use cid::Cid;
 use icn_common::utils::cid_utils::{bytes_to_cid, encode_cid};
-use icn_identity::Did;
 use mesh_types::{
-    ExecutionReceipt, TaskExecutionResult, TaskIntent, TaskMetrics, TaskRunner, TaskRunnerConfig,
+    Did, ExecutionReceipt, TaskExecutionResult, TaskIntent, TaskMetrics, TaskRunner, TaskRunnerConfig,
 };
 use std::{
     collections::HashMap,
@@ -39,6 +39,9 @@ pub struct TaskEnvironment {
     
     /// Logs from the WASM execution
     logs: Vec<String>,
+    
+    /// Output data for hashing
+    output_data: Option<Vec<u8>>,
 }
 
 impl TaskEnvironment {
@@ -57,6 +60,7 @@ impl TaskEnvironment {
             output_dir,
             output_cid: None,
             logs: Vec::new(),
+            output_data: None,
         }
     }
     
@@ -113,6 +117,9 @@ impl TaskEnvironment {
         let cid = bytes_to_cid(data)?;
         self.output_cid = Some(cid.clone());
         self.metrics.io_operations += 1;
+        
+        // Save the output data for hashing later
+        self.output_data = Some(data.to_vec());
         
         Ok(cid)
     }
@@ -274,6 +281,9 @@ impl WasmtimeTaskRunner {
             // Store output data length for now, we'll process it after execution
             caller.data_mut().metrics.custom_metrics.insert("output_size".to_string(), output_data.len() as u64);
             
+            // Save the output data for hashing later
+            caller.data_mut().output_data = Some(output_data.clone());
+            
             // Increment I/O operations count
             caller.data_mut().metrics.io_operations += 1;
             
@@ -397,14 +407,15 @@ impl TaskRunner for WasmtimeTaskRunner {
         };
         
         // Process output data after execution
-        let output_cid = if let Some(cid) = store.data().output_cid.clone() {
-            cid
+        let (output_cid, output_data) = if let Some(cid) = store.data().output_cid.clone() {
+            // Use the output data saved during execution
+            (cid, store.data().output_data.clone())
         } else if let Some(output_size) = store.data().metrics.custom_metrics.get("output_size") {
             // No output CID set yet, generate an empty one as fallback
-            bytes_to_cid(&[])?
+            (bytes_to_cid(&[])?, Some(vec![]))
         } else {
             // No output data stored, return an empty CID
-            bytes_to_cid(&[])?
+            (bytes_to_cid(&[])?, None)
         };
         
         // Create the result
@@ -412,6 +423,7 @@ impl TaskRunner for WasmtimeTaskRunner {
             exit_code,
             metrics: store.data().metrics.clone(),
             output_cid,
+            output_data,
             deterministic: true, // Assume deterministic for now
             execution_trace_hash: None, // No trace for now
         };
@@ -425,11 +437,20 @@ impl TaskRunner for WasmtimeTaskRunner {
         result: &TaskExecutionResult,
         worker_did: &str,
     ) -> Result<ExecutionReceipt> {
+        // Get the output data from the execution result
+        let output_data = result.output_data.as_ref().unwrap_or(&vec![]);
+        
+        // Calculate the hash of the output data using blake3
+        let mut hasher = Hasher::new();
+        hasher.update(output_data);
+        let output_hash = hasher.finalize();
+        
         // Create the receipt
         let receipt = ExecutionReceipt {
             worker_did: worker_did.to_string(),
             task_cid: task.wasm_cid.clone(), // Usually we'd hash the whole task
             output_cid: result.output_cid.clone(),
+            output_hash: output_hash.as_bytes().to_vec(),
             fuel_consumed: result.metrics.fuel_consumed,
             timestamp: Utc::now(),
             signature: vec![], // Would be signed in a real implementation
