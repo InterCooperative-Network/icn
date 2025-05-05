@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use icn_identity::{IdentityId, Signature, KeyPair, verify_signature};
+use icn_identity::{Signature, KeyPair};
 use crate::error::{FederationError, FederationResult};
-use crate::guardian::{Guardian, GuardianQuorumConfig, QuorumType};
-use crate::genesis::{FederationMetadata, bootstrap};
+use crate::guardian::GuardianQuorumConfig;
+use crate::genesis::FederationMetadata;
 use crate::dag_anchor::GenesisAnchor;
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
