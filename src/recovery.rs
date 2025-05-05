@@ -4,9 +4,6 @@ use icn_identity::{Signature, KeyPair, IdentityId};
 use crate::error::{FederationError, FederationResult};
 use crate::quorum::SignerQuorumConfig;
 use crate::genesis::FederationMetadata;
-use crate::dag_anchor::GenesisAnchor;
-use base64::engine::general_purpose::URL_SAFE;
-use base64::Engine;
 
 /// Represents the type of recovery event
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -266,8 +263,8 @@ pub mod recovery {
     
     /// Create a DAG anchor for a recovery event
     pub async fn anchor_recovery_event(
-        event: &RecoveryEvent,
-        federation_keypair: &KeyPair,
+        _event: &RecoveryEvent,
+        _federation_keypair: &KeyPair,
     ) -> FederationResult<String> {
         // Implementation would create a DAG anchor for the event
         // Return the CID of the anchor
@@ -279,7 +276,6 @@ pub mod recovery {
 mod tests {
     use super::*;
     use crate::quorum::{initialization, QuorumType};
-    use icn_identity::IdentityId;
     
     #[tokio::test]
     async fn test_key_rotation() {

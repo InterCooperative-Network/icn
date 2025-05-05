@@ -137,14 +137,14 @@ pub struct QuorumHealth {
     /// Enough validators for quorum? 
     pub has_validator_quorum: bool,
     
-    /// Enough guardians for quorum?
-    pub has_guardian_quorum: bool,
+    /// Enough signers for quorum?
+    pub has_signer_quorum: bool,
     
     /// Validator node count
     pub validator_count: usize,
     
-    /// Guardian node count
-    pub guardian_count: usize,
+    /// Signer node count
+    pub signer_count: usize,
     
     /// Observer node count
     pub observer_count: usize,
@@ -250,9 +250,9 @@ pub async fn get_federation_health(
                 time_since_sync: 0,
                 quorum_health: QuorumHealth {
                     has_validator_quorum: false,
-                    has_guardian_quorum: false,
+                    has_signer_quorum: false,
                     validator_count: 0,
-                    guardian_count: 0,
+                    signer_count: 0,
                     observer_count: 0,
                     required_quorum: 0,
                     quorum_percentage: 0,
@@ -282,7 +282,7 @@ pub async fn get_federation_health(
     // In a real implementation, this would analyze the trust bundle for roles
     // For now, we'll use placeholder logic
     let validator_count = 3; // Placeholder
-    let guardian_count = 2;  // Placeholder
+    let signer_count = 2;  // Placeholder
     let observer_count = 2;  // Placeholder
     let required_quorum = (validator_count * 2) / 3 + 1;
     
@@ -313,9 +313,9 @@ pub async fn get_federation_health(
         time_since_sync,
         quorum_health: QuorumHealth {
             has_validator_quorum: validator_count >= required_quorum,
-            has_guardian_quorum: guardian_count >= 2, // Assuming 2 is the required guardian quorum
+            has_signer_quorum: signer_count >= 2, // Assuming 2 is the required signer quorum
             validator_count,
-            guardian_count,
+            signer_count,
             observer_count,
             required_quorum,
             quorum_percentage: 80, // Placeholder
@@ -426,9 +426,9 @@ mod tests {
             time_since_sync: 60,
             quorum_health: QuorumHealth {
                 has_validator_quorum: true,
-                has_guardian_quorum: true,
+                has_signer_quorum: true,
                 validator_count: 3,
-                guardian_count: 2,
+                signer_count: 2,
                 observer_count: 2,
                 required_quorum: 2,
                 quorum_percentage: 80,

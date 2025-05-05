@@ -7,8 +7,8 @@ use base64::Engine;
 use sha2::{Digest, Sha256};
 
 use crate::error::{FederationResult, FederationError};
-use crate::guardian::GuardianQuorumConfig;
-use crate::guardian::decisions;
+use crate::quorum::SignerQuorumConfig;
+use crate::quorum::decisions;
 
 /// Metadata about a federation entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,8 +34,12 @@ pub struct FederationMetadata {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub initial_members: Vec<String>,
     
-    /// Guardian quorum configuration for this federation
-    pub guardian_quorum: GuardianQuorumConfig,
+    /// Initial signers of the federation (DIDs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub initial_signers: Vec<String>,
+    
+    /// Quorum configuration for this federation
+    pub quorum_config: SignerQuorumConfig,
     
     /// Genesis DAG CID where this federation was anchored
     pub genesis_cid: Cid,
@@ -105,7 +109,7 @@ impl GenesisTrustBundle {
             "federation_name": self.federation_establishment_credential.metadata.name,
             "issued_at": self.issued_at,
             "guardian_count": self.guardian_credentials.len(),
-            "quorum_type": self.federation_establishment_credential.metadata.guardian_quorum.quorum_type,
+            "quorum_type": self.federation_establishment_credential.metadata.quorum_config.quorum_type,
         })
     }
 }
@@ -124,7 +128,7 @@ pub mod bootstrap {
         name: String,
         description: Option<String>,
         guardians: &[Guardian],
-        quorum_config: GuardianQuorumConfig,
+        quorum_config: SignerQuorumConfig,
         initial_policies: Vec<VerifiableCredential>,
         initial_members: Vec<IdentityId>,
     ) -> FederationResult<(FederationMetadata, FederationEstablishmentCredential, TrustBundle)> {
@@ -145,7 +149,8 @@ pub mod bootstrap {
             created_at: Utc::now(),
             initial_policies,
             initial_members: member_dids,
-            guardian_quorum: quorum_config.clone(),
+            initial_signers: Vec::new(),
+            quorum_config: quorum_config.clone(),
             genesis_cid: Cid::default(), // Will be set later in Phase 4
             additional_metadata: None,
         };
@@ -204,7 +209,7 @@ pub mod bootstrap {
         let quorum_proof = decisions::create_quorum_proof(
             &metadata_bytes,
             guardians,
-            &metadata.guardian_quorum,
+            &metadata.quorum_config,
         ).await?;
         
         // If no credentials provided, create a federation establishment credential
@@ -266,8 +271,8 @@ pub mod bootstrap {
             hasher.update(member.as_bytes());
         }
         
-        // Hash the guardian quorum configuration
-        let quorum_bytes = serde_json::to_vec(&metadata.guardian_quorum).unwrap_or_default();
+        // Hash the quorum configuration
+        let quorum_bytes = serde_json::to_vec(&metadata.quorum_config).unwrap_or_default();
         hasher.update(&quorum_bytes);
         
         // Hash the genesis CID
@@ -335,7 +340,7 @@ pub mod trustbundle {
         let quorum_proof = decisions::create_quorum_proof(
             &bundle_bytes,
             guardians,
-            &metadata.guardian_quorum,
+            &metadata.quorum_config,
         ).await?;
         
         // Create the genesis trust bundle
@@ -427,7 +432,7 @@ pub mod trustbundle {
         
         // 4. Verify all guardians have credentials
         let guardian_dids_in_metadata: Vec<String> = bundle.federation_establishment_credential
-            .metadata.guardian_quorum.guardians.clone();
+            .metadata.quorum_config.guardians.clone();
         
         let guardian_dids_with_credentials: Vec<String> = bundle.guardian_credentials.iter()
             .filter_map(|cred| {
@@ -561,7 +566,8 @@ mod tests {
                 "did:key:z6MkMember1".to_string(),
                 "did:key:z6MkMember2".to_string(),
             ],
-            guardian_quorum: GuardianQuorumConfig::new_majority(vec![
+            initial_signers: Vec::new(),
+            quorum_config: SignerQuorumConfig::new_majority(vec![
                 "did:key:z6MkGuardian1".to_string(),
                 "did:key:z6MkGuardian2".to_string(),
                 "did:key:z6MkGuardian3".to_string(),

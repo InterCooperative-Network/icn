@@ -29,11 +29,11 @@ pub enum QuorumType {
     Weighted(Vec<(String, u32)>, u32),
 }
 
-/// Configuration for quorum decisions (simplified from guardian-specific implementation)
+/// Configuration for quorum decisions (generic signer-based implementation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardianQuorumConfig {
+pub struct SignerQuorumConfig {
     /// List of authorized DIDs
-    pub guardians: Vec<String>,
+    pub signers: Vec<String>,
     
     /// Type of quorum required for decisions
     pub quorum_type: QuorumType,
@@ -47,11 +47,11 @@ pub struct GuardianQuorumConfig {
     pub additional_requirements: Option<serde_json::Value>,
 }
 
-impl GuardianQuorumConfig {
+impl SignerQuorumConfig {
     /// Create a new majority-based quorum configuration
     pub fn new_majority(members: Vec<String>) -> Self {
         Self {
-            guardians: members,
+            signers: members,
             quorum_type: QuorumType::Majority,
             min_wait_time_seconds: None,
             additional_requirements: None,
@@ -64,7 +64,7 @@ impl GuardianQuorumConfig {
         let threshold = threshold_percentage.min(100);
         
         Self {
-            guardians: members,
+            signers: members,
             quorum_type: QuorumType::Threshold(threshold),
             min_wait_time_seconds: None,
             additional_requirements: None,
@@ -74,7 +74,7 @@ impl GuardianQuorumConfig {
     /// Create a new unanimous quorum configuration
     pub fn new_unanimous(members: Vec<String>) -> Self {
         Self {
-            guardians: members,
+            signers: members,
             quorum_type: QuorumType::Unanimous,
             min_wait_time_seconds: None,
             additional_requirements: None,
@@ -100,7 +100,7 @@ impl GuardianQuorumConfig {
     
     /// Get the number of DIDs required for a quorum
     pub fn required_signatures(&self) -> usize {
-        let total = self.guardians.len();
+        let total = self.signers.len();
         
         match &self.quorum_type {
             QuorumType::Majority => (total / 2) + 1,
@@ -123,14 +123,14 @@ pub mod initialization {
     pub fn create_quorum_config(
         member_dids: Vec<String>,
         quorum_type: QuorumType,
-    ) -> GuardianQuorumConfig {
+    ) -> SignerQuorumConfig {
         match quorum_type {
-            QuorumType::Majority => GuardianQuorumConfig::new_majority(member_dids),
-            QuorumType::Threshold(threshold) => GuardianQuorumConfig::new_threshold(member_dids, threshold),
-            QuorumType::Unanimous => GuardianQuorumConfig::new_unanimous(member_dids),
+            QuorumType::Majority => SignerQuorumConfig::new_majority(member_dids),
+            QuorumType::Threshold(threshold) => SignerQuorumConfig::new_threshold(member_dids, threshold),
+            QuorumType::Unanimous => SignerQuorumConfig::new_unanimous(member_dids),
             QuorumType::Weighted(weights, required) => {
-                GuardianQuorumConfig {
-                    guardians: member_dids,
+                SignerQuorumConfig {
+                    signers: member_dids,
                     quorum_type: QuorumType::Weighted(weights, required),
                     min_wait_time_seconds: None,
                     additional_requirements: None,
@@ -157,7 +157,7 @@ pub mod initialization {
     pub async fn initialize_test_quorum(
         count: usize,
         quorum_type: QuorumType,
-    ) -> FederationResult<GuardianQuorumConfig> {
+    ) -> FederationResult<SignerQuorumConfig> {
         if count == 0 {
             return Err(FederationError::BootstrapError("Member count must be greater than 0".to_string()));
         }
@@ -170,7 +170,7 @@ pub mod initialization {
     }
 }
 
-/// Functions for quorum decisions (simplified from guardian-specific implementation)
+/// Functions for quorum decisions (generic signer implementation)
 pub mod decisions {
     use super::*;
     use icn_identity::{IdentityId, Signature, sign_message, QuorumProof, QuorumConfig};
@@ -179,9 +179,9 @@ pub mod decisions {
     pub async fn create_quorum_proof(
         action_data: &[u8],
         signatures: Vec<(IdentityId, Signature)>,
-        config: &GuardianQuorumConfig,
+        config: &SignerQuorumConfig,
     ) -> FederationResult<QuorumProof> {
-        // Convert guardian quorum config to identity crate's QuorumConfig
+        // Convert signer quorum config to identity crate's QuorumConfig
         let quorum_config = config.to_quorum_config();
         
         // Use the signatures directly
@@ -219,7 +219,7 @@ pub mod decisions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::guardian::initialization::initialize_test_quorum;
+    use crate::quorum::initialization::initialize_test_quorum;
     
     #[tokio::test]
     async fn test_initialize_quorum_config() {
@@ -230,7 +230,7 @@ mod tests {
         let config = result.unwrap();
         
         // Check config
-        assert_eq!(config.guardians.len(), 3, "Config should have 3 members");
+        assert_eq!(config.signers.len(), 3, "Config should have 3 members");
         assert!(matches!(config.quorum_type, QuorumType::Majority), "Quorum type should be Majority");
         assert_eq!(config.required_signatures(), 2, "A majority of 3 should require 2 signatures");
     }

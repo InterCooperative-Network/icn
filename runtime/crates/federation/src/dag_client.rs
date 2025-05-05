@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use crate::error::{FederationError, FederationResult};
-use crate::recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, GuardianSuccessionEvent, MetadataUpdateEvent, DisasterRecoveryAnchor};
+use crate::recovery::{RecoveryEvent, RecoveryEventType, FederationKeyRotationEvent, SuccessionEvent, MetadataUpdateEvent, DisasterRecoveryAnchor};
 use crate::dag_anchor::GenesisAnchor;
 use crate::genesis::FederationMetadata;
-use crate::guardian::{GuardianQuorumConfig, QuorumType};
+use crate::quorum::{SignerQuorumConfig, QuorumType};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use icn_identity::Signature;
@@ -17,8 +17,8 @@ pub enum FederationDagEvent {
     Genesis(GenesisAnchor),
     /// Key rotation event
     KeyRotation(FederationKeyRotationEvent),
-    /// Guardian succession event
-    GuardianSuccession(GuardianSuccessionEvent),
+    /// Succession event
+    Succession(SuccessionEvent),
     /// Metadata update event
     MetadataUpdate(MetadataUpdateEvent),
     /// Disaster recovery event
@@ -31,7 +31,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(e) => &e.federation_did,
             FederationDagEvent::KeyRotation(e) => &e.base.federation_did,
-            FederationDagEvent::GuardianSuccession(e) => &e.base.federation_did,
+            FederationDagEvent::Succession(e) => &e.base.federation_did,
             FederationDagEvent::MetadataUpdate(e) => &e.base.federation_did,
             FederationDagEvent::DisasterRecovery(e) => &e.base.federation_did,
         }
@@ -42,7 +42,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(e) => e.issued_at,
             FederationDagEvent::KeyRotation(e) => e.base.timestamp,
-            FederationDagEvent::GuardianSuccession(e) => e.base.timestamp,
+            FederationDagEvent::Succession(e) => e.base.timestamp,
             FederationDagEvent::MetadataUpdate(e) => e.base.timestamp,
             FederationDagEvent::DisasterRecovery(e) => e.base.timestamp,
         }
@@ -53,7 +53,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(_) => None, // Genesis has no previous
             FederationDagEvent::KeyRotation(e) => e.base.previous_event_cid.as_ref(),
-            FederationDagEvent::GuardianSuccession(e) => e.base.previous_event_cid.as_ref(),
+            FederationDagEvent::Succession(e) => e.base.previous_event_cid.as_ref(),
             FederationDagEvent::MetadataUpdate(e) => e.base.previous_event_cid.as_ref(),
             FederationDagEvent::DisasterRecovery(e) => e.base.previous_event_cid.as_ref(),
         }
@@ -64,7 +64,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(_) => 0, // Genesis is always sequence 0
             FederationDagEvent::KeyRotation(e) => e.base.sequence_number,
-            FederationDagEvent::GuardianSuccession(e) => e.base.sequence_number,
+            FederationDagEvent::Succession(e) => e.base.sequence_number,
             FederationDagEvent::MetadataUpdate(e) => e.base.sequence_number,
             FederationDagEvent::DisasterRecovery(e) => e.base.sequence_number,
         }
@@ -75,7 +75,7 @@ impl FederationDagEvent {
         match self {
             FederationDagEvent::Genesis(_) => "genesis",
             FederationDagEvent::KeyRotation(_) => "key_rotation",
-            FederationDagEvent::GuardianSuccession(_) => "guardian_succession",
+            FederationDagEvent::Succession(_) => "succession",
             FederationDagEvent::MetadataUpdate(_) => "metadata_update",
             FederationDagEvent::DisasterRecovery(_) => "disaster_recovery",
         }
@@ -212,7 +212,7 @@ impl DagClient for InMemoryDagClient {
         let prefix = match event {
             FederationDagEvent::Genesis(_) => "bafy_genesis",
             FederationDagEvent::KeyRotation(_) => "bafy_key_rotation",
-            FederationDagEvent::GuardianSuccession(_) => "bafy_guardian",
+            FederationDagEvent::Succession(_) => "bafy_succession",
             FederationDagEvent::MetadataUpdate(_) => "bafy_metadata",
             FederationDagEvent::DisasterRecovery(_) => "bafy_recovery",
         };

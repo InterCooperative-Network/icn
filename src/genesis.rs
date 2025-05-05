@@ -279,7 +279,7 @@ pub mod bootstrap {
 /// Functions for creating and verifying trust bundles
 pub mod trustbundle {
     use super::*;
-    use cid::multihash::{Multihash, MultihashDigest};
+    use cid::multihash::{Multihash};
     
     /// Calculate CID from federation metadata
     pub fn calculate_metadata_cid(metadata: &FederationMetadata) -> FederationResult<String> {

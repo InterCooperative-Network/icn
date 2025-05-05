@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use icn_identity::{Signature, KeyPair};
 use crate::error::{FederationError, FederationResult};
-use crate::guardian::GuardianQuorumConfig;
+use crate::quorum::SignerQuorumConfig;
 use crate::genesis::FederationMetadata;
 use crate::dag_anchor::GenesisAnchor;
 use base64::engine::general_purpose::URL_SAFE;
@@ -13,8 +13,8 @@ use base64::Engine;
 pub enum RecoveryEventType {
     /// Federation key rotation event
     FederationKeyRotation,
-    /// Guardian succession event (add/remove/replace)
-    GuardianSuccession,
+    /// Signer succession event (add/remove/replace)
+    Succession,
     /// Quorum configuration update
     QuorumUpdate,
     /// Disaster recovery event
@@ -51,37 +51,39 @@ pub struct FederationKeyRotationEvent {
     pub key_proof: Signature,
 }
 
-/// Serializable version of Guardian for recovery events
+/// Serializable version of Signer for recovery events
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializableGuardian {
-    /// Guardian DID
+pub struct SerializableSigner {
+    /// Signer DID
     pub did: String,
-    /// Guardian Public Key (base64 encoded)
+    /// Signer Public Key (base64 encoded)
     pub public_key: String,
 }
 
-impl From<&Guardian> for SerializableGuardian {
-    fn from(guardian: &Guardian) -> Self {
+// Define a generic Signer type for compatibility
+pub type Signer = icn_identity::IdentityId;
+
+impl From<&Signer> for SerializableSigner {
+    fn from(signer: &Signer) -> Self {
         Self {
-            did: guardian.did.0.clone(),
-            // Since we can't directly access the public key, we'll just use a placeholder
-            // In a real implementation, we would need a method in the Guardian to expose this safely
+            did: signer.0.clone(),
+            // In a real implementation, we would need a method to expose the public key safely
             public_key: "placeholder_key".to_string(),
         }
     }
 }
 
-/// Guardian succession event for adding, removing, or replacing guardians
+/// Succession event for adding, removing, or replacing signers
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuardianSuccessionEvent {
+pub struct SuccessionEvent {
     /// Base recovery event data
     pub base: RecoveryEvent,
-    /// Guardians to add (serializable version)
-    pub guardians_to_add: Vec<SerializableGuardian>,
-    /// Guardian DIDs to remove
-    pub guardians_to_remove: Vec<String>,
+    /// Signers to add (serializable version)
+    pub signers_to_add: Vec<SerializableSigner>,
+    /// Signer DIDs to remove
+    pub signers_to_remove: Vec<String>,
     /// Updated quorum configuration (if changed)
-    pub updated_quorum_config: Option<GuardianQuorumConfig>,
+    pub updated_quorum_config: Option<SignerQuorumConfig>,
 }
 
 /// Disaster recovery anchor for federation reconstitution
@@ -94,7 +96,7 @@ pub struct DisasterRecoveryAnchor {
     /// New guardian set (serializable version)
     pub new_guardians: Vec<SerializableGuardian>,
     /// New quorum configuration
-    pub new_quorum_config: GuardianQuorumConfig,
+    pub new_quorum_config: SignerQuorumConfig,
     /// Justification for disaster recovery
     pub justification: String,
     /// External attestations from trusted parties
@@ -134,7 +136,7 @@ pub mod recovery {
         sequence_number: u64,
         previous_event_cid: Option<String>,
         guardians: &[Guardian],
-        quorum_config: &GuardianQuorumConfig,
+        quorum_config: &SignerQuorumConfig,
     ) -> FederationResult<FederationKeyRotationEvent> {
         // Generate new federation DID from new keypair
         // Since we can't directly access the public key, we'd need a proper method
@@ -185,13 +187,13 @@ pub mod recovery {
         previous_event_cid: Option<String>,
         guardians_to_add: Vec<Guardian>,
         guardians_to_remove: Vec<String>,
-        updated_quorum_config: Option<GuardianQuorumConfig>,
+        updated_quorum_config: Option<SignerQuorumConfig>,
         current_guardians: &[Guardian],
-        current_quorum_config: &GuardianQuorumConfig,
-    ) -> FederationResult<GuardianSuccessionEvent> {
+        current_quorum_config: &SignerQuorumConfig,
+    ) -> FederationResult<SuccessionEvent> {
         // Create base recovery event
         let base = RecoveryEvent {
-            event_type: RecoveryEventType::GuardianSuccession,
+            event_type: RecoveryEventType::Succession,
             federation_did: federation_did.to_string(),
             sequence_number,
             previous_event_cid,
@@ -205,7 +207,7 @@ pub mod recovery {
             .collect();
         
         // Create the guardian succession event
-        let succession_event = GuardianSuccessionEvent {
+        let succession_event = SuccessionEvent {
             base,
             guardians_to_add: serializable_guardians,
             guardians_to_remove,
@@ -224,7 +226,7 @@ pub mod recovery {
         new_federation_did: &str,
         sequence_number: u64,
         new_guardians: Vec<Guardian>,
-        new_quorum_config: GuardianQuorumConfig,
+        new_quorum_config: SignerQuorumConfig,
         justification: String,
         external_attestations: Vec<ExternalAttestation>,
     ) -> FederationResult<DisasterRecoveryAnchor> {
@@ -266,7 +268,7 @@ pub mod recovery {
         previous_event_cid: Option<String>,
         updated_metadata: FederationMetadata,
         current_guardians: &[Guardian],
-        current_quorum_config: &GuardianQuorumConfig,
+        current_quorum_config: &SignerQuorumConfig,
     ) -> FederationResult<MetadataUpdateEvent> {
         // Create base recovery event
         let base = RecoveryEvent {
@@ -294,7 +296,7 @@ pub mod recovery {
     pub async fn verify_recovery_event(
         event: &RecoveryEvent,
         guardians: &[Guardian],
-        quorum_config: &GuardianQuorumConfig,
+        quorum_config: &SignerQuorumConfig,
     ) -> FederationResult<bool> {
         // Implementation would verify signatures against guardians and quorum
         // For now, just a placeholder
@@ -417,7 +419,7 @@ mod tests {
         ];
         
         // Create a new quorum configuration with higher threshold
-        let updated_quorum_config = GuardianQuorumConfig::new(
+        let updated_quorum_config = SignerQuorumConfig::new(
             QuorumType::Threshold(75), // 75% threshold instead of majority
             guardian_dids,
         );
@@ -439,14 +441,14 @@ mod tests {
         let succession_event = succession_result.unwrap();
         
         // 7. Verify the event fields
-        assert_eq!(succession_event.base.event_type, RecoveryEventType::GuardianSuccession);
+        assert_eq!(succession_event.base.event_type, RecoveryEventType::Succession);
         assert_eq!(succession_event.base.federation_did, federation_did);
         assert_eq!(succession_event.base.sequence_number, 1);
         assert_eq!(succession_event.base.previous_event_cid, None);
-        assert_eq!(succession_event.guardians_to_add.len(), 1);
-        assert_eq!(succession_event.guardians_to_add[0].did, new_guardian.did.0);
-        assert_eq!(succession_event.guardians_to_remove.len(), 1);
-        assert_eq!(succession_event.guardians_to_remove[0], guardian_to_remove);
+        assert_eq!(succession_event.signers_to_add.len(), 1);
+        assert_eq!(succession_event.signers_to_add[0].did, new_guardian.did.0);
+        assert_eq!(succession_event.signers_to_remove.len(), 1);
+        assert_eq!(succession_event.signers_to_remove[0], guardian_to_remove);
         assert!(succession_event.updated_quorum_config.is_some());
         
         // 8. In a real implementation, we would now:
