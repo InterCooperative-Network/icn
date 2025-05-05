@@ -50,12 +50,115 @@
 //! }
 //! ```
 
-// Module imports and code
-pub mod error;
-pub mod types;
-pub mod manager;
+use thiserror::Error;
+use serde::{Serialize, Deserialize};
 
-// Re-exports for convenience
-pub use error::{ActionError, ActionResult};
-pub use types::{ActionType, ActionStatus, Action, ActionRecord};
-pub use manager::ActionManager; 
+/// Errors that can occur during wallet actions
+#[derive(Error, Debug)]
+pub enum ActionError {
+    #[error("Storage error: {0}")]
+    Storage(String),
+    
+    #[error("Action not found: {0}")]
+    NotFound(String),
+    
+    #[error("Invalid action state: {0}")]
+    InvalidState(String),
+    
+    #[error("Internal error: {0}")]
+    Internal(String),
+}
+
+/// Result type for wallet actions
+pub type ActionResult<T> = Result<T, ActionError>;
+
+/// Type of action being performed
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ActionType {
+    CreateCredential,
+    VerifyCredential,
+    CreateProposal,
+    VoteOnProposal,
+    SubmitDagNode,
+    StoreDagNode,
+    Custom(String),
+}
+
+/// Status of an action
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ActionStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+}
+
+/// Action record for storing in the action history
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionRecord {
+    pub id: String,
+    pub action_type: ActionType,
+    pub description: Option<String>,
+    pub status: ActionStatus,
+    pub result: Option<serde_json::Value>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Action being performed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Action {
+    pub id: String,
+    pub action_type: ActionType,
+    pub description: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Manager for handling wallet actions
+pub struct ActionManager {
+    // This would normally contain fields like storage
+}
+
+impl ActionManager {
+    /// Create a new action manager
+    pub fn new(_storage: impl std::fmt::Debug) -> Self {
+        Self {}
+    }
+    
+    /// Create a new action
+    pub async fn create_action(
+        &self,
+        action_type: ActionType,
+        description: Option<&str>,
+        metadata: Option<serde_json::Value>,
+    ) -> ActionResult<String> {
+        // This is a stub implementation
+        Ok("action-id-123".to_string())
+    }
+    
+    /// Update the status of an action
+    pub async fn update_action_status(
+        &self,
+        action_id: &str,
+        status: ActionStatus,
+    ) -> ActionResult<()> {
+        // This is a stub implementation
+        Ok(())
+    }
+    
+    /// Complete an action with result
+    pub async fn complete_action(
+        &self,
+        action_id: &str,
+        result: serde_json::Value,
+    ) -> ActionResult<()> {
+        // This is a stub implementation
+        Ok(())
+    }
+    
+    /// Get the action history
+    pub async fn get_action_history(&self) -> ActionResult<Vec<ActionRecord>> {
+        // This is a stub implementation
+        Ok(vec![])
+    }
+} 
