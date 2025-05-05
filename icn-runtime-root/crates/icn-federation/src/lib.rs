@@ -16,6 +16,7 @@ pub mod dag_anchor;
 pub mod receipt;
 pub mod recovery;
 pub mod dag_client;
+pub mod signer;
 
 // Re-export core structs
 pub use genesis::{FederationMetadata, FederationEstablishmentCredential, GenesisTrustBundle};

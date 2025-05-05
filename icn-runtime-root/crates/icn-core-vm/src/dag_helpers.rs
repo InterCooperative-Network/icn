@@ -1,15 +1,15 @@
 use anyhow;
 use wasmtime::Linker;
-use crate::{StoreData, HostEnvironment};
+use crate::ConcreteHostEnvironment;
 use crate::mem_helpers::{read_memory_bytes, write_memory_bytes, try_allocate_guest_memory};
 use cid::Cid;
 use crate::cid_utils;
 
 /// Register DAG-related host functions
-pub fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), wasmtime::Error> {
+pub fn register_dag_functions(linker: &mut Linker<ConcreteHostEnvironment>) -> Result<(), wasmtime::Error> {
     // anchor_to_dag: Anchor content to the DAG
     linker.func_wrap("env", "host_anchor_to_dag", 
-        |mut caller: wasmtime::Caller<'_, StoreData>,
+        |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
          content_ptr: i32, content_len: i32, parents_ptr: i32, parents_count: i32| 
          -> Result<i32, wasmtime::Trap> {
             
@@ -33,17 +33,17 @@ pub fn register_dag_functions(linker: &mut Linker<StoreData>) -> Result<(), wasm
         }
         
         // Clone data for async context
-        let mut host_env = caller.data_mut().host.clone();
+        let mut host_env = caller.data_mut().clone();
         
         // Execute the async function in a blocking context
         let cid_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                host_env.anchor_to_dag(content, parents).await
+                host_env.anchor_to_dag("content", content).await
             })
         }).map_err(|e| wasmtime::Trap::throw(format!("DAG anchoring failed: {}", e)))?;
         
         // Allocate memory for the result CID string
-        let cid_str = cid_utils::cid_to_wasm_string(&cid_result);
+        let cid_str = cid_result;
         
         // Write result CID to memory if output pointer is provided
         if parents_ptr >= 0 {

@@ -10,6 +10,7 @@ use icn_identity::{
 use ssi_jwk::JWK;
 
 use crate::error::{FederationError, FederationResult};
+use crate::signer::Signer;
 use uuid::Uuid;
 use std::collections::HashMap;
 
@@ -48,6 +49,16 @@ pub struct SignerQuorumConfig {
 }
 
 impl SignerQuorumConfig {
+    /// Create a new signer quorum configuration
+    pub fn new(quorum_type: QuorumType, signers: Vec<String>) -> Self {
+        Self {
+            signers,
+            quorum_type,
+            min_wait_time_seconds: None,
+            additional_requirements: None,
+        }
+    }
+
     /// Create a new majority-based quorum configuration
     pub fn new_majority(members: Vec<String>) -> Self {
         Self {
@@ -178,28 +189,41 @@ pub mod decisions {
     /// Create a quorum proof for a specific action
     pub async fn create_quorum_proof(
         action_data: &[u8],
-        signatures: Vec<(IdentityId, Signature)>,
+        signers: &[Signer],
         config: &SignerQuorumConfig,
     ) -> FederationResult<QuorumProof> {
-        // Convert signer quorum config to identity crate's QuorumConfig
-        let quorum_config = config.to_quorum_config();
+        // Collect signatures from signers
+        let mut signatures = Vec::new();
         
-        // Use the signatures directly
-        let votes = signatures;
+        for signer in signers {
+            // Check if the signer is authorized in this quorum
+            if !config.signers.contains(&signer.did.0) {
+                continue;
+            }
+            
+            // Sign the action data with the signer's keypair
+            let signature = sign_message(action_data, &signer.keypair)
+                .map_err(|e| FederationError::CryptoError(format!("Signature failed: {}", e)))?;
+                
+            signatures.push((signer.did.clone(), signature));
+        }
         
-        // Check if we have enough votes
+        // Check if we have enough signatures
         let required = config.required_signatures();
         
-        if votes.len() < required {
+        if signatures.len() < required {
             return Err(FederationError::VerificationError(format!(
                 "Not enough signatures: got {}, need {} for quorum",
-                votes.len(), required
+                signatures.len(), required
             )));
         }
         
+        // Convert signer quorum config to identity crate's QuorumConfig
+        let quorum_config = config.to_quorum_config();
+        
         // Create the quorum proof
         Ok(QuorumProof {
-            votes,
+            votes: signatures,
             config: quorum_config,
         })
     }

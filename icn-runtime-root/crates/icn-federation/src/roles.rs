@@ -12,9 +12,11 @@ use std::sync::Arc;
 use futures::lock::Mutex;
 use std::collections::HashMap;
 use tracing;
+use anyhow::Result;
+use icn_identity::IdentityId;
+use tokio::sync::Mutex as TokioMutex;
 
 use crate::errors::{FederationError, FederationResult};
-use icn_identity::IdentityId;
 use icn_storage::{StorageBackend, ReplicationPolicy as StorageReplicationPolicy};
 use icn_governance_kernel::config::GovernanceConfig;
 
@@ -422,6 +424,149 @@ fn get_config_cid(context_id: &str) -> Cid {
     let key_str = format!("config::{}", context_id);
     let key_hash = crate::create_sha256_multihash(key_str.as_bytes());
     Cid::new_v1(0x71, key_hash) // dag-cbor codec for config data
+}
+
+/// Role configuration for a federation
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RoleConfig {
+    /// The federation context ID
+    pub context_id: String,
+    
+    /// Configuration version (for upgrades)
+    pub version: u32,
+    
+    /// Authorized signers (DIDs)
+    pub signers: Option<Vec<String>>,
+    
+    /// Authorized members (DIDs)
+    pub members: Option<Vec<String>>,
+    
+    /// Additional context-specific roles
+    pub additional_roles: Option<HashMap<String, Vec<String>>>,
+}
+
+impl RoleConfig {
+    /// Create a new empty role configuration
+    pub fn new(context_id: &str) -> Self {
+        Self {
+            context_id: context_id.to_string(),
+            version: 1,
+            signers: None,
+            members: None,
+            additional_roles: None,
+        }
+    }
+    
+    /// Check if a DID is in a specific role list
+    pub fn has_role(&self, identity: &IdentityId, role: &str) -> bool {
+        match role {
+            "signer" => self.signers
+                .as_ref()
+                .map(|signers| {
+                    signers.iter()
+                        .any(|did| did == &identity.0)
+                })
+                .unwrap_or(false),
+            "member" => self.members
+                .as_ref()
+                .map(|members| {
+                    members.iter()
+                        .any(|did| did == &identity.0)
+                })
+                .unwrap_or(false),
+            _ => {
+                if let Some(additional) = &self.additional_roles {
+                    if let Some(role_dids) = additional.get(role) {
+                        return role_dids.iter().any(|did| did == &identity.0);
+                    }
+                }
+                false
+            }
+        }
+    }
+}
+
+/// Legacy role configuration format
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LegacyRoleConfig {
+    pub roles: Roles,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Roles {
+    /// Authorized signers (DIDs)
+    pub signers: Option<Vec<String>>,
+    
+    /// Authorized members (DIDs)
+    pub members: Option<Vec<String>>,
+    
+    /// Additional context-specific roles
+    pub additional_roles: Option<HashMap<String, Vec<String>>>,
+}
+
+/// Get the list of authorized signers for a specific context ID
+pub async fn get_authorized_signers(
+    context_id: &str,
+    storage: Arc<dyn Storage>,
+) -> Result<Vec<IdentityId>> {
+    let mut signer_dids = Vec::new();
+    
+    // Try to get the role configuration directly
+    let config_key = format!("role_config:{}", context_id);
+    if let Some(config_bytes) = storage.get(&config_key).await? {
+        let config: RoleConfig = serde_json::from_slice(&config_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize role config: {}", e))?;
+            
+        if let Some(signers) = config.signers {
+            // Convert string DIDs to IdentityId
+            signer_dids = signers.into_iter()
+                .map(|did| IdentityId(did))
+                .collect();
+                
+            tracing::debug!(context_id, count = signer_dids.len(), "Found authorized signers from config");
+            return Ok(signer_dids);
+        }
+    }
+    
+    // If not found, try the legacy format
+    let legacy_key = format!("legacy_role_config:{}", context_id);
+    if let Some(config_bytes) = storage.get(&legacy_key).await? {
+        let legacy_config: LegacyRoleConfig = serde_json::from_slice(&config_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize legacy role config: {}", e))?;
+            
+        if let Some(signers) = legacy_config.roles.signers {
+            // Convert string DIDs to IdentityId
+            signer_dids = signers.into_iter()
+                .map(|did| IdentityId(did))
+                .collect();
+                
+            tracing::debug!(context_id, count = signer_dids.len(), "Found authorized signers from legacy config");
+            return Ok(signer_dids);
+        }
+    }
+    
+    // If no signers found, return an empty list
+    Ok(signer_dids)
+}
+
+/// Check if an identity is authorized for a specific role in a specific context
+pub async fn is_authorized_for_role(
+    identity: &IdentityId,
+    role: &str,
+    context_id: &str,
+    storage: Arc<dyn Storage>,
+) -> Result<bool> {
+    match role {
+        "signer" => {
+            let signers = get_authorized_signers(context_id, Arc::clone(&storage)).await?;
+            Ok(signers.contains(identity))
+        },
+        _ => {
+            // For other roles, we would implement similar logic
+            // You can extend this function for different roles as needed
+            Ok(false)
+        }
+    }
 }
 
 #[cfg(test)]

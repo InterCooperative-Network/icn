@@ -3,7 +3,7 @@ FROM rust:latest as builder
 
 WORKDIR /app
 
-# Install build dependencies including cmake
+# Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
@@ -17,11 +17,9 @@ RUN apt-get update && \
 # Copy the source code into the image
 COPY . .
 
-# Add cli to workspace members (updated to use icn-runtime-root instead of runtime)
-RUN sed -i 's/members = \[/members = \[\n    "icn-runtime-root\/cli",/g' Cargo.toml
-
-# Build the ICN Runtime
-RUN cargo build --release --bin covm
+# Build just the essential components
+RUN cd icn-runtime-root && \
+    cargo build --release --bins
 
 # ---- Runtime stage ----
 FROM debian:bullseye-slim
@@ -37,7 +35,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the built binary from the builder stage
-COPY --from=builder /app/target/release/covm /usr/local/bin/icn-runtime
+COPY --from=builder /app/target/release/icn-runtime /usr/local/bin/icn-runtime
 
 # Prepare runtime directories
 RUN mkdir -p /data /config

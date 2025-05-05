@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 
 use cid::Cid;
 use multihash::{Code, MultihashDigest};
-use icn_storage::{StorageError, StorageResult, DistributedStorage};
+use icn_models::storage::{StorageError, StorageResult, DistributedStorage};
 use async_trait::async_trait;
 
 /// Simple in-memory blob store implementation for test and development use.

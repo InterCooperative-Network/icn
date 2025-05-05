@@ -1,21 +1,21 @@
 use anyhow::Error as AnyhowError;
 use wasmtime::Linker;
-use crate::{StoreData, HostEnvironment, LogLevel};
-use crate::mem_helpers::{read_memory_string, read_memory_bytes, write_memory_u64};
-use icn_economics::ResourceType;
+use crate::ConcreteHostEnvironment;
+use crate::mem_helpers::{read_memory_string};
+use crate::resources::ResourceType;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Write a string to guest memory
-pub fn write_memory_string(caller: &mut wasmtime::Caller<'_, StoreData>, ptr: i32, value: &str) -> Result<(), AnyhowError> {
+pub fn write_memory_string(caller: &mut wasmtime::Caller<'_, ConcreteHostEnvironment>, ptr: i32, value: &str) -> Result<(), AnyhowError> {
     crate::mem_helpers::write_memory_bytes(caller, ptr, value.as_bytes())
 }
 
 /// Register economics-related host functions
-pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<(), wasmtime::Error> {
+pub fn register_economics_functions(linker: &mut Linker<ConcreteHostEnvironment>) -> Result<(), wasmtime::Error> {
     // check_resource_authorization: Check if a resource usage is authorized
     linker.func_wrap("env", "host_check_resource_authorization", 
-        |caller: wasmtime::Caller<'_, StoreData>,
+        |caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
          resource_type: i32, amount: i32| 
          -> Result<i32, wasmtime::Trap> {
              
@@ -25,46 +25,53 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
         
         // Convert resource_type integer to ResourceType
         let res_type = match resource_type {
-            0 => icn_economics::ResourceType::Compute,
-            1 => icn_economics::ResourceType::Storage,
-            2 => icn_economics::ResourceType::NetworkBandwidth,
+            0 => ResourceType::Compute,
+            1 => ResourceType::Storage,
+            2 => ResourceType::Network,
+            3 => ResourceType::Token,
             _ => return Err(wasmtime::Trap::throw(format!("Invalid resource type: {}", resource_type))),
         };
         
-        // Call the host function
-        let authorized = caller.data().host.check_resource_authorization(res_type, amount as u64)
-            .map_err(|e| wasmtime::Trap::throw(format!("Resource authorization check failed: {}", e)))?;
+        // Check if the amount is below the authorized limit
+        let host_env = caller.data();
+        let auth_limits = host_env.vm_context.resource_authorizations();
+        
+        let authorized = auth_limits.iter()
+            .find(|auth| auth.resource_type == res_type)
+            .map(|auth| auth.limit >= amount as u64)
+            .unwrap_or(false);
         
         // Return 1 for authorized, 0 for not authorized
         Ok(if authorized { 1 } else { 0 })
     })?;
     
     // record_resource_usage: Record resource consumption
-    linker.func_wrap("env", "host_record_resource_usage", |mut caller: wasmtime::Caller<'_, StoreData>,
-                     resource_type: i32, amount: i32| -> Result<(), AnyhowError> {
+    linker.func_wrap("env", "host_record_resource_usage", |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
+                     resource_type: i32, amount: i32| -> Result<(), wasmtime::Trap> {
         if amount < 0 {
-            return Err(anyhow::anyhow!("Amount cannot be negative"));
+            return Err(wasmtime::Trap::throw("Amount cannot be negative"));
         }
         
         // Convert resource_type integer to ResourceType
         let res_type = match resource_type {
-            0 => icn_economics::ResourceType::Compute,
-            1 => icn_economics::ResourceType::Storage,
-            2 => icn_economics::ResourceType::NetworkBandwidth,
-            _ => return Err(anyhow::anyhow!("Invalid resource type: {}", resource_type)),
+            0 => ResourceType::Compute,
+            1 => ResourceType::Storage,
+            2 => ResourceType::Network,
+            3 => ResourceType::Token,
+            _ => return Err(wasmtime::Trap::throw(format!("Invalid resource type: {}", resource_type))),
         };
         
-        // Get host environment and record usage
-        let mut host_env = caller.data_mut().host.clone();
+        // Record resource usage
+        let host_env = caller.data_mut();
         
         host_env.record_resource_usage(res_type, amount as u64)
-            .map_err(|e| anyhow::anyhow!("Resource usage recording failed: {}", e))?;
+            .map_err(|e| wasmtime::Trap::throw(format!("Resource usage recording failed: {}", e)))?;
         
         Ok(())
     })?;
     
     // budget_allocate: Allocate budget for a resource
-    linker.func_wrap("env", "host_budget_allocate", |mut caller: wasmtime::Caller<'_, StoreData>,
+    linker.func_wrap("env", "host_budget_allocate", |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
                      budget_id_ptr: i32, budget_id_len: i32, amount: i32, resource_type: i32| -> Result<i32, AnyhowError> {
         if amount < 0 {
             return Err(anyhow::anyhow!("Amount cannot be negative"));
@@ -75,9 +82,10 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
         
         // Convert resource_type integer to ResourceType
         let res_type = match resource_type {
-            0 => icn_economics::ResourceType::Compute,
-            1 => icn_economics::ResourceType::Storage,
-            2 => icn_economics::ResourceType::NetworkBandwidth,
+            0 => ResourceType::Compute,
+            1 => ResourceType::Storage,
+            2 => ResourceType::Network,
+            3 => ResourceType::Token,
             _ => return Err(anyhow::anyhow!("Invalid resource type: {}", resource_type)),
         };
         
@@ -95,16 +103,17 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
     })?;
     
     // budget_query_balance: Get the available balance for a resource in a budget
-    linker.func_wrap("env", "host_budget_query_balance", |mut caller: wasmtime::Caller<'_, StoreData>,
+    linker.func_wrap("env", "host_budget_query_balance", |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
                      budget_id_ptr: i32, budget_id_len: i32, resource_type: i32| -> Result<i64, AnyhowError> {
         // Read budget ID from guest memory
         let budget_id = read_memory_string(&mut caller, budget_id_ptr, budget_id_len)?;
         
         // Convert resource_type integer to ResourceType
         let res_type = match resource_type {
-            0 => icn_economics::ResourceType::Compute,
-            1 => icn_economics::ResourceType::Storage,
-            2 => icn_economics::ResourceType::NetworkBandwidth,
+            0 => ResourceType::Compute,
+            1 => ResourceType::Storage,
+            2 => ResourceType::Network,
+            3 => ResourceType::Token,
             _ => return Err(anyhow::anyhow!("Invalid resource type: {}", resource_type)),
         };
         
@@ -123,7 +132,7 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
     })?;
     
     // budget_vote: Vote on a budget proposal
-    linker.func_wrap("env", "host_budget_vote", |mut caller: wasmtime::Caller<'_, StoreData>,
+    linker.func_wrap("env", "host_budget_vote", |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
                      budget_id_ptr: i32, budget_id_len: i32, proposal_id_ptr: i32, proposal_id_len: i32, 
                      vote_type: i32, vote_weight: i32| -> Result<i32, AnyhowError> {
         // Read budget ID and proposal ID from guest memory
@@ -164,7 +173,7 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
     })?;
     
     // budget_tally_votes: Tally votes on a budget proposal
-    linker.func_wrap("env", "host_budget_tally_votes", |mut caller: wasmtime::Caller<'_, StoreData>,
+    linker.func_wrap("env", "host_budget_tally_votes", |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
                      budget_id_ptr: i32, budget_id_len: i32, proposal_id_ptr: i32, proposal_id_len: i32| -> Result<i32, AnyhowError> {
         // Read budget ID and proposal ID from guest memory
         let budget_id = read_memory_string(&mut caller, budget_id_ptr, budget_id_len)?;
@@ -200,7 +209,7 @@ pub fn register_economics_functions(linker: &mut Linker<StoreData>) -> Result<()
     })?;
     
     // budget_finalize_proposal: Finalize a budget proposal
-    linker.func_wrap("env", "host_budget_finalize_proposal", |mut caller: wasmtime::Caller<'_, StoreData>,
+    linker.func_wrap("env", "host_budget_finalize_proposal", |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
                      budget_id_ptr: i32, budget_id_len: i32, proposal_id_ptr: i32, proposal_id_len: i32| -> Result<i32, AnyhowError> {
         // Read budget ID and proposal ID from guest memory
         let budget_id = read_memory_string(&mut caller, budget_id_ptr, budget_id_len)?;

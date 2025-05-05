@@ -10,10 +10,10 @@ use std::sync::Arc;
 use icn_storage::memory::MemoryStorageManager;
 use icn_identity::memory::MemoryIdentityManager;
 
-/// Test identity context with Guardian scope
-fn create_test_guardian_context() -> HashMap<String, IdentityScope> {
+/// Test identity context with Administrator scope
+fn create_test_admin_context() -> HashMap<String, IdentityScope> {
     let mut ctx = HashMap::new();
-    ctx.insert("did:icn:guardian".to_string(), IdentityScope::Guardian);
+    ctx.insert("did:icn:admin".to_string(), IdentityScope::Administrator);
     ctx.insert("did:icn:user".to_string(), IdentityScope::Individual);
     ctx
 }
@@ -50,7 +50,7 @@ fn create_test_authorizations() -> Vec<ResourceAuthorization> {
 
 /// Create test execution environment
 fn create_test_environment(caller_did: &str) -> (VMContext, Arc<MemoryStorageManager>, Arc<MemoryIdentityManager>) {
-    let identity_ctx = create_test_guardian_context();
+    let identity_ctx = create_test_admin_context();
     let authorizations = create_test_authorizations();
     
     let memory_storage = Arc::new(MemoryStorageManager::new());
@@ -86,8 +86,8 @@ fn compile_ccl_to_wasm(action: &str, params: serde_json::Value) -> Result<Vec<u8
 
 #[tokio::test]
 async fn test_anchor_data_action() {
-    // Set up the environment with Guardian caller
-    let caller_did = "did:icn:guardian";
+    // Set up the environment with Administrator caller
+    let caller_did = "did:icn:admin";
     let (vm_context, storage_manager, identity_manager) = create_test_environment(caller_did);
     
     // Compile the CCL to WASM for anchor_data action
@@ -161,10 +161,10 @@ async fn test_perform_metered_action() {
 }
 
 #[tokio::test]
-async fn test_mint_token_guardian_only() {
-    // Test with Guardian caller - should succeed
-    let guardian_did = "did:icn:guardian";
-    let (vm_context, storage_manager, identity_manager) = create_test_environment(guardian_did);
+async fn test_mint_token_admin_only() {
+    // Test with Administrator caller - should succeed
+    let admin_did = "did:icn:admin";
+    let (vm_context, storage_manager, identity_manager) = create_test_environment(admin_did);
     
     // Compile the CCL to WASM for mint_token action
     let params = json!({
@@ -175,7 +175,7 @@ async fn test_mint_token_guardian_only() {
     
     let wasm_bytes = compile_ccl_to_wasm("mint_token", params).expect("Failed to compile CCL");
     
-    // Execute the WASM with Guardian caller
+    // Execute the WASM with Administrator caller
     let result = execute_wasm(
         &wasm_bytes,
         "invoke",
@@ -186,14 +186,14 @@ async fn test_mint_token_guardian_only() {
         None
     ).await;
     
-    // Check that execution succeeded for Guardian
-    assert!(result.is_ok(), "Execution failed for Guardian: {:?}", result);
+    // Check that execution succeeded for Administrator
+    assert!(result.is_ok(), "Execution failed for Administrator: {:?}", result);
     
-    // Test with non-Guardian caller - should fail
+    // Test with non-Administrator caller - should fail
     let user_did = "did:icn:user";
     let (vm_context, storage_manager, identity_manager) = create_test_environment(user_did);
     
-    // Execute the same WASM with non-Guardian caller
+    // Execute the same WASM with non-Administrator caller
     let result = execute_wasm(
         &wasm_bytes,
         "invoke",
@@ -221,7 +221,7 @@ async fn test_transfer_resource() {
     // Compile the CCL to WASM for transfer_resource
     let params = json!({
         "from": "did:icn:user",      // From self (this should succeed)
-        "to": "did:icn:guardian",    // To someone else
+        "to": "did:icn:admin",       // To someone else
         "resource_type": 0,          // Compute resource
         "amount": 500                // Amount to transfer
     });
@@ -244,7 +244,7 @@ async fn test_transfer_resource() {
     
     // Now try transferring from someone else as a regular user (should fail)
     let params = json!({
-        "from": "did:icn:guardian",  // From someone else
+        "from": "did:icn:admin",     // From someone else
         "to": "did:icn:user",        // To self
         "resource_type": 0,          // Compute resource
         "amount": 500                // Amount to transfer

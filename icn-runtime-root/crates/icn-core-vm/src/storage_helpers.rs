@@ -1,14 +1,14 @@
 use anyhow::Error as AnyhowError;
 use wasmtime::Linker;
-use crate::{StoreData, HostEnvironment};
+use crate::{ConcreteHostEnvironment, InternalHostError};
 use crate::mem_helpers::{read_memory_bytes, write_memory_bytes, write_memory_u32};
 use crate::cid_utils;
 
 /// Register storage-related host functions
-pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), AnyhowError> {
+pub fn register_storage_functions(linker: &mut Linker<ConcreteHostEnvironment>) -> Result<(), AnyhowError> {
     // storage_get: Get a value from storage by CID
     linker.func_wrap("env", "host_storage_get", 
-        |mut caller: wasmtime::Caller<'_, StoreData>, 
+        |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>, 
          cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| 
          -> Result<i32, wasmtime::Trap> {
             
@@ -17,7 +17,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
             .map_err(|e| wasmtime::Trap::throw(format!("Invalid CID: {}", e)))?;
         
         // Clone the host environment for use in async context
-        let mut host_env = caller.data().host.clone();
+        let mut host_env = caller.data().clone();
         
         // Safe async execution pattern with tokio
         let result = tokio::task::block_in_place(|| {
@@ -55,7 +55,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
     
     // storage_put: Store a key-value pair in storage
     linker.func_wrap("env", "host_storage_put", 
-        |mut caller: wasmtime::Caller<'_, StoreData>,
+        |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
          key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| 
          -> Result<i32, wasmtime::Trap> {
         
@@ -68,7 +68,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
             .map_err(|e| wasmtime::Trap::throw(format!("Failed to read value: {}", e)))?;
         
         // Clone the host environment and value for use in async context
-        let mut host_env = caller.data().host.clone();
+        let mut host_env = caller.data().clone();
         
         // Safe async execution pattern with tokio
         tokio::task::block_in_place(|| {
@@ -82,7 +82,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
     
     // blob_put: Store a blob in IPFS
     linker.func_wrap("env", "host_blob_put", 
-        |mut caller: wasmtime::Caller<'_, StoreData>,
+        |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
          content_ptr: i32, content_len: i32, out_ptr: i32, out_len: i32| 
          -> Result<i32, wasmtime::Trap> {
             
@@ -91,7 +91,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
             .map_err(|e| wasmtime::Trap::throw(format!("Failed to read content: {}", e)))?;
         
         // Clone the host environment for use in async context
-        let mut host_env = caller.data().host.clone();
+        let mut host_env = caller.data().clone();
         
         // Safe async execution pattern with tokio
         let cid_result = tokio::task::block_in_place(|| {
@@ -109,7 +109,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
     
     // blob_get: Retrieve a blob by CID
     linker.func_wrap("env", "host_blob_get", 
-        |mut caller: wasmtime::Caller<'_, StoreData>,
+        |mut caller: wasmtime::Caller<'_, ConcreteHostEnvironment>,
          cid_ptr: i32, cid_len: i32, out_ptr: i32, out_len_ptr: i32| 
          -> Result<i32, wasmtime::Trap> {
             
@@ -118,7 +118,7 @@ pub fn register_storage_functions(linker: &mut Linker<StoreData>) -> Result<(), 
             .map_err(|e| wasmtime::Trap::throw(format!("Invalid CID: {}", e)))?;
         
         // Clone the host environment for use in async context
-        let mut host_env = caller.data().host.clone();
+        let mut host_env = caller.data().clone();
         
         // Safe async execution pattern with tokio
         let result = tokio::task::block_in_place(|| {

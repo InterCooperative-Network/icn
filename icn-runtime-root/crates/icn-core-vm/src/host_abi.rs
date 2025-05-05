@@ -10,14 +10,13 @@ This module provides a security-hardened ABI surface for the Core VM. It handles
 
 use crate::{
     ConcreteHostEnvironment, VmError, ResourceType,
-    HostEnvironment
+    InternalHostError
 };
 use crate::mem_helpers::{read_memory_string, write_memory_string, read_memory_bytes, safe_check_bounds};
 use wasmtime::{Caller, Linker, Memory, Trap, WasmBacktrace};
 use tracing::*;
 use anyhow::{anyhow, Error};
-use crate::InternalHostError;
-use icn_common::errors::StorageError;
+use icn_models::storage::StorageError;
 use icn_identity::IdentityScope;
 use cid::Cid;
 use std::convert::TryInto;
@@ -546,10 +545,10 @@ fn host_mint_token_wrapper(
     // Get host environment
     let env = caller.data_mut();
     
-    // Verify Guardian role - only Guardians can mint tokens
+    // Verify Administrator role - only Administrators can mint tokens
     let caller_scope = env.caller_scope();
-    if caller_scope != IdentityScope::Guardian {
-        error!("Minting attempted by non-Guardian identity scope: {:?}", caller_scope);
+    if caller_scope != IdentityScope::Administrator {
+        error!("Minting attempted by non-Administrator identity scope: {:?}", caller_scope);
         return Ok(-2); // Not authorized
     }
     
@@ -644,18 +643,11 @@ fn host_transfer_resource_wrapper(
     // Get host environment
     let env = caller.data_mut();
     
-    // Get tokio runtime handle
-    let handle = tokio::runtime::Handle::current();
-    
-    // Check if the caller has authority over the 'from' account
-    // This is a simplified check - in a real system, we'd have signature verification
-    if env.caller_did() != from_did {
-        // Additional check for Guardians, who can transfer on behalf of others
-        if env.caller_scope() != IdentityScope::Guardian {
-            error!("Transfer attempted by unauthorized identity: {} for account {}", 
-                env.caller_did(), from_did);
-            return Ok(-2); // Not authorized
-        }
+    // Additional check for Administrators, who can transfer on behalf of others
+    if env.caller_scope() != IdentityScope::Administrator {
+        error!("Transfer attempted by unauthorized identity: {} for account {}", 
+            env.caller_did(), from_did);
+        return Ok(-2); // Not authorized
     }
     
     // Call into the economic system to transfer tokens
@@ -1115,7 +1107,7 @@ pub fn register_host_functions(
         host_anchor_to_dag_wrapper,
     ).map_err(|e| VmError::InitializationError(format!("Failed to register host_anchor_to_dag: {}", e)))?;
     
-    // Register token minting function (Guardian-only)
+    // Register token minting function (Administrator-only)
     linker.func_wrap(
         "env",
         "host_mint_token",

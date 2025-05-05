@@ -21,14 +21,17 @@ use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use tracing::*;
-use icn_identity::{KeyPair, IdentityScope, IdentityManager, IdentityError, IdentityId as IcnIdentityId, JWK};
-use icn_storage::{StorageManager, StorageError};
-use icn_models::{DagNodeBuilder, DagNode, DagStorageManager, Cid};
-use libipld::{Ipld, ipld, codec::Codec};
-use anyhow::{anyhow, Result};
+use icn_identity::{KeyPair, IdentityScope, IdentityManager, IdentityId as IcnIdentityId};
+use icn_models::storage::{StorageManager, StorageError, StorageResult};
+use icn_models::{DagNodeBuilder, DagNode, DagStorageManager, DagNodeMetadata, Cid};
+use libipld::{Ipld, codec::Codec};
+use libipld::dagcbor::DagCborCodec;
+use anyhow::Result;
 use std::sync::RwLock;
-use wasmtime::{Config, Engine, Instance, Module, Store, Caller};
+use wasmtime::{Config, Engine, Instance, Module, Store};
 use uuid;
+use sha2::{Sha256, Digest};
+use hex;
 
 pub use resources::{ResourceType, ResourceAuthorization, ResourceConsumption};
 
@@ -636,12 +639,12 @@ impl ConcreteHostEnvironment {
     }
     
     /// Mint tokens of a specific resource type to a recipient
-    /// Only Guardians can call this method successfully
+    /// Only administrators can call this method successfully
     pub async fn mint_tokens(&self, resource_type: ResourceType, recipient: &str, amount: u64) -> Result<(), InternalHostError> {
-        // Check if caller is a Guardian
-        if self.caller_scope() != IdentityScope::Guardian {
+        // Check if caller is an administrator
+        if self.caller_scope() != IdentityScope::Administrator {
             return Err(InternalHostError::Other(format!(
-                "Only Guardians can mint tokens, caller scope: {:?}", 
+                "Only administrators can mint tokens, caller scope: {:?}", 
                 self.caller_scope()
             )));
         }
@@ -691,8 +694,8 @@ impl ConcreteHostEnvironment {
     ) -> Result<(), InternalHostError> {
         // Check authorization
         if self.caller_did() != from_did {
-            // Allow Guardians to transfer on behalf of others
-            if self.caller_scope() != IdentityScope::Guardian {
+            // Allow administrators to transfer on behalf of others
+            if self.caller_scope() != IdentityScope::Administrator {
                 return Err(InternalHostError::Other(format!(
                     "Caller {} not authorized to transfer from {}", 
                     self.caller_did(), from_did

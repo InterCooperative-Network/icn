@@ -1,5 +1,5 @@
 use cid::Cid;
-use crate::HostError;
+use crate::VmError;
 use std::convert::TryFrom;
 
 /// Convert a CID to bytes for WASM ABI
@@ -8,9 +8,9 @@ pub fn cid_to_wasm_bytes(cid: &Cid) -> Vec<u8> {
 }
 
 /// Convert bytes from WASM ABI to CID
-pub fn cid_from_wasm_bytes(bytes: &[u8]) -> Result<Cid, HostError> {
+pub fn cid_from_wasm_bytes(bytes: &[u8]) -> Result<Cid, VmError> {
     Cid::try_from(bytes)
-        .map_err(|e| HostError::InvalidParameter(format!("Invalid CID bytes: {}", e)))
+        .map_err(|e| VmError::MemoryError(format!("Invalid CID bytes: {}", e)))
 }
 
 /// Convert a CID to a string for WASM ABI
@@ -19,24 +19,24 @@ pub fn cid_to_wasm_string(cid: &Cid) -> String {
 }
 
 /// Convert a string from WASM ABI to CID
-pub fn cid_from_wasm_string(s: &str) -> Result<Cid, HostError> {
+pub fn cid_from_wasm_string(s: &str) -> Result<Cid, VmError> {
     Cid::try_from(s)
-        .map_err(|e| HostError::InvalidParameter(format!("Invalid CID string: {}", e)))
+        .map_err(|e| VmError::MemoryError(format!("Invalid CID string: {}", e)))
 }
 
 /// Helper to read a CID from WASM memory
 pub fn read_cid_from_wasm_memory(
-    caller: &mut wasmtime::Caller<'_, crate::StoreData>,
+    caller: &mut wasmtime::Caller<'_, crate::ConcreteHostEnvironment>,
     cid_ptr: i32,
     cid_len: i32,
-) -> Result<Cid, HostError> {
+) -> Result<Cid, VmError> {
     if cid_ptr < 0 || cid_len <= 0 {
-        return Err(HostError::InvalidParameter("Invalid CID pointer or length".to_string()));
+        return Err(VmError::MemoryError("Invalid CID pointer or length".to_string()));
     }
     
     // Read CID string from memory
     let cid_str = crate::mem_helpers::read_memory_string(caller, cid_ptr, cid_len)
-        .map_err(|e| HostError::InvalidParameter(format!("Failed to read CID string: {}", e)))?;
+        .map_err(|e| VmError::MemoryError(format!("Failed to read CID string: {}", e)))?;
     
     // Convert to CID
     cid_from_wasm_string(&cid_str)
@@ -44,13 +44,13 @@ pub fn read_cid_from_wasm_memory(
 
 /// Helper to write a CID to WASM memory
 pub fn write_cid_to_wasm_memory(
-    caller: &mut wasmtime::Caller<'_, crate::StoreData>,
+    caller: &mut wasmtime::Caller<'_, crate::ConcreteHostEnvironment>,
     cid: &Cid,
     out_ptr: i32,
     out_len_ptr: i32,
-) -> Result<(), HostError> {
+) -> Result<(), VmError> {
     if out_ptr < 0 {
-        return Err(HostError::InvalidParameter("Invalid output pointer".to_string()));
+        return Err(VmError::MemoryError("Invalid output pointer".to_string()));
     }
     
     // Convert CID to string
@@ -60,13 +60,13 @@ pub fn write_cid_to_wasm_memory(
     // Write to memory
     if out_ptr >= 0 {
         crate::mem_helpers::write_memory_bytes(caller, out_ptr, cid_bytes)
-            .map_err(|e| HostError::InvalidParameter(format!("Failed to write CID to memory: {}", e)))?;
+            .map_err(|e| VmError::MemoryError(format!("Failed to write CID to memory: {}", e)))?;
     }
     
     // Write length if needed
     if out_len_ptr >= 0 {
         crate::mem_helpers::write_memory_u32(caller, out_len_ptr, cid_bytes.len() as u32)
-            .map_err(|e| HostError::InvalidParameter(format!("Failed to write CID length: {}", e)))?;
+            .map_err(|e| VmError::MemoryError(format!("Failed to write CID length: {}", e)))?;
     }
     
     Ok(())
