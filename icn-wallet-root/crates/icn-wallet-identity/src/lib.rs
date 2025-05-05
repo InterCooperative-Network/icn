@@ -1,3 +1,57 @@
+//! # ICN Wallet Identity
+//! 
+//! The `icn-wallet-identity` crate provides comprehensive identity management capabilities 
+//! for the ICN Wallet ecosystem. It enables the creation, management, and verification of 
+//! decentralized identifiers (DIDs) and verifiable credentials.
+//! 
+//! ## Features
+//! 
+//! - **DID Management**: Create and manage decentralized identifiers using various methods
+//! - **Key Management**: Generate and securely store cryptographic keys
+//! - **Credential Operations**: Issue, verify, and manage verifiable credentials
+//! - **Signature Capabilities**: Sign and verify messages and data structures
+//! - **Standards Compliance**: Follows W3C DID and Verifiable Credentials standards
+//! 
+//! ## Identity Types Supported
+//! 
+//! - **did:icn**: ICN's native DID method for wallet identities
+//! - **did:key**: Simple method for key-based DIDs
+//! - **did:web**: Web-based DIDs for integration with existing systems
+//! 
+//! ## Usage Example
+//! 
+//! ```rust,no_run
+//! use icn_wallet_identity::{IdentityManager, IdentityOptions};
+//! use icn_wallet_storage::StorageManager;
+//! 
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Initialize storage
+//!     let storage = StorageManager::new("wallet_data").await?;
+//!     
+//!     // Create identity manager
+//!     let identity_manager = IdentityManager::new(storage);
+//!     
+//!     // Create a new DID
+//!     let did = identity_manager.create_identity().await?;
+//!     println!("Created DID: {}", did);
+//!     
+//!     // Sign data with identity
+//!     let data = "Hello, world!";
+//!     let signature = identity_manager.sign(&did, data.as_bytes()).await?;
+//!     
+//!     // Verify signature
+//!     let is_valid = identity_manager.verify(
+//!         &did,
+//!         data.as_bytes(),
+//!         &signature
+//!     ).await?;
+//!     
+//!     assert!(is_valid);
+//!     
+//!     Ok(())
+//! }
+//! ```
+
 pub mod error;
 pub mod types;
 
