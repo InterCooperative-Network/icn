@@ -66,6 +66,7 @@ For detailed information about ICN, refer to these documents:
 - [Architecture Overview](docs/ARCHITECTURE.md) - System architecture and components
 - [DAG Structure](docs/DAG_STRUCTURE.md) - Technical details of the DAG implementation
 - [Governance System](docs/GOVERNANCE_SYSTEM.md) - Federation governance mechanisms
+- [Federation Lifecycle](docs/FEDERATION_LIFECYCLE.md) - Federation merge and split operations
 - [Economic System](docs/ECONOMICS.md) - Token economics and resource metering
 - [Security](docs/SECURITY.md) - Security model and threat mitigations
 - [Trust Model](docs/TRUST_MODEL.md) - Trust relationships and federation design

@@ -2486,6 +2486,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "federation-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "cid 0.10.1",
+ "futures",
+ "icn-common",
+ "icn-core-vm",
+ "icn-dag",
+ "icn-economics",
+ "icn-federation",
+ "icn-governance-kernel",
+ "icn-identity",
+ "multihash 0.16.3",
+ "rand 0.8.5",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

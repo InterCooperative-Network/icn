@@ -7,6 +7,7 @@ members = [
     "icn-runtime-root/crates/icn-dag",
     "icn-runtime-root/crates/icn-economics",
     "icn-runtime-root/crates/icn-federation",
+    "icn-runtime-root/crates/federation-lifecycle",
     "icn-runtime-root/crates/icn-governance-kernel",
     "icn-runtime-root/crates/icn-identity",
     "icn-runtime-root/crates/icn-storage",
