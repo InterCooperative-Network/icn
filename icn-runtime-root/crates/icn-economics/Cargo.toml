@@ -21,6 +21,7 @@ cid.workspace = true
 multihash.workspace = true
 sha2 = "0.10.9"
 futures.workspace = true
+toml = "0.8.8"
 
 [dev-dependencies]
 tokio = { version = "1.28", features = ["rt", "macros", "rt-multi-thread"] }

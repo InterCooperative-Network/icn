@@ -409,7 +409,10 @@ mod tests {
         
         // Convert back from payload
         let payload_json = node.payload_as_json().unwrap();
-        let bundle2: TrustBundle = serde_json::from_value(payload_json).unwrap();
+        let mut bundle2: TrustBundle = serde_json::from_value(payload_json).unwrap();
+        
+        // Ensure the ID is set correctly in the reconstructed bundle
+        bundle2.id = node.cid.clone();
         
         // Fields should match
         assert_eq!(bundle.id, bundle2.id);

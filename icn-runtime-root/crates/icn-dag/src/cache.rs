@@ -340,13 +340,11 @@ impl DagNodeCache {
             
             async move {
                 if let Some(node) = load_fn(cid_copy).await {
-                    // Insert into cache
-                    cache.insert(cid_copy, Arc::new(node));
+                    // Insert a clone into cache
+                    let node_clone = node.clone();
+                    cache.insert(cid_copy, Arc::new(node_clone));
                     
-                    // Update stats
-                    let mut stats = cache.stats.lock().unwrap();
-                    stats.prefetched_nodes += 1;
-                    
+                    // Also return the original node and cid
                     Some((cid_copy, node))
                 } else {
                     // Remove from tracker if load failed
@@ -451,15 +449,41 @@ impl DagNodeCache {
     
     /// Clone for use in async contexts
     pub fn clone(&self) -> Self {
-        // We don't actually clone the underlying data, just the Arc references
         Self {
-            cache: self.cache.clone(),
-            stats: self.stats.clone(),
-            prefetch_tracker: self.prefetch_tracker.clone(),
-            access_patterns: self.access_patterns.clone(),
+            cache: RwLock::new(self.cache.read().unwrap().clone()),
+            stats: Mutex::new(self.stats.lock().unwrap().clone()),
+            prefetch_tracker: Mutex::new(self.prefetch_tracker.lock().unwrap().clone()),
+            access_patterns: Mutex::new(self.access_patterns.lock().unwrap().clone()),
             max_prefetch_depth: self.max_prefetch_depth,
             max_prefetch_count: self.max_prefetch_count,
             prefetch_enabled: self.prefetch_enabled,
+        }
+    }
+}
+
+impl Clone for DagNodeCache {
+    fn clone(&self) -> Self {
+        Self {
+            cache: RwLock::new(self.cache.read().unwrap().clone()),
+            stats: Mutex::new(self.stats.lock().unwrap().clone()),
+            prefetch_tracker: Mutex::new(self.prefetch_tracker.lock().unwrap().clone()),
+            access_patterns: Mutex::new(self.access_patterns.lock().unwrap().clone()),
+            max_prefetch_depth: self.max_prefetch_depth,
+            max_prefetch_count: self.max_prefetch_count,
+            prefetch_enabled: self.prefetch_enabled,
+        }
+    }
+}
+
+// Add Clone for AccessPatternTracker
+impl Clone for AccessPatternTracker {
+    fn clone(&self) -> Self {
+        Self {
+            recent_accesses: self.recent_accesses.clone(),
+            co_access_patterns: self.co_access_patterns.clone(),
+            max_recent_accesses: self.max_recent_accesses,
+            last_cleanup: self.last_cleanup,
+            min_pattern_count: self.min_pattern_count,
         }
     }
 }

@@ -7,6 +7,7 @@ use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
 use cid::Cid;
 use sha2::{Sha256, Digest};
+use crate::token_storage::StorageBackend;
 
 /// Helper function to create a multihash using SHA-256
 fn create_sha256_multihash(data: &[u8]) -> cid::multihash::Multihash {
@@ -40,7 +41,7 @@ pub trait BudgetStorage: Send + Sync {
 
 /// Implementation of BudgetStorage that wraps a StorageBackend
 #[async_trait]
-impl<T: icn_storage::StorageBackend + Send + Sync> BudgetStorage for T {
+impl<T: StorageBackend + Send + Sync> BudgetStorage for T {
     async fn store_budget(&mut self, key: &str, data: Vec<u8>) -> EconomicsResult<()> {
         // Generate a key CID from the string key
         let key_str = format!("budget::{}", key);

@@ -5,7 +5,7 @@ use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::{SyncClient, error::SyncError, DagNode, DagNodeMetadata};
+use crate::{SyncClient, error::SyncError, DagNode, DagNodeMetadata, generate_cid};
 
 /// Trust bundle containing verified DIDs and credentials
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,21 +64,30 @@ impl TrustBundle {
         }
     }
     
-    /// Convert to a DAG node
-    pub fn to_dag_node(&self) -> Result<DagNode, SyncError> {
+    /// Helper function to generate content bytes for CID calculation
+    fn generate_content_bytes(&self) -> Result<Vec<u8>, SyncError> {
+        // Create a temporary copy with empty ID to ensure consistent CID generation
+        let mut temp_bundle = self.clone();
+        temp_bundle.id = String::new();
+        
         // Convert to JSON
-        let value = serde_json::to_value(&*self)
+        let value = serde_json::to_value(&temp_bundle)
             .map_err(|e| SyncError::Serialization(e))?;
         
         // Serialize to bytes for CID generation and payload
         let json_bytes = serde_json::to_vec(&value)
             .map_err(|e| SyncError::Serialization(e))?;
         
-        // Generate CID using SHA-256
-        let mut hasher = Sha256::new();
-        hasher.update(&json_bytes);
-        let digest = hasher.finalize();
-        let cid = format!("bafybeih{}", hex::encode(&digest[0..16]));
+        Ok(json_bytes)
+    }
+    
+    /// Convert to a DAG node
+    pub fn to_dag_node(&self) -> Result<DagNode, SyncError> {
+        // Generate content bytes
+        let json_bytes = self.generate_content_bytes()?;
+        
+        // Use the helper function to generate the CID
+        let cid = generate_cid(&json_bytes)?;
         
         // Create DAG node
         let node = DagNode {
@@ -87,7 +96,8 @@ impl TrustBundle {
             creator: self.issuer.clone(),
             timestamp: self.created_at,
             signatures: vec![],
-            content: json_bytes, content_type: "application/json".to_string(),
+            content: json_bytes, 
+            content_type: "application/json".to_string(),
             metadata: DagNodeMetadata {
                 sequence: Some(self.epoch),
                 scope: Some("federation".to_string()),
@@ -99,22 +109,11 @@ impl TrustBundle {
     
     /// Generate ID for this trust bundle
     pub fn generate_id(&mut self) -> Result<(), SyncError> {
-        // Temporarily clear the ID for consistent CID generation
-        self.id = String::new();
+        // Generate content bytes
+        let json_bytes = self.generate_content_bytes()?;
         
-        // Convert to JSON
-        let value = serde_json::to_value(&*self)
-            .map_err(|e| SyncError::Serialization(e))?;
-        
-        // Serialize to bytes for CID generation
-        let json_bytes = serde_json::to_vec(&value)
-            .map_err(|e| SyncError::Serialization(e))?;
-        
-        // Generate CID using SHA-256
-        let mut hasher = Sha256::new();
-        hasher.update(&json_bytes);
-        let digest = hasher.finalize();
-        let cid = format!("bafybeih{}", hex::encode(&digest[0..16]));
+        // Use the helper function to generate the CID
+        let cid = generate_cid(&json_bytes)?;
         
         // Set the ID
         self.id = cid;

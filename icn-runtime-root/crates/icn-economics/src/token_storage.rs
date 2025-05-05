@@ -5,6 +5,14 @@ use sha2::{Sha256, Digest};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// StorageBackend trait from icn-storage
+#[async_trait]
+pub trait StorageBackend {
+    async fn put_kv(&mut self, key: Cid, value: Vec<u8>) -> Result<(), String>;
+    async fn get_kv(&self, key: &Cid) -> Result<Option<Vec<u8>>, String>;
+    async fn list_keys(&self) -> Result<Vec<Cid>, String>;
+}
+
 /// Storage key prefix for token state
 const TOKEN_KEY_PREFIX: &str = "token::";
 /// Storage key prefix for authorization state
@@ -35,11 +43,18 @@ pub trait TokenStorage: Send + Sync {
     
     /// List tokens owned by a particular DID
     async fn list_tokens_by_owner(&self, owner_did: &str) -> EconomicsResult<Vec<ScopedResourceToken>>;
+    
+    /// List all CIDs in storage (for implementations that need it)
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        // Default implementation returns an empty list
+        // Concrete implementations should override this
+        Ok(Vec::new())
+    }
 }
 
 /// Implementation of TokenStorage that wraps a StorageBackend
 #[async_trait]
-impl<T: icn_storage::StorageBackend + Send + Sync> TokenStorage for T {
+impl<T: StorageBackend + Send + Sync> TokenStorage for T {
     async fn store_token(&mut self, token: &ScopedResourceToken) -> EconomicsResult<()> {
         // Generate a key CID from the token ID
         let key_str = format!("{}:{}", TOKEN_KEY_PREFIX, token.token_id);
@@ -129,7 +144,7 @@ impl<T: icn_storage::StorageBackend + Send + Sync> TokenStorage for T {
         // Here we'll use a simplified approach that relies on list_all() which is not efficient
         // A production implementation would use a proper indexing mechanism
         
-        let all_cids = self.list_all()
+        let all_cids = TokenStorage::list_all(self)
             .await
             .map_err(|e| EconomicsError::InvalidToken(format!("Storage error: {}", e)))?;
         
@@ -166,6 +181,13 @@ impl<T: icn_storage::StorageBackend + Send + Sync> TokenStorage for T {
         
         Ok(tokens)
     }
+
+    /// List all CIDs in storage
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        self.list_keys()
+            .await
+            .map_err(|e| EconomicsError::InvalidToken(format!("Storage error: {}", e)))
+    }
 }
 
 /// Mock implementation of TokenStorage for testing
@@ -173,6 +195,8 @@ impl<T: icn_storage::StorageBackend + Send + Sync> TokenStorage for T {
 pub struct MockTokenStorage {
     /// In-memory storage for tokens
     pub tokens: HashMap<Uuid, ScopedResourceToken>,
+    /// Mock cids for list_all
+    pub cids: Vec<Cid>,
 }
 
 impl MockTokenStorage {
@@ -180,6 +204,7 @@ impl MockTokenStorage {
     pub fn new() -> Self {
         Self {
             tokens: HashMap::new(),
+            cids: Vec::new(),
         }
     }
 }
@@ -207,6 +232,12 @@ impl TokenStorage for MockTokenStorage {
             .collect();
         Ok(tokens)
     }
+
+    /// List all CIDs in storage
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        // Return the mock CIDs
+        Ok(self.cids.clone())
+    }
 }
 
 /// Simple authorization storage trait
@@ -223,11 +254,18 @@ pub trait AuthorizationStorage: Send + Sync {
     
     /// List authorizations by grantee DID
     async fn list_authorizations_by_grantee(&self, grantee_did: &str) -> EconomicsResult<Vec<ResourceAuthorization>>;
+    
+    /// List all CIDs in storage (for implementations that need it)
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        // Default implementation returns an empty list
+        // Concrete implementations should override this
+        Ok(Vec::new())
+    }
 }
 
 /// Implementation of AuthorizationStorage that wraps a StorageBackend
 #[async_trait]
-impl<T: icn_storage::StorageBackend + Send + Sync> AuthorizationStorage for T {
+impl<T: StorageBackend + Send + Sync> AuthorizationStorage for T {
     async fn store_authorization(&mut self, auth: &ResourceAuthorization) -> EconomicsResult<()> {
         // Generate a key CID from the authorization ID
         let key_str = format!("{}:{}", AUTH_KEY_PREFIX, auth.auth_id);
@@ -289,7 +327,7 @@ impl<T: icn_storage::StorageBackend + Send + Sync> AuthorizationStorage for T {
         // In a real implementation, we would query an index or scan for authorizations by grantee
         // Here we'll use a simplified approach that relies on list_all()
         
-        let all_cids = self.list_all()
+        let all_cids = AuthorizationStorage::list_all(self)
             .await
             .map_err(|e| EconomicsError::InvalidToken(format!("Storage error: {}", e)))?;
         
@@ -326,6 +364,11 @@ impl<T: icn_storage::StorageBackend + Send + Sync> AuthorizationStorage for T {
         
         Ok(authorizations)
     }
+
+    /// List all CIDs in storage
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        Ok(Vec::new())
+    }
 }
 
 /// MockAuthorizationStorage for testing
@@ -333,6 +376,8 @@ impl<T: icn_storage::StorageBackend + Send + Sync> AuthorizationStorage for T {
 pub struct MockAuthorizationStorage {
     /// In-memory storage for authorizations
     pub authorizations: HashMap<Uuid, ResourceAuthorization>,
+    /// Mock cids for list_all
+    pub cids: Vec<Cid>,
 }
 
 impl MockAuthorizationStorage {
@@ -340,6 +385,7 @@ impl MockAuthorizationStorage {
     pub fn new() -> Self {
         Self {
             authorizations: HashMap::new(),
+            cids: Vec::new(),
         }
     }
 }
@@ -366,6 +412,12 @@ impl AuthorizationStorage for MockAuthorizationStorage {
             .cloned()
             .collect();
         Ok(auths)
+    }
+
+    /// List all CIDs in storage
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        // Return the mock CIDs
+        Ok(self.cids.clone())
     }
 }
 
@@ -412,6 +464,11 @@ impl TokenStorage for MockEconomicsStorage {
     async fn list_tokens_by_owner(&self, owner_did: &str) -> EconomicsResult<Vec<ScopedResourceToken>> {
         self.token_storage.list_tokens_by_owner(owner_did).await
     }
+
+    /// List all CIDs in storage
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        TokenStorage::list_all(&self.token_storage).await
+    }
 }
 
 #[async_trait]
@@ -430,6 +487,11 @@ impl AuthorizationStorage for MockEconomicsStorage {
     
     async fn list_authorizations_by_grantee(&self, grantee_did: &str) -> EconomicsResult<Vec<ResourceAuthorization>> {
         self.auth_storage.list_authorizations_by_grantee(grantee_did).await
+    }
+
+    /// List all CIDs in storage
+    async fn list_all(&self) -> EconomicsResult<Vec<Cid>> {
+        AuthorizationStorage::list_all(&self.auth_storage).await
     }
 }
 

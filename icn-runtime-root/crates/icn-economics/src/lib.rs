@@ -28,6 +28,15 @@ pub mod budget_ops;
 // New token storage module
 pub mod token_storage;
 
+// Resources module
+pub mod resources;
+
+// Policy module
+pub mod policy;
+
+// Export key types from resources module
+pub use resources::{RegenerativeResourceType, ManaPool, ResourceManager, OperationCosts};
+
 /// Errors that can occur during economic operations
 #[derive(Debug, Error)]
 pub enum EconomicsError {
@@ -580,10 +589,6 @@ pub struct BudgetProposal {
     pub metadata: Option<serde_json::Value>,
 }
 
-pub mod resources;
-pub mod policy;
-
-pub use resources::{ResourceType, ResourceBalance, ResourceAccount};
 pub use policy::{
     FederationPolicy, PolicyEnforcer, PolicyError, 
     TokenAuthorizationRule, RateLimit, ResourceType as PolicyResourceType
