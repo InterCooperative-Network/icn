@@ -14,7 +14,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 icn-wallet-sync = { path = "../icn-wallet-sync" }
 icn-wallet-core = { path = "../icn-wallet-core" }
-icn-dag = { path = "../../../runtime/crates/dag" }
+icn-dag = { path = "../../../icn-runtime-root/crates/icn-dag" }
 chrono = { workspace = true }
 x25519-dalek = "2.0"
 rand = { workspace = true }

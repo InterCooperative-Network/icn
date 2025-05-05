@@ -24,9 +24,9 @@ base64 = { workspace = true }
 aes-gcm = "0.10"
 url = "2.3"
 
-icn-wallet-agent = { path = "../../wallet/crates/icn-wallet-agent" }
-icn-wallet-core = { path = "../../wallet/crates/icn-wallet-core" }
-icn-dag = { path = "../../runtime/crates/dag" }
+icn-wallet-agent = { path = "../../icn-wallet-root/crates/icn-wallet-agent" }
+icn-wallet-core = { path = "../../icn-wallet-root/crates/icn-wallet-core" }
+icn-dag = { path = "../../icn-runtime-root/crates/icn-dag" }
 
 [dev-dependencies]
 reqwest = { workspace = true }

@@ -24,7 +24,7 @@ pest_derive = "2.7"
 anyhow = "1.0"
 sha2 = "0.10.6"
 base64 = "0.21.0"
-icn-core-vm = { path = "../core-vm" }
-icn-identity = { path = "../identity" }
-icn-storage = { path = "../storage" }
-icn-economics = { path = "../economics" } 
+icn-core-vm = { path = "../icn-core-vm" }
+icn-identity = { path = "../icn-identity" }
+icn-storage = { path = "../icn-storage" }
+icn-economics = { path = "../icn-economics" } 

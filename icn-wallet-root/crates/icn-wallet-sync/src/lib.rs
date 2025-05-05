@@ -21,6 +21,7 @@ pub use trust::{TrustBundle, TrustManager};
 pub use error::SyncError;
 pub use federation::{FederationSyncClient, TrustBundleSubscription, FederationNodeAddress};
 pub use compat::{LegacyDagNode, legacy_to_current, current_to_legacy, parse_dag_node_json};
+pub use compat::{to_wallet_types_dag_node, from_wallet_types_dag_node};
 
 // Define our own DagNodeMetadata to avoid circular dependencies
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -53,7 +54,8 @@ impl DagNode {
     pub fn content_as_json(&self) -> Result<Value, serde_json::Error> {
         serde_json::from_slice(&self.content)
     }
-    // Add helper methods for compatibility
+    
+    // For backward compatibility with existing code
     pub fn payload_as_json(&self) -> Result<Value, serde_json::Error> {
         serde_json::from_slice(&self.content)
     }
@@ -81,10 +83,10 @@ pub struct SyncClient {
     client: Client,
     
     /// Base URL for ICN node
-    base_url: String,
+    pub(crate) base_url: String,
     
     /// Authentication token (if needed)
-    auth_token: Option<String>,
+    pub(crate) auth_token: Option<String>,
 }
 
 impl SyncClient {
@@ -155,6 +157,18 @@ impl SyncClient {
         let node = compat::parse_dag_node_json(json_value)?;
         
         Ok(node)
+    }
+    
+    /// Get a DagNode from icn-wallet-types and convert it to the sync format
+    pub async fn get_node_as_wallet_type(&self, node_id: &str) -> Result<icn_wallet_types::dag::DagNode, SyncError> {
+        let node = self.get_node(node_id).await?;
+        compat::to_wallet_types_dag_node(&node)
+    }
+    
+    /// Submit a DagNode in icn-wallet-types format
+    pub async fn submit_wallet_type_node(&self, node: &icn_wallet_types::dag::DagNode) -> Result<NodeSubmissionResponse, SyncError> {
+        let sync_node = compat::from_wallet_types_dag_node(node);
+        self.submit_node(&sync_node).await
     }
     
     /// Extract thread_id from Execution Receipt credential
@@ -349,7 +363,6 @@ mod tests {
     #[test]
     fn test_dag_node_serialization() {
         // Create a DagNode using the current structure
-        let payload = serde_json::to_vec(&json!({ "test": "value" })).unwrap();
         let node = DagNode {
             cid: "test-cid".to_string(),
             parents: vec!["ref1".to_string(), "ref2".to_string()],
@@ -371,7 +384,7 @@ mod tests {
         // Fields should match
         assert_eq!(node.cid, node2.cid);
         assert_eq!(node.parents, node2.parents);
-        assert_eq!(node.payload, node2.payload);
+        assert_eq!(node.content, node2.content);
     }
     
     #[tokio::test]

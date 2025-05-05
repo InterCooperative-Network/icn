@@ -36,6 +36,7 @@ members = [
 exclude = [
     "frontend/*",
     "icn-runtime-root/crates/icn-core-vm/fuzz", # Fuzz tests have their own setup
+    "icn-runtime-root/crates/common", # Duplicate of icn-common
 ]
 
 [workspace.dependencies]

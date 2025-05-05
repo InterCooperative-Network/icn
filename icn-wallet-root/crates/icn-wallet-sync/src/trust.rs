@@ -278,8 +278,6 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, Duration};
     
-    // Existing tests if any...
-    
     #[tokio::test]
     async fn test_trust_bundle_verification() {
         // Create a mock sync client
@@ -313,10 +311,11 @@ mod tests {
         let valid_node = DagNode {
             cid: "test-valid-node".to_string(),
             parents: vec![],
-            issuer: "did:icn:trusted1".to_string(), // This is in the trusted DIDs
+            creator: "did:icn:trusted1".to_string(), // This is in the trusted DIDs
             timestamp: SystemTime::now(),
-            signature: vec![1, 2, 3, 4],
-            payload: vec![10, 20, 30],
+            signatures: vec!["test-signature".to_string()],
+            content: vec![10, 20, 30],
+            content_type: "application/octet-stream".to_string(),
             metadata: DagNodeMetadata::default(),
         };
         
@@ -328,10 +327,11 @@ mod tests {
         let invalid_node = DagNode {
             cid: "test-invalid-node".to_string(),
             parents: vec![],
-            issuer: "did:icn:untrusted".to_string(), // This is NOT in the trusted DIDs
+            creator: "did:icn:untrusted".to_string(), // This is NOT in the trusted DIDs
             timestamp: SystemTime::now(),
-            signature: vec![1, 2, 3, 4],
-            payload: vec![10, 20, 30],
+            signatures: vec!["test-signature".to_string()],
+            content: vec![10, 20, 30],
+            content_type: "application/octet-stream".to_string(),
             metadata: DagNodeMetadata::default(),
         };
         

@@ -31,18 +31,18 @@ ssi = { workspace = true, features = ["ed25519", "rsa"] }
 tempfile = "3.8"
 
 # ICN crates
-icn-core-vm = { path = "../crates/core-vm" }
-icn-governance-kernel = { path = "../crates/governance-kernel" }
-icn-identity = { path = "../crates/identity", features = ["jwk", "signing"] }
-icn-storage = { path = "../crates/storage", default-features = false, features = ["memory-storage"] }
-icn-economics = { path = "../crates/economics" }
-icn-execution-tools = { path = "../crates/execution-tools" }
-icn-ccl-compiler = { path = "../crates/ccl-compiler" }
-icn-federation = { path = "../crates/federation" }
-icn-dag = { path = "../crates/dag" }
+icn-core-vm = { path = "../crates/icn-core-vm" }
+icn-governance-kernel = { path = "../crates/icn-governance-kernel" }
+icn-identity = { path = "../crates/icn-identity", features = ["jwk", "signing"] }
+icn-storage = { path = "../crates/icn-storage", default-features = false, features = ["memory-storage"] }
+icn-economics = { path = "../crates/icn-economics" }
+icn-execution-tools = { path = "../crates/icn-execution-tools" }
+icn-ccl-compiler = { path = "../crates/icn-ccl-compiler" }
+icn-federation = { path = "../crates/icn-federation" }
+icn-dag = { path = "../crates/icn-dag" }
 
 # Wallet components
-icn-wallet-types = { path = "../../wallet/crates/icn-wallet-types" }
+icn-wallet-types = { path = "../../icn-wallet-root/crates/icn-wallet-types" }
 
 [[bin]]
 name = "covm"
@@ -53,7 +53,7 @@ path = "covm.rs"
 tempfile = "3.8"
 assert_fs = "1.0"
 predicates = "2.1"
-icn-ccl-compiler = { path = "../crates/ccl-compiler" }
+icn-ccl-compiler = { path = "../crates/icn-ccl-compiler" }
 
 [[test]]
 name = "entity_creation_test"

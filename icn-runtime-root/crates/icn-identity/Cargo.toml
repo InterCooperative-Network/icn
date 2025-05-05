@@ -16,7 +16,7 @@ cid = { workspace = true, features = ["serde-codec"] }
 multihash = { workspace = true }
 
 # Common types and utilities
-icn-common = { path = "../common" }
+icn-common = { path = "../icn-common" }
 
 # Other required dependencies
 did-method-key = "0.3"
@@ -29,7 +29,7 @@ base64 = "0.21"
 hex = "0.4"
 
 # W3C DID/VC standards and JWS implementation
-ssi = { version = "0.7", features = ["ed25519"] }
+ssi = { version = "0.7", features = ["ed25519", "rsa", "secp256k1", "http-did", "w3c"] }
 ssi-jwk = "0.1.2"
 ssi-jws = "0.1.1"
 ssi-dids = "0.1.1"

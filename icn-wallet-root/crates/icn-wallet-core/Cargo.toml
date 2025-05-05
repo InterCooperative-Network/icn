@@ -12,7 +12,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 icn-wallet-sync = { path = "../icn-wallet-sync" } # Re-enabled after fixing circular dependencies
-icn-dag = { path = "../../../runtime/crates/dag" }
+icn-dag = { path = "../../../icn-runtime-root/crates/icn-dag" }
 icn-wallet-storage = { path = "../icn-wallet-storage" }
 icn-wallet-identity = { path = "../icn-wallet-identity" }
 async-trait = { workspace = true }

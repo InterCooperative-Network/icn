@@ -5,9 +5,9 @@ edition = "2021"
 description = "Deliberation thread linking logic stub for the ICN Runtime"
 
 [dependencies]
-icn-identity = { path = "../identity" }
-icn-dag = { path = "../dag" }
-icn-governance-kernel = { path = "../governance-kernel" }
+icn-identity = { path = "../icn-identity" }
+icn-dag = { path = "../icn-dag" }
+icn-governance-kernel = { path = "../icn-governance-kernel" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }

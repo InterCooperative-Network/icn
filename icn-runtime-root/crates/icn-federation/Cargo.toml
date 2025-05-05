@@ -24,8 +24,8 @@ base64 = "0.21"
 ssi-jwk = "0.1.2"
 
 # ICN crates
-icn-common = { path = "../common" }
-icn-identity = { path = "../identity" }
+icn-common = { path = "../icn-common" }
+icn-identity = { path = "../icn-identity" }
 
 # LibP2P dependencies
 libp2p = { version = "0.53", features = ["tokio", "tcp", "noise", "yamux", "gossipsub", "mdns", "kad", "request-response", "macros", "identify", "serde", "json", "cbor"] }

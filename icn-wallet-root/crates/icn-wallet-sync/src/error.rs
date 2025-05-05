@@ -45,6 +45,12 @@ pub enum SyncError {
     
     #[error("Wallet error: {0}")]
     WalletError(#[from] SharedError),
+    
+    #[error("Type conversion error: {0}")]
+    TypeConversion(String),
+    
+    #[error("Timestamp conversion error: {0}")]
+    TimestampError(String),
 }
 
 // Implement a conversion from backoff::Error<SyncError> to SyncError
@@ -75,6 +81,8 @@ impl From<SyncError> for SharedError {
             SyncError::BackoffError => SharedError::TimeoutError("Operation failed after retries".to_string()),
             SyncError::Internal(msg) => SharedError::GenericError(format!("Internal error: {}", msg)),
             SyncError::WalletError(e) => e,
+            SyncError::TypeConversion(msg) => SharedError::SerializationError(format!("Type conversion error: {}", msg)),
+            SyncError::TimestampError(msg) => SharedError::GenericError(format!("Timestamp error: {}", msg)),
         }
     }
 }
@@ -89,6 +97,9 @@ pub fn map_reqwest_error(err: reqwest::Error) -> SyncError {
         match status.as_u16() {
             401 | 403 => SyncError::Authentication(format!("Authentication failed: {}", err)),
             404 => SyncError::NodeNotFound(format!("Resource not found: {}", err)),
+            408 => SyncError::Network(format!("Request timeout: {}", err)),
+            429 => SyncError::Network(format!("Rate limited: {}", err)),
+            500..=599 => SyncError::Api(format!("Server error: {}", err)),
             _ => SyncError::Request(err),
         }
     } else {

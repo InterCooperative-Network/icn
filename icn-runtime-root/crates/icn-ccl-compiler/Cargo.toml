@@ -8,10 +8,10 @@ license = "Apache-2.0 OR MIT"
 
 [dependencies]
 # Project internal dependencies
-icn-governance-kernel = { path = "../governance-kernel" }
-icn-identity = { path = "../identity" }
-icn-economics = { path = "../economics" }
-icn-dag = { path = "../dag" }
+icn-governance-kernel = { path = "../icn-governance-kernel" }
+icn-identity = { path = "../icn-identity" }
+icn-economics = { path = "../icn-economics" }
+icn-dag = { path = "../icn-dag" }
 
 # WASM compilation
 wasm-encoder = "0.31"
@@ -46,8 +46,8 @@ tera = { version = "1.19", optional = true }
 
 [dev-dependencies]
 # For integration tests
-icn-core-vm = { path = "../core-vm" }
-icn-storage = { path = "../storage" }
+icn-core-vm = { path = "../icn-core-vm" }
+icn-storage = { path = "../icn-storage" }
 tempfile = "3.8"
 wasmparser = "0.116"
 

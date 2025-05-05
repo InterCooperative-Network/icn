@@ -5,13 +5,13 @@ edition = "2021"
 description = "CLI helpers, Replay logic, and common utils for the ICN Runtime"
 
 [dependencies]
-icn-core-vm = { path = "../core-vm" }
-icn-governance-kernel = { path = "../governance-kernel" }
-icn-dag = { path = "../dag" }
-icn-identity = { path = "../identity" }
-icn-economics = { path = "../economics" }
-icn-federation = { path = "../federation" }
-icn-storage = { path = "../storage" }
+icn-core-vm = { path = "../icn-core-vm" }
+icn-governance-kernel = { path = "../icn-governance-kernel" }
+icn-dag = { path = "../icn-dag" }
+icn-identity = { path = "../icn-identity" }
+icn-economics = { path = "../icn-economics" }
+icn-federation = { path = "../icn-federation" }
+icn-storage = { path = "../icn-storage" }
 clap = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }

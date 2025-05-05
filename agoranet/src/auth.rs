@@ -35,7 +35,7 @@ pub struct AuthUser(pub UserClaims);
 // Rename the auth_middleware to did_auth_middleware
 pub async fn did_auth_middleware<B>(
     mut req: Request<B>,
-    next: Next,
+    next: Next<B>,
 ) -> Result<Response, StatusCode> 
 where
     B: Send + 'static,
@@ -57,11 +57,8 @@ where
         
         req.extensions_mut().insert(AuthUser(user_claims));
         
-        // Convert the request type from B to Body (this is what Axum middleware expects)
-        let (parts, _) = req.into_parts();
-        let new_req = Request::from_parts(parts, Body::empty());
-        
-        return Ok(next.run(new_req).await);
+        // Continue with the request
+        return Ok(next.run(req).await);
     }
     
     // Process the bearer token
@@ -100,12 +97,8 @@ where
     
     req.extensions_mut().insert(AuthUser(user_claims));
     
-    // Convert the request type from B to Body (this is what Axum middleware expects)
-    let (parts, _) = req.into_parts();
-    let new_req = Request::from_parts(parts, Body::empty());
-    
     // Continue with the request
-    Ok(next.run(new_req).await)
+    Ok(next.run(req).await)
 }
 
 // Endpoint to verify a token (for testing)
