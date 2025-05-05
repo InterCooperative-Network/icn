@@ -72,6 +72,50 @@ The Mesh Compute overlay leverages the ICN's federation-based trust model:
 2. Verifiers receive payment for correct verification
 3. Penalties apply for incorrect execution/verification
 
+## Execution Model
+
+The Mesh Compute overlay implements a purpose-bound execution model:
+
+- **Capability Scope**: Tasks define their exact resource requirements using CapabilityScope:
+  - Memory capacity (MB)
+  - CPU cycles
+  - GPU FLOPS (for accelerated tasks)
+  - I/O bandwidth (MB)
+
+- **Hardware Selection**: Workers publish their available hardware capabilities, and only workers with sufficient resources are selected
+
+- **Execution Summary**: Detailed resource usage is tracked and reported for accountability:
+  - Actual resources consumed
+  - Contribution score for quality assessment
+  - Verification confirmation
+
+- **Deterministic Verification**: Verifiers confirm outputs through independent re-execution
+
+## Economics
+
+The Mesh Compute overlay uses an escrow-based economic model:
+
+1. **Task Creation**:
+   - Publisher defines a total reward amount
+   - Tokens are locked in an escrow contract
+
+2. **Worker Compensation**:
+   - Successful workers receive ~90% of reward
+   - Reward proportional to execution quality and timeliness
+
+3. **Verifier Compensation**:
+   - Verifiers share ~10% of reward
+   - Distribution weighted by verifier reputation
+
+4. **Dispute Resolution**:
+   - Disputed executions trigger multi-party verification
+   - Invalid executions result in escrow refund
+   - Malicious participants face reputation penalties
+
+5. **Reward Scaling**:
+   - Rewards scale with task complexity (capability scope)
+   - Market dynamics adjust pricing through worker competition
+
 ## Implementation Details
 
 ### Data Structures

@@ -339,6 +339,81 @@ pub struct EscrowContractEvent {
     pub timestamp: DateTime<Utc>,
 }
 
+/// Claims rewards for a successful worker after verification
+pub async fn claim_reward(escrow_cid: &Cid, worker_did: &str, reward_amount: u64) -> Result<()> {
+    info!("Claiming reward of {} tokens for worker {} from escrow {}", 
+          reward_amount, worker_did, escrow_cid);
+    
+    // Call the compute_escrow contract's release action
+    execute_escrow_action(
+        escrow_cid, 
+        "release", 
+        &[worker_did.to_string(), reward_amount.to_string()]
+    ).await?;
+    
+    // Anchor event to DAG
+    anchor_escrow_event(
+        escrow_cid,
+        "claimed",
+        Some(worker_did),
+        Some(reward_amount)
+    ).await?;
+    
+    info!("Reward claim successful");
+    Ok(())
+}
+
+/// Refunds tokens for an invalid execution
+pub async fn refund(escrow_cid: &Cid) -> Result<()> {
+    info!("Refunding tokens for escrow {}", escrow_cid);
+    
+    // Call the compute_escrow contract's refund action
+    execute_escrow_action(
+        escrow_cid, 
+        "refund", 
+        &[]
+    ).await?;
+    
+    // Anchor event to DAG
+    anchor_escrow_event(
+        escrow_cid,
+        "refunded",
+        None,
+        None
+    ).await?;
+    
+    info!("Refund successful");
+    Ok(())
+}
+
+/// Helper to execute an action on the escrow contract
+async fn execute_escrow_action(escrow_cid: &Cid, action: &str, params: &[String]) -> Result<()> {
+    // In a real implementation, this would:
+    // 1. Use the CCL interpreter to execute the contract action
+    // 2. Update the contract state in storage
+    
+    // For now, we just log that it happened
+    info!("Executing escrow action: {} with params: {:?}", action, params);
+    Ok(())
+}
+
+/// Helper to anchor an escrow event to the DAG
+async fn anchor_escrow_event(
+    escrow_cid: &Cid,
+    event_type: &str,
+    worker_did: Option<&str>,
+    amount: Option<u64>
+) -> Result<()> {
+    // In a real implementation, this would:
+    // 1. Create a DagEvent::MeshEscrowEvent
+    // 2. Anchor it to the DAG
+    
+    // For now, we just log that it happened
+    info!("Anchoring escrow event: {} for worker {:?} with amount {:?}", 
+          event_type, worker_did, amount);
+    Ok(())
+}
+
 #[cfg(test)]
 mod base_tests {
     use super::*;

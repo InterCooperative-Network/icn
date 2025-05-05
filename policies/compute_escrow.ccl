@@ -1,0 +1,20 @@
+// Compute Escrow CCL Contract
+// This contract handles escrow operations for mesh compute, locking tokens
+// until computation is verified and then distributing them appropriately.
+
+contract compute_escrow(cid escrow_cid, TokenAmount total_reward) {
+    // Lock tokens when creating an escrow for a compute task
+    action lock_tokens { 
+        host_lock_tokens(escrow_cid, total_reward)
+    }
+    
+    // Release tokens to a worker who successfully completed the task
+    action release(worker_did, TokenAmount reward) { 
+        host_release_tokens(escrow_cid, worker_did, reward)
+    }
+    
+    // Refund tokens back to the original owner in case of failure or cancellation
+    action refund() { 
+        host_refund_tokens(escrow_cid)
+    }
+} 

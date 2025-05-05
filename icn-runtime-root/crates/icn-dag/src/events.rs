@@ -91,4 +91,18 @@ pub enum DagEvent {
         /// Timestamp
         timestamp: DateTime<Utc>,
     },
+    
+    /// Mesh escrow event
+    MeshEscrowEvent {
+        /// The content ID of the escrow contract
+        escrow_cid: Cid,
+        /// Event type (created, claimed, refunded)
+        event_type: String,
+        /// Worker DID (if applicable)
+        worker_did: Option<String>,
+        /// Amount of tokens involved
+        amount: Option<u64>,
+        /// Timestamp
+        timestamp: DateTime<Utc>,
+    },
 } 

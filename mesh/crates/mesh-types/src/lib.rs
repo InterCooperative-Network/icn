@@ -10,9 +10,70 @@ pub use task_runner::*;
 /// Type alias for DID string
 pub type Did = String;
 
-/// A task intent representing a request to execute a WASM module in the mesh network
+/// Hardware capabilities information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskIntent {
+pub struct HwCaps {
+    /// Available memory in MB
+    pub mem_mb: u32,
+    
+    /// Available CPU cycles (relative measure)
+    pub cpu_cycles: u32,
+    
+    /// Available GPU operations (in FLOPS)
+    pub gpu_flops: u32,
+    
+    /// Available I/O bandwidth (in MB)
+    pub io_mb: u32,
+}
+
+/// Capability scope defines the resources required for task execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapabilityScope {
+    /// Required memory in MB
+    pub mem_mb: u32,
+    
+    /// Required CPU cycles (relative measure)
+    pub cpu_cycles: u32,
+    
+    /// Required GPU operations (in FLOPS)
+    pub gpu_flops: u32,
+    
+    /// Required I/O bandwidth (in MB)
+    pub io_mb: u32,
+}
+
+impl CapabilityScope {
+    /// Check if these capabilities fit within the provided hardware capabilities
+    pub fn fits(&self, hw_caps: &HwCaps) -> bool {
+        self.mem_mb <= hw_caps.mem_mb &&
+        self.cpu_cycles <= hw_caps.cpu_cycles &&
+        self.gpu_flops <= hw_caps.gpu_flops &&
+        self.io_mb <= hw_caps.io_mb
+    }
+}
+
+/// Execution summary containing information about resource usage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionSummary {
+    /// Memory used in MB
+    pub mem_mb: u32,
+    
+    /// CPU cycles used (relative measure)
+    pub cpu_cycles: u32,
+    
+    /// GPU operations used (in FLOPS)
+    pub gpu_flops: u32,
+    
+    /// I/O bandwidth used (in MB)
+    pub io_mb: u32,
+    
+    /// Overall contribution score (0.0-1.0)
+    pub contribution_score: f64,
+}
+
+/// A participation intent representing a request to execute a WASM module in the mesh network
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParticipationIntent {
     /// The DID of the publisher requesting the computation
     pub publisher_did: Did,
     
@@ -30,6 +91,13 @@ pub struct TaskIntent {
     
     /// Expiry timestamp after which the task is no longer valid
     pub expiry: DateTime<Utc>,
+    
+    /// Required capability scope for execution
+    pub capability_scope: CapabilityScope,
+    
+    /// Content ID of the escrow contract (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escrow_cid: Option<Cid>,
     
     /// Additional task metadata
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -51,8 +119,8 @@ pub struct ExecutionReceipt {
     /// Raw hash of the output data (for deterministic verification)
     pub output_hash: Vec<u8>,
     
-    /// Amount of computational fuel consumed during execution
-    pub fuel_consumed: u64,
+    /// Summary of resources consumed during execution
+    pub execution_summary: ExecutionSummary,
     
     /// Timestamp when the execution was completed
     pub timestamp: DateTime<Utc>,
@@ -112,8 +180,8 @@ pub struct MeshPolicy {
     /// Minimum acceptable fee for task execution
     pub min_fee: u64,
     
-    /// Base capacity units representing computational resources
-    pub capacity_units: u32,
+    /// Base capability scope representing computational resources
+    pub base_capability_scope: CapabilityScope,
 }
 
 /// Information about a compute offer in response to a task intent
@@ -128,8 +196,8 @@ pub struct ComputeOffer {
     /// Estimated cost to execute the task
     pub cost_estimate: u64,
     
-    /// Available capacity of the worker
-    pub available_capacity: u32,
+    /// Available hardware capabilities of the worker
+    pub available_hw_caps: HwCaps,
     
     /// Estimated time to completion
     pub estimated_time_ms: u64,
@@ -150,8 +218,8 @@ pub struct PeerInfo {
     /// Current reputation score of the peer
     pub reputation_score: f64,
     
-    /// Available capacity units of the peer
-    pub capacity_units: u32,
+    /// Available hardware capabilities of the peer
+    pub hw_caps: HwCaps,
     
     /// Amount of tokens staked by the peer
     pub staked_tokens: u64,
@@ -185,7 +253,7 @@ pub mod events {
     #[derive(Debug, Clone)]
     pub enum MeshEvent {
         /// A new task has been published
-        TaskPublished(TaskIntent),
+        ParticipationRequested(ParticipationIntent),
         
         /// A worker has offered to execute a task
         OfferReceived(ComputeOffer),
@@ -212,22 +280,57 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_task_intent_serialization() {
-        let task = TaskIntent {
+    fn test_participation_intent_serialization() {
+        let intent = ParticipationIntent {
             publisher_did: "did:icn:test:publisher".to_string(),
             wasm_cid: Cid::default(),
             input_cid: Cid::default(),
             fee: 100,
             verifiers: 3,
             expiry: Utc::now(),
+            capability_scope: CapabilityScope {
+                mem_mb: 512,
+                cpu_cycles: 1000,
+                gpu_flops: 0,
+                io_mb: 100,
+            },
+            escrow_cid: None,
             metadata: None,
         };
         
-        let json = serde_json::to_string(&task).unwrap();
-        let deserialized: TaskIntent = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&intent).unwrap();
+        let deserialized: ParticipationIntent = serde_json::from_str(&json).unwrap();
         
-        assert_eq!(task.publisher_did, deserialized.publisher_did);
-        assert_eq!(task.fee, deserialized.fee);
-        assert_eq!(task.verifiers, deserialized.verifiers);
+        assert_eq!(intent.publisher_did, deserialized.publisher_did);
+        assert_eq!(intent.fee, deserialized.fee);
+        assert_eq!(intent.verifiers, deserialized.verifiers);
+        assert_eq!(intent.capability_scope.mem_mb, deserialized.capability_scope.mem_mb);
+    }
+    
+    #[test]
+    fn test_capability_scope_fits() {
+        let capability = CapabilityScope {
+            mem_mb: 512,
+            cpu_cycles: 1000,
+            gpu_flops: 0,
+            io_mb: 100,
+        };
+        
+        let hw_sufficient = HwCaps {
+            mem_mb: 1024,
+            cpu_cycles: 2000,
+            gpu_flops: 0,
+            io_mb: 200,
+        };
+        
+        let hw_insufficient = HwCaps {
+            mem_mb: 256,
+            cpu_cycles: 2000,
+            gpu_flops: 0,
+            io_mb: 200,
+        };
+        
+        assert!(capability.fits(&hw_sufficient));
+        assert!(!capability.fits(&hw_insufficient));
     }
 }

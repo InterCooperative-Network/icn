@@ -891,6 +891,135 @@ fn host_get_execution_receipts_wrapper(
     }
 }
 
+/// Wrapper for host_lock_tokens
+fn host_lock_tokens_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    escrow_cid_ptr: u32, escrow_cid_len: u32,
+    amount: u64,
+) -> Result<i32, Trap> {
+    debug!(escrow_cid_ptr, amount, "host_lock_tokens called");
+    
+    // Read the escrow CID from memory
+    let cid_bytes = match safe_read_bytes(&mut caller, escrow_cid_ptr, escrow_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the CID
+    let escrow_cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 500) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the lock function
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.lock_tokens(&escrow_cid, amount)) {
+        Ok(_) => Ok(0), // Success
+        Err(e) => {
+            error!("Failed to lock tokens: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
+/// Wrapper for host_release_tokens
+fn host_release_tokens_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    escrow_cid_ptr: u32, escrow_cid_len: u32,
+    worker_did_ptr: u32, worker_did_len: u32,
+    amount: u64,
+) -> Result<i32, Trap> {
+    debug!(escrow_cid_ptr, worker_did_ptr, amount, "host_release_tokens called");
+    
+    // Read the escrow CID from memory
+    let cid_bytes = match safe_read_bytes(&mut caller, escrow_cid_ptr, escrow_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the CID
+    let escrow_cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Read the worker DID from memory
+    let worker_did = match safe_read_string(&mut caller, worker_did_ptr, worker_did_len) {
+        Ok(did) => did,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 700) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the release function
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.release_tokens(&escrow_cid, &worker_did, amount)) {
+        Ok(_) => Ok(0), // Success
+        Err(e) => {
+            error!("Failed to release tokens: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
+/// Wrapper for host_refund_tokens
+fn host_refund_tokens_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    escrow_cid_ptr: u32, escrow_cid_len: u32,
+) -> Result<i32, Trap> {
+    debug!(escrow_cid_ptr, "host_refund_tokens called");
+    
+    // Read the escrow CID from memory
+    let cid_bytes = match safe_read_bytes(&mut caller, escrow_cid_ptr, escrow_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the CID
+    let escrow_cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 500) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the refund function
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.refund_tokens(&escrow_cid)) {
+        Ok(_) => Ok(0), // Success
+        Err(e) => {
+            error!("Failed to refund tokens: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
 /// Creates a Linker with all the registered host functions for the ConcreteHostEnvironment
 pub fn create_import_object(store: &mut wasmtime::Store<ConcreteHostEnvironment>) -> wasmtime::Linker<ConcreteHostEnvironment> {
     let mut linker = wasmtime::Linker::new(store.engine());
@@ -1056,6 +1185,25 @@ pub fn register_host_functions(
         "transfer_resource", 
         host_transfer_resource_wrapper
     ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register transfer_resource: {}", e)))?;
+    
+    // Mesh escrow functions
+    linker.func_wrap(
+        "env", 
+        "host_lock_tokens", 
+        host_lock_tokens_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_lock_tokens: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "host_release_tokens", 
+        host_release_tokens_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_release_tokens: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "host_refund_tokens", 
+        host_refund_tokens_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_refund_tokens: {}", e)))?;
     
     // Add economics helpers
     crate::economics_helpers::register_economics_functions(linker)
