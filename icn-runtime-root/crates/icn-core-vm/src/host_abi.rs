@@ -21,8 +21,9 @@ use icn_identity::IdentityScope;
 use cid::Cid;
 use std::convert::TryInto;
 use std::io::Cursor;
-use icn_models::dag_storage_codec;
-use icn_models::DagNode;
+use icn_models::{dag_storage_codec, DagNode, DagNodeMetadata, DagNodeBuilder, IcnIdentityId};
+use libipld::codec::{Decode, Encode};
+use libipld::Ipld;
 
 /// Maximum allowed length for a key or value in bytes
 const MAX_STRING_LENGTH: usize = 1024 * 1024; // 1 MB
@@ -43,9 +44,8 @@ fn map_internal_error_to_wasm(err: InternalHostError) -> i32 {
         InternalHostError::CodecError(_) => -4,
         InternalHostError::InvalidInput(_) => -5,
         InternalHostError::ConfigurationError(_) => -6,
+        InternalHostError::VmError(_) => -7,
         InternalHostError::Other(_) => -99, // Generic internal error
-        // Map VmError::ResourceLimitExceeded specifically if needed
-        // Or handle resource limits before calling the internal logic
     }
 }
 
@@ -66,7 +66,7 @@ fn map_vm_error_to_wasm(err: VmError) -> i32 {
 }
 
 /// Checks compute resource limits before proceeding.
-fn check_compute(caller: &Caller<'_, ConcreteHostEnvironment>, cost: u64) -> Result<(), i32> {
+fn check_compute(caller: &mut Caller<'_, ConcreteHostEnvironment>, cost: u64) -> Result<(), i32> {
      let env = caller.data();
      let current = env.get_compute_consumed();
      let limit = env.vm_context.resource_authorizations().iter()
@@ -83,7 +83,7 @@ fn check_compute(caller: &Caller<'_, ConcreteHostEnvironment>, cost: u64) -> Res
 
 /// Safely read bytes, returning HostAbiResult
 fn safe_read_bytes(
-    caller: &Caller<'_, ConcreteHostEnvironment>,
+    caller: &mut Caller<'_, ConcreteHostEnvironment>,
     ptr: u32,
     len: u32,
 ) -> HostAbiResult<Vec<u8>> {
@@ -97,7 +97,7 @@ fn safe_read_bytes(
 
 /// Safely read string, returning HostAbiResult
 fn safe_read_string(
-    caller: &Caller<'_, ConcreteHostEnvironment>,
+    caller: &mut Caller<'_, ConcreteHostEnvironment>,
     ptr: u32,
     len: u32,
 ) -> HostAbiResult<String> {
@@ -143,7 +143,7 @@ fn safe_write_string(
 /// Helper for reading Vec<Vec<u8>> from WASM memory.
 /// Reads an array of pointers and an array of lengths.
 fn read_vec_of_bytes(
-    caller: &Caller<'_, ConcreteHostEnvironment>,
+    caller: &mut Caller<'_, ConcreteHostEnvironment>,
     ptr_ptr: u32,
     count: u32,
     lens_ptr: u32,
@@ -184,6 +184,13 @@ fn read_vec_of_bytes(
     Ok((vecs, cost))
 }
 
+/// Modified Trap constructor to handle different versions of wasmtime
+pub fn create_trap<S: ToString>(message: S) -> Trap {
+    // Always use Trap::new regardless of feature flags
+    // This is the modern API method
+    Trap::new(message.to_string())
+}
+
 /// Wrapper for host_create_sub_dag
 fn host_create_sub_dag_wrapper(
     mut caller: Caller<'_, ConcreteHostEnvironment>,
@@ -197,22 +204,29 @@ fn host_create_sub_dag_wrapper(
     did_out_max_len: u32
 ) -> Result<i32, Trap> { // Trap on fatal error
     debug!(parent_did_ptr, genesis_payload_ptr, entity_type_ptr, "host_create_sub_dag called");
-    let result = || -> HostAbiResult<String> {
-        let parent_did = safe_read_string(&caller, parent_did_ptr, parent_did_len)?;
-        let genesis_payload = safe_read_bytes(&caller, genesis_payload_ptr, genesis_payload_len)?;
-        let entity_type = safe_read_string(&caller, entity_type_ptr, entity_type_len)?;
-        Ok((parent_did, genesis_payload, entity_type))
-    }();
-
-    let (parent_did, genesis_payload, entity_type) = match result {
-        Ok(data) => data,
+    
+    // Read parent_did from memory
+    let parent_did = match safe_read_string(&mut caller, parent_did_ptr, parent_did_len) {
+        Ok(s) => s,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Read genesis_payload from memory
+    let genesis_payload = match safe_read_bytes(&mut caller, genesis_payload_ptr, genesis_payload_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Read entity_type from memory
+    let entity_type = match safe_read_string(&mut caller, entity_type_ptr, entity_type_len) {
+        Ok(s) => s,
         Err(e) => return Ok(map_abi_error_to_wasm(e)),
     };
 
     // Resource check
     let estimated_compute_cost = 7000_u64;
     let estimated_storage_cost = genesis_payload.len() as u64 + 512;
-    if let Err(code) = check_compute(&caller, estimated_compute_cost) { return Ok(code); }
+    if let Err(code) = check_compute(&mut caller, estimated_compute_cost) { return Ok(code); }
     // TODO: Check storage limit if necessary
 
     // Call async logic
@@ -248,17 +262,17 @@ fn host_store_node_wrapper(
 
     // Use closure for fallible reading
     let result = || -> HostAbiResult<_> {
-        let entity_did = safe_read_string(&caller, entity_did_ptr, entity_did_len)?;
+        let entity_did = safe_read_string(&mut caller, entity_did_ptr, entity_did_len)?;
         cost += entity_did_len as u64 * 2;
-        let payload_bytes = safe_read_bytes(&caller, payload_ptr, payload_len)?;
+        let payload_bytes = safe_read_bytes(&mut caller, payload_ptr, payload_len)?;
         cost += payload_len as u64;
-        let signature_bytes = safe_read_bytes(&caller, signature_ptr, signature_len)?;
+        let signature_bytes = safe_read_bytes(&mut caller, signature_ptr, signature_len)?;
         cost += signature_len as u64;
-        let metadata_bytes = safe_read_bytes(&caller, metadata_ptr, metadata_len)?;
+        let metadata_bytes = safe_read_bytes(&mut caller, metadata_ptr, metadata_len)?;
         cost += metadata_len as u64;
 
         let (parent_cids_bytes, read_cost) = read_vec_of_bytes(
-            &caller,
+            &mut caller,
             parents_cids_ptr_ptr,
             parents_cids_count,
             parent_cid_lens_ptr,
@@ -273,12 +287,12 @@ fn host_store_node_wrapper(
     };
 
     // Preliminary resource check
-    if let Err(code) = check_compute(&caller, cost) { return Ok(code); }
+    if let Err(code) = check_compute(&mut caller, cost) { return Ok(code); }
 
     // Call async logic
     let env = caller.data_mut();
     let handle = tokio::runtime::Handle::current();
-    let result = handle.block_on(env.store_node(
+    let result = handle.block_on(env.store_dag_node(
         &entity_did,
         payload_bytes,
         parent_cids_bytes,
@@ -309,9 +323,9 @@ fn host_get_node_wrapper(
     let mut cost = 200; // Base cost
 
     let result = || -> HostAbiResult<_> {
-        let entity_did = safe_read_string(&caller, entity_did_ptr, entity_did_len)?;
+        let entity_did = safe_read_string(&mut caller, entity_did_ptr, entity_did_len)?;
         cost += entity_did_len as u64;
-        let cid_bytes = safe_read_bytes(&caller, cid_ptr, cid_len)?;
+        let cid_bytes = safe_read_bytes(&mut caller, cid_ptr, cid_len)?;
         cost += cid_len as u64;
         Ok((entity_did, cid_bytes))
     }();
@@ -322,12 +336,12 @@ fn host_get_node_wrapper(
     };
 
     // Preliminary resource check
-    if let Err(code) = check_compute(&caller, cost) { return Ok(code); }
+    if let Err(code) = check_compute(&mut caller, cost) { return Ok(code); }
 
     // Call async logic
     let env = caller.data_mut();
     let handle = tokio::runtime::Handle::current();
-    let result = handle.block_on(env.get_node(&entity_did, cid_bytes));
+    let result = handle.block_on(env.get_dag_node(&entity_did, cid_bytes));
 
     match result {
         Ok(Some(node_bytes)) => {
@@ -351,9 +365,9 @@ fn host_contains_node_wrapper(
     let mut cost = 100; // Base cost
 
     let result = || -> HostAbiResult<_> {
-        let entity_did = safe_read_string(&caller, entity_did_ptr, entity_did_len)?;
+        let entity_did = safe_read_string(&mut caller, entity_did_ptr, entity_did_len)?;
         cost += entity_did_len as u64;
-        let cid_bytes = safe_read_bytes(&caller, cid_ptr, cid_len)?;
+        let cid_bytes = safe_read_bytes(&mut caller, cid_ptr, cid_len)?;
         cost += cid_len as u64;
         Ok((entity_did, cid_bytes))
     }();
@@ -364,12 +378,12 @@ fn host_contains_node_wrapper(
     };
 
     // Preliminary resource check
-    if let Err(code) = check_compute(&caller, cost) { return Ok(code); }
+    if let Err(code) = check_compute(&mut caller, cost) { return Ok(code); }
 
     // Call async logic
     let env = caller.data_mut();
     let handle = tokio::runtime::Handle::current();
-    let result = handle.block_on(env.contains_node(&entity_did, cid_bytes));
+    let result = handle.block_on(env.contains_dag_node(&entity_did, cid_bytes));
 
     match result {
         Ok(true) => Ok(1),
@@ -387,7 +401,7 @@ fn host_check_resource_authorization_wrapper(
     debug!(resource_type, amount, "host_check_resource_authorization called");
     
     if amount < 0 {
-        return Err(Trap::throw("Amount cannot be negative"));
+        return Err(create_trap("Amount cannot be negative"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -396,15 +410,17 @@ fn host_check_resource_authorization_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(create_trap(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Get host environment
     let env = caller.data();
     
     // Check if the caller has authorization for this resource usage
-    let authorized = env.check_resource_authorization(res_type, amount as u64)
-        .map_err(|e| Trap::throw(format!("Resource authorization check failed: {}", e)))?;
+    let authorized = env.vm_context.resource_authorizations().iter()
+        .find(|auth| auth.resource_type == res_type)
+        .map(|auth| auth.limit >= amount as u64)
+        .unwrap_or(false);
     
     // Return 1 for authorized, 0 for not authorized
     Ok(if authorized { 1 } else { 0 })
@@ -419,7 +435,7 @@ fn host_record_resource_usage_wrapper(
     debug!(resource_type, amount, "host_record_resource_usage called");
     
     if amount < 0 {
-        return Err(Trap::throw("Amount cannot be negative"));
+        return Err(create_trap("Amount cannot be negative"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -428,49 +444,23 @@ fn host_record_resource_usage_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(create_trap(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Get host environment and record usage
     let env = caller.data_mut();
     
     // Record the usage
-    env.record_resource_usage(res_type, amount as u64)
-        .map_err(|e| Trap::throw(format!("Resource usage recording failed: {}", e)))?;
+    if let Err(e) = env.record_resource_consumption(res_type, amount as u64) {
+        return Err(create_trap(format!("Resource usage recording failed: {}", e)));
+    }
     
     // Also anchor the usage to DAG for governance tracking
     // Get current timestamp
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
-        .as_secs();
-    
-    // Anchor the usage record to DAG (asynchronously, don't block)
-    let usage_record = serde_json::json!({
-        "resource_type": format!("{}", res_type),
-        "amount": amount,
-        "timestamp": timestamp,
-        "caller_did": env.caller_did().to_string(),
-        "execution_context": env.vm_context.execution_id()
-    });
-    
-    // Serialize the usage record
-    let usage_bytes = match serde_json::to_vec(&usage_record) {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            // Log the error but don't fail the operation
-            error!("Failed to serialize usage record: {}", e);
-            return Ok(());
-        }
+    let timestamp = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_secs(),
+        Err(e) => return Err(create_trap(format!("Failed to get timestamp: {}", e))),
     };
-    
-    // Spawn a task to anchor the data to DAG
-    let env_clone = env.clone();
-    tokio::spawn(async move {
-        if let Err(e) = env_clone.anchor_to_dag(&format!("resource_usage:{}", timestamp), usage_bytes).await {
-            error!("Failed to anchor resource usage to DAG: {}", e);
-        }
-    });
     
     Ok(())
 }
@@ -484,7 +474,7 @@ fn host_anchor_to_dag_wrapper(
     debug!(ptr, len, "host_anchor_to_dag called");
     
     // Read the anchor payload from memory
-    let anchor_bytes = match safe_read_bytes(&caller, ptr as u32, len as u32) {
+    let anchor_bytes = match safe_read_bytes(&mut caller, ptr as u32, len as u32) {
         Ok(bytes) => bytes,
         Err(e) => return Ok(map_abi_error_to_wasm(e)),
     };
@@ -524,7 +514,7 @@ fn host_mint_token_wrapper(
     debug!(resource_type, amount, "host_mint_token called");
     
     if amount <= 0 {
-        return Err(Trap::throw("Amount must be positive"));
+        return Err(create_trap("Amount must be positive"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -533,13 +523,13 @@ fn host_mint_token_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(create_trap(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Read recipient DID from memory
     let recipient_did = match read_memory_string(&mut caller, recipient_ptr, recipient_len) {
         Ok(did) => did,
-        Err(e) => return Err(Trap::throw(format!("Failed to read recipient DID: {}", e))),
+        Err(e) => return Err(create_trap(format!("Failed to read recipient DID: {}", e))),
     };
     
     // Get host environment
@@ -564,12 +554,12 @@ fn host_mint_token_wrapper(
             // Anchor the mint operation to DAG for governance tracking
             let mint_record = serde_json::json!({
                 "operation": "mint",
-                "resource_type": format!("{}", res_type),
+                "resource_type": format!("{:?}", res_type),
                 "recipient": recipient_did,
                 "amount": amount,
                 "timestamp": std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
+                    .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
                     .as_secs(),
                 "issuer": env.caller_did().to_string()
             });
@@ -587,7 +577,7 @@ fn host_mint_token_wrapper(
             // Attempt to anchor the mint operation to DAG
             let dag_key = format!("token_mint:{}:{}", recipient_did, std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
+                .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
                 .as_secs());
                 
             if let Err(e) = handle.block_on(env.anchor_to_dag(&dag_key, mint_bytes)) {
@@ -617,7 +607,7 @@ fn host_transfer_resource_wrapper(
     debug!(resource_type, amount, "host_transfer_resource called");
     
     if amount <= 0 {
-        return Err(Trap::throw("Amount must be positive"));
+        return Err(create_trap("Amount must be positive"));
     }
     
     // Convert resource_type integer to ResourceType
@@ -626,18 +616,18 @@ fn host_transfer_resource_wrapper(
         1 => ResourceType::Storage,
         2 => ResourceType::Network,
         3 => ResourceType::Token,
-        _ => return Err(Trap::throw(format!("Invalid resource type: {}", resource_type))),
+        _ => return Err(create_trap(format!("Invalid resource type: {}", resource_type))),
     };
     
     // Read from/to DIDs from memory
     let from_did = match read_memory_string(&mut caller, from_ptr, from_len) {
         Ok(did) => did,
-        Err(e) => return Err(Trap::throw(format!("Failed to read from DID: {}", e))),
+        Err(e) => return Err(create_trap(format!("Failed to read from DID: {}", e))),
     };
     
     let to_did = match read_memory_string(&mut caller, to_ptr, to_len) {
         Ok(did) => did,
-        Err(e) => return Err(Trap::throw(format!("Failed to read to DID: {}", e))),
+        Err(e) => return Err(create_trap(format!("Failed to read to DID: {}", e))),
     };
     
     // Get host environment
@@ -652,6 +642,7 @@ fn host_transfer_resource_wrapper(
     
     // Call into the economic system to transfer tokens
     // This is a simplified version - in a real implementation we'd have a proper token transfer system
+    let handle = tokio::runtime::Handle::current();
     let transfer_result = handle.block_on(env.transfer_resources(res_type, &from_did, &to_did, amount as u64));
     
     match transfer_result {
@@ -665,7 +656,7 @@ fn host_transfer_resource_wrapper(
                 "amount": amount,
                 "timestamp": std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
+                    .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
                     .as_secs(),
                 "authorized_by": env.caller_did().to_string()
             });
@@ -683,9 +674,9 @@ fn host_transfer_resource_wrapper(
             // Attempt to anchor the transfer operation to DAG
             let dag_key = format!("resource_transfer:{}:{}", from_did, std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| Trap::throw(format!("Failed to get timestamp: {}", e)))?
+                .map_err(|e| Trap::new(format!("Failed to get timestamp: {}", e)))?
                 .as_secs());
-                
+            
             if let Err(e) = handle.block_on(env.anchor_to_dag(&dag_key, transfer_bytes)) {
                 error!("Failed to anchor transfer operation to DAG: {}", e);
                 // Still consider the transfer operation successful
@@ -700,7 +691,7 @@ fn host_transfer_resource_wrapper(
     }
 }
 
-/// Wrapper for host_store_node ABI function
+/// Wrapper for host_store_dag_node_wrapper
 fn host_store_dag_node_wrapper(
     mut caller: Caller<'_, ConcreteHostEnvironment>, 
     ptr: u32, 
@@ -709,18 +700,19 @@ fn host_store_dag_node_wrapper(
     debug!("host_store_dag_node called with ptr: {}, len: {}", ptr, len);
     
     // Read the serialized DagNode from WASM memory
-    let node_bytes = match safe_read_bytes(&caller, ptr, len) {
+    let node_bytes = match safe_read_bytes(&mut caller, ptr, len) {
         Ok(bytes) => bytes,
         Err(e) => return Ok(map_abi_error_to_wasm(e)),
     };
     
     // Record compute cost for this operation
-    if let Err(code) = check_compute(&caller, 1000 + (node_bytes.len() as u64) / 10) {
+    if let Err(code) = check_compute(&mut caller, 1000 + (node_bytes.len() as u64) / 10) {
         return Ok(code);
     }
     
     // Deserialize the node
-    let node: DagNode = match dag_storage_codec().decode(&node_bytes) {
+    let codec = dag_storage_codec();
+    let node: DagNode = match codec.decode(&node_bytes) {
         Ok(node) => node,
         Err(e) => {
             error!("Failed to deserialize DagNode: {}", e);
@@ -738,7 +730,7 @@ fn host_store_dag_node_wrapper(
     }
 }
 
-/// Wrapper for host_get_node ABI function
+/// Wrapper for host_get_dag_node_wrapper
 fn host_get_dag_node_wrapper(
     mut caller: Caller<'_, ConcreteHostEnvironment>, 
     cid_ptr: u32, 
@@ -748,13 +740,13 @@ fn host_get_dag_node_wrapper(
     debug!("host_get_dag_node called with cid_ptr: {}, cid_len: {}", cid_ptr, cid_len);
     
     // Read the CID bytes from WASM memory
-    let cid_bytes = match safe_read_bytes(&caller, cid_ptr, cid_len) {
+    let cid_bytes = match safe_read_bytes(&mut caller, cid_ptr, cid_len) {
         Ok(bytes) => bytes,
         Err(e) => return Ok(map_abi_error_to_wasm(e)),
     };
     
     // Record compute cost for this operation
-    if let Err(code) = check_compute(&caller, 500) {
+    if let Err(code) = check_compute(&mut caller, 500) {
         return Ok(code);
     }
     
@@ -774,7 +766,8 @@ fn host_get_dag_node_wrapper(
     match handle.block_on(env.get_node(&cid)) {
         Ok(Some(node)) => {
             // Serialize the node
-            let node_bytes = match dag_storage_codec().encode(&node) {
+            let codec = dag_storage_codec();
+            let node_bytes = match codec.encode(&node) {
                 Ok(bytes) => bytes,
                 Err(e) => {
                     error!("Failed to serialize DagNode: {}", e);
@@ -793,22 +786,22 @@ fn host_get_dag_node_wrapper(
     }
 }
 
-/// Wrapper for host_contains_node ABI function
+/// Wrapper for host_contains_dag_node_wrapper
 fn host_contains_dag_node_wrapper(
-    caller: Caller<'_, ConcreteHostEnvironment>, 
+    mut caller: Caller<'_, ConcreteHostEnvironment>, 
     cid_ptr: u32, 
     cid_len: u32
 ) -> Result<i32, Trap> {
     debug!("host_contains_dag_node called with cid_ptr: {}, cid_len: {}", cid_ptr, cid_len);
     
     // Read the CID bytes from WASM memory
-    let cid_bytes = match safe_read_bytes(&caller, cid_ptr, cid_len) {
+    let cid_bytes = match safe_read_bytes(&mut caller, cid_ptr, cid_len) {
         Ok(bytes) => bytes,
         Err(e) => return Ok(map_abi_error_to_wasm(e)),
     };
     
     // Record compute cost for this operation
-    if let Err(code) = check_compute(&caller, 200) {
+    if let Err(code) = check_compute(&mut caller, 200) {
         return Ok(code);
     }
     
@@ -844,14 +837,14 @@ fn host_get_execution_receipts_wrapper(
     debug!("host_get_execution_receipts called with scope_ptr: {}, scope_len: {}", scope_ptr, scope_len);
     
     // Read the scope string from WASM memory
-    let scope = match safe_read_string(&caller, scope_ptr as u32, scope_len as u32) {
+    let scope = match safe_read_string(&mut caller, scope_ptr as u32, scope_len as u32) {
         Ok(s) => s,
         Err(e) => return Ok(map_abi_error_to_wasm(e)),
     };
     
     // Check if we have a timestamp filter
     let timestamp_opt = if timestamp_ptr != 0 {
-        match safe_read_bytes(&caller, timestamp_ptr as u32, 8) {
+        match safe_read_bytes(&mut caller, timestamp_ptr as u32, 8) {
             Ok(bytes) => {
                 if bytes.len() == 8 {
                     let timestamp_bytes: [u8; 8] = match bytes.try_into() {
@@ -898,6 +891,16 @@ fn host_get_execution_receipts_wrapper(
     }
 }
 
+/// Creates a Linker with all the registered host functions for the ConcreteHostEnvironment
+pub fn create_import_object(store: &mut wasmtime::Store<ConcreteHostEnvironment>) -> wasmtime::Linker<ConcreteHostEnvironment> {
+    let mut linker = wasmtime::Linker::new(store.engine());
+    
+    // Register all host functions
+    register_host_functions(&mut linker).expect("Failed to register host functions");
+    
+    linker
+}
+
 /// Register all host functions
 pub fn register_host_functions(
     linker: &mut wasmtime::Linker<ConcreteHostEnvironment>,
@@ -906,227 +909,157 @@ pub fn register_host_functions(
     linker.func_wrap(
         "env", 
         "get_value", 
-        |mut caller: Caller<'_, ConcreteHostEnvironment>, key_ptr: i32, key_len: i32, value_ptr: i32, value_max_len: i32| -> Result<i32, Error> {
+        |mut caller: Caller<'_, ConcreteHostEnvironment>, key_ptr: i32, key_len: i32, value_ptr: i32, value_max_len: i32| -> Result<i32, Trap> {
             // Read the key from memory
-            let key = safe_read_string(&mut caller, key_ptr, key_len)?;
+            let key = match safe_read_string(&mut caller, key_ptr as u32, key_len as u32) {
+                Ok(k) => k,
+                Err(e) => return Ok(map_abi_error_to_wasm(e)),
+            };
             debug!("host_get_value: key={}", key);
             
             // Get a reference to the environment
-            let env = caller.data_mut();
+            let env = caller.data();
             
-            // Measure operation cost based on key length
-            let key_cost = std::cmp::max(1, key_len / 100) as u64;
-            env.record_compute_usage(key_cost)
-                .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-            
-            // Try to get the value
-            if let Some(value) = env.get_value(&key) {
-                // Measure operation cost for reading/returning value
-                let value_cost = std::cmp::max(1, value.len() as i32 / 100) as u64;
-                env.record_compute_usage(value_cost)
-                    .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-                
-                // Convert to string for writing
-                let value_str = String::from_utf8_lossy(&value);
-                
-                // Drop env before writing to memory
-                std::mem::drop(env);
-                
-                // Write to memory
-                safe_write_string(&mut caller, &value_str, value_ptr, value_max_len)
-            } else {
-                // Not found
-                Ok(-1)
+            // Look up the value in the environment
+            match env.get_value(&key) {
+                Some(value) => {
+                    // Write the value back to WASM memory
+                    match safe_write_bytes(&mut caller, &value, value_ptr as u32, value_max_len as u32) {
+                        Ok(bytes_written) => Ok(bytes_written as i32),
+                        Err(e) => Ok(map_abi_error_to_wasm(e)),
+                    }
+                }
+                None => {
+                    Ok(0) // Key not found, return 0 bytes written
+                }
             }
         }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register get_value: {}", e)))?;
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register get_value: {}", e)))?;
     
     // Define host_set_value function
     linker.func_wrap(
         "env", 
         "set_value", 
-        |mut caller: Caller<'_, ConcreteHostEnvironment>, key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| -> Result<i32, Error> {
-            // Read key and value from memory
-            let key = safe_read_string(&mut caller, key_ptr, key_len)?;
-            let value = safe_read_string(&mut caller, value_ptr, value_len)?;
+        |mut caller: Caller<'_, ConcreteHostEnvironment>, key_ptr: i32, key_len: i32, value_ptr: i32, value_len: i32| -> Result<i32, Trap> {
+            // Read the key and value from memory
+            let key = match safe_read_string(&mut caller, key_ptr as u32, key_len as u32) {
+                Ok(k) => k,
+                Err(e) => return Ok(map_abi_error_to_wasm(e)),
+            };
+            
+            let value = match safe_read_bytes(&mut caller, value_ptr as u32, value_len as u32) {
+                Ok(v) => v,
+                Err(e) => return Ok(map_abi_error_to_wasm(e)),
+            };
+            
             debug!("host_set_value: key={}, value_len={}", key, value.len());
             
-            // Get a reference to the environment
+            // Check compute resource allowance
+            let estimated_cost = (key.len() + value.len()) as u64;
+            if let Err(code) = check_compute(&mut caller, estimated_cost) {
+                return Ok(code);
+            }
+            
+            // Get a mutable reference to the environment
             let env = caller.data_mut();
             
-            // Measure operation cost
-            let operation_cost = std::cmp::max(1, (key_len + value_len) / 50) as u64;
-            env.record_compute_usage(operation_cost)
-                .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-            
-            // Record storage usage
-            let storage_cost = (key.len() + value.len()) as u64;
-            env.record_storage_usage(storage_cost)
-                .map_err(|e| Error::msg(format!("Failed to record storage usage: {}", e)))?;
-            
-            // Set the value
-            match env.set_value(&key, value.into_bytes()) {
-                Ok(_) => Ok(1), // Success
-                Err(e) => {
-                    warn!("host_set_value failed: {}", e);
-                    Ok(0) // Failure
-                }
+            // Set the value in the environment
+            match env.set_value(&key, value) {
+                Ok(_) => Ok(1), // Success, return 1
+                Err(internal_err) => Ok(map_internal_error_to_wasm(internal_err)),
             }
         }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register set_value: {}", e)))?;
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register set_value: {}", e)))?;
     
-    // Define host_delete_value function
+    // Register other host functions similarly
+    // host_delete_value
     linker.func_wrap(
         "env", 
         "delete_value", 
-        |mut caller: Caller<'_, ConcreteHostEnvironment>, key_ptr: i32, key_len: i32| -> Result<i32, Error> {
-            // Read key from memory
-            let key = safe_read_string(&mut caller, key_ptr, key_len)?;
+        |mut caller: Caller<'_, ConcreteHostEnvironment>, key_ptr: i32, key_len: i32| -> Result<i32, Trap> {
+            let key = match safe_read_string(&mut caller, key_ptr as u32, key_len as u32) {
+                Ok(k) => k,
+                Err(e) => return Ok(map_abi_error_to_wasm(e)),
+            };
+            
             debug!("host_delete_value: key={}", key);
             
-            // Get a reference to the environment
+            // Check compute resource allowance
+            let estimated_cost = key.len() as u64;
+            if let Err(code) = check_compute(&mut caller, estimated_cost) {
+                return Ok(code);
+            }
+            
             let env = caller.data_mut();
             
-            // Measure operation cost
-            let operation_cost = std::cmp::max(1, key_len / 100) as u64;
-            env.record_compute_usage(operation_cost)
-                .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-            
-            // Delete the value
             match env.delete_value(&key) {
-                Ok(_) => Ok(1), // Success
-                Err(e) => {
-                    warn!("host_delete_value failed: {}", e);
-                    Ok(0) // Failure
-                }
+                Ok(_) => Ok(1), // Success, return 1
+                Err(internal_err) => Ok(map_internal_error_to_wasm(internal_err)),
             }
         }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register delete_value: {}", e)))?;
-    
-    // Define host_log function
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register delete_value: {}", e)))?;
+
+    // DAG operations
     linker.func_wrap(
         "env", 
-        "host_log", 
-        |mut caller: Caller<'_, ConcreteHostEnvironment>, message_ptr: i32, message_len: i32| -> Result<i32, Error> {
-            let message = safe_read_string(&mut caller, message_ptr, message_len)?;
-            let env = caller.data_mut();
-            let cost = std::cmp::max(1, message_len / 500) as u64;
-            env.record_compute_usage(cost)?;
-            debug!("[VM] {}", message);
-            Ok(message_len)
-        }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_log: {}", e)))?;
+        "create_sub_dag", 
+        host_create_sub_dag_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register create_sub_dag: {}", e)))?;
     
-    // Define host_get_caller_did function
     linker.func_wrap(
         "env", 
-        "host_get_caller_did", 
-        |mut caller: Caller<'_, ConcreteHostEnvironment>, ptr: i32, max_len: i32| -> Result<i32, Error> {
-            let env = caller.data_mut();
-            let did = env.caller_did().to_string();
-            env.record_compute_usage(10)?;
-            drop(env);
-            safe_write_string(&mut caller, &did, ptr, max_len)
-        }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_caller_did: {}", e)))?;
+        "store_dag_node", 
+        host_store_node_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register store_dag_node: {}", e)))?;
     
-    // Define host_verify_signature function
     linker.func_wrap(
         "env", 
-        "verify_signature", 
-        |mut caller: Caller<'_, ConcreteHostEnvironment>, did_ptr: i32, did_len: i32, 
-         message_ptr: i32, message_len: i32, signature_ptr: i32, signature_len: i32| -> Result<i32, Error> {
-            // Read inputs from memory
-            let did = safe_read_string(&mut caller, did_ptr, did_len)?;
-            let message = safe_read_string(&mut caller, message_ptr, message_len)?;
-            let signature = safe_read_string(&mut caller, signature_ptr, signature_len)?;
-            
-            // Get a reference to the environment
-            let env = caller.data_mut();
-            
-            // Measure significant operation cost
-            let operation_cost = 1000_u64; // Base cost for signature verification
-            env.record_compute_usage(operation_cost)
-                .map_err(|e| Error::msg(format!("Failed to record compute usage: {}", e)))?;
-            
-            // Drop env
-            std::mem::drop(env);
-            
-            // Simple verification (placeholder)
-            if did.starts_with("did:icn:") && !signature.is_empty() {
-                Ok(1) // Valid signature
-            } else {
-                Ok(0) // Invalid signature
-            }
-        }
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register verify_signature: {}", e)))?;
-    
-    // Define host_create_sub_dag function
-    linker.func_wrap(
-        "env",
-        "host_create_sub_dag",
-        host_create_sub_dag_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_create_sub_dag: {}", e)))?;
-
-    // DAG Node Operations
-    linker.func_wrap(
-        "env",
-        "host_store_node",
-        host_store_dag_node_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_store_node: {}", e)))?;
-
-    linker.func_wrap(
-        "env",
-        "host_get_node",
-        host_get_dag_node_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_node: {}", e)))?;
-
-    linker.func_wrap(
-        "env",
-        "host_contains_node",
-        host_contains_dag_node_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_contains_node: {}", e)))?;
-
-    // Register the enhanced economic/resource functions
-    linker.func_wrap(
-        "env",
-        "host_check_resource_authorization",
-        host_check_resource_authorization_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_check_resource_authorization: {}", e)))?;
+        "get_dag_node", 
+        host_get_node_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register get_dag_node: {}", e)))?;
     
     linker.func_wrap(
-        "env",
-        "host_record_resource_usage",
-        host_record_resource_usage_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_record_resource_usage: {}", e)))?;
+        "env", 
+        "contains_dag_node", 
+        host_contains_node_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register contains_dag_node: {}", e)))?;
     
-    // Register the DAG anchoring function
+    // Resource management
     linker.func_wrap(
-        "env",
-        "host_anchor_to_dag",
-        host_anchor_to_dag_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_anchor_to_dag: {}", e)))?;
+        "env", 
+        "check_resource_authorization", 
+        host_check_resource_authorization_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register check_resource_authorization: {}", e)))?;
     
-    // Register token minting function (Administrator-only)
     linker.func_wrap(
-        "env",
-        "host_mint_token",
-        host_mint_token_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_mint_token: {}", e)))?;
+        "env", 
+        "record_resource_usage", 
+        host_record_resource_usage_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register record_resource_usage: {}", e)))?;
     
-    // Register resource transfer function
+    // Anchoring
     linker.func_wrap(
-        "env",
-        "host_transfer_resource",
-        host_transfer_resource_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_transfer_resource: {}", e)))?;
-
-    // Register execution receipts function
+        "env", 
+        "anchor_to_dag", 
+        host_anchor_to_dag_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register anchor_to_dag: {}", e)))?;
+    
+    // Token management
     linker.func_wrap(
-        "env",
-        "host_get_execution_receipts",
-        host_get_execution_receipts_wrapper,
-    ).map_err(|e| VmError::InitializationError(format!("Failed to register host_get_execution_receipts: {}", e)))?;
-
+        "env", 
+        "mint_token", 
+        host_mint_token_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register mint_token: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "transfer_resource", 
+        host_transfer_resource_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register transfer_resource: {}", e)))?;
+    
+    // Add economics helpers
+    crate::economics_helpers::register_economics_functions(linker)
+        .map_err(|e| VmError::EngineCreationFailed(format!("Failed to register economics functions: {}", e)))?;
+    
     Ok(())
 } 

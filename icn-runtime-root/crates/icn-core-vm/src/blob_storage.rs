@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 
 use cid::Cid;
 use multihash::{Code, MultihashDigest};
-use icn_models::storage::{StorageError, StorageResult, DistributedStorage};
+use icn_models::storage::{StorageError, StorageResult, StorageBackend};
 use async_trait::async_trait;
 
 /// Simple in-memory blob store implementation for test and development use.
@@ -105,7 +105,7 @@ impl InMemoryBlobStore {
 }
 
 #[async_trait]
-impl DistributedStorage for InMemoryBlobStore {
+impl StorageBackend for InMemoryBlobStore {
     async fn put_blob(&self, content: &[u8]) -> StorageResult<Cid> {
         // Check blob size if there's a limit
         if let Some(max_size) = self.max_size {
@@ -143,34 +143,51 @@ impl DistributedStorage for InMemoryBlobStore {
         Ok(blobs.get(cid).cloned())
     }
     
-    async fn blob_exists(&self, cid: &Cid) -> StorageResult<bool> {
+    async fn contains_blob(&self, cid: &Cid) -> StorageResult<bool> {
         let blobs = self.blobs.lock().await;
         Ok(blobs.contains_key(cid))
     }
     
-    async fn blob_size(&self, cid: &Cid) -> StorageResult<Option<u64>> {
-        let blobs = self.blobs.lock().await;
-        Ok(blobs.get(cid).map(|blob| blob.len() as u64))
-    }
-    
-    async fn is_pinned(&self, cid: &Cid) -> StorageResult<bool> {
-        // In this simple implementation, all blobs are considered "pinned"
-        let blobs = self.blobs.lock().await;
-        Ok(blobs.contains_key(cid))
-    }
-    
-    async fn pin_blob(&self, cid: &Cid) -> StorageResult<()> {
-        // Check if it exists
-        let blobs = self.blobs.lock().await;
-        if !blobs.contains_key(cid) {
-            return Err(StorageError::BlobNotFound(cid.to_string()));
-        }
-        // All blobs are already pinned in this implementation
+    async fn delete_blob(&self, cid: &Cid) -> StorageResult<()> {
+        let mut blobs = self.blobs.lock().await;
+        let _ = blobs.remove(cid);
         Ok(())
     }
     
-    async fn unpin_blob(&self, _cid: &Cid) -> StorageResult<()> {
-        // In this simple implementation, we can't unpin
+    async fn put_kv(&self, key_cid: Cid, value_bytes: Vec<u8>) -> StorageResult<()> {
+        let mut blobs = self.blobs.lock().await;
+        blobs.insert(key_cid, value_bytes);
+        Ok(())
+    }
+    
+    async fn get_kv(&self, key_cid: &Cid) -> StorageResult<Option<Vec<u8>>> {
+        let blobs = self.blobs.lock().await;
+        Ok(blobs.get(key_cid).cloned())
+    }
+    
+    async fn contains_kv(&self, key_cid: &Cid) -> StorageResult<bool> {
+        let blobs = self.blobs.lock().await;
+        Ok(blobs.contains_key(key_cid))
+    }
+    
+    async fn delete_kv(&self, key_cid: &Cid) -> StorageResult<()> {
+        let mut blobs = self.blobs.lock().await;
+        let _ = blobs.remove(key_cid);
+        Ok(())
+    }
+    
+    async fn begin_transaction(&self) -> StorageResult<()> {
+        // In-memory implementation doesn't support transactions
+        Ok(())
+    }
+    
+    async fn commit_transaction(&self) -> StorageResult<()> {
+        // In-memory implementation doesn't support transactions
+        Ok(())
+    }
+    
+    async fn rollback_transaction(&self) -> StorageResult<()> {
+        // In-memory implementation doesn't support transactions
         Ok(())
     }
 } 

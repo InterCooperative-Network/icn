@@ -68,6 +68,7 @@ pub enum IdentityScope {
     Federation,
     Node,
     Guardian,
+    Administrator,
 }
 
 /// Defines the interface for storing and retrieving cryptographic keys.

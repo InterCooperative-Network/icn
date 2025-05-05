@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use icn_identity::{IdentityId, KeyPair, Signature, VerifiableCredential};
 use crate::error::{FederationError, FederationResult};
 use crate::quorum::SignerQuorumConfig;
+use crate::quorum::QuorumType as QuorumTypeConfig;
 
 /// Represents a federation signer with their ID and key information
 #[derive(Debug, Clone)]
@@ -34,17 +35,6 @@ impl From<&Signer> for SerializableSigner {
     }
 }
 
-/// Quorum type for decisions
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum QuorumType {
-    /// Simple majority (>50%)
-    Majority,
-    /// Specified threshold percentage (0-100)
-    Threshold(u8),
-    /// Unanimous agreement
-    Unanimous,
-}
-
 /// Functions for initializing signers
 pub mod initialization {
     use super::*;
@@ -53,7 +43,7 @@ pub mod initialization {
     /// Generate a single signer with a new DID and keypair
     pub async fn generate_signer() -> FederationResult<(Signer, KeyPair)> {
         // Create a new keypair
-        let keypair = KeyPair::new();
+        let keypair = KeyPair::generate_random();
         
         // Generate a DID for the signer
         let signer_did = format!("did:icn:signer:{}", Utc::now().timestamp_millis());
@@ -69,7 +59,7 @@ pub mod initialization {
     }
     
     /// Initialize a set of signers with the specified quorum configuration
-    pub async fn initialize_signer_set(count: usize, quorum_type: QuorumType) -> FederationResult<(Vec<Signer>, SignerQuorumConfig)> {
+    pub async fn initialize_signer_set(count: usize, quorum_type: QuorumTypeConfig) -> FederationResult<(Vec<Signer>, SignerQuorumConfig)> {
         // Generate the specified number of signers
         let mut signers = Vec::with_capacity(count);
         let mut signer_dids = HashSet::new();
@@ -107,26 +97,24 @@ pub mod initialization {
         issuer_did: &str,
         issuer_keypair: &KeyPair,
     ) -> FederationResult<VerifiableCredential> {
-        // Create a basic verifiable credential
-        let mut credential = VerifiableCredential {
-            context: vec!["https://www.w3.org/2018/credentials/v1".to_string()],
-            id: Some(format!("urn:uuid:{}", uuid::Uuid::new_v4())),
-            type_: vec![
-                "VerifiableCredential".to_string(),
-                "SignerCredential".to_string(),
-            ],
-            issuer: issuer_did.to_string(),
-            issuanceDate: Utc::now().to_rfc3339(),
-            credentialSubject: serde_json::json!({
-                "id": signer.did.0,
-                "role": "federationSigner",
-                "issuedAt": Utc::now().to_rfc3339(),
-            }),
-            proof: None,
-        };
+        // Create credential using the VerifiableCredential::new method
+        let issuer_id = IdentityId(issuer_did.to_string());
+        let subject_id = signer.did.clone();
+        
+        let claims = serde_json::json!({
+            "role": "federationSigner",
+            "issuedAt": Utc::now().to_rfc3339(),
+        });
+        
+        let credential = VerifiableCredential::new(
+            vec!["VerifiableCredential".to_string(), "SignerCredential".to_string()],
+            &issuer_id,
+            &subject_id,
+            claims
+        );
         
         // In a real implementation, we would sign the credential with the issuer's key
-        // credential.proof = create_proof(credential, issuer_keypair);
+        // credential = sign_credential(credential, issuer_did, issuer_keypair).await?;
         
         Ok(credential)
     }
@@ -148,7 +136,7 @@ mod tests {
     #[tokio::test]
     async fn test_signer_set_initialization() {
         let count = 3;
-        let quorum_type = QuorumType::Majority;
+        let quorum_type = QuorumTypeConfig::Majority;
         
         let result = initialization::initialize_signer_set(count, quorum_type).await;
         assert!(result.is_ok());
@@ -156,6 +144,6 @@ mod tests {
         let (signers, quorum_config) = result.unwrap();
         assert_eq!(signers.len(), count);
         assert_eq!(quorum_config.signers.len(), count);
-        assert_eq!(quorum_config.quorum_type, QuorumType::Majority);
+        assert_eq!(quorum_config.quorum_type, QuorumTypeConfig::Majority);
     }
 } 

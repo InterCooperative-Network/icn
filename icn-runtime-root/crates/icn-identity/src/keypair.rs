@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use crate::error::{IdentityError, IdentityResult};
+use rand::RngCore;
 
 /// Represents a signature
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,6 +39,25 @@ impl KeyPair {
         }
     }
     
+    /// Generate a random keypair (for testing purposes)
+    pub fn generate_random() -> Self {
+        // This is a simplified implementation. In production, use proper key generation.
+        let mut private_key = vec![0u8; 32];
+        let mut rng = rand::thread_rng();
+        rng.fill_bytes(&mut private_key);
+        
+        // Derive a "public key" by hashing the private key
+        // (This is NOT how real keypairs work but suffices for testing)
+        let mut hasher = Sha256::new();
+        hasher.update(&private_key);
+        let public_key = hasher.finalize().to_vec();
+        
+        Self {
+            private_key,
+            public_key,
+        }
+    }
+    
     /// Sign a message using the private key (simplified placeholder)
     pub fn sign(&self, message: &[u8]) -> IdentityResult<Vec<u8>> {
         // This is a simplified implementation. Replace with actual crypto.
@@ -51,6 +71,12 @@ impl KeyPair {
     /// Get the public key bytes
     pub fn public_key(&self) -> &[u8] {
         &self.public_key
+    }
+}
+
+impl Default for KeyPair {
+    fn default() -> Self {
+        Self::generate_random()
     }
 }
 

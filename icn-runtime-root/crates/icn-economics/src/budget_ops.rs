@@ -448,11 +448,11 @@ pub async fn record_budget_vote(
                 voter_did, budget.scope_id
             );
         },
-        IdentityScope::Guardian => {
+        IdentityScope::Guardian | IdentityScope::Administrator => {
             // For guardian scope, check if voter is a guardian
             // This would require access to guardian lists
             tracing::debug!(
-                "Would check if voter {} is a guardian in scope {}",
+                "Would check if voter {} is a guardian or administrator in scope {}",
                 voter_did, budget.scope_id
             );
         },

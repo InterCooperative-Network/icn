@@ -8,6 +8,7 @@ use crate::dag_anchor::GenesisAnchor;
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
 use crate::signer::{Signer, SerializableSigner};
+use crate::quorum::QuorumType;
 
 /// Represents the type of recovery event
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,7 +108,6 @@ pub struct MetadataUpdateEvent {
 /// Recovery module functions
 pub mod recovery {
     use super::*;
-    use crate::signer::QuorumType;
     
     /// Create a federation key rotation event
     pub async fn create_key_rotation_event(

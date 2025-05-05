@@ -18,6 +18,7 @@ tracing = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
 futures = { workspace = true }

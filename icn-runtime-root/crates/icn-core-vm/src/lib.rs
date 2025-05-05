@@ -17,21 +17,26 @@ pub mod economics_helpers;
 pub mod monitor;
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, RwLock};
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use tracing::*;
 use icn_identity::{KeyPair, IdentityScope, IdentityManager, IdentityId as IcnIdentityId};
-use icn_models::storage::{StorageManager, StorageError, StorageResult};
-use icn_models::{DagNodeBuilder, DagNode, DagStorageManager, DagNodeMetadata, Cid};
-use libipld::{Ipld, codec::Codec};
-use libipld::dagcbor::DagCborCodec;
-use anyhow::Result;
-use std::sync::RwLock;
-use wasmtime::{Config, Engine, Instance, Module, Store};
-use uuid;
+use icn_identity::error::IdentityError;
+use icn_models::storage::{BasicStorageManager, DagStorageManager, StorageError, StorageResult};
+use icn_models::{DagNodeBuilder, DagNode, DagNodeMetadata, Cid, dag_storage_codec, DagCodec};
+use libipld::{Ipld, codec::Encode, codec::Decode};
+use anyhow::{anyhow, Context, Result};
+use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use hex;
+use cid::Cid;
+use std::convert::TryFrom;
+use icn_identity::{IdentityError, IdentityManager, IdentityScope, KeyPair, PublicJwk};
+use icn_models::storage::{BasicStorageManager, DagStorageManager, StorageError};
+use icn_models::{dag_storage_codec, DagNode, DagNodeBuilder, DagNodeMetadata, IcnIdentityId};
+use libipld::codec::{Decode, Encode};
+use thiserror::Error;
 
 pub use resources::{ResourceType, ResourceAuthorization, ResourceConsumption};
 
@@ -77,14 +82,19 @@ impl IdentityContext {
 pub struct VMContext {
     identity_context: Arc<IdentityContext>,
     resource_authorizations: Vec<ResourceAuthorization>,
+    execution_id: String, // Add execution_id field
 }
 
 impl VMContext {
     /// Create a new VM context
-    pub fn new(identity_context: Arc<IdentityContext>, resource_authorizations: Vec<ResourceAuthorization>) -> Self {
+    pub fn new(
+        identity_context: Arc<IdentityContext>,
+        resource_authorizations: Vec<ResourceAuthorization>,
+    ) -> Self {
         Self {
             identity_context,
             resource_authorizations,
+            execution_id: uuid::Uuid::new_v4().to_string(), // Generate a unique execution ID
         }
     }
 
@@ -97,16 +107,22 @@ impl VMContext {
     pub fn resource_authorizations(&self) -> &[ResourceAuthorization] {
         &self.resource_authorizations
     }
+    
+    /// Get the execution ID for this VM context
+    pub fn execution_id(&self) -> &str {
+        &self.execution_id
+    }
 }
 
 impl Default for VMContext {
     fn default() -> Self {
         Self {
             identity_context: Arc::new(IdentityContext {
-                keypair: Arc::new(KeyPair::new()),
+                keypair: Arc::new(KeyPair::generate_random()),
                 did: "did:icn:anonymous".to_string(),
             }),
             resource_authorizations: Vec::new(),
+            execution_id: uuid::Uuid::new_v4().to_string(), // Generate a unique execution ID for default context
         }
     }
 }
@@ -216,17 +232,37 @@ pub enum InternalHostError {
     #[error("Identity operation failed: {0}")]
     IdentityError(#[from] IdentityError),
     #[error("Storage operation failed: {0}")]
-    StorageError(#[from] StorageError), // Assuming StorageError is defined
+    StorageError(String),
     #[error("DAG operation failed: {0}")]
-    DagError(#[from] icn_dag::DagError), // Assuming DagError is defined
+    DagError(String),
     #[error("Serialization/Deserialization error: {0}")]
-    CodecError(#[from] libipld::error::Error),
+    CodecError(String),
     #[error("Invalid input from WASM: {0}")]
     InvalidInput(String),
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
+    #[error("Virtual machine error: {0}")]
+    VmError(String),
     #[error("Generic internal error: {0}")]
-    Other(#[from] anyhow::Error),
+    Other(String),
+}
+
+impl From<anyhow::Error> for InternalHostError {
+    fn from(e: anyhow::Error) -> Self {
+        InternalHostError::Other(e.to_string())
+    }
+}
+
+impl From<VmError> for InternalHostError {
+    fn from(e: VmError) -> Self {
+        Self::VmError(e.to_string())
+    }
+}
+
+impl From<StorageError> for InternalHostError {
+    fn from(e: StorageError) -> Self {
+        Self::StorageError(e.to_string())
+    }
 }
 
 /// Host environment trait for VM execution (keep existing, maybe add new methods later)
@@ -236,17 +272,17 @@ pub enum InternalHostError {
 #[derive(Clone)]
 pub struct ConcreteHostEnvironment {
     vm_context: VMContext,
-    storage_manager: Arc<dyn StorageManager>,
+    storage_manager: Arc<dyn BasicStorageManager + Send + Sync>,
     identity_manager: Arc<dyn IdentityManager>,
     parent_federation_did: Option<String>,
-    consumed_resources: HashMap<ResourceType, u64>,
+    consumed_resources: Arc<RwLock<HashMap<ResourceType, u64>>>,
     // --- Added temporary state for entity creation --- 
     last_created_entity_info: Option<(String, Cid)>, // Store (DID, Genesis CID)
     /// Resources consumed during execution
-    resource_usage: RwLock<HashMap<ResourceType, u64>>,
+    resource_usage: Arc<RwLock<HashMap<ResourceType, u64>>>,
     
     /// The last DAG anchor CID created during execution
-    last_anchor_cid: RwLock<Option<String>>,
+    last_anchor_cid: Arc<RwLock<Option<String>>>,
     
     /// DAG storage manager for WASM host ABI functions
     pub dag_storage: Arc<dyn DagStorageManager + Send + Sync>,
@@ -256,7 +292,7 @@ impl ConcreteHostEnvironment {
     /// Create a new concrete host environment
     pub fn new(
         vm_context: VMContext,
-        storage_manager: Arc<dyn StorageManager>,
+        storage_manager: Arc<dyn BasicStorageManager + Send + Sync>,
         identity_manager: Arc<dyn IdentityManager>,
         parent_federation_did: Option<String>,
         dag_storage: Arc<dyn DagStorageManager + Send + Sync>,
@@ -266,31 +302,34 @@ impl ConcreteHostEnvironment {
             storage_manager,
             identity_manager,
             parent_federation_did,
-            consumed_resources: HashMap::new(),
+            consumed_resources: Arc::new(RwLock::new(HashMap::new())),
             last_created_entity_info: None, // Initialize as None
-            resource_usage: RwLock::new(HashMap::new()),
-            last_anchor_cid: RwLock::new(None),
+            resource_usage: Arc::new(RwLock::new(HashMap::new())),
+            last_anchor_cid: Arc::new(RwLock::new(None)),
             dag_storage,
         }
     }
     
     /// Get the amount of compute resources consumed
     pub fn get_compute_consumed(&self) -> u64 {
-        self.consumed_resources.get(&ResourceType::Compute).copied().unwrap_or(0)
+        self.consumed_resources.read().unwrap()
+            .get(&ResourceType::Compute).copied().unwrap_or(0)
     }
 
     /// Get the amount of storage resources consumed
     pub fn get_storage_consumed(&self) -> u64 {
-        self.consumed_resources.get(&ResourceType::Storage).copied().unwrap_or(0)
+        self.consumed_resources.read().unwrap()
+            .get(&ResourceType::Storage).copied().unwrap_or(0)
     }
 
     /// Get the amount of network resources consumed
     pub fn get_network_consumed(&self) -> u64 {
-        self.consumed_resources.get(&ResourceType::Network).copied().unwrap_or(0)
+        self.consumed_resources.read().unwrap()
+            .get(&ResourceType::Network).copied().unwrap_or(0)
     }
 
     /// Record consumption of a resource type
-    fn record_resource_usage(&self, resource_type: ResourceType, amount: u64) -> Result<(), VmError> {
+    fn record_resource_consumption(&self, resource_type: ResourceType, amount: u64) -> Result<(), VmError> {
         // Update the usage tracking
         let mut usage = self.resource_usage.write().unwrap();
         let entry = usage.entry(resource_type).or_insert(0);
@@ -319,8 +358,9 @@ impl ConcreteHostEnvironment {
         // Update the usage tracking
         *entry = new_total;
         
-        // Also update the legacy consumed_resources tracker for backward compatibility
-        let consumed_entry = self.consumed_resources.entry(resource_type).or_insert(0);
+        // Also update the consumed_resources tracker for backward compatibility
+        let mut consumed = self.consumed_resources.write().unwrap();
+        let consumed_entry = consumed.entry(resource_type).or_insert(0);
         *consumed_entry = new_total;
         
         Ok(())
@@ -328,17 +368,17 @@ impl ConcreteHostEnvironment {
 
     /// Record consumption of compute resources
     pub fn record_compute_usage(&self, amount: u64) -> Result<(), VmError> {
-        self.record_resource_usage(ResourceType::Compute, amount)
+        self.record_resource_consumption(ResourceType::Compute, amount)
     }
 
     /// Record consumption of storage resources
     pub fn record_storage_usage(&self, amount: u64) -> Result<(), VmError> {
-        self.record_resource_usage(ResourceType::Storage, amount)
+        self.record_resource_consumption(ResourceType::Storage, amount)
     }
 
     /// Record consumption of network resources
     pub fn record_network_usage(&self, amount: u64) -> Result<(), VmError> {
-        self.record_resource_usage(ResourceType::Network, amount)
+        self.record_resource_consumption(ResourceType::Network, amount)
     }
 
     /// Get the caller's DID
@@ -363,62 +403,61 @@ impl ConcreteHostEnvironment {
     ) -> Result<String, InternalHostError> { // Returns only DID string now
         // --- Basic Compute Cost ---
         // Record some base cost for this complex operation
-        self.record_compute_usage(5000)?; // Adjust cost as needed
+        let _ = self.record_compute_usage(5000); // Adjust cost as needed
 
         // 1. Generate new DID and Keypair
         let (new_did_key_str, _public_jwk) = self
             .identity_manager
             .generate_and_store_did_key()
             .await
-            .map_err(|e| InternalHostError::Other(e.into()))?;
+            .map_err(|e| InternalHostError::Other(e.to_string()))?;
         tracing::info!(new_did = %new_did_key_str, "Generated new DID for sub-entity");
 
         // Record cost associated with key generation
-        self.record_compute_usage(1000)?; // Cost for crypto op
+        let _ = self.record_compute_usage(1000); // Cost for crypto op
 
         // 2. Deserialize/Prepare Genesis Payload
-        // Assume genesis_payload_bytes is CBOR or JSON representing the initial state/metadata
-        // For now, let's treat it as CBOR-encoded IPLD data for the node's payload field.
-        let genesis_ipld: Ipld = DagCborCodec.decode(&genesis_payload_bytes)?;
+        // Create a codec for serialization/deserialization
+        let codec = dag_storage_codec();
+        let genesis_ipld: Ipld = codec.decode(&genesis_payload_bytes)
+            .map_err(|e| InternalHostError::CodecError(e.to_string()))?;
+        
         // Record cost for decoding
-        self.record_compute_usage((genesis_payload_bytes.len() / 100) as u64)?;
-
+        let _ = self.record_compute_usage((genesis_payload_bytes.len() / 100) as u64);
 
         // 3. Construct Genesis DagNode
         //    The issuer ('iss') of the genesis node is the *new* entity's DID.
-        //    Add public key to payload? Or handle via DID doc resolution? Let's assume resolution for now.
         //    Parents list is empty for a genesis node.
-        let node_builder = DagNodeBuilder::new()
-            .issuer(IcnIdentityId::new(new_did_key_str.clone())) // Use icn_identity::IdentityId
-            .payload(genesis_ipld) // Store the provided payload
-            .parents(vec![]); // Genesis node has no parents
+        let node_builder = DagNodeBuilder::default()
+            .with_issuer(IcnIdentityId::new(new_did_key_str.clone())) // Use correct builder method
+            .with_payload(genesis_ipld) // Store the provided payload
+            .with_parents(vec![]); // Genesis node has no parents
 
-        // 4. Store Genesis Node using StorageManager
-        //    This calculates the CID and stores the node in the new entity's CF.
+        // 4. Store Genesis Node using DAG Storage Manager
         let store_result = self
-            .storage_manager
-            .store_new_dag_root(&new_did_key_str, node_builder)
-            .await;
+            .dag_storage
+            .store_new_dag_root(&new_did_key_str, &node_builder)
+            .await
+            .map_err(|e| InternalHostError::StorageError(e.to_string()));
 
-        let (genesis_cid, _genesis_node) = match store_result {
+        let (genesis_cid, genesis_node) = match store_result {
              Ok((cid, node)) => {
                  // Record storage cost - size of the encoded node
-                 // We need the encoded size. Let's re-encode for costing (less efficient).
-                 // A better way would be if store_new_dag_root returned the size.
-                 let encoded_bytes = DagCborCodec.encode(&node)?;
-                 self.record_storage_usage(encoded_bytes.len() as u64)?;
+                 let encoded_size = serde_json::to_vec(&node)
+                     .map_err(|e| InternalHostError::CodecError(format!("Failed to serialize node: {}", e)))?
+                     .len();
+                 self.record_storage_usage(encoded_size as u64)?;
                  Ok((cid, node))
              }
              Err(e) => {
                  // Attempt to clean up stored key if node storage failed
                  tracing::error!(new_did = %new_did_key_str, "Failed to store genesis node, attempting to delete key");
                  let _ = self.identity_manager.get_key(&new_did_key_str).await; // Example: How to delete key? Needs method in IdentityManager/KeyStorage
-                 Err(InternalHostError::Other(e.into())) // Convert StorageManager's Result
+                 Err(e) // Convert StorageManager's Result
              }
          }?;
 
         tracing::info!(new_did = %new_did_key_str, %genesis_cid, "Stored genesis node for sub-entity");
-
 
         // 5. Register Entity Metadata
         //    Link the new DID to the parent, genesis CID, and type.
@@ -435,30 +474,17 @@ impl ConcreteHostEnvironment {
 
          if let Err(e) = metadata_result {
              // Critical failure: Node is stored, but metadata registration failed.
-             // This leaves the system in an inconsistent state.
-             // Options:
-             // 1. Log error and return failure. Requires manual intervention/cleanup.
-             // 2. Attempt rollback (delete node? delete key?). Complex and potentially failing.
              tracing::error!(
                  new_did = %new_did_key_str,
                  %genesis_cid,
                  parent_did = %parent_did,
                  "CRITICAL: Failed to register entity metadata after storing genesis node: {}", e
              );
-             // For now, log and return error.
-              return Err(InternalHostError::Other(e.into())); // Convert IdentityManager's Result
+             return Err(InternalHostError::Other(e.to_string())); // Convert IdentityManager's Result
          }
 
         // Record cost for metadata storage (assume small fixed cost)
         self.record_storage_usage(100)?;
-
-        // --- Parent State Update (Anchoring) ---
-        // TODO: Implement anchoring the new entity's creation on the parent's DAG.
-        // This likely involves:
-        // 1. Constructing an anchor node (e.g., { "event": "entity_created", "did": new_did, "genesis_cid": cid })
-        // 2. Calling self.storage_manager.store_node() for the *parent_did*.
-        // This should happen *outside* this function, perhaps in the ExecutionManager after this call succeeds.
-
 
         // 6. Store DID and Genesis CID internally
         self.last_created_entity_info = Some((new_did_key_str.clone(), genesis_cid));
@@ -468,61 +494,79 @@ impl ConcreteHostEnvironment {
     }
 
     /// Stores a regular DAG node within the specified entity's DAG.
-    pub async fn store_node(
-        &mut self,
+    pub async fn store_dag_node(
+        &self,
         entity_did: &str,
-        node_payload_bytes: Vec<u8>, // Expecting CBOR-encoded Ipld payload
-        parent_cids_bytes: Vec<Vec<u8>>, // Expecting Vec of CBOR-encoded CIDs
+        node_payload_bytes: Vec<u8>,
+        parent_cids_bytes: Vec<Vec<u8>>,
         signature_bytes: Vec<u8>,
-        metadata_bytes: Vec<u8>, // Expecting CBOR-encoded DagNodeMetadata
+        metadata_bytes: Vec<u8>,
     ) -> Result<Cid, InternalHostError> { // Returns the CID of the stored node
         // Record base compute cost
         self.record_compute_usage(2000)?; // Base cost for storing
 
-        // Decode necessary parts
-        let payload: Ipld = DagCborCodec.decode(&node_payload_bytes)?;
-        let parents: Vec<Cid> = parent_cids_bytes
-            .into_iter()
-            .map(|bytes| Cid::read_bytes(std::io::Cursor::new(bytes)).map_err(|e| InternalHostError::InvalidInput(format!("Invalid parent CID bytes: {}", e))))
-            .collect::<Result<Vec<_>, _>>()?; // Changed to Cid::read_bytes
-        let metadata: DagNodeMetadata = DagCborCodec.decode(&metadata_bytes)?;
-        // Record compute cost for decoding
-        self.record_compute_usage(((node_payload_bytes.len() + metadata_bytes.len()) / 100) as u64)?; // Simplified cost
-
-        // Assume issuer DID comes from the VM context (caller)
-        // Note: caller_did() returns &str, IdentityId::new() takes impl Into<String>
-        let issuer_did_str = self.vm_context.caller_did();
-        let issuer_did = IcnIdentityId::new(issuer_did_str);
-
-        // Build the node
-        let builder = DagNodeBuilder::new()
-            .issuer(issuer_did) // Use caller's DID from context
-            .payload(payload)
-            .parents(parents)
-            .signature(signature_bytes) // Signature provided by WASM
-            .metadata(metadata);
-
-        // Store the node using StorageManager
-        let store_result = self.storage_manager.store_node(entity_did, builder).await;
-
-        let (cid, stored_node) = match store_result {
-            Ok((cid, node)) => {
-                // Record storage cost
-                let encoded_bytes = DagCborCodec.encode(&node)?;
-                self.record_storage_usage(encoded_bytes.len() as u64)?;
-                Ok((cid, node))
+        // Create a codec for serialization
+        let codec = dag_storage_codec();
+        
+        // Parse the payload from CBOR
+        let payload: Ipld = codec.decode(&node_payload_bytes)
+            .map_err(|e| InternalHostError::CodecError(format!("Failed to decode payload: {}", e)))?;
+        
+        // Parse parent CIDs
+        let mut parents = Vec::new();
+        for cid_bytes in parent_cids_bytes {
+            match Cid::read_bytes(std::io::Cursor::new(&cid_bytes)) {
+                Ok(cid) => parents.push(cid),
+                Err(e) => return Err(InternalHostError::InvalidInput(format!("Invalid parent CID: {}", e))),
             }
-            Err(e) => Err(InternalHostError::Other(e.into())),
-        }?; // Use ? to propagate error
-
-        tracing::debug!(%entity_did, %cid, "Stored node via host_store_node");
-        Ok(cid) // Return the CID of the newly stored node
+        }
+        
+        // Parse metadata
+        let metadata = if !metadata_bytes.is_empty() {
+            match codec.decode::<DagNodeMetadata>(&metadata_bytes) {
+                Ok(m) => m,
+                Err(e) => return Err(InternalHostError::CodecError(format!("Failed to decode metadata: {}", e))),
+            }
+        } else {
+            // Create default metadata if none provided
+            DagNodeMetadata {
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| InternalHostError::Other(format!("Failed to get timestamp: {}", e)))?
+                    .as_secs(),
+                sequence: 0, // Default sequence
+                content_type: None,
+                tags: Vec::new(),
+            }
+        };
+        
+        // Create the node builder
+        let node_builder = DagNodeBuilder::default()
+            .with_issuer(IcnIdentityId::new(entity_did.to_string()))
+            .with_payload(payload)
+            .with_parents(parents)
+            .with_metadata(metadata);
+        
+        // Store the node using DagStorageManager
+        let result = self.dag_storage.store_node(entity_did, &node_builder).await
+            .map_err(|e| InternalHostError::StorageError(e.to_string()));
+        
+        match result {
+            Ok((cid, node)) => {
+                // Calculate storage costs based on estimated size
+                let encoded_size = serde_json::to_vec(&node)
+                    .map_err(|e| InternalHostError::CodecError(format!("Failed to serialize node: {}", e)))?
+                    .len();
+                self.record_storage_usage(encoded_size as u64)?;
+                Ok(cid)
+            },
+            Err(e) => Err(e),
+        }
     }
 
-
-    /// Gets a DAG node by CID from the specified entity's DAG.
-    pub async fn get_node(
-        &mut self,
+    /// Retrieves a DAG node by CID
+    pub async fn get_dag_node(
+        &self,
         entity_did: &str,
         cid_bytes: Vec<u8>,
     ) -> Result<Option<Vec<u8>>, InternalHostError> { // Returns CBOR bytes of the node
@@ -532,8 +576,8 @@ impl ConcreteHostEnvironment {
         let cid = Cid::read_bytes(std::io::Cursor::new(cid_bytes))
             .map_err(|e| InternalHostError::InvalidInput(format!("Invalid CID bytes: {}", e)))?;
 
-        let node_bytes_opt = self.storage_manager.get_node_bytes(entity_did, &cid).await
-            .map_err(|e| InternalHostError::Other(e.into()))?;
+        let node_bytes_opt = self.dag_storage.get_node_bytes(entity_did, &cid).await
+            .map_err(|e| InternalHostError::StorageError(e.to_string()))?;
 
         // Record storage cost based on size if found.
         if let Some(bytes) = &node_bytes_opt {
@@ -543,9 +587,9 @@ impl ConcreteHostEnvironment {
         Ok(node_bytes_opt)
     }
 
-    /// Checks if a DAG node exists within the specified entity's DAG.
-    pub async fn contains_node(
-        &mut self,
+    /// Checks if a DAG node exists
+    pub async fn contains_dag_node(
+        &self,
         entity_did: &str,
         cid_bytes: Vec<u8>,
     ) -> Result<bool, InternalHostError> {
@@ -555,8 +599,8 @@ impl ConcreteHostEnvironment {
         let cid = Cid::read_bytes(std::io::Cursor::new(cid_bytes))
             .map_err(|e| InternalHostError::InvalidInput(format!("Invalid CID bytes: {}", e)))?;
 
-        let exists = self.storage_manager.contains_node(entity_did, &cid).await
-            .map_err(|e| InternalHostError::Other(e.into()))?;
+        let exists = self.dag_storage.contains_node(entity_did, &cid).await
+            .map_err(|e| InternalHostError::StorageError(e.to_string()))?;
 
         Ok(exists)
     }
@@ -575,7 +619,7 @@ impl ConcreteHostEnvironment {
         hasher.update(data);
         let hash = hasher.finalize();
         
-        // Convert to a base58 string prefixed with 'bafybeih'
+        // Convert to a hex string prefixed with 'bafybeih'
         let hex_string = format!("bafybeih{}", hex::encode(&hash[0..16]));
         
         Ok(hex_string)
@@ -590,7 +634,7 @@ impl ConcreteHostEnvironment {
             .map_err(|e| InternalHostError::StorageError(format!("Failed to get DAG store: {}", e)))?;
             
         // Calculate content CID
-        let content_cid = compute_content_cid(&data)
+        let content_cid = Self::compute_content_cid(&data)
             .map_err(|e| InternalHostError::DagError(format!("Failed to compute content CID: {}", e)))?;
         
         // Prepare DAG node with key, data, and execution context
@@ -788,19 +832,39 @@ impl ConcreteHostEnvironment {
     }
 
     /// Get a reference to the storage manager
-    pub fn storage_manager(&self) -> Result<&Arc<dyn StorageManager>, InternalHostError> {
-        Ok(&self.storage_manager)
+    pub fn storage_manager(&self) -> Result<Arc<dyn BasicStorageManager + Send + Sync>, InternalHostError> {
+        Ok(self.storage_manager.clone())
+    }
+
+    /// Get a value from storage
+    pub fn get_value(&self, key: &str) -> Option<Vec<u8>> {
+        // This is a simplified implementation for the moment
+        // In a real implementation, this would use a key-value store
+        tracing::debug!("get_value called for key: {}", key);
+        None // Always return None for now
     }
 
     /// Store a key-value pair in storage
     pub fn set_value(&self, key: &str, value: Vec<u8>) -> Result<(), InternalHostError> {
         // Record storage usage
-        self.record_resource_usage(ResourceType::Storage, value.len() as u64)
-            .map_err(|e| InternalHostError::StorageError(format!("Failed to record storage usage: {}", e)))?;
+        self.record_compute_usage(100)?;
+        self.record_storage_usage(value.len() as u64)?;
         
         // In a real implementation, this would store the value in a storage system
         // For now, we just log it
-        info!(key = %key, value_len = %value.len(), "Storing key-value pair");
+        tracing::info!(key = %key, value_len = %value.len(), "Storing key-value pair");
+        
+        Ok(())
+    }
+
+    /// Delete a value from storage
+    pub fn delete_value(&self, key: &str) -> Result<(), InternalHostError> {
+        // Record compute usage
+        self.record_compute_usage(50)?;
+        
+        // In a real implementation, this would delete from storage
+        // For now, we just log it
+        tracing::info!(key = %key, "Deleting key-value pair");
         
         Ok(())
     }
@@ -974,145 +1038,56 @@ pub async fn execute_wasm(
     // Set up the WASM module
     let module = Module::new(&engine, wasm_bytes)
         .map_err(|e| VmError::ModuleCreationFailed(e.to_string()))?;
+        
+    // Clone the host environment for the store
+    let mut host_env = host_env.clone();
     
-    // Create a new store with the host environment
-    let mut store = Store::new(&engine, host_env.clone());
+    // Create a store with the host environment
+    let mut store = Store::new(&engine, host_env);
     
-    // Allocate fuel for execution (1M units by default)
-    store.add_fuel(1_000_000)
+    // Allocate fuel for the execution (1,000,000 units as default)
+    let fuel_limit = context.resource_authorizations()
+        .iter()
+        .find(|auth| auth.resource_type == ResourceType::Compute)
+        .map_or(1_000_000, |auth| auth.limit);
+        
+    store.add_fuel(fuel_limit)
         .map_err(|e| VmError::FuelAllocationFailed(e.to_string()))?;
     
-    // Set up the initial resource usage tracking
-    let mut resource_usage = HashMap::new();
+    // Create import object with host functions
+    let mut linker = host_abi::create_import_object(&mut store);
     
-    // Create an instance of the module with imported functions
-    let instance = Instance::new_async(&mut store, &module, &host_abi::create_import_object(&mut store))
-        .await
+    // Instantiate the module
+    let instance = linker.instantiate(&mut store, &module)
         .map_err(|e| VmError::InstantiationFailed(e.to_string()))?;
-    
-    // Get the default export function from the module
-    let execute_fn = instance.get_typed_func::<(), i32>(&mut store, "execute")
-        .map_err(|e| VmError::EntryPointNotFound(e.to_string()))?;
-    
-    // Execute the WASM function
-    let result = execute_fn.call_async(&mut store, ()).await;
-    
-    // Calculate fuel used
-    let fuel_used = store.fuel_consumed().unwrap_or(0);
-    resource_usage.insert(ResourceType::Compute, fuel_used as u64);
-    
-    // Get environment from store to check resource usage
-    let host_env = store.into_data();
-    
-    let execution_result = match result {
-        Ok(code) => {
-            // Add resource usage from host environment
-            // This would be populated by the various host functions during execution
-            for (resource_type, amount) in host_env.get_resource_usage() {
-                let entry = resource_usage.entry(resource_type).or_insert(0);
-                *entry += amount;
+        
+    // Check for a "main" export
+    let main_func = instance.get_typed_func::<(), i32>(&mut store, "main")
+        .or_else(|_| instance.get_typed_func::<(), i32>(&mut store, "_start"))
+        .or_else(|_| instance.get_typed_func::<(), i32>(&mut store, "__main"))
+        .map_err(|_| VmError::EntryPointNotFound("No main/_start/__main function found".to_string()))?;
+        
+    // Execute the function
+    let return_code = main_func.call(&mut store, ())
+        .map_err(|e| {
+            if e.to_string().contains("out of fuel") {
+                VmError::ResourceLimitExceeded("Execution exceeded fuel limit".to_string())
+            } else {
+                VmError::ExecutionError(e.to_string())
             }
-            
-            let outcome = if code == 0 { "Success" } else { "Failure" };
-            
-            // Generate an execution ID if we don't have a proposal ID
-            let execution_id = proposal_id.unwrap_or_else(|| {
-                // Generate a unique ID for this execution
-                uuid::Uuid::new_v4().to_string()
-            });
-            
-            // Determine federation scope with fallback
-            let scope = federation_scope.unwrap_or("default");
-            
-            // Issue an execution receipt credential
-            if let Err(e) = issue_execution_receipt(
-                &host_env,
-                &execution_id,
-                outcome,
-                resource_usage.clone(),
-                &host_env.get_last_anchor_cid().unwrap_or_default(),
-                scope,
-                None,
-            ).await {
-                tracing::warn!(error = %e, "Failed to issue execution receipt");
-            }
-            
-            // Create and anchor an additional simplified execution receipt in JSON format
-            let receipt_json = serde_json::json!({
-                "type": "ExecutionReceipt",
-                "scope": scope,
-                "execution_id": execution_id,
-                "issuer": host_env.caller_did(),
-                "outcome": outcome,
-                "timestamp": chrono::Utc::now().timestamp(),
-                "resource_usage": resource_usage.iter()
-                    .map(|(k, v)| (format!("{:?}", k), v))
-                    .collect::<HashMap<String, &u64>>(),
-                "code": code
-            });
-            
-            // Anchor the simplified receipt to make it available to other contracts
-            let receipt_str = serde_json::to_string(&receipt_json).unwrap_or_default();
-            if let Err(e) = host_env.anchor_metadata_to_dag(&receipt_str).await {
-                tracing::warn!(error = %e, "Failed to anchor simplified execution receipt");
-            }
-            
-            Ok(VmExecutionResult {
-                code,
-                resource_usage,
-                dag_anchor_cid: host_env.get_last_anchor_cid(),
-            })
-        },
-        Err(e) => {
-            let error_message = e.to_string();
-            
-            // Generate an execution ID if we don't have a proposal ID
-            let execution_id = proposal_id.unwrap_or_else(|| {
-                // Generate a unique ID for this execution
-                uuid::Uuid::new_v4().to_string()
-            });
-            
-            // Determine federation scope with fallback
-            let scope = federation_scope.unwrap_or("default");
-            
-            // Issue an execution receipt credential for the failure
-            if let Err(e) = issue_execution_receipt(
-                &host_env,
-                &execution_id,
-                "Error",
-                resource_usage.clone(),
-                &host_env.get_last_anchor_cid().unwrap_or_default(),
-                scope,
-                None,
-            ).await {
-                tracing::warn!(error = %e, "Failed to issue execution receipt for error");
-            }
-            
-            // Create and anchor a simplified error receipt as well
-            let error_receipt = serde_json::json!({
-                "type": "ExecutionReceipt",
-                "scope": scope,
-                "execution_id": execution_id,
-                "issuer": host_env.caller_did(),
-                "outcome": "Error",
-                "timestamp": chrono::Utc::now().timestamp(),
-                "resource_usage": resource_usage.iter()
-                    .map(|(k, v)| (format!("{:?}", k), v))
-                    .collect::<HashMap<String, &u64>>(),
-                "error": error_message
-            });
-            
-            // Anchor the error receipt
-            let receipt_str = serde_json::to_string(&error_receipt).unwrap_or_default();
-            if let Err(e) = host_env.anchor_metadata_to_dag(&receipt_str).await {
-                tracing::warn!(error = %e, "Failed to anchor simplified error receipt");
-            }
-            
-            Err(VmError::ExecutionError(error_message))
-        }
-    };
+        })?;
     
-    execution_result
+    // Get resource usage
+    let resource_usage = store.data().get_resource_usage();
+    
+    // Get the last anchor CID if there was one
+    let dag_anchor_cid = store.data().get_last_anchor_cid();
+    
+    Ok(VmExecutionResult {
+        code: return_code,
+        resource_usage,
+        dag_anchor_cid,
+    })
 }
 
 // Helper trait/impl for ResourceConsumption (if not already existing)
