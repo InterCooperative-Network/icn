@@ -5,10 +5,10 @@ edition = "2021"
 description = "DAG objects, Merkle anchoring, and Lineage for the ICN Runtime"
 
 [dependencies]
-icn-common = { path = "../common" }
-icn-identity = { path = "../identity" }
-icn-models = { path = "../models" }
-icn-storage = { path = "../storage" }
+icn-common = { path = "../icn-common" }
+icn-identity = { path = "../icn-identity" }
+icn-models = { path = "../icn-models" }
+icn-storage = { path = "../icn-storage" }
 
 # Workspace dependencies
 serde = { workspace = true }

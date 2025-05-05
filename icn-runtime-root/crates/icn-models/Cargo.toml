@@ -20,5 +20,5 @@ serde_ipld_dagcbor = "0.4"
 serde_bytes = "0.11"
 
 # ICN dependencies
-icn-common = { path = "../common" }
-icn-identity = { path = "../identity" }
+icn-common = { path = "../icn-common" }
+icn-identity = { path = "../icn-identity" }

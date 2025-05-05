@@ -21,9 +21,9 @@ multihash = { workspace = true }
 libipld = { workspace = true }
 
 # ICN dependencies
-icn-common = { path = "../common" }
-icn-models = { path = "../models" }
-icn-identity = { path = "../identity" }
+icn-common = { path = "../icn-common" }
+icn-models = { path = "../icn-models" }
+icn-identity = { path = "../icn-identity" }
 
 # Additional dependencies
 serde_bytes = "0.11"
