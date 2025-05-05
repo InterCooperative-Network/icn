@@ -1,64 +1,68 @@
 #!/bin/bash
 set -e
 
-# Colors for better output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+echo "Setting up AgoraNet database..."
 
-echo -e "${GREEN}Setting up PostgreSQL for AgoraNet...${NC}"
+# Database configuration
+DB_HOST=${PGHOST:-localhost}
+DB_PORT=${PGPORT:-5432}
+DB_USER=${PGUSER:-postgres}
+DB_PASSWORD=${PGPASSWORD:-postgres}
+DB_NAME=${PGDATABASE:-agoranet}
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Docker is not installed. Please install Docker first.${NC}"
-    exit 1
-fi
+# Export DATABASE_URL for sqlx
+export DATABASE_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
-# Check if PostgreSQL container is already running
-if docker ps | grep -q "icn-postgres"; then
-    echo -e "${YELLOW}PostgreSQL container is already running.${NC}"
+# Check if the database exists
+if ! PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -lqt | cut -d \| -f 1 | grep -qw $DB_NAME; then
+    echo "Creating database $DB_NAME..."
+    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -c "CREATE DATABASE $DB_NAME;"
+    echo "Database created."
 else
-    # Start PostgreSQL container
-    echo -e "${YELLOW}Starting PostgreSQL container...${NC}"
-    docker run --name icn-postgres \
-        -e POSTGRES_PASSWORD=postgres \
-        -e POSTGRES_USER=postgres \
-        -p 5432:5432 \
-        -d postgres
-    
-    # Wait for PostgreSQL to start
-    echo -e "${YELLOW}Waiting for PostgreSQL to start...${NC}"
-    sleep 5
+    echo "Database $DB_NAME already exists."
 fi
 
-# Set environment variable
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/icn_agoranet
-echo -e "${YELLOW}Setting DATABASE_URL: ${DATABASE_URL}${NC}"
-echo "export DATABASE_URL=${DATABASE_URL}" >> ~/.bashrc
+# Create .env file if it doesn't exist
+if [ ! -f /home/matt/dev/icn/agoranet/.env ]; then
+    echo "Creating .env file..."
+    cat > /home/matt/dev/icn/agoranet/.env << EOF
+# Database configuration
+DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+PGUSER=${DB_USER}
+PGPASSWORD=${DB_PASSWORD}
+PGDATABASE=${DB_NAME}
+PGHOST=${DB_HOST}
+PGPORT=${DB_PORT}
 
-# Check if sqlx-cli is installed
-if ! command -v sqlx &> /dev/null; then
-    echo -e "${YELLOW}Installing sqlx-cli...${NC}"
-    cargo install sqlx-cli
-fi
+# API configuration
+PORT=3030
+HOST=0.0.0.0
 
-# Create database and run migrations
-echo -e "${YELLOW}Creating database...${NC}"
-sqlx database create || echo "Database already exists"
+# Federation configuration
+FEDERATION_ID=dev_federation
+NODE_ID=dev_node
+PEER_DISCOVERY_INTERVAL=30
+SYNC_INTERVAL=60
 
-echo -e "${YELLOW}Running migrations...${NC}"
-cd agoranet
-if [ -d "migrations" ]; then
-    sqlx migrate run
+# Log configuration
+RUST_LOG=info,agoranet=debug
+EOF
+    echo ".env file created."
 else
-    echo -e "${RED}No migrations directory found. Skipping migrations.${NC}"
+    echo ".env file already exists."
 fi
 
-# Create prepare file for offline mode
-echo -e "${YELLOW}Preparing SQLx offline mode...${NC}"
-cargo sqlx prepare -- --lib || echo "Failed to prepare SQLx offline mode"
+# Run the migrations
+echo "Running database migrations..."
+cd /home/matt/dev/icn/agoranet
+cargo sqlx migrate run
+echo "Migrations completed."
 
-echo -e "${GREEN}Database setup complete!${NC}"
-echo -e "${YELLOW}You can now build AgoraNet with:${NC}"
-echo -e "SQLX_OFFLINE=true cargo build -p icn-agoranet" 
+# Generate sqlx-data.json for offline use (optional)
+if [ "$1" == "--prepare" ]; then
+    echo "Generating sqlx-data.json for offline mode..."
+    cargo sqlx prepare --database-url $DATABASE_URL
+    echo "sqlx-data.json generated."
+fi
+
+echo "AgoraNet database setup complete!" 

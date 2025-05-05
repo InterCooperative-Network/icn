@@ -3795,6 +3795,15 @@ version = "0.1.0"
 [[package]]
 name = "icn-wallet-actions"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "icn-wallet-storage",
+ "icn-wallet-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
 
 [[package]]
 name = "icn-wallet-agent"

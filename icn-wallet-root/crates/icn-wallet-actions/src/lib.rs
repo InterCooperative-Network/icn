@@ -128,9 +128,9 @@ impl ActionManager {
     /// Create a new action
     pub async fn create_action(
         &self,
-        action_type: ActionType,
-        description: Option<&str>,
-        metadata: Option<serde_json::Value>,
+        _action_type: ActionType,
+        _description: Option<&str>,
+        _metadata: Option<serde_json::Value>,
     ) -> ActionResult<String> {
         // This is a stub implementation
         Ok("action-id-123".to_string())
@@ -139,8 +139,8 @@ impl ActionManager {
     /// Update the status of an action
     pub async fn update_action_status(
         &self,
-        action_id: &str,
-        status: ActionStatus,
+        _action_id: &str,
+        _status: ActionStatus,
     ) -> ActionResult<()> {
         // This is a stub implementation
         Ok(())
@@ -149,8 +149,8 @@ impl ActionManager {
     /// Complete an action with result
     pub async fn complete_action(
         &self,
-        action_id: &str,
-        result: serde_json::Value,
+        _action_id: &str,
+        _result: serde_json::Value,
     ) -> ActionResult<()> {
         // This is a stub implementation
         Ok(())
