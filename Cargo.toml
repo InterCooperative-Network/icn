@@ -30,7 +30,7 @@ members = [
     "agoranet",
     "agoranet/crates/agoranet-api",
     "tools/health_check",
-    "tools/icn-verifier",
+    "tools/icn-verifier", "mesh/crates/mesh-types",
 ]
 
 # Temporarily excluded components with issues

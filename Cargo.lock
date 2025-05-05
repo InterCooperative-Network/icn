@@ -5768,6 +5768,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mesh-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cid 0.10.1",
+ "ed25519-dalek 1.0.1",
+ "icn-common",
+ "icn-identity",
+ "multihash 0.16.3",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio-test",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
