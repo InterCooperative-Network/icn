@@ -1,0 +1,32 @@
+[package]
+name = "mesh-net"
+version = "0.1.0"
+edition = "2021"
+description = "Networking layer for ICN Mesh Compute overlay"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+
+# Networking
+libp2p = { version = "0.52", features = ["tokio", "gossipsub", "kad", "identify", "noise", "yamux", "mdns"] }
+
+# ICN dependencies
+mesh-types = { path = "../mesh-types" }
+icn-identity = { path = "../../../icn-runtime-root/crates/icn-identity" }
+icn-common = { path = "../../../icn-runtime-root/crates/icn-common" }
+
+# Content addressing
+cid = { workspace = true }
+multihash = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tracing-subscriber = "0.3" 
