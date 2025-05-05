@@ -1020,6 +1020,241 @@ fn host_refund_tokens_wrapper(
     }
 }
 
+/// Wrapper for host_get_active_mesh_policy_cid
+fn host_get_active_mesh_policy_cid_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    federation_did_ptr: u32, federation_did_len: u32,
+    cid_out_ptr: u32, cid_out_max_len: u32,
+) -> Result<i32, Trap> {
+    debug!("host_get_active_mesh_policy_cid called");
+    
+    // Read the federation DID from memory
+    let federation_did = match safe_read_string(&mut caller, federation_did_ptr, federation_did_len) {
+        Ok(did) => did,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 500) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the function
+    let env = caller.data();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.get_active_mesh_policy_cid(&federation_did)) {
+        Ok(Some(cid)) => {
+            let cid_bytes = cid.to_bytes();
+            match safe_write_bytes(&mut caller, &cid_bytes, cid_out_ptr, cid_out_max_len) {
+                Ok(len) => Ok(len as i32),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        },
+        Ok(None) => Ok(0), // No active policy CID found
+        Err(e) => {
+            error!("Failed to get active mesh policy CID: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
+/// Wrapper for host_load_mesh_policy
+fn host_load_mesh_policy_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    policy_cid_ptr: u32, policy_cid_len: u32,
+    policy_out_ptr: u32, policy_out_max_len: u32,
+) -> Result<i32, Trap> {
+    debug!("host_load_mesh_policy called");
+    
+    // Read the policy CID from memory
+    let cid_bytes = match safe_read_bytes(&mut caller, policy_cid_ptr, policy_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the CID
+    let policy_cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 800) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the function
+    let env = caller.data();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.load_mesh_policy(&policy_cid)) {
+        Ok(Some(policy_json)) => {
+            match safe_write_string(&mut caller, &policy_json, policy_out_ptr, policy_out_max_len) {
+                Ok(len) => Ok(len),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        },
+        Ok(None) => Ok(0), // Policy not found
+        Err(e) => {
+            error!("Failed to load mesh policy: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
+/// Wrapper for host_update_mesh_policy
+fn host_update_mesh_policy_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    previous_cid_ptr: u32, previous_cid_len: u32,
+    fragment_ptr: u32, fragment_len: u32,
+    federation_did_ptr: u32, federation_did_len: u32,
+    cid_out_ptr: u32, cid_out_max_len: u32,
+) -> Result<i32, Trap> {
+    debug!("host_update_mesh_policy called");
+    
+    // Read inputs from memory
+    let previous_cid_bytes = match safe_read_bytes(&mut caller, previous_cid_ptr, previous_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    let fragment_json = match safe_read_string(&mut caller, fragment_ptr, fragment_len) {
+        Ok(json) => json,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    let federation_did = match safe_read_string(&mut caller, federation_did_ptr, federation_did_len) {
+        Ok(did) => did,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the previous CID
+    let previous_cid = match Cid::read_bytes(Cursor::new(previous_cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse previous CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 1500) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the function
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.update_mesh_policy(&previous_cid, &fragment_json, &federation_did)) {
+        Ok(new_cid) => {
+            let cid_bytes = new_cid.to_bytes();
+            match safe_write_bytes(&mut caller, &cid_bytes, cid_out_ptr, cid_out_max_len) {
+                Ok(len) => Ok(len as i32),
+                Err(e) => Ok(map_abi_error_to_wasm(e)),
+            }
+        },
+        Err(e) => {
+            error!("Failed to update mesh policy: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
+/// Wrapper for host_activate_mesh_policy
+fn host_activate_mesh_policy_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    policy_cid_ptr: u32, policy_cid_len: u32,
+) -> Result<i32, Trap> {
+    debug!("host_activate_mesh_policy called");
+    
+    // Read the policy CID from memory
+    let cid_bytes = match safe_read_bytes(&mut caller, policy_cid_ptr, policy_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the CID
+    let policy_cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 1000) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the function
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.activate_mesh_policy(&policy_cid)) {
+        Ok(_) => Ok(1), // Success
+        Err(e) => {
+            error!("Failed to activate mesh policy: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
+/// Wrapper for host_record_policy_vote
+fn host_record_policy_vote_wrapper(
+    mut caller: Caller<'_, ConcreteHostEnvironment>,
+    voter_did_ptr: u32, voter_did_len: u32,
+    policy_cid_ptr: u32, policy_cid_len: u32,
+    approve: i32,
+) -> Result<i32, Trap> {
+    debug!("host_record_policy_vote called");
+    
+    // Read inputs from memory
+    let voter_did = match safe_read_string(&mut caller, voter_did_ptr, voter_did_len) {
+        Ok(did) => did,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    let cid_bytes = match safe_read_bytes(&mut caller, policy_cid_ptr, policy_cid_len) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(map_abi_error_to_wasm(e)),
+    };
+    
+    // Parse the CID
+    let policy_cid = match Cid::read_bytes(Cursor::new(cid_bytes)) {
+        Ok(cid) => cid,
+        Err(e) => {
+            error!("Failed to parse CID: {}", e);
+            return Ok(-5); // Invalid input
+        }
+    };
+    
+    // Convert approval integer to boolean
+    let approved = approve != 0;
+    
+    // Resource usage check
+    if let Err(code) = check_compute(&mut caller, 700) {
+        return Ok(code);
+    }
+    
+    // Get the host environment and call the function
+    let env = caller.data_mut();
+    let handle = tokio::runtime::Handle::current();
+    
+    match handle.block_on(env.record_policy_vote(&voter_did, &policy_cid, approved)) {
+        Ok(_) => Ok(1), // Success
+        Err(e) => {
+            error!("Failed to record policy vote: {}", e);
+            Ok(map_internal_error_to_wasm(e))
+        }
+    }
+}
+
 /// Creates a Linker with all the registered host functions for the ConcreteHostEnvironment
 pub fn create_import_object(store: &mut wasmtime::Store<ConcreteHostEnvironment>) -> wasmtime::Linker<ConcreteHostEnvironment> {
     let mut linker = wasmtime::Linker::new(store.engine());
@@ -1204,6 +1439,37 @@ pub fn register_host_functions(
         "host_refund_tokens", 
         host_refund_tokens_wrapper
     ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_refund_tokens: {}", e)))?;
+    
+    // Mesh policy governance functions
+    linker.func_wrap(
+        "env", 
+        "host_get_active_mesh_policy_cid", 
+        host_get_active_mesh_policy_cid_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_get_active_mesh_policy_cid: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "host_load_mesh_policy", 
+        host_load_mesh_policy_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_load_mesh_policy: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "host_update_mesh_policy", 
+        host_update_mesh_policy_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_update_mesh_policy: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "host_activate_mesh_policy", 
+        host_activate_mesh_policy_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_activate_mesh_policy: {}", e)))?;
+    
+    linker.func_wrap(
+        "env", 
+        "host_record_policy_vote", 
+        host_record_policy_vote_wrapper
+    ).map_err(|e| VmError::EngineCreationFailed(format!("Failed to register host_record_policy_vote: {}", e)))?;
     
     // Add economics helpers
     crate::economics_helpers::register_economics_functions(linker)

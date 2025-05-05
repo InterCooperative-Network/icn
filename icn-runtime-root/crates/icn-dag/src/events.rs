@@ -105,4 +105,34 @@ pub enum DagEvent {
         /// Timestamp
         timestamp: DateTime<Utc>,
     },
+    
+    /// Mesh policy activated event
+    MeshPolicyActivated {
+        /// Content ID of the activated policy
+        policy_cid: Cid,
+        /// Federation DID
+        federation_did: String,
+        /// Policy version
+        policy_version: u32,
+        /// Proposer DID
+        proposer_did: String,
+        /// Previous policy CID (if any)
+        previous_policy_cid: Option<Cid>,
+        /// Timestamp
+        timestamp: DateTime<Utc>,
+    },
+    
+    /// Mesh policy vote event
+    MeshPolicyVote {
+        /// Content ID of the policy proposal
+        policy_cid: Cid,
+        /// Federation DID
+        federation_did: String,
+        /// Voter DID
+        voter_did: String,
+        /// Approval status
+        approved: bool,
+        /// Timestamp
+        timestamp: DateTime<Utc>,
+    },
 } 

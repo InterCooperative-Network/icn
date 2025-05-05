@@ -1,0 +1,40 @@
+// Mesh Policy Update CCL Contract
+// This contract handles the governance process for updating mesh compute policy parameters
+
+contract mesh_policy_update(cid previous_policy_cid, MeshPolicy updated_policy_fragment, federation_did) {
+    // Verify the proposal is from a valid federation member
+    verify federation_membership(federation_did, context.caller_did);
+    
+    // Verify the previous policy CID matches the currently active policy
+    verify previous_policy_matches_active(previous_policy_cid, federation_did);
+    
+    // Apply the update to create a new policy version
+    action apply_update {
+        // Host call merges the fragment with the current policy and activates it
+        host_update_mesh_policy(previous_policy_cid, updated_policy_fragment, federation_did)
+    }
+    
+    // Allow members to vote on the policy update
+    action vote(bool approve) {
+        // Record the vote in the governance system
+        host_record_policy_vote(context.caller_did, approve)
+    }
+    
+    // Execute the policy update if quorum is reached
+    action execute_if_approved {
+        // Check if approval quorum is reached
+        verify policy_update_approved();
+        
+        // Activate the new policy
+        host_activate_mesh_policy(previous_policy_cid, updated_policy_fragment)
+    }
+    
+    // Cancel the proposal if it's rejected or expired
+    action cancel {
+        // Verify the proposal is eligible for cancellation
+        verify can_cancel_proposal();
+        
+        // Cancel the proposal
+        host_cancel_policy_update()
+    }
+} 

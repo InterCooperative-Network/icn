@@ -116,6 +116,81 @@ The Mesh Compute overlay uses an escrow-based economic model:
    - Rewards scale with task complexity (capability scope)
    - Market dynamics adjust pricing through worker competition
 
+## Governance
+
+The Mesh Compute overlay is governed through a federation-based policy mechanism:
+
+### Mesh Policy
+
+The `MeshPolicy` structure defines all configurable parameters of the mesh network:
+
+- **Reputation Parameters**: Weights for different aspects of reputation scoring (α, β, γ) and decay rate (λ).
+- **Reward Settings**: Distribution percentages between workers, verifiers, and platform.
+- **Bonding Requirements**: Minimum stake amount, lock periods, and allowed token types.
+- **Scheduling Parameters**: Queue management, task timeouts, and priority boost factors.
+- **Verification Quorum**: Required consensus levels for task verification.
+- **Capability Requirements**: Baseline hardware requirements for participation.
+
+Each federation has its own active policy, which can be updated through governance proposals.
+
+### Policy Update Process
+
+1. **Proposal Creation**:
+   - Federation members can propose policy updates by creating a `MeshPolicyFragment`.
+   - The fragment contains only the parameters that need to be changed.
+   - Proposals are submitted through the `mesh-policy-update.ccl` contract.
+
+2. **Voting**:
+   - Federation members vote on proposals using the standard ICN governance process.
+   - Votes are recorded in the DAG with `MeshPolicyVote` events.
+   - Quorum requirements are defined by the federation's governance rules.
+
+3. **Policy Activation**:
+   - When a proposal reaches approval quorum, the new policy is activated.
+   - The update is anchored to the DAG with a `MeshPolicyActivated` event.
+   - Previous policy versions are preserved for audit purposes.
+
+4. **Policy Application**:
+   - All mesh components query the active policy at runtime.
+   - Components adapt to policy changes without requiring restarts.
+   - Workers and verifiers automatically adjust their behavior based on the active policy.
+
+### CLI Management
+
+The wallet CLI provides commands for managing mesh policies:
+
+```bash
+# View the current active policy
+icn-wallet mesh policy view
+
+# Create a policy update proposal
+icn-wallet mesh policy propose --update-file policy_update.json --description "Increase worker rewards"
+
+# List policy proposals
+icn-wallet mesh policy list
+
+# Vote on a policy proposal
+icn-wallet mesh policy vote --policy-cid bafy... --approve
+```
+
+### Policy Updates via JSON
+
+Policy updates are defined in JSON format:
+
+```json
+{
+  "reward_settings": {
+    "worker_percentage": 75,
+    "verifier_percentage": 20,
+    "platform_fee_percentage": 5
+  },
+  "verification_quorum": {
+    "required_percentage": 66,
+    "minimum_verifiers": 3
+  }
+}
+```
+
 ## Implementation Details
 
 ### Data Structures
