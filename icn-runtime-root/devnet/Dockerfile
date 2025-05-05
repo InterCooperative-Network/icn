@@ -17,8 +17,8 @@ RUN apt-get update && \
 # Copy the source code into the image
 COPY . .
 
-# Add cli to workspace members
-RUN sed -i 's/members = \[/members = \[\n    "runtime\/cli",/g' Cargo.toml
+# Add cli to workspace members (updated to use icn-runtime-root instead of runtime)
+RUN sed -i 's/members = \[/members = \[\n    "icn-runtime-root\/cli",/g' Cargo.toml
 
 # Build the ICN Runtime
 RUN cargo build --release --bin covm

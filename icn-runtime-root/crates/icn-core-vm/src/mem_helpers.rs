@@ -11,6 +11,21 @@ pub fn get_memory(caller: &mut Caller<'_, ConcreteHostEnvironment>) -> Result<Me
         .ok_or_else(|| anyhow::anyhow!("Failed to find memory export"))
 }
 
+/// Safely check memory bounds without accessing the memory
+pub fn safe_check_bounds(memory: &Memory, caller: &Caller<'_, ConcreteHostEnvironment>, ptr: u32, len: u32) -> Result<(), anyhow::Error> {
+    let mem_size = memory.data_size(caller);
+    let end_ptr = ptr.checked_add(len).ok_or_else(|| anyhow::anyhow!("Memory access would overflow"))?;
+    
+    if end_ptr as usize > mem_size {
+        return Err(anyhow::anyhow!(
+            "Memory access out of bounds: ptr={}, len={}, end={}, mem_size={}",
+            ptr, len, end_ptr, mem_size
+        ));
+    }
+    
+    Ok(())
+}
+
 /// Read a string from WASM memory
 pub fn read_memory_string<'a>(caller: &mut Caller<'a, ConcreteHostEnvironment>, ptr: i32, len: i32) -> Result<String, anyhow::Error> {
     if ptr < 0 || len < 0 {
