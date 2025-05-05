@@ -38,6 +38,18 @@ pub enum ActionType {
     
     /// Reject an action
     Reject,
+    
+    /// Publish media
+    PublishMedia,
+    
+    /// Media agreement
+    MediaAgreement,
+    
+    /// Social post
+    SocialPost,
+    
+    /// Mesh task
+    MeshTask,
 }
 
 /// Status of an action

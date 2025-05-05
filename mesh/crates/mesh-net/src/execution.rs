@@ -240,27 +240,21 @@ impl MeshExecutionEngine {
             status.insert(task_cid.clone(), TaskStatus::InProgress);
         }
         
-        // In a real implementation, this would:
-        // 1. Fetch the WASM module from the WASM_DIR or IPFS
-        // 2. Fetch the input data from the DATA_DIR or IPFS
-        // 3. Set up a WASM runtime (wasmer, wasmtime, etc.)
-        // 4. Execute the WASM module with the input data
-        // 5. Measure execution metrics (time, memory, etc.)
-        // 6. Store the output data
-        // 7. Create and sign an execution receipt
+        // Create a Wasmtime task runner
+        let worker_did = "did:icn:mesh:local".to_string();
+        let runner = crate::task_runner::WasmtimeTaskRunner::new(
+            self.wasm_dir.clone(),
+            self.data_dir.clone(),
+            self.data_dir.clone(), // Use same dir for output
+            &worker_did,
+        )?;
         
-        // For now, we'll return a mock execution receipt
-        let output_cid = Cid::default(); // In reality, this would be the CID of the output data
+        // Execute the task using the runner
+        let result = runner.execute_task(&task).await
+            .map_err(|e| anyhow!("Failed to execute task: {}", e))?;
         
-        let receipt = ExecutionReceipt {
-            worker_did: "did:icn:mesh:local".to_string(),
-            task_cid: task_cid.clone(),
-            output_cid,
-            fuel_consumed: 1000, // Mock value
-            timestamp: Utc::now(),
-            signature: vec![], // In reality, this would be a cryptographic signature
-            metadata: None,
-        };
+        // Generate an execution receipt
+        let receipt = runner.generate_receipt(&task, &result, &worker_did)?;
         
         // Update task status
         {

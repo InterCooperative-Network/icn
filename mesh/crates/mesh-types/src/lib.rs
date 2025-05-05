@@ -4,6 +4,10 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// Export task runner module
+pub mod task_runner;
+pub use task_runner::*;
+
 /// A task intent representing a request to execute a WASM module in the mesh network
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskIntent {

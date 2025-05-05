@@ -161,4 +161,14 @@ impl ActionManager {
         // This is a stub implementation
         Ok(vec![])
     }
-} 
+}
+
+pub mod crypto;
+pub mod dag;
+pub mod error;
+pub mod federation;
+pub mod identity;
+pub mod ipld;
+pub mod mesh_actions;
+pub mod storage;
+pub mod wallet; 
