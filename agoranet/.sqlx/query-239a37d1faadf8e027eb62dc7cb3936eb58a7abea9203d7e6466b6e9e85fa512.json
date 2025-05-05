@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM threads WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "creator_did",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "federation_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "topic_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "proposal_ref",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "dag_ref",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "239a37d1faadf8e027eb62dc7cb3936eb58a7abea9203d7e6466b6e9e85fa512"
+}

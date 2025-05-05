@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE messages\n            SET dag_ref = $1, dag_anchored = true\n            WHERE id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "374e4ea520f771436ad7fe7b6aae2ccaf3f53fedfd749cf99355c32f21cfe5e8"
+}
