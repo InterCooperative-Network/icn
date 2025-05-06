@@ -1,0 +1,1 @@
+//! icn-identity-core placeholder 

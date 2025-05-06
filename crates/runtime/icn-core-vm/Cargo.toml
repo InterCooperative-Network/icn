@@ -5,13 +5,13 @@ edition = "2021"
 description = "Secure WASM Virtual Machine Runtime for the ICN"
 
 [dependencies]
-icn-common = { path = "../icn-common" }
+icn-common = { path = "../../common/icn-common" }
 icn-identity = { path = "../icn-identity" }
 icn-storage = { path = "../icn-storage" }
 icn-dag = { path = "../icn-dag" }
 icn-economics = { path = "../icn-economics" }
 icn-models = { path = "../icn-models" }
-icn-wallet-sync = { path = "../../../icn-wallet-root/crates/icn-wallet-sync" }
+icn-wallet-sync = { path = "../../wallet/icn-wallet-sync" }
 wasmtime = "12.0.2"
 thiserror = { workspace = true }
 tracing = { workspace = true }

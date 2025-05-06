@@ -1,8 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    # Common utilities and shared libraries
-    "crates/common/*",
+    "crates/runtime/icn-runtime",
+    "crates/wallet/icn-wallet",
+    "crates/agoranet/agoranet-core",
+    "crates/mesh/planetary-mesh",
+    "crates/common/icn-types",
+    "crates/common/icn-identity-core",
+    "crates/tools/icn-cli"
 ]
 
 [workspace.package]

@@ -21,7 +21,7 @@ multihash = { workspace = true }
 libipld = { workspace = true }
 
 # ICN dependencies
-icn-common = { path = "../icn-common" }
+icn-common = { path = "../../common/icn-common" }
 icn-models = { path = "../icn-models" }
 icn-identity = { path = "../icn-identity" }
 

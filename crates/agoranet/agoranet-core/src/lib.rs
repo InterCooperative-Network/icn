@@ -13,4 +13,6 @@ pub mod storage;
 pub mod types;
 pub mod services;
 
-// ... rest of lib.rs or main.rs ... 
+// ... rest of lib.rs or main.rs ...
+
+//! agoranet-core placeholder 
