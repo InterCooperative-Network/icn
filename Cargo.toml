@@ -1,62 +1,27 @@
 [workspace]
 resolver = "2"
 members = [
-    "icn-runtime-root",
-    "icn-runtime-root/crates/icn-common",
-    "icn-runtime-root/crates/icn-core-vm",
-    "icn-runtime-root/crates/icn-dag",
-    "icn-runtime-root/crates/icn-economics",
-    "icn-runtime-root/crates/icn-federation",
-    "icn-runtime-root/crates/federation-lifecycle",
-    "icn-runtime-root/crates/icn-governance-kernel",
-    "icn-runtime-root/crates/icn-identity",
-    "icn-runtime-root/crates/icn-storage",
-    "icn-runtime-root/crates/icn-ccl-compiler",
-    "icn-runtime-root/crates/icn-execution-tools",
-    "icn-runtime-root/crates/icn-agoranet-integration",
-    "icn-runtime-root/crates/icn-models",
-    "icn-runtime-root/crates/icn-verifier-runtime",
-    "icn-runtime-root/cli",
-    "icn-wallet-root",
-    "icn-wallet-root/crates/icn-wallet-actions",
-    "icn-wallet-root/crates/icn-wallet-agent",
-    "icn-wallet-root/crates/icn-wallet-api",
-    "icn-wallet-root/crates/icn-wallet-core",
-    "icn-wallet-root/crates/icn-wallet-ffi",
-    "icn-wallet-root/crates/icn-wallet-identity",
-    "icn-wallet-root/crates/icn-wallet-storage",
-    "icn-wallet-root/crates/icn-wallet-sync",
-    "icn-wallet-root/crates/icn-wallet-types",
-    "agoranet",
-    "agoranet/crates/agoranet-api",
-    "tools/health_check",
-    "tools/icn-verifier",
-    "mesh/crates/mesh-types",
-    "mesh/crates/mesh-net",
-    "mesh/crates/mesh-reputation",
-    "mesh/crates/mesh-escrow",
-    "mesh/meshctl",
+    # Common utilities and shared libraries
+    "crates/common/*",
 ]
 
-# Temporarily excluded components with issues
-exclude = [
-    "frontend/*",
-    "icn-runtime-root/crates/icn-core-vm/fuzz", # Fuzz tests have their own setup
-    "icn-runtime-root/crates/common", # Duplicate of icn-common
-]
+[workspace.package]
+authors = ["Internet Cooperation Network <developer@icn.org>"]
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/intercoop-network/icn"
 
 [workspace.dependencies]
-# Common dependencies
-anyhow = "1.0"
+# Common dependencies with version specification
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
-async-trait = "0.1"
-thiserror = "1.0"
+tokio = { version = "1.28", features = ["full"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
-futures = "0.3"
-clap = { version = "4.4", features = ["derive"] }
+thiserror = "1.0"
+anyhow = "1.0"
+async-trait = "0.1"
+hex = "0.4"
 
 # Network and storage
 libp2p = "0.53"
@@ -86,16 +51,29 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.3", features = ["v4", "serde"] }
 rand = "0.8"
 sha2 = "0.10"
-hex = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 ed25519-dalek = "1.0"
 axum = "0.7.9"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "migrate"] }
 dotenv = "0.15.0"
 tokio-stream = "0.1"
+futures = "0.3"
+clap = { version = "4.4", features = ["derive"] }
 
 # Web and frontend integration
 tower = "0.4"
 tower-http = { version = "0.4", features = ["trace", "cors"] }
 hyper = { version = "0.14", features = ["full"] }
 url = "2.3"
+tracing-subscriber = "0.3"
+
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0
+debug = true

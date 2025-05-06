@@ -1,0 +1,56 @@
+[package]
+name = "icn-ccl-compiler"
+version = "0.1.0"
+edition = "2021"
+description = "Compiler for Constitutional Cooperative Language (CCL) to WASM modules"
+authors = ["InterCooperative Network"]
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+# Project internal dependencies
+icn-governance-kernel = { path = "../icn-governance-kernel" }
+icn-identity = { path = "../icn-identity" }
+icn-economics = { path = "../icn-economics" }
+icn-dag = { path = "../icn-dag" }
+
+# WASM compilation
+wasm-encoder = "0.31"
+wasmtime = "12.0.2"
+
+# Schema validation
+jsonschema = "0.17"
+
+# IPLD & DAG-CBOR serialization
+libipld = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+cid = { workspace = true }
+
+# Date and time
+chrono = "0.4"
+
+# Utilities
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { version = "1.5", features = ["v4", "serde"] }
+
+# Async
+tokio = { version = "1.0", features = ["full"] }
+futures = { workspace = true }
+
+# Optional templating
+askama = { version = "0.12", optional = true }
+tera = { version = "1.19", optional = true }
+
+[dev-dependencies]
+# For integration tests
+icn-core-vm = { path = "../icn-core-vm" }
+icn-storage = { path = "../icn-storage" }
+tempfile = "3.8"
+wasmparser = "0.116"
+
+[features]
+default = []
+templating = ["askama", "tera"] 

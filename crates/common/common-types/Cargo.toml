@@ -1,0 +1,15 @@
+[package]
+name = "common-types"
+version = "0.1.0"
+edition = "2021"
+description = "Common type definitions shared across ICN components"
+authors = ["Internet Cooperation Network <developer@icn.org>"]
+repository = "https://github.com/intercoop-network/icn"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+hex = { workspace = true } 

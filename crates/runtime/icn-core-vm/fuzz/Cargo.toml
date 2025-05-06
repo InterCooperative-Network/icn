@@ -1,0 +1,37 @@
+[package]
+name = "icn-core-vm-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+icn-core-vm = { path = ".." }
+icn-identity = { path = "../../icn-identity" }
+icn-storage = { path = "../../icn-storage" }
+icn-dag = { path = "../../icn-dag" }
+tokio = { version = "1.0", features = ["rt", "sync", "macros"] }
+cid = { workspace = true }
+rand = "0.8"
+
+[[bin]]
+name = "host_check_resource_authorization"
+path = "fuzz_targets/host_check_resource_authorization.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "host_anchor_to_dag"
+path = "fuzz_targets/host_anchor_to_dag.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "memory_operations"
+path = "fuzz_targets/memory_operations.rs"
+test = false
+doc = false 

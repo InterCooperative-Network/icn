@@ -1,0 +1,33 @@
+[package]
+name = "agoranet-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core networking and deliberation engine for the ICN system"
+authors = ["Internet Cooperation Network <developer@icn.org>"]
+repository = "https://github.com/intercoop-network/icn"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+# Web and API dependencies
+axum = "0.7.9"
+tower = "0.4"
+tower-http = { version = "0.4", features = ["trace", "cors"] }
+hyper = { version = "0.14", features = ["full"] }
+
+# Database
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "migrate"] }
+
+# Runtime integration
+common-types = { path = "../../common/common-types" }
+
+[dev-dependencies]
+tokio-test = "0.4" 

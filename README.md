@@ -1,85 +1,103 @@
-# ICN - Internet Cooperation Network
+# Internet Cooperation Network (ICN)
 
-This repository contains the core components of the Internet Cooperation Network (ICN).
+A decentralized governance and economic coordination system built using Rust. The ICN system facilitates federated decision-making and resource allocation through a WebAssembly execution environment.
 
-## Repository Structure
+## Project Structure
 
-- **wallet/** - The ICN Wallet implementation
-  - Modern, modular architecture with clean separation of concerns
-  - Support for DIDs, secure storage, and federation protocol
-  
-- **runtime/** - The ICN Runtime implementation
-  - Execution environment for ICN applications
-  - DAG-based state management
-  
-- **agoranet/** - AgoraNet implementation (federation node)
-  - Networking and synchronization for the ICN network
-  
-- **docs/** - Documentation for the ICN system
-  - Architecture guides
-  - Protocol specifications
-  
-- **scripts/** - Utility scripts for development and deployment
+The ICN project has been reorganized into a standardized monorepo structure with all components consolidated under a single workspace:
+
+```
+icn/
+├── crates/               # All Rust crates organized by component
+│   ├── runtime/          # Runtime/CoVM components
+│   ├── wallet/           # Wallet components
+│   ├── agoranet/         # AgoraNet components
+│   ├── mesh/             # Mesh compute components
+│   └── common/           # Shared utilities and libraries
+├── docs/                 # Documentation
+├── scripts/              # Build and development scripts
+└── Cargo.toml            # Workspace definition
+```
+
+For detailed information about the project structure, see [NEW_STRUCTURE.md](docs/NEW_STRUCTURE.md).
+
+## Components
+
+The ICN system consists of four primary components:
+
+1. **Runtime (CoVM v3)**: A WebAssembly execution environment that processes governance operations, enforces economic policies, and maintains federated state.
+
+2. **Wallet**: A secure, mobile-first client agent that manages user identity, credentials, and local state.
+
+3. **AgoraNet**: A REST API server and deliberation engine that facilitates inter-federation communication and governance processes.
+
+4. **Mesh Compute**: A distributed computation overlay network that enables secure, privacy-preserving task execution.
+
+## Documentation
+
+For detailed documentation on each component, refer to:
+
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Runtime Overview](docs/RUNTIME_OVERVIEW.md)
+- [Wallet Overview](docs/WALLET_OVERVIEW.md)
+- [AgoraNet Overview](docs/NETWORKING.md)
+- [Mesh Implementation](docs/MESH_IMPLEMENTATION.md)
+- [DAG Structure](docs/DAG_STRUCTURE.md)
+- [System Integration](CONSOLIDATED_SYSTEM_INTEGRATION.md)
+- [Developer Guide](CONSOLIDATED_DEVELOPER_GUIDE.md)
 
 ## Getting Started
 
 ### Prerequisites
 
-- Rust 1.70+ (`rustc` and `cargo`)
-- Node.js 18+ (for CLI tools)
+- Rust toolchain (1.70+)
+- Cargo
+- Docker (for development environments)
 
-### Building the Wallet
+### Building the Project
 
-```bash
-cd wallet
-cargo build
-```
-
-### Running the Runtime
+The project now uses a unified build system:
 
 ```bash
-cd runtime
-cargo run -- --help
+# Build all components
+./scripts/build.sh
+
+# Build specific components
+./scripts/build.sh runtime
+./scripts/build.sh wallet
+./scripts/build.sh agoranet
+./scripts/build.sh mesh
+
+# Build in release mode
+./scripts/build.sh --release
+
+# Build and run tests
+./scripts/build.sh --test
 ```
 
-### Running the Development Network
+### Development Workflow
 
-```bash
-./scripts/run_icn_devnet.sh
-```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/intercoop-network/icn.git
+   cd icn
+   ```
 
-## Architecture
+2. Build the components you want to work on:
+   ```bash
+   ./scripts/build.sh common
+   ./scripts/build.sh runtime
+   ```
 
-The ICN system consists of several key components:
-
-1. **Identity System** - DID-based identity with cryptographic verification
-2. **DAG System** - Directed Acyclic Graph for state management
-3. **Federation Protocol** - For node synchronization and consensus
-4. **Governance Kernel** - For community governance and decision making
-
-Please refer to the documentation in `docs/` for more detailed information.
-
-## Documentation
-
-For detailed information about ICN, refer to these documents:
-
-- [Architecture Overview](docs/ARCHITECTURE.md) - System architecture and components
-- [DAG Structure](docs/DAG_STRUCTURE.md) - Technical details of the DAG implementation
-- [Governance System](docs/GOVERNANCE_SYSTEM.md) - Federation governance mechanisms
-- [Federation Lifecycle](docs/FEDERATION_LIFECYCLE.md) - Federation merge and split operations
-- [Economic System](docs/ECONOMICS.md) - Token economics and resource metering
-- [Security](docs/SECURITY.md) - Security model and threat mitigations
-- [Trust Model](docs/TRUST_MODEL.md) - Trust relationships and federation design
-- [Integration Guide](docs/INTEGRATION_GUIDE.md) - Guide for developers and federation operators
+3. Run tests to ensure everything is working:
+   ```bash
+   ./scripts/build.sh common --test
+   ```
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under dual MIT/Apache-2.0 license. 
+This project is licensed under the MIT License or Apache License 2.0, at your option - see the LICENSE files for details. 

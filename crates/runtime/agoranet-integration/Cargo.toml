@@ -1,0 +1,30 @@
+[package]
+name = "agoranet-integration"
+version = "0.1.0"
+edition = "2021"
+description = "Integration layer between AgoraNet and the ICN Runtime"
+authors = ["Internet Cooperation Network <developer@icn.org>"]
+repository = "https://github.com/intercoop-network/icn"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+# Storage and IPLD
+cid = { workspace = true }
+multihash = { workspace = true }
+libipld = { workspace = true }
+libipld-core = { workspace = true }
+
+# Integration with common code
+common-types = { path = "../../common/common-types" }
+
+[dev-dependencies]
+tokio-test = "0.4" 
