@@ -35,6 +35,14 @@ impl Supervisor {
     pub async fn run(self) -> Result<()> {
         info!("Supervisor starting");
 
+        // Initialize metrics
+        icn_obs::init_metrics()?;
+
+        // Start metrics server
+        if let Err(e) = icn_obs::start_metrics_server(9090).await {
+            warn!("Failed to start metrics server: {}", e);
+        }
+
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         // Spawn actors (requires keypair from unlocked keystore)
@@ -149,6 +157,30 @@ impl Supervisor {
             );
 
             info!("Anti-entropy task spawned");
+
+            // Spawn metrics update task
+            let start_time = std::time::Instant::now();
+            let mut metrics_shutdown = self.shutdown_tx.subscribe();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Update uptime
+                            let uptime_secs = start_time.elapsed().as_secs();
+                            icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
+
+                            // Count active actors (network + gossip + ledger + rpc + anti-entropy = 5)
+                            icn_obs::metrics::system::actors_active_set(5);
+                        }
+                        _ = metrics_shutdown.recv() => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            info!("Metrics update task spawned");
 
             (Some(network_handle), Some(gossip_handle), Some(ledger_handle))
         } else {
