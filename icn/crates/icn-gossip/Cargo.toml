@@ -14,3 +14,5 @@ thiserror.workspace = true
 tracing.workspace = true
 bytes.workspace = true
 futures.workspace = true
+sha2 = "0.10"
+hex = "0.4"
