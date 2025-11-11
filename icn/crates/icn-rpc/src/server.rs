@@ -126,6 +126,11 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "ledger.head" => handle_ledger_head(req.id, state).await,
         "ledger.balance" => handle_ledger_balance(req.id, &req.params, state).await,
         "ledger.history" => handle_ledger_history(req.id, &req.params, state).await,
+        "ledger.quarantine.list" => handle_quarantine_list(req.id, state).await,
+        "ledger.quarantine.get" => handle_quarantine_get(req.id, &req.params, state).await,
+        "ledger.quarantine.release" => handle_quarantine_release(req.id, &req.params, state).await,
+        "ledger.quarantine.drop" => handle_quarantine_drop(req.id, &req.params, state).await,
+        "ledger.quarantine.purge" => handle_quarantine_purge(req.id, state).await,
         "contract.deploy" => handle_contract_deploy(req.id, &req.params, state).await,
         "contract.call" => handle_contract_call(req.id, &req.params, state).await,
         "contract.list" => handle_contract_list(req.id, state).await,
@@ -645,6 +650,244 @@ async fn handle_contract_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
         .collect();
 
     RpcResponse::success(id, serde_json::json!({ "contracts": contracts_rpc }))
+}
+
+/// Handle ledger.quarantine.list RPC call - list all quarantined entries
+async fn handle_quarantine_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+        }
+    };
+
+    let ledger = ledger_handle.read().await;
+    match ledger.quarantine().list() {
+        Ok(items) => {
+            let items_json: Vec<serde_json::Value> = items
+                .iter()
+                .map(|item| {
+                    serde_json::json!({
+                        "entry_id": item.entry_id.to_hex(),
+                        "reason": format!("{:?}", item.reason),
+                        "author": format!("{:?}", item.author),
+                        "observed_at": item.observed_at,
+                        "metadata": item.metadata,
+                    })
+                })
+                .collect();
+
+            RpcResponse::success(id, serde_json::json!({ "quarantined": items_json }))
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list quarantine: {}", e)),
+    }
+}
+
+/// Handle ledger.quarantine.get RPC call - get a specific quarantined entry
+async fn handle_quarantine_get(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct GetParams {
+        entry_id: String,
+    }
+
+    let get_params: GetParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse entry ID
+    let hash_bytes = match hex::decode(&get_params.entry_id) {
+        Ok(bytes) if bytes.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            arr
+        }
+        _ => {
+            return RpcResponse::error(id, -32602, "Invalid entry ID format".to_string());
+        }
+    };
+    let entry_id = icn_ledger::ContentHash::from_bytes(hash_bytes);
+
+    let ledger = ledger_handle.read().await;
+    match ledger.quarantine().get(&entry_id) {
+        Ok(Some((entry, item))) => {
+            let result = serde_json::json!({
+                "entry": {
+                    "id": entry.id.map(|id| id.to_hex()),
+                    "author": format!("{:?}", entry.author),
+                    "parents": entry.parents.iter().map(|p| p.to_hex()).collect::<Vec<_>>(),
+                    "timestamp": entry.timestamp,
+                    "num_accounts": entry.accounts.len(),
+                },
+                "quarantine_info": {
+                    "entry_id": item.entry_id.to_hex(),
+                    "reason": format!("{:?}", item.reason),
+                    "author": format!("{:?}", item.author),
+                    "observed_at": item.observed_at,
+                    "metadata": item.metadata,
+                }
+            });
+            RpcResponse::success(id, result)
+        }
+        Ok(None) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get quarantine entry: {}", e)),
+    }
+}
+
+/// Handle ledger.quarantine.release RPC call - release an entry for retry
+async fn handle_quarantine_release(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct ReleaseParams {
+        entry_id: String,
+    }
+
+    let release_params: ReleaseParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse entry ID
+    let hash_bytes = match hex::decode(&release_params.entry_id) {
+        Ok(bytes) if bytes.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            arr
+        }
+        _ => {
+            return RpcResponse::error(id, -32602, "Invalid entry ID format".to_string());
+        }
+    };
+    let entry_id = icn_ledger::ContentHash::from_bytes(hash_bytes);
+
+    let mut ledger = ledger_handle.write().await;
+    match ledger.quarantine_mut().release(&entry_id) {
+        Ok(Some(entry)) => {
+            // Try to append the released entry back to the ledger
+            match ledger.append_entry(entry) {
+                Ok(_) => RpcResponse::success(
+                    id,
+                    serde_json::json!({
+                        "released": true,
+                        "reappended": true,
+                        "entry_id": entry_id.to_hex()
+                    }),
+                ),
+                Err(e) => RpcResponse::success(
+                    id,
+                    serde_json::json!({
+                        "released": true,
+                        "reappended": false,
+                        "error": format!("{}", e),
+                        "entry_id": entry_id.to_hex()
+                    }),
+                ),
+            }
+        }
+        Ok(None) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to release entry: {}", e)),
+    }
+}
+
+/// Handle ledger.quarantine.drop RPC call - permanently drop an entry
+async fn handle_quarantine_drop(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct DropParams {
+        entry_id: String,
+    }
+
+    let drop_params: DropParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse entry ID
+    let hash_bytes = match hex::decode(&drop_params.entry_id) {
+        Ok(bytes) if bytes.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            arr
+        }
+        _ => {
+            return RpcResponse::error(id, -32602, "Invalid entry ID format".to_string());
+        }
+    };
+    let entry_id = icn_ledger::ContentHash::from_bytes(hash_bytes);
+
+    let mut ledger = ledger_handle.write().await;
+    match ledger.quarantine_mut().drop(&entry_id) {
+        Ok(true) => RpcResponse::success(
+            id,
+            serde_json::json!({
+                "dropped": true,
+                "entry_id": entry_id.to_hex()
+            }),
+        ),
+        Ok(false) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to drop entry: {}", e)),
+    }
+}
+
+/// Handle ledger.quarantine.purge RPC call - purge all expired entries
+async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+        }
+    };
+
+    let mut ledger = ledger_handle.write().await;
+    match ledger.quarantine_mut().purge_expired() {
+        Ok(purged) => RpcResponse::success(
+            id,
+            serde_json::json!({
+                "purged": purged
+            }),
+        ),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to purge expired entries: {}", e)),
+    }
 }
 
 /// Create a JSON response
