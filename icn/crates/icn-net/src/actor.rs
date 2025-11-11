@@ -268,12 +268,21 @@ impl NetworkActor {
             }
 
             NetworkMsg::Dial { addr, did, response } => {
-                let result = self
-                    .session_manager
-                    .read()
+                // Timeout for dial operation (30 seconds to allow for slow networks)
+                const DIAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+                let dial_future = async {
+                    self.session_manager
+                        .read()
+                        .await
+                        .dial(addr, did.as_str().to_string())
+                        .await
+                };
+
+                let result = tokio::time::timeout(DIAL_TIMEOUT, dial_future)
                     .await
-                    .dial(addr, did.as_str().to_string())
-                    .await
+                    .context("Timeout dialing peer")
+                    .and_then(|r| r)
                     .map(|_| {
                         // Increment connection counter
                         let stats = self.stats.clone();
@@ -325,25 +334,46 @@ impl NetworkActor {
 
     /// Send a message to a specific peer
     async fn send_message_to_peer(&self, did: &Did, message: NetworkMessage) -> Result<()> {
-        // Get connection for this peer
-        let connections = self.session_manager.read().await.connections().await;
-        let connection = connections
-            .iter()
-            .find(|(peer_did, _)| peer_did == did.as_str())
-            .map(|(_, conn)| conn.clone())
-            .context("No connection to peer")?;
+        // Timeout for the entire send operation (10 seconds)
+        const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
-        // Open a new stream and send the message
-        let (mut send, _recv) = connection
-            .open_bi()
+        let send_future = async {
+            // Get connection for this peer
+            let connections = self.session_manager.read().await.connections().await;
+            let connection = connections
+                .iter()
+                .find(|(peer_did, _)| peer_did == did.as_str())
+                .map(|(_, conn)| conn.clone())
+                .context("No connection to peer")?;
+
+            // Open a new stream (with timeout to prevent hanging on stream open)
+            let (mut send, _recv) = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                connection.open_bi(),
+            )
             .await
+            .context("Timeout opening stream to peer")?
             .context("Failed to open stream")?;
 
-        write_message(&mut send, &message)
+            // Write message (with timeout to prevent hanging on slow writes)
+            tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                write_message(&mut send, &message),
+            )
             .await
+            .context("Timeout writing message to peer")?
             .context("Failed to write message")?;
 
-        send.finish().context("Failed to finish stream")?;
+            send.finish().context("Failed to finish stream")?;
+
+            Ok::<(), anyhow::Error>(())
+        };
+
+        // Apply overall timeout to the entire operation
+        tokio::time::timeout(SEND_TIMEOUT, send_future)
+            .await
+            .context("Timeout sending message to peer")?
+            .context("Failed to send message")?;
 
         // Track metrics
         icn_obs::metrics::network::messages_sent_inc();
@@ -353,17 +383,28 @@ impl NetworkActor {
 
     /// Broadcast a message to all connected peers
     async fn broadcast_message(&self, message: NetworkMessage) -> Result<()> {
+        // Timeout for each peer send operation (5 seconds)
+        const PEER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
         let connections = self.session_manager.read().await.connections().await;
 
         // Send to all connected peers
         let mut sent_count = 0;
         for (_did, connection) in connections {
-            // Open a new stream and send the message
-            if let Ok((mut send, _recv)) = connection.open_bi().await {
-                if write_message(&mut send, &message).await.is_ok() {
-                    let _ = send.finish();
-                    sent_count += 1;
-                }
+            // Use timeout for each peer to prevent one slow peer from blocking broadcast
+            let send_result = tokio::time::timeout(PEER_TIMEOUT, async {
+                // Open a new stream and send the message
+                let (mut send, _recv) = connection.open_bi().await?;
+                write_message(&mut send, &message).await?;
+                send.finish()?;
+                Ok::<(), anyhow::Error>(())
+            }).await;
+
+            if send_result.is_ok() {
+                sent_count += 1;
+            } else {
+                // Log timeout or error but continue with other peers
+                warn!("Failed to broadcast to peer (timeout or error)");
             }
         }
 
