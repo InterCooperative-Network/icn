@@ -16,13 +16,15 @@ use tracing::{debug, error, info, warn};
 
 use icn_net::NetworkHandle;
 use icn_ledger::Ledger;
+use icn_ccl::ContractRuntime;
 
-use crate::types::{LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{ContractExecutionResponse, ContractInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
 
 /// RPC server state
 pub struct RpcServer {
     network_handle: Option<Arc<RwLock<NetworkHandle>>>,
     ledger_handle: Option<Arc<RwLock<Ledger>>>,
+    contract_runtime: Option<Arc<RwLock<ContractRuntime>>>,
     listen_addr: SocketAddr,
 }
 
@@ -32,6 +34,7 @@ impl RpcServer {
         RpcServer {
             network_handle: None,
             ledger_handle: None,
+            contract_runtime: None,
             listen_addr,
         }
     }
@@ -44,6 +47,11 @@ impl RpcServer {
     /// Set the ledger handle (called after Ledger initializes)
     pub fn set_ledger_handle(&mut self, handle: Arc<RwLock<Ledger>>) {
         self.ledger_handle = Some(handle);
+    }
+
+    /// Set the contract runtime handle (called after ContractRuntime initializes)
+    pub fn set_contract_runtime(&mut self, handle: Arc<RwLock<ContractRuntime>>) {
+        self.contract_runtime = Some(handle);
     }
 
     /// Start the RPC server
@@ -118,6 +126,9 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "ledger.head" => handle_ledger_head(req.id, state).await,
         "ledger.balance" => handle_ledger_balance(req.id, &req.params, state).await,
         "ledger.history" => handle_ledger_history(req.id, &req.params, state).await,
+        "contract.deploy" => handle_contract_deploy(req.id, &req.params, state).await,
+        "contract.call" => handle_contract_call(req.id, &req.params, state).await,
+        "contract.list" => handle_contract_list(req.id, state).await,
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -442,6 +453,189 @@ async fn handle_ledger_history(
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {}", e)),
     }
+}
+
+/// Handle contract.deploy RPC call - deploy a new contract
+async fn handle_contract_deploy(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let contract_runtime = match &state.contract_runtime {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Contract runtime not available".to_string(),
+            );
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct DeployParams {
+        contract_json: String,
+    }
+
+    let deploy_params: DeployParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse contract from JSON
+    let contract: icn_ccl::Contract = match serde_json::from_str(&deploy_params.contract_json) {
+        Ok(c) => c,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid contract JSON: {}", e));
+        }
+    };
+
+    // Compute contract hash (simplified - in production would use proper content addressing)
+    let contract_bytes = deploy_params.contract_json.as_bytes();
+    let hash_bytes = {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(contract_bytes);
+        let result = hasher.finalize();
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&result[..]);
+        arr
+    };
+    let code_hash = icn_ledger::ContentHash::from_bytes(hash_bytes);
+
+    // Install contract
+    let mut runtime = contract_runtime.write().await;
+    match runtime.install_contract(code_hash.clone(), contract) {
+        Ok(_) => {
+            let response = serde_json::json!({
+                "code_hash": code_hash.to_hex(),
+                "success": true,
+            });
+            RpcResponse::success(id, response)
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to deploy contract: {}", e)),
+    }
+}
+
+/// Handle contract.call RPC call - execute a contract rule
+async fn handle_contract_call(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let contract_runtime = match &state.contract_runtime {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Contract runtime not available".to_string(),
+            );
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct CallParams {
+        code_hash: String,
+        rule_name: String,
+        caller: String,
+        args: serde_json::Value,
+    }
+
+    let call_params: CallParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse code hash
+    let hash_bytes = match hex::decode(&call_params.code_hash) {
+        Ok(bytes) if bytes.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            arr
+        }
+        _ => {
+            return RpcResponse::error(id, -32602, "Invalid code hash format".to_string());
+        }
+    };
+    let code_hash = icn_ledger::ContentHash::from_bytes(hash_bytes);
+
+    // Parse caller DID
+    let caller_did = match serde_json::from_value(serde_json::Value::String(call_params.caller.clone())) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
+        }
+    };
+
+    // Parse arguments
+    let args: std::collections::HashMap<String, icn_ccl::Value> = match serde_json::from_value(call_params.args) {
+        Ok(a) => a,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid args: {}", e));
+        }
+    };
+
+    // Create execution context with generous fuel
+    let context = icn_ccl::ExecutionContext::new(
+        caller_did,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        10000, // Generous fuel limit
+        vec![], // No capabilities for now
+        vec![], // No participants for now
+    );
+
+    // Execute rule
+    let mut runtime = contract_runtime.write().await;
+    match runtime.execute_rule(&code_hash, &call_params.rule_name, context, args).await {
+        Ok(result) => {
+            let response_value = serde_json::to_value(&result.value)
+                .unwrap_or_else(|_| serde_json::json!(null));
+
+            let response = ContractExecutionResponse {
+                success: true,
+                fuel_consumed: result.fuel_consumed,
+                return_value: response_value,
+            };
+
+            match serde_json::to_value(&response) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Contract execution failed: {}", e)),
+    }
+}
+
+/// Handle contract.list RPC call - list all installed contracts
+async fn handle_contract_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let contract_runtime = match &state.contract_runtime {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Contract runtime not available".to_string(),
+            );
+        }
+    };
+
+    // Note: ContractRuntime doesn't expose a method to list all contracts
+    // For now, return an error indicating this needs to be implemented
+    RpcResponse::error(
+        id,
+        -32000,
+        "Contract listing not yet implemented in runtime".to_string(),
+    )
 }
 
 /// Create a JSON response

@@ -78,6 +78,24 @@ pub struct LedgerAccountDelta {
     pub credit: Option<i64>,
 }
 
+/// Contract information (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractInfo {
+    pub code_hash: String,
+    pub name: String,
+    pub participants: Vec<String>,
+    pub currency: Option<String>,
+    pub rules: Vec<String>,
+}
+
+/// Contract execution response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractExecutionResponse {
+    pub success: bool,
+    pub fuel_consumed: u64,
+    pub return_value: serde_json::Value,
+}
+
 impl RpcResponse {
     pub fn success(id: u64, result: serde_json::Value) -> Self {
         RpcResponse {

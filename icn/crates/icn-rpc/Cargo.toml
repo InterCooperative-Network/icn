@@ -14,8 +14,11 @@ hyper.workspace = true
 hyper-util = "0.1"
 http-body-util = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
+sha2 = "0.10"
+hex = "0.4"
 
 # ICN crates
 icn-identity.workspace = true
 icn-net.workspace = true
 icn-ledger.workspace = true
+icn-ccl.workspace = true

@@ -23,6 +23,7 @@ icn-net.workspace = true
 icn-rpc.workspace = true
 icn-gossip.workspace = true
 icn-ledger.workspace = true
+icn-ccl.workspace = true
 icn-obs.workspace = true
 
 [dev-dependencies]

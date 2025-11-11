@@ -67,6 +67,12 @@ impl Supervisor {
 
             info!("Ledger initialized at {}", store_path.display());
 
+            // Initialize Contract Runtime
+            let contract_runtime = icn_ccl::ContractRuntime::new(ledger_handle.clone());
+            let contract_runtime_handle = Arc::new(tokio::sync::RwLock::new(contract_runtime));
+
+            info!("Contract runtime initialized");
+
             // TODO: Spawn Identity actor
             // let identity_handle = IdentityActor::spawn(
             //     self.config.keystore_path(),
@@ -234,12 +240,13 @@ impl Supervisor {
 
             info!("Gossip send callback configured");
 
-            // Spawn RPC server with network and ledger handles
+            // Spawn RPC server with network, ledger, and contract handles
             let rpc_port = self.config.network.rpc_port;
             let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
             let mut rpc_server = RpcServer::new(rpc_addr);
             rpc_server.set_network_handle(network_handle.clone());
             rpc_server.set_ledger_handle(ledger_handle.clone());
+            rpc_server.set_contract_runtime(contract_runtime_handle.clone());
 
             tokio::spawn(async move {
                 if let Err(e) = rpc_server.run().await {
