@@ -257,6 +257,16 @@ impl Supervisor {
 
             info!("Anti-entropy task spawned");
 
+            // Start periodic digest emitter
+            let _digest_emitter_handle = icn_gossip::start_digest_emitter(
+                gossip_handle.clone(),
+                10_000, // 10 seconds base interval
+                2_000,  // ±2 seconds jitter
+                self.shutdown_tx.subscribe(),
+            );
+
+            info!("Digest emitter spawned");
+
             // Spawn metrics update task
             let start_time = std::time::Instant::now();
             let network_handle_metrics = network_handle.clone();
@@ -270,8 +280,8 @@ impl Supervisor {
                             let uptime_secs = start_time.elapsed().as_secs();
                             icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
 
-                            // Count active actors (network + gossip + ledger + rpc + anti-entropy = 5)
-                            icn_obs::metrics::system::actors_active_set(5);
+                            // Count active actors (network + gossip + ledger + rpc + anti-entropy + digest-emitter = 6)
+                            icn_obs::metrics::system::actors_active_set(6);
 
                             // Update network stats (this also updates metrics via GetStats handler)
                             let _ = network_handle_metrics.get_stats().await;
