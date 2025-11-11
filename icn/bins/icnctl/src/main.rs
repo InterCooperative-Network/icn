@@ -300,6 +300,17 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
                 );
             }
 
+            // Verify passphrase before allowing export
+            let passphrase = read_passphrase("Enter passphrase to authorize export: ")?;
+
+            // Open and unlock keystore to verify ownership
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)
+                .context("Failed to unlock keystore. Incorrect passphrase.")?;
+
+            // Get DID for export confirmation
+            let did = keystore.get_keypair()?.did().clone();
+
             // Create output directory if needed
             if let Some(parent) = output.parent() {
                 std::fs::create_dir_all(parent)
@@ -311,6 +322,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
                 .with_context(|| format!("Failed to export keystore to {}", output.display()))?;
 
             println!("✓ Identity exported successfully!");
+            println!("  DID:  {}", did);
             println!("  From: {}", keystore_path.display());
             println!("  To:   {}", output.display());
             println!("\nIMPORTANT:");
