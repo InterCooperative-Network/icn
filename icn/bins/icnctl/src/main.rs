@@ -8,6 +8,7 @@ use icn_trust::{TrustEdge, TrustGraph};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use zeroize::Zeroizing;
 
 #[derive(Parser, Debug)]
 #[command(name = "icnctl")]
@@ -283,15 +284,91 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
         }
 
         IdCommands::Export { output } => {
-            println!("Export: Not implemented yet");
-            println!("  Output: {}", output.display());
-            // TODO: Implement export
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!(
+                    "No identity found at {}. Run 'id init' first.",
+                    keystore_path.display()
+                );
+            }
+
+            // Check if output file already exists
+            if output.exists() {
+                bail!(
+                    "Output file already exists: {}. Remove it first or choose a different path.",
+                    output.display()
+                );
+            }
+
+            // Create output directory if needed
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent)
+                    .context("Failed to create output directory")?;
+            }
+
+            // Copy the encrypted keystore to output
+            std::fs::copy(&keystore_path, &output)
+                .with_context(|| format!("Failed to export keystore to {}", output.display()))?;
+
+            println!("✓ Identity exported successfully!");
+            println!("  From: {}", keystore_path.display());
+            println!("  To:   {}", output.display());
+            println!("\nIMPORTANT:");
+            println!("  • Store this file securely");
+            println!("  • The file is encrypted with your passphrase");
+            println!("  • You'll need the same passphrase to import it");
         }
 
         IdCommands::Import { input } => {
-            println!("Import: Not implemented yet");
-            println!("  Input: {}", input.display());
-            // TODO: Implement import
+            // Check if input file exists
+            if !input.exists() {
+                bail!("Input file not found: {}", input.display());
+            }
+
+            // Check if target keystore already exists
+            if keystore_path.exists() {
+                // Prompt for confirmation
+                print!(
+                    "Identity already exists at {}. Overwrite? (y/N): ",
+                    keystore_path.display()
+                );
+                io::stdout().flush()?;
+
+                let mut response = String::new();
+                io::stdin().read_line(&mut response)?;
+                if !response.trim().eq_ignore_ascii_case("y") {
+                    println!("Import cancelled.");
+                    return Ok(());
+                }
+
+                println!("Overwriting existing identity...");
+            }
+
+            // Create data directory if needed
+            std::fs::create_dir_all(data_dir)
+                .context("Failed to create data directory")?;
+
+            // Verify the input file by attempting to load it
+            print!("Enter passphrase for imported identity: ");
+            io::stdout().flush()?;
+            let passphrase = rpassword::read_password()?;
+            let passphrase = Zeroizing::new(passphrase.into_bytes());
+
+            // Test unlock on the input file
+            let mut test_keystore = AgeKeyStore::new(&input);
+            test_keystore.unlock(&passphrase)
+                .context("Failed to unlock imported keystore. Check your passphrase.")?;
+
+            let imported_did = test_keystore.get_keypair()?.did().clone();
+
+            // Copy the validated keystore to target location
+            std::fs::copy(&input, &keystore_path)
+                .with_context(|| format!("Failed to import keystore to {}", keystore_path.display()))?;
+
+            println!("\n✓ Identity imported successfully!");
+            println!("  From: {}", input.display());
+            println!("  To:   {}", keystore_path.display());
+            println!("  DID:  {}", imported_did);
         }
     }
 

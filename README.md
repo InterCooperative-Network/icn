@@ -184,11 +184,11 @@ cargo build --release
 # Rotate keys
 ./target/release/icnctl id rotate
 
-# Export backup (coming soon)
-# ./target/release/icnctl id export backup.age
+# Export backup
+./target/release/icnctl id export backup.age
 
-# Import backup (coming soon)
-# ./target/release/icnctl id import backup.age
+# Import backup
+./target/release/icnctl id import backup.age
 ```
 
 ### Trust Management
