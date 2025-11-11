@@ -157,6 +157,22 @@ pub fn init_descriptions() {
         "icn_ledger_transaction_amount",
         "Distribution of transaction amounts"
     );
+    describe_counter!(
+        "icn_ledger_merge_conflicts_total",
+        "Total number of merge conflicts detected"
+    );
+    describe_counter!(
+        "icn_ledger_entries_quarantined_total",
+        "Total number of entries quarantined"
+    );
+    describe_counter!(
+        "icn_ledger_entries_discarded_total",
+        "Total number of entries discarded during merge"
+    );
+    describe_gauge!(
+        "icn_ledger_quarantine_size",
+        "Current number of entries in quarantine"
+    );
 
     // System metrics
     describe_gauge!(
@@ -330,6 +346,22 @@ pub mod ledger {
 
     pub fn transaction_amount_record(amount: i64) {
         histogram!("icn_ledger_transaction_amount").record(amount.abs() as f64);
+    }
+
+    pub fn merge_conflicts_inc() {
+        counter!("icn_ledger_merge_conflicts_total").increment(1);
+    }
+
+    pub fn entries_quarantined_inc() {
+        counter!("icn_ledger_entries_quarantined_total").increment(1);
+    }
+
+    pub fn entries_discarded_inc() {
+        counter!("icn_ledger_entries_discarded_total").increment(1);
+    }
+
+    pub fn quarantine_size_set(size: u64) {
+        gauge!("icn_ledger_quarantine_size").set(size as f64);
     }
 }
 

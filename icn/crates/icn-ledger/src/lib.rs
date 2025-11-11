@@ -46,10 +46,14 @@ pub mod balance;
 pub mod entry;
 pub mod hash;
 pub mod ledger;
+pub mod merge;
+pub mod quarantine;
 pub mod sync;
 pub mod types;
 
 pub use ledger::Ledger;
+pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
+pub use quarantine::QuarantineStore;
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, Currency, JournalEntry, QuarantinedEntry,
