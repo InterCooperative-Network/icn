@@ -4,6 +4,21 @@ use crate::types::Value;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 
+/// Maximum contract name length
+const MAX_NAME_LENGTH: usize = 128;
+
+/// Maximum loop nesting depth
+const MAX_LOOP_DEPTH: usize = 5;
+
+/// Maximum expression depth
+const MAX_EXPR_DEPTH: usize = 50;
+
+/// Reserved keywords that cannot be used as variable names
+const RESERVED_KEYWORDS: &[&str] = &[
+    "if", "else", "for", "return", "true", "false", "none",
+    "ledger_transfer", "set_credit_limit", "caller", "self",
+];
+
 /// A complete contract definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contract {
@@ -232,6 +247,180 @@ impl Contract {
     pub fn get_rule(&self, name: &str) -> Option<&Rule> {
         self.rules.iter().find(|r| r.name == name)
     }
+
+    /// Validate contract structure and sanitize inputs
+    ///
+    /// Checks for:
+    /// - Valid names (non-empty, length limits)
+    /// - No reserved keywords used as identifiers
+    /// - No name collisions (state vars, rules, params)
+    /// - Bounded loop nesting depth
+    /// - Bounded expression depth
+    pub fn validate(&self) -> anyhow::Result<()> {
+        use anyhow::{bail, Context};
+        use std::collections::HashSet;
+
+        // Validate contract name
+        if self.name.is_empty() {
+            bail!("Contract name cannot be empty");
+        }
+        if self.name.len() > MAX_NAME_LENGTH {
+            bail!("Contract name too long: {} chars (max {})", self.name.len(), MAX_NAME_LENGTH);
+        }
+        if RESERVED_KEYWORDS.contains(&self.name.as_str()) {
+            bail!("Contract name '{}' is a reserved keyword", self.name);
+        }
+
+        // Validate currency
+        if let Some(ref currency) = self.currency {
+            if currency.is_empty() {
+                bail!("Currency name cannot be empty");
+            }
+            if currency.len() > MAX_NAME_LENGTH {
+                bail!("Currency name too long");
+            }
+        }
+
+        // Check for duplicate state variable names
+        let mut state_names = HashSet::new();
+        for var in &self.state_vars {
+            if var.name.is_empty() {
+                bail!("State variable name cannot be empty");
+            }
+            if var.name.len() > MAX_NAME_LENGTH {
+                bail!("State variable name '{}' too long", var.name);
+            }
+            if RESERVED_KEYWORDS.contains(&var.name.as_str()) {
+                bail!("State variable name '{}' is a reserved keyword", var.name);
+            }
+            if !state_names.insert(&var.name) {
+                bail!("Duplicate state variable name: {}", var.name);
+            }
+        }
+
+        // Validate rules
+        let mut rule_names = HashSet::new();
+        for rule in &self.rules {
+            // Validate rule name
+            if rule.name.is_empty() {
+                bail!("Rule name cannot be empty");
+            }
+            if rule.name.len() > MAX_NAME_LENGTH {
+                bail!("Rule name '{}' too long", rule.name);
+            }
+            if RESERVED_KEYWORDS.contains(&rule.name.as_str()) {
+                bail!("Rule name '{}' is a reserved keyword", rule.name);
+            }
+            if !rule_names.insert(&rule.name) {
+                bail!("Duplicate rule name: {}", rule.name);
+            }
+
+            // Validate parameters
+            let mut param_names = HashSet::new();
+            for param in &rule.params {
+                if param.name.is_empty() {
+                    bail!("Parameter name cannot be empty in rule '{}'", rule.name);
+                }
+                if param.name.len() > MAX_NAME_LENGTH {
+                    bail!("Parameter name '{}' too long in rule '{}'", param.name, rule.name);
+                }
+                if RESERVED_KEYWORDS.contains(&param.name.as_str()) {
+                    bail!("Parameter name '{}' is a reserved keyword in rule '{}'", param.name, rule.name);
+                }
+                if state_names.contains(&param.name) {
+                    bail!("Parameter '{}' shadows state variable in rule '{}'", param.name, rule.name);
+                }
+                if !param_names.insert(&param.name) {
+                    bail!("Duplicate parameter name '{}' in rule '{}'", param.name, rule.name);
+                }
+            }
+
+            // Validate loop nesting depth in rule body
+            Self::validate_stmt_depth(&rule.body, 0).context(format!("In rule '{}'", rule.name))?;
+
+            // Validate expression depth in requires
+            for (i, require) in rule.requires.iter().enumerate() {
+                Self::validate_expr_depth(require, 0)
+                    .context(format!("In rule '{}' require #{}", rule.name, i))?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate loop nesting depth in statements
+    fn validate_stmt_depth(stmts: &[Stmt], current_depth: usize) -> anyhow::Result<()> {
+        use anyhow::bail;
+
+        for stmt in stmts {
+            match stmt {
+                Stmt::For { body, .. } => {
+                    if current_depth >= MAX_LOOP_DEPTH {
+                        bail!("Loop nesting too deep: {} (max {})", current_depth + 1, MAX_LOOP_DEPTH);
+                    }
+                    Self::validate_stmt_depth(body, current_depth + 1)?;
+                }
+                Stmt::If { then_block, else_block, .. } => {
+                    Self::validate_stmt_depth(then_block, current_depth)?;
+                    if let Some(else_stmts) = else_block {
+                        Self::validate_stmt_depth(else_stmts, current_depth)?;
+                    }
+                }
+                Stmt::Assign { value, .. } => {
+                    Self::validate_expr_depth(value, 0)?;
+                }
+                Stmt::LedgerTransfer { from, to, amount, currency } => {
+                    Self::validate_expr_depth(from, 0)?;
+                    Self::validate_expr_depth(to, 0)?;
+                    Self::validate_expr_depth(amount, 0)?;
+                    Self::validate_expr_depth(currency, 0)?;
+                }
+                Stmt::SetCreditLimit { account, currency, limit } => {
+                    Self::validate_expr_depth(account, 0)?;
+                    Self::validate_expr_depth(currency, 0)?;
+                    Self::validate_expr_depth(limit, 0)?;
+                }
+                Stmt::Return { value } => {
+                    Self::validate_expr_depth(value, 0)?;
+                }
+                Stmt::Expr(expr) => {
+                    Self::validate_expr_depth(expr, 0)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate expression depth to prevent stack overflow
+    fn validate_expr_depth(expr: &Expr, current_depth: usize) -> anyhow::Result<()> {
+        use anyhow::bail;
+
+        if current_depth >= MAX_EXPR_DEPTH {
+            bail!("Expression nesting too deep: {} (max {})", current_depth, MAX_EXPR_DEPTH);
+        }
+
+        match expr {
+            Expr::BinOp { left, right, .. } => {
+                Self::validate_expr_depth(left, current_depth + 1)?;
+                Self::validate_expr_depth(right, current_depth + 1)?;
+            }
+            Expr::UnOp { operand, .. } => {
+                Self::validate_expr_depth(operand, current_depth + 1)?;
+            }
+            Expr::Call { args, .. } => {
+                for arg in args {
+                    Self::validate_expr_depth(arg, current_depth + 1)?;
+                }
+            }
+            Expr::List(items) => {
+                for item in items {
+                    Self::validate_expr_depth(item, current_depth + 1)?;
+                }
+            }
+            _ => {} // Literals and variables don't increase depth
+        }
+        Ok(())
+    }
 }
 
 impl Rule {
@@ -261,5 +450,70 @@ impl Rule {
     pub fn add_stmt(mut self, stmt: Stmt) -> Self {
         self.body.push(stmt);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icn_identity::KeyPair;
+
+    #[test]
+    fn test_empty_contract_name() {
+        let contract = Contract::new("".to_string());
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
+    }
+
+    #[test]
+    fn test_reserved_keyword_as_name() {
+        let contract = Contract::new("if".to_string());
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("reserved keyword"));
+    }
+
+    #[test]
+    fn test_duplicate_state_var() {
+        let contract = Contract::new("test".to_string())
+            .add_state_var("count".to_string(), Value::Int(0))
+            .add_state_var("count".to_string(), Value::Int(1));
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Duplicate"));
+    }
+
+    #[test]
+    fn test_valid_contract() {
+        let kp = KeyPair::generate().unwrap();
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_state_var("count".to_string(), Value::Int(0))
+            .with_currency("hours".to_string());
+        assert!(contract.validate().is_ok());
+    }
+
+    #[test]
+    fn test_too_long_name() {
+        let long_name = "a".repeat(MAX_NAME_LENGTH + 1);
+        let contract = Contract::new(long_name);
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too long"));
+    }
+
+    #[test]
+    fn test_duplicate_rule_name() {
+        let rule1 = Rule::new("transfer".to_string());
+        let rule2 = Rule::new("transfer".to_string());
+
+        let contract = Contract::new("test".to_string())
+            .add_rule(rule1)
+            .add_rule(rule2);
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Duplicate rule"));
     }
 }

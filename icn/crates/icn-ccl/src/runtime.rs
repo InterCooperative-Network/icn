@@ -41,6 +41,9 @@ impl ContractRuntime {
     ) -> Result<()> {
         info!("Installing contract: {} ({})", contract.name, code_hash);
 
+        // Validate contract structure before installation
+        contract.validate().context("Contract validation failed")?;
+
         // Initialize state with state variables
         let mut state = ContractState::new();
         for state_var in &contract.state_vars {
