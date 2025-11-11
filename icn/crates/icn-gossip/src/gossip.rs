@@ -403,22 +403,17 @@ impl GossipActor {
                 icn_obs::metrics::gossip::responses_received_inc();
                 debug!("Received Response: topic={}, hash={:?}", entry.topic, entry.hash);
 
-                // Store the entry
-                self.entries
-                    .entry(entry.topic.clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(entry.hash, entry.clone());
-
-                // Update bloom filter
-                if let Some(filter) = self.bloom_filters.get_mut(&entry.topic) {
-                    filter.insert(&entry.hash);
-                }
+                // Store the entry using store_entry() to ensure:
+                // 1. Subscriber notifications are triggered
+                // 2. Vector clock is merged
+                // 3. max_entries limit is enforced
+                // 4. Duplicate entries are detected
+                self.store_entry(entry)?;
 
                 // Track metrics
                 icn_obs::metrics::gossip::entries_received_inc();
                 self.update_gauge_metrics();
 
-                debug!("Stored entry in topic: {}", entry.topic);
                 Ok(())
             }
 
