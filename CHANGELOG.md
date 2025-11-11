@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 7 Pull Protocol Completion (2025-01-11)
+
+**Gossip Pull Protocol:**
+- **Pull protocol now fully operational** with verified end-to-end convergence
+  - Digest emission background task with jitter (10s ± 2s)
+  - Pull request/response handlers with backpressure
+  - Empty `want_ids` semantics for "send all entries" requests
+  - Vector clock-based detection of missing entries
+  - Trust-gated resource limits per peer class
+  - Comprehensive integration test validating full flow
+- Ledger merge report API for operator visibility
+  - `merge_batch()` returns detailed `MergeDecision` with accepted/discarded/quarantined counts
+  - `QuarantineStore` with ring buffer (1000 entries) and 7-day TTL
+  - Methods for quarantine management: `list()`, `get()`, `release()`, `drop()`
+  - New metrics: `merge_conflicts_total`, `entries_quarantined_total`, `quarantine_size`
+
+**New Metrics:**
+- Gossip pull protocol: `digests_sent/received`, `pull_requests_sent/received`, `pull_responses_sent/received`
+- Pull bandwidth: `bytes_pulled_total`, `bytes_pushed_total`
+- Backpressure: `pull_truncated_total`, `peer_deficit_bytes`
+- Ledger merge: `merge_conflicts_total`, `entries_quarantined_total`, `entries_discarded_total`, `quarantine_size`
+
+### Fixed - Phase 7 Critical Bugs (2025-01-11)
+
+**TLS Handshake (BLOCKER):**
+- Fixed `NoSignatureSchemesInCommon` error by generating Ed25519 certificates
+  - Changed from RSA (default) to Ed25519 to match client verifier expectations
+  - Location: `icn-net/src/tls.rs` - now uses `rcgen::PKCS_ED25519`
+  - **Impact**: Unblocked ALL integration tests
+
+**mDNS Discovery:**
+- Fixed hostname format bug causing registration failure
+  - Changed `"{}"` → `"{}.local."` to comply with mDNS requirements
+  - Location: `icn-net/src/discovery.rs:79`
+
+**Pull Protocol Routing:**
+- Added sender DID propagation to `handle_message()` signature
+  - Changed: `handle_message(message)` → `handle_message(&sender, message)`
+  - Enables Digest handler to identify message sender for reply routing
+  - Updated 10+ call sites across codebase
+
 ### Added - Phase 7 Production Hardening (2025-01-11)
 
 **Security & Hardening:**
