@@ -17,6 +17,10 @@ struct Args {
     #[arg(short, long)]
     data_dir: Option<PathBuf>,
 
+    /// RPC endpoint (defaults to 127.0.0.1:5601)
+    #[arg(short, long, default_value = "127.0.0.1:5601")]
+    endpoint: String,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -176,7 +180,7 @@ async fn main() -> Result<()> {
 
         Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
 
-        Commands::Network(net_cmd) => handle_network_command(net_cmd)?,
+        Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
     }
 
     Ok(())
@@ -398,9 +402,9 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
 }
 
 #[tokio::main]
-async fn handle_network_command(cmd: NetworkCommands) -> Result<()> {
+async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<()> {
     // Network commands communicate with daemon via RPC
-    let rpc_addr = "127.0.0.1:5050".parse()?;
+    let rpc_addr = endpoint.parse()?;
     let mut client = icn_rpc::RpcClient::new(rpc_addr);
 
     match cmd {

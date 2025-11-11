@@ -21,11 +21,19 @@ pub struct NetworkConfig {
     /// Enable mDNS discovery
     pub mdns_enabled: bool,
 
-    /// QUIC listen address
+    /// QUIC listen address (format: "IP:PORT")
     pub listen_addr: String,
+
+    /// RPC (JSON-RPC over HTTP) listen port
+    #[serde(default = "default_rpc_port")]
+    pub rpc_port: u16,
 
     /// Bootstrap rendezvous endpoints
     pub bootstrap_peers: Vec<String>,
+}
+
+fn default_rpc_port() -> u16 {
+    5601
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,11 +56,12 @@ impl Default for Config {
                 .join("icn"),
             network: NetworkConfig {
                 mdns_enabled: true,
-                listen_addr: "0.0.0.0:4433".to_string(),
+                listen_addr: "0.0.0.0:7777".to_string(),
+                rpc_port: 5601,
                 bootstrap_peers: vec![],
             },
             observability: ObservabilityConfig {
-                metrics_port: 9090,
+                metrics_port: 9100,
                 health_port: 8080,
                 log_level: "info".to_string(),
             },

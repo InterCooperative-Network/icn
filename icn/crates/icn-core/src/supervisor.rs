@@ -39,7 +39,8 @@ impl Supervisor {
         icn_obs::init_metrics()?;
 
         // Start metrics server
-        if let Err(e) = icn_obs::start_metrics_server(9090).await {
+        let metrics_port = self.config.observability.metrics_port;
+        if let Err(e) = icn_obs::start_metrics_server(metrics_port).await {
             warn!("Failed to start metrics server: {}", e);
         }
 
@@ -234,7 +235,8 @@ impl Supervisor {
             info!("Gossip send callback configured");
 
             // Spawn RPC server with network handle
-            let rpc_addr = "127.0.0.1:5050".parse()?;
+            let rpc_port = self.config.network.rpc_port;
+            let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
             let mut rpc_server = RpcServer::new(rpc_addr);
             rpc_server.set_network_handle(network_handle.clone());
 

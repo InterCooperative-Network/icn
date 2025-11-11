@@ -5,11 +5,12 @@
 data_dir = "/tmp/icn-alpha"
 
 [network]
-listen_addr = "0.0.0.0:4433"
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
 mdns_enabled = true
 bootstrap_peers = []
 
 [observability]
-metrics_port = 9090
+metrics_port = 9100
 health_port = 8080
 log_level = "info"

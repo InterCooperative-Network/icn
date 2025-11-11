@@ -17,8 +17,8 @@ cd icn && cargo build --release
 ./target/release/icnd --config ../config/icn-beta.toml
 
 # 4. Check network status (terminal 3)
-./target/release/icnctl --endpoint 127.0.0.1:5050 network status
-./target/release/icnctl --endpoint 127.0.0.1:5050 network peers
+./target/release/icnctl network status
+./target/release/icnctl network peers
 
 # Nodes will discover each other via mDNS within seconds
 ```
@@ -229,12 +229,12 @@ By default, ICN exposes these services:
 
 | Service | Port | Protocol | Purpose |
 |---------|------|----------|---------|
-| **Peer Transport** | 4433 | QUIC/UDP | P2P communication |
-| **RPC API** | 5050 | HTTP | CLI control (icnctl) |
-| **Metrics** | 9090 | HTTP | Prometheus exporter |
+| **Peer Transport** | 7777 | QUIC/UDP | P2P communication |
+| **RPC API** | 5601 | HTTP | CLI control (icnctl) |
+| **Metrics** | 9100 | HTTP | Prometheus exporter |
 | **Health** | 8080 | HTTP | Health checks |
 
-Access metrics: `curl http://localhost:9090/metrics`
+Access metrics: `curl http://localhost:9100/metrics`
 
 Access health: `curl http://localhost:8080/health`
 

@@ -18,8 +18,13 @@ data_dir = "/home/user/.icn"
 
 # QUIC listener address for peer-to-peer connections
 # Format: "IP:PORT" - Port is UDP
-# Default: "0.0.0.0:4433"
-listen_addr = "0.0.0.0:4433"
+# Default: "0.0.0.0:7777"
+listen_addr = "0.0.0.0:7777"
+
+# RPC (JSON-RPC over HTTP) listen port
+# Used by icnctl to control the daemon
+# Default: 5601
+rpc_port = 5601
 
 # Enable mDNS for automatic local network peer discovery
 # Set to false for WAN-only deployments
@@ -33,8 +38,8 @@ bootstrap_peers = []
 
 # Example bootstrap configuration (commented out):
 # bootstrap_peers = [
-#     "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@seed1.example.org:4433",
-#     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@seed2.example.org:4433"
+#     "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@seed1.example.org:7777",
+#     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@seed2.example.org:7777"
 # ]
 
 # ============================================================================
@@ -45,8 +50,8 @@ bootstrap_peers = []
 
 # Prometheus metrics exporter port (HTTP)
 # Metrics exposed at http://0.0.0.0:<port>/metrics
-# Default: 9090
-metrics_port = 9090
+# Default: 9100
+metrics_port = 9100
 
 # Health check endpoint port (HTTP)
 # Health status at http://0.0.0.0:<port>/health
