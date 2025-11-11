@@ -84,19 +84,30 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 - TimeBank example contract (implemented)
 - Text parser (deferred - contracts built programmatically via AST)
 
-### Phase 5: Gossip ✓
+### Phase 5: Gossip & Distributed Sync ✓
 - Topic bus with ACLs (implemented)
 - Vector clocks for causal ordering (implemented)
 - Bloom filter anti-entropy (implemented)
 - GossipActor for distributed sync (implemented)
 - Hybrid push/pull protocol (implemented)
-- Rate limiting + QoS (deferred to Phase 6: Polish)
+- Ledger-gossip integration (implemented)
+- Per-currency topic isolation (implemented)
+- Automatic entry publishing (implemented)
+- Multi-node convergence (verified)
+- Rate limiting + QoS (deferred to Phase 6: Network Bridge)
 
-### Phase 6: Polish
+### Phase 6: Network Protocol Bridge
+- Wire gossip messages to QUIC transport
+- Subscribe to peers' gossip topics
+- Background anti-entropy task
+- Network partition recovery
+- End-to-end two-node testing
+
+### Phase 7: Polish & Production
 - Metrics exporter
 - Snapshots + backup
 - Systemd hardening
-- Documentation
+- Comprehensive documentation
 
 ## Security Principles
 

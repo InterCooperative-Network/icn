@@ -27,14 +27,47 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 ## Project Status
 
 **Phase 0 - Scaffold: Complete ✓**
+- [x] Workspace structure, core runtime, supervisor
+- [x] Identity/DID generation & verification
+- [x] CLI tooling (icnd + icnctl)
 
-- [x] Workspace structure
-- [x] Core runtime with supervisor
-- [x] Identity/DID generation
-- [x] CLI tooling (icnctl)
-- [x] Observability infrastructure
+**Phase 1 - Identity & Trust: Complete ✓**
+- [x] Age-encrypted keystore with passphrase unlock
+- [x] Key rotation protocol with transition records
+- [x] Trust graph storage & transitive trust computation
+- [x] DID import/export
 
-**Next: Phase 1 - Identity & Trust**
+**Phase 2 - Network Transport: Complete ✓**
+- [x] QUIC/TLS sessions with DID-based certificates
+- [x] mDNS local discovery
+- [x] Network actor with session pooling
+- [x] Secure passphrase handling (zeroization)
+
+**Phase 3 - Ledger: Complete ✓**
+- [x] Double-entry mutual credit accounting
+- [x] Merkle-DAG content-addressable structure
+- [x] Multi-currency support with credit limits
+- [x] Balance queries & integrity verification
+
+**Phase 4 - Cooperative Contracts (CCL): Complete ✓**
+- [x] Domain-specific contract language (AST-based)
+- [x] Deterministic interpreter with fuel metering
+- [x] Capability system (ReadLedger, WriteLedger, etc.)
+- [x] Contract runtime with ledger integration
+- [x] TimeBank example contract
+
+**Phase 5 - Gossip & Distributed Sync: Complete ✓**
+- [x] Topic-based gossip protocol with ACLs
+- [x] Vector clocks for causal ordering
+- [x] Bloom filter anti-entropy
+- [x] Ledger-gossip integration
+- [x] Multi-node convergence verification
+
+**Next: Phase 6 - Network Protocol Bridge**
+- Wire gossip to QUIC transport
+- End-to-end multi-node testing
+- Background anti-entropy
+- Partition recovery
 
 ## Building
 
