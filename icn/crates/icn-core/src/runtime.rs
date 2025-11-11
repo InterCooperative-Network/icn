@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use tokio::sync::broadcast;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::config::Config;
 

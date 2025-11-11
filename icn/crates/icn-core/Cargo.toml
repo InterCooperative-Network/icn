@@ -13,3 +13,9 @@ serde.workspace = true
 toml.workspace = true
 futures.workspace = true
 dirs = "5.0"
+ed25519-dalek.workspace = true
+
+# ICN crates
+icn-identity.workspace = true
+icn-store.workspace = true
+icn-trust.workspace = true

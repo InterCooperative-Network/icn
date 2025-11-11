@@ -6,6 +6,7 @@ use secrecy::{Secret, Zeroize};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
+use zeroize::Zeroizing;
 
 /// Trait for secure key storage backends
 pub trait KeyStore: Send + Sync {
@@ -123,8 +124,8 @@ impl AgeKeyStore {
 
     /// Encrypt and save key material
     fn encrypt_and_save(path: &Path, stored: &StoredKey, passphrase: &[u8]) -> Result<()> {
-        // Serialize key material
-        let json = serde_json::to_vec(stored)?;
+        // Serialize key material - use Zeroizing to ensure plaintext is cleared
+        let json = Zeroizing::new(serde_json::to_vec(stored)?);
 
         // Create age encryptor with passphrase
         let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
@@ -149,6 +150,7 @@ impl AgeKeyStore {
         // Write to file
         std::fs::write(path, encrypted).context("Failed to write keystore file")?;
 
+        // json is automatically zeroized when dropped here
         Ok(())
     }
 

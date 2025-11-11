@@ -74,4 +74,14 @@ impl Config {
         std::fs::write(path, contents)?;
         Ok(())
     }
+
+    /// Get the keystore path
+    pub fn keystore_path(&self) -> PathBuf {
+        self.data_dir.join("identity.age")
+    }
+
+    /// Get the store path
+    pub fn store_path(&self) -> PathBuf {
+        self.data_dir.join("store")
+    }
 }
