@@ -182,13 +182,13 @@ histogram_quantile(0.95, icn_gossip_bloom_fp_rate)
 - Adaptive Bloom filter sizing
 - Full Digest handler with bloom intersection and backpressure
 - PullRequest/PullResponse handlers with peer state updates
+- **Periodic digest emission with jitter** (background task)
 - Comprehensive metrics
 - 47 passing unit tests
 
 **🚧 In Progress**:
-- Periodic digest emission
 - Integration tests (convergence, backpressure, FP rate)
-- Network layer wiring
+- Network layer wiring (supervisor integration)
 
 ## Code Locations
 
@@ -197,7 +197,9 @@ histogram_quantile(0.95, icn_gossip_bloom_fp_rate)
 - **PeerSyncState**: `icn-gossip/src/sync.rs:77-155`
 - **Backoff**: `icn-gossip/src/sync.rs:12-63`
 - **Adaptive bloom**: `icn-gossip/src/bloom.rs:40-70`
-- **Handlers**: `icn-gossip/src/gossip.rs:505-591`
+- **Handlers**: `icn-gossip/src/gossip.rs:505-791`
+- **Digest emission**: `icn-gossip/src/gossip.rs:845-912` (emit_digest, emit_all_digests)
+- **Background emitter**: `icn-gossip/src/gossip.rs:954-989` (start_digest_emitter)
 - **Metrics**: `icn-obs/src/metrics.rs:98-141, 225-268`
 
 ## References
