@@ -60,11 +60,13 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Trust graph storage + computation
 - DID import/export
 
-### Phase 2: Networking
-- mDNS discovery
-- QUIC/TLS sessions
-- Peer lifecycle management
-- NAT traversal
+### Phase 2: Networking ✓
+- mDNS discovery (implemented)
+- QUIC/TLS sessions (implemented)
+- DID-based certificate generation (implemented)
+- Network actor coordination (implemented)
+- Passphrase unlock with zeroization (implemented)
+- NAT traversal (deferred to Phase 2.5)
 
 ### Phase 3: Ledger
 - Double-entry journal
@@ -96,6 +98,7 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 3. **Verify everything:** Signatures, invariants, constraints
 4. **Explicit capabilities:** Least privilege
 5. **Auditable:** All actions logged, traceable
+6. **Secure memory handling:** Zeroize sensitive data (passphrases, keys)
 
 ## Performance Targets (v1)
 

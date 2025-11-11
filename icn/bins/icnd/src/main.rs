@@ -7,6 +7,7 @@ use icn_core::{Config, Runtime};
 use icn_identity::{AgeKeyStore, KeyStore};
 use std::io::{self, Write};
 use std::path::PathBuf;
+use zeroize::Zeroizing;
 
 #[derive(Parser, Debug)]
 #[command(name = "icnd")]
@@ -63,7 +64,9 @@ async fn main() -> Result<()> {
     let keypair = if keystore_path.exists() {
         tracing::info!("Identity keystore found at: {:?}", keystore_path);
 
-        // Prompt for passphrase
+        // Prompt for passphrase (returns Zeroizing<Vec<u8>> for secure memory handling)
+        // Security: Passphrase is automatically zeroed from memory when it goes out of scope,
+        // preventing recovery from memory dumps or swap space.
         // Note: This will fail when run as a systemd service (non-interactive)
         // Consider using environment variable or socket-based authentication for production
         let passphrase = read_passphrase("Enter keystore passphrase: ")
@@ -96,10 +99,13 @@ async fn main() -> Result<()> {
 }
 
 /// Read passphrase from stdin
-fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
+///
+/// Returns a zeroizing container that automatically clears the passphrase
+/// from memory when it goes out of scope, preventing sensitive data leakage.
+fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
     print!("{}", prompt);
     io::stdout().flush()?;
     let passphrase = rpassword::read_password()
         .context("Failed to read password")?;
-    Ok(passphrase.into_bytes())
+    Ok(Zeroizing::new(passphrase.into_bytes()))
 }
