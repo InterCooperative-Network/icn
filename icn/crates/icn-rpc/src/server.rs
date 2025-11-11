@@ -629,13 +629,22 @@ async fn handle_contract_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
         }
     };
 
-    // Note: ContractRuntime doesn't expose a method to list all contracts
-    // For now, return an error indicating this needs to be implemented
-    RpcResponse::error(
-        id,
-        -32000,
-        "Contract listing not yet implemented in runtime".to_string(),
-    )
+    let runtime = contract_runtime.read().await;
+    let contracts = runtime.list_contracts();
+
+    // Convert from icn-ccl::ContractInfo to RPC ContractInfo format
+    let contracts_rpc: Vec<crate::types::ContractInfo> = contracts
+        .iter()
+        .map(|info| crate::types::ContractInfo {
+            code_hash: info.code_hash.to_hex(),
+            name: info.name.clone(),
+            participants: info.participants.iter().map(|did| format!("{:?}", did)).collect(),
+            currency: info.currency.clone(),
+            rules: info.rules.clone(),
+        })
+        .collect();
+
+    RpcResponse::success(id, serde_json::json!({ "contracts": contracts_rpc }))
 }
 
 /// Create a JSON response

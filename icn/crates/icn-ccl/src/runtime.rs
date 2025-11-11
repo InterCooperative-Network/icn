@@ -153,6 +153,32 @@ impl ContractRuntime {
     pub fn get_contract(&self, code_hash: &ContentHash) -> Option<&Contract> {
         self.contracts.get(code_hash)
     }
+
+    /// List all installed contracts with metadata
+    pub fn list_contracts(&self) -> Vec<ContractInfo> {
+        self.contracts
+            .iter()
+            .map(|(code_hash, contract)| ContractInfo {
+                code_hash: code_hash.clone(),
+                name: contract.name.clone(),
+                participants: contract.participants.clone(),
+                currency: contract.currency.clone(),
+                rules: contract.rules.iter().map(|r| r.name.clone()).collect(),
+                num_state_vars: contract.state_vars.len(),
+            })
+            .collect()
+    }
+}
+
+/// Summary information about an installed contract
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ContractInfo {
+    pub code_hash: ContentHash,
+    pub name: String,
+    pub participants: Vec<icn_identity::Did>,
+    pub currency: Option<String>,
+    pub rules: Vec<String>,
+    pub num_state_vars: usize,
 }
 
 #[cfg(test)]

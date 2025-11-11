@@ -48,7 +48,7 @@ pub mod types;
 // Re-export commonly used types
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
 pub use interpreter::Interpreter;
-pub use runtime::ContractRuntime;
+pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{
     Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult,
     LedgerOperation, Value,
