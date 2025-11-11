@@ -47,6 +47,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Complete Docker deployment ready out-of-box
 - 5 example configuration files covering all use cases
 
+### Added - Phase 3 CLI Tools & Production Features (2025-11-11)
+
+**Contract Examples:**
+- **`examples/contracts/echo.json`** - Simple test contract demonstrating basic CCL features
+  - `echo(message)` - Returns message parameter
+  - `add(a, b)` - Adds two numbers using BinOp
+- **`examples/contracts/timebank.json`** - Mutual credit time banking contract
+  - State variable: `total_hours_exchanged`
+  - `record_service(recipient, hours)` - Records service exchange with preconditions
+  - `get_stats()` - Returns total hours exchanged
+  - Demonstrates: state variables, ledger operations, preconditions, special `sender` variable
+- **`examples/contracts/README.md`** - Comprehensive contract development documentation
+- **`examples/contracts/test-contracts.sh`** - Automated testing script for contract validation
+
+**Contract Management:**
+- Contract listing functionality: `icnctl contract list`
+  - Displays installed contracts with metadata (name, participants, currency, rules)
+  - Shows state variable count and rule names
+  - RPC endpoint: `contract.list`
+
+**Quarantine Management (PR #1):**
+- Full operator control over quarantined ledger entries
+- **RPC Endpoints:**
+  - `ledger.quarantine.list` - List all quarantined entries
+  - `ledger.quarantine.get` - Get detailed info about specific entry
+  - `ledger.quarantine.release` - Release and retry entry
+  - `ledger.quarantine.drop` - Permanently discard entry
+  - `ledger.quarantine.purge` - Remove all expired entries
+- **CLI Commands:**
+  ```bash
+  icnctl ledger quarantine list
+  icnctl ledger quarantine get <entry_id>
+  icnctl ledger quarantine release <entry_id>
+  icnctl ledger quarantine drop <entry_id>
+  icnctl ledger quarantine purge
+  ```
+- **RPC Client Methods** in `icn-rpc/src/client.rs`:
+  - `quarantine_list()`, `quarantine_get()`, `quarantine_release()`, `quarantine_drop()`, `quarantine_purge()`
+
+**WAN Bootstrap Peers (PR #2):**
+- Internet-wide connectivity beyond local mDNS discovery
+- Configure bootstrap peers in `icn.toml`:
+  ```toml
+  bootstrap_peers = [
+      "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777"
+  ]
+  ```
+- URL format: `icn://DID@IP:PORT`
+- Automatic dialing on daemon startup
+- Multiple peers for redundancy (no single point of failure)
+- Connection failures are non-fatal (logged as warnings)
+- Current limitation: IP addresses only (DNS hostname resolution to be added later)
+
+### Fixed - Phase 3 Error Handling (2025-11-11)
+
+**Quarantine Release Semantics:**
+- Fixed incorrect error handling in `ledger.quarantine.release`
+  - Operation now returns JSON-RPC error when entry release succeeds but reappend fails
+  - Previously returned success response with error flags (violated JSON-RPC 2.0 semantics)
+  - Error message format: "Entry released from quarantine but reappend failed: <reason>"
+  - Follows standard JSON-RPC pattern: errors in error field, successes in result field
+- **Rationale**: Operation name "release" implies "release for retry" - partial success is a failure
+
+**Impact:**
+- Operators can now inspect, manage, and resolve quarantined ledger entries
+- WAN connectivity enables internet-wide ICN networks
+- Contract examples provide learning resources and test cases
+- Proper JSON-RPC error handling enables reliable error detection in monitoring tools
+
 ### Added - Phase 7 Pull Protocol Completion (2025-01-11)
 
 **Gossip Pull Protocol:**
