@@ -405,7 +405,7 @@ impl GossipActor {
     }
 
     /// Handle incoming gossip message from network
-    pub fn handle_message(&mut self, message: GossipMessage) -> Result<()> {
+    pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         match message {
             GossipMessage::Announce { hash, author, clock, topic } => {
                 debug!("Received Announce: topic={}, hash={:?}, author={}", topic, hash, author);
@@ -577,13 +577,8 @@ impl GossipActor {
                 let _remote_bloom = BloomFilter::from_data(&bloom);
 
                 // PULL LOGIC: Detect if we're missing entries by comparing vector clocks
-                // Get peer DID from vector clock (extract primary DID as peer identifier)
-                let peer_did = if let Some((did, _)) = vector.clock.iter().next() {
-                    did.clone()
-                } else {
-                    debug!("Digest has empty vector clock, cannot identify peer");
-                    return Ok(());
-                };
+                // Use the sender parameter to identify who sent this Digest
+                let peer_did = sender.clone();
 
                 // Check if we're behind this peer's sequence
                 let mut are_we_behind = false;
@@ -1118,7 +1113,7 @@ mod tests {
             topic: "global:identity".to_string(),
         };
 
-        gossip2.handle_message(announce).unwrap();
+        gossip2.handle_message(&did1, announce).unwrap();
 
         // Gossip2 should have sent a Request message
         let messages = sent_messages.lock().unwrap();
@@ -1142,7 +1137,7 @@ mod tests {
         }));
 
         let request = GossipMessage::Request { hash };
-        gossip1.handle_message(request).unwrap();
+        gossip1.handle_message(&did2, request).unwrap();
 
         // Gossip1 should have sent a Response message
         let messages1 = sent_messages1.lock().unwrap();
@@ -1182,7 +1177,7 @@ mod tests {
             hashes: vec![hash1, hash2],
         };
 
-        gossip.handle_message(request_missing).unwrap();
+        gossip.handle_message(&did, request_missing).unwrap();
 
         // Should have sent 2 Response messages
         let messages = sent_messages.lock().unwrap();
@@ -1551,8 +1546,8 @@ mod tests {
                 .as_millis() as u64,
         };
 
-        // Simulate receiving a Response message
-        let result = gossip.handle_message(GossipMessage::Response {
+        // Simulate receiving a Response message from the author
+        let result = gossip.handle_message(&author, GossipMessage::Response {
             entry: entry.clone(),
         });
         assert!(result.is_ok(), "Response handler should succeed");
@@ -1604,7 +1599,7 @@ mod tests {
             // Small delay to ensure distinct timestamps
             std::thread::sleep(std::time::Duration::from_millis(2));
 
-            gossip.handle_message(GossipMessage::Response { entry }).unwrap();
+            gossip.handle_message(&author, GossipMessage::Response { entry }).unwrap();
         }
 
         // Verify only 3 entries are stored (max_entries enforced)

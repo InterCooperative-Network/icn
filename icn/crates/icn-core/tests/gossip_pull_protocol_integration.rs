@@ -81,9 +81,10 @@ impl TestNode {
 
                     // Handle message asynchronously
                     let gossip_handle = gossip_handle_clone.clone();
+                    let sender = sender_did.clone();
                     tokio::spawn(async move {
                         let mut gossip = gossip_handle.write().await;
-                        if let Err(e) = gossip.handle_message(gossip_msg) {
+                        if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
                             warn!("Failed to handle gossip message: {}", e);
                         }
                     });
