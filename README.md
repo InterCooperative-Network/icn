@@ -74,9 +74,51 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 **Phase 7 - Polish & Production: In Progress**
 - [x] Metrics exporter (Prometheus) ✓
 - [x] Complete pull protocol (Request/Response) ✓
-- [ ] Topic subscriptions & routing
-- [ ] Production hardening
-- [ ] Comprehensive documentation
+- [x] Topic subscriptions & routing ✓
+- [x] Production hardening (3 critical + 4 high priority issues fixed) ✓
+- [x] Comprehensive documentation ✓
+
+## Topic Subscriptions
+
+ICN supports topic subscriptions for filtered gossip routing:
+
+```rust
+// Subscribe to topics on a peer
+let subscribe_msg = NetworkMessage::subscribe(
+    my_did.clone(),
+    peer_did.clone(),
+    vec!["global:identity".to_string(), "ledger:hours".to_string()],
+);
+network_handle.send_message(peer_did, subscribe_msg).await?;
+
+// Query subscription state
+let subscribers = gossip.get_subscribers("global:identity");
+let my_subscriptions = gossip.get_subscriptions(&my_did);
+
+// Unsubscribe
+let unsubscribe_msg = NetworkMessage::unsubscribe(
+    my_did.clone(),
+    peer_did.clone(),
+    vec!["global:identity".to_string()],
+);
+network_handle.send_message(peer_did, unsubscribe_msg).await?;
+```
+
+Topics enforce access control policies (Public, TrustClass, Participants) during subscription.
+
+See [docs/topic-subscriptions-api.md](docs/topic-subscriptions-api.md) for complete API documentation.
+
+## Security & Production Hardening
+
+ICN includes comprehensive production hardening against DoS attacks and resource exhaustion:
+
+- **Rate limiting**: Per-peer message rate limiting (100 msg/sec, burst 20)
+- **QUIC stream limits**: Bounded concurrent streams (10) and receive windows (1MB/stream)
+- **Certificate validation**: DID extraction and expiration checking on TLS certificates
+- **Message validation**: Size limits and overflow protection
+- **Async-safe operations**: No blocking calls in Tokio runtime
+
+See [docs/production-hardening.md](docs/production-hardening.md) for complete security documentation.
 
 ## Building
 

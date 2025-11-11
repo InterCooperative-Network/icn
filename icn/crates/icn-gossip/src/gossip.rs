@@ -126,7 +126,9 @@ impl GossipActor {
         let hash = Self::hash_data(&data);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
-            .as_millis() as u64;
+            .as_millis()
+            .try_into()
+            .context("Timestamp overflow - system clock too far in future")?;
 
         let entry = GossipEntry {
             hash,
@@ -229,12 +231,64 @@ impl GossipActor {
 
         if !subscribers.contains(&subscriber) {
             subscribers.push(subscriber.clone());
+            info!("DID {} subscribed to topic: {}", subscriber, topic);
+
+            // Update metrics
+            self.update_gauge_metrics();
         }
 
         Ok(Subscription {
             topic: topic.to_string(),
             subscriber,
         })
+    }
+
+    /// Unsubscribe from a topic
+    pub fn unsubscribe(&mut self, topic: &str, subscriber: &Did) -> Result<()> {
+        let subscribers = self
+            .subscriptions
+            .get_mut(topic)
+            .context("Topic not found")?;
+
+        if let Some(pos) = subscribers.iter().position(|did| did == subscriber) {
+            subscribers.remove(pos);
+            info!("DID {} unsubscribed from topic: {}", subscriber, topic);
+
+            // Update metrics
+            self.update_gauge_metrics();
+        }
+
+        Ok(())
+    }
+
+    /// Get all subscribers for a topic
+    pub fn get_subscribers(&self, topic: &str) -> Vec<Did> {
+        self.subscriptions
+            .get(topic)
+            .map(|subs| subs.clone())
+            .unwrap_or_default()
+    }
+
+    /// Get all topics a DID is subscribed to
+    pub fn get_subscriptions(&self, did: &Did) -> Vec<String> {
+        self.subscriptions
+            .iter()
+            .filter_map(|(topic, subscribers)| {
+                if subscribers.contains(did) {
+                    Some(topic.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Check if a DID is subscribed to a topic
+    pub fn is_subscribed(&self, topic: &str, did: &Did) -> bool {
+        self.subscriptions
+            .get(topic)
+            .map(|subs| subs.contains(did))
+            .unwrap_or(false)
     }
 
     /// Get bloom filter for a topic
@@ -454,6 +508,10 @@ impl GossipActor {
         // Count total entries across all topics
         let total_entries: usize = self.entries.values().map(|e| e.len()).sum();
         icn_obs::metrics::gossip::entries_total_set(total_entries as u64);
+
+        // Count total subscriptions across all topics
+        let total_subscriptions: usize = self.subscriptions.values().map(|subs| subs.len()).sum();
+        icn_obs::metrics::gossip::subscriptions_total_set(total_subscriptions as u64);
     }
 
     /// Hash data to create content hash
@@ -686,5 +744,124 @@ mod tests {
                 panic!("Expected Response message");
             }
         }
+    }
+
+    #[test]
+    fn test_unsubscribe() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Subscribe first
+        gossip.subscribe("global:identity", did.clone()).unwrap();
+        assert!(gossip.is_subscribed("global:identity", &did));
+
+        // Unsubscribe
+        gossip.unsubscribe("global:identity", &did).unwrap();
+        assert!(!gossip.is_subscribed("global:identity", &did));
+    }
+
+    #[test]
+    fn test_get_subscribers() {
+        let keypair1 = KeyPair::generate().unwrap();
+        let did1 = keypair1.did().clone();
+
+        let keypair2 = KeyPair::generate().unwrap();
+        let did2 = keypair2.did().clone();
+
+        let mut gossip = GossipActor::new(did1.clone(), Arc::new(mock_trust_lookup));
+
+        // Subscribe both DIDs
+        gossip.subscribe("global:identity", did1.clone()).unwrap();
+        gossip.subscribe("global:identity", did2.clone()).unwrap();
+
+        // Get subscribers
+        let subscribers = gossip.get_subscribers("global:identity");
+        assert_eq!(subscribers.len(), 2);
+        assert!(subscribers.contains(&did1));
+        assert!(subscribers.contains(&did2));
+    }
+
+    #[test]
+    fn test_get_subscriptions() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Subscribe to multiple topics
+        gossip.subscribe("global:identity", did.clone()).unwrap();
+        gossip.subscribe("global:rendezvous", did.clone()).unwrap();
+
+        // Get all subscriptions for this DID
+        let subscriptions = gossip.get_subscriptions(&did);
+        assert_eq!(subscriptions.len(), 2);
+        assert!(subscriptions.contains(&"global:identity".to_string()));
+        assert!(subscriptions.contains(&"global:rendezvous".to_string()));
+    }
+
+    #[test]
+    fn test_is_subscribed() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Not subscribed initially
+        assert!(!gossip.is_subscribed("global:identity", &did));
+
+        // Subscribe
+        gossip.subscribe("global:identity", did.clone()).unwrap();
+        assert!(gossip.is_subscribed("global:identity", &did));
+    }
+
+    #[test]
+    fn test_subscribe_duplicate_prevention() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Subscribe twice
+        gossip.subscribe("global:identity", did.clone()).unwrap();
+        gossip.subscribe("global:identity", did.clone()).unwrap();
+
+        // Should only be subscribed once
+        let subscribers = gossip.get_subscribers("global:identity");
+        assert_eq!(subscribers.len(), 1);
+    }
+
+    #[test]
+    fn test_unsubscribe_nonexistent_topic() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Try to unsubscribe from non-existent topic
+        let result = gossip.unsubscribe("nonexistent:topic", &did);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_subscribe_acl_denied() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Trust lookup that returns None (no trust)
+        let no_trust_lookup = Arc::new(|_did: &Did| None);
+        let mut gossip = GossipActor::new(did.clone(), no_trust_lookup);
+
+        // Create a topic with TrustClass::Partner requirement
+        let topic = Topic::new(
+            "partner:only".to_string(),
+            AccessControl::TrustClass(TrustClass::Partner),
+        );
+        gossip.create_topic(topic);
+
+        // Try to subscribe with no trust - should fail
+        let result = gossip.subscribe("partner:only", did.clone());
+        assert!(result.is_err());
     }
 }

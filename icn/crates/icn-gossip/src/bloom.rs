@@ -101,6 +101,16 @@ impl BloomFilter {
 
     /// Deserialize from BloomFilterData
     pub fn from_data(data: &BloomFilterData) -> Self {
+        // Validate non-zero size to prevent division by zero
+        if data.size == 0 {
+            tracing::warn!("BloomFilter deserialization: zero size. Creating minimal filter.");
+            return BloomFilter {
+                bits: vec![false],
+                num_hashes: data.num_hashes.max(1),
+                size: 1,
+            };
+        }
+
         let mut bits = Vec::new();
 
         // Unpack bytes into bits
@@ -110,13 +120,31 @@ impl BloomFilter {
             }
         }
 
-        // Trim to exact size
-        bits.truncate(data.size as usize);
+        // Validate size before truncation to prevent index out of bounds
+        let unpacked_bits = bits.len();
+        let claimed_size = data.size as usize;
 
-        BloomFilter {
-            bits,
-            num_hashes: data.num_hashes,
-            size: data.size,
+        if claimed_size > unpacked_bits {
+            // Malformed data: claimed size exceeds actual bits
+            // Use the actual unpacked size to prevent index out of bounds
+            tracing::warn!(
+                "BloomFilter deserialization: claimed size {} exceeds unpacked bits {}. Using actual size.",
+                claimed_size,
+                unpacked_bits
+            );
+            BloomFilter {
+                bits,
+                num_hashes: data.num_hashes,
+                size: unpacked_bits as u64,
+            }
+        } else {
+            // Trim to exact size (normal case)
+            bits.truncate(claimed_size);
+            BloomFilter {
+                bits,
+                num_hashes: data.num_hashes,
+                size: data.size,
+            }
         }
     }
 

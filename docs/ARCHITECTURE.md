@@ -992,11 +992,104 @@ pub enum MessagePayload {
 - Broadcast to 10 peers: 10-20ms
 - Max message size: 10MB
 
-**Future enhancements (Phase 7):**
-- Complete pull protocol (Request → Response)
-- Topic subscriptions (filter by interest)
+**Completed in Phase 7:**
+- ✅ Complete pull protocol (Request → Response)
+- ✅ Topic subscriptions (filter by interest)
+
+**Future enhancements:**
 - Smart peer selection (probabilistic gossip)
 - Message batching (multiple per stream)
+
+---
+
+### 6.6 Topic Subscriptions
+
+**Decision: Explicit subscription management with ACL enforcement**
+
+**Implementation:**
+
+Topic subscriptions enable peers to express interest in specific topics and receive filtered gossip messages. The subscription system consists of three layers:
+
+**1. GossipActor Subscription Management:**
+
+```rust
+impl GossipActor {
+    /// Subscribe a DID to a topic (with ACL check)
+    pub fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription>;
+
+    /// Unsubscribe a DID from a topic
+    pub fn unsubscribe(&mut self, topic: &str, subscriber: &Did) -> Result<()>;
+
+    /// Query methods
+    pub fn get_subscribers(&self, topic: &str) -> Vec<Did>;
+    pub fn get_subscriptions(&self, did: &Did) -> Vec<String>;
+    pub fn is_subscribed(&self, topic: &str, did: &Did) -> bool;
+}
+```
+
+**2. Network Protocol Messages:**
+
+```rust
+pub enum MessagePayload {
+    // Existing...
+    Subscribe { topics: Vec<String> },     // Request subscription
+    Unsubscribe { topics: Vec<String> },   // Cancel subscription
+    SubscribeAck { topics: Vec<String> },  // Confirm subscription
+}
+```
+
+**3. Supervisor Message Routing:**
+
+The supervisor's incoming message handler processes subscription messages:
+
+```
+Subscribe received → GossipActor.subscribe() (with ACL check)
+                  → Send SubscribeAck for successful subscriptions
+
+Unsubscribe received → GossipActor.unsubscribe()
+```
+
+**Subscription Flow:**
+
+1. **Node A wants to subscribe to "global:identity" on Node B:**
+   ```
+   Node A → Send Subscribe {topics: ["global:identity"]} → Node B
+   Node B → Check ACL via trust_lookup(Node A)
+   Node B → Add Node A to subscribers if authorized
+   Node B → Send SubscribeAck {topics: ["global:identity"]} → Node A
+   ```
+
+2. **ACL Enforcement:**
+   - Subscriptions are checked against topic AccessControl rules
+   - TrustClass-gated topics require minimum trust level
+   - Participants-only topics enforce whitelist
+   - Public topics allow all subscriptions
+
+3. **Subscription State:**
+   - In-memory HashMap: `topic → Vec<subscriber_did>`
+   - Not persisted (resubscribe on reconnection)
+   - Metrics tracked: `icn_gossip_subscriptions_total`
+
+**Metrics:**
+
+```
+icn_gossip_subscriptions_total          # Gauge: Total active subscriptions
+icn_gossip_subscribes_received_total    # Counter: Subscribe messages received
+icn_gossip_unsubscribes_received_total  # Counter: Unsubscribe messages received
+icn_gossip_subscribe_acks_sent_total    # Counter: SubscribeAck messages sent
+```
+
+**Limitations (v1):**
+- No persistence (subscriptions lost on restart)
+- No automatic resubscription protocol
+- Broadcast still sends to all peers (subscription doesn't filter routing yet)
+- No subscription metadata (timestamp, filters, preferences)
+
+**Future enhancements:**
+- Selective routing based on subscriptions (bandwidth optimization)
+- Subscription persistence and reconnection recovery
+- Topic filters (e.g., subscribe to "ledger:*" pattern)
+- Per-subscription metadata and preferences
 
 ---
 
@@ -1169,6 +1262,38 @@ pub struct RetentionPolicy {
 **Security contacts:**
 - security@intercooperative.network (to be set up)
 - Encrypted reporting (PGP)
+
+---
+
+### 8.4 Production Hardening
+
+ICN implements comprehensive DoS protection and resource management:
+
+**Network-level protections:**
+- **Rate limiting:** Token bucket per-peer (100 msg/sec, burst 20)
+  - Implementation: `icn-net/src/rate_limit.rs`
+  - Metric: `icn_network_messages_rate_limited_total`
+- **QUIC stream limits:** 10 concurrent streams, 1MB/stream window
+  - Prevents stream flooding attacks
+  - Connection idle timeout: 60s, keep-alive: 30s
+- **Message size validation:** 10MB max, validated before allocation
+  - Prevents unbounded memory allocation DoS
+
+**Protocol-level protections:**
+- **Certificate validation:** DID extraction + expiration checks
+  - TLS verifier validates DID format and validity period
+  - ⚠️ Trust graph integration pending (accepts all valid DIDs)
+- **Bloom filter validation:** Bounds checking on deserialization
+  - Handles zero-size and malformed filter data safely
+- **Timestamp overflow protection:** Checked conversion u128 → u64
+  - Prevents silent wraparound post-year 2262
+
+**Runtime protections:**
+- **Async-safe operations:** No `blocking_*` calls in Tokio runtime
+  - All message handlers spawn async tasks
+  - Prevents thread pool starvation
+
+**See also:** [Production Hardening Documentation](production-hardening.md) for detailed implementation notes, configuration, and monitoring recommendations.
 
 ---
 

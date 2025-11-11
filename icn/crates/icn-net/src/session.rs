@@ -17,6 +17,32 @@ use tracing::info;
 
 use crate::tls;
 
+/// Create transport configuration with DoS protection limits
+fn create_transport_config() -> quinn::TransportConfig {
+    let mut config = quinn::TransportConfig::default();
+
+    // Limit concurrent streams to prevent resource exhaustion
+    // 10 bidirectional streams per connection is sufficient for gossip + RPC
+    config.max_concurrent_bidi_streams(10u32.into());
+
+    // Unidirectional streams not currently used, set to minimal
+    config.max_concurrent_uni_streams(0u32.into());
+
+    // Set reasonable idle timeout (60 seconds)
+    // Connections idle longer than this are closed
+    config.max_idle_timeout(Some(std::time::Duration::from_secs(60).try_into().unwrap()));
+
+    // Enable keep-alive to detect broken connections (30 seconds)
+    config.keep_alive_interval(Some(std::time::Duration::from_secs(30)));
+
+    // Limit stream data to prevent memory exhaustion
+    // 1MB per stream is sufficient for gossip messages
+    config.stream_receive_window((1024u32 * 1024u32).into());
+    config.receive_window((10u32 * 1024u32 * 1024u32).into()); // 10MB total per connection
+
+    config
+}
+
 /// Session manager for peer connections
 pub struct SessionManager {
     /// QUIC endpoint for listening and dialing
@@ -57,17 +83,16 @@ impl SessionManager {
             quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
         ));
 
-        // Configure transport parameters
-        let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_concurrent_bidi_streams(100u32.into());
-        transport_config.max_concurrent_uni_streams(100u32.into());
-        server_config.transport_config(Arc::new(transport_config));
+        // Configure transport parameters for DoS protection
+        let transport_config = Arc::new(create_transport_config());
+        server_config.transport_config(transport_config.clone());
 
-        // Create client config
+        // Create client config with same transport limits
         let client_config = tls::create_client_config()?;
-        let client_config = ClientConfig::new(Arc::new(
+        let mut client_config = ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?,
         ));
+        client_config.transport_config(transport_config);
 
         // Create endpoint
         let mut endpoint = Endpoint::server(server_config, listen_addr)?;

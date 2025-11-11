@@ -145,13 +145,24 @@ pub async fn read_message(
     recv.read_exact(&mut len_buf)
         .await
         .context("Failed to read message length")?;
-    let len = u32::from_be_bytes(len_buf) as usize;
+    let len_u32 = u32::from_be_bytes(len_buf);
 
-    if len > MAX_MESSAGE_SIZE {
-        anyhow::bail!("Message too large: {} bytes (max {})", len, MAX_MESSAGE_SIZE);
+    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
+    if len_u32 == 0 {
+        anyhow::bail!("Invalid message: zero length");
+    }
+    if len_u32 > MAX_MESSAGE_SIZE as u32 {
+        anyhow::bail!(
+            "Message too large: {} bytes (max {})",
+            len_u32,
+            MAX_MESSAGE_SIZE
+        );
     }
 
-    // Read message bytes
+    // Safe to cast after validation
+    let len = len_u32 as usize;
+
+    // Allocate buffer (size is now validated)
     let mut buf = vec![0u8; len];
     recv.read_exact(&mut buf)
         .await

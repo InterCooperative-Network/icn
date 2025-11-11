@@ -1,7 +1,7 @@
 //! Journal entry creation and validation
 
 use crate::types::{AccountDelta, ContentHash, JournalEntry};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use icn_identity::Did;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -65,10 +65,12 @@ impl JournalEntryBuilder {
         // Validate that amounts are positive
         validate_positive_amounts(&self.accounts)?;
 
-        // Get current timestamp
+        // Get current timestamp (checked conversion to prevent overflow)
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
-            .as_millis() as u64;
+            .as_millis()
+            .try_into()
+            .context("Timestamp overflow - system clock too far in future")?;
 
         let mut entry = JournalEntry {
             id: None,

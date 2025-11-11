@@ -33,6 +33,10 @@ pub fn init_descriptions() {
         "icn_network_peers_discovered",
         "Number of peers discovered via mDNS"
     );
+    describe_counter!(
+        "icn_network_messages_rate_limited_total",
+        "Total number of messages dropped due to rate limiting"
+    );
 
     // Gossip metrics
     describe_gauge!(
@@ -74,6 +78,22 @@ pub fn init_descriptions() {
     describe_counter!(
         "icn_gossip_responses_received_total",
         "Total number of Response messages received"
+    );
+    describe_gauge!(
+        "icn_gossip_subscriptions_total",
+        "Total number of active subscriptions across all topics"
+    );
+    describe_counter!(
+        "icn_gossip_subscribes_received_total",
+        "Total number of Subscribe messages received"
+    );
+    describe_counter!(
+        "icn_gossip_unsubscribes_received_total",
+        "Total number of Unsubscribe messages received"
+    );
+    describe_counter!(
+        "icn_gossip_subscribe_acks_sent_total",
+        "Total number of SubscribeAck messages sent"
     );
 
     // Ledger metrics
@@ -136,6 +156,10 @@ pub mod network {
     pub fn peers_discovered_set(value: u64) {
         gauge!("icn_network_peers_discovered").set(value as f64);
     }
+
+    pub fn messages_rate_limited_inc() {
+        counter!("icn_network_messages_rate_limited_total").increment(1);
+    }
 }
 
 /// Gossip metrics
@@ -180,6 +204,22 @@ pub mod gossip {
 
     pub fn responses_received_inc() {
         counter!("icn_gossip_responses_received_total").increment(1);
+    }
+
+    pub fn subscriptions_total_set(value: u64) {
+        gauge!("icn_gossip_subscriptions_total").set(value as f64);
+    }
+
+    pub fn subscribes_received_inc() {
+        counter!("icn_gossip_subscribes_received_total").increment(1);
+    }
+
+    pub fn unsubscribes_received_inc() {
+        counter!("icn_gossip_unsubscribes_received_total").increment(1);
+    }
+
+    pub fn subscribe_acks_sent_inc() {
+        counter!("icn_gossip_subscribe_acks_sent_total").increment(1);
     }
 }
 

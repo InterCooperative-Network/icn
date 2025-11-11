@@ -13,7 +13,11 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tracing::{info, warn};
 
-use crate::{protocol::{NetworkMessage, read_message, write_message}, Discovery, PeerInfo, SessionManager};
+use crate::{
+    protocol::{NetworkMessage, read_message, write_message},
+    rate_limit::{RateLimitConfig, RateLimiter},
+    Discovery, PeerInfo, SessionManager,
+};
 
 /// Callback for handling incoming network messages
 pub type IncomingMessageHandler = Arc<dyn Fn(NetworkMessage) + Send + Sync>;
@@ -132,6 +136,7 @@ pub struct NetworkActor {
     stats: Arc<RwLock<NetworkStats>>,
     rx: mpsc::Receiver<NetworkMsg>,
     incoming_handler: Option<IncomingMessageHandler>,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl NetworkActor {
@@ -175,14 +180,19 @@ impl NetworkActor {
         // Wrap session_manager in Arc for sharing between tasks
         let session_manager = Arc::new(RwLock::new(session_manager));
 
+        // Create rate limiter with default config
+        let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+
         // Spawn incoming connection handler if handler is provided
         if let Some(handler) = incoming_handler.clone() {
             let session_manager_clone = session_manager.clone();
+            let rate_limiter_clone = rate_limiter.clone();
             let shutdown_rx = shutdown_tx.subscribe();
             tokio::spawn(async move {
                 if let Err(e) = Self::handle_incoming_connections(
                     session_manager_clone,
                     handler,
+                    rate_limiter_clone,
                     shutdown_rx,
                 )
                 .await
@@ -199,6 +209,7 @@ impl NetworkActor {
             stats: stats.clone(),
             rx,
             incoming_handler,
+            rate_limiter,
         };
 
         // Spawn actor task
@@ -368,6 +379,7 @@ impl NetworkActor {
     async fn handle_incoming_connections(
         session_manager: Arc<RwLock<SessionManager>>,
         handler: IncomingMessageHandler,
+        rate_limiter: Arc<RateLimiter>,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) -> Result<()> {
         info!("Starting incoming connection handler");
@@ -399,8 +411,9 @@ impl NetworkActor {
                     Ok(Some(connection)) => {
                         // Spawn handler for this connection
                         let handler_clone = handler.clone();
+                        let rate_limiter_clone = rate_limiter.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = Self::handle_connection(connection, handler_clone).await {
+                            if let Err(e) = Self::handle_connection(connection, handler_clone, rate_limiter_clone).await {
                                 warn!("Connection handler error: {}", e);
                             }
                         });
@@ -424,6 +437,7 @@ impl NetworkActor {
     async fn handle_connection(
         connection: quinn::Connection,
         handler: IncomingMessageHandler,
+        rate_limiter: Arc<RateLimiter>,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
@@ -434,6 +448,22 @@ impl NetworkActor {
                     // Read network message
                     match read_message(&mut recv).await {
                         Ok(message) => {
+                            // Check rate limit BEFORE processing message
+                            let allowed = rate_limiter.check_rate_limit(&message.from).await;
+
+                            if !allowed {
+                                warn!(
+                                    "Rate limited message from {} (exceeded limit)",
+                                    message.from
+                                );
+
+                                // Track rate limiting metric
+                                icn_obs::metrics::network::messages_rate_limited_inc();
+
+                                // Drop the message (don't call handler)
+                                continue;
+                            }
+
                             info!("Received message from {}", message.from);
 
                             // Track metrics

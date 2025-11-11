@@ -79,13 +79,100 @@ impl Supervisor {
 
             // Create incoming message handler that routes to gossip
             let gossip_handle_clone = gossip_handle.clone();
+            let network_handle_for_handler = Arc::new(tokio::sync::RwLock::new(None::<icn_net::NetworkHandle>));
+            let network_handle_for_handler_clone = network_handle_for_handler.clone();
+            let own_did_for_handler = did.clone();
+
             let incoming_handler: icn_net::IncomingMessageHandler = Arc::new(move |net_msg| {
-                // Extract gossip message if present
-                if let icn_net::MessagePayload::Gossip(gossip_msg) = net_msg.payload {
-                    // Route to gossip actor
-                    let mut gossip = gossip_handle_clone.blocking_write();
-                    if let Err(e) = gossip.handle_message(gossip_msg) {
-                        warn!("Failed to handle gossip message: {}", e);
+                let sender_did = net_msg.from.clone();
+
+                match net_msg.payload {
+                    icn_net::MessagePayload::Gossip(gossip_msg) => {
+                        // Spawn async task to avoid blocking the callback thread
+                        let gossip_handle = gossip_handle_clone.clone();
+                        tokio::spawn(async move {
+                            let mut gossip = gossip_handle.write().await;
+                            if let Err(e) = gossip.handle_message(gossip_msg) {
+                                warn!("Failed to handle gossip message: {}", e);
+                            }
+                        });
+                    }
+
+                    icn_net::MessagePayload::Subscribe { topics } => {
+                        info!("Received Subscribe from {} for topics: {:?}", sender_did, topics);
+                        icn_obs::metrics::gossip::subscribes_received_inc();
+
+                        // Spawn async task to avoid blocking the callback thread
+                        let gossip_handle = gossip_handle_clone.clone();
+                        let network_handle_lock = network_handle_for_handler_clone.clone();
+                        let own_did = own_did_for_handler.clone();
+
+                        tokio::spawn(async move {
+                            let mut gossip = gossip_handle.write().await;
+                            let mut acked_topics = Vec::new();
+
+                            for topic in &topics {
+                                match gossip.subscribe(&topic, sender_did.clone()) {
+                                    Ok(_) => {
+                                        info!("Subscribed {} to topic: {}", sender_did, topic);
+                                        acked_topics.push(topic.clone());
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to subscribe {} to topic {}: {}", sender_did, topic, e);
+                                    }
+                                }
+                            }
+
+                            // Send SubscribeAck back if we have any successful subscriptions
+                            if !acked_topics.is_empty() {
+                                icn_obs::metrics::gossip::subscribe_acks_sent_inc();
+                                if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
+                                    let ack_msg = icn_net::NetworkMessage::subscribe_ack(
+                                        own_did,
+                                        sender_did.clone(),
+                                        acked_topics
+                                    );
+                                    if let Err(e) = net_handle.send_message(sender_did, ack_msg).await {
+                                        warn!("Failed to send SubscribeAck: {}", e);
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    icn_net::MessagePayload::Unsubscribe { topics } => {
+                        info!("Received Unsubscribe from {} for topics: {:?}", sender_did, topics);
+                        icn_obs::metrics::gossip::unsubscribes_received_inc();
+
+                        // Spawn async task to avoid blocking the callback thread
+                        let gossip_handle = gossip_handle_clone.clone();
+                        tokio::spawn(async move {
+                            let mut gossip = gossip_handle.write().await;
+                            for topic in &topics {
+                                match gossip.unsubscribe(&topic, &sender_did) {
+                                    Ok(_) => {
+                                        info!("Unsubscribed {} from topic: {}", sender_did, topic);
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to unsubscribe {} from topic {}: {}", sender_did, topic, e);
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    icn_net::MessagePayload::SubscribeAck { topics } => {
+                        info!("Received SubscribeAck from {} for topics: {:?}", sender_did, topics);
+                        // Track successful subscription acknowledgment
+                        // In a full implementation, this could update a local subscription registry
+                    }
+
+                    icn_net::MessagePayload::Ping => {
+                        // Ping/Pong handled by network actor
+                    }
+
+                    icn_net::MessagePayload::Pong => {
+                        // Ping/Pong handled by network actor
                     }
                 }
             });
@@ -97,6 +184,9 @@ impl Supervisor {
                 Some(incoming_handler),
             )
             .await?;
+
+            // Initialize network handle for the incoming message handler
+            *network_handle_for_handler.write().await = Some(network_handle.clone());
 
             info!("Network actor spawned on {}", listen_addr);
 

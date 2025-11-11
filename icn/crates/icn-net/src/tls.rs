@@ -67,24 +67,105 @@ pub fn create_client_config() -> Result<rustls::ClientConfig> {
 
 /// Custom certificate verifier for DID-based certificates
 ///
-/// TODO: This currently accepts all certificates. In production, it should:
-/// 1. Extract the DID from the certificate CN
-/// 2. Query the trust graph for the peer's trust score
-/// 3. Accept/reject based on trust class (e.g., only Partner or Federated)
+/// This verifier extracts the DID from certificate SAN (Subject Alternative Name) and performs
+/// basic validation. Full trust graph integration is TODO.
+///
+/// Security notes:
+/// - Currently accepts self-signed certificates (required for P2P architecture)
+/// - Does NOT yet integrate with trust graph for trust score verification
+/// - Logs all certificate verifications for security auditing
+/// - Validates DID format and certificate expiration
 #[derive(Debug)]
 struct DidCertificateVerifier;
+
+impl DidCertificateVerifier {
+    /// Extract DID from certificate Subject Alternative Names
+    fn extract_did_from_cert(cert: &CertificateDer<'_>) -> Result<String, rustls::Error> {
+        use x509_parser::prelude::*;
+
+        // Parse X.509 certificate
+        let (_, parsed_cert) = X509Certificate::from_der(cert)
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {}", e)))?;
+
+        // Look for DID in Subject Alternative Names
+        if let Ok(Some(san_ext)) = parsed_cert.subject_alternative_name() {
+            for name in &san_ext.value.general_names {
+                if let GeneralName::DNSName(dns) = name {
+                    // DIDs are stored in DNS SAN fields
+                    if dns.starts_with("did:icn:") {
+                        return Ok(dns.to_string());
+                    }
+                }
+            }
+        }
+
+        Err(rustls::Error::General(
+            "No DID found in certificate SAN".to_string(),
+        ))
+    }
+
+    /// Validate certificate hasn't expired
+    fn check_expiration(cert: &CertificateDer<'_>, now: rustls::pki_types::UnixTime) -> Result<(), rustls::Error> {
+        use x509_parser::prelude::*;
+
+        let (_, parsed_cert) = X509Certificate::from_der(cert)
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {}", e)))?;
+
+        let current_time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(now.as_secs());
+        let not_before = parsed_cert.validity().not_before.to_datetime();
+        let not_after = parsed_cert.validity().not_after.to_datetime();
+
+        if current_time < not_before {
+            return Err(rustls::Error::General(
+                "Certificate not yet valid".to_string(),
+            ));
+        }
+
+        if current_time > not_after {
+            return Err(rustls::Error::General(
+                "Certificate expired".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
 
 impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
     fn verify_server_cert(
         &self,
-        _end_entity: &CertificateDer<'_>,
+        end_entity: &CertificateDer<'_>,
         _intermediates: &[CertificateDer<'_>],
         _server_name: &rustls::pki_types::ServerName<'_>,
         _ocsp_response: &[u8],
-        _now: rustls::pki_types::UnixTime,
+        now: rustls::pki_types::UnixTime,
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-        // TODO: Implement proper DID certificate verification
-        // For now, accept all certificates (development only)
+        // Extract and validate DID from certificate
+        let did = Self::extract_did_from_cert(end_entity)?;
+
+        // Validate DID format
+        if !did.starts_with("did:icn:") {
+            return Err(rustls::Error::General(format!(
+                "Invalid DID format: {}",
+                did
+            )));
+        }
+
+        // Check certificate expiration
+        Self::check_expiration(end_entity, now)?;
+
+        // Log certificate verification for security audit
+        tracing::info!(
+            "Certificate verification: Accepted self-signed cert for DID: {}",
+            did
+        );
+        tracing::warn!(
+            "⚠️  SECURITY: Trust graph verification not yet implemented for DID: {}",
+            did
+        );
+
+        // TODO: Query trust graph and reject if trust score < Partner
+        // For now, accept all valid DID certificates (development mode)
         Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
 
