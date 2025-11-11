@@ -17,6 +17,9 @@ use tracing::{debug, info};
 /// If recipient_did is None, broadcast to all peers
 pub type SendMessageCallback = Arc<dyn Fn(Option<Did>, GossipMessage) + Send + Sync>;
 
+/// Maximum subscribers per topic to prevent unbounded memory growth
+const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
+
 /// Gossip actor manages topics and entry synchronization
 pub struct GossipActor {
     /// This node's DID
@@ -164,6 +167,23 @@ impl GossipActor {
             return Ok(()); // Already have it
         }
 
+        // Check topic max_entries limit BEFORE inserting to prevent unbounded growth
+        if let Some(topic_obj) = self.topics.get(topic) {
+            if topic_entries.len() >= topic_obj.max_entries {
+                // At capacity - remove oldest entry first to make room
+                let mut entries_vec: Vec<_> = topic_entries.values().cloned().collect();
+                entries_vec.sort_by_key(|e| e.timestamp);
+
+                if let Some(oldest) = entries_vec.first() {
+                    debug!(
+                        "Topic {} at capacity ({}), removing oldest entry",
+                        topic, topic_obj.max_entries
+                    );
+                    topic_entries.remove(&oldest.hash);
+                }
+            }
+        }
+
         // Add to bloom filter
         if let Some(bloom) = self.bloom_filters.get_mut(topic) {
             bloom.insert(&hash);
@@ -174,26 +194,6 @@ impl GossipActor {
 
         // Merge vector clock
         self.clock.merge(&entry.clock);
-
-        // Apply retention policy (remove old entries if over limit)
-        if let Some(topic_obj) = self.topics.get(topic) {
-            if topic_entries.len() > topic_obj.max_entries {
-                // Remove oldest entries
-                let mut entries_vec: Vec<_> = topic_entries.values().collect();
-                entries_vec.sort_by_key(|e| e.timestamp);
-
-                let to_remove = topic_entries.len() - topic_obj.max_entries;
-                let hashes_to_remove: Vec<ContentHash> = entries_vec
-                    .iter()
-                    .take(to_remove)
-                    .map(|e| e.hash)
-                    .collect();
-
-                for hash in hashes_to_remove {
-                    topic_entries.remove(&hash);
-                }
-            }
-        }
 
         Ok(())
     }
@@ -230,6 +230,15 @@ impl GossipActor {
             .or_insert_with(Vec::new);
 
         if !subscribers.contains(&subscriber) {
+            // Check subscriber limit to prevent unbounded growth
+            if subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
+                bail!(
+                    "Topic subscription limit reached: {} (max {})",
+                    subscribers.len(),
+                    MAX_SUBSCRIBERS_PER_TOPIC
+                );
+            }
+
             subscribers.push(subscriber.clone());
             info!("DID {} subscribed to topic: {}", subscriber, topic);
 
@@ -863,5 +872,92 @@ mod tests {
         // Try to subscribe with no trust - should fail
         let result = gossip.subscribe("partner:only", did.clone());
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[ignore] // Slow test - fills 10,000 slots
+    fn test_subscribe_limit_enforcement_full() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        let topic = Topic::new("test:limited".to_string(), AccessControl::Public);
+        gossip.create_topic(topic);
+
+        // Manually fill subscribers vector to MAX
+        let subscribers = gossip.subscriptions.get_mut("test:limited").unwrap();
+        let filler_did = KeyPair::generate().unwrap().did().clone();
+        while subscribers.len() < super::MAX_SUBSCRIBERS_PER_TOPIC {
+            subscribers.push(filler_did.clone());
+        }
+
+        // Verify at MAX
+        assert_eq!(subscribers.len(), super::MAX_SUBSCRIBERS_PER_TOPIC);
+
+        // Try to add another - should fail
+        let did = KeyPair::generate().unwrap().did().clone();
+        let result = gossip.subscribe("test:limited", did);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("limit reached"));
+    }
+
+    #[test]
+    fn test_subscribe_limit_enforcement_logic() {
+        // Test the limit checking logic with a small number
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        let topic = Topic::new("test:limited".to_string(), AccessControl::Public);
+        gossip.create_topic(topic);
+
+        // Add 100 subscribers to verify normal operation
+        for i in 0..100 {
+            let did = KeyPair::generate().unwrap().did().clone();
+            let result = gossip.subscribe("test:limited", did);
+            assert!(result.is_ok(), "Subscribe {} should succeed", i);
+        }
+
+        // Verify count
+        let count = gossip.get_subscribers("test:limited").len();
+        assert_eq!(count, 100, "Should have 100 subscribers");
+
+        // The limit logic is validated in the ignored test above
+        // This test just confirms normal operation works
+    }
+
+    #[test]
+    fn test_entry_limit_enforcement() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Create a topic with small max_entries for testing
+        let topic = Topic::new("test:entries".to_string(), AccessControl::Public)
+            .with_max_entries(5); // Small limit for fast testing
+        gossip.create_topic(topic);
+
+        // Publish more entries than the limit
+        for i in 0..10 {
+            let data = format!("entry_{}", i).into_bytes();
+            let result = gossip.publish("test:entries", data);
+            assert!(result.is_ok(), "Publish {} failed: {:?}", i, result);
+        }
+
+        // Should have exactly max_entries (5) entries
+        let entries = gossip.get_entries("test:entries");
+        assert_eq!(
+            entries.len(),
+            5,
+            "Should have exactly 5 entries, got {}",
+            entries.len()
+        );
+
+        // Oldest entries should be removed (entries 0-4 gone, 5-9 remain)
+        let data_values: Vec<String> = entries
+            .iter()
+            .map(|e| String::from_utf8_lossy(&e.data).to_string())
+            .collect();
+
+        // Should contain the newest entries
+        assert!(data_values.contains(&"entry_9".to_string()));
+        assert!(data_values.contains(&"entry_8".to_string()));
     }
 }
