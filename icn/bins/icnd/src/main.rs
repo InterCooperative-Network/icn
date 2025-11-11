@@ -102,10 +102,17 @@ async fn main() -> Result<()> {
 ///
 /// Returns a zeroizing container that automatically clears the passphrase
 /// from memory when it goes out of scope, preventing sensitive data leakage.
+///
+/// Security: Both the String returned by rpassword and the final Vec<u8> are
+/// wrapped in Zeroizing to ensure complete memory cleanup.
 fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
     print!("{}", prompt);
     io::stdout().flush()?;
-    let passphrase = rpassword::read_password()
-        .context("Failed to read password")?;
-    Ok(Zeroizing::new(passphrase.into_bytes()))
+    // Wrap the String immediately in Zeroizing to prevent it from lingering in memory
+    let passphrase_str = Zeroizing::new(
+        rpassword::read_password()
+            .context("Failed to read password")?
+    );
+    // Convert to bytes (copies from zeroized String, which is then dropped and zeroed)
+    Ok(Zeroizing::new(passphrase_str.as_bytes().to_vec()))
 }

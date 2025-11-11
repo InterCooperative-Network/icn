@@ -5,14 +5,15 @@ edition.workspace = true
 
 [dependencies]
 tokio.workspace = true
-tonic.workspace = true
-prost.workspace = true
-icn-identity.workspace = true
-icn-ledger.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+hyper.workspace = true
+hyper-util = "0.1"
+http-body-util = "0.1"
 
-[build-dependencies]
-tonic-build = "0.12"
+# ICN crates
+icn-identity.workspace = true
+icn-net.workspace = true
