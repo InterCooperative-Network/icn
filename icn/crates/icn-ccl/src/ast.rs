@@ -407,6 +407,9 @@ impl Contract {
             Expr::UnOp { operand, .. } => {
                 Self::validate_expr_depth(operand, current_depth + 1)?;
             }
+            Expr::FieldAccess { object, .. } => {
+                Self::validate_expr_depth(object, current_depth + 1)?;
+            }
             Expr::Call { args, .. } => {
                 for arg in args {
                     Self::validate_expr_depth(arg, current_depth + 1)?;
@@ -417,7 +420,22 @@ impl Contract {
                     Self::validate_expr_depth(item, current_depth + 1)?;
                 }
             }
-            _ => {} // Literals and variables don't increase depth
+            Expr::Set(items) => {
+                for item in items {
+                    Self::validate_expr_depth(item, current_depth + 1)?;
+                }
+            }
+            Expr::Map(entries) => {
+                for (_key, value) in entries {
+                    Self::validate_expr_depth(value, current_depth + 1)?;
+                }
+            }
+            Expr::In { elem, collection } => {
+                Self::validate_expr_depth(elem, current_depth + 1)?;
+                Self::validate_expr_depth(collection, current_depth + 1)?;
+            }
+            // Only Literal and Var don't contain nested expressions
+            Expr::Literal(_) | Expr::Var(_) => {}
         }
         Ok(())
     }
@@ -515,5 +533,103 @@ mod tests {
         let result = contract.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Duplicate rule"));
+    }
+
+    #[test]
+    fn test_deep_field_access_chain() {
+        // Create deeply nested FieldAccess: obj.a.b.c.d...
+        let mut expr = Expr::Var("obj".to_string());
+        for _ in 0..MAX_EXPR_DEPTH + 5 {
+            expr = Expr::FieldAccess {
+                object: Box::new(expr),
+                field: "field".to_string(),
+            };
+        }
+
+        let rule = Rule::new("test".to_string())
+            .add_stmt(Stmt::Return { value: expr });
+
+        let contract = Contract::new("test".to_string()).add_rule(rule);
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("too deep"));
+    }
+
+    #[test]
+    fn test_deep_set_nesting() {
+        // Create deeply nested Set expressions
+        let mut expr = Expr::Literal(Value::Int(1));
+        for _ in 0..MAX_EXPR_DEPTH + 5 {
+            expr = Expr::Set(vec![expr]);
+        }
+
+        let rule = Rule::new("test".to_string())
+            .add_stmt(Stmt::Return { value: expr });
+
+        let contract = Contract::new("test".to_string()).add_rule(rule);
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("too deep"));
+    }
+
+    #[test]
+    fn test_deep_map_nesting() {
+        // Create deeply nested Map expressions
+        let mut expr = Expr::Literal(Value::Int(1));
+        for _ in 0..MAX_EXPR_DEPTH + 5 {
+            expr = Expr::Map(vec![("key".to_string(), expr)]);
+        }
+
+        let rule = Rule::new("test".to_string())
+            .add_stmt(Stmt::Return { value: expr });
+
+        let contract = Contract::new("test".to_string()).add_rule(rule);
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("too deep"));
+    }
+
+    #[test]
+    fn test_deep_in_expression() {
+        // Create deeply nested In expressions
+        let mut expr = Expr::Literal(Value::Int(1));
+        for _ in 0..MAX_EXPR_DEPTH + 5 {
+            expr = Expr::In {
+                elem: Box::new(Expr::Literal(Value::Int(1))),
+                collection: Box::new(expr),
+            };
+        }
+
+        let rule = Rule::new("test".to_string())
+            .add_stmt(Stmt::Return { value: expr });
+
+        let contract = Contract::new("test".to_string()).add_rule(rule);
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("too deep"));
+    }
+
+    #[test]
+    fn test_shallow_expressions_accepted() {
+        // Normal shallow expressions should pass validation
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Var("obj".to_string())),
+            field: "name".to_string(),
+        };
+
+        let rule = Rule::new("test".to_string())
+            .add_stmt(Stmt::Return { value: expr });
+
+        let contract = Contract::new("test".to_string()).add_rule(rule);
+
+        assert!(contract.validate().is_ok());
     }
 }
