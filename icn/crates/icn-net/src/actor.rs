@@ -457,7 +457,7 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
-        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone())
+        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone(), None)
             .await
             .unwrap();
 

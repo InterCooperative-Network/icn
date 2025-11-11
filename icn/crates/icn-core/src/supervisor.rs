@@ -92,6 +92,39 @@ impl Supervisor {
 
             info!("Network actor spawned on {}", listen_addr);
 
+            // Set send callback on gossip actor to enable request/response
+            {
+                let mut gossip = gossip_handle.write().await;
+                let network_handle_clone = network_handle.clone();
+                let own_did_clone = did.clone();
+
+                let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient, gossip_msg| {
+                    let net_handle = network_handle_clone.clone();
+                    let from_did = own_did_clone.clone();
+
+                    // Spawn async task to send message
+                    tokio::spawn(async move {
+                        let result = if let Some(target_did) = recipient {
+                            // Unicast
+                            let net_msg = icn_net::NetworkMessage::gossip(from_did, Some(target_did.clone()), gossip_msg);
+                            net_handle.send_message(target_did, net_msg).await
+                        } else {
+                            // Broadcast
+                            let net_msg = icn_net::NetworkMessage::gossip(from_did, None, gossip_msg);
+                            net_handle.broadcast(net_msg).await
+                        };
+
+                        if let Err(e) = result {
+                            warn!("Failed to send gossip message: {}", e);
+                        }
+                    });
+                });
+
+                gossip.set_send_callback(send_callback);
+            }
+
+            info!("Gossip send callback configured");
+
             // Spawn RPC server with network handle
             let rpc_addr = "127.0.0.1:5050".parse()?;
             let mut rpc_server = RpcServer::new(rpc_addr);

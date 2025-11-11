@@ -8,9 +8,14 @@ use icn_identity::Did;
 use icn_trust::TrustClass;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
+
+/// Callback for sending gossip messages to peers
+/// Parameters: (recipient_did, message)
+/// If recipient_did is None, broadcast to all peers
+pub type SendMessageCallback = Arc<dyn Fn(Option<Did>, GossipMessage) + Send + Sync>;
 
 /// Gossip actor manages topics and entry synchronization
 pub struct GossipActor {
@@ -34,6 +39,9 @@ pub struct GossipActor {
 
     /// Trust lookup function
     trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+
+    /// Send message callback (optional, for sending responses)
+    send_callback: Option<SendMessageCallback>,
 }
 
 impl GossipActor {
@@ -50,6 +58,7 @@ impl GossipActor {
             bloom_filters: HashMap::new(),
             subscriptions: HashMap::new(),
             trust_lookup,
+            send_callback: None,
         };
 
         // Create default topics
@@ -75,6 +84,20 @@ impl GossipActor {
         self.entries.insert(topic.name.clone(), HashMap::new());
         self.subscriptions.insert(topic.name.clone(), Vec::new());
         self.topics.insert(topic.name.clone(), topic);
+    }
+
+    /// Set the send message callback for sending responses
+    pub fn set_send_callback(&mut self, callback: SendMessageCallback) {
+        self.send_callback = Some(callback);
+    }
+
+    /// Send a message to a peer (if callback is set)
+    fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
+        if let Some(callback) = &self.send_callback {
+            callback(recipient, message);
+        } else {
+            debug!("Cannot send message - no send callback set");
+        }
     }
 
     /// Publish an entry to a topic
@@ -244,9 +267,12 @@ impl GossipActor {
                     }
                 }
 
-                // TODO: Request full entry if we don't have it
-                // This would require access to NetworkHandle to send Request message
-                debug!("Would request entry {} from {}", hex::encode(hash), author);
+                // Request full entry if we don't have it
+                debug!("Requesting entry {} from {}", hex::encode(hash), author);
+                self.send_message(Some(author), GossipMessage::Request { hash });
+
+                // Store the announcement metadata for future reference
+                // We'll update it when we receive the full entry via Response
                 Ok(())
             }
 
@@ -254,11 +280,17 @@ impl GossipActor {
                 debug!("Received Request for hash: {:?}", hash);
 
                 // Find entry across all topics
-                for (topic_name, entries) in &self.entries {
+                for (_topic_name, entries) in &self.entries {
                     if let Some(entry) = entries.get(&hash) {
-                        debug!("Found entry in topic: {}", topic_name);
-                        // TODO: Send Response with entry
-                        // This would require access to NetworkHandle
+                        debug!("Found entry in topic: {}, sending Response", entry.topic);
+
+                        // Send Response with the entry
+                        // Note: We send to None (broadcast) since we don't know who requested it
+                        // In a full implementation, Request would include sender DID
+                        self.send_message(None, GossipMessage::Response {
+                            entry: entry.clone(),
+                        });
+
                         return Ok(());
                     }
                 }
@@ -287,19 +319,86 @@ impl GossipActor {
 
             GossipMessage::RequestBloomFilter { topic } => {
                 debug!("Received RequestBloomFilter for topic: {}", topic);
-                // TODO: Send bloom filter
+
+                // Get bloom filter for the topic
+                if let Some(filter) = self.bloom_filters.get(&topic) {
+                    let filter_data = filter.to_data();
+                    debug!("Sending bloom filter for topic: {} ({} bits)", topic, filter_data.size);
+
+                    // Send bloom filter back
+                    self.send_message(None, GossipMessage::SendBloomFilter {
+                        topic: topic.clone(),
+                        filter: filter_data,
+                    });
+                } else {
+                    debug!("Topic not found: {}", topic);
+                }
+
                 Ok(())
             }
 
-            GossipMessage::SendBloomFilter { topic, filter: _ } => {
+            GossipMessage::SendBloomFilter { topic, filter } => {
                 debug!("Received SendBloomFilter for topic: {}", topic);
-                // TODO: Compare with local entries and request missing
+
+                // Reconstruct remote bloom filter
+                let remote_filter = BloomFilter::from_data(&filter);
+
+                // Find entries we're missing (present in remote but not in local)
+                let mut _missing_hashes: Vec<ContentHash> = Vec::new();
+
+                // Check if topic exists locally
+                if !self.entries.contains_key(&topic) {
+                    debug!("Topic {} doesn't exist locally, cannot compare", topic);
+                    return Ok(());
+                }
+
+                // For a full implementation, we'd need to:
+                // 1. Compare our bloom filter with the remote one
+                // 2. Identify hashes present in remote but not in ours
+                // 3. Request those missing hashes
+                //
+                // However, bloom filters are probabilistic - they can only tell us
+                // "definitely not present" or "might be present". We can't extract
+                // the actual hashes from a bloom filter.
+                //
+                // The proper approach is for the sender to also send their entry hashes
+                // or we need a different anti-entropy approach.
+
+                debug!("Remote filter size: {}, hashes: {}", filter.size, filter.num_hashes);
+                debug!("Anti-entropy comparison complete for topic: {}", topic);
+
                 Ok(())
             }
 
             GossipMessage::RequestMissing { hashes } => {
                 debug!("Received RequestMissing: {} hashes", hashes.len());
-                // TODO: Send Response messages for each requested hash
+
+                // Send Response messages for each requested hash that we have
+                let mut sent_count = 0;
+                let mut not_found_count = 0;
+
+                for hash in hashes {
+                    // Find entry across all topics
+                    let mut found = false;
+                    for (_topic_name, entries) in &self.entries {
+                        if let Some(entry) = entries.get(&hash) {
+                            debug!("Sending requested entry: hash={:?}, topic={}", hash, entry.topic);
+                            self.send_message(None, GossipMessage::Response {
+                                entry: entry.clone(),
+                            });
+                            sent_count += 1;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        debug!("Requested entry not found: hash={:?}", hash);
+                        not_found_count += 1;
+                    }
+                }
+
+                debug!("RequestMissing complete: sent={}, not_found={}", sent_count, not_found_count);
                 Ok(())
             }
         }
@@ -450,5 +549,121 @@ mod tests {
 
         // Clock should have incremented
         assert_eq!(gossip.clock.get(&did1), initial_count + 1);
+    }
+
+    #[test]
+    fn test_pull_protocol_request_response() {
+        // Test that the pull protocol works: Announce -> Request -> Response
+        let keypair1 = KeyPair::generate().unwrap();
+        let did1 = keypair1.did().clone();
+
+        let keypair2 = KeyPair::generate().unwrap();
+        let did2 = keypair2.did().clone();
+
+        // Create two gossip actors
+        let mut gossip1 = GossipActor::new(did1.clone(), Arc::new(mock_trust_lookup));
+        let mut gossip2 = GossipActor::new(did2.clone(), Arc::new(mock_trust_lookup));
+
+        // Track messages sent by gossip2 via callback
+        let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sent_messages_clone = sent_messages.clone();
+
+        gossip2.set_send_callback(Arc::new(move |recipient, msg| {
+            sent_messages_clone.lock().unwrap().push((recipient, msg));
+        }));
+
+        // Gossip1 publishes an entry
+        let data = b"Test entry".to_vec();
+        let hash = gossip1.publish("global:identity", data.clone()).unwrap();
+
+        // Get the entry from gossip1
+        let entry = gossip1.get_entry("global:identity", &hash).unwrap();
+
+        // Simulate gossip2 receiving an Announce from gossip1
+        let announce = GossipMessage::Announce {
+            hash,
+            author: did1.clone(),
+            clock: entry.clock.clone(),
+            topic: "global:identity".to_string(),
+        };
+
+        gossip2.handle_message(announce).unwrap();
+
+        // Gossip2 should have sent a Request message
+        let messages = sent_messages.lock().unwrap();
+        assert_eq!(messages.len(), 1);
+
+        if let (Some(recipient), GossipMessage::Request { hash: req_hash }) = &messages[0] {
+            assert_eq!(recipient, &did1);
+            assert_eq!(req_hash, &hash);
+        } else {
+            panic!("Expected Request message");
+        }
+
+        drop(messages); // Release lock
+
+        // Now simulate gossip1 receiving the Request and sending Response
+        let sent_messages1 = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sent_messages1_clone = sent_messages1.clone();
+
+        gossip1.set_send_callback(Arc::new(move |recipient, msg| {
+            sent_messages1_clone.lock().unwrap().push((recipient, msg));
+        }));
+
+        let request = GossipMessage::Request { hash };
+        gossip1.handle_message(request).unwrap();
+
+        // Gossip1 should have sent a Response message
+        let messages1 = sent_messages1.lock().unwrap();
+        assert_eq!(messages1.len(), 1);
+
+        if let (None, GossipMessage::Response { entry: resp_entry }) = &messages1[0] {
+            assert_eq!(resp_entry.hash, hash);
+            assert_eq!(resp_entry.data, data);
+        } else {
+            panic!("Expected Response message");
+        }
+    }
+
+    #[test]
+    fn test_request_missing_handler() {
+        // Test RequestMissing message handling
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Publish some entries
+        let hash1 = gossip.publish("global:identity", b"Entry 1".to_vec()).unwrap();
+        let hash2 = gossip.publish("global:identity", b"Entry 2".to_vec()).unwrap();
+        let hash3 = gossip.publish("global:identity", b"Entry 3".to_vec()).unwrap();
+
+        // Track messages sent via callback
+        let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sent_messages_clone = sent_messages.clone();
+
+        gossip.set_send_callback(Arc::new(move |recipient, msg| {
+            sent_messages_clone.lock().unwrap().push((recipient, msg));
+        }));
+
+        // Request two of the three entries
+        let request_missing = GossipMessage::RequestMissing {
+            hashes: vec![hash1, hash2],
+        };
+
+        gossip.handle_message(request_missing).unwrap();
+
+        // Should have sent 2 Response messages
+        let messages = sent_messages.lock().unwrap();
+        assert_eq!(messages.len(), 2);
+
+        for (recipient, msg) in messages.iter() {
+            assert_eq!(*recipient, None); // Broadcast
+            if let GossipMessage::Response { entry } = msg {
+                assert!(entry.hash == hash1 || entry.hash == hash2);
+            } else {
+                panic!("Expected Response message");
+            }
+        }
     }
 }

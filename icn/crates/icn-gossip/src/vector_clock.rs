@@ -45,7 +45,7 @@ impl VectorClock {
     /// - All entries in this clock are <= corresponding entries in other
     /// - At least one entry in this clock is < corresponding entry in other
     pub fn happened_before(&self, other: &VectorClock) -> bool {
-        let mut all_less_or_equal = true;
+        let all_less_or_equal = true;
         let mut at_least_one_less = false;
 
         // Check all entries in this clock

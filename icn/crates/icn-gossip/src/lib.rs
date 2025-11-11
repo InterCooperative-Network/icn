@@ -34,6 +34,6 @@ pub mod types;
 pub mod vector_clock;
 
 pub use bloom::BloomFilter;
-pub use gossip::{GossipActor, GossipHandle};
+pub use gossip::{GossipActor, GossipHandle, SendMessageCallback};
 pub use types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic};
 pub use vector_clock::VectorClock;
