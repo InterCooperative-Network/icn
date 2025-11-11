@@ -195,11 +195,12 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
         gossip2.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
     }
 
-    // Connect nodes: 1 ↔ 2
+    // Connect nodes: 1 ↔ 2 (bidirectional)
     node1.network_handle.dial(node2.listen_addr, node2.did.clone()).await?;
+    node2.network_handle.dial(node1.listen_addr, node1.did.clone()).await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    info!("✓ Nodes connected");
+    info!("✓ Nodes connected (bidirectional)");
 
     // Node 1 publishes 3 entries
     let mut hashes = Vec::new();
