@@ -115,8 +115,8 @@ impl ContractRuntime {
 
                     // Create journal entry
                     let entry = JournalEntryBuilder::new(from.clone())
-                        .debit(to.clone(), currency.clone(), *amount)
-                        .credit(from.clone(), currency.clone(), *amount)
+                        .debit(from.clone(), currency.clone(), *amount)
+                        .credit(to.clone(), currency.clone(), *amount)
                         .build()?;
 
                     ledger.append_entry(entry)?;

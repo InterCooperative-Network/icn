@@ -1,8 +1,13 @@
 //! Supervisor for managing actors
 
 use anyhow::Result;
+use icn_gossip::GossipActor;
 use icn_identity::KeyPair;
+use icn_ledger::Ledger;
 use icn_rpc::RpcServer;
+use icn_store::SledStore;
+use icn_trust::TrustClass;
+use std::sync::Arc;
 use tokio::select;
 use tracing::{info, warn};
 
@@ -33,8 +38,25 @@ impl Supervisor {
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         // Spawn actors (requires keypair from unlocked keystore)
-        let network_handle = if let Some(keypair) = &self.keypair {
+        let (network_handle, gossip_handle, ledger_handle) = if let Some(keypair) = &self.keypair {
             info!("Keypair available - spawning actors");
+
+            let did = keypair.did().clone();
+
+            // Spawn Gossip actor
+            let trust_lookup = Arc::new(|_did: &icn_identity::Did| Some(TrustClass::Partner));
+            let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+
+            info!("Gossip actor spawned");
+
+            // Spawn Ledger
+            let store_path = self.config.store_path().join("ledger");
+            let store = Arc::new(SledStore::open(&store_path)?);
+            let mut ledger = Ledger::new(store)?;
+            ledger.set_gossip(gossip_handle.clone());
+            let ledger_handle = Arc::new(tokio::sync::RwLock::new(ledger));
+
+            info!("Ledger initialized at {}", store_path.display());
 
             // TODO: Spawn Identity actor
             // let identity_handle = IdentityActor::spawn(
@@ -68,14 +90,12 @@ impl Supervisor {
 
             info!("RPC server spawned on {}", rpc_addr);
 
-            Some(network_handle)
+            (Some(network_handle), Some(gossip_handle), Some(ledger_handle))
         } else {
             warn!("No keypair available - actors not spawned");
             warn!("Run 'icnctl id init' to create an identity");
-            None
+            (None, None, None)
         };
-
-        // TODO: Spawn other actors (gossip, replication, etc.)
 
         // Wait for shutdown signal
         select! {
@@ -97,7 +117,14 @@ impl Supervisor {
             info!("Network actor will shut down via shutdown signal");
         }
 
-        // TODO: Wait for other actors to complete
+        // Gossip and Ledger are wrapped in Arc<RwLock> and will be dropped when
+        // all references are released
+        if gossip_handle.is_some() {
+            info!("Gossip actor will be dropped when all references are released");
+        }
+        if ledger_handle.is_some() {
+            info!("Ledger will be dropped when all references are released");
+        }
 
         info!("Supervisor stopped");
         Ok(())

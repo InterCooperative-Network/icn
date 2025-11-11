@@ -79,6 +79,12 @@ impl GossipActor {
 
     /// Publish an entry to a topic
     pub fn publish(&mut self, topic: &str, data: Vec<u8>) -> Result<ContentHash> {
+        // Auto-create topic if it doesn't exist (as public topic)
+        if !self.topics.contains_key(topic) {
+            debug!("Auto-creating public topic: {}", topic);
+            self.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
+        }
+
         let topic_obj = self
             .topics
             .get(topic)
@@ -238,6 +244,17 @@ impl GossipActor {
 
 /// Shared gossip actor handle
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
+
+impl GossipActor {
+    /// Spawn a gossip actor and return a handle
+    pub fn spawn(
+        own_did: Did,
+        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+    ) -> GossipHandle {
+        let actor = GossipActor::new(own_did, trust_lookup);
+        Arc::new(RwLock::new(actor))
+    }
+}
 
 #[cfg(test)]
 mod tests {

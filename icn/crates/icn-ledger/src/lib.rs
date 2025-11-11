@@ -46,9 +46,11 @@ pub mod balance;
 pub mod entry;
 pub mod hash;
 pub mod ledger;
+pub mod sync;
 pub mod types;
 
 pub use ledger::Ledger;
+pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, Currency, JournalEntry, QuarantinedEntry,
     QuarantineReason, Resolution, Signature,

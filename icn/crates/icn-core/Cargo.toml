@@ -21,3 +21,5 @@ icn-store.workspace = true
 icn-trust.workspace = true
 icn-net.workspace = true
 icn-rpc.workspace = true
+icn-gossip.workspace = true
+icn-ledger.workspace = true

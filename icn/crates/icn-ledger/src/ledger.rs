@@ -1,8 +1,10 @@
 //! Ledger implementation with storage
 
-use crate::balance::{compute_all_balances, compute_account_balance, compute_balance};
+use crate::balance::compute_all_balances;
+use crate::sync::{serialize_sync_message, LedgerSyncMessage};
 use crate::types::{AccountBalances, ContentHash, JournalEntry};
 use anyhow::{Context, Result};
+use icn_gossip::GossipHandle;
 use icn_identity::Did;
 use icn_store::Store;
 use std::collections::HashMap;
@@ -22,6 +24,9 @@ pub struct Ledger {
 
     /// Cached balances (in-memory for fast queries)
     cached_balances: HashMap<Did, AccountBalances>,
+
+    /// Optional gossip handle for distributed synchronization
+    gossip: Option<GossipHandle>,
 }
 
 impl Ledger {
@@ -30,12 +35,18 @@ impl Ledger {
         let mut ledger = Ledger {
             store,
             cached_balances: HashMap::new(),
+            gossip: None,
         };
 
         // Load cached balances from storage
         ledger.load_cached_balances()?;
 
         Ok(ledger)
+    }
+
+    /// Set the gossip handle for distributed synchronization
+    pub fn set_gossip(&mut self, gossip: GossipHandle) {
+        self.gossip = Some(gossip);
     }
 
     /// Append a journal entry to the ledger
@@ -69,7 +80,129 @@ impl Ledger {
 
         info!("Ledger entry appended: {}", hash);
 
+        // Publish to gossip if available
+        if let Some(gossip) = &self.gossip {
+            self.publish_to_gossip(gossip, &entry)?;
+        }
+
         Ok(hash)
+    }
+
+    /// Publish a journal entry to gossip for distributed synchronization
+    fn publish_to_gossip(&self, gossip: &GossipHandle, entry: &JournalEntry) -> Result<()> {
+        use crate::sync::ledger_topic;
+
+        let hash = entry.id.as_ref().context("Entry must have hash")?.clone();
+
+        // Get all currencies from this entry
+        let mut currencies: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for delta in &entry.accounts {
+            currencies.insert(delta.currency.clone());
+        }
+
+        // Publish to each currency's topic
+        for currency in currencies {
+            let topic = ledger_topic(&currency);
+            let msg = LedgerSyncMessage::NewEntry {
+                hash: hash.clone(),
+                entry: entry.clone(),
+            };
+
+            let data = serialize_sync_message(&msg)?;
+
+            // Publish via gossip (blocking lock)
+            let mut gossip_actor = gossip.blocking_write();
+            gossip_actor.publish(&topic, data)?;
+
+            debug!("Published entry {} to topic {}", hash, topic);
+        }
+
+        Ok(())
+    }
+
+    /// Handle an incoming sync message from gossip
+    pub fn handle_sync_message(&mut self, msg: LedgerSyncMessage) -> Result<()> {
+        match msg {
+            LedgerSyncMessage::NewEntry { hash, mut entry } => {
+                // Check if we already have this entry
+                if self.get_entry(&hash)?.is_some() {
+                    debug!("Already have entry {}, skipping", hash);
+                    return Ok(());
+                }
+
+                // Ensure entry has the correct ID
+                entry.id = Some(hash.clone());
+
+                // Append the entry (this will also publish to gossip if gossip is set,
+                // but we should avoid re-publishing entries we just received)
+                // For now, temporarily remove gossip handle to avoid re-broadcast
+                let gossip = self.gossip.take();
+                let result = self.append_entry(entry);
+                self.gossip = gossip;
+
+                match result {
+                    Ok(h) => {
+                        info!("Received and stored entry {} via gossip", h);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        warn!("Failed to store received entry: {}", e);
+                        Ok(()) // Don't propagate error, just log it
+                    }
+                }
+            }
+
+            LedgerSyncMessage::RequestEntry { hash } => {
+                // Handle request for specific entry
+                debug!("Received request for entry {}", hash);
+
+                if let Some(gossip) = &self.gossip {
+                    let entry_opt = self.get_entry(&hash)?;
+
+                    // Determine topic from entry if available
+                    if let Some(ref e) = entry_opt {
+                        if let Some(delta) = e.accounts.first() {
+                            use crate::sync::ledger_topic;
+                            let topic = ledger_topic(&delta.currency);
+
+                            let response = LedgerSyncMessage::EntryResponse {
+                                hash: hash.clone(),
+                                entry: entry_opt,
+                            };
+                            let data = serialize_sync_message(&response)?;
+
+                            let mut gossip_actor = gossip.blocking_write();
+                            gossip_actor.publish(&topic, data)?;
+
+                            debug!("Sent entry {} response", hash);
+                        }
+                    } else {
+                        debug!("Entry {} not found locally", hash);
+                    }
+                }
+
+                Ok(())
+            }
+
+            LedgerSyncMessage::EntryResponse { hash, entry } => {
+                // Handle response with entry
+                if let Some(e) = entry {
+                    debug!("Received entry {} response", hash);
+                    // Temporarily remove gossip to avoid re-broadcast
+                    let gossip = self.gossip.take();
+                    let result = self.append_entry(e);
+                    self.gossip = gossip;
+
+                    if let Err(e) = result {
+                        warn!("Failed to store entry from response: {}", e);
+                    }
+                } else {
+                    debug!("Entry {} not found on remote", hash);
+                }
+
+                Ok(())
+            }
+        }
     }
 
     /// Get a journal entry by its hash
