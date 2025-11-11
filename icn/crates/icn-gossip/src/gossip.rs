@@ -574,21 +574,10 @@ impl GossipActor {
                 }
 
                 // Reconstruct remote bloom filter
-                let remote_bloom = BloomFilter::from_data(&bloom);
+                let _remote_bloom = BloomFilter::from_data(&bloom);
 
-                // Find entries we have that remote doesn't (potential to push)
-                let entries_we_have = self.find_entries_to_push(&topic, &remote_bloom);
-
-                if entries_we_have.is_empty() {
-                    debug!("No missing entries to send for topic: {}", topic);
-                    return Ok(());
-                }
-
-                debug!("Found {} entries remote might be missing for topic: {}", entries_we_have.len(), topic);
-
-                // Get peer DID from vector clock (extract first DID as peer identifier)
-                // In a full implementation, the Digest message would include sender DID
-                // For now, we'll use a simplified approach: extract from vector clock
+                // PULL LOGIC: Detect if we're missing entries by comparing vector clocks
+                // Get peer DID from vector clock (extract primary DID as peer identifier)
                 let peer_did = if let Some((did, _)) = vector.clock.iter().next() {
                     did.clone()
                 } else {
@@ -596,36 +585,41 @@ impl GossipActor {
                     return Ok(());
                 };
 
-                // Get trust class for peer
-                let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
-                let limits = TrustResourceLimits::for_trust_class(trust_class);
-
-                // Calculate how many entries we can send based on limits
-                let mut want_ids = Vec::new();
-                let mut estimated_bytes = 0u32;
-                let max_bytes = limits.max_pull_bytes;
-
-                for hash in entries_we_have {
-                    // Estimate size (rough approximation: data + overhead)
-                    if let Some(entries) = self.entries.get(&topic) {
-                        if let Some(entry) = entries.get(&hash) {
-                            let entry_bytes = entry.data.len() as u32 + 256;
-
-                            if estimated_bytes + entry_bytes > max_bytes {
-                                debug!("Hit byte limit ({} bytes), selected {} entries", max_bytes, want_ids.len());
-                                break;
-                            }
-
-                            want_ids.push(hash);
-                            estimated_bytes += entry_bytes;
-                        }
+                // Check if we're behind this peer's sequence
+                let mut are_we_behind = false;
+                for (did, remote_seq) in &vector.clock {
+                    let our_seq = self.clock.get(did);
+                    if *remote_seq > our_seq {
+                        debug!("We're behind on {}: remote_seq={} > our_seq={}", did, remote_seq, our_seq);
+                        are_we_behind = true;
+                        break;
                     }
                 }
 
-                if want_ids.is_empty() {
-                    debug!("No entries selected after size filtering");
+                // Also check entry count hint
+                let our_entry_count = self.entries.get(&topic).map(|e| e.len()).unwrap_or(0);
+                if hint_count > our_entry_count as u32 {
+                    debug!("Remote has {} entries, we have {} - we're behind", hint_count, our_entry_count);
+                    are_we_behind = true;
+                }
+
+                if !are_we_behind {
+                    debug!("We're not behind remote peer - no pull needed");
                     return Ok(());
                 }
+
+                // We're behind! Send PullRequest with empty want_ids to request ALL entries
+                // The responder will interpret empty want_ids as "send everything (up to max_bytes)"
+                debug!("Detected we're behind - sending PullRequest for all entries");
+
+                // Get trust class and limits
+                let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
+                let limits = TrustResourceLimits::for_trust_class(trust_class);
+                let max_bytes = limits.max_pull_bytes;
+
+                // Empty want_ids means "send all entries"
+                let want_ids = Vec::new();
+                let estimated_bytes = hint_count * 512; // Rough estimate
 
                 // Update peer sync state (borrow mutable)
                 let (request_nonce, deficit_after) = {
@@ -702,7 +696,17 @@ impl GossipActor {
                 let mut total_bytes = 0u32;
                 let mut truncated = false;
 
-                for hash in want_ids {
+                // If want_ids is empty, interpret as "send all entries" (up to max_bytes)
+                // This supports the case where requester detects missing entries via vector
+                // clock but doesn't know specific hashes
+                let hashes_to_send: Vec<ContentHash> = if want_ids.is_empty() {
+                    debug!("Empty want_ids - sending all entries for topic (up to max_bytes)");
+                    topic_entries.keys().copied().collect()
+                } else {
+                    want_ids.clone()
+                };
+
+                for hash in hashes_to_send {
                     if let Some(entry) = topic_entries.get(&hash) {
                         // Estimate entry size (rough approximation)
                         let entry_bytes = entry.data.len() as u32 + 256; // Data + overhead

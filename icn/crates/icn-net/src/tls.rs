@@ -20,13 +20,22 @@ pub fn generate_self_signed_cert(
 
     info!("Generating self-signed certificate for DID: {}", did);
 
-    // Use rcgen to generate a simple self-signed certificate with the DID as subject
-    let subject_alt_names = vec![did.as_str().to_string()];
-    let certified_key = rcgen::generate_simple_self_signed(subject_alt_names)?;
+    // Create certificate parameters with Ed25519 algorithm
+    let mut params = rcgen::CertificateParams::new(vec![did.as_str().to_string()])?;
+    params.key_usages = vec![
+        rcgen::KeyUsagePurpose::DigitalSignature,
+        rcgen::KeyUsagePurpose::KeyEncipherment,
+    ];
+
+    // Generate Ed25519 key pair for the certificate
+    let key_pair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519)?;
+
+    // Create certificate with Ed25519 key
+    let cert = params.self_signed(&key_pair)?;
 
     // Export certificate and key
-    let cert_der = CertificateDer::from(certified_key.cert.der().to_vec());
-    let key_der = PrivateKeyDer::try_from(certified_key.key_pair.serialize_der())
+    let cert_der = CertificateDer::from(cert.der().to_vec());
+    let key_der = PrivateKeyDer::try_from(key_pair.serialize_der())
         .map_err(|e| anyhow::anyhow!("Failed to serialize private key: {}", e))?;
 
     Ok((vec![cert_der], key_der))
