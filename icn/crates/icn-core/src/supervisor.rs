@@ -199,6 +199,29 @@ impl Supervisor {
         } else {
             warn!("No keypair available - actors not spawned");
             warn!("Run 'icnctl id init' to create an identity");
+
+            // Still spawn metrics update task for system metrics
+            let start_time = std::time::Instant::now();
+            let mut metrics_shutdown = self.shutdown_tx.subscribe();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Update system metrics even without actors
+                            let uptime_secs = start_time.elapsed().as_secs();
+                            icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
+                            icn_obs::metrics::system::actors_active_set(0);
+                        }
+                        _ = metrics_shutdown.recv() => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            info!("Metrics update task spawned (system metrics only)");
+
             (None, None, None)
         };
 
