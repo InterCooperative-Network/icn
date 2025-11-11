@@ -230,6 +230,112 @@ impl GossipActor {
         missing
     }
 
+    /// Handle incoming gossip message from network
+    pub fn handle_message(&mut self, message: GossipMessage) -> Result<()> {
+        match message {
+            GossipMessage::Announce { hash, author, clock, topic } => {
+                debug!("Received Announce: topic={}, hash={:?}, author={}", topic, hash, author);
+
+                // Check if we already have this entry
+                if let Some(entries) = self.entries.get(&topic) {
+                    if entries.contains_key(&hash) {
+                        debug!("Already have entry {}", hex::encode(hash));
+                        return Ok(());
+                    }
+                }
+
+                // TODO: Request full entry if we don't have it
+                // This would require access to NetworkHandle to send Request message
+                debug!("Would request entry {} from {}", hex::encode(hash), author);
+                Ok(())
+            }
+
+            GossipMessage::Request { hash } => {
+                debug!("Received Request for hash: {:?}", hash);
+
+                // Find entry across all topics
+                for (topic_name, entries) in &self.entries {
+                    if let Some(entry) = entries.get(&hash) {
+                        debug!("Found entry in topic: {}", topic_name);
+                        // TODO: Send Response with entry
+                        // This would require access to NetworkHandle
+                        return Ok(());
+                    }
+                }
+
+                debug!("Entry not found for hash: {:?}", hash);
+                Ok(())
+            }
+
+            GossipMessage::Response { entry } => {
+                debug!("Received Response: topic={}, hash={:?}", entry.topic, entry.hash);
+
+                // Store the entry
+                self.entries
+                    .entry(entry.topic.clone())
+                    .or_insert_with(HashMap::new)
+                    .insert(entry.hash, entry.clone());
+
+                // Update bloom filter
+                if let Some(filter) = self.bloom_filters.get_mut(&entry.topic) {
+                    filter.insert(&entry.hash);
+                }
+
+                debug!("Stored entry in topic: {}", entry.topic);
+                Ok(())
+            }
+
+            GossipMessage::RequestBloomFilter { topic } => {
+                debug!("Received RequestBloomFilter for topic: {}", topic);
+                // TODO: Send bloom filter
+                Ok(())
+            }
+
+            GossipMessage::SendBloomFilter { topic, filter: _ } => {
+                debug!("Received SendBloomFilter for topic: {}", topic);
+                // TODO: Compare with local entries and request missing
+                Ok(())
+            }
+
+            GossipMessage::RequestMissing { hashes } => {
+                debug!("Received RequestMissing: {} hashes", hashes.len());
+                // TODO: Send Response messages for each requested hash
+                Ok(())
+            }
+        }
+    }
+
+    /// Get all topic names
+    pub fn get_topics(&self) -> Vec<String> {
+        self.topics.keys().cloned().collect()
+    }
+
+    /// Perform anti-entropy for a specific topic
+    ///
+    /// Returns the bloom filter for the topic and a list of missing hashes
+    /// to request from the remote peer.
+    pub fn anti_entropy_check(
+        &self,
+        topic: &str,
+        remote_filter_data: &crate::types::BloomFilterData,
+    ) -> Result<(crate::types::BloomFilterData, Vec<ContentHash>)> {
+        // Get our bloom filter
+        let local_filter = self
+            .get_bloom_filter(topic)
+            .context("Topic not found")?;
+
+        // Reconstruct remote bloom filter
+        let remote_filter = BloomFilter::from_data(remote_filter_data);
+
+        // Find entries we have that remote doesn't
+        let missing_on_remote = self.find_missing(topic, &remote_filter);
+
+        // Serialize our bloom filter for sending
+        let local_filter_data = local_filter.to_data();
+
+        Ok((local_filter_data, missing_on_remote))
+    }
+
     /// Hash data to create content hash
     fn hash_data(data: &[u8]) -> ContentHash {
         use sha2::{Digest, Sha256};

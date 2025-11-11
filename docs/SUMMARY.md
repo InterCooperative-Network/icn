@@ -96,12 +96,15 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Multi-node convergence (verified)
 - Rate limiting + QoS (deferred to Phase 6: Network Bridge)
 
-### Phase 6: Network Protocol Bridge
-- Wire gossip messages to QUIC transport
-- Subscribe to peers' gossip topics
-- Background anti-entropy task
-- Network partition recovery
-- End-to-end two-node testing
+### Phase 6: Network Protocol Bridge ✓
+- Wire protocol for gossip over QUIC (implemented)
+- NetworkMessage envelope with routing (implemented)
+- NetworkActor extensions (send/broadcast) (implemented)
+- Gossip-network bridge in supervisor (implemented)
+- Background anti-entropy task (implemented)
+- Two-node integration test structure (implemented)
+- Subscribe to peers' gossip topics (deferred to Phase 7)
+- Network partition recovery (deferred to Phase 7)
 
 ### Phase 7: Polish & Production
 - Metrics exporter

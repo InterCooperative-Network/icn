@@ -66,12 +66,27 @@ impl Supervisor {
             //     self.shutdown_tx.clone()
             // )?;
 
-            // Spawn Network actor
+            // Spawn Network actor with gossip bridge
             let listen_addr: std::net::SocketAddr = self.config.network.listen_addr.parse()?;
+
+            // Create incoming message handler that routes to gossip
+            let gossip_handle_clone = gossip_handle.clone();
+            let incoming_handler: icn_net::IncomingMessageHandler = Arc::new(move |net_msg| {
+                // Extract gossip message if present
+                if let icn_net::MessagePayload::Gossip(gossip_msg) = net_msg.payload {
+                    // Route to gossip actor
+                    let mut gossip = gossip_handle_clone.blocking_write();
+                    if let Err(e) = gossip.handle_message(gossip_msg) {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                }
+            });
+
             let network_handle = icn_net::NetworkActor::spawn(
                 keypair,
                 listen_addr,
                 self.shutdown_tx.clone(),
+                Some(incoming_handler),
             )
             .await?;
 
@@ -89,6 +104,18 @@ impl Supervisor {
             });
 
             info!("RPC server spawned on {}", rpc_addr);
+
+            // Spawn anti-entropy task
+            let anti_entropy_config = crate::anti_entropy::AntiEntropyConfig::default();
+            let _anti_entropy_handle = crate::anti_entropy::spawn_anti_entropy_task(
+                gossip_handle.clone(),
+                network_handle.clone(),
+                did.clone(),
+                anti_entropy_config,
+                self.shutdown_tx.subscribe(),
+            );
+
+            info!("Anti-entropy task spawned");
 
             (Some(network_handle), Some(gossip_handle), Some(ledger_handle))
         } else {

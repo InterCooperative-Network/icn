@@ -7,7 +7,6 @@ edition.workspace = true
 tokio.workspace = true
 icn-identity.workspace = true
 icn-trust.workspace = true
-icn-net.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true

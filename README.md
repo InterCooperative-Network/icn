@@ -63,11 +63,20 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 - [x] Ledger-gossip integration
 - [x] Multi-node convergence verification
 
-**Next: Phase 6 - Network Protocol Bridge**
-- Wire gossip to QUIC transport
-- End-to-end multi-node testing
-- Background anti-entropy
-- Partition recovery
+**Phase 6 - Network Protocol Bridge: Complete ✓**
+- [x] Wire protocol for gossip over QUIC
+- [x] NetworkMessage envelope with DID routing
+- [x] NetworkActor extensions (send/broadcast)
+- [x] Gossip-network bridge in supervisor
+- [x] Background anti-entropy task
+- [x] Two-node integration test structure
+
+**Next: Phase 7 - Polish & Production**
+- Metrics exporter (Prometheus)
+- Complete pull protocol (Request/Response)
+- Topic subscriptions & routing
+- Production hardening
+- Comprehensive documentation
 
 ## Building
 

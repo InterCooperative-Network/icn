@@ -2,7 +2,7 @@
 
 **Status:** Living Document
 **Version:** 0.1.0
-**Last Updated:** 2025-11-10
+**Last Updated:** 2025-11-11
 
 This document captures architectural decisions, design tradeoffs, and the reasoning behind ICNd's implementation.
 
@@ -903,6 +903,100 @@ pub enum AccessControl {
 **Per-peer limits:**
 - Trust-weighted: Federated peers get more bandwidth
 - Fairness: No single peer starves others
+
+---
+
+### 6.5 Network Protocol Bridge
+
+**Decision: Length-prefixed bincode over QUIC streams**
+
+**Protocol:**
+
+**Wire format:**
+```
+[4 bytes: length (big-endian)] [N bytes: bincode-serialized NetworkMessage]
+```
+
+**NetworkMessage envelope:**
+```rust
+pub struct NetworkMessage {
+    version: u32,           // Protocol version (current: 1)
+    from: Did,              // Source DID
+    to: Option<Did>,        // Destination (None = broadcast)
+    payload: MessagePayload,
+}
+
+pub enum MessagePayload {
+    Gossip(GossipMessage),  // Wrapped gossip protocol
+    Ping,                   // Keepalive
+    Pong,                   // Response to ping
+    Subscribe { topics: Vec<String> },
+    Unsubscribe { topics: Vec<String> },
+    SubscribeAck { topics: Vec<String> },
+}
+```
+
+**Rationale:**
+- **Length-prefixed:** Handles variable-size messages efficiently
+- **Bincode:** Fast, compact serialization (5-10% overhead)
+- **DID routing:** Enables unicast and broadcast patterns
+- **Versioned:** Forward compatibility for protocol evolution
+- **Simple:** No complex framing, easy to implement
+
+**Message flow:**
+
+1. **Publishing:**
+   ```
+   Ledger → GossipActor.publish() → (in-process only in v1)
+   ```
+   *Network publishing deferred to Phase 7*
+
+2. **Reception:**
+   ```
+   QUIC connection → NetworkActor.handle_incoming_connections()
+   → read_message() → IncomingMessageHandler callback
+   → Supervisor extracts GossipMessage
+   → GossipActor.handle_message() → process/store
+   ```
+
+3. **Anti-entropy:**
+   ```
+   Background task (30s interval)
+   → NetworkHandle.broadcast(RequestBloomFilter)
+   → All connected peers receive
+   → (Response handling deferred to Phase 7)
+   ```
+
+**Implementation details:**
+
+- **NetworkActor extensions:**
+  - `send_message(did, message)`: Unicast to specific peer
+  - `broadcast(message)`: Multicast to all connected peers
+  - `handle_incoming_connections()`: Background acceptor task
+  - `handle_connection()`: Per-connection stream processor
+
+- **Gossip routing:**
+  - Supervisor creates `IncomingMessageHandler` callback
+  - Callback extracts `GossipMessage` from `NetworkMessage`
+  - Routes to `GossipActor.handle_message()`
+
+- **Limitations (v1):**
+  - Push-only: Can announce entries, cannot request
+  - No request/response correlation
+  - Broadcast-only anti-entropy (O(n) messages)
+  - No topic-based routing
+
+**Performance:**
+- Message overhead: ~100 bytes + payload
+- Single send latency: 1-2ms (local network)
+- Broadcast to 10 peers: 10-20ms
+- Max message size: 10MB
+
+**Future enhancements (Phase 7):**
+- Complete pull protocol (Request → Response)
+- Topic subscriptions (filter by interest)
+- Smart peer selection (probabilistic gossip)
+- Message batching (multiple per stream)
 
 ---
 

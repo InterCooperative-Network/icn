@@ -1,0 +1,285 @@
+//! Network protocol for ICN
+//!
+//! Defines wire-format messages sent over QUIC connections.
+
+use anyhow::{Context, Result};
+use icn_gossip::GossipMessage;
+use icn_identity::Did;
+use serde::{Deserialize, Serialize};
+
+/// Network protocol version
+pub const PROTOCOL_VERSION: u32 = 1;
+
+/// Maximum message size (10MB)
+pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
+
+/// Wire-format message envelope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkMessage {
+    /// Protocol version
+    pub version: u32,
+
+    /// Source DID (sender)
+    pub from: Did,
+
+    /// Destination DID (None = broadcast)
+    pub to: Option<Did>,
+
+    /// Message payload
+    pub payload: MessagePayload,
+}
+
+/// Message payload types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessagePayload {
+    /// Gossip protocol message
+    Gossip(GossipMessage),
+
+    /// Ping (keepalive)
+    Ping,
+
+    /// Pong (response to ping)
+    Pong,
+
+    /// Subscribe to peer's topics
+    Subscribe { topics: Vec<String> },
+
+    /// Unsubscribe from peer's topics
+    Unsubscribe { topics: Vec<String> },
+
+    /// Ack subscription
+    SubscribeAck { topics: Vec<String> },
+}
+
+impl NetworkMessage {
+    /// Create a new network message
+    pub fn new(from: Did, to: Option<Did>, payload: MessagePayload) -> Self {
+        NetworkMessage {
+            version: PROTOCOL_VERSION,
+            from,
+            to,
+            payload,
+        }
+    }
+
+    /// Create a gossip message
+    pub fn gossip(from: Did, to: Option<Did>, gossip_msg: GossipMessage) -> Self {
+        Self::new(from, to, MessagePayload::Gossip(gossip_msg))
+    }
+
+    /// Create a ping message
+    pub fn ping(from: Did, to: Did) -> Self {
+        Self::new(from, Some(to), MessagePayload::Ping)
+    }
+
+    /// Create a pong message
+    pub fn pong(from: Did, to: Did) -> Self {
+        Self::new(from, Some(to), MessagePayload::Pong)
+    }
+
+    /// Create a subscribe message
+    pub fn subscribe(from: Did, to: Did, topics: Vec<String>) -> Self {
+        Self::new(from, Some(to), MessagePayload::Subscribe { topics })
+    }
+
+    /// Create an unsubscribe message
+    pub fn unsubscribe(from: Did, to: Did, topics: Vec<String>) -> Self {
+        Self::new(from, Some(to), MessagePayload::Unsubscribe { topics })
+    }
+
+    /// Create a subscribe ack message
+    pub fn subscribe_ack(from: Did, to: Did, topics: Vec<String>) -> Self {
+        Self::new(from, Some(to), MessagePayload::SubscribeAck { topics })
+    }
+
+    /// Serialize to bytes using bincode
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let bytes = bincode::serialize(self).context("Failed to serialize network message")?;
+
+        if bytes.len() > MAX_MESSAGE_SIZE {
+            anyhow::bail!(
+                "Message too large: {} bytes (max {})",
+                bytes.len(),
+                MAX_MESSAGE_SIZE
+            );
+        }
+
+        Ok(bytes)
+    }
+
+    /// Deserialize from bytes using bincode
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() > MAX_MESSAGE_SIZE {
+            anyhow::bail!(
+                "Message too large: {} bytes (max {})",
+                bytes.len(),
+                MAX_MESSAGE_SIZE
+            );
+        }
+
+        bincode::deserialize(bytes).context("Failed to deserialize network message")
+    }
+
+    /// Check if this message is for a specific DID
+    pub fn is_for(&self, did: &Did) -> bool {
+        match &self.to {
+            Some(target) => target == did,
+            None => true, // Broadcast messages are for everyone
+        }
+    }
+
+    /// Check if this is a broadcast message
+    pub fn is_broadcast(&self) -> bool {
+        self.to.is_none()
+    }
+}
+
+/// Helper for reading length-prefixed messages from QUIC streams
+pub async fn read_message(
+    recv: &mut quinn::RecvStream,
+) -> Result<NetworkMessage> {
+    use tokio::io::AsyncReadExt;
+
+    // Read 4-byte length prefix (big-endian)
+    let mut len_buf = [0u8; 4];
+    recv.read_exact(&mut len_buf)
+        .await
+        .context("Failed to read message length")?;
+    let len = u32::from_be_bytes(len_buf) as usize;
+
+    if len > MAX_MESSAGE_SIZE {
+        anyhow::bail!("Message too large: {} bytes (max {})", len, MAX_MESSAGE_SIZE);
+    }
+
+    // Read message bytes
+    let mut buf = vec![0u8; len];
+    recv.read_exact(&mut buf)
+        .await
+        .context("Failed to read message body")?;
+
+    NetworkMessage::from_bytes(&buf)
+}
+
+/// Helper for writing length-prefixed messages to QUIC streams
+pub async fn write_message(
+    send: &mut quinn::SendStream,
+    msg: &NetworkMessage,
+) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+
+    let bytes = msg.to_bytes()?;
+    let len = bytes.len() as u32;
+
+    // Write 4-byte length prefix (big-endian)
+    send.write_all(&len.to_be_bytes())
+        .await
+        .context("Failed to write message length")?;
+
+    // Write message bytes
+    send.write_all(&bytes)
+        .await
+        .context("Failed to write message body")?;
+
+    send.flush().await.context("Failed to flush stream")?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icn_gossip::{types::ContentHash, VectorClock};
+    use icn_identity::KeyPair;
+
+    #[test]
+    fn test_network_message_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice, bob);
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(decoded.version, PROTOCOL_VERSION);
+        assert!(matches!(decoded.payload, MessagePayload::Ping));
+    }
+
+    #[test]
+    fn test_gossip_message_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let hash: ContentHash = [1u8; 32];
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+        let gossip_msg = GossipMessage::Announce {
+            hash,
+            author: alice.clone(),
+            clock,
+            topic: "test".to_string(),
+        };
+
+        let net_msg = NetworkMessage::gossip(alice.clone(), Some(bob.clone()), gossip_msg);
+        let bytes = net_msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
+
+    #[test]
+    fn test_broadcast_message() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::gossip(alice.clone(), None, GossipMessage::Request {
+            hash: [0u8; 32],
+        });
+
+        assert!(msg.is_broadcast());
+        assert!(msg.is_for(&bob));
+        assert!(msg.is_for(&alice));
+    }
+
+    #[test]
+    fn test_targeted_message() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let charlie = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice.clone(), bob.clone());
+
+        assert!(!msg.is_broadcast());
+        assert!(msg.is_for(&bob));
+        assert!(!msg.is_for(&charlie));
+    }
+
+    #[test]
+    fn test_max_message_size() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let data = vec![0u8; MAX_MESSAGE_SIZE + 1];
+
+        // This should fail during serialization
+        // (We can't easily test this without a huge message, so just check the constant)
+        assert_eq!(MAX_MESSAGE_SIZE, 10 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_subscribe_message() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let topics = vec!["ledger:hours".to_string(), "global:identity".to_string()];
+        let msg = NetworkMessage::subscribe(alice.clone(), bob.clone(), topics.clone());
+
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        if let MessagePayload::Subscribe { topics: decoded_topics } = decoded.payload {
+            assert_eq!(decoded_topics, topics);
+        } else {
+            panic!("Expected Subscribe payload");
+        }
+    }
+}

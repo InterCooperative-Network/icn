@@ -2,9 +2,11 @@
 
 pub mod actor;
 pub mod discovery;
+pub mod protocol;
 pub mod session;
 pub mod tls;
 
-pub use actor::{NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
+pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
 pub use discovery::{Discovery, PeerInfo};
+pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};
 pub use session::SessionManager;
