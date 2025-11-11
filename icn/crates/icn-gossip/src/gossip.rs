@@ -946,6 +946,9 @@ mod tests {
             let data = format!("entry_{}", i).into_bytes();
             let result = gossip.publish("test:entries", data);
             assert!(result.is_ok(), "Publish {} failed: {:?}", i, result);
+
+            // Sleep briefly to ensure distinct timestamps for proper ordering
+            std::thread::sleep(std::time::Duration::from_millis(2));
         }
 
         // Should have exactly max_entries (5) entries
@@ -963,8 +966,15 @@ mod tests {
             .map(|e| String::from_utf8_lossy(&e.data).to_string())
             .collect();
 
-        // Should contain the newest entries
-        assert!(data_values.contains(&"entry_9".to_string()));
-        assert!(data_values.contains(&"entry_8".to_string()));
+        // Should contain the newest entries (5-9), oldest (0-4) should be evicted
+        assert!(data_values.contains(&"entry_9".to_string()), "Missing entry_9");
+        assert!(data_values.contains(&"entry_8".to_string()), "Missing entry_8");
+        assert!(data_values.contains(&"entry_7".to_string()), "Missing entry_7");
+        assert!(data_values.contains(&"entry_6".to_string()), "Missing entry_6");
+        assert!(data_values.contains(&"entry_5".to_string()), "Missing entry_5");
+
+        // Verify old entries were evicted
+        assert!(!data_values.contains(&"entry_0".to_string()), "entry_0 should have been evicted");
+        assert!(!data_values.contains(&"entry_4".to_string()), "entry_4 should have been evicted");
     }
 }
