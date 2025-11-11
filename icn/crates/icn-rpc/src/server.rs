@@ -15,12 +15,14 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use icn_net::NetworkHandle;
+use icn_ledger::Ledger;
 
-use crate::types::{NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
 
 /// RPC server state
 pub struct RpcServer {
     network_handle: Option<Arc<RwLock<NetworkHandle>>>,
+    ledger_handle: Option<Arc<RwLock<Ledger>>>,
     listen_addr: SocketAddr,
 }
 
@@ -29,6 +31,7 @@ impl RpcServer {
     pub fn new(listen_addr: SocketAddr) -> Self {
         RpcServer {
             network_handle: None,
+            ledger_handle: None,
             listen_addr,
         }
     }
@@ -36,6 +39,11 @@ impl RpcServer {
     /// Set the network handle (called after NetworkActor spawns)
     pub fn set_network_handle(&mut self, handle: NetworkHandle) {
         self.network_handle = Some(Arc::new(RwLock::new(handle)));
+    }
+
+    /// Set the ledger handle (called after Ledger initializes)
+    pub fn set_ledger_handle(&mut self, handle: Arc<RwLock<Ledger>>) {
+        self.ledger_handle = Some(handle);
     }
 
     /// Start the RPC server
@@ -107,6 +115,9 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "network.dial" => handle_network_dial(req.id, &req.params, state).await,
         "network.stats" => handle_network_stats(req.id, state).await,
         "network.status" => handle_network_status(req.id, state).await,
+        "ledger.head" => handle_ledger_head(req.id, state).await,
+        "ledger.balance" => handle_ledger_balance(req.id, &req.params, state).await,
+        "ledger.history" => handle_ledger_history(req.id, &req.params, state).await,
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -245,6 +256,191 @@ async fn handle_network_status(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     match serde_json::to_value(&status) {
         Ok(value) => RpcResponse::success(id, value),
         Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+    }
+}
+
+/// Handle ledger.head RPC call - get the most recent ledger entry
+async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Ledger not available".to_string(),
+            );
+        }
+    };
+
+    let ledger = ledger_handle.read().await;
+    match ledger.get_all_entries() {
+        Ok(entries) => {
+            if let Some(last_entry) = entries.last() {
+                let hash = last_entry.id.as_ref()
+                    .map(|h| h.to_hex())
+                    .unwrap_or_else(|| "unknown".to_string());
+
+                let rpc_entry = LedgerEntry {
+                    hash,
+                    timestamp: last_entry.timestamp,
+                    author: last_entry.author.as_str().to_string(),
+                    accounts: last_entry.accounts.iter().map(|delta| {
+                        LedgerAccountDelta {
+                            account_id: delta.account_id.as_str().to_string(),
+                            currency: delta.currency.clone(),
+                            debit: delta.debit,
+                            credit: delta.credit,
+                        }
+                    }).collect(),
+                };
+
+                match serde_json::to_value(&rpc_entry) {
+                    Ok(value) => RpcResponse::success(id, value),
+                    Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                }
+            } else {
+                RpcResponse::success(id, serde_json::json!(null))
+            }
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {}", e)),
+    }
+}
+
+/// Handle ledger.balance RPC call - get balance for an account
+async fn handle_ledger_balance(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Ledger not available".to_string(),
+            );
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct BalanceParams {
+        account_id: String,
+        currency: Option<String>,
+    }
+
+    let balance_params: BalanceParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    let account_did = match serde_json::from_value(serde_json::Value::String(balance_params.account_id.clone())) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
+        }
+    };
+
+    let ledger = ledger_handle.read().await;
+
+    if let Some(currency) = balance_params.currency {
+        // Get balance for specific currency
+        let amount = ledger.get_balance(&account_did, &currency);
+        let balance = LedgerBalance {
+            account_id: balance_params.account_id,
+            currency,
+            amount,
+        };
+
+        match serde_json::to_value(&balance) {
+            Ok(value) => RpcResponse::success(id, value),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+        }
+    } else {
+        // Get all balances for account
+        let account_balances = ledger.get_account_balances(&account_did);
+        let balances: Vec<LedgerBalance> = account_balances.balances.iter().map(|(currency, amount)| {
+            LedgerBalance {
+                account_id: balance_params.account_id.clone(),
+                currency: currency.clone(),
+                amount: *amount,
+            }
+        }).collect();
+
+        match serde_json::to_value(&balances) {
+            Ok(value) => RpcResponse::success(id, value),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+        }
+    }
+}
+
+/// Handle ledger.history RPC call - get recent ledger entries
+async fn handle_ledger_history(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let ledger_handle = match &state.ledger_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Ledger not available".to_string(),
+            );
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct HistoryParams {
+        limit: Option<usize>,
+    }
+
+    let history_params: HistoryParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(_) => HistoryParams { limit: None }, // Use default if params are empty
+    };
+
+    let limit = history_params.limit.unwrap_or(10);
+
+    let ledger = ledger_handle.read().await;
+    match ledger.get_all_entries() {
+        Ok(entries) => {
+            let recent_entries: Vec<LedgerEntry> = entries
+                .iter()
+                .rev() // Reverse to get most recent first
+                .take(limit)
+                .map(|entry| {
+                    let hash = entry.id.as_ref()
+                        .map(|h| h.to_hex())
+                        .unwrap_or_else(|| "unknown".to_string());
+
+                    LedgerEntry {
+                        hash,
+                        timestamp: entry.timestamp,
+                        author: entry.author.as_str().to_string(),
+                        accounts: entry.accounts.iter().map(|delta| {
+                            LedgerAccountDelta {
+                                account_id: delta.account_id.as_str().to_string(),
+                                currency: delta.currency.clone(),
+                                debit: delta.debit,
+                                credit: delta.credit,
+                            }
+                        }).collect(),
+                    }
+                })
+                .collect();
+
+            match serde_json::to_value(&recent_entries) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {}", e)),
     }
 }
 

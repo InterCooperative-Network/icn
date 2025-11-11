@@ -39,6 +39,10 @@ enum Commands {
     #[command(subcommand)]
     Trust(TrustCommands),
 
+    /// Ledger operations
+    #[command(subcommand)]
+    Ledger(LedgerCommands),
+
     /// Network operations (mDNS discovery, QUIC sessions)
     #[command(subcommand)]
     Network(NetworkCommands),
@@ -100,6 +104,29 @@ enum TrustCommands {
     Remove {
         /// Target DID
         did: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum LedgerCommands {
+    /// Show most recent ledger entry
+    Head,
+
+    /// Show balance for an account
+    Balance {
+        /// Account DID
+        account_id: String,
+
+        /// Optional currency filter
+        #[arg(short, long)]
+        currency: Option<String>,
+    },
+
+    /// Show recent ledger history
+    History {
+        /// Number of entries to show (default: 10)
+        #[arg(short, long, default_value = "10")]
+        limit: usize,
     },
 }
 
@@ -180,6 +207,8 @@ async fn main() -> Result<()> {
         Commands::Id(id_cmd) => handle_id_command(id_cmd, &data_dir)?,
 
         Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
+
+        Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
     }
@@ -551,6 +580,101 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
             println!("Network Actor Status:\n");
             println!("  Running:               {}", status.running);
             println!("  Listener address:      {}", status.listen_addr);
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()> {
+    // Ledger commands communicate with daemon via RPC
+    let rpc_addr = endpoint.parse()?;
+    let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+    match cmd {
+        LedgerCommands::Head => {
+            match client
+                .get_ledger_head()
+                .await
+                .context("Failed to get ledger head from daemon. Is icnd running?")?
+            {
+                Some(entry) => {
+                    println!("Most recent ledger entry:\n");
+                    println!("  Hash:      {}", entry.hash);
+                    println!("  Timestamp: {}", entry.timestamp);
+                    println!("  Author:    {}", entry.author);
+                    println!("\n  Account deltas:");
+                    for delta in entry.accounts {
+                        println!("    • {}", delta.account_id);
+                        println!("      Currency: {}", delta.currency);
+                        if let Some(debit) = delta.debit {
+                            println!("      Debit:    {}", debit);
+                        }
+                        if let Some(credit) = delta.credit {
+                            println!("      Credit:   {}", credit);
+                        }
+                    }
+                }
+                None => {
+                    println!("Ledger is empty.");
+                }
+            }
+        }
+
+        LedgerCommands::Balance {
+            account_id,
+            currency,
+        } => {
+            let balances = client
+                .get_ledger_balance(account_id.clone(), currency.clone())
+                .await
+                .context("Failed to get balance from daemon. Is icnd running?")?;
+
+            if balances.is_empty() {
+                println!("No balances found for account: {}", account_id);
+            } else if balances.len() == 1 && currency.is_some() {
+                let balance = &balances[0];
+                println!("Balance for {}:\n", account_id);
+                println!("  Currency: {}", balance.currency);
+                println!("  Amount:   {}", balance.amount);
+            } else {
+                println!("Balances for {}:\n", account_id);
+                for balance in balances {
+                    println!("  {:<10} {}", balance.currency, balance.amount);
+                }
+            }
+        }
+
+        LedgerCommands::History { limit } => {
+            let entries = client
+                .get_ledger_history(Some(limit))
+                .await
+                .context("Failed to get ledger history from daemon. Is icnd running?")?;
+
+            if entries.is_empty() {
+                println!("Ledger is empty.");
+            } else {
+                println!("Recent ledger entries (showing {}):\n", entries.len());
+
+                for entry in entries {
+                    println!("Hash:      {}", entry.hash);
+                    println!("Timestamp: {}", entry.timestamp);
+                    println!("Author:    {}", entry.author);
+                    println!("Accounts:");
+                    for delta in entry.accounts {
+                        print!("  • {} ({}): ", delta.account_id, delta.currency);
+                        if let Some(debit) = delta.debit {
+                            print!("debit {} ", debit);
+                        }
+                        if let Some(credit) = delta.credit {
+                            print!("credit {} ", credit);
+                        }
+                        println!();
+                    }
+                    println!();
+                }
+            }
         }
     }
 

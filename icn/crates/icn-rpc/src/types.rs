@@ -52,6 +52,32 @@ pub struct NetworkStatus {
     pub listen_addr: String,
 }
 
+/// Ledger balance for a specific account and currency
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerBalance {
+    pub account_id: String,
+    pub currency: String,
+    pub amount: i64,
+}
+
+/// Ledger entry (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerEntry {
+    pub hash: String,
+    pub timestamp: u64,
+    pub author: String,
+    pub accounts: Vec<LedgerAccountDelta>,
+}
+
+/// Account delta in a ledger entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerAccountDelta {
+    pub account_id: String,
+    pub currency: String,
+    pub debit: Option<i64>,
+    pub credit: Option<i64>,
+}
+
 impl RpcResponse {
     pub fn success(id: u64, result: serde_json::Value) -> Self {
         RpcResponse {

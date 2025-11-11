@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use std::net::SocketAddr;
 
-use crate::types::{NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
 
 /// RPC client for daemon communication
 pub struct RpcClient {
@@ -84,5 +84,59 @@ impl RpcClient {
         let status: NetworkStatus = serde_json::from_value(result)
             .context("Failed to deserialize status")?;
         Ok(status)
+    }
+
+    /// Get the most recent ledger entry (head)
+    pub async fn get_ledger_head(&mut self) -> Result<Option<LedgerEntry>> {
+        let result = self.call("ledger.head", serde_json::json!({})).await?;
+        if result.is_null() {
+            Ok(None)
+        } else {
+            let entry: LedgerEntry = serde_json::from_value(result)
+                .context("Failed to deserialize ledger entry")?;
+            Ok(Some(entry))
+        }
+    }
+
+    /// Get balance for an account
+    /// If currency is provided, returns single balance; otherwise returns all balances
+    pub async fn get_ledger_balance(&mut self, account_id: String, currency: Option<String>) -> Result<Vec<LedgerBalance>> {
+        let params = if let Some(curr) = currency {
+            serde_json::json!({
+                "account_id": account_id,
+                "currency": curr,
+            })
+        } else {
+            serde_json::json!({
+                "account_id": account_id,
+            })
+        };
+
+        let result = self.call("ledger.balance", params).await?;
+
+        // Result can be a single balance or array of balances
+        if result.is_array() {
+            let balances: Vec<LedgerBalance> = serde_json::from_value(result)
+                .context("Failed to deserialize balances")?;
+            Ok(balances)
+        } else {
+            let balance: LedgerBalance = serde_json::from_value(result)
+                .context("Failed to deserialize balance")?;
+            Ok(vec![balance])
+        }
+    }
+
+    /// Get ledger history (recent entries)
+    pub async fn get_ledger_history(&mut self, limit: Option<usize>) -> Result<Vec<LedgerEntry>> {
+        let params = if let Some(l) = limit {
+            serde_json::json!({ "limit": l })
+        } else {
+            serde_json::json!({})
+        };
+
+        let result = self.call("ledger.history", params).await?;
+        let entries: Vec<LedgerEntry> = serde_json::from_value(result)
+            .context("Failed to deserialize ledger entries")?;
+        Ok(entries)
     }
 }
