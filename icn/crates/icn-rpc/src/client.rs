@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use std::net::SocketAddr;
 
-use crate::types::{LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{ContractExecutionResponse, ContractInfo, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
 
 /// RPC client for daemon communication
 pub struct RpcClient {
@@ -138,5 +138,51 @@ impl RpcClient {
         let entries: Vec<LedgerEntry> = serde_json::from_value(result)
             .context("Failed to deserialize ledger entries")?;
         Ok(entries)
+    }
+
+    /// Deploy a contract
+    pub async fn deploy_contract(&mut self, contract_json: String) -> Result<String> {
+        let params = serde_json::json!({
+            "contract_json": contract_json,
+        });
+
+        let result = self.call("contract.deploy", params).await?;
+
+        // Extract code_hash from response
+        let code_hash = result["code_hash"]
+            .as_str()
+            .context("Missing code_hash in response")?
+            .to_string();
+
+        Ok(code_hash)
+    }
+
+    /// Call a contract rule
+    pub async fn call_contract(
+        &mut self,
+        code_hash: String,
+        rule_name: String,
+        caller: String,
+        args: serde_json::Value,
+    ) -> Result<ContractExecutionResponse> {
+        let params = serde_json::json!({
+            "code_hash": code_hash,
+            "rule_name": rule_name,
+            "caller": caller,
+            "args": args,
+        });
+
+        let result = self.call("contract.call", params).await?;
+        let response: ContractExecutionResponse = serde_json::from_value(result)
+            .context("Failed to deserialize contract execution response")?;
+        Ok(response)
+    }
+
+    /// List deployed contracts
+    pub async fn list_contracts(&mut self) -> Result<Vec<ContractInfo>> {
+        let result = self.call("contract.list", serde_json::json!({})).await?;
+        let contracts: Vec<ContractInfo> = serde_json::from_value(result)
+            .context("Failed to deserialize contracts")?;
+        Ok(contracts)
     }
 }

@@ -43,6 +43,10 @@ enum Commands {
     #[command(subcommand)]
     Ledger(LedgerCommands),
 
+    /// Contract operations
+    #[command(subcommand)]
+    Contract(ContractCommands),
+
     /// Network operations (mDNS discovery, QUIC sessions)
     #[command(subcommand)]
     Network(NetworkCommands),
@@ -131,6 +135,34 @@ enum LedgerCommands {
 }
 
 #[derive(Subcommand, Debug)]
+enum ContractCommands {
+    /// Deploy a contract from JSON file
+    Deploy {
+        /// Path to contract JSON file
+        contract_file: PathBuf,
+    },
+
+    /// Call a contract rule
+    Call {
+        /// Contract code hash (hex)
+        code_hash: String,
+
+        /// Rule name to execute
+        rule_name: String,
+
+        /// Caller DID
+        caller: String,
+
+        /// Arguments as JSON
+        #[arg(short, long)]
+        args: Option<String>,
+    },
+
+    /// List deployed contracts
+    List,
+}
+
+#[derive(Subcommand, Debug)]
 enum NetworkCommands {
     /// List discovered peers (via mDNS)
     Peers,
@@ -209,6 +241,8 @@ async fn main() -> Result<()> {
         Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
 
         Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
+
+        Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
     }
@@ -673,6 +707,104 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                         println!();
                     }
                     println!();
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn handle_contract_command(cmd: ContractCommands, endpoint: &str) -> Result<()> {
+    // Contract commands communicate with daemon via RPC
+    let rpc_addr = endpoint.parse()?;
+    let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+    match cmd {
+        ContractCommands::Deploy { contract_file } => {
+            // Read contract JSON from file
+            let contract_json = std::fs::read_to_string(&contract_file)
+                .with_context(|| format!("Failed to read contract file: {}", contract_file.display()))?;
+
+            println!("Deploying contract from {}...\n", contract_file.display());
+
+            match client
+                .deploy_contract(contract_json)
+                .await
+                .context("Failed to deploy contract to daemon. Is icnd running?")?
+            {
+                code_hash => {
+                    println!("✓ Contract deployed successfully!");
+                    println!("  Code Hash: {}", code_hash);
+                    println!("\nYou can now call contract rules using:");
+                    println!("  icnctl contract call {} <rule_name> <caller_did> --args '{{}}'", code_hash);
+                }
+            }
+        }
+
+        ContractCommands::Call {
+            code_hash,
+            rule_name,
+            caller,
+            args,
+        } => {
+            // Parse args JSON (default to empty object)
+            let args_value: serde_json::Value = if let Some(args_str) = args {
+                serde_json::from_str(&args_str)
+                    .context("Failed to parse args JSON")?
+            } else {
+                serde_json::json!({})
+            };
+
+            println!("Calling contract {}...", code_hash);
+            println!("  Rule: {}", rule_name);
+            println!("  Caller: {}", caller);
+            println!("  Args: {}\n", args_value);
+
+            match client
+                .call_contract(code_hash.clone(), rule_name.clone(), caller.clone(), args_value)
+                .await
+                .context("Failed to call contract. Is icnd running?")?
+            {
+                response => {
+                    if response.success {
+                        println!("✓ Contract execution successful!");
+                        println!("  Fuel consumed: {}", response.fuel_consumed);
+                        println!("  Return value: {}", response.return_value);
+                    } else {
+                        println!("✗ Contract execution failed!");
+                    }
+                }
+            }
+        }
+
+        ContractCommands::List => {
+            match client
+                .list_contracts()
+                .await
+            {
+                Ok(contracts) => {
+                    if contracts.is_empty() {
+                        println!("No contracts deployed.");
+                    } else {
+                        println!("Deployed contracts:\n");
+                        for contract in contracts {
+                            println!("Code Hash: {}", contract.code_hash);
+                            println!("  Name: {}", contract.name);
+                            println!("  Participants: {}", contract.participants.join(", "));
+                            if let Some(currency) = contract.currency {
+                                println!("  Currency: {}", currency);
+                            }
+                            println!("  Rules: {}", contract.rules.join(", "));
+                            println!();
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("Note: Contract listing not yet fully implemented.");
+                    println!("Error: {}", e);
+                    println!("\nYou can still deploy and call contracts by code hash.");
                 }
             }
         }
