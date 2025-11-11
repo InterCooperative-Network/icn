@@ -1,0 +1,1 @@
+/home/matt/projects/icn/icn/target/release/libicn_trust.rlib: /home/matt/projects/icn/icn/crates/icn-identity/src/lib.rs /home/matt/projects/icn/icn/crates/icn-store/src/lib.rs /home/matt/projects/icn/icn/crates/icn-trust/src/lib.rs

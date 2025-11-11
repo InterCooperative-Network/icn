@@ -1,0 +1,12 @@
+[package]
+name = "icn-store"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+sled.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+bytes.workspace = true

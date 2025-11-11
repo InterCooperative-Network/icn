@@ -1,0 +1,40 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+!bins/*/Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ICN data directories
+/data/
+*.db
+*.db-*
+
+# Secrets
+*.key
+*.pem
+/keys/
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Testing
+/coverage/
+
+# Misc
+.env
+.env.local

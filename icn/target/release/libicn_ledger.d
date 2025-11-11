@@ -1,0 +1,1 @@
+/home/matt/projects/icn/icn/target/release/libicn_ledger.rlib: /home/matt/projects/icn/icn/crates/icn-identity/src/lib.rs /home/matt/projects/icn/icn/crates/icn-ledger/src/lib.rs /home/matt/projects/icn/icn/crates/icn-store/src/lib.rs

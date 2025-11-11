@@ -1,0 +1,16 @@
+[package]
+name = "icn-gossip"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+icn-identity.workspace = true
+icn-trust.workspace = true
+icn-net.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+bytes.workspace = true
+futures.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "icn-identity"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+ed25519-dalek.workspace = true
+x25519-dalek.workspace = true
+rand_core.workspace = true
+zeroize.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+multibase = "0.9"

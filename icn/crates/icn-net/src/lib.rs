@@ -1,0 +1,7 @@
+//! ICN Net - Network transport, discovery, and session management
+
+pub mod discovery;
+pub mod session;
+
+pub use discovery::Discovery;
+pub use session::SessionManager;

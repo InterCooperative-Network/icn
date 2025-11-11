@@ -1,0 +1,12 @@
+[package]
+name = "icn-testkit"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+icn-core.workspace = true
+icn-identity.workspace = true
+icn-net.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

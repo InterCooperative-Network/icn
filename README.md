@@ -1,0 +1,88 @@
+# ICN - Intercooperative Network
+
+A substrate daemon for the cooperative internet.
+
+## What is ICN?
+
+ICN is not a blockchain. It's not a federation server. It's a **substrate daemon** that provides:
+
+- **Identity Layer**: Decentralized identifiers (DIDs) with Ed25519 cryptography
+- **Trust Graph**: Web-of-participation based trust computation
+- **Networking Layer**: QUIC/TLS secure sessions with mDNS discovery
+- **Cooperative Contracts**: CCL (Cooperative Contract Language) execution
+- **Mutual Credit Ledger**: Double-entry accounting with Merkle-DAG
+- **P2P Coordination**: Gossip protocol with trust-gated topics
+
+## Architecture
+
+ICNd is built on Tokio with an actor-based runtime. The daemon manages:
+
+- Identity & key management
+- Peer discovery (LAN + WAN)
+- Secure session establishment
+- Contract execution
+- Ledger state synchronization
+- Policy enforcement via trust graph
+
+## Project Status
+
+**Phase 0 - Scaffold: Complete ✓**
+
+- [x] Workspace structure
+- [x] Core runtime with supervisor
+- [x] Identity/DID generation
+- [x] CLI tooling (icnctl)
+- [x] Observability infrastructure
+
+**Next: Phase 1 - Identity & Trust**
+
+## Building
+
+```bash
+cargo build --release
+```
+
+## Usage
+
+Start the daemon:
+
+```bash
+./target/release/icnd
+```
+
+Generate a DID:
+
+```bash
+./target/release/icnctl id generate
+```
+
+Check status:
+
+```bash
+./target/release/icnctl status
+```
+
+## Development
+
+### Crates
+
+- `icn-core` - Runtime, supervisor, config
+- `icn-identity` - DID, keys, crypto
+- `icn-trust` - Trust graph & policy
+- `icn-net` - Discovery, sessions, transport
+- `icn-gossip` - Topic-based sync
+- `icn-ledger` - Mutual credit accounting
+- `icn-ccl` - Contract language runtime
+- `icn-store` - Persistent KV storage
+- `icn-rpc` - gRPC API
+- `icn-obs` - Metrics, tracing, logging
+- `icn-testkit` - Test utilities
+
+### Binaries
+
+- `icnd` - The ICN daemon
+- `icnctl` - CLI management tool
+
+## License
+
+MIT OR Apache-2.0
