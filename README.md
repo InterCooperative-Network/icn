@@ -71,12 +71,12 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 - [x] Background anti-entropy task
 - [x] Two-node integration test structure
 
-**Next: Phase 7 - Polish & Production**
-- Metrics exporter (Prometheus)
-- Complete pull protocol (Request/Response)
-- Topic subscriptions & routing
-- Production hardening
-- Comprehensive documentation
+**Phase 7 - Polish & Production: In Progress**
+- [ ] Metrics exporter (Prometheus)
+- [x] Complete pull protocol (Request/Response)
+- [ ] Topic subscriptions & routing
+- [ ] Production hardening
+- [ ] Comprehensive documentation
 
 ## Building
 
