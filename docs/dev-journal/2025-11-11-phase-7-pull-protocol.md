@@ -392,10 +392,12 @@ Total: ~150 lines added/modified
 ## Next Steps
 
 Phase 7 remaining:
-- [ ] Metrics exporter (Prometheus)
+- [x] Metrics exporter (Prometheus) ✅
 - [x] Complete pull protocol (Request/Response) ✅
 - [ ] Topic subscriptions & routing
 - [ ] Production hardening
 - [ ] Comprehensive documentation
 
-Immediate next: **Metrics exporter** for observability
+**Update (2025-11-11)**: Metrics implementation complete! See [2025-11-11-metrics-implementation.md](./2025-11-11-metrics-implementation.md) for full details.
+
+Immediate next: **Topic subscriptions & routing** or **Integration testing**
