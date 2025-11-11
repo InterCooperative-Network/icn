@@ -110,6 +110,15 @@ impl Supervisor {
                     let net_handle = network_handle_clone.clone();
                     let from_did = own_did_clone.clone();
 
+                    // Track metrics based on message type
+                    use icn_gossip::GossipMessage;
+                    match &gossip_msg {
+                        GossipMessage::Announce { .. } => icn_obs::metrics::gossip::announces_sent_inc(),
+                        GossipMessage::Request { .. } => icn_obs::metrics::gossip::requests_sent_inc(),
+                        GossipMessage::Response { .. } => icn_obs::metrics::gossip::responses_sent_inc(),
+                        _ => {} // Other message types
+                    }
+
                     // Spawn async task to send message
                     tokio::spawn(async move {
                         let result = if let Some(target_did) = recipient {

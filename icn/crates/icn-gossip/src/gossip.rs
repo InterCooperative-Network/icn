@@ -140,6 +140,10 @@ impl GossipActor {
         // Store entry
         self.store_entry(entry)?;
 
+        // Track metrics
+        icn_obs::metrics::gossip::entries_published_inc();
+        self.update_gauge_metrics();
+
         debug!("Published entry {} to topic {}", hex::encode(hash), topic);
 
         Ok(hash)
@@ -258,6 +262,7 @@ impl GossipActor {
         match message {
             GossipMessage::Announce { hash, author, clock, topic } => {
                 debug!("Received Announce: topic={}, hash={:?}, author={}", topic, hash, author);
+                icn_obs::metrics::gossip::announces_received_inc();
 
                 // Check if we already have this entry
                 if let Some(entries) = self.entries.get(&topic) {
@@ -277,6 +282,7 @@ impl GossipActor {
             }
 
             GossipMessage::Request { hash } => {
+                icn_obs::metrics::gossip::requests_received_inc();
                 debug!("Received Request for hash: {:?}", hash);
 
                 // Find entry across all topics
@@ -300,6 +306,7 @@ impl GossipActor {
             }
 
             GossipMessage::Response { entry } => {
+                icn_obs::metrics::gossip::responses_received_inc();
                 debug!("Received Response: topic={}, hash={:?}", entry.topic, entry.hash);
 
                 // Store the entry
@@ -312,6 +319,10 @@ impl GossipActor {
                 if let Some(filter) = self.bloom_filters.get_mut(&entry.topic) {
                     filter.insert(&entry.hash);
                 }
+
+                // Track metrics
+                icn_obs::metrics::gossip::entries_received_inc();
+                self.update_gauge_metrics();
 
                 debug!("Stored entry in topic: {}", entry.topic);
                 Ok(())
@@ -433,6 +444,16 @@ impl GossipActor {
         let local_filter_data = local_filter.to_data();
 
         Ok((local_filter_data, missing_on_remote))
+    }
+
+    /// Update gauge metrics for topics and entries
+    fn update_gauge_metrics(&self) {
+        // Count total topics
+        icn_obs::metrics::gossip::topics_total_set(self.topics.len() as u64);
+
+        // Count total entries across all topics
+        let total_entries: usize = self.entries.values().map(|e| e.len()).sum();
+        icn_obs::metrics::gossip::entries_total_set(total_entries as u64);
     }
 
     /// Hash data to create content hash
