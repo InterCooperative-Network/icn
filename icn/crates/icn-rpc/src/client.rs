@@ -140,6 +140,40 @@ impl RpcClient {
         Ok(entries)
     }
 
+    /// List all quarantined ledger entries
+    pub async fn quarantine_list(&mut self) -> Result<serde_json::Value> {
+        self.call("ledger.quarantine.list", serde_json::json!({})).await
+    }
+
+    /// Get detailed info about a quarantined entry
+    pub async fn quarantine_get(&mut self, entry_id: String) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_id": entry_id,
+        });
+        self.call("ledger.quarantine.get", params).await
+    }
+
+    /// Release a quarantined entry (retry)
+    pub async fn quarantine_release(&mut self, entry_id: String) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_id": entry_id,
+        });
+        self.call("ledger.quarantine.release", params).await
+    }
+
+    /// Permanently drop a quarantined entry
+    pub async fn quarantine_drop(&mut self, entry_id: String) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_id": entry_id,
+        });
+        self.call("ledger.quarantine.drop", params).await
+    }
+
+    /// Purge all expired quarantined entries
+    pub async fn quarantine_purge(&mut self) -> Result<serde_json::Value> {
+        self.call("ledger.quarantine.purge", serde_json::json!({})).await
+    }
+
     /// Deploy a contract
     pub async fn deploy_contract(&mut self, contract_json: String) -> Result<String> {
         let params = serde_json::json!({

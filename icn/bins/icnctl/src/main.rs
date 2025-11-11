@@ -132,6 +132,37 @@ enum LedgerCommands {
         #[arg(short, long, default_value = "10")]
         limit: usize,
     },
+
+    /// Quarantine management
+    #[command(subcommand)]
+    Quarantine(QuarantineCommands),
+}
+
+#[derive(Subcommand, Debug)]
+enum QuarantineCommands {
+    /// List all quarantined entries
+    List,
+
+    /// Get detailed info about a quarantined entry
+    Get {
+        /// Entry ID (content hash)
+        entry_id: String,
+    },
+
+    /// Release an entry from quarantine (retry)
+    Release {
+        /// Entry ID (content hash)
+        entry_id: String,
+    },
+
+    /// Permanently drop an entry from quarantine
+    Drop {
+        /// Entry ID (content hash)
+        entry_id: String,
+    },
+
+    /// Purge all expired entries
+    Purge,
 }
 
 #[derive(Subcommand, Debug)]
@@ -709,6 +740,118 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                     println!();
                 }
             }
+        }
+
+        LedgerCommands::Quarantine(q_cmd) => {
+            handle_quarantine_command(q_cmd, &mut client).await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc::RpcClient) -> Result<()> {
+    match cmd {
+        QuarantineCommands::List => {
+            let result = client
+                .quarantine_list()
+                .await
+                .context("Failed to list quarantine from daemon. Is icnd running?")?;
+
+            let quarantined: Vec<serde_json::Value> = result
+                .get("quarantined")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+
+            if quarantined.is_empty() {
+                println!("No entries in quarantine.");
+            } else {
+                println!("Quarantined entries (showing {}):\n", quarantined.len());
+
+                for item in quarantined {
+                    println!("Entry ID:    {}", item["entry_id"].as_str().unwrap_or("N/A"));
+                    println!("Reason:      {}", item["reason"].as_str().unwrap_or("N/A"));
+                    println!("Author:      {}", item["author"].as_str().unwrap_or("N/A"));
+                    println!("Observed at: {}", item["observed_at"].as_u64().unwrap_or(0));
+                    if let Some(metadata) = item["metadata"].as_str() {
+                        println!("Metadata:    {}", metadata);
+                    }
+                    println!();
+                }
+            }
+        }
+
+        QuarantineCommands::Get { entry_id } => {
+            let result = client
+                .quarantine_get(entry_id.clone())
+                .await
+                .context("Failed to get quarantine entry from daemon. Is icnd running?")?;
+
+            println!("Quarantined Entry: {}\n", entry_id);
+
+            if let Some(entry) = result.get("entry") {
+                println!("Entry Details:");
+                println!("  ID:          {}", entry["id"].as_str().unwrap_or("None"));
+                println!("  Author:      {}", entry["author"].as_str().unwrap_or("N/A"));
+                println!("  Timestamp:   {}", entry["timestamp"].as_u64().unwrap_or(0));
+                println!("  Parents:     {:?}", entry["parents"].as_array().map(|v| v.len()).unwrap_or(0));
+                println!("  Accounts:    {}", entry["num_accounts"].as_u64().unwrap_or(0));
+                println!();
+            }
+
+            if let Some(info) = result.get("quarantine_info") {
+                println!("Quarantine Info:");
+                println!("  Reason:      {}", info["reason"].as_str().unwrap_or("N/A"));
+                println!("  Author:      {}", info["author"].as_str().unwrap_or("N/A"));
+                println!("  Observed:    {}", info["observed_at"].as_u64().unwrap_or(0));
+                if let Some(metadata) = info["metadata"].as_str() {
+                    println!("  Metadata:    {}", metadata);
+                }
+            }
+        }
+
+        QuarantineCommands::Release { entry_id } => {
+            let result = client
+                .quarantine_release(entry_id.clone())
+                .await
+                .context("Failed to release entry from daemon. Is icnd running?")?;
+
+            println!("Released entry: {}", entry_id);
+
+            if let Some(reappended) = result.get("reappended").and_then(|v| v.as_bool()) {
+                if reappended {
+                    println!("✓ Successfully reappended to ledger");
+                } else {
+                    println!("✗ Released but failed to reappend");
+                    if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
+                        println!("  Error: {}", error);
+                    }
+                }
+            }
+        }
+
+        QuarantineCommands::Drop { entry_id } => {
+            let result = client
+                .quarantine_drop(entry_id.clone())
+                .await
+                .context("Failed to drop entry from daemon. Is icnd running?")?;
+
+            if result.get("dropped").and_then(|v| v.as_bool()).unwrap_or(false) {
+                println!("✓ Permanently dropped entry: {}", entry_id);
+            } else {
+                println!("✗ Failed to drop entry (not found in quarantine)");
+            }
+        }
+
+        QuarantineCommands::Purge => {
+            let result = client
+                .quarantine_purge()
+                .await
+                .context("Failed to purge expired entries from daemon. Is icnd running?")?;
+
+            let purged = result.get("purged").and_then(|v| v.as_u64()).unwrap_or(0);
+            println!("✓ Purged {} expired entries", purged);
         }
     }
 

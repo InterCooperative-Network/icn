@@ -800,14 +800,10 @@ async fn handle_quarantine_release(
                         "entry_id": entry_id.to_hex()
                     }),
                 ),
-                Err(e) => RpcResponse::success(
+                Err(e) => RpcResponse::error(
                     id,
-                    serde_json::json!({
-                        "released": true,
-                        "reappended": false,
-                        "error": format!("{}", e),
-                        "entry_id": entry_id.to_hex()
-                    }),
+                    -32000,
+                    format!("Released but failed to reappend: {}", e),
                 ),
             }
         }
