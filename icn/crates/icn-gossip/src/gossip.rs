@@ -17,6 +17,11 @@ use tracing::{debug, info};
 /// If recipient_did is None, broadcast to all peers
 pub type SendMessageCallback = Arc<dyn Fn(Option<Did>, GossipMessage) + Send + Sync>;
 
+/// Callback for notifying subscribers of new entries
+/// Parameters: (topic, entry, subscriber_did)
+/// Called when a new entry is stored in a topic that has subscribers
+pub type EntryNotificationCallback = Arc<dyn Fn(String, GossipEntry, Did) + Send + Sync>;
+
 /// Maximum subscribers per topic to prevent unbounded memory growth
 const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 
@@ -45,6 +50,9 @@ pub struct GossipActor {
 
     /// Send message callback (optional, for sending responses)
     send_callback: Option<SendMessageCallback>,
+
+    /// Entry notification callback (optional, for notifying subscribers)
+    notification_callback: Option<EntryNotificationCallback>,
 }
 
 impl GossipActor {
@@ -62,6 +70,7 @@ impl GossipActor {
             subscriptions: HashMap::new(),
             trust_lookup,
             send_callback: None,
+            notification_callback: None,
         };
 
         // Create default topics
@@ -92,6 +101,11 @@ impl GossipActor {
     /// Set the send message callback for sending responses
     pub fn set_send_callback(&mut self, callback: SendMessageCallback) {
         self.send_callback = Some(callback);
+    }
+
+    /// Set the entry notification callback for notifying subscribers
+    pub fn set_notification_callback(&mut self, callback: EntryNotificationCallback) {
+        self.notification_callback = Some(callback);
     }
 
     /// Send a message to a peer (if callback is set)
@@ -201,6 +215,16 @@ impl GossipActor {
 
         // Merge vector clock
         self.clock.merge(&entry.clock);
+
+        // Notify subscribers about the new entry
+        if let Some(callback) = &self.notification_callback {
+            if let Some(subscribers) = self.subscriptions.get(topic) {
+                for subscriber in subscribers {
+                    debug!("Notifying subscriber {} about new entry in topic {}", subscriber, topic);
+                    callback(topic.clone(), entry.clone(), subscriber.clone());
+                }
+            }
+        }
 
         Ok(())
     }
@@ -976,5 +1000,96 @@ mod tests {
         // Verify old entries were evicted
         assert!(!data_values.contains(&"entry_0".to_string()), "entry_0 should have been evicted");
         assert!(!data_values.contains(&"entry_4".to_string()), "entry_4 should have been evicted");
+    }
+
+    #[test]
+    fn test_subscription_notifications() {
+        use std::sync::Mutex;
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let subscriber1 = KeyPair::generate().unwrap().did().clone();
+        let subscriber2 = KeyPair::generate().unwrap().did().clone();
+
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Create the topic first
+        gossip.create_topic(Topic::new("test:notifications".to_string(), AccessControl::Public));
+
+        // Track notifications
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+
+        // Set up notification callback
+        let callback: EntryNotificationCallback = Arc::new(move |topic, entry, subscriber| {
+            let mut notifs = notifications_clone.lock().unwrap();
+            notifs.push((topic, entry.hash, subscriber));
+        });
+        gossip.set_notification_callback(callback);
+
+        // Subscribe both users to the topic
+        gossip.subscribe("test:notifications", subscriber1.clone()).unwrap();
+        gossip.subscribe("test:notifications", subscriber2.clone()).unwrap();
+
+        // Publish an entry
+        let data = b"Test notification".to_vec();
+        let hash = gossip.publish("test:notifications", data).unwrap();
+
+        // Verify both subscribers were notified
+        let notifs = notifications.lock().unwrap();
+        assert_eq!(notifs.len(), 2, "Should have 2 notifications (one per subscriber)");
+
+        // Check that both subscribers received the notification
+        let subscriber_dids: Vec<_> = notifs.iter().map(|(_, _, did)| did.clone()).collect();
+        assert!(subscriber_dids.contains(&subscriber1), "subscriber1 should be notified");
+        assert!(subscriber_dids.contains(&subscriber2), "subscriber2 should be notified");
+
+        // Verify all notifications are for the correct topic and hash
+        for (topic, notif_hash, _) in notifs.iter() {
+            assert_eq!(topic, "test:notifications");
+            assert_eq!(*notif_hash, hash);
+        }
+    }
+
+    #[test]
+    fn test_no_notification_without_callback() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let subscriber = KeyPair::generate().unwrap().did().clone();
+
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Create the topic first
+        gossip.create_topic(Topic::new("test:no-callback".to_string(), AccessControl::Public));
+
+        // Subscribe without setting callback
+        gossip.subscribe("test:no-callback", subscriber.clone()).unwrap();
+
+        // This should not panic even without a callback set
+        let result = gossip.publish("test:no-callback", b"Test".to_vec());
+        assert!(result.is_ok(), "Publishing should succeed even without notification callback");
+    }
+
+    #[test]
+    fn test_no_notification_without_subscribers() {
+        use std::sync::Mutex;
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        let notification_count = Arc::new(Mutex::new(0));
+        let count_clone = notification_count.clone();
+
+        // Set up callback that counts notifications
+        let callback: EntryNotificationCallback = Arc::new(move |_, _, _| {
+            let mut count = count_clone.lock().unwrap();
+            *count += 1;
+        });
+        gossip.set_notification_callback(callback);
+
+        // Publish without any subscribers
+        gossip.publish("test:no-subs", b"Test".to_vec()).unwrap();
+
+        // Verify no notifications were sent
+        let count = notification_count.lock().unwrap();
+        assert_eq!(*count, 0, "Should have 0 notifications when there are no subscribers");
     }
 }
