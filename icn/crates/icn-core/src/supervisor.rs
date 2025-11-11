@@ -1,18 +1,50 @@
 //! Supervisor for managing actors
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use icn_gossip::GossipActor;
-use icn_identity::KeyPair;
+use icn_identity::{Did, KeyPair};
 use icn_ledger::Ledger;
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
 use icn_trust::TrustClass;
+use serde_json;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
 use tracing::{info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
+
+/// Parse bootstrap peer URL in format: icn://did:icn:PUBKEY@IP:PORT
+/// Returns (DID, SocketAddr) on success
+///
+/// Note: Currently only supports IP addresses. DNS hostname resolution can be added later.
+fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
+    // Check for icn:// prefix
+    let url = url.strip_prefix("icn://")
+        .context("Bootstrap peer URL must start with 'icn://'")?;
+
+    // Split on @ to get DID and address
+    let parts: Vec<&str> = url.split('@').collect();
+    if parts.len() != 2 {
+        bail!("Invalid bootstrap peer format, expected icn://DID@IP:PORT");
+    }
+
+    let did_str = parts[0];
+    let addr_str = parts[1];
+
+    // Parse DID
+    let did: Did = serde_json::from_value(serde_json::Value::String(did_str.to_string()))
+        .context("Failed to parse DID")?;
+
+    // Parse socket address (IP:PORT)
+    // Note: This requires an IP address, not a DNS hostname
+    let addr: SocketAddr = addr_str.parse()
+        .context("Failed to parse socket address (must be IP:PORT, DNS names not yet supported)")?;
+
+    Ok((did, addr))
+}
 
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {
@@ -240,6 +272,25 @@ impl Supervisor {
 
             info!("Gossip send callback configured");
 
+            // Dial bootstrap peers for WAN connectivity
+            if !self.config.network.bootstrap_peers.is_empty() {
+                info!("Dialing {} bootstrap peers", self.config.network.bootstrap_peers.len());
+                for peer_url in &self.config.network.bootstrap_peers {
+                    match parse_bootstrap_peer(peer_url) {
+                        Ok((peer_did, peer_addr)) => {
+                            info!("Connecting to bootstrap peer: {} at {}", peer_did, peer_addr);
+                            match network_handle.dial(peer_addr, peer_did.clone()).await {
+                                Ok(_) => info!("✓ Connected to bootstrap peer: {}", peer_did),
+                                Err(e) => warn!("Failed to connect to bootstrap peer {}: {}", peer_did, e),
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to parse bootstrap peer URL '{}': {}", peer_url, e);
+                        }
+                    }
+                }
+            }
+
             // Spawn RPC server with network, ledger, and contract handles
             let rpc_port = self.config.network.rpc_port;
             let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
@@ -367,5 +418,56 @@ impl Supervisor {
 
         info!("Supervisor stopped");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_bootstrap_peer_valid() {
+        let url = "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
+        let result = parse_bootstrap_peer(url);
+        assert!(result.is_ok());
+
+        let (did, addr) = result.unwrap();
+        assert_eq!(did.as_str(), "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK");
+        assert_eq!(addr.to_string(), "203.0.113.50:7777");
+    }
+
+    #[test]
+    fn test_parse_bootstrap_peer_ipv4() {
+        let url = "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@192.168.1.100:7777";
+        let result = parse_bootstrap_peer(url);
+        assert!(result.is_ok());
+
+        let (did, addr) = result.unwrap();
+        assert_eq!(did.as_str(), "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH");
+        assert_eq!(addr.to_string(), "192.168.1.100:7777");
+    }
+
+    #[test]
+    fn test_parse_bootstrap_peer_missing_prefix() {
+        let url = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
+        let result = parse_bootstrap_peer(url);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must start with 'icn://'"));
+    }
+
+    #[test]
+    fn test_parse_bootstrap_peer_missing_at() {
+        let url = "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK_203.0.113.50:7777";
+        let result = parse_bootstrap_peer(url);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("expected icn://DID@IP:PORT"));
+    }
+
+    #[test]
+    fn test_parse_bootstrap_peer_invalid_port() {
+        let url = "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:invalid";
+        let result = parse_bootstrap_peer(url);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to parse socket address"));
     }
 }

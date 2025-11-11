@@ -31,15 +31,16 @@ rpc_port = 5601
 # Default: true
 mdns_enabled = true
 
-# Bootstrap peers for initial network connectivity
+# Bootstrap peers for initial network connectivity (WAN seed nodes)
 # Format: ["icn://did:icn:PEER_DID@IP:PORT"]
+# Note: Currently only IP addresses are supported (DNS hostnames will be added later)
 # Default: []
 bootstrap_peers = []
 
 # Example bootstrap configuration (commented out):
 # bootstrap_peers = [
-#     "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@seed1.example.org:7777",
-#     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@seed2.example.org:7777"
+#     "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777",
+#     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@203.0.113.51:7777"
 # ]
 
 # ============================================================================
