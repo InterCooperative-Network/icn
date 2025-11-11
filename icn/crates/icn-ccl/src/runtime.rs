@@ -4,8 +4,7 @@ use crate::ast::Contract;
 use crate::interpreter::Interpreter;
 use crate::types::{ContractState, ExecutionContext, ExecutionResult, LedgerOperation};
 use anyhow::{Context as _, Result};
-use icn_ledger::{entry::JournalEntryBuilder, AccountDelta, ContentHash, Ledger};
-use icn_identity::Did;
+use icn_ledger::{entry::JournalEntryBuilder, ContentHash, Ledger};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -117,9 +116,11 @@ impl ContractRuntime {
                     );
 
                     // Create journal entry
+                    // In mutual credit: debit = owed (positive), credit = owes (negative)
+                    // For a transfer from -> to: recipient is debited (gains), sender is credited (loses)
                     let entry = JournalEntryBuilder::new(from.clone())
-                        .debit(from.clone(), currency.clone(), *amount)
-                        .credit(to.clone(), currency.clone(), *amount)
+                        .debit(to.clone(), currency.clone(), *amount)
+                        .credit(from.clone(), currency.clone(), *amount)
                         .build()?;
 
                     ledger.append_entry(entry)?;

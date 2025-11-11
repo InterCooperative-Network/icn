@@ -1,6 +1,6 @@
 //! CCL interpreter with capability checking and fuel metering
 
-use crate::ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
+use crate::ast::{BinOp, Contract, Expr, Stmt, UnOp};
 use crate::types::{
     Capability, ContractState, ExecutionContext, ExecutionResult, LedgerOperation, Value,
 };
