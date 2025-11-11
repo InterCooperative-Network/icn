@@ -34,6 +34,56 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `icnd` - The ICN daemon
 - `icnctl` - CLI management tool
 
+## Documentation Structure
+
+**Project root `/home/matt/projects/icn/`:**
+- `CLAUDE.md` - This file; guidance for Claude Code when working on the project
+- `README.md` - Project overview and quick start guide for users
+- `CHANGELOG.md` - Formal, user-facing changelog following Keep a Changelog format
+
+**Documentation directory `/home/matt/projects/icn/docs/`:**
+- `ARCHITECTURE.md` - System architecture, component design, and implementation details
+- `production-hardening.md` - Security hardening measures and vulnerability fixes
+- `deployment-guide.md` - Installation, configuration, monitoring, and operations
+- `topic-subscriptions-api.md` - API reference for gossip subscriptions
+- `dev-journal/` - Detailed development journals (see below)
+
+### Development Journal (`docs/dev-journal/`)
+
+The dev journal contains detailed, chronological records of development sessions. Each journal entry:
+
+**Purpose:**
+- Document design decisions and rationale
+- Record implementation challenges and solutions
+- Provide context for future development
+- Track progress within major phases
+
+**When to create a new entry:**
+- Starting work on a new phase or major feature
+- After completing significant work (e.g., Phase 7 production hardening)
+- When making architectural decisions that need documentation
+- After resolving complex bugs or challenges
+
+**Naming convention:** `YYYY-MM-DD-phase-N-feature-name.md`
+
+**What to include:**
+- Phase/feature overview and goals
+- Implementation approach and architecture decisions
+- Challenges encountered and how they were solved
+- Test results and validation
+- Security considerations
+- Links to relevant commits
+- Next steps or remaining work
+
+**What NOT to include:**
+- Routine commits (those go in git log)
+- Minor bug fixes (document in commit messages)
+- Refactoring details without architectural significance
+
+**Distinction from CHANGELOG:**
+- **Dev journal**: Detailed, developer-focused narrative with context and reasoning
+- **CHANGELOG**: Concise, user-facing list of changes following semantic versioning
+
 ## Build & Test Commands
 
 All commands run from `icn/` directory:
