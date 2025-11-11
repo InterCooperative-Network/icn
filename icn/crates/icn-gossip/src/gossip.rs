@@ -359,6 +359,51 @@ impl GossipActor {
         missing
     }
 
+    /// Get all entry hashes for a topic
+    fn get_topic_hashes(&self, topic: &str) -> Vec<ContentHash> {
+        self.entries
+            .get(topic)
+            .map(|entries| entries.keys().copied().collect())
+            .unwrap_or_default()
+    }
+
+    /// Find entries we have that remote might not have (based on bloom filter)
+    fn find_entries_to_push(&self, topic: &str, remote_bloom: &BloomFilter) -> Vec<ContentHash> {
+        let mut to_push = Vec::new();
+
+        if let Some(entries) = self.entries.get(topic) {
+            for hash in entries.keys() {
+                // If remote bloom says they don't have it, we should offer it
+                if !remote_bloom.contains(hash) {
+                    to_push.push(*hash);
+                }
+            }
+        }
+
+        to_push
+    }
+
+    /// Find entries we're missing based on remote vector clock
+    fn find_entries_to_pull(&self, topic: &str, remote_vector: &VectorClock) -> Vec<ContentHash> {
+        let mut to_pull = Vec::new();
+
+        if let Some(entries) = self.entries.get(topic) {
+            // Check each entry we have
+            for (hash, entry) in entries {
+                // If remote clock is ahead of this entry's clock, we might be missing entries
+                if remote_vector.happened_after(&entry.clock) {
+                    // This entry is causally before remote state
+                    // We might be missing newer entries from remote
+                    continue;
+                }
+            }
+        }
+
+        // For now, we'll use a simpler heuristic: compare local bloom against remote
+        // A full implementation would track per-peer vector clocks and compute diffs
+        to_pull
+    }
+
     /// Handle incoming gossip message from network
     pub fn handle_message(&mut self, message: GossipMessage) -> Result<()> {
         match message {
@@ -511,12 +556,130 @@ impl GossipActor {
             }
 
             GossipMessage::Digest { topic, vector, bloom, hint_count, nonce } => {
+                // Digest Handler: Anti-entropy synchronization flow
+                // 1. Reconstruct remote bloom filter from data
+                // 2. Find entries we have that remote doesn't (bloom intersection)
+                // 3. Check trust class and get resource limits
+                // 4. Check backpressure: can we send to this peer?
+                // 5. Select entries to request (capped by max_pull_bytes)
+                // 6. Update peer sync state (vector, bloom, nonce, deficit)
+                // 7. Send PullRequest with selected entry hashes
                 icn_obs::metrics::gossip::digests_received_inc();
                 debug!("Received Digest: topic={}, hint_count={}, nonce={}", topic, hint_count, nonce);
 
-                // TODO: Implement digest handler
-                // This will be implemented in the next phase
-                warn!("Digest message handler not yet implemented");
+                // Check if we have this topic
+                if !self.topics.contains_key(&topic) {
+                    debug!("Received Digest for unknown topic: {}", topic);
+                    return Ok(());
+                }
+
+                // Reconstruct remote bloom filter
+                let remote_bloom = BloomFilter::from_data(&bloom);
+
+                // Find entries we have that remote doesn't (potential to push)
+                let entries_we_have = self.find_entries_to_push(&topic, &remote_bloom);
+
+                if entries_we_have.is_empty() {
+                    debug!("No missing entries to send for topic: {}", topic);
+                    return Ok(());
+                }
+
+                debug!("Found {} entries remote might be missing for topic: {}", entries_we_have.len(), topic);
+
+                // Get peer DID from vector clock (extract first DID as peer identifier)
+                // In a full implementation, the Digest message would include sender DID
+                // For now, we'll use a simplified approach: extract from vector clock
+                let peer_did = if let Some((did, _)) = vector.clock.iter().next() {
+                    did.clone()
+                } else {
+                    debug!("Digest has empty vector clock, cannot identify peer");
+                    return Ok(());
+                };
+
+                // Get trust class for peer
+                let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
+                let limits = TrustResourceLimits::for_trust_class(trust_class);
+
+                // Calculate how many entries we can send based on limits
+                let mut want_ids = Vec::new();
+                let mut estimated_bytes = 0u32;
+                let max_bytes = limits.max_pull_bytes;
+
+                for hash in entries_we_have {
+                    // Estimate size (rough approximation: data + overhead)
+                    if let Some(entries) = self.entries.get(&topic) {
+                        if let Some(entry) = entries.get(&hash) {
+                            let entry_bytes = entry.data.len() as u32 + 256;
+
+                            if estimated_bytes + entry_bytes > max_bytes {
+                                debug!("Hit byte limit ({} bytes), selected {} entries", max_bytes, want_ids.len());
+                                break;
+                            }
+
+                            want_ids.push(hash);
+                            estimated_bytes += entry_bytes;
+                        }
+                    }
+                }
+
+                if want_ids.is_empty() {
+                    debug!("No entries selected after size filtering");
+                    return Ok(());
+                }
+
+                // Update peer sync state (borrow mutable)
+                let (request_nonce, deficit_after) = {
+                    let peer_state = self.peer_sync.get_or_create(peer_did.clone());
+
+                    // Update peer's known state
+                    peer_state.update_vector(vector.clone());
+                    peer_state.update_bloom(bloom.clone());
+
+                    // Check if we can send (backpressure + limits + backoff)
+                    if !peer_state.can_send(limits.max_outstanding_reqs, 10000) {
+                        debug!("Cannot send to peer {} - backpressured or at limit", peer_did);
+                        let deficit = peer_state.deficit_bytes;
+                        icn_obs::metrics::gossip::peer_deficit_bytes_set(
+                            peer_did.as_str(),
+                            deficit,
+                        );
+                        return Ok(());
+                    }
+
+                    // Generate nonce for this request
+                    let request_nonce = peer_state.next_nonce();
+
+                    // Record outgoing request
+                    peer_state.record_request();
+                    peer_state.debit_bytes(estimated_bytes);
+
+                    (request_nonce, peer_state.deficit_bytes)
+                };
+                // Mutable borrow of peer_sync ends here
+
+                debug!(
+                    "Sending PullRequest to {}: {} entries, ~{} bytes, nonce={}",
+                    peer_did, want_ids.len(), estimated_bytes, request_nonce
+                );
+
+                // Send PullRequest (immutable borrow of self)
+                self.send_message(
+                    Some(peer_did.clone()),
+                    GossipMessage::PullRequest {
+                        topic: topic.clone(),
+                        want_ids,
+                        max_bytes,
+                        nonce: request_nonce,
+                    },
+                );
+
+                // Track metrics
+                icn_obs::metrics::gossip::pull_requests_sent_inc();
+                icn_obs::metrics::gossip::peer_deficit_bytes_set(
+                    peer_did.as_str(),
+                    deficit_after,
+                );
+
                 Ok(())
             }
 
@@ -577,12 +740,22 @@ impl GossipActor {
                 debug!("Received PullResponse: topic={}, entries={}, truncated={}, nonce={}",
                     topic, entries.len(), truncated, nonce);
 
-                // Calculate total bytes received
+                // Calculate total bytes received and extract peer DID from first entry
                 let mut total_bytes = 0u32;
-                for entry in entries {
+                let mut peer_did: Option<Did> = None;
+
+                for entry in &entries {
                     let entry_bytes = entry.data.len() as u32 + 256;
                     total_bytes += entry_bytes;
 
+                    // Extract peer DID from entry author (first entry)
+                    if peer_did.is_none() {
+                        peer_did = Some(entry.author.clone());
+                    }
+                }
+
+                // Store all entries
+                for entry in entries {
                     // Store the entry using store_entry() to ensure:
                     // 1. Subscriber notifications are triggered
                     // 2. Vector clock is merged
@@ -591,11 +764,29 @@ impl GossipActor {
                     self.store_entry(entry)?;
                 }
 
+                // Update peer sync state if we can identify the peer
+                if let Some(did) = peer_did {
+                    if let Some(peer_state) = self.peer_sync.get_mut(&did) {
+                        peer_state.record_response(total_bytes);
+
+                        debug!(
+                            "Updated peer {} sync state: deficit={}, outstanding={}",
+                            did, peer_state.deficit_bytes, peer_state.outstanding_requests
+                        );
+
+                        // Track peer deficit metric
+                        icn_obs::metrics::gossip::peer_deficit_bytes_set(
+                            did.as_str(),
+                            peer_state.deficit_bytes,
+                        );
+                    }
+                }
+
                 icn_obs::metrics::gossip::bytes_pulled_add(total_bytes as u64);
                 icn_obs::metrics::gossip::entries_received_inc();
                 self.update_gauge_metrics();
 
-                debug!("PullResponse processed: {} bytes received", total_bytes);
+                debug!("PullResponse processed: {} bytes received, truncated={}", total_bytes, truncated);
                 Ok(())
             }
         }

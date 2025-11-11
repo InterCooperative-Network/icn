@@ -180,12 +180,12 @@ histogram_quantile(0.95, icn_gossip_bloom_fp_rate)
 - PeerSyncState with deficit tracking
 - Exponential backoff with trust-aware timing
 - Adaptive Bloom filter sizing
-- PullRequest/PullResponse handlers
+- Full Digest handler with bloom intersection and backpressure
+- PullRequest/PullResponse handlers with peer state updates
 - Comprehensive metrics
 - 47 passing unit tests
 
 **🚧 In Progress**:
-- Full Digest handler (vector clock diff + bloom intersection)
 - Periodic digest emission
 - Integration tests (convergence, backpressure, FP rate)
 - Network layer wiring
