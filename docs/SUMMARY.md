@@ -75,11 +75,14 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Credit limit validation (implemented)
 - Anti-entropy sync (deferred to Phase 5: Gossip)
 
-### Phase 4: Contracts (CCL)
-- DSL parser + interpreter
-- Capability system
-- Contract installation + invocation
-- Basic mutual credit example
+### Phase 4: Contracts (CCL) ✓
+- DSL interpreter (implemented)
+- AST for contract language (implemented)
+- Capability system (implemented)
+- Contract runtime with ledger integration (implemented)
+- Fuel metering for bounded execution (implemented)
+- TimeBank example contract (implemented)
+- Text parser (deferred - contracts built programmatically via AST)
 
 ### Phase 5: Gossip
 - Topic bus with ACLs
