@@ -84,10 +84,13 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 - TimeBank example contract (implemented)
 - Text parser (deferred - contracts built programmatically via AST)
 
-### Phase 5: Gossip
-- Topic bus with ACLs
-- Bloom filter anti-entropy
-- Rate limiting + QoS
+### Phase 5: Gossip ✓
+- Topic bus with ACLs (implemented)
+- Vector clocks for causal ordering (implemented)
+- Bloom filter anti-entropy (implemented)
+- GossipActor for distributed sync (implemented)
+- Hybrid push/pull protocol (implemented)
+- Rate limiting + QoS (deferred to Phase 6: Polish)
 
 ### Phase 6: Polish
 - Metrics exporter
