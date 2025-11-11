@@ -133,14 +133,21 @@ impl GossipActor {
             .try_into()
             .context("Timestamp overflow - system clock too far in future")?;
 
-        let entry = GossipEntry {
+        let mut entry = GossipEntry {
             hash,
             author: self.own_did.clone(),
             clock: self.clock.clone(),
             topic: topic.to_string(),
             data,
+            compressed: false,
             timestamp,
         };
+
+        // Compress large entries before storing/sending
+        if let Err(e) = entry.compress() {
+            debug!("Failed to compress entry: {}", e);
+            // Continue without compression - not critical
+        }
 
         // Store entry
         self.store_entry(entry)?;

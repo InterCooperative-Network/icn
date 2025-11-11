@@ -9,6 +9,9 @@ use std::time::Duration;
 /// Content hash for gossip entries
 pub type ContentHash = [u8; 32];
 
+/// Minimum size (in bytes) for compression to be worthwhile
+const COMPRESSION_THRESHOLD: usize = 1024; // 1 KB
+
 /// Gossip entry metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GossipEntry {
@@ -24,11 +27,65 @@ pub struct GossipEntry {
     /// Topic this entry belongs to
     pub topic: String,
 
-    /// Actual entry data (serialized)
+    /// Actual entry data (may be compressed)
     pub data: Vec<u8>,
+
+    /// Whether data is zstd-compressed
+    #[serde(default)]
+    pub compressed: bool,
 
     /// Timestamp (local, not for ordering)
     pub timestamp: u64,
+}
+
+impl GossipEntry {
+    /// Compress entry data if it exceeds the compression threshold
+    ///
+    /// Uses zstd compression with level 3 (fast compression, good ratio).
+    /// Only compresses if data is >= 1KB and compression reduces size.
+    pub fn compress(&mut self) -> anyhow::Result<()> {
+        if self.compressed || self.data.len() < COMPRESSION_THRESHOLD {
+            return Ok(()); // Already compressed or too small
+        }
+
+        let original_size = self.data.len();
+        let compressed_data = zstd::encode_all(self.data.as_slice(), 3)?;
+
+        // Only use compression if it actually reduces size
+        if compressed_data.len() < original_size {
+            tracing::debug!(
+                "Compressed gossip entry: {} -> {} bytes",
+                original_size,
+                compressed_data.len()
+            );
+            self.data = compressed_data;
+            self.compressed = true;
+        }
+
+        Ok(())
+    }
+
+    /// Decompress entry data if it's compressed
+    pub fn decompress(&mut self) -> anyhow::Result<()> {
+        if !self.compressed {
+            return Ok(()); // Not compressed
+        }
+
+        let decompressed_data = zstd::decode_all(self.data.as_slice())?;
+        self.data = decompressed_data;
+        self.compressed = false;
+
+        Ok(())
+    }
+
+    /// Get decompressed data without modifying the entry
+    pub fn get_data(&self) -> anyhow::Result<Vec<u8>> {
+        if self.compressed {
+            Ok(zstd::decode_all(self.data.as_slice())?)
+        } else {
+            Ok(self.data.clone())
+        }
+    }
 }
 
 /// Gossip message types
@@ -208,5 +265,106 @@ mod tests {
         assert!(topic.can_publish(&alice, None));
         assert!(topic.can_publish(&bob, None));
         assert!(!topic.can_publish(&charlie, None));
+    }
+
+    #[test]
+    fn test_compression_small_data() {
+        let kp = KeyPair::generate().unwrap();
+        let data = vec![0u8; 512]; // 512 bytes - below threshold
+
+        let mut entry = GossipEntry {
+            hash: [0u8; 32],
+            author: kp.did().clone(),
+            clock: VectorClock::new(),
+            topic: "test".to_string(),
+            data: data.clone(),
+            compressed: false,
+            timestamp: 0,
+        };
+
+        // Should not compress (too small)
+        entry.compress().unwrap();
+        assert!(!entry.compressed, "Should not compress data below threshold");
+        assert_eq!(entry.data, data);
+    }
+
+    #[test]
+    fn test_compression_large_data() {
+        let kp = KeyPair::generate().unwrap();
+        // Create compressible data (repetitive)
+        let data = vec![42u8; 2048]; // 2KB of same byte
+
+        let mut entry = GossipEntry {
+            hash: [0u8; 32],
+            author: kp.did().clone(),
+            clock: VectorClock::new(),
+            topic: "test".to_string(),
+            data: data.clone(),
+            compressed: false,
+            timestamp: 0,
+        };
+
+        let original_size = entry.data.len();
+
+        // Should compress
+        entry.compress().unwrap();
+        assert!(entry.compressed, "Should compress data above threshold");
+        assert!(
+            entry.data.len() < original_size,
+            "Compressed size should be smaller"
+        );
+
+        // Should decompress back to original
+        entry.decompress().unwrap();
+        assert!(!entry.compressed);
+        assert_eq!(entry.data, data);
+    }
+
+    #[test]
+    fn test_get_data_compressed() {
+        let kp = KeyPair::generate().unwrap();
+        let data = vec![99u8; 2048];
+
+        let mut entry = GossipEntry {
+            hash: [0u8; 32],
+            author: kp.did().clone(),
+            clock: VectorClock::new(),
+            topic: "test".to_string(),
+            data: data.clone(),
+            compressed: false,
+            timestamp: 0,
+        };
+
+        // Compress
+        entry.compress().unwrap();
+        assert!(entry.compressed);
+
+        // get_data should return decompressed without modifying entry
+        let retrieved = entry.get_data().unwrap();
+        assert_eq!(retrieved, data);
+        assert!(entry.compressed, "Entry should still be compressed");
+    }
+
+    #[test]
+    fn test_compression_idempotent() {
+        let kp = KeyPair::generate().unwrap();
+        let data = vec![1u8; 2048];
+
+        let mut entry = GossipEntry {
+            hash: [0u8; 32],
+            author: kp.did().clone(),
+            clock: VectorClock::new(),
+            topic: "test".to_string(),
+            data: data.clone(),
+            compressed: false,
+            timestamp: 0,
+        };
+
+        // Compress twice - should be idempotent
+        entry.compress().unwrap();
+        let compressed_once = entry.data.clone();
+
+        entry.compress().unwrap();
+        assert_eq!(entry.data, compressed_once, "Double compression should be no-op");
     }
 }
