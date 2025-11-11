@@ -244,15 +244,8 @@ fn hostname() -> String {
 
 /// Parse a DID from a string
 fn parse_did(s: &str) -> Result<Did> {
-    // Simple validation - should start with "did:icn:"
-    if !s.starts_with("did:icn:") {
-        anyhow::bail!("Invalid DID format: {}", s);
-    }
-
-    // Deserialize from JSON string representation
-    Ok(serde_json::from_value(serde_json::Value::String(
-        s.to_string(),
-    ))?)
+    // Use validated parsing from icn-identity
+    Did::from_str(s)
 }
 
 // Add broadcast extension for shutdown signal
@@ -301,7 +294,10 @@ mod tests {
 
     #[test]
     fn test_parse_did() {
-        let did_str = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
+        // Generate a valid DID from a real keypair
+        let kp = KeyPair::generate().unwrap();
+        let did_str = kp.did().as_str();
+
         let did = parse_did(did_str).unwrap();
         assert_eq!(did.as_str(), did_str);
     }
