@@ -68,11 +68,12 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 - Passphrase unlock with zeroization (implemented)
 - NAT traversal (deferred to Phase 2.5)
 
-### Phase 3: Ledger
-- Double-entry journal
-- Merkle-DAG structure
-- Balance queries
-- Anti-entropy sync
+### Phase 3: Ledger ✓
+- Double-entry journal (implemented)
+- Merkle-DAG structure (implemented)
+- Balance queries (implemented)
+- Credit limit validation (implemented)
+- Anti-entropy sync (deferred to Phase 5: Gossip)
 
 ### Phase 4: Contracts (CCL)
 - DSL parser + interpreter
