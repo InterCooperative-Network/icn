@@ -95,6 +95,50 @@ pub fn init_descriptions() {
         "icn_gossip_subscribe_acks_sent_total",
         "Total number of SubscribeAck messages sent"
     );
+    describe_counter!(
+        "icn_gossip_digests_sent_total",
+        "Total number of Digest messages sent"
+    );
+    describe_counter!(
+        "icn_gossip_digests_received_total",
+        "Total number of Digest messages received"
+    );
+    describe_counter!(
+        "icn_gossip_pull_requests_sent_total",
+        "Total number of PullRequest messages sent"
+    );
+    describe_counter!(
+        "icn_gossip_pull_requests_received_total",
+        "Total number of PullRequest messages received"
+    );
+    describe_counter!(
+        "icn_gossip_pull_responses_sent_total",
+        "Total number of PullResponse messages sent"
+    );
+    describe_counter!(
+        "icn_gossip_pull_responses_received_total",
+        "Total number of PullResponse messages received"
+    );
+    describe_counter!(
+        "icn_gossip_bytes_pulled_total",
+        "Total bytes received via pull protocol"
+    );
+    describe_counter!(
+        "icn_gossip_bytes_pushed_total",
+        "Total bytes sent via push protocol"
+    );
+    describe_gauge!(
+        "icn_gossip_peer_deficit_bytes",
+        "Current deficit bytes per peer (negative means backpressure debt)"
+    );
+    describe_histogram!(
+        "icn_gossip_bloom_fp_rate",
+        "Bloom filter false positive rate by topic"
+    );
+    describe_counter!(
+        "icn_gossip_pull_truncated_total",
+        "Total number of pull responses truncated due to size limits"
+    );
 
     // Ledger metrics
     describe_gauge!(
@@ -164,7 +208,7 @@ pub mod network {
 
 /// Gossip metrics
 pub mod gossip {
-    use metrics::{counter, gauge};
+    use metrics::{counter, gauge, histogram};
 
     pub fn topics_total_set(value: u64) {
         gauge!("icn_gossip_topics_total").set(value as f64);
@@ -220,6 +264,51 @@ pub mod gossip {
 
     pub fn subscribe_acks_sent_inc() {
         counter!("icn_gossip_subscribe_acks_sent_total").increment(1);
+    }
+
+    pub fn digests_sent_inc() {
+        counter!("icn_gossip_digests_sent_total").increment(1);
+    }
+
+    pub fn digests_received_inc() {
+        counter!("icn_gossip_digests_received_total").increment(1);
+    }
+
+    pub fn pull_requests_sent_inc() {
+        counter!("icn_gossip_pull_requests_sent_total").increment(1);
+    }
+
+    pub fn pull_requests_received_inc() {
+        counter!("icn_gossip_pull_requests_received_total").increment(1);
+    }
+
+    pub fn pull_responses_sent_inc() {
+        counter!("icn_gossip_pull_responses_sent_total").increment(1);
+    }
+
+    pub fn pull_responses_received_inc() {
+        counter!("icn_gossip_pull_responses_received_total").increment(1);
+    }
+
+    pub fn bytes_pulled_add(bytes: u64) {
+        counter!("icn_gossip_bytes_pulled_total").increment(bytes);
+    }
+
+    pub fn bytes_pushed_add(bytes: u64) {
+        counter!("icn_gossip_bytes_pushed_total").increment(bytes);
+    }
+
+    pub fn peer_deficit_bytes_set(peer: &str, deficit: i64) {
+        gauge!("icn_gossip_peer_deficit_bytes", "peer" => peer.to_string())
+            .set(deficit as f64);
+    }
+
+    pub fn bloom_fp_rate_record(topic: &str, rate: f64) {
+        histogram!("icn_gossip_bloom_fp_rate", "topic" => topic.to_string()).record(rate);
+    }
+
+    pub fn pull_truncated_inc() {
+        counter!("icn_gossip_pull_truncated_total").increment(1);
     }
 }
 

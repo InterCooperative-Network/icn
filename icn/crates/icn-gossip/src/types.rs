@@ -116,6 +116,31 @@ pub enum GossipMessage {
 
     /// Request missing entries based on bloom filter
     RequestMissing { hashes: Vec<ContentHash> },
+
+    /// Digest announcing what a peer has (enhanced anti-entropy)
+    Digest {
+        topic: String,
+        vector: VectorClock,
+        bloom: BloomFilterData,
+        hint_count: u32,
+        nonce: u64,
+    },
+
+    /// Targeted pull request for missing entries
+    PullRequest {
+        topic: String,
+        want_ids: Vec<ContentHash>,
+        max_bytes: u32,
+        nonce: u64,
+    },
+
+    /// Response with multiple entries (may be truncated)
+    PullResponse {
+        topic: String,
+        entries: Vec<GossipEntry>,
+        truncated: bool,
+        nonce: u64,
+    },
 }
 
 /// Serialized bloom filter data
@@ -204,6 +229,61 @@ pub enum AccessControl {
 
     /// Only specific participants (e.g., contract members)
     Participants(Vec<Did>),
+}
+
+/// Resource limits for a specific trust class
+#[derive(Debug, Clone)]
+pub struct TrustResourceLimits {
+    /// Maximum bytes per pull request
+    pub max_pull_bytes: u32,
+
+    /// Maximum bytes per push
+    pub max_push_bytes: u32,
+
+    /// Maximum outstanding pull requests
+    pub max_outstanding_reqs: u32,
+
+    /// Minimum retry backoff in milliseconds
+    pub retry_min_ms: u64,
+
+    /// Maximum retry backoff in milliseconds
+    pub retry_max_ms: u64,
+}
+
+impl TrustResourceLimits {
+    /// Get resource limits for a specific trust class
+    pub fn for_trust_class(trust_class: TrustClass) -> Self {
+        match trust_class {
+            TrustClass::Isolated => Self {
+                max_pull_bytes: 64 * 1024,      // 64 KB
+                max_push_bytes: 64 * 1024,
+                max_outstanding_reqs: 1,
+                retry_min_ms: 1500,
+                retry_max_ms: 5000,
+            },
+            TrustClass::Known => Self {
+                max_pull_bytes: 256 * 1024,     // 256 KB
+                max_push_bytes: 256 * 1024,
+                max_outstanding_reqs: 2,
+                retry_min_ms: 800,
+                retry_max_ms: 2500,
+            },
+            TrustClass::Partner => Self {
+                max_pull_bytes: 1024 * 1024,    // 1 MB
+                max_push_bytes: 1024 * 1024,
+                max_outstanding_reqs: 3,
+                retry_min_ms: 300,
+                retry_max_ms: 1200,
+            },
+            TrustClass::Federated => Self {
+                max_pull_bytes: 1024 * 1024,    // 1 MB (same as Partner)
+                max_push_bytes: 1024 * 1024,
+                max_outstanding_reqs: 3,
+                retry_min_ms: 300,
+                retry_max_ms: 1200,
+            },
+        }
+    }
 }
 
 /// Subscription handle

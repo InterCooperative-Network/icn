@@ -1,7 +1,11 @@
 //! Gossip actor for managing distributed synchronization
 
 use crate::bloom::BloomFilter;
-use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic};
+use crate::sync::PeerSyncManager;
+use crate::types::{
+    AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic,
+    TrustResourceLimits,
+};
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
@@ -10,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Callback for sending gossip messages to peers
 /// Parameters: (recipient_did, message)
@@ -53,6 +57,9 @@ pub struct GossipActor {
 
     /// Entry notification callback (optional, for notifying subscribers)
     notification_callback: Option<EntryNotificationCallback>,
+
+    /// Per-peer sync state manager
+    peer_sync: PeerSyncManager,
 }
 
 impl GossipActor {
@@ -71,6 +78,7 @@ impl GossipActor {
             trust_lookup,
             send_callback: None,
             notification_callback: None,
+            peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
         };
 
         // Create default topics
@@ -499,6 +507,95 @@ impl GossipActor {
                 }
 
                 debug!("RequestMissing complete: sent={}, not_found={}", sent_count, not_found_count);
+                Ok(())
+            }
+
+            GossipMessage::Digest { topic, vector, bloom, hint_count, nonce } => {
+                icn_obs::metrics::gossip::digests_received_inc();
+                debug!("Received Digest: topic={}, hint_count={}, nonce={}", topic, hint_count, nonce);
+
+                // TODO: Implement digest handler
+                // This will be implemented in the next phase
+                warn!("Digest message handler not yet implemented");
+                Ok(())
+            }
+
+            GossipMessage::PullRequest { topic, want_ids, max_bytes, nonce } => {
+                icn_obs::metrics::gossip::pull_requests_received_inc();
+                debug!("Received PullRequest: topic={}, want_ids={}, max_bytes={}, nonce={}",
+                    topic, want_ids.len(), max_bytes, nonce);
+
+                // Get entries for the topic
+                let topic_entries = match self.entries.get(&topic) {
+                    Some(entries) => entries,
+                    None => {
+                        debug!("Topic not found: {}", topic);
+                        return Ok(());
+                    }
+                };
+
+                // Collect requested entries
+                let mut response_entries = Vec::new();
+                let mut total_bytes = 0u32;
+                let mut truncated = false;
+
+                for hash in want_ids {
+                    if let Some(entry) = topic_entries.get(&hash) {
+                        // Estimate entry size (rough approximation)
+                        let entry_bytes = entry.data.len() as u32 + 256; // Data + overhead
+
+                        if total_bytes + entry_bytes > max_bytes {
+                            truncated = true;
+                            icn_obs::metrics::gossip::pull_truncated_inc();
+                            break;
+                        }
+
+                        response_entries.push(entry.clone());
+                        total_bytes += entry_bytes;
+                    }
+                }
+
+                debug!("Sending PullResponse: {} entries, {} bytes, truncated={}",
+                    response_entries.len(), total_bytes, truncated);
+
+                // Send pull response
+                self.send_message(None, GossipMessage::PullResponse {
+                    topic: topic.clone(),
+                    entries: response_entries,
+                    truncated,
+                    nonce,
+                });
+
+                icn_obs::metrics::gossip::pull_responses_sent_inc();
+                icn_obs::metrics::gossip::bytes_pushed_add(total_bytes as u64);
+
+                Ok(())
+            }
+
+            GossipMessage::PullResponse { topic, entries, truncated, nonce } => {
+                icn_obs::metrics::gossip::pull_responses_received_inc();
+                debug!("Received PullResponse: topic={}, entries={}, truncated={}, nonce={}",
+                    topic, entries.len(), truncated, nonce);
+
+                // Calculate total bytes received
+                let mut total_bytes = 0u32;
+                for entry in entries {
+                    let entry_bytes = entry.data.len() as u32 + 256;
+                    total_bytes += entry_bytes;
+
+                    // Store the entry using store_entry() to ensure:
+                    // 1. Subscriber notifications are triggered
+                    // 2. Vector clock is merged
+                    // 3. max_entries limit is enforced
+                    // 4. Duplicate entries are detected
+                    self.store_entry(entry)?;
+                }
+
+                icn_obs::metrics::gossip::bytes_pulled_add(total_bytes as u64);
+                icn_obs::metrics::gossip::entries_received_inc();
+                self.update_gauge_metrics();
+
+                debug!("PullResponse processed: {} bytes received", total_bytes);
                 Ok(())
             }
         }

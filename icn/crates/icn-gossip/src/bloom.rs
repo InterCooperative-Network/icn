@@ -37,6 +37,38 @@ impl BloomFilter {
         }
     }
 
+    /// Create an adaptively-sized bloom filter based on cardinality hint
+    ///
+    /// Uses a heuristic to balance size vs false positive rate:
+    /// - m = min(65536, next_pow2(8 * expected_ids))
+    /// - k = max(1, round(m/expected_ids * ln2))
+    ///
+    /// This ensures filters stay reasonably sized while maintaining good FP rates.
+    pub fn new_adaptive(expected_ids: usize) -> Self {
+        if expected_ids == 0 {
+            // Minimal filter for empty set
+            return BloomFilter {
+                bits: vec![false; 64],
+                num_hashes: 1,
+                size: 64,
+            };
+        }
+
+        // Calculate size: min(65536, next_pow2(8 * expected_ids))
+        let target_bits = (8 * expected_ids).max(64);
+        let size = target_bits.next_power_of_two().min(65536) as u64;
+
+        // Calculate hash count: max(1, round((m/n) * ln(2)))
+        let ratio = size as f64 / expected_ids as f64;
+        let num_hashes = (ratio * std::f64::consts::LN_2).round().max(1.0) as u32;
+
+        BloomFilter {
+            bits: vec![false; size as usize],
+            num_hashes,
+            size,
+        }
+    }
+
     /// Calculate optimal bit array size
     fn optimal_size(n: usize, p: f64) -> u64 {
         let n = n as f64;
@@ -260,5 +292,67 @@ mod tests {
         // After clear, the hash should not be in the filter
         // But this might be a false positive, so we just check the filter is cleared
         assert_eq!(filter.estimated_count(), 0);
+    }
+
+    #[test]
+    fn test_adaptive_sizing() {
+        // Test with 0 entries
+        let filter0 = BloomFilter::new_adaptive(0);
+        assert_eq!(filter0.size, 64); // Minimal size
+
+        // Test with small number of entries
+        let filter10 = BloomFilter::new_adaptive(10);
+        assert!(filter10.size >= 64);
+        assert!(filter10.size <= 65536);
+        assert!(filter10.num_hashes >= 1);
+
+        // Test with medium number of entries
+        let filter100 = BloomFilter::new_adaptive(100);
+        assert!(filter100.size >= 64);
+        assert!(filter100.size <= 65536);
+
+        // Test with large number of entries (should cap at 65536)
+        let filter10k = BloomFilter::new_adaptive(10000);
+        assert_eq!(filter10k.size, 65536);
+
+        println!("Adaptive filter for 10 entries: size={}, hashes={}", filter10.size, filter10.num_hashes);
+        println!("Adaptive filter for 100 entries: size={}, hashes={}", filter100.size, filter100.num_hashes);
+        println!("Adaptive filter for 10k entries: size={}, hashes={}", filter10k.size, filter10k.num_hashes);
+    }
+
+    #[test]
+    fn test_adaptive_sizing_functional() {
+        // Verify adaptive filter actually works
+        let mut filter = BloomFilter::new_adaptive(50);
+
+        // Insert 50 items
+        for i in 0..50 {
+            let mut hash = [0u8; 32];
+            hash[0] = i;
+            filter.insert(&hash);
+        }
+
+        // All inserted items should be found
+        for i in 0..50 {
+            let mut hash = [0u8; 32];
+            hash[0] = i;
+            assert!(filter.contains(&hash), "Should contain hash {}", i);
+        }
+
+        // Test false positive rate on non-inserted items
+        let mut false_positives = 0;
+        for i in 50..150 {
+            let mut hash = [0u8; 32];
+            hash[0] = i;
+            if filter.contains(&hash) {
+                false_positives += 1;
+            }
+        }
+
+        let fp_rate = false_positives as f64 / 100.0;
+        println!("Adaptive filter FP rate: {:.2}%", fp_rate * 100.0);
+
+        // Should be reasonably low (< 20% for adaptive sizing)
+        assert!(fp_rate < 0.2, "FP rate too high: {:.2}%", fp_rate * 100.0);
     }
 }

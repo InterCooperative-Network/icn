@@ -30,10 +30,15 @@
 
 pub mod bloom;
 pub mod gossip;
+pub mod sync;
 pub mod types;
 pub mod vector_clock;
 
 pub use bloom::BloomFilter;
 pub use gossip::{EntryNotificationCallback, GossipActor, GossipHandle, SendMessageCallback};
-pub use types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic};
+pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
+pub use types::{
+    AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic,
+    TrustResourceLimits,
+};
 pub use vector_clock::VectorClock;
