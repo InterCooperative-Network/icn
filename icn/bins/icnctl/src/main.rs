@@ -34,9 +34,9 @@ enum Commands {
     #[command(subcommand)]
     Trust(TrustCommands),
 
-    /// Peer management
+    /// Network operations (mDNS discovery, QUIC sessions)
     #[command(subcommand)]
-    Peers(PeerCommands),
+    Network(NetworkCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -99,12 +99,25 @@ enum TrustCommands {
 }
 
 #[derive(Subcommand, Debug)]
-enum PeerCommands {
-    /// List known peers
-    List,
+enum NetworkCommands {
+    /// List discovered peers (via mDNS)
+    Peers,
 
-    /// Add a peer manually
-    Add { multiaddr: String },
+    /// Connect to a peer via QUIC
+    Dial {
+        /// Target DID
+        did: String,
+
+        /// Optional socket address (IP:port)
+        #[arg(short, long)]
+        addr: Option<String>,
+    },
+
+    /// Show network statistics
+    Stats,
+
+    /// Show network actor status
+    Status,
 }
 
 fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
@@ -163,18 +176,7 @@ async fn main() -> Result<()> {
 
         Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
 
-        Commands::Peers(peer_cmd) => match peer_cmd {
-            PeerCommands::List => {
-                println!("Peers: Not implemented yet");
-                // TODO: Connect to daemon and list peers
-            }
-
-            PeerCommands::Add { multiaddr } => {
-                println!("Adding peer: {}", multiaddr);
-                println!("Not implemented yet");
-                // TODO: Connect to daemon and add peer
-            }
-        },
+        Commands::Network(net_cmd) => handle_network_command(net_cmd)?,
     }
 
     Ok(())
@@ -389,6 +391,70 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
             graph.remove_edge(&own_did, &target_did)?;
 
             println!("✓ Removed trust edge to {}", target_did);
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_network_command(cmd: NetworkCommands) -> Result<()> {
+    // Network commands require daemon RPC communication
+    // TODO: Implement RPC client in icn-rpc crate
+    //
+    // For now, these are documented stubs that show the intended API
+
+    match cmd {
+        NetworkCommands::Peers => {
+            println!("Network: Discovered Peers");
+            println!("Status: Not implemented - requires daemon RPC\n");
+            println!("This command will list all peers discovered via mDNS.");
+            println!("When implemented, it will call: NetworkHandle::get_peers()");
+            println!("\nExample output:");
+            println!("  DID                                           Address            Version");
+            println!("  did:icn:z6Mk...                                192.168.1.100:4433 0.1.0");
+            println!("  did:icn:z6Mk...                                192.168.1.101:4433 0.1.0");
+            println!("\n→ Start the daemon with: icnd");
+            println!("→ Ensure mDNS is enabled in config");
+        }
+
+        NetworkCommands::Dial { did, addr } => {
+            println!("Network: Dial Peer");
+            println!("Status: Not implemented - requires daemon RPC\n");
+            println!("  Target DID: {}", did);
+            if let Some(a) = addr {
+                println!("  Address: {}", a);
+            } else {
+                println!("  Address: Will be discovered via mDNS");
+            }
+            println!("\nThis command will establish a QUIC connection to the peer.");
+            println!("When implemented, it will call: NetworkHandle::dial(addr, did)");
+            println!("\n→ Start the daemon with: icnd");
+        }
+
+        NetworkCommands::Stats => {
+            println!("Network: Statistics");
+            println!("Status: Not implemented - requires daemon RPC\n");
+            println!("This command will show network statistics:");
+            println!("  - Peers discovered (via mDNS)");
+            println!("  - Active QUIC connections");
+            println!("  - Total connections established");
+            println!("\nWhen implemented, it will call: NetworkHandle::get_stats()");
+            println!("\nExample output:");
+            println!("  Peers discovered:     5");
+            println!("  Active connections:   3");
+            println!("  Total connections:    42");
+            println!("\n→ Start the daemon with: icnd");
+        }
+
+        NetworkCommands::Status => {
+            println!("Network: Actor Status");
+            println!("Status: Not implemented - requires daemon RPC\n");
+            println!("This command will show the NetworkActor status:");
+            println!("  - Is NetworkActor running?");
+            println!("  - mDNS discovery status");
+            println!("  - QUIC listener address");
+            println!("  - Recent errors/warnings");
+            println!("\n→ Start the daemon with: icnd");
         }
     }
 
