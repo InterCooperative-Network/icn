@@ -2,6 +2,33 @@
 
 A substrate daemon for the cooperative internet.
 
+## Quick Start
+
+Get a two-node network running in under 5 minutes:
+
+```bash
+# 1. Build ICN
+cd icn && cargo build --release
+
+# 2. Start node alpha (terminal 1)
+./target/release/icnd --config ../config/icn-alpha.toml
+
+# 3. Start node beta (terminal 2)
+./target/release/icnd --config ../config/icn-beta.toml
+
+# 4. Check network status (terminal 3)
+./target/release/icnctl --endpoint 127.0.0.1:5050 network status
+./target/release/icnctl --endpoint 127.0.0.1:5050 network peers
+
+# Nodes will discover each other via mDNS within seconds
+```
+
+**Next Steps:**
+- [Configuration Examples](config/) - Customize your node
+- [Docker Deployment](docker/) - Run with containers
+- [Examples](examples/) - Tutorials and demos
+- [Documentation](docs/) - Architecture, deployment, APIs
+
 ## What is ICN?
 
 ICN is not a blockchain. It's not a federation server. It's a **substrate daemon** that provides:
@@ -123,28 +150,93 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete se
 ## Building
 
 ```bash
+# From repository root
+cd icn
 cargo build --release
+
+# Binaries will be in icn/target/release/
 ```
 
 ## Usage
 
-Start the daemon:
+### Starting the Daemon
 
 ```bash
+# With default config (~/.icn/)
 ./target/release/icnd
+
+# With custom config
+./target/release/icnd --config path/to/config.toml
+
+# Override data directory
+./target/release/icnd --data-dir /custom/path --log-level debug
 ```
 
-Generate a DID:
+### Identity Management
 
 ```bash
-./target/release/icnctl id generate
+# Initialize new identity (creates keystore)
+./target/release/icnctl id init
+
+# Show current DID
+./target/release/icnctl id show
+
+# Rotate keys
+./target/release/icnctl id rotate
+
+# Export backup (coming soon)
+# ./target/release/icnctl id export backup.age
+
+# Import backup (coming soon)
+# ./target/release/icnctl id import backup.age
 ```
 
-Check status:
+### Trust Management
 
 ```bash
-./target/release/icnctl status
+# Add trust edge
+./target/release/icnctl trust add did:icn:z6Mk... --score 0.8 --label partner
+
+# List trust edges
+./target/release/icnctl trust list
+
+# Show computed trust score
+./target/release/icnctl trust show did:icn:z6Mk...
+
+# Remove trust edge
+./target/release/icnctl trust remove did:icn:z6Mk...
 ```
+
+### Network Operations
+
+```bash
+# Check network status
+./target/release/icnctl network status
+
+# List discovered peers
+./target/release/icnctl network peers
+
+# Get network statistics
+./target/release/icnctl network stats
+
+# Manually dial a peer
+./target/release/icnctl network dial did:icn:z6Mk... 192.168.1.100:4433
+```
+
+### Ports & Services
+
+By default, ICN exposes these services:
+
+| Service | Port | Protocol | Purpose |
+|---------|------|----------|---------|
+| **Peer Transport** | 4433 | QUIC/UDP | P2P communication |
+| **RPC API** | 5050 | HTTP | CLI control (icnctl) |
+| **Metrics** | 9090 | HTTP | Prometheus exporter |
+| **Health** | 8080 | HTTP | Health checks |
+
+Access metrics: `curl http://localhost:9090/metrics`
+
+Access health: `curl http://localhost:8080/health`
 
 ## Development
 

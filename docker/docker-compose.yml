@@ -1,0 +1,140 @@
+# Docker Compose for ICN Two-Node Network with Monitoring
+#
+# This compose file sets up:
+# - Two ICN nodes (alpha and beta) on the same network
+# - Prometheus for metrics collection
+# - Persistent volumes for node data
+#
+# Usage:
+#   docker-compose -f docker/docker-compose.yml up
+#
+# Access:
+#   - Alpha RPC: http://localhost:5050
+#   - Beta RPC: http://localhost:5051
+#   - Alpha Metrics: http://localhost:9090
+#   - Beta Metrics: http://localhost:9091
+#   - Prometheus: http://localhost:9000
+
+version: '3.9'
+
+services:
+  # ============================================================================
+  # ICN Alpha Node
+  # ============================================================================
+  icn-alpha:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: icn-alpha
+    hostname: icn-alpha
+    networks:
+      - icn-network
+    ports:
+      - "4433:4433/udp"  # QUIC peer transport
+      - "5050:5050"      # RPC API
+      - "9090:9090"      # Prometheus metrics
+      - "8080:8080"      # Health check
+    volumes:
+      - icn-alpha-data:/data
+      - ../config/icn-alpha.toml:/etc/icn/icn.toml:ro
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
+      - ICN_OBSERVABILITY_METRICS_PORT=9090
+      - ICN_OBSERVABILITY_HEALTH_PORT=8080
+      - ICN_OBSERVABILITY_LOG_LEVEL=info
+      - ICN_NETWORK_MDNS_ENABLED=false  # Use direct addressing in Docker
+    command:
+      - --config
+      - /etc/icn/icn.toml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # ICN Beta Node
+  # ============================================================================
+  icn-beta:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: icn-beta
+    hostname: icn-beta
+    networks:
+      - icn-network
+    ports:
+      - "4434:4433/udp"  # QUIC peer transport
+      - "5051:5050"      # RPC API
+      - "9091:9090"      # Prometheus metrics
+      - "8081:8080"      # Health check
+    volumes:
+      - icn-beta-data:/data
+      - ../config/icn-beta.toml:/etc/icn/icn.toml:ro
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
+      - ICN_OBSERVABILITY_METRICS_PORT=9090
+      - ICN_OBSERVABILITY_HEALTH_PORT=8080
+      - ICN_OBSERVABILITY_LOG_LEVEL=info
+      - ICN_NETWORK_MDNS_ENABLED=false
+    command:
+      - --config
+      - /etc/icn/icn.toml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - icn-alpha
+
+  # ============================================================================
+  # Prometheus Metrics Collection
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: icn-prometheus
+    hostname: prometheus
+    networks:
+      - icn-network
+    ports:
+      - "9000:9090"  # Prometheus UI (on 9000 to avoid conflict with ICN)
+    volumes:
+      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    depends_on:
+      - icn-alpha
+      - icn-beta
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  icn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  icn-alpha-data:
+    driver: local
+  icn-beta-data:
+    driver: local
+  prometheus-data:
+    driver: local

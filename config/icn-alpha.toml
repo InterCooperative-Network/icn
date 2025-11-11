@@ -1,0 +1,15 @@
+# ICN Alpha Node Configuration
+# This is node 1 of 2 in the local two-node demo.
+# Use with: icnd --config config/icn-alpha.toml
+
+data_dir = "/tmp/icn-alpha"
+
+[network]
+listen_addr = "0.0.0.0:4433"
+mdns_enabled = true
+bootstrap_peers = []
+
+[observability]
+metrics_port = 9090
+health_port = 8080
+log_level = "info"

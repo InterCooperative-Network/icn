@@ -1,0 +1,15 @@
+# ICN Beta Node Configuration
+# This is node 2 of 2 in the local two-node demo.
+# Use with: icnd --config config/icn-beta.toml
+
+data_dir = "/tmp/icn-beta"
+
+[network]
+listen_addr = "0.0.0.0:4434"
+mdns_enabled = true
+bootstrap_peers = []
+
+[observability]
+metrics_port = 9091
+health_port = 8081
+log_level = "info"

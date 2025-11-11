@@ -35,7 +35,7 @@ cargo build --release
 
 The daemon will:
 1. Load identity from `~/.icn/keystore.age`
-2. Start QUIC listener on `0.0.0.0:5000` (default)
+2. Start QUIC listener on `0.0.0.0:4433` (default)
 3. Enable mDNS discovery on LAN
 4. Expose Prometheus metrics on `:9090/metrics`
 
@@ -96,7 +96,7 @@ COPY --from=builder /app/target/release/icnctl /usr/local/bin/
 VOLUME ["/data"]
 ENV ICN_DATA_DIR=/data
 
-EXPOSE 5000/udp 9090/tcp
+EXPOSE 4433/udp 9090/tcp
 ENTRYPOINT ["icnd"]
 ```
 
@@ -106,7 +106,7 @@ docker build -t icnd:latest .
 docker run -d \
   --name icnd \
   -v icn-data:/data \
-  -p 5000:5000/udp \
+  -p 4433:4433/udp \
   -p 9090:9090 \
   icnd:latest
 ```
@@ -120,20 +120,26 @@ docker run -d \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ICN_DATA_DIR` | `~/.icn` | Data directory (keystore, ledger, state) |
-| `ICN_LISTEN_ADDR` | `0.0.0.0:5000` | QUIC listener address |
+| `ICN_LISTEN_ADDR` | `0.0.0.0:4433` | QUIC listener address |
 | `ICN_METRICS_PORT` | `9090` | Prometheus metrics port |
 | `ICN_LOG_LEVEL` | `info` | Log level (trace, debug, info, warn, error) |
 
-### Configuration File (Future)
+### Configuration File
 
-Currently, ICN uses environment variables and CLI flags. A TOML config file is planned:
+ICN supports TOML configuration files. See [../config/](../config/) for examples:
 
 ```toml
-# /etc/icn/config.toml (future)
+# ~/.icn/icn.toml
+data_dir = "/home/user/.icn"
+
 [network]
-listen_addr = "0.0.0.0:5000"
-max_peers = 500
-enable_mdns = true
+listen_addr = "0.0.0.0:4433"
+mdns_enabled = true
+bootstrap_peers = []
+
+[observability]
+metrics_port = 9090
+log_level = "info"
 
 [security]
 rate_limit_msg_per_sec = 100
@@ -155,7 +161,7 @@ data_dir = "/var/lib/icn"
 icnd --help
 
 # Common flags:
-icnd --listen 0.0.0.0:5000
+icnd --config /etc/icn/icn.toml
 icnd --data-dir /var/lib/icn
 icnd --log-level debug
 ```
@@ -224,22 +230,25 @@ sudo journalctl -u icnd -f
 
 ### Docker Compose
 
+See [../docker/](../docker/) for complete Docker Compose examples.
+
 ```yaml
-version: '3.8'
+version: '3.9'
 
 services:
   icnd:
-    image: icnd:latest
-    container_name: icnd
+    image: icn:latest
+    container_name: icn-alpha
     restart: unless-stopped
     ports:
-      - "5000:5000/udp"
+      - "4433:4433/udp"
+      - "5050:5050"
       - "9090:9090"
     volumes:
       - icn-data:/data
     environment:
       - ICN_DATA_DIR=/data
-      - ICN_LOG_LEVEL=info
+      - ICN_OBSERVABILITY_LOG_LEVEL=info
     networks:
       - icn-net
 
@@ -448,8 +457,8 @@ Enable: `sudo systemctl enable --now icn-backup.timer`
 **Symptom:** `icnd` exits immediately
 
 **Checklist:**
-1. Identity initialized? Run `icnctl id show`
-2. Port already in use? Check with `sudo lsof -i :5000`
+1. Identity initialized? Run `icnctl id init`
+2. Port already in use? Check with `sudo lsof -i :4433`
 3. Permissions? Ensure data directory is readable/writable
 4. Logs? Check `journalctl -u icnd -n 50`
 
@@ -471,13 +480,13 @@ Error: Permission denied
 
 **Checklist:**
 1. mDNS working? Check with `avahi-browse -a` (Linux) or `dns-sd -B` (macOS)
-2. Firewall blocking? Open UDP 5000
+2. Firewall blocking? Open UDP 4433
 3. Multiple networks? mDNS doesn't cross subnets
 4. Docker network mode? Use `host` mode for mDNS
 
-**Manual peer addition (future):**
+**Manual peer dialing:**
 ```bash
-icnctl peers add 192.168.1.100:5000 did:icn:abc123...
+icnctl network dial did:icn:abc123... 192.168.1.100:4433
 ```
 
 ### High memory usage

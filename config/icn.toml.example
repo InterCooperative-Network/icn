@@ -1,0 +1,133 @@
+# ICN Configuration Example
+# This file demonstrates all available configuration options.
+# Copy to ~/.icn/icn.toml or specify with --config flag.
+
+# ============================================================================
+# Node Configuration
+# ============================================================================
+
+# Data directory for node state, keystore, and databases
+# Default: ~/.icn
+data_dir = "/home/user/.icn"
+
+# ============================================================================
+# Network Configuration
+# ============================================================================
+
+[network]
+
+# QUIC listener address for peer-to-peer connections
+# Format: "IP:PORT" - Port is UDP
+# Default: "0.0.0.0:4433"
+listen_addr = "0.0.0.0:4433"
+
+# Enable mDNS for automatic local network peer discovery
+# Set to false for WAN-only deployments
+# Default: true
+mdns_enabled = true
+
+# Bootstrap peers for initial network connectivity
+# Format: ["icn://did:icn:PEER_DID@IP:PORT"]
+# Default: []
+bootstrap_peers = []
+
+# Example bootstrap configuration (commented out):
+# bootstrap_peers = [
+#     "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@seed1.example.org:4433",
+#     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@seed2.example.org:4433"
+# ]
+
+# ============================================================================
+# Observability Configuration
+# ============================================================================
+
+[observability]
+
+# Prometheus metrics exporter port (HTTP)
+# Metrics exposed at http://0.0.0.0:<port>/metrics
+# Default: 9090
+metrics_port = 9090
+
+# Health check endpoint port (HTTP)
+# Health status at http://0.0.0.0:<port>/health
+# Default: 8080
+health_port = 8080
+
+# Log level for structured logging
+# Options: "trace", "debug", "info", "warn", "error"
+# Default: "info"
+log_level = "info"
+
+# ============================================================================
+# PLANNED FEATURES (Not Yet Implemented)
+# ============================================================================
+# The following sections are shown for completeness but are not yet supported.
+# They will be implemented in future releases.
+
+# [identity]
+# # DID for this node (auto-generated if not specified)
+# did = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+#
+# # Key rotation grace period (seconds)
+# rotation_grace_period = 86400  # 24 hours
+
+# [rpc]
+# # JSON-RPC over HTTP listener address
+# # Default: "0.0.0.0:5050"
+# listen_addr = "0.0.0.0:5050"
+#
+# # Enable TLS for RPC endpoint
+# # Default: false (uses HTTP in development)
+# tls_enabled = false
+
+# [trust]
+# # Trust computation policy
+# # Options: "default", "strict", "permissive"
+# # Default: "default"
+# policy = "default"
+#
+# # Trust score thresholds for access classes
+# [trust.thresholds]
+# isolated = 0.0   # Untrusted
+# known = 0.1      # Basic interaction
+# partner = 0.4    # Trusted collaboration
+# federated = 0.7  # Full cooperation
+
+# [gossip]
+# # Maximum entries per topic (prevents unbounded growth)
+# # Default: 1000
+# max_entries_per_topic = 1000
+#
+# # Compression threshold (bytes)
+# # Entries larger than this are compressed with zstd
+# # Default: 1024 (1KB)
+# compression_threshold = 1024
+#
+# # Anti-entropy digest interval (milliseconds)
+# # Default: 10000 (10 seconds)
+# digest_interval_ms = 10000
+#
+# # Rate limits by trust class (messages per second)
+# [gossip.limits]
+# isolated = 2      # Untrusted peers
+# known = 10        # Basic trust
+# partner = 50      # Trusted partners
+# federated = 100   # Full cooperation
+
+# [ledger]
+# # Quarantine conflicting entries instead of rejecting
+# # Default: true
+# merge_quarantine_on_conflict = true
+#
+# # Maximum journal entries before compaction
+# # Default: 10000
+# max_journal_size = 10000
+
+# [contracts]
+# # Maximum fuel per contract execution
+# # Default: 1000000
+# max_fuel = 1000000
+#
+# # Maximum expression depth (prevents stack overflow)
+# # Default: 50
+# max_expression_depth = 50

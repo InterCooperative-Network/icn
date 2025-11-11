@@ -1,0 +1,16 @@
+# Minimal ICN Configuration
+# Copy to ~/.icn/icn.toml or specify with --config flag.
+# All values shown are defaults and can be omitted.
+
+# Optional: Override default data directory (~/.icn)
+# data_dir = "/custom/path"
+
+[network]
+# All fields optional - shown with defaults
+listen_addr = "0.0.0.0:4433"
+mdns_enabled = true
+
+[observability]
+# All fields optional - shown with defaults
+metrics_port = 9090
+log_level = "info"
