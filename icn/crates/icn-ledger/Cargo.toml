@@ -7,7 +7,13 @@ edition.workspace = true
 icn-identity.workspace = true
 icn-store.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 bytes.workspace = true
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+tempfile = "3.8"
