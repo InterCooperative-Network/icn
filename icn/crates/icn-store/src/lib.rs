@@ -7,6 +7,7 @@ pub trait Store: Send + Sync {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
     fn delete(&self, key: &[u8]) -> Result<()>;
+    fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 }
 
 /// Sled-based storage implementation
@@ -39,5 +40,16 @@ impl Store for SledStore {
     fn delete(&self, key: &[u8]) -> Result<()> {
         self.db.remove(key)?;
         Ok(())
+    }
+
+    fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let mut results = Vec::new();
+
+        for item in self.db.scan_prefix(prefix) {
+            let (k, v) = item?;
+            results.push((k.to_vec(), v.to_vec()));
+        }
+
+        Ok(results)
     }
 }

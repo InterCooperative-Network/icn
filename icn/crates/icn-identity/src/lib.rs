@@ -1,10 +1,14 @@
 //! ICN Identity - DID management, key generation, and cryptographic operations
 
+pub mod keystore;
+
 use anyhow::Result;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
+
+pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 
 /// A decentralized identifier for an ICN node
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -52,6 +56,24 @@ impl KeyPair {
         })
     }
 
+    /// Reconstruct a keypair from raw bytes
+    pub fn from_bytes(secret_bytes: &[u8; 32], public_bytes: &[u8; 32]) -> Result<Self> {
+        let verifying_key = VerifyingKey::from_bytes(public_bytes)?;
+        let did = Did::from_public_key(&verifying_key);
+
+        // Verify the keys match
+        let signing_key = SigningKey::from_bytes(secret_bytes);
+        if signing_key.verifying_key() != verifying_key {
+            anyhow::bail!("Public key does not match secret key");
+        }
+
+        Ok(KeyPair {
+            secret_bytes: Zeroizing::new(*secret_bytes),
+            verifying_key,
+            did,
+        })
+    }
+
     /// Get the DID for this key pair
     pub fn did(&self) -> &Did {
         &self.did
@@ -60,6 +82,11 @@ impl KeyPair {
     /// Get the verifying (public) key
     pub fn verifying_key(&self) -> &VerifyingKey {
         &self.verifying_key
+    }
+
+    /// Get access to secret bytes (for serialization only)
+    pub(crate) fn secret_bytes(&self) -> &[u8; 32] {
+        &self.secret_bytes
     }
 
     /// Sign a message
