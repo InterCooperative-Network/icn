@@ -1,8 +1,9 @@
 //! Supervisor for managing actors
 
 use anyhow::Result;
+use icn_identity::KeyPair;
 use tokio::select;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -10,14 +11,16 @@ use crate::runtime::ShutdownTx;
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {
     config: Config,
+    keypair: Option<KeyPair>,
     shutdown_tx: ShutdownTx,
 }
 
 impl Supervisor {
     /// Create a new supervisor
-    pub fn new(config: Config, shutdown_tx: ShutdownTx) -> Self {
+    pub fn new(config: Config, keypair: Option<KeyPair>, shutdown_tx: ShutdownTx) -> Self {
         Supervisor {
             config,
+            keypair,
             shutdown_tx,
         }
     }
@@ -28,42 +31,34 @@ impl Supervisor {
 
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
-        // Spawn actors
-        // TODO: Identity actor
-        //   Challenge: Keystore requires passphrase to unlock
-        //   Options:
-        //     1. Prompt for passphrase on daemon startup (secure, but UX friction)
-        //     2. Load identity via API after daemon starts (deferred unlock)
-        //     3. Use system keyring for passphrase storage (OS-dependent)
-        //   For now: Use icnctl for identity operations (not in-daemon)
-        //
-        // Example code once passphrase strategy is resolved:
-        //   let keypair = load_and_unlock_keystore(&self.config.keystore_path(), passphrase)?;
-        //   let identity_handle = IdentityActor::spawn(
-        //       self.config.keystore_path(),
-        //       self.config.store_path(),
-        //       keypair,
-        //       self.shutdown_tx.clone()
-        //   )?;
+        // Spawn actors (requires keypair from unlocked keystore)
+        let network_handle = if let Some(keypair) = &self.keypair {
+            info!("Keypair available - spawning actors");
 
-        // TODO: Network actor (depends on passphrase unlock)
-        //   Challenge: NetworkActor requires keypair for TLS certificate generation
-        //   Same passphrase challenge as IdentityActor above
-        //
-        // Example code once passphrase strategy is resolved:
-        //   use icn_net::NetworkActor;
-        //   let listen_addr: std::net::SocketAddr = self.config.network.listen_addr.parse()?;
-        //   let network_handle = NetworkActor::spawn(
-        //       &keypair,
-        //       listen_addr,
-        //       self.shutdown_tx.clone()
-        //   ).await?;
-        //
-        // Note: NetworkActor coordinates both mDNS discovery and QUIC session management
-        //       Once spawned, use network_handle for:
-        //         - network_handle.get_peers() - list discovered peers
-        //         - network_handle.dial(addr, did) - connect to specific peer
-        //         - network_handle.get_stats() - network statistics
+            // TODO: Spawn Identity actor
+            // let identity_handle = IdentityActor::spawn(
+            //     self.config.keystore_path(),
+            //     self.config.store_path(),
+            //     keypair.clone(),
+            //     self.shutdown_tx.clone()
+            // )?;
+
+            // Spawn Network actor
+            let listen_addr: std::net::SocketAddr = self.config.network.listen_addr.parse()?;
+            let network_handle = icn_net::NetworkActor::spawn(
+                keypair,
+                listen_addr,
+                self.shutdown_tx.clone(),
+            )
+            .await?;
+
+            info!("Network actor spawned on {}", listen_addr);
+            Some(network_handle)
+        } else {
+            warn!("No keypair available - actors not spawned");
+            warn!("Run 'icnctl id init' to create an identity");
+            None
+        };
 
         // TODO: Spawn other actors (gossip, replication, etc.)
 
@@ -81,7 +76,13 @@ impl Supervisor {
         // Graceful shutdown of actors
         info!("Supervisor shutting down actors");
 
-        // TODO: Wait for actors to complete
+        // Network actor will shut down gracefully via the shutdown signal
+        // The actor's run loop listens for shutdown_rx and cleans up properly
+        if network_handle.is_some() {
+            info!("Network actor will shut down via shutdown signal");
+        }
+
+        // TODO: Wait for other actors to complete
 
         info!("Supervisor stopped");
         Ok(())

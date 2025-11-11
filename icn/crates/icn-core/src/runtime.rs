@@ -1,6 +1,7 @@
 //! Tokio-based actor runtime
 
 use anyhow::Result;
+use icn_identity::KeyPair;
 use tokio::sync::broadcast;
 use tracing::info;
 
@@ -13,16 +14,18 @@ pub type ShutdownRx = broadcast::Receiver<()>;
 /// ICNd runtime handle
 pub struct Runtime {
     config: Config,
+    keypair: Option<KeyPair>,
     shutdown_tx: ShutdownTx,
 }
 
 impl Runtime {
-    /// Create a new runtime with the given configuration
-    pub fn new(config: Config) -> Self {
+    /// Create a new runtime with the given configuration and optional keypair
+    pub fn new(config: Config, keypair: Option<KeyPair>) -> Self {
         let (shutdown_tx, _) = broadcast::channel(1);
 
         Runtime {
             config,
+            keypair,
             shutdown_tx,
         }
     }
@@ -42,7 +45,11 @@ impl Runtime {
         info!("ICNd runtime starting");
 
         // Create supervisor
-        let supervisor = crate::supervisor::Supervisor::new(self.config.clone(), self.shutdown_tx.clone());
+        let supervisor = crate::supervisor::Supervisor::new(
+            self.config.clone(),
+            self.keypair,
+            self.shutdown_tx.clone(),
+        );
 
         // Run supervisor
         supervisor.run().await?;

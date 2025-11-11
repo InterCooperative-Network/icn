@@ -12,6 +12,8 @@ tokio.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
 clap.workspace = true
+rpassword = "7.3"
+rustls.workspace = true
 
 # ICN crates
 icn-core.workspace = true

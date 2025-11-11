@@ -41,6 +41,16 @@ pub struct KeyPair {
     did: Did,
 }
 
+impl Clone for KeyPair {
+    fn clone(&self) -> Self {
+        KeyPair {
+            secret_bytes: Zeroizing::new(*self.secret_bytes),
+            verifying_key: self.verifying_key,
+            did: self.did.clone(),
+        }
+    }
+}
+
 impl KeyPair {
     /// Generate a new random key pair
     pub fn generate() -> Result<Self> {
