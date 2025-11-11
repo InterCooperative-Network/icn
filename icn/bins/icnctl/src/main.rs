@@ -812,23 +812,15 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
         }
 
         QuarantineCommands::Release { entry_id } => {
-            let result = client
+            // Note: This returns an error if reappend fails, as the intent of "release"
+            // is to retry the entry. Standard error handling will display the error message.
+            client
                 .quarantine_release(entry_id.clone())
                 .await
                 .context("Failed to release entry from daemon. Is icnd running?")?;
 
-            println!("Released entry: {}", entry_id);
-
-            if let Some(reappended) = result.get("reappended").and_then(|v| v.as_bool()) {
-                if reappended {
-                    println!("✓ Successfully reappended to ledger");
-                } else {
-                    println!("✗ Released but failed to reappend");
-                    if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
-                        println!("  Error: {}", error);
-                    }
-                }
-            }
+            println!("✓ Released entry: {}", entry_id);
+            println!("✓ Successfully reappended to ledger");
         }
 
         QuarantineCommands::Drop { entry_id } => {

@@ -791,8 +791,8 @@ async fn handle_quarantine_release(
     match ledger.quarantine_mut().release(&entry_id) {
         Ok(Some(entry)) => {
             // Try to append the released entry back to the ledger
-            // Note: Release is the primary operation; reappend is a convenience.
-            // Return success even if reappend fails, with details about what happened.
+            // The intent of "release" is to retry the entry, so if reappend fails,
+            // the operation has not fully succeeded and should return an error.
             match ledger.append_entry(entry) {
                 Ok(_) => RpcResponse::success(
                     id,
@@ -802,14 +802,10 @@ async fn handle_quarantine_release(
                         "entry_id": entry_id.to_hex()
                     }),
                 ),
-                Err(e) => RpcResponse::success(
+                Err(e) => RpcResponse::error(
                     id,
-                    serde_json::json!({
-                        "released": true,
-                        "reappended": false,
-                        "error": format!("{}", e),
-                        "entry_id": entry_id.to_hex()
-                    }),
+                    -32000,
+                    format!("Entry released from quarantine but reappend failed: {}", e),
                 ),
             }
         }
