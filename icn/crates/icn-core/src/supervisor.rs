@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use icn_identity::KeyPair;
+use icn_rpc::RpcServer;
 use tokio::select;
 use tracing::{info, warn};
 
@@ -53,6 +54,20 @@ impl Supervisor {
             .await?;
 
             info!("Network actor spawned on {}", listen_addr);
+
+            // Spawn RPC server with network handle
+            let rpc_addr = "127.0.0.1:5050".parse()?;
+            let mut rpc_server = RpcServer::new(rpc_addr);
+            rpc_server.set_network_handle(network_handle.clone());
+
+            tokio::spawn(async move {
+                if let Err(e) = rpc_server.run().await {
+                    warn!("RPC server error: {}", e);
+                }
+            });
+
+            info!("RPC server spawned on {}", rpc_addr);
+
             Some(network_handle)
         } else {
             warn!("No keypair available - actors not spawned");

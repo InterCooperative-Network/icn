@@ -13,6 +13,7 @@ tracing.workspace = true
 hyper.workspace = true
 hyper-util = "0.1"
 http-body-util = "0.1"
+reqwest = { version = "0.12", features = ["json"] }
 
 # ICN crates
 icn-identity.workspace = true

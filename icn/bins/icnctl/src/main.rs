@@ -397,64 +397,67 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn handle_network_command(cmd: NetworkCommands) -> Result<()> {
-    // Network commands require daemon RPC communication
-    // TODO: Implement RPC client in icn-rpc crate
-    //
-    // For now, these are documented stubs that show the intended API
+#[tokio::main]
+async fn handle_network_command(cmd: NetworkCommands) -> Result<()> {
+    // Network commands communicate with daemon via RPC
+    let rpc_addr = "127.0.0.1:5050".parse()?;
+    let mut client = icn_rpc::RpcClient::new(rpc_addr);
 
     match cmd {
         NetworkCommands::Peers => {
-            println!("Network: Discovered Peers");
-            println!("Status: Not implemented - requires daemon RPC\n");
-            println!("This command will list all peers discovered via mDNS.");
-            println!("When implemented, it will call: NetworkHandle::get_peers()");
-            println!("\nExample output:");
-            println!("  DID                                           Address            Version");
-            println!("  did:icn:z6Mk...                                192.168.1.100:4433 0.1.0");
-            println!("  did:icn:z6Mk...                                192.168.1.101:4433 0.1.0");
-            println!("\n→ Start the daemon with: icnd");
-            println!("→ Ensure mDNS is enabled in config");
+            let peers = client
+                .get_peers()
+                .await
+                .context("Failed to get peers from daemon. Is icnd running?")?;
+
+            if peers.is_empty() {
+                println!("No peers discovered yet.");
+                println!("\nTip: Ensure other ICN nodes are running on the network.");
+            } else {
+                println!("Discovered Peers:\n");
+                println!("{:<50} {:<22} {}", "DID", "Address", "Version");
+                println!("{}", "-".repeat(80));
+                for peer in peers {
+                    println!("{:<50} {:<22} {}", peer.did, peer.addr, peer.version);
+                }
+            }
         }
 
         NetworkCommands::Dial { did, addr } => {
-            println!("Network: Dial Peer");
-            println!("Status: Not implemented - requires daemon RPC\n");
+            let addr_str = addr.unwrap_or_else(|| "auto-discover".to_string());
+            println!("Dialing peer...");
             println!("  Target DID: {}", did);
-            if let Some(a) = addr {
-                println!("  Address: {}", a);
-            } else {
-                println!("  Address: Will be discovered via mDNS");
-            }
-            println!("\nThis command will establish a QUIC connection to the peer.");
-            println!("When implemented, it will call: NetworkHandle::dial(addr, did)");
-            println!("\n→ Start the daemon with: icnd");
+            println!("  Address: {}\n", addr_str);
+
+            client
+                .dial(did.clone(), addr_str)
+                .await
+                .context("Failed to dial peer. Is icnd running?")?;
+
+            println!("✓ Successfully established connection to {}", did);
         }
 
         NetworkCommands::Stats => {
-            println!("Network: Statistics");
-            println!("Status: Not implemented - requires daemon RPC\n");
-            println!("This command will show network statistics:");
-            println!("  - Peers discovered (via mDNS)");
-            println!("  - Active QUIC connections");
-            println!("  - Total connections established");
-            println!("\nWhen implemented, it will call: NetworkHandle::get_stats()");
-            println!("\nExample output:");
-            println!("  Peers discovered:     5");
-            println!("  Active connections:   3");
-            println!("  Total connections:    42");
-            println!("\n→ Start the daemon with: icnd");
+            let stats = client
+                .get_stats()
+                .await
+                .context("Failed to get network stats from daemon. Is icnd running?")?;
+
+            println!("Network Statistics:\n");
+            println!("  Peers discovered:      {}", stats.peers_discovered);
+            println!("  Active connections:    {}", stats.connections_active);
+            println!("  Total connections:     {}", stats.connections_total);
         }
 
         NetworkCommands::Status => {
-            println!("Network: Actor Status");
-            println!("Status: Not implemented - requires daemon RPC\n");
-            println!("This command will show the NetworkActor status:");
-            println!("  - Is NetworkActor running?");
-            println!("  - mDNS discovery status");
-            println!("  - QUIC listener address");
-            println!("  - Recent errors/warnings");
-            println!("\n→ Start the daemon with: icnd");
+            let status = client
+                .get_status()
+                .await
+                .context("Failed to get network status from daemon. Is icnd running?")?;
+
+            println!("Network Actor Status:\n");
+            println!("  Running:               {}", status.running);
+            println!("  Listener address:      {}", status.listen_addr);
         }
     }
 
