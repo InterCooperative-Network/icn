@@ -837,6 +837,80 @@ impl GossipActor {
         icn_obs::metrics::gossip::subscriptions_total_set(total_subscriptions as u64);
     }
 
+    /// Emit a Digest message for a topic to all peers
+    ///
+    /// This broadcasts our current state (vector clock + bloom filter) to help peers
+    /// discover what entries we have. Peers can then send PullRequests for entries
+    /// they're missing.
+    pub fn emit_digest(&mut self, topic: &str) -> Result<()> {
+        // Check if topic exists
+        if !self.topics.contains_key(topic) {
+            debug!("Skipping digest for non-existent topic: {}", topic);
+            return Ok(());
+        }
+
+        // Get entry count for adaptive bloom sizing
+        let entry_count = self
+            .entries
+            .get(topic)
+            .map(|e| e.len())
+            .unwrap_or(0);
+
+        if entry_count == 0 {
+            debug!("Skipping digest for empty topic: {}", topic);
+            return Ok(());
+        }
+
+        // Build adaptive bloom filter
+        let bloom = BloomFilter::new_adaptive(entry_count);
+        let mut bloom_with_entries = bloom;
+
+        // Add all entry hashes to bloom filter
+        if let Some(entries) = self.entries.get(topic) {
+            for hash in entries.keys() {
+                bloom_with_entries.insert(hash);
+            }
+        }
+
+        // Convert to BloomFilterData for transmission
+        let bloom_data = bloom_with_entries.to_data();
+
+        // Generate nonce for this digest (using own DID as peer state key)
+        let nonce = self.peer_sync.get_or_create(self.own_did.clone()).next_nonce();
+
+        // Create Digest message
+        let digest = GossipMessage::Digest {
+            topic: topic.to_string(),
+            vector: self.clock.clone(),
+            bloom: bloom_data,
+            hint_count: entry_count as u32,
+            nonce,
+        };
+
+        // Broadcast to all peers (None = broadcast)
+        debug!("Emitting digest for topic {}: {} entries, nonce={}", topic, entry_count, nonce);
+        self.send_message(None, digest);
+
+        // Track metrics
+        icn_obs::metrics::gossip::digests_sent_inc();
+
+        Ok(())
+    }
+
+    /// Emit digests for all topics
+    ///
+    /// This is typically called periodically by a background task to broadcast
+    /// our current state to all peers.
+    pub fn emit_all_digests(&mut self) -> Result<()> {
+        let topics: Vec<String> = self.topics.keys().cloned().collect();
+
+        for topic in topics {
+            self.emit_digest(&topic)?;
+        }
+
+        Ok(())
+    }
+
     /// Hash data to create content hash
     fn hash_data(data: &[u8]) -> ContentHash {
         use sha2::{Digest, Sha256};
@@ -861,6 +935,57 @@ impl GossipActor {
         let actor = GossipActor::new(own_did, trust_lookup);
         Arc::new(RwLock::new(actor))
     }
+}
+
+/// Start periodic digest emission background task
+///
+/// This spawns a tokio task that periodically broadcasts Digest messages
+/// for all topics. The interval is configurable with jitter to prevent
+/// thundering herd issues.
+///
+/// # Parameters
+/// - `gossip_handle`: Shared handle to the gossip actor
+/// - `interval_ms`: Base interval between digest broadcasts (e.g., 10000 for 10 seconds)
+/// - `jitter_ms`: Maximum random jitter to add (e.g., 2000 for ±2 seconds)
+/// - `shutdown`: Receiver for graceful shutdown signal
+///
+/// # Returns
+/// JoinHandle for the background task
+pub fn start_digest_emitter(
+    gossip_handle: GossipHandle,
+    interval_ms: u64,
+    jitter_ms: u64,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("Starting periodic digest emitter: interval={}ms, jitter=±{}ms", interval_ms, jitter_ms);
+
+        loop {
+            // Calculate next interval with jitter (thread_rng is recreated each iteration to avoid Send issues)
+            let jitter = if jitter_ms > 0 {
+                use rand::Rng;
+                rand::thread_rng().gen_range(0..jitter_ms)
+            } else {
+                0
+            };
+            let sleep_duration = tokio::time::Duration::from_millis(interval_ms + jitter);
+
+            // Wait for either timeout or shutdown
+            tokio::select! {
+                _ = tokio::time::sleep(sleep_duration) => {
+                    // Time to emit digests
+                    let mut gossip = gossip_handle.write().await;
+                    if let Err(e) = gossip.emit_all_digests() {
+                        warn!("Failed to emit digests: {}", e);
+                    }
+                }
+                _ = shutdown.recv() => {
+                    info!("Digest emitter shutting down");
+                    break;
+                }
+            }
+        }
+    })
 }
 
 #[cfg(test)]

@@ -35,7 +35,9 @@ pub mod types;
 pub mod vector_clock;
 
 pub use bloom::BloomFilter;
-pub use gossip::{EntryNotificationCallback, GossipActor, GossipHandle, SendMessageCallback};
+pub use gossip::{
+    start_digest_emitter, EntryNotificationCallback, GossipActor, GossipHandle, SendMessageCallback,
+};
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
     AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic,
