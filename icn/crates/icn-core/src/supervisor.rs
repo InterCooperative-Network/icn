@@ -46,7 +46,26 @@ impl Supervisor {
         //       self.shutdown_tx.clone()
         //   )?;
 
-        // TODO: Spawn other actors (discovery, session, gossip, etc.)
+        // TODO: Network actor (depends on passphrase unlock)
+        //   Challenge: NetworkActor requires keypair for TLS certificate generation
+        //   Same passphrase challenge as IdentityActor above
+        //
+        // Example code once passphrase strategy is resolved:
+        //   use icn_net::NetworkActor;
+        //   let listen_addr: std::net::SocketAddr = self.config.network.listen_addr.parse()?;
+        //   let network_handle = NetworkActor::spawn(
+        //       &keypair,
+        //       listen_addr,
+        //       self.shutdown_tx.clone()
+        //   ).await?;
+        //
+        // Note: NetworkActor coordinates both mDNS discovery and QUIC session management
+        //       Once spawned, use network_handle for:
+        //         - network_handle.get_peers() - list discovered peers
+        //         - network_handle.dial(addr, did) - connect to specific peer
+        //         - network_handle.get_stats() - network statistics
+
+        // TODO: Spawn other actors (gossip, replication, etc.)
 
         // Wait for shutdown signal
         select! {

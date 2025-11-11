@@ -19,3 +19,4 @@ ed25519-dalek.workspace = true
 icn-identity.workspace = true
 icn-store.workspace = true
 icn-trust.workspace = true
+icn-net.workspace = true

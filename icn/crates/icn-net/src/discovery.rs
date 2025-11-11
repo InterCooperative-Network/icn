@@ -40,6 +40,7 @@ pub struct Discovery {
 
     /// Shutdown channel
     shutdown_tx: mpsc::Sender<()>,
+    #[allow(dead_code)]
     shutdown_rx: mpsc::Receiver<()>,
 }
 

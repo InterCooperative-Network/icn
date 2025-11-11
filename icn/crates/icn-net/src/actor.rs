@@ -8,11 +8,10 @@
 
 use anyhow::{Context, Result};
 use icn_identity::{Did, KeyPair};
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::{Discovery, PeerInfo, SessionManager};
 
