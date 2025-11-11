@@ -269,6 +269,9 @@ impl NetworkActor {
                         tokio::spawn(async move {
                             stats.write().await.connections_total += 1;
                         });
+
+                        // Track metrics
+                        icn_obs::metrics::network::connections_total_inc();
                     });
 
                 let _ = response.send(result);
@@ -300,6 +303,10 @@ impl NetworkActor {
                     connections_total: total,
                 };
 
+                // Update gauge metrics
+                icn_obs::metrics::network::peers_discovered_set(stats.peers_discovered as u64);
+                icn_obs::metrics::network::connections_active_set(stats.connections_active as u64);
+
                 let _ = tx.send(stats);
             }
         }
@@ -327,6 +334,9 @@ impl NetworkActor {
 
         send.finish().context("Failed to finish stream")?;
 
+        // Track metrics
+        icn_obs::metrics::network::messages_sent_inc();
+
         Ok(())
     }
 
@@ -335,13 +345,20 @@ impl NetworkActor {
         let connections = self.session_manager.read().await.connections().await;
 
         // Send to all connected peers
+        let mut sent_count = 0;
         for (_did, connection) in connections {
             // Open a new stream and send the message
             if let Ok((mut send, _recv)) = connection.open_bi().await {
                 if write_message(&mut send, &message).await.is_ok() {
                     let _ = send.finish();
+                    sent_count += 1;
                 }
             }
+        }
+
+        // Track metrics (one increment per successful send)
+        for _ in 0..sent_count {
+            icn_obs::metrics::network::messages_sent_inc();
         }
 
         Ok(())
@@ -418,6 +435,10 @@ impl NetworkActor {
                     match read_message(&mut recv).await {
                         Ok(message) => {
                             info!("Received message from {}", message.from);
+
+                            // Track metrics
+                            icn_obs::metrics::network::messages_received_inc();
+
                             // Call the handler
                             handler(message);
                         }

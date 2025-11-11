@@ -169,6 +169,7 @@ impl Supervisor {
 
             // Spawn metrics update task
             let start_time = std::time::Instant::now();
+            let network_handle_metrics = network_handle.clone();
             let mut metrics_shutdown = self.shutdown_tx.subscribe();
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
@@ -181,6 +182,9 @@ impl Supervisor {
 
                             // Count active actors (network + gossip + ledger + rpc + anti-entropy = 5)
                             icn_obs::metrics::system::actors_active_set(5);
+
+                            // Update network stats (this also updates metrics via GetStats handler)
+                            let _ = network_handle_metrics.get_stats().await;
                         }
                         _ = metrics_shutdown.recv() => {
                             break;
