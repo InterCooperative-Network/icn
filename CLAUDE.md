@@ -129,6 +129,21 @@ This pattern is used throughout integration tests (see `icn/crates/icn-core/test
 - Pull requests: Request missing content by hash
 - Anti-entropy: Periodic Bloom filter exchange
 - Vector clocks: Track causal dependencies per peer
+- **Subscription notifications**: Reactive callbacks when new entries arrive in subscribed topics
+
+**Subscription Notifications**:
+Subscribers can register a callback to be notified when new entries are published to topics:
+```rust
+let notification_callback: EntryNotificationCallback = Arc::new(|topic, entry, subscriber_did| {
+    println!("New entry in {}: {:?} for {}", topic, entry.hash, subscriber_did);
+    // Process the entry...
+});
+gossip.set_notification_callback(notification_callback);
+
+// Subscribe to topic - will receive notifications for new entries
+gossip.subscribe("ledger:sync", my_did)?;
+```
+Each subscriber receives individual notifications. This enables reactive patterns like UI updates, event-driven workflows, and real-time collaboration.
 
 **Ledger Sync** (`icn-ledger/src/sync.rs`):
 - Publishes entries to topic `ledger:sync`
@@ -205,11 +220,21 @@ icnctl id import backup.age
 **Phase 7 - Polish & Production (Complete ✓)**:
 - [x] Metrics exporter (Prometheus)
 - [x] Complete pull protocol (Request/Response)
-- [x] Topic subscriptions & routing
-- [x] Production hardening (3 critical + 4 high priority issues fixed)
-- [x] Comprehensive documentation
+- [x] Topic subscriptions & routing with notification callbacks
+- [x] Production hardening (1 critical security + 7 robustness fixes)
+- [x] Comprehensive test coverage (120+ tests)
 
-**Production Hardening Completed (2025-01-11)**:
+**Production Hardening Completed (Latest Session - 2025-01-11)**:
+1. **Network timeouts** - Added 30s dial, 10s send, 5s broadcast timeouts
+2. **DID validation** - Comprehensive validation prevents panic on malformed DIDs
+3. **Bounded growth** - Topic entry limits (default 1000) prevent memory exhaustion
+4. **Compression** - zstd compression for entries >1KB reduces bandwidth
+5. **Input sanitization** - Contract validation enforces limits on names, vars, rules, depth
+6. **CRITICAL SECURITY FIX** - Expression depth validation prevents stack overflow bypass
+7. **Ledger semantics** - Fixed inverted debit/credit in mutual credit transfers
+8. **Test reliability** - Fixed timing-dependent test flakiness
+
+**Earlier Production Hardening (2025-01-11)**:
 - Fixed unbounded message allocation DoS
 - Fixed blocking operations in async context
 - Implemented TLS certificate verification (DID extraction + expiration)
@@ -217,8 +242,6 @@ icnctl id import backup.age
 - Added Bloom filter validation (bounds checking)
 - Implemented network message rate limiting (token bucket, 100 msg/sec)
 - Added bounded QUIC stream limits (10 concurrent, 1MB/stream)
-
-See [docs/production-hardening.md](docs/production-hardening.md) for details.
 
 ## Common Development Workflows
 
@@ -235,7 +258,8 @@ See [docs/production-hardening.md](docs/production-hardening.md) for details.
 2. Configure `AccessControl` enum (Public, Private, TrustGated)
 3. Subscribe in relevant actor: `gossip.subscribe(topic, access_control)`
 4. Implement message serialization (use `bincode` or `serde_json`)
-5. Handle incoming messages in gossip actor's message handler
+5. Set up notification callback via `set_notification_callback()` to receive new entries
+6. Handle incoming messages in gossip actor's message handler
 
 **Adding metrics**:
 1. Define metric in `icn-obs/src/metrics/{module}.rs`
