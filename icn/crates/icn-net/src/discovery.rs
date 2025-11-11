@@ -1,7 +1,7 @@
 //! Peer discovery via mDNS and rendezvous
 
 use anyhow::Result;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Discovery service for finding peers
 pub struct Discovery {
