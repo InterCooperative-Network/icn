@@ -1087,4 +1087,111 @@ mod tests {
         let count = notification_count.lock().unwrap();
         assert_eq!(*count, 0, "Should have 0 notifications when there are no subscribers");
     }
+
+    #[test]
+    fn test_response_handler_triggers_notifications() {
+        use std::sync::Mutex;
+        use sha2::{Digest, Sha256};
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let subscriber = KeyPair::generate().unwrap().did().clone();
+        let author = KeyPair::generate().unwrap().did().clone();
+
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Create topic and subscribe
+        gossip.create_topic(Topic::new("test:response".to_string(), AccessControl::Public));
+        gossip.subscribe("test:response", subscriber.clone()).unwrap();
+
+        // Track notifications
+        let notifications = Arc::new(Mutex::new(Vec::new()));
+        let notifications_clone = notifications.clone();
+
+        let callback: EntryNotificationCallback = Arc::new(move |topic, entry, sub_did| {
+            let mut notifs = notifications_clone.lock().unwrap();
+            notifs.push((topic, entry.hash, sub_did));
+        });
+        gossip.set_notification_callback(callback);
+
+        // Create an entry as if it came from the network via Response message
+        let data = b"Entry from network".to_vec();
+        let mut hasher = Sha256::new();
+        hasher.update(&data);
+        let result_bytes = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result_bytes);
+
+        let entry = GossipEntry {
+            hash,
+            author: author.clone(),
+            clock: VectorClock::new(),
+            topic: "test:response".to_string(),
+            data: data.clone(),
+            compressed: false,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        };
+
+        // Simulate receiving a Response message
+        let result = gossip.handle_message(GossipMessage::Response {
+            entry: entry.clone(),
+        });
+        assert!(result.is_ok(), "Response handler should succeed");
+
+        // Verify notification was sent to subscriber
+        let notifs = notifications.lock().unwrap();
+        assert_eq!(notifs.len(), 1, "Should have 1 notification for the subscriber");
+        assert_eq!(notifs[0].0, "test:response");
+        assert_eq!(notifs[0].1, hash);
+        assert_eq!(notifs[0].2, subscriber);
+    }
+
+    #[test]
+    fn test_response_handler_enforces_max_entries() {
+        use sha2::{Digest, Sha256};
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let author = KeyPair::generate().unwrap().did().clone();
+
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Create topic with small limit
+        let topic = Topic::new("test:max-entries".to_string(), AccessControl::Public)
+            .with_max_entries(3);
+        gossip.create_topic(topic);
+
+        // Send 5 entries via Response messages
+        for i in 0..5 {
+            let data = format!("Entry {}", i).into_bytes();
+            let mut hasher = Sha256::new();
+            hasher.update(&data);
+            let result_bytes = hasher.finalize();
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&result_bytes);
+
+            let entry = GossipEntry {
+                hash,
+                author: author.clone(),
+                clock: VectorClock::new(),
+                topic: "test:max-entries".to_string(),
+                data,
+                compressed: false,
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            };
+
+            // Small delay to ensure distinct timestamps
+            std::thread::sleep(std::time::Duration::from_millis(2));
+
+            gossip.handle_message(GossipMessage::Response { entry }).unwrap();
+        }
+
+        // Verify only 3 entries are stored (max_entries enforced)
+        let entries = gossip.get_entries("test:max-entries");
+        assert_eq!(entries.len(), 3, "Should enforce max_entries limit for Response messages");
+    }
 }
