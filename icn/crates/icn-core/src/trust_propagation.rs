@@ -290,9 +290,9 @@ pub async fn handle_trust_attestation_entry(
     // Apply to trust graph
     let mut graph = trust_graph.write().await;
 
-    // Check if we already have this edge - propagate storage errors
-    match graph.get_edge(&edge.source, &edge.target)? {
-        Some(existing) => {
+    // Check if we already have this edge - gracefully degrade if lookup fails
+    match graph.get_edge(&edge.source, &edge.target) {
+        Ok(Some(existing)) => {
             // Use should_supersede to handle clock skew and score tiebreaking
             if !attestation.should_supersede(existing.created_at, existing.score) {
                 debug!(
@@ -317,8 +317,17 @@ pub async fn handle_trust_attestation_entry(
             // Mark as an update rather than new edge
             icn_obs::metrics::trust::attestations_updated_inc();
         }
-        None => {
+        Ok(None) => {
             // This is a new trust edge
+            icn_obs::metrics::trust::attestations_new_inc();
+        }
+        Err(e) => {
+            // Storage error during lookup - log but proceed with adding edge anyway
+            // This ensures attestations are not lost due to transient storage issues
+            warn!(
+                "Failed to lookup existing edge during attestation processing: {}; treating as new edge",
+                e
+            );
             icn_obs::metrics::trust::attestations_new_inc();
         }
     }
