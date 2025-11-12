@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 icn-identity.workspace = true
 icn-store.workspace = true
+icn-obs.workspace = true
 serde.workspace = true
 serde_json = "1.0"
 anyhow.workspace = true

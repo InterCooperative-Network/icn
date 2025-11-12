@@ -183,11 +183,16 @@ impl TrustGraph {
     ///     DirectTrust(own -> target) * 0.7 +
     ///     TransitiveTrust(own -> intermediate -> target) * 0.3
     pub fn compute_trust_score(&mut self, target: &Did) -> Result<f64> {
+        // Record lookup
+        icn_obs::metrics::trust::lookups_inc();
+
         // Check cache first
         if let Some(&score) = self.cache.get(target) {
+            icn_obs::metrics::trust::cache_hits_inc();
             return Ok(score);
         }
 
+        icn_obs::metrics::trust::cache_misses_inc();
         debug!("Computing trust score for {}", target);
 
         // Get direct trust edge
@@ -233,6 +238,9 @@ impl TrustGraph {
 
         // Cache result
         self.cache.insert(target.clone(), final_score);
+
+        // Record score distribution
+        icn_obs::metrics::trust::score_distribution_record(final_score);
 
         Ok(final_score)
     }

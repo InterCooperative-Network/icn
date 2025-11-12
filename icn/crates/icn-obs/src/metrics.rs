@@ -186,6 +186,32 @@ pub fn init_descriptions() {
         "Current number of entries in quarantine"
     );
 
+    // Trust graph metrics
+    describe_gauge!(
+        "icn_trust_edges_total",
+        "Total number of trust edges in the graph"
+    );
+    describe_gauge!(
+        "icn_trust_peers_by_class",
+        "Number of peers by trust class"
+    );
+    describe_counter!(
+        "icn_trust_lookups_total",
+        "Total number of trust score lookups"
+    );
+    describe_counter!(
+        "icn_trust_cache_hits_total",
+        "Total number of trust cache hits"
+    );
+    describe_counter!(
+        "icn_trust_cache_misses_total",
+        "Total number of trust cache misses"
+    );
+    describe_histogram!(
+        "icn_trust_score_distribution",
+        "Distribution of trust scores"
+    );
+
     // System metrics
     describe_gauge!(
         "icn_system_uptime_seconds",
@@ -386,6 +412,35 @@ pub mod ledger {
 
     pub fn quarantine_size_set(size: u64) {
         gauge!("icn_ledger_quarantine_size").set(size as f64);
+    }
+}
+
+/// Trust graph metrics
+pub mod trust {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn edges_total_set(value: u64) {
+        gauge!("icn_trust_edges_total").set(value as f64);
+    }
+
+    pub fn peers_by_class_set(trust_class: &str, count: u64) {
+        gauge!("icn_trust_peers_by_class", "class" => trust_class.to_string()).set(count as f64);
+    }
+
+    pub fn lookups_inc() {
+        counter!("icn_trust_lookups_total").increment(1);
+    }
+
+    pub fn cache_hits_inc() {
+        counter!("icn_trust_cache_hits_total").increment(1);
+    }
+
+    pub fn cache_misses_inc() {
+        counter!("icn_trust_cache_misses_total").increment(1);
+    }
+
+    pub fn score_distribution_record(score: f64) {
+        histogram!("icn_trust_score_distribution").record(score);
     }
 }
 
