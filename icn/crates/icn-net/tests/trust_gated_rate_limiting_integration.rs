@@ -109,6 +109,7 @@ async fn test_configuration_support() -> Result<()> {
 
     // Test custom configuration
     let custom_config = TrustGatedRateLimitConfig {
+        min_trust_threshold: 0.0, // Allow all authenticated DIDs for rate limiting
         isolated: icn_net::RateLimitConfig {
             max_messages_per_second: 5,
             burst_capacity: 1,

@@ -165,6 +165,12 @@ pub struct Topic {
     /// Access control for this topic
     pub acl: AccessControl,
 
+    /// Minimum trust score required for subscription (0.0 - 1.0)
+    /// When set, overrides coarse-grained AccessControl with fine-grained trust score check
+    /// Requires GossipActor to have trust_graph configured
+    /// Examples: 0.1 (Known+), 0.4 (Partner+), 0.7 (Federated)
+    pub min_trust_threshold: Option<f64>,
+
     /// How long to retain entries
     pub retention: Duration,
 
@@ -178,6 +184,7 @@ impl Topic {
         Topic {
             name,
             acl,
+            min_trust_threshold: None,                  // No fine-grained threshold by default
             retention: Duration::from_secs(86400 * 30), // 30 days default
             max_entries: 10000,                         // Default limit
         }
@@ -192,6 +199,14 @@ impl Topic {
     /// Set max entries
     pub fn with_max_entries(mut self, max: usize) -> Self {
         self.max_entries = max;
+        self
+    }
+
+    /// Set minimum trust score threshold for subscription
+    /// This enables fine-grained trust-based access control
+    /// Requires GossipActor to be configured with trust_graph
+    pub fn with_min_trust_threshold(mut self, threshold: f64) -> Self {
+        self.min_trust_threshold = Some(threshold);
         self
     }
 

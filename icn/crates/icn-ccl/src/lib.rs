@@ -40,14 +40,18 @@
 //!     );
 //! ```
 
+pub mod actor;
 pub mod ast;
 pub mod interpreter;
+pub mod messages;
 pub mod runtime;
 pub mod types;
 
 // Re-export commonly used types
+pub use actor::ContractActor;
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
 pub use interpreter::Interpreter;
+pub use messages::{ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse};
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{
     Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult,

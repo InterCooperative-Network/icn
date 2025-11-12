@@ -50,6 +50,10 @@ pub struct ContractInstallation {
 
     /// When the contract was installed
     pub installed_at: u64,
+
+    /// Minimum trust score required for non-participants to invoke this contract
+    /// If None, only participants can invoke
+    pub min_caller_trust: Option<f64>,
 }
 
 /// Contract state (key-value store per contract)

@@ -18,6 +18,9 @@ pub struct ContractRuntime {
     /// Installed contracts (code_hash -> Contract)
     contracts: HashMap<ContentHash, Contract>,
 
+    /// Contract installations (code_hash -> Installation metadata)
+    installations: HashMap<ContentHash, crate::types::ContractInstallation>,
+
     /// Contract states (code_hash -> State)
     states: HashMap<ContentHash, ContractState>,
 }
@@ -28,15 +31,17 @@ impl ContractRuntime {
         ContractRuntime {
             ledger,
             contracts: HashMap::new(),
+            installations: HashMap::new(),
             states: HashMap::new(),
         }
     }
 
-    /// Install a contract
-    pub fn install_contract(
+    /// Install a contract with installation metadata
+    pub fn install_contract_with_metadata(
         &mut self,
         code_hash: ContentHash,
         contract: Contract,
+        installation: crate::types::ContractInstallation,
     ) -> Result<()> {
         info!("Installing contract: {} ({})", contract.name, code_hash);
 
@@ -50,9 +55,45 @@ impl ContractRuntime {
         }
 
         self.contracts.insert(code_hash.clone(), contract);
+        self.installations.insert(code_hash.clone(), installation);
         self.states.insert(code_hash, state);
 
         Ok(())
+    }
+
+    /// Install a contract (deprecated - use install_contract_with_metadata)
+    pub fn install_contract(
+        &mut self,
+        code_hash: ContentHash,
+        contract: Contract,
+    ) -> Result<()> {
+        // Create a basic installation for backward compatibility
+        let installation = crate::types::ContractInstallation {
+            code_hash: code_hash.clone(),
+            installed_by: contract.participants.first().cloned().unwrap_or_else(|| {
+                // Fallback to a dummy DID
+                use icn_identity::KeyPair;
+                KeyPair::generate().unwrap().did().clone()
+            }),
+            capabilities: vec![
+                // Grant all capabilities for backward compatibility
+                crate::types::Capability::WriteLedger {
+                    accounts: contract.participants.clone(),
+                },
+                crate::types::Capability::ReadLedger {
+                    accounts: contract.participants.clone(),
+                },
+            ],
+            participants: contract.participants.clone(),
+            signatures: vec![],
+            installed_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            min_caller_trust: None,
+        };
+
+        self.install_contract_with_metadata(code_hash, contract, installation)
     }
 
     /// Execute a contract rule
@@ -152,6 +193,11 @@ impl ContractRuntime {
     /// Get installed contract
     pub fn get_contract(&self, code_hash: &ContentHash) -> Option<&Contract> {
         self.contracts.get(code_hash)
+    }
+
+    /// Get contract installation metadata
+    pub fn get_installation(&self, code_hash: &ContentHash) -> Option<&crate::types::ContractInstallation> {
+        self.installations.get(code_hash)
     }
 
     /// List all installed contracts with metadata

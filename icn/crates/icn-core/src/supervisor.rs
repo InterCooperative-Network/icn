@@ -107,10 +107,14 @@ impl Supervisor {
                 })
             });
 
-            // Spawn Gossip actor
-            let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+            // Spawn Gossip actor with trust graph for fine-grained trust-based subscription control
+            let gossip_handle = GossipActor::spawn_with_trust_graph(
+                did.clone(),
+                trust_lookup,
+                Some(trust_graph_handle.clone()),
+            );
 
-            info!("Gossip actor spawned");
+            info!("Gossip actor spawned with trust-gated subscription support");
 
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");

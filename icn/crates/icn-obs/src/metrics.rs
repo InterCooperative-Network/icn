@@ -104,6 +104,10 @@ pub fn init_descriptions() {
         "Total number of active subscriptions across all topics"
     );
     describe_counter!(
+        "icn_gossip_subscriptions_rejected_total",
+        "Total number of subscriptions rejected due to insufficient trust"
+    );
+    describe_counter!(
         "icn_gossip_subscribes_received_total",
         "Total number of Subscribe messages received"
     );
@@ -252,6 +256,52 @@ pub fn init_descriptions() {
         "Total number of existing trust edges updated from attestations"
     );
 
+    // Contract metrics
+    describe_gauge!(
+        "icn_contract_installed_total",
+        "Total number of installed contracts"
+    );
+    describe_counter!(
+        "icn_contract_deployments_total",
+        "Total number of contract deployments initiated"
+    );
+    describe_counter!(
+        "icn_contract_deployments_received_total",
+        "Total number of contract deployments received from network"
+    );
+    describe_counter!(
+        "icn_contract_deployments_rejected_total",
+        "Total number of contract deployments rejected"
+    );
+    describe_counter!(
+        "icn_contract_deployments_rejected_trust_total",
+        "Total number of contract deployments rejected due to insufficient trust"
+    );
+    describe_counter!(
+        "icn_contract_executions_total",
+        "Total number of contract rule executions"
+    );
+    describe_counter!(
+        "icn_contract_executions_failed_total",
+        "Total number of failed contract executions"
+    );
+    describe_counter!(
+        "icn_contract_executions_rejected_unauthorized_total",
+        "Total number of contract executions rejected due to unauthorized caller"
+    );
+    describe_histogram!(
+        "icn_contract_execution_fuel_used",
+        "Distribution of fuel consumed during contract execution"
+    );
+    describe_histogram!(
+        "icn_contract_execution_duration_seconds",
+        "Duration of contract rule executions in seconds"
+    );
+    describe_counter!(
+        "icn_contract_ledger_operations_total",
+        "Total number of ledger operations from contract execution"
+    );
+
     // System metrics
     describe_gauge!(
         "icn_system_uptime_seconds",
@@ -379,6 +429,14 @@ pub mod gossip {
 
     pub fn subscriptions_total_set(value: u64) {
         gauge!("icn_gossip_subscriptions_total").set(value as f64);
+    }
+
+    pub fn subscriptions_rejected_inc(topic: &str, trust_score: f64) {
+        counter!(
+            "icn_gossip_subscriptions_rejected_total",
+            "topic" => topic.to_string(),
+            "trust_score" => format!("{:.2}", trust_score)
+        ).increment(1);
     }
 
     pub fn subscribes_received_inc() {
@@ -534,6 +592,71 @@ pub mod trust {
 
     pub fn attestations_updated_inc() {
         counter!("icn_trust_attestations_updated_total").increment(1);
+    }
+}
+
+/// Contract metrics
+pub mod contract {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn installed_total_set(value: u64) {
+        gauge!("icn_contract_installed_total").set(value as f64);
+    }
+
+    pub fn deployments_inc() {
+        counter!("icn_contract_deployments_total").increment(1);
+    }
+
+    pub fn deployments_received_inc() {
+        counter!("icn_contract_deployments_received_total").increment(1);
+    }
+
+    pub fn deployments_rejected_inc(reason: &str) {
+        counter!("icn_contract_deployments_rejected_total", "reason" => reason.to_string()).increment(1);
+    }
+
+    pub fn deployments_rejected_trust_inc(deployer: &str, trust_score: f64) {
+        counter!(
+            "icn_contract_deployments_rejected_trust_total",
+            "deployer" => deployer.to_string(),
+            "trust_score" => format!("{:.2}", trust_score)
+        ).increment(1);
+    }
+
+    pub fn executions_inc(contract_name: &str, rule_name: &str) {
+        counter!(
+            "icn_contract_executions_total",
+            "contract" => contract_name.to_string(),
+            "rule" => rule_name.to_string()
+        ).increment(1);
+    }
+
+    pub fn executions_failed_inc(contract_name: &str, rule_name: &str, error: &str) {
+        counter!(
+            "icn_contract_executions_failed_total",
+            "contract" => contract_name.to_string(),
+            "rule" => rule_name.to_string(),
+            "error" => error.to_string()
+        ).increment(1);
+    }
+
+    pub fn executions_rejected_unauthorized_inc(caller: &str) {
+        counter!(
+            "icn_contract_executions_rejected_unauthorized_total",
+            "caller" => caller.to_string()
+        ).increment(1);
+    }
+
+    pub fn execution_fuel_used_record(fuel: u64) {
+        histogram!("icn_contract_execution_fuel_used").record(fuel as f64);
+    }
+
+    pub fn execution_duration_record(duration_secs: f64) {
+        histogram!("icn_contract_execution_duration_seconds").record(duration_secs);
+    }
+
+    pub fn ledger_operations_add(count: u64) {
+        counter!("icn_contract_ledger_operations_total").increment(count);
     }
 }
 

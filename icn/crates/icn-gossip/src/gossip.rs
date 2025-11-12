@@ -49,8 +49,12 @@ pub struct GossipActor {
     /// Subscriptions (topic -> subscribers)
     subscriptions: HashMap<String, Vec<Did>>,
 
-    /// Trust lookup function
+    /// Trust lookup function (returns trust class for resource limits)
     trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+
+    /// Trust graph for fine-grained trust score computation (optional)
+    /// When provided, enables trust-gated subscription authorization
+    trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
 
     /// Send message callback (optional, for sending responses)
     send_callback: Option<SendMessageCallback>,
@@ -68,6 +72,15 @@ impl GossipActor {
         own_did: Did,
         trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
     ) -> Self {
+        Self::new_with_trust_graph(own_did, trust_lookup, None)
+    }
+
+    /// Create a new gossip actor with optional trust graph for fine-grained trust control
+    pub fn new_with_trust_graph(
+        own_did: Did,
+        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+        trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+    ) -> Self {
         let mut gossip = GossipActor {
             own_did: own_did.clone(),
             clock: VectorClock::new(),
@@ -76,6 +89,7 @@ impl GossipActor {
             bloom_filters: HashMap::new(),
             subscriptions: HashMap::new(),
             trust_lookup,
+            trust_graph,
             send_callback: None,
             notification_callback: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
@@ -260,7 +274,52 @@ impl GossipActor {
     pub fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // Check ACL
+        // Priority 1: Check fine-grained trust threshold (if configured)
+        if let Some(threshold) = topic_obj.min_trust_threshold {
+            if let Some(trust_graph) = &self.trust_graph {
+                // Compute exact trust score from trust graph
+                // Use blocking operation since we're in a sync context
+                let trust_score = {
+                    // block_in_place allows blocking in async runtime context
+                    tokio::task::block_in_place(|| {
+                        let rt = tokio::runtime::Handle::current();
+                        rt.block_on(async {
+                            let graph = trust_graph.read().await;
+                            graph.compute_trust_score(&subscriber).unwrap_or(0.0)
+                        })
+                    })
+                };
+
+                // Enforce trust threshold
+                if trust_score < threshold {
+                    warn!(
+                        "🔒 Subscription rejected: DID {} to topic {} (trust score: {:.3} < threshold: {:.3})",
+                        subscriber, topic, trust_score, threshold
+                    );
+
+                    // Track rejection metrics
+                    icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
+
+                    bail!(
+                        "Insufficient trust: score {:.3} < required {:.3}",
+                        trust_score,
+                        threshold
+                    );
+                }
+
+                info!(
+                    "✅ Subscription authorized: DID {} to topic {} (trust score: {:.3})",
+                    subscriber, topic, trust_score
+                );
+            } else {
+                warn!(
+                    "Topic {} has min_trust_threshold {:.3} but GossipActor has no trust_graph - falling back to ACL check",
+                    topic, threshold
+                );
+            }
+        }
+
+        // Priority 2: Check AccessControl-based ACL (coarse-grained)
         let trust_class = (self.trust_lookup)(&subscriber);
         if !topic_obj.can_subscribe(&subscriber, trust_class) {
             bail!("Not authorized to subscribe to topic: {}", topic);
@@ -935,7 +994,16 @@ impl GossipActor {
         own_did: Did,
         trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
     ) -> GossipHandle {
-        let actor = GossipActor::new(own_did, trust_lookup);
+        Self::spawn_with_trust_graph(own_did, trust_lookup, None)
+    }
+
+    /// Spawn a gossip actor with optional trust graph and return a handle
+    pub fn spawn_with_trust_graph(
+        own_did: Did,
+        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+        trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+    ) -> GossipHandle {
+        let actor = GossipActor::new_with_trust_graph(own_did, trust_lookup, trust_graph);
         Arc::new(RwLock::new(actor))
     }
 }
@@ -1609,5 +1677,177 @@ mod tests {
         // Verify only 3 entries are stored (max_entries enforced)
         let entries = gossip.get_entries("test:max-entries");
         assert_eq!(entries.len(), 3, "Should enforce max_entries limit for Response messages");
+    }
+
+    /// Trust-Gated Subscription Tests
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_gated_subscription_rejection() {
+        // Test that subscriptions are rejected when trust score < threshold
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create trust graph with Alice having low trust (0.05)
+        let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
+
+        // Add trust edge: owner trusts Alice with score 0.05 (below threshold)
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 0.05);
+        trust_graph.add_edge(edge).unwrap();
+
+        let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
+
+        // Create gossip actor with trust graph
+        let mut gossip = GossipActor::new_with_trust_graph(
+            owner.clone(),
+            Arc::new(mock_trust_lookup),
+            Some(trust_graph_handle),
+        );
+
+        // Create topic with min_trust_threshold of 0.1 (Known+)
+        let topic = Topic::new("test:trust-gated".to_string(), AccessControl::Public)
+            .with_min_trust_threshold(0.1);
+        gossip.create_topic(topic);
+
+        // Alice attempts to subscribe - should be rejected (score 0.05 < 0.1)
+        let result = gossip.subscribe("test:trust-gated", alice.clone());
+        assert!(result.is_err(), "Subscription should be rejected due to low trust");
+        assert!(result.unwrap_err().to_string().contains("Insufficient trust"));
+
+        // Bob (unknown, score 0.0) attempts to subscribe - should also be rejected
+        let result = gossip.subscribe("test:trust-gated", bob.clone());
+        assert!(result.is_err(), "Subscription should be rejected for unknown peer");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_gated_subscription_acceptance() {
+        // Test that subscriptions are accepted when trust score >= threshold
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+
+        // Create trust graph with Alice having sufficient trust
+        // Note: TrustGraph uses weighted score: 70% direct + 30% transitive
+        // To get final score >= 0.4, need direct trust >= 0.58 (0.58 * 0.7 = 0.406)
+        let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
+
+        // Add trust edge: owner trusts Alice with score 0.6 (final score: 0.6 * 0.7 = 0.42)
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 0.6);
+        trust_graph.add_edge(edge).unwrap();
+
+        let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
+
+        // Create gossip actor with trust graph
+        let mut gossip = GossipActor::new_with_trust_graph(
+            owner.clone(),
+            Arc::new(mock_trust_lookup),
+            Some(trust_graph_handle),
+        );
+
+        // Create topic with min_trust_threshold of 0.4 (Partner)
+        let topic = Topic::new("test:trust-gated".to_string(), AccessControl::Public)
+            .with_min_trust_threshold(0.4);
+        gossip.create_topic(topic);
+
+        // Alice attempts to subscribe - should succeed (final score ~0.42 >= 0.4)
+        let result = gossip.subscribe("test:trust-gated", alice.clone());
+        assert!(result.is_ok(), "Subscription should be accepted with sufficient trust");
+        assert!(gossip.is_subscribed("test:trust-gated", &alice));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_gated_subscription_exact_threshold() {
+        // Test boundary condition: trust score exactly equals threshold
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+
+        // Create trust graph with Alice at exact threshold
+        // Note: TrustGraph uses weighted score: 70% direct + 30% transitive
+        // To get final score = 0.4, need direct trust = 0.4 / 0.7 = 0.571...
+        let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
+
+        // Add trust edge: owner trusts Alice with score 0.58 (final score: 0.58 * 0.7 = 0.406)
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 0.58);
+        trust_graph.add_edge(edge).unwrap();
+
+        let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
+
+        // Create gossip actor with trust graph
+        let mut gossip = GossipActor::new_with_trust_graph(
+            owner.clone(),
+            Arc::new(mock_trust_lookup),
+            Some(trust_graph_handle),
+        );
+
+        // Create topic with min_trust_threshold of 0.4
+        let topic = Topic::new("test:trust-gated".to_string(), AccessControl::Public)
+            .with_min_trust_threshold(0.4);
+        gossip.create_topic(topic);
+
+        // Alice attempts to subscribe - should succeed (score 0.4 >= 0.4)
+        let result = gossip.subscribe("test:trust-gated", alice.clone());
+        assert!(result.is_ok(), "Subscription should be accepted at exact threshold");
+        assert!(gossip.is_subscribed("test:trust-gated", &alice));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_gated_fallback_to_acl() {
+        // Test that when no trust graph is provided, falls back to AccessControl
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+
+        // Create gossip actor WITHOUT trust graph
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Create topic with min_trust_threshold but no trust graph available
+        let topic = Topic::new("test:fallback".to_string(), AccessControl::Public)
+            .with_min_trust_threshold(0.4);
+        gossip.create_topic(topic);
+
+        // Alice attempts to subscribe - should succeed via fallback to Public ACL
+        let result = gossip.subscribe("test:fallback", alice.clone());
+        assert!(result.is_ok(), "Subscription should succeed via ACL fallback");
+        assert!(gossip.is_subscribed("test:fallback", &alice));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_gated_mixed_with_acl() {
+        // Test that trust threshold takes priority over ACL
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+
+        // Create trust graph with Alice having high trust
+        // Note: TrustGraph uses weighted score: 70% direct + 30% transitive
+        // To get final score >= 0.7, need direct trust = 1.0 (1.0 * 0.7 = 0.7)
+        let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
+
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 1.0);
+        trust_graph.add_edge(edge).unwrap();
+
+        let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
+
+        // Create gossip actor with trust graph
+        let mut gossip = GossipActor::new_with_trust_graph(
+            owner.clone(),
+            Arc::new(mock_trust_lookup),
+            Some(trust_graph_handle),
+        );
+
+        // Create topic with BOTH min_trust_threshold AND TrustClass requirement
+        let topic = Topic::new(
+            "test:mixed".to_string(),
+            AccessControl::TrustClass(TrustClass::Partner), // Requires Partner class
+        )
+        .with_min_trust_threshold(0.7); // Requires 0.7 score (Federated)
+
+        gossip.create_topic(topic);
+
+        // Alice attempts to subscribe - should succeed (has score 0.8 >= 0.7)
+        let result = gossip.subscribe("test:mixed", alice.clone());
+        assert!(result.is_ok(), "Trust score check should pass before ACL check");
+        assert!(gossip.is_subscribed("test:mixed", &alice));
     }
 }
