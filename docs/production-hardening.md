@@ -459,30 +459,58 @@ The following issues were identified but not yet addressed:
    - Hard to diagnose issues in production
    - Recommendation: Add trace! logs at key decision points
 
-3. **TODO comments in critical paths**
-   - Trust graph integration in TLS verification
+3. **TODO comments in non-critical paths**
+   - Minor TODOs in test utilities and helper functions
    - Recommendation: Track as GitHub issues
 
-### Trust Graph Integration (Critical TODO)
+### Trust-Gated TLS Verification (✓ Implemented - Phase 8B)
 
-The TLS certificate verifier currently accepts all valid DID certificates without checking trust scores. This must be implemented before production deployment:
+**Status**: COMPLETE (2025-01-12)
+**File**: [`icn-net/src/tls.rs`](../icn/crates/icn-net/src/tls.rs)
+
+The TLS certificate verifier now integrates with the trust graph to enforce trust-based access control:
 
 ```rust
-// Current (development mode):
-Ok(rustls::client::danger::ServerCertVerified::assertion())
+// Extract DID from certificate
+let did_str = Self::extract_did_from_cert(end_entity)?;
+let peer_did = Did::from_str(&did_str)?;
 
-// TODO (production):
-let trust_score = trust_graph.lookup(&did)?;
-if trust_score < TrustClass::Partner {
+// Query trust graph for peer's trust score
+let trust_score = {
+    let graph = self.trust_graph.blocking_read();
+    graph.compute_trust_score(&peer_did).unwrap_or(0.0)
+};
+
+// Enforce trust threshold
+if trust_score < self.min_trust_threshold {
+    warn!("🔒 Connection rejected: DID {} has insufficient trust", did_str);
+    icn_obs::metrics::network::connections_rejected_untrusted_inc(&did_str, trust_score);
     return Err(rustls::Error::General(format!(
-        "Insufficient trust score for DID: {}",
-        did
+        "Peer DID {} has insufficient trust score {:.3} (required: {:.3})",
+        did_str, trust_score, self.min_trust_threshold
     )));
 }
-Ok(rustls::client::danger::ServerCertVerified::assertion())
 ```
 
-**Impact**: Without trust graph integration, ICN operates in "development mode" where all peers are implicitly trusted.
+**Security Benefits**:
+- Prevents Sybil attacks from unknown/untrusted peers
+- Configurable trust thresholds (default: 0.0 = development mode)
+- Production recommendation: 0.1 (reject isolated peers) or 0.4 (partners only)
+- Per-peer and per-trust-class rejection metrics
+- Full Ed25519 signature verification on TLS 1.3 handshakes
+
+**Configuration**:
+```rust
+TrustGatedRateLimitConfig {
+    min_trust_threshold: 0.1,  // Reject isolated peers (score < 0.1)
+    // ... rate limit settings
+}
+```
+
+**Tests**: 3 comprehensive integration tests in `icn-net/tests/trust_gated_tls_integration.rs`
+- Trusted peer connection acceptance
+- Untrusted peer connection rejection
+- Trust threshold boundary conditions
 
 ---
 
