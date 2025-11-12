@@ -290,7 +290,7 @@ icnctl id import backup.age
 - Implemented TLS certificate verification (DID extraction + expiration)
 - Fixed integer overflow in timestamp conversion
 - Added Bloom filter validation (bounds checking)
-- Implemented network message rate limiting (token bucket, 100 msg/sec)
+- Implemented trust-gated network rate limiting (token bucket, trust-based limits)
 - Added bounded QUIC stream limits (10 concurrent, 1MB/stream)
 
 ## Common Development Workflows
@@ -320,8 +320,14 @@ icnctl id import backup.age
 ## Security & Production Hardening
 
 **Network-level protections:**
-- **Rate limiting**: Token bucket per-peer (100 msg/sec, burst 20)
+- **Trust-gated rate limiting**: Different limits per trust class (token bucket algorithm)
+  - **Isolated peers** (score < 0.1): 10 msg/sec, burst 2
+  - **Known peers** (score 0.1-0.4): 50 msg/sec, burst 10
+  - **Partner peers** (score 0.4-0.7): 100 msg/sec, burst 20
+  - **Federated peers** (score 0.7+): 200 msg/sec, burst 50
   - Implementation: `icn-net/src/rate_limit.rs`
+  - Dynamically adjusts when peer trust changes
+  - Falls back to 100 msg/sec if trust graph unavailable
   - Metric: `icn_network_messages_rate_limited_total`
 - **QUIC stream limits**: 10 concurrent streams, 1MB/stream window
   - Configuration: `icn-net/src/session.rs::create_transport_config()`
