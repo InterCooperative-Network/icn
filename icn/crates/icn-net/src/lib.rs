@@ -10,5 +10,5 @@ pub mod tls;
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
 pub use discovery::{Discovery, PeerInfo};
 pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};
-pub use rate_limit::{RateLimitConfig, RateLimiter};
+pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use session::SessionManager;

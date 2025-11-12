@@ -222,6 +222,7 @@ impl Supervisor {
                 listen_addr,
                 self.shutdown_tx.clone(),
                 Some(incoming_handler),
+                None, // TODO: Pass real trust graph once implemented
             )
             .await?;
 

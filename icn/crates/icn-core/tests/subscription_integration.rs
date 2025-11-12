@@ -55,7 +55,7 @@ impl TestNode {
             match net_msg.payload {
                 MessagePayload::Gossip(gossip_msg) => {
                     let mut gossip = gossip_handle_clone.blocking_write();
-                    if let Err(e) = gossip.handle_message(gossip_msg) {
+                    if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
                         warn!("Failed to handle gossip message: {}", e);
                     }
                 }
@@ -129,6 +129,7 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
+            None, // No trust graph for tests
         )
         .await?;
 

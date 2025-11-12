@@ -100,6 +100,7 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
+            None, // No trust graph for tests
         )
         .await?;
 

@@ -143,11 +143,14 @@ impl NetworkActor {
     /// Start the network actor
     ///
     /// Initializes discovery and session management on the given address.
+    /// If trust_graph is provided, enables trust-gated rate limiting with different
+    /// limits for different trust classes.
     pub async fn spawn(
         keypair: &KeyPair,
         listen_addr: SocketAddr,
         shutdown_tx: tokio::sync::broadcast::Sender<()>,
         incoming_handler: Option<IncomingMessageHandler>,
+        trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
     ) -> Result<NetworkHandle> {
         let did = keypair.did().clone();
 
@@ -180,8 +183,17 @@ impl NetworkActor {
         // Wrap session_manager in Arc for sharing between tasks
         let session_manager = Arc::new(RwLock::new(session_manager));
 
-        // Create rate limiter with default config
-        let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+        // Create rate limiter (trust-gated if trust_graph provided, otherwise fallback)
+        let rate_limiter = if let Some(trust_graph) = trust_graph {
+            info!("Trust-gated rate limiting enabled");
+            Arc::new(RateLimiter::new_trust_gated(
+                crate::rate_limit::TrustGatedRateLimitConfig::default(),
+                trust_graph,
+            ))
+        } else {
+            info!("Using fallback rate limiting (no trust graph)");
+            Arc::new(RateLimiter::new(RateLimitConfig::default()))
+        };
 
         // Spawn incoming connection handler if handler is provided
         if let Some(handler) = incoming_handler.clone() {
@@ -549,7 +561,7 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
-        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone(), None)
+        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone(), None, None)
             .await
             .unwrap();
 

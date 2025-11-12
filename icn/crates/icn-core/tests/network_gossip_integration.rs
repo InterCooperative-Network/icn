@@ -43,8 +43,9 @@ impl TestNode {
         let gossip_handle_clone = gossip_handle.clone();
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
+                let sender = net_msg.from.clone();
                 let mut gossip = gossip_handle_clone.blocking_write();
-                if let Err(e) = gossip.handle_message(gossip_msg) {
+                if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
                     warn!("Failed to handle gossip message: {}", e);
                 }
             }
@@ -57,6 +58,7 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
+            None, // No trust graph for tests
         )
         .await?;
 
