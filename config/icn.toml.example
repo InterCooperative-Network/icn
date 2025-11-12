@@ -65,6 +65,54 @@ health_port = 8080
 log_level = "info"
 
 # ============================================================================
+# Rate Limiting Configuration (Trust-Gated)
+# ============================================================================
+# Trust-gated rate limiting provides different message rate limits based on
+# peer trust classification. This protects against DoS attacks while allowing
+# trusted peers higher throughput.
+
+[rate_limiting]
+
+# Enable trust-gated rate limiting
+# Default: true
+enabled = true
+
+# Token bucket refill interval (milliseconds)
+# How often tokens are added back to peer buckets
+# Default: 100
+refill_interval_ms = 100
+
+# Rate limits for Isolated peers (trust score 0.0 - 0.1)
+# These are untrusted or newly connected peers
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+# Rate limits for Known peers (trust score 0.1 - 0.4)
+# These have basic trust but limited history
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+# Rate limits for Partner peers (trust score 0.4 - 0.7)
+# These are trusted collaborators
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+# Rate limits for Federated peers (trust score 0.7 - 1.0)
+# These are highly trusted federation members
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+
+# Fallback rate limits when trust graph is unavailable
+# Used during startup or if trust computation fails
+[rate_limiting.fallback]
+max_messages_per_second = 100
+burst_capacity = 20
+
+# ============================================================================
 # PLANNED FEATURES (Not Yet Implemented)
 # ============================================================================
 # The following sections are shown for completeness but are not yet supported.
@@ -112,13 +160,6 @@ log_level = "info"
 # # Anti-entropy digest interval (milliseconds)
 # # Default: 10000 (10 seconds)
 # digest_interval_ms = 10000
-#
-# # Rate limits by trust class (messages per second)
-# [gossip.limits]
-# isolated = 2      # Untrusted peers
-# known = 10        # Basic trust
-# partner = 50      # Trusted partners
-# federated = 100   # Full cooperation
 
 # [ledger]
 # # Quarantine conflicting entries instead of rejecting
