@@ -786,6 +786,170 @@ pub struct ContractUpgrade {
 
 ---
 
+### 5.5 Distributed Contract Deployment
+
+**Decision: Gossip-based distribution with trust-gated authorization (Phase 9)**
+
+**Architecture:**
+
+Contracts are distributed across the ICN network using the gossip protocol, enabling decentralized deployment without central coordination while maintaining security through trust-based authorization.
+
+**Components:**
+
+```rust
+pub struct ContractActor {
+    did: Did,
+    runtime: Arc<RwLock<ContractRuntime>>,
+    trust_graph: Option<Arc<RwLock<TrustGraph>>>,
+}
+
+impl ContractActor {
+    pub async fn deploy_contract(
+        &self,
+        contract: Contract,
+        installation: ContractInstallation,
+    ) -> Result<ContentHash>;
+
+    pub async fn execute_rule(
+        &self,
+        request: ContractExecutionRequest,
+    ) -> Result<ExecutionResult>;
+
+    pub async fn handle_deployment_message(
+        &self,
+        msg: ContractDeploymentMessage,
+    ) -> Result<()>;
+}
+```
+
+**Deployment Flow:**
+
+1. **Local Installation**
+   - Deployer validates contract structure (`contract.validate()`)
+   - Creates `ContractInstallation` with capabilities and signatures
+   - Generates deterministic code hash (SHA-256 of contract + participants)
+   - Installs locally via `ContractRuntime::install_contract_with_metadata()`
+
+2. **Trust Authorization**
+   - Check deployer trust score via TrustGraph
+   - Require `trust_score >= MIN_DEPLOYER_TRUST` (0.4 = "Known" tier)
+   - Reject deployments from untrusted nodes to prevent spam
+
+3. **Gossip Distribution**
+   - Serialize contract to `ContractDeploymentMessage` (serde_json)
+   - Publish to `contracts:deploy` topic (AccessControl::Public)
+   - Gossip propagates to all subscribed peers via push/pull
+
+4. **Peer Reception**
+   - Notification callback triggered on new entry
+   - Deserialize `ContractDeploymentMessage`
+   - Verify deployer trust score >= MIN_DEPLOYER_TRUST
+   - Validate contract structure and participant signatures
+   - Install locally if all checks pass
+
+**Trust-Based Authorization:**
+
+| Trust Score | Class | Contract Deployment | Contract Execution |
+|-------------|-------|---------------------|-------------------|
+| < 0.1 | Isolated | ❌ Rejected | ❌ (unless participant) |
+| 0.1 - 0.4 | Known | ❌ Rejected | ❌ (unless participant) |
+| 0.4 - 0.7 | Partner | ✅ Accepted | ✅ (if `min_caller_trust` allows) |
+| 0.7+ | Federated | ✅ Accepted | ✅ (if `min_caller_trust` allows) |
+
+**Execution Authorization:**
+
+```rust
+pub struct ContractInstallation {
+    // ... other fields
+    min_caller_trust: Option<f64>, // Per-contract trust threshold
+}
+```
+
+- **Participants**: Always authorized to execute
+- **Non-participants**: Require `trust_score >= min_caller_trust`
+- **None**: Participant-only execution (most restrictive)
+
+**Defense-in-Depth:**
+
+1. **TLS Layer**: Certificate-based peer authentication
+2. **Gossip Layer**: Topic subscription with trust gates (Phase 8C)
+3. **Contract Layer**: Deployer trust + contract-level execution control
+4. **Capability Layer**: Explicit permissions for ledger/state access
+
+**Message Types:**
+
+```rust
+pub struct ContractDeploymentMessage {
+    code_hash: ContentHash,
+    contract: Contract,
+    installation: ContractInstallation,
+    deployer_signature: Vec<u8>,
+}
+
+pub struct ContractExecutionRequest {
+    code_hash: ContentHash,
+    rule_name: String,
+    args: HashMap<String, Value>,
+    caller: Did,
+    timestamp: u64, // For deterministic execution
+}
+
+pub struct ContractExecutionResponse {
+    result: ExecutionResult,
+    success: bool,
+    error: Option<String>,
+}
+```
+
+**Metrics & Observability:**
+
+All contract operations tracked via Prometheus:
+
+- `icn_contract_installed_total` - Gauge of installed contracts
+- `icn_contract_deployments_total` - Deployments initiated
+- `icn_contract_deployments_received_total` - Deployments from network
+- `icn_contract_deployments_rejected_trust_total` - Trust-based rejections
+- `icn_contract_executions_total` - Rule executions (by contract + rule)
+- `icn_contract_executions_failed_total` - Failed executions
+- `icn_contract_execution_fuel_used` - Histogram of fuel consumption
+- `icn_contract_execution_duration_seconds` - Execution time distribution
+
+**Security Properties:**
+
+✅ **Spam Prevention**: Only trusted deployers (score >= 0.4) can distribute
+✅ **Sybil Resistance**: Trust graph prevents identity farming
+✅ **Participant Control**: All participants must sign installation
+✅ **Capability Isolation**: Contracts sandboxed by explicit capabilities
+✅ **Execution Limits**: Fuel metering prevents DoS
+✅ **Auditability**: All deployments logged with deployer DID
+
+**Tradeoffs:**
+
+| Aspect | Chosen | Alternative | Rationale |
+|--------|--------|-------------|-----------|
+| **Distribution** | Gossip | Central registry | Decentralized, resilient to failures |
+| **Authorization** | Trust-based | Stake-based | Aligns with ICN's web-of-participation model |
+| **Serialization** | Serde-json | Bincode/CBOR | Human-readable, debuggable |
+| **Code Hash** | Contract + participants | Bytecode only | Ties deployment to specific participants |
+| **Trust Threshold** | 0.4 (Partner) | Higher/Lower | Balances spam prevention with accessibility |
+
+**Future Enhancements:**
+
+- **v2**: Contract marketplace with ratings/reviews
+- **v3**: Multi-signature deployment workflows
+- **v4**: Contract templates with instantiation parameters
+- **v5**: On-chain governance for system contracts
+
+**Implementation:**
+
+- ContractActor: `icn-ccl/src/actor.rs` (deployment + execution)
+- Messages: `icn-ccl/src/messages.rs` (serialization types)
+- Runtime: `icn-ccl/src/runtime.rs` (contract storage + metadata)
+- Supervisor: `icn-core/src/supervisor.rs:134-185` (gossip integration)
+- Metrics: `icn-obs/src/metrics.rs:259-615` (observability)
+
+---
+
 ## 6. Gossip & Synchronization
 
 ### 6.1 Consistency Model
