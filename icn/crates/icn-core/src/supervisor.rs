@@ -84,8 +84,30 @@ impl Supervisor {
 
             let did = keypair.did().clone();
 
+            // Create trust graph
+            let trust_store_path = self.config.store_path().join("trust");
+            let trust_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&trust_store_path)?);
+            let trust_graph = icn_trust::TrustGraph::new(trust_store, did.clone());
+            let trust_graph_handle = Arc::new(tokio::sync::RwLock::new(trust_graph));
+
+            info!("Trust graph initialized at {}", trust_store_path.display());
+
+            // Create trust lookup closure for gossip actor
+            let trust_graph_for_gossip = trust_graph_handle.clone();
+            let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
+                // Use a blocking task since we're in a sync context
+                let graph = trust_graph_for_gossip.clone();
+                let peer = peer_did.clone();
+                tokio::task::block_in_place(|| {
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(async {
+                        let mut graph = graph.write().await;
+                        graph.trust_class(&peer).ok()
+                    })
+                })
+            });
+
             // Spawn Gossip actor
-            let trust_lookup = Arc::new(|_did: &icn_identity::Did| Some(TrustClass::Partner));
             let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
 
             info!("Gossip actor spawned");
@@ -222,7 +244,7 @@ impl Supervisor {
                 listen_addr,
                 self.shutdown_tx.clone(),
                 Some(incoming_handler),
-                None, // TODO: Pass real trust graph once implemented
+                Some(trust_graph_handle.clone()), // Enable trust-gated rate limiting
             )
             .await?;
 
