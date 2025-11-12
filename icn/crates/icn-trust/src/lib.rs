@@ -1,5 +1,9 @@
 //! ICN Trust - Trust graph management and policy enforcement
 
+pub mod attestation;
+
+pub use attestation::TrustAttestation;
+
 use anyhow::Result;
 use icn_identity::Did;
 use icn_store::Store;

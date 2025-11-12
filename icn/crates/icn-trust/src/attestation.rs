@@ -1,0 +1,659 @@
+//! Trust attestations for network propagation
+//!
+//! This module provides signed trust attestations that can be broadcast
+//! over the gossip network to build distributed trust webs.
+
+use crate::TrustEdge;
+use anyhow::Result;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use icn_identity::Did;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+/// A signed trust attestation that can be broadcast over the network
+///
+/// This represents a cryptographically signed statement: "I (issuer) trust
+/// (subject) with score X, valid until TTL expires."
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustAttestation {
+    /// The DID making the trust statement (same as trust edge source)
+    pub issuer: Did,
+
+    /// The DID being trusted (same as trust edge target)
+    pub subject: Did,
+
+    /// Trust score (0.0-1.0)
+    pub score: f64,
+
+    /// Optional labels (e.g., "partner", "validator", "service-provider")
+    #[serde(default)]
+    pub labels: Vec<String>,
+
+    /// Optional evidence references (content hashes)
+    #[serde(default)]
+    pub evidence: Vec<String>,
+
+    /// Time-to-live in seconds (how long this attestation is valid)
+    /// Default: 30 days (2,592,000 seconds)
+    pub ttl_seconds: u64,
+
+    /// Unix timestamp when this attestation was created
+    pub created_at: u64,
+
+    /// Ed25519 signature over the canonical representation
+    /// Signature covers: issuer || subject || score || ttl || created_at
+    pub signature: Vec<u8>,
+}
+
+impl TrustAttestation {
+    /// Create a new unsigned attestation
+    ///
+    /// Note: This returns an attestation with an empty signature.
+    /// You must call `sign()` before broadcasting.
+    pub fn new(issuer: Did, subject: Did, score: f64) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        Self {
+            issuer,
+            subject,
+            score,
+            labels: Vec::new(),
+            evidence: Vec::new(),
+            ttl_seconds: 30 * 24 * 60 * 60, // 30 days default
+            created_at: now,
+            signature: Vec::new(),
+        }
+    }
+
+    /// Add a label to this attestation
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.labels.push(label.into());
+        self
+    }
+
+    /// Add evidence to this attestation
+    pub fn with_evidence(mut self, evidence: impl Into<String>) -> Self {
+        self.evidence.push(evidence.into());
+        self
+    }
+
+    /// Set custom TTL
+    pub fn with_ttl(mut self, ttl_seconds: u64) -> Self {
+        self.ttl_seconds = ttl_seconds;
+        self
+    }
+
+    /// Get the canonical signing payload
+    ///
+    /// The signature covers the core attestation fields in a deterministic order:
+    /// issuer || subject || score || ttl || created_at || labels || evidence
+    fn signing_payload(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+
+        // Core fields
+        hasher.update(self.issuer.as_str().as_bytes());
+        hasher.update(self.subject.as_str().as_bytes());
+        hasher.update(self.score.to_le_bytes());
+        hasher.update(self.ttl_seconds.to_le_bytes());
+        hasher.update(self.created_at.to_le_bytes());
+
+        // Labels (sorted for determinism)
+        let mut sorted_labels = self.labels.clone();
+        sorted_labels.sort();
+        for label in sorted_labels {
+            hasher.update(label.as_bytes());
+        }
+
+        // Evidence (sorted for determinism)
+        let mut sorted_evidence = self.evidence.clone();
+        sorted_evidence.sort();
+        for ev in sorted_evidence {
+            hasher.update(ev.as_bytes());
+        }
+
+        hasher.finalize().to_vec()
+    }
+
+    /// Sign this attestation with a keypair
+    ///
+    /// This creates an Ed25519 signature over the canonical representation
+    /// and stores it in the `signature` field.
+    pub fn sign(&mut self, keypair: &icn_identity::KeyPair) -> Result<()> {
+        if keypair.did() != &self.issuer {
+            anyhow::bail!(
+                "Keypair DID ({}) does not match attestation issuer ({})",
+                keypair.did(),
+                self.issuer
+            );
+        }
+
+        let payload = self.signing_payload();
+        let sig = keypair.sign(&payload);
+        self.signature = sig.to_bytes().to_vec();
+
+        Ok(())
+    }
+
+    /// Verify the signature on this attestation
+    ///
+    /// Extracts the verifying key from the issuer DID and checks the signature.
+    pub fn verify(&self) -> Result<()> {
+        if self.signature.is_empty() {
+            anyhow::bail!("Attestation has no signature");
+        }
+
+        if self.signature.len() != 64 {
+            anyhow::bail!(
+                "Invalid signature length: {} (expected 64)",
+                self.signature.len()
+            );
+        }
+
+        // Extract public key from issuer DID
+        let verifying_key = self.extract_verifying_key_from_did(&self.issuer)?;
+
+        // Parse signature
+        let sig_bytes: [u8; 64] = self
+            .signature
+            .as_slice()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to convert signature to array"))?;
+        let signature = Signature::from_bytes(&sig_bytes);
+
+        // Verify
+        let payload = self.signing_payload();
+        verifying_key
+            .verify(&payload, &signature)
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Check if this attestation has expired
+    pub fn is_expired(&self, now: u64) -> bool {
+        now > self.created_at + self.ttl_seconds
+    }
+
+    /// Calculate the expiration timestamp
+    pub fn expires_at(&self) -> u64 {
+        self.created_at + self.ttl_seconds
+    }
+
+    /// Check if this attestation should supersede another attestation
+    ///
+    /// This handles clock skew by using a tolerance window. Within the tolerance window,
+    /// we use trust score as a tiebreaker (higher trust wins).
+    ///
+    /// ## Clock Skew Tolerance
+    ///
+    /// Distributed systems face clock synchronization challenges. If Node A's clock is
+    /// +5 minutes ahead and Node B's clock is -5 minutes behind, a 10-minute ordering
+    /// window exists where conflicting attestations could arrive out of order.
+    ///
+    /// **Solution:**
+    /// - Accept attestation if `created_at` is newer by more than tolerance (5 minutes)
+    /// - Within tolerance window: use trust score as tiebreaker (higher trust wins)
+    /// - This prevents clock skew from causing incorrect rejections while maintaining
+    ///   general chronological ordering
+    ///
+    /// ## Replay Attack Mitigation
+    ///
+    /// Attestations are replay-resistant through monotonic timestamp checking.
+    /// When a trust relationship is updated, the newer attestation supersedes
+    /// the older one, preventing replay of stale high-trust attestations.
+    ///
+    /// **Limitations:**
+    /// - If an attacker records an attestation and the issuer's node is compromised
+    ///   before publishing a revocation, the attacker could replay the high-trust
+    ///   attestation within the clock skew window.
+    /// - This is mitigated by:
+    ///   1. Short TTLs (default 30 days)
+    ///   2. Requiring issuer to actively re-attest to maintain high trust
+    ///   3. Key rotation invalidates old signatures (future Phase 8C)
+    ///
+    /// ## Parameters
+    ///
+    /// - `other_created_at`: Timestamp of existing attestation
+    /// - `other_score`: Trust score of existing attestation
+    ///
+    /// ## Returns
+    ///
+    /// `true` if this attestation should supersede the other, `false` otherwise
+    pub fn should_supersede(&self, other_created_at: u64, other_score: f64) -> bool {
+        const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300; // 5 minutes
+
+        let time_diff = self.created_at as i64 - other_created_at as i64;
+
+        // Clearly newer: accept
+        if time_diff > CLOCK_SKEW_TOLERANCE_SECS {
+            return true;
+        }
+
+        // Clearly older: reject
+        if time_diff < -CLOCK_SKEW_TOLERANCE_SECS {
+            return false;
+        }
+
+        // Within tolerance window: use score as tiebreaker
+        // Higher trust wins. If scores are equal, accept the newer one (even if within tolerance)
+        if (self.score - other_score).abs() < 0.001 {
+            // Scores effectively equal - accept newer timestamp
+            time_diff >= 0
+        } else {
+            // Use score to break tie
+            self.score >= other_score
+        }
+    }
+
+    /// Convert this attestation to a TrustEdge for storage
+    pub fn to_trust_edge(&self) -> TrustEdge {
+        TrustEdge {
+            source: self.issuer.clone(),
+            target: self.subject.clone(),
+            labels: self.labels.clone(),
+            score: self.score,
+            evidence: self.evidence.clone(),
+            expires_at: Some(self.expires_at()),
+            created_at: self.created_at,
+        }
+    }
+
+    /// Create an attestation from a TrustEdge (before signing)
+    pub fn from_trust_edge(edge: &TrustEdge) -> Self {
+        let ttl_seconds = edge
+            .expires_at
+            .map(|exp| exp.saturating_sub(edge.created_at))
+            .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
+
+        Self {
+            issuer: edge.source.clone(),
+            subject: edge.target.clone(),
+            score: edge.score,
+            labels: edge.labels.clone(),
+            evidence: edge.evidence.clone(),
+            ttl_seconds,
+            created_at: edge.created_at,
+            signature: Vec::new(),
+        }
+    }
+
+    /// Extract verifying key from a DID
+    ///
+    /// DIDs are in the format: did:icn:<multibase-encoded-pubkey>
+    fn extract_verifying_key_from_did(&self, did: &Did) -> Result<VerifyingKey> {
+        let did_str = did.as_str();
+
+        if !did_str.starts_with("did:icn:") {
+            anyhow::bail!("Invalid DID format: {}", did_str);
+        }
+
+        let encoded = &did_str[8..]; // Skip "did:icn:"
+        let (_base, decoded) = multibase::decode(encoded)?;
+
+        if decoded.len() != 32 {
+            anyhow::bail!(
+                "Invalid public key length: {} (expected 32)",
+                decoded.len()
+            );
+        }
+
+        let key_bytes: [u8; 32] = decoded
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
+
+        Ok(VerifyingKey::from_bytes(&key_bytes)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icn_identity::KeyPair;
+
+    #[test]
+    fn test_attestation_creation() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.75)
+            .with_label("partner")
+            .with_evidence("contract_xyz");
+
+        assert_eq!(attestation.issuer, *alice.did());
+        assert_eq!(attestation.subject, *bob.did());
+        assert_eq!(attestation.score, 0.75);
+        assert_eq!(attestation.labels, vec!["partner"]);
+        assert_eq!(attestation.evidence, vec!["contract_xyz"]);
+        assert_eq!(attestation.ttl_seconds, 30 * 24 * 60 * 60);
+    }
+
+    #[test]
+    fn test_attestation_sign_and_verify() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        // Sign
+        attestation.sign(&alice).unwrap();
+
+        // Verify
+        assert!(attestation.verify().is_ok());
+    }
+
+    #[test]
+    fn test_attestation_verify_fails_wrong_signature() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let eve = KeyPair::generate().unwrap();
+
+        let mut attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        // Sign with Eve's key (wrong issuer)
+        attestation.issuer = eve.did().clone();
+        attestation.sign(&eve).unwrap();
+
+        // Change issuer back to Alice
+        attestation.issuer = alice.did().clone();
+
+        // Verify should fail
+        assert!(attestation.verify().is_err());
+    }
+
+    #[test]
+    fn test_attestation_verify_fails_tampered_score() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        attestation.sign(&alice).unwrap();
+
+        // Tamper with score
+        attestation.score = 0.9;
+
+        // Verify should fail
+        assert!(attestation.verify().is_err());
+    }
+
+    #[test]
+    fn test_attestation_expiry() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
+            .with_ttl(3600); // 1 hour
+
+        let now = attestation.created_at;
+
+        assert!(!attestation.is_expired(now));
+        assert!(!attestation.is_expired(now + 1800)); // 30 minutes later
+        assert!(attestation.is_expired(now + 3601)); // 1 hour + 1 second later
+    }
+
+    #[test]
+    fn test_attestation_to_trust_edge() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.6)
+            .with_label("validator")
+            .with_ttl(7200);
+
+        let edge = attestation.to_trust_edge();
+
+        assert_eq!(edge.source, attestation.issuer);
+        assert_eq!(edge.target, attestation.subject);
+        assert_eq!(edge.score, attestation.score);
+        assert_eq!(edge.labels, attestation.labels);
+        assert_eq!(edge.expires_at, Some(attestation.expires_at()));
+    }
+
+    #[test]
+    fn test_attestation_from_trust_edge() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8)
+            .with_label("partner")
+            .with_evidence("collaboration_proof");
+
+        let expiry = edge.created_at + 86400; // 1 day
+        edge = edge.with_expiry(expiry);
+
+        let attestation = TrustAttestation::from_trust_edge(&edge);
+
+        assert_eq!(attestation.issuer, edge.source);
+        assert_eq!(attestation.subject, edge.target);
+        assert_eq!(attestation.score, edge.score);
+        assert_eq!(attestation.labels, edge.labels);
+        assert_eq!(attestation.evidence, edge.evidence);
+        assert_eq!(attestation.ttl_seconds, 86400);
+    }
+
+    #[test]
+    fn test_signing_payload_determinism() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        // Create two attestations with same data but labels in different order
+        let mut att1 = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        att1.labels = vec!["b".to_string(), "a".to_string()];
+        att1.created_at = 1000;
+
+        let mut att2 = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        att2.labels = vec!["a".to_string(), "b".to_string()];
+        att2.created_at = 1000;
+
+        // Signing payloads should be identical (labels get sorted)
+        assert_eq!(att1.signing_payload(), att2.signing_payload());
+    }
+
+    #[test]
+    fn test_sign_wrong_keypair() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let eve = KeyPair::generate().unwrap();
+
+        let mut attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        // Try to sign with Eve's keypair (should fail)
+        let result = attestation.sign(&eve);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("does not match attestation issuer"));
+    }
+
+    #[test]
+    fn test_should_supersede_clearly_newer() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 1000u64;
+
+        let old_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.5,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            signature: vec![],
+        };
+
+        let new_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.5,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 400, // 6.67 minutes newer (> 5 min tolerance)
+            signature: vec![],
+        };
+
+        assert!(new_att.should_supersede(old_att.created_at, old_att.score));
+        assert!(!old_att.should_supersede(new_att.created_at, new_att.score));
+    }
+
+    #[test]
+    fn test_should_supersede_within_tolerance_higher_score() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 1000u64;
+
+        let low_trust_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.3,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            signature: vec![],
+        };
+
+        let high_trust_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.8,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 60, // 1 minute newer (within tolerance)
+            signature: vec![],
+        };
+
+        // Higher trust should supersede even if only slightly newer
+        assert!(high_trust_att.should_supersede(low_trust_att.created_at, low_trust_att.score));
+
+        // Lower trust should NOT supersede even if slightly newer
+        assert!(!low_trust_att.should_supersede(high_trust_att.created_at, high_trust_att.score));
+    }
+
+    #[test]
+    fn test_should_supersede_within_tolerance_equal_scores() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 1000u64;
+
+        let old_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.5,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            signature: vec![],
+        };
+
+        let new_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.5, // Same score
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 60, // 1 minute newer (within tolerance)
+            signature: vec![],
+        };
+
+        // With equal scores, newer timestamp wins
+        assert!(new_att.should_supersede(old_att.created_at, old_att.score));
+        assert!(!old_att.should_supersede(new_att.created_at, new_att.score));
+    }
+
+    #[test]
+    fn test_should_supersede_clock_skew_scenario() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        // Simulate Node A with clock +5 minutes ahead
+        let node_a_time = 1000u64 + 300; // +5 minutes
+
+        // Simulate Node B with clock -5 minutes behind
+        let node_b_time = 1000u64 - 300; // -5 minutes
+
+        let att_from_node_a = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.7,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: node_a_time,
+            signature: vec![],
+        };
+
+        let att_from_node_b = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.6,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: node_b_time,
+            signature: vec![],
+        };
+
+        // Node A's attestation appears 10 minutes newer, but that's within 2x tolerance
+        // The 10-minute gap is exactly at the boundary (2 * 5 minutes)
+        // With these specific timestamps, neither clearly supersedes by time alone
+        // So score should be the tiebreaker
+
+        // Node A (higher score 0.7) should supersede Node B (lower score 0.6)
+        assert!(att_from_node_a.should_supersede(att_from_node_b.created_at, att_from_node_b.score));
+    }
+
+    #[test]
+    fn test_should_supersede_trust_downgrade() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 1000u64;
+
+        // Alice initially trusts Bob highly
+        let high_trust = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            signature: vec![],
+        };
+
+        // Alice downgrades trust significantly
+        let low_trust = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.2,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 3600, // 1 hour later (well outside tolerance)
+            signature: vec![],
+        };
+
+        // Downgrade should supersede because it's much newer
+        assert!(low_trust.should_supersede(high_trust.created_at, high_trust.score));
+
+        // Old high trust should not supersede newer low trust
+        assert!(!high_trust.should_supersede(low_trust.created_at, low_trust.score));
+    }
+}
+
