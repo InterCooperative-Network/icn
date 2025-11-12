@@ -186,6 +186,7 @@ impl RateLimitingConfig {
             partner: self.partner.to_rate_limit_config(refill_interval),
             federated: self.federated.to_rate_limit_config(refill_interval),
             refill_interval,
+            min_trust_threshold: 0.0, // Default: allow all authenticated DIDs
         }
     }
 

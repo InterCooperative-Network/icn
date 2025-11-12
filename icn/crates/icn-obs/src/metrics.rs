@@ -49,6 +49,14 @@ pub fn init_descriptions() {
         "icn_network_trust_class_changes_total",
         "Total number of peer trust class changes affecting rate limits"
     );
+    describe_counter!(
+        "icn_network_connections_rejected_untrusted_total",
+        "Total number of connections rejected due to insufficient trust"
+    );
+    describe_counter!(
+        "icn_network_connections_rejected_by_class_total",
+        "Total number of connections rejected by trust class"
+    );
 
     // Gossip metrics
     describe_gauge!(
@@ -301,6 +309,27 @@ pub mod network {
 
     pub fn trust_class_changes_inc() {
         counter!("icn_network_trust_class_changes_total").increment(1);
+    }
+
+    pub fn connections_rejected_untrusted_inc(peer_did: &str, trust_score: f64) {
+        counter!("icn_network_connections_rejected_untrusted_total",
+                 "peer_did" => peer_did.to_string(),
+                 "trust_score" => format!("{:.3}", trust_score))
+            .increment(1);
+
+        // Also increment by trust class for aggregated metrics
+        let trust_class = if trust_score < 0.1 {
+            "isolated"
+        } else if trust_score < 0.4 {
+            "known"
+        } else if trust_score < 0.7 {
+            "partner"
+        } else {
+            "federated"
+        };
+
+        counter!("icn_network_connections_rejected_by_class_total", "class" => trust_class.to_string())
+            .increment(1);
     }
 }
 

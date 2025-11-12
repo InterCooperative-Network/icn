@@ -61,6 +61,10 @@ pub struct TrustGatedRateLimitConfig {
 
     /// Refill interval (shared across all trust levels)
     pub refill_interval: Duration,
+
+    /// Minimum trust score required for TLS connections (default: 0.0 = allow all authenticated DIDs)
+    /// Peers with trust scores below this threshold will be rejected during TLS handshake
+    pub min_trust_threshold: f64,
 }
 
 impl Default for TrustGatedRateLimitConfig {
@@ -89,6 +93,7 @@ impl Default for TrustGatedRateLimitConfig {
                 refill_interval,
             },
             refill_interval,
+            min_trust_threshold: 0.0, // Default: allow all authenticated DIDs
         }
     }
 }
