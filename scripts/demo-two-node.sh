@@ -39,6 +39,26 @@ fi
 echo -e "${YELLOW}Cleaning up existing test data...${NC}"
 rm -rf /tmp/icn-alpha /tmp/icn-beta
 
+# Initialize identities for both nodes
+echo -e "${YELLOW}Initializing identities...${NC}"
+mkdir -p /tmp/icn-alpha /tmp/icn-beta
+
+# Alpha identity
+echo -e "${GREEN}Creating Alpha node identity...${NC}"
+echo "testpass123" | DATA_DIR=/tmp/icn-alpha ./target/release/icnctl id init --data-dir /tmp/icn-alpha 2>/dev/null || {
+    echo "testpass123" > /tmp/alpha_pass
+    cat /tmp/alpha_pass | DATA_DIR=/tmp/icn-alpha ./target/release/icnctl id init --data-dir /tmp/icn-alpha > /dev/null 2>&1
+    rm /tmp/alpha_pass
+}
+
+# Beta identity
+echo -e "${GREEN}Creating Beta node identity...${NC}"
+echo "testpass123" | DATA_DIR=/tmp/icn-beta ./target/release/icnctl id init --data-dir /tmp/icn-beta 2>/dev/null || {
+    echo "testpass123" > /tmp/beta_pass
+    cat /tmp/beta_pass | DATA_DIR=/tmp/icn-beta ./target/release/icnctl id init --data-dir /tmp/icn-beta > /dev/null 2>&1
+    rm /tmp/beta_pass
+}
+
 # Trap to cleanup on exit
 cleanup() {
     echo
