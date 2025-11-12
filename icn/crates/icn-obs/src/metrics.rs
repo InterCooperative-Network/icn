@@ -211,6 +211,38 @@ pub fn init_descriptions() {
         "icn_trust_score_distribution",
         "Distribution of trust scores"
     );
+    describe_counter!(
+        "icn_trust_attestations_received_total",
+        "Total number of trust attestations received from network"
+    );
+    describe_counter!(
+        "icn_trust_attestations_broadcasted_total",
+        "Total number of trust attestations broadcasted to network"
+    );
+    describe_counter!(
+        "icn_trust_attestations_rejected_expired_total",
+        "Total number of attestations rejected due to expiration"
+    );
+    describe_counter!(
+        "icn_trust_attestations_rejected_invalid_signature_total",
+        "Total number of attestations rejected due to invalid signature"
+    );
+    describe_counter!(
+        "icn_trust_attestations_rejected_outdated_total",
+        "Total number of attestations rejected as outdated (older than existing)"
+    );
+    describe_counter!(
+        "icn_trust_attestations_rejected_rate_limited_total",
+        "Total number of attestations rejected due to rate limiting"
+    );
+    describe_counter!(
+        "icn_trust_attestations_new_total",
+        "Total number of new trust edges created from attestations"
+    );
+    describe_counter!(
+        "icn_trust_attestations_updated_total",
+        "Total number of existing trust edges updated from attestations"
+    );
 
     // System metrics
     describe_gauge!(
@@ -441,6 +473,38 @@ pub mod trust {
 
     pub fn score_distribution_record(score: f64) {
         histogram!("icn_trust_score_distribution").record(score);
+    }
+
+    pub fn attestations_received_inc() {
+        counter!("icn_trust_attestations_received_total").increment(1);
+    }
+
+    pub fn attestations_broadcasted_inc() {
+        counter!("icn_trust_attestations_broadcasted_total").increment(1);
+    }
+
+    pub fn attestations_rejected_expired_inc() {
+        counter!("icn_trust_attestations_rejected_expired_total").increment(1);
+    }
+
+    pub fn attestations_rejected_invalid_signature_inc() {
+        counter!("icn_trust_attestations_rejected_invalid_signature_total").increment(1);
+    }
+
+    pub fn attestations_rejected_outdated_inc() {
+        counter!("icn_trust_attestations_rejected_outdated_total").increment(1);
+    }
+
+    pub fn attestations_rejected_rate_limited_inc() {
+        counter!("icn_trust_attestations_rejected_rate_limited_total").increment(1);
+    }
+
+    pub fn attestations_new_inc() {
+        counter!("icn_trust_attestations_new_total").increment(1);
+    }
+
+    pub fn attestations_updated_inc() {
+        counter!("icn_trust_attestations_updated_total").increment(1);
     }
 }
 
