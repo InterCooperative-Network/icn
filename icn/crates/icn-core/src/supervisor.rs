@@ -240,13 +240,14 @@ impl Supervisor {
             });
 
             // Prepare rate limiting configuration
-            let (trust_gated_config, fallback_config) = if self.config.rate_limiting.enabled {
+            let (trust_graph_for_rate_limit, trust_gated_config, fallback_config) = if self.config.rate_limiting.enabled {
                 (
+                    Some(trust_graph_handle.clone()), // Enable trust-gated rate limiting
                     Some(self.config.rate_limiting.to_trust_gated_config()),
                     Some(self.config.rate_limiting.to_fallback_config()),
                 )
             } else {
-                (None, None)
+                (None, None, None) // Disable trust-gated rate limiting
             };
 
             let network_handle = icn_net::NetworkActor::spawn(
@@ -254,7 +255,7 @@ impl Supervisor {
                 listen_addr,
                 self.shutdown_tx.clone(),
                 Some(incoming_handler),
-                Some(trust_graph_handle.clone()), // Enable trust-gated rate limiting
+                trust_graph_for_rate_limit,
                 trust_gated_config,
                 fallback_config,
             )
