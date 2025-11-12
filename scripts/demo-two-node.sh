@@ -45,19 +45,21 @@ mkdir -p /tmp/icn-alpha /tmp/icn-beta
 
 # Alpha identity
 echo -e "${GREEN}Creating Alpha node identity...${NC}"
-echo "testpass123" | DATA_DIR=/tmp/icn-alpha ./target/release/icnctl id init --data-dir /tmp/icn-alpha 2>/dev/null || {
-    echo "testpass123" > /tmp/alpha_pass
-    cat /tmp/alpha_pass | DATA_DIR=/tmp/icn-alpha ./target/release/icnctl id init --data-dir /tmp/icn-alpha > /dev/null 2>&1
-    rm /tmp/alpha_pass
-}
+if [ ! -f /tmp/icn-alpha/identity.age ]; then
+    echo "testpass123" | ./target/release/icnctl --data-dir /tmp/icn-alpha id init || {
+        echo -e "${RED}Failed to create Alpha identity${NC}"
+        exit 1
+    }
+fi
 
 # Beta identity
 echo -e "${GREEN}Creating Beta node identity...${NC}"
-echo "testpass123" | DATA_DIR=/tmp/icn-beta ./target/release/icnctl id init --data-dir /tmp/icn-beta 2>/dev/null || {
-    echo "testpass123" > /tmp/beta_pass
-    cat /tmp/beta_pass | DATA_DIR=/tmp/icn-beta ./target/release/icnctl id init --data-dir /tmp/icn-beta > /dev/null 2>&1
-    rm /tmp/beta_pass
-}
+if [ ! -f /tmp/icn-beta/identity.age ]; then
+    echo "testpass123" | ./target/release/icnctl --data-dir /tmp/icn-beta id init || {
+        echo -e "${RED}Failed to create Beta identity${NC}"
+        exit 1
+    }
+fi
 
 # Trap to cleanup on exit
 cleanup() {
