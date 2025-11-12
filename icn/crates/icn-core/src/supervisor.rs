@@ -131,6 +131,16 @@ impl Supervisor {
 
             info!("Contract runtime initialized");
 
+            // Create ContractActor
+            let contract_actor = icn_ccl::ContractActor::new(
+                did.clone(),
+                contract_runtime_handle.clone(),
+                Some(trust_graph_handle.clone()),
+            );
+            let contract_actor_handle = Arc::new(tokio::sync::RwLock::new(contract_actor));
+
+            info!("Contract actor created");
+
             // TODO: Spawn Identity actor
             // let identity_handle = IdentityActor::spawn(
             //     self.config.keystore_path(),
@@ -309,11 +319,13 @@ impl Supervisor {
 
                 gossip.set_send_callback(send_callback);
 
-                // Set up notification callback for trust attestations
+                // Set up notification callback for trust attestations and contract deployments
                 let trust_graph_for_notifications = trust_graph_handle.clone();
                 let own_did_for_notifications = did.clone();
+                let contract_actor_for_notifications = contract_actor_handle.clone();
 
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
+                    // Handle trust attestations
                     if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
                         let trust_graph = trust_graph_for_notifications.clone();
                         let own_did = own_did_for_notifications.clone();
@@ -329,6 +341,31 @@ impl Supervisor {
                             }
                         });
                     }
+                    // Handle contract deployments
+                    else if topic == "contracts:deploy" {
+                        let contract_actor = contract_actor_for_notifications.clone();
+                        let entry_data = entry.data.clone();
+
+                        tokio::spawn(async move {
+                            // Deserialize contract deployment message
+                            match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
+                                Ok(deployment_msg) => {
+                                    let mut actor = contract_actor.write().await;
+                                    if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
+                                        warn!("Failed to handle contract deployment: {}", e);
+                                        icn_obs::metrics::contract::deployments_rejected_inc("handling_error");
+                                    } else {
+                                        info!("Contract deployment processed successfully");
+                                        icn_obs::metrics::contract::deployments_received_inc();
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize contract deployment message: {}", e);
+                                    icn_obs::metrics::contract::deployments_rejected_inc("deserialization_error");
+                                }
+                            }
+                        });
+                    }
                 });
 
                 gossip.set_notification_callback(notification_callback);
@@ -338,6 +375,13 @@ impl Supervisor {
                     warn!("Failed to subscribe to trust attestations topic: {}", e);
                 } else {
                     info!("Subscribed to trust:attestations topic");
+                }
+
+                // Subscribe to contracts:deploy topic with trust-gated access (min trust 0.4)
+                if let Err(e) = gossip.subscribe("contracts:deploy", did.clone()) {
+                    warn!("Failed to subscribe to contracts:deploy topic: {}", e);
+                } else {
+                    info!("Subscribed to contracts:deploy topic");
                 }
             }
 
