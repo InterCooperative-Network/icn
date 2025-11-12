@@ -297,6 +297,44 @@ mod tests {
     }
 
     #[test]
+    fn test_repository_config_files() {
+        // Test that the actual config files in the repository parse correctly
+        let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
+            .map(|dir| std::path::PathBuf::from(dir).parent().unwrap().parent().unwrap().parent().unwrap().to_path_buf())
+            .unwrap_or_else(|_| std::path::PathBuf::from("/home/matt/projects/icn"));
+
+        let config_dir = workspace_root.join("config");
+
+        // Test icn-alpha.toml
+        let alpha_path = config_dir.join("icn-alpha.toml");
+        if alpha_path.exists() {
+            let alpha = Config::from_file(&alpha_path).unwrap();
+            assert_eq!(alpha.network.listen_addr, "0.0.0.0:7777");
+            assert_eq!(alpha.observability.metrics_port, 9100);
+            assert!(alpha.rate_limiting.enabled);
+            assert_eq!(alpha.rate_limiting.isolated.max_messages_per_second, 10);
+            assert_eq!(alpha.rate_limiting.federated.max_messages_per_second, 200);
+        }
+
+        // Test icn-beta.toml
+        let beta_path = config_dir.join("icn-beta.toml");
+        if beta_path.exists() {
+            let beta = Config::from_file(&beta_path).unwrap();
+            assert_eq!(beta.network.listen_addr, "0.0.0.0:7778");
+            assert_eq!(beta.observability.metrics_port, 9101);
+            assert!(beta.rate_limiting.enabled);
+        }
+
+        // Test icn.toml.example
+        let example_path = config_dir.join("icn.toml.example");
+        if example_path.exists() {
+            let example = Config::from_file(&example_path).unwrap();
+            assert!(example.rate_limiting.enabled);
+            assert_eq!(example.rate_limiting.partner.max_messages_per_second, 100);
+        }
+    }
+
+    #[test]
     fn test_partial_rate_limiting_config() {
         // Test that we can override individual rate limiting settings
         let toml_str = r#"
