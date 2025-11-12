@@ -1,0 +1,67 @@
+# ICN Configuration Example
+# Copy this file to ~/.icn/icn.toml to customize settings
+
+# Data directory for ICN state
+data_dir = "~/.icn"
+
+[network]
+# Enable mDNS peer discovery on local network
+mdns_enabled = true
+
+# QUIC listen address (IP:PORT format)
+listen_addr = "0.0.0.0:7777"
+
+# JSON-RPC HTTP API listen port
+rpc_port = 5601
+
+# Bootstrap rendezvous peers (format: ["did:icn:base58pubkey@host:port"])
+bootstrap_peers = []
+
+[observability]
+# Prometheus metrics server port
+metrics_port = 9100
+
+# Health check endpoint port
+health_port = 8080
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+[rate_limiting]
+# Enable trust-gated rate limiting (requires trust graph)
+# When enabled, rate limits adjust based on peer trust classification
+enabled = true
+
+# Token bucket refill interval in milliseconds
+# Shorter intervals = smoother rate limiting, longer = more burst tolerance
+refill_interval_ms = 100
+
+# Rate limits for isolated peers (trust score < 0.1)
+# These are untrusted or new peers with strict limits
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+# Rate limits for known peers (trust score 0.1-0.4)
+# Peers with some trust but not yet partners
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+# Rate limits for partner peers (trust score 0.4-0.7)
+# Trusted partners with moderate throughput
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+# Rate limits for federated peers (trust score 0.7+)
+# Highly trusted peers with maximum throughput
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+
+# Fallback rate limits when trust graph is unavailable
+# Used when trust-gated limiting is disabled or trust lookup fails
+[rate_limiting.fallback]
+max_messages_per_second = 100
+burst_capacity = 20

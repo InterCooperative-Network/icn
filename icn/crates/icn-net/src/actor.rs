@@ -151,6 +151,8 @@ impl NetworkActor {
         shutdown_tx: tokio::sync::broadcast::Sender<()>,
         incoming_handler: Option<IncomingMessageHandler>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
+        trust_gated_config: Option<crate::rate_limit::TrustGatedRateLimitConfig>,
+        fallback_config: Option<RateLimitConfig>,
     ) -> Result<NetworkHandle> {
         let did = keypair.did().clone();
 
@@ -185,14 +187,19 @@ impl NetworkActor {
 
         // Create rate limiter (trust-gated if trust_graph provided, otherwise fallback)
         let rate_limiter = if let Some(trust_graph) = trust_graph {
+            let config = trust_gated_config.unwrap_or_else(|| {
+                info!("Using default trust-gated rate limit config");
+                crate::rate_limit::TrustGatedRateLimitConfig::default()
+            });
             info!("Trust-gated rate limiting enabled");
-            Arc::new(RateLimiter::new_trust_gated(
-                crate::rate_limit::TrustGatedRateLimitConfig::default(),
-                trust_graph,
-            ))
+            Arc::new(RateLimiter::new_trust_gated(config, trust_graph))
         } else {
+            let config = fallback_config.unwrap_or_else(|| {
+                info!("Using default fallback rate limit config");
+                RateLimitConfig::default()
+            });
             info!("Using fallback rate limiting (no trust graph)");
-            Arc::new(RateLimiter::new(RateLimitConfig::default()))
+            Arc::new(RateLimiter::new(config))
         };
 
         // Spawn incoming connection handler if handler is provided
@@ -561,7 +568,7 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
-        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone(), None, None)
+        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone(), None, None, None, None)
             .await
             .unwrap();
 
