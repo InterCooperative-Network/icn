@@ -304,6 +304,37 @@ impl Supervisor {
                 });
 
                 gossip.set_send_callback(send_callback);
+
+                // Set up notification callback for trust attestations
+                let trust_graph_for_notifications = trust_graph_handle.clone();
+                let own_did_for_notifications = did.clone();
+
+                let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
+                    if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
+                        let trust_graph = trust_graph_for_notifications.clone();
+                        let own_did = own_did_for_notifications.clone();
+
+                        tokio::spawn(async move {
+                            if let Err(e) = crate::trust_propagation::handle_trust_attestation_entry(
+                                &entry,
+                                &trust_graph,
+                                &own_did,
+                                None, // TODO: Add rate limiter in Phase 8A+
+                            ).await {
+                                warn!("Failed to handle trust attestation: {}", e);
+                            }
+                        });
+                    }
+                });
+
+                gossip.set_notification_callback(notification_callback);
+
+                // Subscribe to trust attestations topic
+                if let Err(e) = gossip.subscribe(crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC, did.clone()) {
+                    warn!("Failed to subscribe to trust attestations topic: {}", e);
+                } else {
+                    info!("Subscribed to trust:attestations topic");
+                }
             }
 
             info!("Gossip send callback configured");

@@ -90,6 +90,10 @@ impl GossipActor {
             "global:rendezvous".to_string(),
             AccessControl::Public,
         ));
+        gossip.create_topic(Topic::new(
+            "trust:attestations".to_string(),
+            AccessControl::TrustClass(TrustClass::Known), // Require Known or higher
+        ));
 
         gossip
     }
