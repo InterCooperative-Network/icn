@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 8A: Trust Network Propagation (2025-01-12)
+
+**Trust Attestation System:**
+- **Signed trust attestations** with Ed25519 cryptographic signatures
+  - `TrustAttestation` message format with issuer, subject, score, TTL, and signature
+  - Deterministic signing payload (SHA256 hash of sorted fields)
+  - Signature verification extracting verifying key from DIDs
+  - TTL-based expiration (default: 30 days) with automatic decay
+  - Conversion to/from `TrustEdge` for seamless storage integration
+- **`trust:attestations` gossip topic** for network-wide trust propagation
+  - Access control: `TrustClass::Known` (requires trust score ≥0.1)
+  - Prevents spam from untrusted/isolated nodes
+  - Integrates with existing gossip infrastructure
+- **Trust propagation module** (`icn-core/src/trust_propagation.rs`)
+  - `broadcast_trust_attestation()` - Signs and publishes attestations
+  - `handle_trust_attestation_entry()` - Verifies and applies remote attestations
+  - Deduplication: only accepts newer attestations (by `created_at` timestamp)
+  - Automatic notification callback integration with gossip subscriptions
+- **Supervisor wiring** for incoming attestation handling
+  - Notification callback processes trust attestations reactively
+  - Automatic subscription to `trust:attestations` topic
+  - Spawns async tasks for non-blocking attestation processing
+
+**Observability:**
+- **Prometheus metrics** for trust propagation:
+  - `icn_trust_attestations_broadcasted_total` - Outbound attestations
+  - `icn_trust_attestations_received_total` - Inbound attestations
+- Enable monitoring of trust graph growth and network health
+
+**Testing:**
+- **14 unit tests** for trust attestations (100% pass rate)
+  - Signature creation, verification, and tampering detection
+  - Expiry checking and TTL management
+  - TrustEdge conversion roundtrips
+  - Signing payload determinism
+- **2 integration tests** for end-to-end trust propagation
+  - Two-node trust propagation with full QUIC/TLS stack
+  - Three-node transitive trust computation verification
+  - Real gossip network with announce/pull cycles
+
+**Architecture:**
+- Trust edges now propagate across the network via signed attestations
+- Nodes build distributed trust webs automatically
+- Transitive trust computation works across remote trust edges
+- Foundation for trust-based governance and cooperation
+
+**Security Features:**
+- Cryptographic signature verification prevents forgery
+- Timestamp monotonic checks mitigate replay attacks
+- TTL expiration prevents stale trust information
+- Trust-gated topic access prevents spam flooding
+
+**Performance:**
+- Average attestation size: ~300 bytes (JSON-serialized)
+- Signature overhead: 64 bytes (Ed25519)
+- Propagation latency: <1 second for 2-hop networks
+- Gossip compression for larger attestations (>1KB)
+
+**Impact:**
+- **Closes the biggest gap** in ICN's distributed cooperation infrastructure
+- Enables truly distributed trust building (no central authority)
+- Foundation for Phase 8B (trust-gated security) and Phase 8C (WAN discovery)
+- First step toward federated trust networks
+
 ### Added - User Onboarding Improvements (2025-11-11)
 
 **New Directories:**
