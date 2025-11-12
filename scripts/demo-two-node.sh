@@ -21,6 +21,14 @@ echo -e "${BLUE}║       ICN Two-Node Demo - Trust-Gated Rate Limiting         
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo
 
+# Get the script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE_ROOT="$PROJECT_ROOT/icn"
+
+# Change to workspace directory for cargo commands
+cd "$WORKSPACE_ROOT"
+
 # Check if icnd binary exists
 if [ ! -f "target/release/icnd" ]; then
     echo -e "${YELLOW}Building release binary...${NC}"
@@ -44,7 +52,7 @@ trap cleanup EXIT INT TERM
 # Start Alpha node
 echo -e "${GREEN}Starting Alpha node (port 7777, metrics 9100)...${NC}"
 ICN_PASSPHRASE="testpass123" ./target/release/icnd \
-    --config config/icn-alpha.toml > /tmp/icn-alpha.log 2>&1 &
+    --config "$PROJECT_ROOT/config/icn-alpha.toml" > /tmp/icn-alpha.log 2>&1 &
 ALPHA_PID=$!
 echo "  PID: $ALPHA_PID"
 
@@ -54,7 +62,7 @@ sleep 3
 # Start Beta node
 echo -e "${GREEN}Starting Beta node (port 7778, metrics 9101)...${NC}"
 ICN_PASSPHRASE="testpass123" ./target/release/icnd \
-    --config config/icn-beta.toml > /tmp/icn-beta.log 2>&1 &
+    --config "$PROJECT_ROOT/config/icn-beta.toml" > /tmp/icn-beta.log 2>&1 &
 BETA_PID=$!
 echo "  PID: $BETA_PID"
 
