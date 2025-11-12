@@ -290,34 +290,37 @@ pub async fn handle_trust_attestation_entry(
     // Apply to trust graph
     let mut graph = trust_graph.write().await;
 
-    // Check if we already have this edge
-    if let Ok(Some(existing)) = graph.get_edge(&edge.source, &edge.target) {
-        // Use should_supersede to handle clock skew and score tiebreaking
-        if !attestation.should_supersede(existing.created_at, existing.score) {
-            debug!(
-                "Rejecting outdated trust attestation: {} -> {} (existing: ts={}, score={:.2}; incoming: ts={}, score={:.2})",
-                edge.source, edge.target,
-                existing.created_at, existing.score,
-                attestation.created_at, attestation.score
-            );
-            icn_obs::metrics::trust::attestations_rejected_outdated_inc();
-            return Ok(());
-        }
+    // Check if we already have this edge - propagate storage errors
+    match graph.get_edge(&edge.source, &edge.target)? {
+        Some(existing) => {
+            // Use should_supersede to handle clock skew and score tiebreaking
+            if !attestation.should_supersede(existing.created_at, existing.score) {
+                debug!(
+                    "Rejecting outdated trust attestation: {} -> {} (existing: ts={}, score={:.2}; incoming: ts={}, score={:.2})",
+                    edge.source, edge.target,
+                    existing.created_at, existing.score,
+                    attestation.created_at, attestation.score
+                );
+                icn_obs::metrics::trust::attestations_rejected_outdated_inc();
+                return Ok(());
+            }
 
-        // Log significant trust changes (>0.3 delta) for audit trail
-        let score_delta = (attestation.score - existing.score).abs();
-        if score_delta > 0.3 {
-            warn!(
-                "Significant trust change: {} -> {} from {:.2} to {:.2} (delta: {:.2})",
-                edge.source, edge.target, existing.score, attestation.score, score_delta
-            );
-        }
+            // Log significant trust changes (>0.3 delta) for audit trail
+            let score_delta = (attestation.score - existing.score).abs();
+            if score_delta > 0.3 {
+                warn!(
+                    "Significant trust change: {} -> {} from {:.2} to {:.2} (delta: {:.2})",
+                    edge.source, edge.target, existing.score, attestation.score, score_delta
+                );
+            }
 
-        // Mark as an update rather than new edge
-        icn_obs::metrics::trust::attestations_updated_inc();
-    } else {
-        // This is a new trust edge
-        icn_obs::metrics::trust::attestations_new_inc();
+            // Mark as an update rather than new edge
+            icn_obs::metrics::trust::attestations_updated_inc();
+        }
+        None => {
+            // This is a new trust edge
+            icn_obs::metrics::trust::attestations_new_inc();
+        }
     }
 
     graph.add_edge(edge.clone())?;
