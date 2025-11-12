@@ -269,9 +269,8 @@ impl RateLimiter {
 
         let allowed = bucket.try_consume();
 
-        // Record rate limiting metrics
+        // Record per-class rate limiting metric (general counter recorded in actor.rs)
         if !allowed {
-            icn_obs::metrics::network::messages_rate_limited_inc();
             if let Some(class) = trust_class {
                 icn_obs::metrics::network::messages_rate_limited_by_class_inc(trust_class_to_str(class));
             }
