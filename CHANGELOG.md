@@ -116,6 +116,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contract examples provide learning resources and test cases
 - Proper JSON-RPC error handling enables reliable error detection in monitoring tools
 
+### Added - Trust-Gated Rate Limiting (PR #3) (2025-11-11)
+
+**Dynamic Rate Limiting Based on Trust:**
+- Different message rate limits for each trust class:
+  - **Isolated peers** (trust score < 0.1): 10 messages/sec, burst capacity 2
+  - **Known peers** (trust score 0.1-0.4): 50 messages/sec, burst capacity 10
+  - **Partner peers** (trust score 0.4-0.7): 100 messages/sec, burst capacity 20
+  - **Federated peers** (trust score 0.7+): 200 messages/sec, burst capacity 50
+- Rate limits automatically adjust when peer trust changes
+- Immediate benefit for trust upgrades (token bucket reset to new capacity)
+- Backwards compatible: Falls back to 100 msg/sec when no trust graph available
+
+**Architecture:**
+- `TrustGatedRateLimitConfig` in `icn-net/src/rate_limit.rs`
+- `RateLimiter::new_trust_gated()` integrates with trust graph
+- Token buckets track trust class and detect changes
+- Trust graph shared between Gossip and Network actors
+- Trust data persisted in `~/.icn/trust/` directory
+
+**Testing:**
+- 3 comprehensive unit tests for trust-gated behavior
+- Tests verify different limits for each trust class
+- Tests verify dynamic adjustment on trust class changes
+- All 140+ tests passing
+
+**Impact:**
+- Provides robust DoS protection against untrusted peers (10 msg/sec limit)
+- Enables high throughput for trusted partners (200 msg/sec for federated peers)
+- Adaptive security: protection strengthens/weakens based on actual trust relationships
+- No configuration required: works automatically based on trust graph state
+
 ### Added - Phase 7 Pull Protocol Completion (2025-01-11)
 
 **Gossip Pull Protocol:**
