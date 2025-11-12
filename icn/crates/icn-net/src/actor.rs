@@ -165,10 +165,11 @@ impl NetworkActor {
             .await
             .context("Failed to start discovery")?;
 
-        // Start session manager
+        // Start session manager with trust-gated TLS if trust_graph provided
         let mut session_manager = SessionManager::new();
+        let tls_trust_threshold = trust_gated_config.as_ref().map(|cfg| cfg.min_trust_threshold);
         session_manager
-            .start(keypair, listen_addr)
+            .start(keypair, listen_addr, trust_graph.clone(), tls_trust_threshold)
             .await
             .context("Failed to start session manager")?;
 

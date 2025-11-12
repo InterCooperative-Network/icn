@@ -7,7 +7,7 @@
 //! - DID-based peer authentication
 
 use anyhow::{Context, Result};
-use icn_identity::KeyPair;
+use icn_identity::{Did, KeyPair};
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -71,8 +71,19 @@ impl SessionManager {
     ///
     /// This creates a QUIC endpoint bound to the given address and starts
     /// listening for incoming connections.
-    pub async fn start(&mut self, keypair: &KeyPair, listen_addr: SocketAddr) -> Result<()> {
+    ///
+    /// If trust_graph is provided, enables trust-gated TLS verification where
+    /// connections from peers below min_trust_threshold are rejected.
+    pub async fn start(
+        &mut self,
+        keypair: &KeyPair,
+        listen_addr: SocketAddr,
+        trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+        min_trust_threshold: Option<f64>,
+    ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
+
+        let own_did = keypair.did().clone();
 
         // Generate TLS certificate for this DID
         let (certs, key) = tls::generate_self_signed_cert(keypair)?;
@@ -87,8 +98,18 @@ impl SessionManager {
         let transport_config = Arc::new(create_transport_config());
         server_config.transport_config(transport_config.clone());
 
-        // Create client config with same transport limits
-        let client_config = tls::create_client_config()?;
+        // Create client config with trust-gated verification if trust_graph provided
+        let client_config = if let Some(trust_graph) = trust_graph {
+            info!("Trust-gated TLS verification enabled (min_threshold: {:?})", min_trust_threshold);
+            tls::create_client_config(trust_graph, own_did, min_trust_threshold)?
+        } else {
+            // Fallback: create a permissive client config (accepts all authenticated DIDs)
+            info!("TLS verification in development mode (no trust graph)");
+            // Create a temporary trust graph for development mode
+            let temp_store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary()?);
+            let temp_trust_graph = icn_trust::TrustGraph::new(temp_store, own_did.clone());
+            tls::create_client_config(Arc::new(RwLock::new(temp_trust_graph)), own_did, Some(0.0))?
+        };
         let mut client_config = ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?,
         ));
@@ -211,7 +232,7 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let addr = "127.0.0.1:0".parse().unwrap();
 
-        manager.start(&keypair, addr).await.unwrap();
+        manager.start(&keypair, addr, None, None).await.unwrap();
 
         // Endpoint should be initialized
         assert!(manager.endpoint.read().await.is_some());
@@ -230,7 +251,7 @@ mod tests {
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         server_manager
-            .start(&server_keypair, server_addr)
+            .start(&server_keypair, server_addr, None, None)
             .await
             .unwrap();
 
@@ -249,7 +270,7 @@ mod tests {
         let client_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         client_manager
-            .start(&client_keypair, client_addr)
+            .start(&client_keypair, client_addr, None, None)
             .await
             .unwrap();
 

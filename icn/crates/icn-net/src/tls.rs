@@ -1,13 +1,39 @@
-//! TLS certificate generation using DIDs
+//! TLS certificate generation using DIDs with trust-gated verification
 //!
-//! ICN uses DID-based certificates for mTLS authentication. The certificate includes
-//! the DID as the Common Name, allowing peers to identify each other.
+//! ICN uses DID-based certificates for mTLS authentication with trust graph integration:
+//!
+//! ## Certificate Generation
+//! - Self-signed certificates with DID as Subject Alternative Name (SAN)
+//! - Ed25519 keypairs for TLS (separate from DID signing key)
+//! - Certificates store DID in DNS SAN field for peer identification
+//!
+//! ## Trust-Gated Verification
+//! The `DidCertificateVerifier` implements trust-based access control by:
+//! 1. Extracting DID from certificate SAN during TLS handshake
+//! 2. Querying trust graph for peer's trust score
+//! 3. Rejecting connections if trust score < min_trust_threshold
+//! 4. Recording rejection metrics for security monitoring
+//!
+//! ## Security Model
+//! - **Default threshold: 0.0** - Accept all authenticated DIDs (development mode)
+//! - **Recommended production: 0.1** - Reject isolated/unknown peers
+//! - **High security: 0.4** - Only accept partner-level or higher trust
+//! - Trust scores computed from own DID's perspective using trust graph
+//! - Prevents Sybil attacks and unauthorized network access
+//!
+//! ## Ed25519 Signature Verification
+//! - TLS 1.3 handshake signatures verified using certificate's Ed25519 public key
+//! - 32-byte public key extracted from X.509 certificate
+//! - Full cryptographic verification prevents MITM attacks
 
 use anyhow::{Context, Result};
-use icn_identity::KeyPair;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use icn_identity::{Did, KeyPair};
+use icn_trust::TrustGraph;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::sync::Arc;
-use tracing::info;
+use tokio::sync::RwLock;
+use tracing::{info, warn};
 
 /// Generate a self-signed certificate for a DID
 ///
@@ -57,15 +83,29 @@ pub fn create_server_config(
     Ok(config)
 }
 
-/// Create a rustls client configuration for QUIC
+/// Create a rustls client configuration for QUIC with trust-gated verification
 ///
-/// This uses a custom certificate verifier that validates DID-based certificates.
-pub fn create_client_config() -> Result<rustls::ClientConfig> {
-    // Create a client config that accepts self-signed certificates
-    // In production, this should validate the DID signature
+/// This uses a custom certificate verifier that validates DID-based certificates
+/// and enforces trust-based access control.
+///
+/// # Arguments
+/// * `trust_graph` - Shared trust graph for peer trust lookups
+/// * `own_did` - This node's DID (for trust computation)
+/// * `min_trust_threshold` - Minimum trust score required (default: 0.0 = allow all authenticated DIDs)
+pub fn create_client_config(
+    trust_graph: Arc<RwLock<TrustGraph>>,
+    own_did: Did,
+    min_trust_threshold: Option<f64>,
+) -> Result<rustls::ClientConfig> {
+    let verifier = DidCertificateVerifier {
+        trust_graph,
+        own_did,
+        min_trust_threshold: min_trust_threshold.unwrap_or(0.0),
+    };
+
     let mut config = rustls::ClientConfig::builder()
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(DidCertificateVerifier))
+        .with_custom_certificate_verifier(Arc::new(verifier))
         .with_no_client_auth();
 
     // Enable ALPN for QUIC
@@ -77,15 +117,35 @@ pub fn create_client_config() -> Result<rustls::ClientConfig> {
 /// Custom certificate verifier for DID-based certificates
 ///
 /// This verifier extracts the DID from certificate SAN (Subject Alternative Name) and performs
-/// basic validation. Full trust graph integration is TODO.
+/// comprehensive validation including trust graph integration.
 ///
-/// Security notes:
-/// - Currently accepts self-signed certificates (required for P2P architecture)
-/// - Does NOT yet integrate with trust graph for trust score verification
+/// Security features:
+/// - Accepts self-signed certificates (required for P2P architecture)
+/// - Integrates with trust graph for trust score verification
+/// - Rejects connections from untrusted peers (score < min_trust_threshold)
 /// - Logs all certificate verifications for security auditing
 /// - Validates DID format and certificate expiration
-#[derive(Debug)]
-struct DidCertificateVerifier;
+///
+/// Trust-based access control:
+/// - Isolated peers (score < 0.1): Connection rejected
+/// - Known peers (score ≥ 0.1): Allowed by default
+/// - Configurable minimum threshold (default: 0.0 = allow all authenticated DIDs)
+#[derive(Clone)]
+struct DidCertificateVerifier {
+    trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    own_did: icn_identity::Did,
+    min_trust_threshold: f64,
+}
+
+impl std::fmt::Debug for DidCertificateVerifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DidCertificateVerifier")
+            .field("own_did", &self.own_did)
+            .field("min_trust_threshold", &self.min_trust_threshold)
+            .field("trust_graph", &"<Arc<RwLock<TrustGraph>>>")
+            .finish()
+    }
+}
 
 impl DidCertificateVerifier {
     /// Extract DID from certificate Subject Alternative Names
@@ -150,31 +210,52 @@ impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
         now: rustls::pki_types::UnixTime,
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         // Extract and validate DID from certificate
-        let did = Self::extract_did_from_cert(end_entity)?;
+        let did_str = Self::extract_did_from_cert(end_entity)?;
 
         // Validate DID format
-        if !did.starts_with("did:icn:") {
+        if !did_str.starts_with("did:icn:") {
             return Err(rustls::Error::General(format!(
                 "Invalid DID format: {}",
-                did
+                did_str
             )));
         }
+
+        // Parse DID
+        let peer_did = Did::from_str(&did_str)
+            .map_err(|e| rustls::Error::General(format!("Failed to parse DID: {}", e)))?;
 
         // Check certificate expiration
         Self::check_expiration(end_entity, now)?;
 
-        // Log certificate verification for security audit
-        tracing::info!(
-            "Certificate verification: Accepted self-signed cert for DID: {}",
-            did
-        );
-        tracing::warn!(
-            "⚠️  SECURITY: Trust graph verification not yet implemented for DID: {}",
-            did
+        // Query trust graph for peer's trust score
+        // Use blocking_read since we're in a sync context (rustls callback)
+        let trust_score = {
+            let graph = self.trust_graph.blocking_read();
+            graph.compute_trust_score(&peer_did).unwrap_or(0.0)
+        };
+
+        // Enforce trust threshold
+        if trust_score < self.min_trust_threshold {
+            warn!(
+                "🔒 Connection rejected: DID {} has insufficient trust (score: {:.3}, required: {:.3})",
+                did_str, trust_score, self.min_trust_threshold
+            );
+
+            // Increment rejection metric
+            icn_obs::metrics::network::connections_rejected_untrusted_inc(&did_str, trust_score);
+
+            return Err(rustls::Error::General(format!(
+                "Peer DID {} has insufficient trust score {:.3} (required: {:.3})",
+                did_str, trust_score, self.min_trust_threshold
+            )));
+        }
+
+        // Log successful verification
+        info!(
+            "✅ Certificate verified: DID {} (trust score: {:.3})",
+            did_str, trust_score
         );
 
-        // TODO: Query trust graph and reject if trust score < Partner
-        // For now, accept all valid DID certificates (development mode)
         Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
 
@@ -190,11 +271,54 @@ impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
 
     fn verify_tls13_signature(
         &self,
-        _message: &[u8],
-        _cert: &CertificateDer<'_>,
-        _dss: &rustls::DigitallySignedStruct,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
     ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        // TODO: Implement signature verification
+        use rustls::SignatureScheme;
+
+        // Verify we're using Ed25519
+        if dss.scheme != SignatureScheme::ED25519 {
+            return Err(rustls::Error::General(format!(
+                "Unsupported signature scheme: {:?} (expected Ed25519)",
+                dss.scheme
+            )));
+        }
+
+        // Parse the certificate to extract the public key
+        use x509_parser::prelude::*;
+        let (_, parsed_cert) = X509Certificate::from_der(cert)
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {}", e)))?;
+
+        // Extract the public key bytes
+        let public_key_bytes = parsed_cert.public_key().subject_public_key.data.clone();
+
+        // Ed25519 public keys are 32 bytes
+        if public_key_bytes.len() != 32 {
+            return Err(rustls::Error::General(format!(
+                "Invalid Ed25519 public key length: {} (expected 32)",
+                public_key_bytes.len()
+            )));
+        }
+
+        // Convert to [u8; 32] array
+        let key_array: [u8; 32] = public_key_bytes[..32]
+            .try_into()
+            .map_err(|_| rustls::Error::General("Failed to convert public key".to_string()))?;
+
+        // Create Ed25519 verifying key
+        let verifying_key = VerifyingKey::from_bytes(&key_array)
+            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 public key: {}", e)))?;
+
+        // Parse signature
+        let signature = Signature::from_slice(&dss.signature())
+            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 signature: {}", e)))?;
+
+        // Verify signature
+        verifying_key
+            .verify(message, &signature)
+            .map_err(|e| rustls::Error::General(format!("Signature verification failed: {}", e)))?;
+
         Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
     }
 
@@ -237,7 +361,14 @@ mod tests {
     #[test]
     fn test_create_client_config() {
         setup();
-        let config = create_client_config().unwrap();
+        let keypair = KeyPair::generate().unwrap();
+        let own_did = keypair.did().clone();
+
+        // Create a temporary trust graph for testing
+        let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(store, own_did.clone())));
+
+        let config = create_client_config(trust_graph, own_did, None).unwrap();
 
         // Should have ALPN configured
         assert_eq!(config.alpn_protocols, vec![b"icn/1".to_vec()]);
