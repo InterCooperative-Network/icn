@@ -101,7 +101,7 @@ impl Supervisor {
                 tokio::task::block_in_place(|| {
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(async {
-                        let mut graph = graph.write().await;
+                        let graph = graph.read().await;
                         graph.trust_class(&peer).ok()
                     })
                 })

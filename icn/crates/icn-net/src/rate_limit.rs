@@ -233,10 +233,9 @@ impl RateLimiter {
             (&self.trust_gated_config, &self.trust_graph)
         {
             // Trust-gated mode: look up peer's trust class
-            // Note: trust_class() requires &mut because it updates internal cache
-            // Future optimization: use interior mutability in TrustGraph to allow read locks
+            // Uses read lock - TrustGraph cache uses interior mutability (Mutex)
             let trust_class = {
-                let mut graph = trust_graph.write().await;
+                let graph = trust_graph.read().await;
                 graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
             };
 

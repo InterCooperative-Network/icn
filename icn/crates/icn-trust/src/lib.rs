@@ -5,7 +5,7 @@ use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::{debug, info};
 
 /// Trust classification for a peer
@@ -102,7 +102,8 @@ impl TrustEdge {
 pub struct TrustGraph {
     store: Arc<dyn Store>,
     own_did: Did,
-    cache: HashMap<Did, f64>, // Cached trust scores
+    /// Cached trust scores with interior mutability for concurrent read access
+    cache: Mutex<HashMap<Did, f64>>,
 }
 
 impl TrustGraph {
@@ -111,7 +112,7 @@ impl TrustGraph {
         Self {
             store,
             own_did,
-            cache: HashMap::new(),
+            cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -128,7 +129,9 @@ impl TrustGraph {
         self.store.put(key.as_bytes(), &value)?;
 
         // Invalidate cache for target
-        self.cache.remove(&edge.target);
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.remove(&edge.target);
+        }
 
         Ok(())
     }
@@ -182,14 +185,16 @@ impl TrustGraph {
     /// TrustScore(own -> target) =
     ///     DirectTrust(own -> target) * 0.7 +
     ///     TransitiveTrust(own -> intermediate -> target) * 0.3
-    pub fn compute_trust_score(&mut self, target: &Did) -> Result<f64> {
+    pub fn compute_trust_score(&self, target: &Did) -> Result<f64> {
         // Record lookup
         icn_obs::metrics::trust::lookups_inc();
 
-        // Check cache first
-        if let Some(&score) = self.cache.get(target) {
-            icn_obs::metrics::trust::cache_hits_inc();
-            return Ok(score);
+        // Check cache first (using interior mutability via Mutex)
+        if let Ok(cache) = self.cache.lock() {
+            if let Some(&score) = cache.get(target) {
+                icn_obs::metrics::trust::cache_hits_inc();
+                return Ok(score);
+            }
         }
 
         icn_obs::metrics::trust::cache_misses_inc();
@@ -236,8 +241,10 @@ impl TrustGraph {
             target, direct_score, transitive_score, final_score
         );
 
-        // Cache result
-        self.cache.insert(target.clone(), final_score);
+        // Cache result (using interior mutability via Mutex)
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.insert(target.clone(), final_score);
+        }
 
         // Record score distribution
         icn_obs::metrics::trust::score_distribution_record(final_score);
@@ -246,7 +253,7 @@ impl TrustGraph {
     }
 
     /// Get the trust class for a DID
-    pub fn trust_class(&mut self, did: &Did) -> Result<TrustClass> {
+    pub fn trust_class(&self, did: &Did) -> Result<TrustClass> {
         let score = self.compute_trust_score(did)?;
         Ok(TrustClass::from_score(score))
     }
@@ -255,13 +262,20 @@ impl TrustGraph {
     pub fn remove_edge(&mut self, source: &Did, target: &Did) -> Result<()> {
         let key = format!("trust/edges/{}:{}", source.as_str(), target.as_str());
         self.store.delete(key.as_bytes())?;
-        self.cache.remove(target);
+
+        // Invalidate cache for target
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.remove(target);
+        }
+
         Ok(())
     }
 
     /// Clear the trust score cache
-    pub fn clear_cache(&mut self) {
-        self.cache.clear();
+    pub fn clear_cache(&self) {
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.clear();
+        }
     }
 }
 
