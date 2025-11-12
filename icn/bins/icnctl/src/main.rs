@@ -234,6 +234,11 @@ fn get_store_path(data_dir: &PathBuf) -> PathBuf {
 }
 
 fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
+    // Check for ICN_PASSPHRASE environment variable first
+    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+        return Ok(passphrase.into_bytes());
+    }
+
     print!("{}", prompt);
     io::stdout().flush()?;
     let passphrase = rpassword::read_password()?;
@@ -241,6 +246,11 @@ fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
 }
 
 fn confirm_passphrase() -> Result<Vec<u8>> {
+    // If ICN_PASSPHRASE is set, use it without confirmation
+    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+        return Ok(passphrase.into_bytes());
+    }
+
     let pass1 = read_passphrase("Enter passphrase: ")?;
     let pass2 = read_passphrase("Confirm passphrase: ")?;
 
