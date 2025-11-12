@@ -37,6 +37,18 @@ pub fn init_descriptions() {
         "icn_network_messages_rate_limited_total",
         "Total number of messages dropped due to rate limiting"
     );
+    describe_counter!(
+        "icn_network_messages_rate_limited_by_class_total",
+        "Total number of messages rate limited by trust class"
+    );
+    describe_gauge!(
+        "icn_network_active_peers_by_class",
+        "Number of active peers by trust class"
+    );
+    describe_counter!(
+        "icn_network_trust_class_changes_total",
+        "Total number of peer trust class changes affecting rate limits"
+    );
 
     // Gossip metrics
     describe_gauge!(
@@ -219,6 +231,18 @@ pub mod network {
 
     pub fn messages_rate_limited_inc() {
         counter!("icn_network_messages_rate_limited_total").increment(1);
+    }
+
+    pub fn messages_rate_limited_by_class_inc(trust_class: &str) {
+        counter!("icn_network_messages_rate_limited_by_class_total", "class" => trust_class.to_string()).increment(1);
+    }
+
+    pub fn active_peers_by_class_set(trust_class: &str, count: u64) {
+        gauge!("icn_network_active_peers_by_class", "class" => trust_class.to_string()).set(count as f64);
+    }
+
+    pub fn trust_class_changes_inc() {
+        counter!("icn_network_trust_class_changes_total").increment(1);
     }
 }
 

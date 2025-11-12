@@ -10,6 +10,16 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
+// Helper to convert TrustClass to string for metrics
+fn trust_class_to_str(class: TrustClass) -> &'static str {
+    match class {
+        TrustClass::Isolated => "isolated",
+        TrustClass::Known => "known",
+        TrustClass::Partner => "partner",
+        TrustClass::Federated => "federated",
+    }
+}
+
 /// Configuration for rate limiting
 #[derive(Clone, Debug)]
 pub struct RateLimitConfig {
@@ -130,7 +140,7 @@ impl TokenBucket {
     }
 
     /// Update bucket configuration if trust class has changed
-    fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64, new_trust_class: Option<TrustClass>) {
+    fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64, new_trust_class: Option<TrustClass>) -> bool {
         // Only update if trust class actually changed
         if self.trust_class != new_trust_class {
             self.capacity = new_capacity;
@@ -140,6 +150,9 @@ impl TokenBucket {
             // This gives immediate benefit for trust upgrades
             self.tokens = new_capacity;
             self.last_refill = Instant::now();
+            true // Changed
+        } else {
+            false // No change
         }
     }
 
@@ -220,6 +233,8 @@ impl RateLimiter {
             (&self.trust_gated_config, &self.trust_graph)
         {
             // Trust-gated mode: look up peer's trust class
+            // Note: trust_class() requires &mut because it updates internal cache
+            // Future optimization: use interior mutability in TrustGraph to allow read locks
             let trust_class = {
                 let mut graph = trust_graph.write().await;
                 graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
@@ -247,9 +262,22 @@ impl RateLimiter {
         });
 
         // Update bucket config if trust class has changed
-        bucket.update_config(capacity, refill_rate, trust_class);
+        let changed = bucket.update_config(capacity, refill_rate, trust_class);
+        if changed {
+            icn_obs::metrics::network::trust_class_changes_inc();
+        }
 
-        bucket.try_consume()
+        let allowed = bucket.try_consume();
+
+        // Record rate limiting metrics
+        if !allowed {
+            icn_obs::metrics::network::messages_rate_limited_inc();
+            if let Some(class) = trust_class {
+                icn_obs::metrics::network::messages_rate_limited_by_class_inc(trust_class_to_str(class));
+            }
+        }
+
+        allowed
     }
 
     /// Clean up old buckets for peers that haven't sent messages recently
