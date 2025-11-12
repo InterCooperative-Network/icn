@@ -299,9 +299,19 @@ mod tests {
     #[test]
     fn test_repository_config_files() {
         // Test that the actual config files in the repository parse correctly
-        let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-            .map(|dir| std::path::PathBuf::from(dir).parent().unwrap().parent().unwrap().parent().unwrap().to_path_buf())
-            .unwrap_or_else(|_| std::path::PathBuf::from("/home/matt/projects/icn"));
+        // CARGO_MANIFEST_DIR is always set during cargo test and points to the crate directory
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR should be set during cargo test");
+
+        // From icn-core crate: icn/crates/icn-core -> icn (workspace root) -> project root
+        let workspace_root = std::path::PathBuf::from(manifest_dir)
+            .parent()  // -> crates/
+            .expect("manifest dir should have parent")
+            .parent()  // -> icn/
+            .expect("crates dir should have parent")
+            .parent()  // -> project root
+            .expect("workspace should have parent")
+            .to_path_buf();
 
         let config_dir = workspace_root.join("config");
 

@@ -22,20 +22,21 @@ Use as a starting point for simple deployments.
 **Two-node local demo** configurations for testing ICN on a single machine.
 
 Each node uses different ports to avoid conflicts:
-- **Alpha**: QUIC=4433, Metrics=9090, Health=8080, Data=/tmp/icn-alpha
-- **Beta**: QUIC=4434, Metrics=9091, Health=8081, Data=/tmp/icn-beta
+- **Alpha**: QUIC=7777, RPC=5601, Metrics=9100, Health=8080, Data=/tmp/icn-alpha
+- **Beta**: QUIC=7778, RPC=5602, Metrics=9101, Health=8081, Data=/tmp/icn-beta
 
 Run both nodes:
 ```bash
+# Quick start with demo script
+./scripts/demo-two-node.sh
+
+# Or manually in separate terminals:
 # Terminal 1
 cd icn && cargo build --release
-../target/release/icnd --config ../config/icn-alpha.toml
+ICN_PASSPHRASE="testpass123" ./target/release/icnd --config config/icn-alpha.toml
 
 # Terminal 2
-../target/release/icnd --config ../config/icn-beta.toml
-
-# Terminal 3 - Control alpha
-../target/release/icnctl --endpoint 127.0.0.1:5050 network status
+ICN_PASSPHRASE="testpass123" ./target/release/icnd --config config/icn-beta.toml
 
 # Nodes will discover each other via mDNS
 ```
@@ -69,6 +70,22 @@ Metrics and logging configuration.
 - `metrics_port`: Prometheus HTTP exporter
 - `health_port`: Health check endpoint
 - `log_level`: `trace` | `debug` | `info` | `warn` | `error`
+
+### `[rate_limiting]` **NEW!**
+Trust-gated rate limiting protects nodes from DoS attacks while allowing trusted peers higher throughput.
+
+Rate limits are applied per-peer based on their trust classification:
+- **Isolated** (trust 0.0-0.1): 10 msg/sec, burst 2 — Untrusted/new peers
+- **Known** (trust 0.1-0.4): 50 msg/sec, burst 10 — Basic trust
+- **Partner** (trust 0.4-0.7): 100 msg/sec, burst 20 — Trusted collaborators
+- **Federated** (trust 0.7-1.0): 200 msg/sec, burst 50 — Highly trusted
+
+Configuration options:
+- `enabled`: Toggle trust-gated rate limiting (default: `true`)
+- `refill_interval_ms`: Token bucket refill rate (default: `100`)
+- Per-class limits: `isolated`, `known`, `partner`, `federated`, `fallback`
+
+Trust upgrades take immediate effect with full token reset, enabling dynamic security without manual intervention.
 
 ## Environment Variable Overrides
 
