@@ -106,6 +106,11 @@ async fn main() -> Result<()> {
 /// Security: Both the String returned by rpassword and the final Vec<u8> are
 /// wrapped in Zeroizing to ensure complete memory cleanup.
 fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
+    // Check for ICN_PASSPHRASE environment variable first
+    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+        return Ok(Zeroizing::new(passphrase.into_bytes()));
+    }
+
     print!("{}", prompt);
     io::stdout().flush()?;
     // Wrap the String immediately in Zeroizing to prevent it from lingering in memory
