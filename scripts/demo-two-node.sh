@@ -46,7 +46,7 @@ mkdir -p /tmp/icn-alpha /tmp/icn-beta
 # Alpha identity
 echo -e "${GREEN}Creating Alpha node identity...${NC}"
 if [ ! -f /tmp/icn-alpha/identity.age ]; then
-    echo "testpass123" | ./target/release/icnctl --data-dir /tmp/icn-alpha id init || {
+    printf "testpass123\ntestpass123\n" | ./target/release/icnctl --data-dir /tmp/icn-alpha id init || {
         echo -e "${RED}Failed to create Alpha identity${NC}"
         exit 1
     }
@@ -55,7 +55,7 @@ fi
 # Beta identity
 echo -e "${GREEN}Creating Beta node identity...${NC}"
 if [ ! -f /tmp/icn-beta/identity.age ]; then
-    echo "testpass123" | ./target/release/icnctl --data-dir /tmp/icn-beta id init || {
+    printf "testpass123\ntestpass123\n" | ./target/release/icnctl --data-dir /tmp/icn-beta id init || {
         echo -e "${RED}Failed to create Beta identity${NC}"
         exit 1
     }
