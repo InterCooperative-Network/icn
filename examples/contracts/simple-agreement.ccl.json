@@ -1,0 +1,23 @@
+{
+  "name": "SimpleAgreement",
+  "participants": [
+    "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+  ],
+  "currency": null,
+  "state_vars": [],
+  "rules": [
+    {
+      "name": "accept",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": { "Literal": { "Bool": true } }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

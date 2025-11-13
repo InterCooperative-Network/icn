@@ -1,96 +1,51 @@
 # CCL Contract Examples
 
-This directory contains example contracts written in CCL (Cooperative Contract Language) that can be deployed to ICN nodes.
+This directory contains example contracts in CCL (Cooperative Contract Language) JSON format.
 
-## Available Contracts
+## File Format
 
-### 1. Echo Contract (`echo.json`)
+CCL contracts are represented as JSON files with the `.ccl.json` extension. The format directly maps to the `Contract` struct from `icn-ccl/src/ast.rs`.
 
-A simple contract for testing that demonstrates basic CCL features:
+### Contract Structure
 
-**Rules:**
-- `echo(message)` - Returns the message passed to it
-- `add(a, b)` - Adds two numbers together
-
-**Example Usage:**
-```bash
-# Deploy the contract
-icnctl contract deploy examples/contracts/echo.json
-
-# Call the echo rule
-icnctl contract call <code_hash> echo did:icn:alice --args '{"message":"hello"}'
-
-# Call the add rule
-icnctl contract call <code_hash> add did:icn:alice --args '{"a":5,"b":3}'
+```json
+{
+  "name": "ContractName",
+  "participants": ["did:icn:z...", "did:icn:z..."],
+  "currency": "hours",
+  "state_vars": [
+    {
+      "name": "variable_name",
+      "initial_value": { "Int": 0 }
+    }
+  ],
+  "rules": [
+    {
+      "name": "rule_name",
+      "params": ["param1", "param2"],
+      "body": []
+    }
+  ],
+  "triggers": []
+}
 ```
 
-### 2. TimeBank Contract (`timebank.json`)
+## Example Contracts
 
-A mutual credit time banking system where members exchange hours of service:
+### 1. TimeBank (timebank.ccl.json)
+Mutual credit timebank - exchange hours of service.
 
-**Features:**
-- Tracks service exchanges in hours
-- Maintains running total of all hours exchanged
-- Enforces positive hour amounts via preconditions
+### 2. Simple Agreement (simple-agreement.ccl.json)
+Basic state management contract.
 
-**State Variables:**
-- `total_hours_exchanged` - Cumulative count of all hours traded
+### 3. Calculator (calculator.ccl.json)
+Stateless computational contract.
 
-**Rules:**
-- `record_service(recipient, hours)` - Record a service exchange
-  - Transfers hours from sender to recipient
-  - Updates total_hours_exchanged counter
-  - Requires hours > 0
-- `get_stats()` - Returns total hours exchanged in the timebank
+## Deployment
 
-**Example Usage:**
-```bash
-# Deploy the timebank contract
-icnctl contract deploy examples/contracts/timebank.json
+1. Create contract in `.ccl.json` format
+2. All participants sign deployment  
+3. Deploy: `icnctl contract deploy contract.ccl.json`
+4. Execute: `icnctl contract call <hash> <rule> <args>`
 
-# Record a service (Alice helped Bob for 5 hours)
-icnctl contract call <code_hash> record_service did:icn:alice \
-  --args '{"recipient":"did:icn:bob","hours":5}'
-
-# Check timebank statistics
-icnctl contract call <code_hash> get_stats did:icn:alice
-```
-
-## Contract Structure
-
-CCL contracts are JSON-serialized AST (Abstract Syntax Tree) structures with:
-
-- **name**: Human-readable contract identifier
-- **participants**: List of DIDs authorized to interact (optional)
-- **currency**: Default currency for ledger operations (optional)
-- **state_vars**: Persistent contract state variables
-- **rules**: Callable functions with parameters and preconditions
-- **triggers**: Scheduled actions (not yet implemented)
-
-## Validation
-
-All contracts are validated on deployment:
-- Syntax correctness
-- Expression depth limits (max 50)
-- Reserved keyword checks
-- Double-entry ledger invariants
-
-## Security Model
-
-Contracts execute with:
-- **Fuel metering**: Bounded execution prevents infinite loops (10,000 fuel default)
-- **Capability-based security**: Explicit permissions for ledger/state access
-- **Deterministic execution**: Same inputs always produce same outputs
-- **Not Turing-complete**: Safe subset of operations for predictability
-
-## Creating New Contracts
-
-To create a new contract:
-
-1. Write contract logic using the CCL AST structure
-2. Serialize to JSON following the examples above
-3. Test locally with `icnctl contract deploy`
-4. Deploy to network nodes
-5. Call rules via `icnctl contract call`
-
-For more details on CCL semantics, see `icn/crates/icn-ccl/src/lib.rs`.
+See full documentation in docs/CCL-FORMAT.md

@@ -1,0 +1,32 @@
+{
+  "name": "Calculator",
+  "participants": [
+    "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+  ],
+  "currency": null,
+  "state_vars": [],
+  "rules": [
+    {
+      "name": "add",
+      "params": [
+        { "name": "a" },
+        { "name": "b" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "a" },
+                "right": { "Var": "b" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}
