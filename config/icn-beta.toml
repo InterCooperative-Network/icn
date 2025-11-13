@@ -38,3 +38,19 @@ burst_capacity = 50
 [rate_limiting.fallback]
 max_messages_per_second = 100
 burst_capacity = 20
+
+[topology]
+region = "local-dev"
+cluster_id = "laptop-1"
+role = "edge"
+
+[topology.neighbor_limits]
+max_local_cluster = 10
+max_regional = 10
+max_backbone = 5
+max_trusted = 20
+
+[topology.fanout]
+local_cluster = 8
+regional = 6
+global = 4

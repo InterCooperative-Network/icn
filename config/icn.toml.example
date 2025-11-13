@@ -113,6 +113,103 @@ max_messages_per_second = 100
 burst_capacity = 20
 
 # ============================================================================
+# Topology Configuration (Regional/Cluster-Based Federation)
+# ============================================================================
+# Topology-aware networking enables efficient regional and cluster-based
+# message routing. Nodes categorize peers based on geographic/logical location
+# and trust scores, optimizing gossip propagation.
+
+[topology]
+
+# Geographic region identifier
+# Used to group nodes into regional clusters for efficient routing
+# Examples: "us-west", "eu-central", "ap-southeast"
+# Default: "" (topology disabled)
+region = "us-west"
+
+# Cluster identifier within the region
+# Groups nodes that should coordinate tightly (e.g., same data center)
+# Examples: "sfo-1", "lax-2", "pdx-1"
+# Default: "" (topology disabled)
+cluster_id = "sfo-1"
+
+# Node role in the network topology
+# Options:
+#   - "edge": Regular node (default)
+#   - "rendezvous": Bootstrap/discovery hub
+#   - "archive": Long-term storage node
+# Default: "edge"
+role = "edge"
+
+# Neighbor set size limits (prevents unbounded memory usage)
+# These limits are enforced per category with LRU eviction
+[topology.neighbor_limits]
+
+# Maximum local cluster neighbors (same region + cluster_id)
+# These are the tightest coordinated peers
+# Default: 50
+max_local_cluster = 50
+
+# Maximum regional neighbors (same region, different cluster)
+# Cross-cluster peers within the same geographic region
+# Default: 30
+max_regional = 30
+
+# Maximum backbone neighbors (different region)
+# Cross-regional connectivity for global propagation
+# Default: 20
+max_backbone = 20
+
+# Maximum trusted neighbors (high trust score >= 0.7)
+# Highly trusted peers override location limits
+# Default: 100
+max_trusted = 100
+
+# Gossip fanout configuration per scope
+# Controls how many peers receive each gossip message
+[topology.fanout]
+
+# Local cluster fanout (tight coordination)
+# Higher fanout ensures fast convergence within cluster
+# Default: 8
+local_cluster = 8
+
+# Regional fanout (cross-cluster sync)
+# Medium fanout balances latency and bandwidth
+# Default: 6
+regional = 6
+
+# Global fanout (cross-regional propagation)
+# Lower fanout minimizes WAN traffic
+# Default: 4
+global = 4
+
+# ============================================================================
+# Topology Configuration Examples
+# ============================================================================
+#
+# Example 1: Edge node in US West, San Francisco cluster
+# [topology]
+# region = "us-west"
+# cluster_id = "sfo-1"
+# role = "edge"
+#
+# Example 2: Rendezvous node in EU Central (no specific cluster)
+# [topology]
+# region = "eu-central"
+# cluster_id = "hub-1"
+# role = "rendezvous"
+#
+# Example 3: Archive node for long-term storage
+# [topology]
+# region = "us-east"
+# cluster_id = "nyc-archive"
+# role = "archive"
+#
+# To disable topology-aware networking, omit the [topology] section entirely
+# or set region = "" and cluster_id = "".
+
+# ============================================================================
 # PLANNED FEATURES (Not Yet Implemented)
 # ============================================================================
 # The following sections are shown for completeness but are not yet supported.

@@ -18,19 +18,23 @@
 //! use std::sync::Arc;
 //! use tokio::sync::RwLock;
 //!
-//! # async fn example() {
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create policy source from trust graph
-//! let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new()));
+//! let keypair = icn_identity::KeyPair::generate()?;
+//! let own_did = keypair.did().clone();
+//! let store = Arc::new(icn_store::SledStore::temporary()?);
+//! let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(store, own_did)));
 //! let policy_source = DefaultPolicySource::new(trust_graph);
 //!
 //! // Look up policy for a peer
-//! let peer_did = icn_identity::KeyPair::generate().unwrap().did().clone();
+//! let peer_did = icn_identity::KeyPair::generate()?.did().clone();
 //! let policy = policy_source.policy_for(&peer_did).await;
 //!
 //! // Check capabilities
 //! if policy.has_capability(&Capability::DeployContract) {
 //!     // Allow contract deployment
 //! }
+//! # Ok(())
 //! # }
 //! ```
 

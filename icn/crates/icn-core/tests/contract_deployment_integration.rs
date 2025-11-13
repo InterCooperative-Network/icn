@@ -112,6 +112,7 @@ impl TestNode {
             None, // No rate limiting for tests
             None,
             None,
+            None, // No topology config for tests
         )
         .await?;
 

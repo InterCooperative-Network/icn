@@ -15,13 +15,15 @@
 //! ```rust
 //! use icn_net::global_rate_limit::GlobalRateLimiter;
 //!
+//! # async fn example() {
 //! let limiter = GlobalRateLimiter::new(10_000); // 10k msg/sec
 //!
-//! if limiter.check() {
+//! if limiter.check().await {
 //!     // Process message
 //! } else {
 //!     // Drop message, rate limit exceeded
 //! }
+//! # }
 //! ```
 
 use std::sync::atomic::{AtomicU64, Ordering};
