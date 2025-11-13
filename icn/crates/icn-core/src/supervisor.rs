@@ -2,11 +2,10 @@
 
 use anyhow::{bail, Context, Result};
 use icn_gossip::GossipActor;
-use icn_identity::{Did, IdentityBundle, KeyPair};
+use icn_identity::{Did, IdentityBundle};
 use icn_ledger::Ledger;
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
-use icn_trust::TrustClass;
 use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -49,16 +48,16 @@ fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {
     config: Config,
-    keypair: Option<KeyPair>,
+    identity_bundle: Option<IdentityBundle>,
     shutdown_tx: ShutdownTx,
 }
 
 impl Supervisor {
     /// Create a new supervisor
-    pub fn new(config: Config, keypair: Option<KeyPair>, shutdown_tx: ShutdownTx) -> Self {
+    pub fn new(config: Config, identity_bundle: Option<IdentityBundle>, shutdown_tx: ShutdownTx) -> Self {
         Supervisor {
             config,
-            keypair,
+            identity_bundle,
             shutdown_tx,
         }
     }
@@ -78,11 +77,11 @@ impl Supervisor {
 
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
-        // Spawn actors (requires keypair from unlocked keystore)
-        let (network_handle, gossip_handle, ledger_handle) = if let Some(keypair) = &self.keypair {
-            info!("Keypair available - spawning actors");
+        // Spawn actors (requires identity bundle from unlocked keystore)
+        let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) = &self.identity_bundle {
+            info!("Identity bundle available - spawning actors");
 
-            let did = keypair.did().clone();
+            let did = identity_bundle.did().clone();
 
             // Create trust graph
             let trust_store_path = self.config.store_path().join("trust");
@@ -276,12 +275,11 @@ impl Supervisor {
                 (None, None, None) // Disable trust-gated rate limiting
             };
 
-            // Create identity bundle with DID-TLS binding
-            let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
-            info!("Created identity bundle with DID-TLS binding");
+            // Use identity bundle loaded from keystore (preserves TLS cert across restarts)
+            info!("Using identity bundle with DID-TLS binding: {}", identity_bundle.did());
 
             let network_handle = icn_net::NetworkActor::spawn(
-                identity_bundle,
+                identity_bundle.clone(),
                 listen_addr,
                 self.shutdown_tx.clone(),
                 Some(incoming_handler),
@@ -520,7 +518,7 @@ impl Supervisor {
 
             (Some(network_handle), Some(gossip_handle), Some(ledger_handle))
         } else {
-            warn!("No keypair available - actors not spawned");
+            warn!("No identity bundle available - actors not spawned");
             warn!("Run 'icnctl id init' to create an identity");
 
             // Still spawn metrics update task for system metrics

@@ -1,6 +1,6 @@
 //! Secure key storage with encryption at rest
 
-use crate::{Did, KeyPair};
+use crate::{Did, IdentityBundle, KeyPair};
 use anyhow::{Context, Result};
 use secrecy::{Secret, Zeroize};
 use serde::{Deserialize, Serialize};
@@ -49,19 +49,29 @@ pub enum RotationReason {
     Manual,
 }
 
-/// Serialized key material
+/// Serialized key material (v2 format with optional TLS binding)
 #[derive(Serialize, Deserialize, Zeroize)]
 #[zeroize(drop)]
 struct StoredKey {
     secret_bytes: [u8; 32],
     public_bytes: [u8; 32],
     did: String,
+
+    // v2 fields for IdentityBundle (optional for backward compatibility)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tls_cert_der: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tls_key_der: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tls_binding_sig: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    created_at: Option<u64>,
 }
 
 /// Age-encrypted key storage
 pub struct AgeKeyStore {
     path: PathBuf,
-    keypair: Option<KeyPair>,
+    identity_bundle: Option<IdentityBundle>,
 }
 
 impl AgeKeyStore {
@@ -69,11 +79,18 @@ impl AgeKeyStore {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self {
             path: path.into(),
-            keypair: None,
+            identity_bundle: None,
         }
     }
 
-    /// Initialize a new keystore with a generated keypair
+    /// Get the identity bundle (fails if locked)
+    pub fn get_identity_bundle(&self) -> Result<&IdentityBundle> {
+        self.identity_bundle
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Keystore is locked"))
+    }
+
+    /// Initialize a new keystore with a generated identity bundle
     pub fn init(path: impl Into<PathBuf>, passphrase: &[u8]) -> Result<Self> {
         let path = path.into();
 
@@ -88,23 +105,28 @@ impl AgeKeyStore {
                 .context("Failed to create keystore directory")?;
         }
 
-        // Generate new keypair
-        let keypair = KeyPair::generate()?;
-        info!("Generated new identity: {}", keypair.did());
+        // Generate new identity bundle with DID-TLS binding
+        let identity_bundle = IdentityBundle::generate()?;
+        info!("Generated new identity with DID-TLS binding: {}", identity_bundle.did());
 
-        // Encrypt and save
+        // Extract key material and TLS binding info for storage
+        let keypair = identity_bundle.keypair();
         let stored = StoredKey {
             secret_bytes: *keypair.secret_bytes(),
             public_bytes: keypair.verifying_key().to_bytes(),
-            did: keypair.did().as_str().to_string(),
+            did: identity_bundle.did().as_str().to_string(),
+            tls_cert_der: Some(identity_bundle.tls_cert().as_ref().to_vec()),
+            tls_key_der: Some(identity_bundle.tls_key_der_bytes().to_vec()),
+            tls_binding_sig: Some(identity_bundle.binding_info().tls_binding_sig.clone()),
+            created_at: Some(identity_bundle.binding_info().created_at),
         };
 
         Self::encrypt_and_save(&path, &stored, passphrase)?;
-        info!("Saved encrypted keystore to {:?}", path);
+        info!("Saved encrypted identity bundle to {:?}", path);
 
         Ok(Self {
             path,
-            keypair: Some(keypair),
+            identity_bundle: Some(identity_bundle),
         })
     }
 
@@ -118,7 +140,7 @@ impl AgeKeyStore {
 
         Ok(Self {
             path,
-            keypair: None,
+            identity_bundle: None,
         })
     }
 
@@ -186,7 +208,7 @@ impl AgeKeyStore {
 
 impl KeyStore for AgeKeyStore {
     fn unlock(&mut self, passphrase: &[u8]) -> Result<()> {
-        if self.keypair.is_some() {
+        if self.identity_bundle.is_some() {
             warn!("Keystore already unlocked");
             return Ok(());
         }
@@ -194,30 +216,55 @@ impl KeyStore for AgeKeyStore {
         // Decrypt and load
         let stored = Self::decrypt_and_load(&self.path, passphrase)?;
 
-        // Reconstruct keypair
+        // Reconstruct keypair from stored bytes
         let keypair = KeyPair::from_bytes(&stored.secret_bytes, &stored.public_bytes)?;
 
-        info!("Unlocked keystore: {}", keypair.did());
-        self.keypair = Some(keypair);
+        // Check if we have TLS binding info (v2 keystore)
+        let identity_bundle = if let (Some(tls_cert_der), Some(tls_key_der), Some(tls_binding_sig), Some(created_at)) =
+            (stored.tls_cert_der.clone(), stored.tls_key_der.clone(), stored.tls_binding_sig.clone(), stored.created_at) {
+            // V2 keystore: reconstruct IdentityBundle from stored TLS data
+            info!("Unlocked v2 keystore with DID-TLS binding: {}", keypair.did());
 
+            // Reconstruct IdentityBundle using the stored data
+            // We need to access the private fields, so we'll use the from_stored method
+            IdentityBundle::from_stored(
+                keypair,
+                tls_cert_der,
+                tls_key_der,
+                tls_binding_sig,
+                created_at,
+            )?
+        } else {
+            // V1 keystore: generate new TLS certificate and binding
+            info!("Unlocked v1 keystore: {} (generating DID-TLS binding)", keypair.did());
+            warn!("⚠️  Migrating v1 keystore to v2 format with DID-TLS binding");
+
+            // Generate new IdentityBundle from the keypair
+            let bundle = IdentityBundle::from_keypair(keypair)?;
+
+            // TODO: Auto-save the upgraded keystore with TLS binding
+            // For now, we just log the migration - the next write will save the new format
+
+            bundle
+        };
+
+        self.identity_bundle = Some(identity_bundle);
         Ok(())
     }
 
     fn lock(&mut self) {
-        if self.keypair.is_some() {
+        if self.identity_bundle.is_some() {
             info!("Locking keystore");
-            self.keypair = None;
+            self.identity_bundle = None;
         }
     }
 
     fn is_locked(&self) -> bool {
-        self.keypair.is_none()
+        self.identity_bundle.is_none()
     }
 
     fn get_keypair(&self) -> Result<&KeyPair> {
-        self.keypair
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Keystore is locked"))
+        Ok(self.get_identity_bundle()?.keypair())
     }
 
     fn rotate(&mut self, new_keypair: KeyPair) -> Result<KeyRotation> {
@@ -244,8 +291,11 @@ impl KeyStore for AgeKeyStore {
             rotation.old_did, rotation.new_did
         );
 
-        // Replace keypair
-        self.keypair = Some(new_keypair);
+        // Create new identity bundle with fresh TLS binding
+        let new_bundle = IdentityBundle::from_keypair(new_keypair)?;
+
+        // Replace identity bundle
+        self.identity_bundle = Some(new_bundle);
 
         Ok(rotation)
     }

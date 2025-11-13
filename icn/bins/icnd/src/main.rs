@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
 
     // Check for identity keystore
     let keystore_path = config.keystore_path();
-    let keypair = if keystore_path.exists() {
+    let identity_bundle = if keystore_path.exists() {
         tracing::info!("Identity keystore found at: {:?}", keystore_path);
 
         // Prompt for passphrase (returns Zeroizing<Vec<u8>> for secure memory handling)
@@ -78,11 +78,11 @@ async fn main() -> Result<()> {
         keystore.unlock(&passphrase)
             .context("Failed to unlock keystore - incorrect passphrase?")?;
 
-        let kp = keystore.get_keypair()
-            .context("Failed to get keypair from keystore")?;
+        let bundle = keystore.get_identity_bundle()
+            .context("Failed to get identity bundle from keystore")?;
 
-        tracing::info!("Identity loaded: {}", kp.did());
-        Some(kp.clone())
+        tracing::info!("Identity loaded: {} (with DID-TLS binding)", bundle.did());
+        Some(bundle.clone())
     } else {
         tracing::warn!("No identity keystore found at: {:?}", keystore_path);
         tracing::warn!("Run 'icnctl id init' to create an identity");
@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
     };
 
     // Create and run runtime
-    let runtime = Runtime::new(config, keypair);
+    let runtime = Runtime::new(config, identity_bundle);
     runtime.run().await?;
 
     tracing::info!("ICNd stopped");

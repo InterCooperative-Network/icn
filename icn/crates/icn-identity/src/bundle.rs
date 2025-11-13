@@ -101,6 +101,41 @@ impl IdentityBundle {
         })
     }
 
+    /// Reconstruct identity bundle from stored components
+    ///
+    /// This is used by the keystore to restore a previously saved bundle.
+    /// The TLS certificate and binding signature are already generated.
+    pub fn from_stored(
+        did_keypair: KeyPair,
+        tls_cert_der: Vec<u8>,
+        tls_key_der: Vec<u8>,
+        tls_binding_sig: Vec<u8>,
+        created_at: u64,
+    ) -> Result<Self> {
+        let did = did_keypair.did().clone();
+        let tls_cert = CertificateDer::from(tls_cert_der);
+
+        // Verify the binding is still valid
+        let cert_hash = Self::hash_certificate(&tls_cert);
+        let verifying_key = did.to_verifying_key()?;
+        let signature = ed25519_dalek::Signature::from_slice(&tls_binding_sig)
+            .context("Invalid stored binding signature format")?;
+
+        use ed25519_dalek::Verifier;
+        verifying_key
+            .verify(&cert_hash, &signature)
+            .context("Stored TLS binding signature verification failed")?;
+
+        Ok(IdentityBundle {
+            did,
+            did_keypair,
+            tls_cert,
+            tls_key_der,
+            tls_binding_sig,
+            created_at,
+        })
+    }
+
     /// Verify the TLS binding signature
     ///
     /// Confirms that:
@@ -141,6 +176,11 @@ impl IdentityBundle {
     /// Get the TLS private key
     pub fn tls_key(&self) -> PrivateKeyDer<'static> {
         PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(self.tls_key_der.clone()))
+    }
+
+    /// Get the raw TLS private key bytes (DER format)
+    pub(crate) fn tls_key_der_bytes(&self) -> &[u8] {
+        &self.tls_key_der
     }
 
     /// Get binding info for network transmission

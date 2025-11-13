@@ -12,7 +12,7 @@ use icn_net::{IncomingMessageHandler, NetworkActor, NetworkMessage};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::info;
 
 /// Test node helper
@@ -22,6 +22,7 @@ struct TestNode {
     network_handle: icn_net::NetworkHandle,
     _shutdown_tx: broadcast::Sender<()>,
     messages_received: Arc<RwLock<Vec<NetworkMessage>>>,
+    _message_receiver_task: tokio::task::JoinHandle<()>,
 }
 
 impl TestNode {
@@ -34,12 +35,19 @@ impl TestNode {
         let messages_received: Arc<RwLock<Vec<NetworkMessage>>> = Arc::new(RwLock::new(Vec::new()));
         let messages_clone = messages_received.clone();
 
-        // Set up incoming message handler to track received messages
+        // Use a channel to avoid race conditions with spawned tasks
+        let (msg_tx, mut msg_rx) = mpsc::unbounded_channel::<NetworkMessage>();
+
+        // Spawn task to collect messages from channel into the RwLock
+        let message_receiver_task = tokio::spawn(async move {
+            while let Some(net_msg) = msg_rx.recv().await {
+                messages_clone.write().await.push(net_msg);
+            }
+        });
+
+        // Set up incoming message handler to send to channel
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
-            let messages = messages_clone.clone();
-            tokio::spawn(async move {
-                messages.write().await.push(net_msg);
-            });
+            let _ = msg_tx.send(net_msg);
         });
 
         let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
@@ -63,6 +71,7 @@ impl TestNode {
             network_handle,
             _shutdown_tx: shutdown_tx,
             messages_received,
+            _message_receiver_task: message_receiver_task,
         })
     }
 
