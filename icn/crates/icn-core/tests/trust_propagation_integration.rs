@@ -128,7 +128,9 @@ impl TestNode {
             None, // No trust graph for rate limiting in tests
             None, // No trust-gated config for tests
             None, // No fallback config for tests
-        )
+            None, // No topology config
+
+            None, // No topology config        )
         .await?;
 
         // Wire up gossip send callback

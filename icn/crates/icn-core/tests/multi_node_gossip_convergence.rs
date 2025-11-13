@@ -153,7 +153,9 @@ impl TestNode {
             None, // No trust graph for tests
             None, // No trust-gated config for tests
             None, // No fallback config for tests
-        )
+            None, // No topology config
+
+            None, // No topology config        )
         .await?;
 
         // Initialize network handle for the message handler
