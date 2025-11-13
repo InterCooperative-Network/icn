@@ -60,6 +60,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         Some(alice_trust.clone()),
         None,
         None,
+        None,
     )
     .await?;
 
@@ -76,6 +77,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         bob_shutdown_tx.clone(),
         None,
         None, // Bob has no trust graph (doesn't need to verify Alice)
+        None,
         None,
         None,
     )
@@ -146,6 +148,7 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
             ..Default::default()
         }),
         None,
+        None,
     )
     .await?;
 
@@ -160,6 +163,7 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         &mallory_keypair,
         "127.0.0.1:15501".parse()?,
         mallory_shutdown_tx.clone(),
+        None,
         None,
         None,
         None,
@@ -233,6 +237,7 @@ async fn test_trust_threshold_boundary() -> Result<()> {
             ..Default::default()
         }),
         None,
+        None,
     )
     .await?;
 
@@ -244,6 +249,7 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         &bob_keypair,
         "127.0.0.1:15601".parse()?,
         bob_shutdown_tx.clone(),
+        None,
         None,
         None,
         None,

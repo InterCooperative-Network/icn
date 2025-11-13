@@ -19,6 +19,7 @@ use icn_ledger::Ledger;
 use icn_ccl::ContractRuntime;
 
 use crate::types::{ContractExecutionResponse, ContractInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::receipt::ReceiptStore;
 
 use icn_gossip::GossipActor;
 
@@ -28,6 +29,7 @@ pub struct RpcServer {
     ledger_handle: Option<Arc<RwLock<Ledger>>>,
     contract_runtime: Option<Arc<RwLock<ContractRuntime>>>,
     gossip_handle: Option<Arc<RwLock<GossipActor>>>,
+    receipt_store: Arc<ReceiptStore>,
     listen_addr: SocketAddr,
 }
 
@@ -39,6 +41,7 @@ impl RpcServer {
             ledger_handle: None,
             contract_runtime: None,
             gossip_handle: None,
+            receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             listen_addr,
         }
     }
@@ -135,14 +138,15 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "ledger.head" => handle_ledger_head(req.id, state).await,
         "ledger.balance" => handle_ledger_balance(req.id, &req.params, state).await,
         "ledger.history" => handle_ledger_history(req.id, &req.params, state).await,
-        "ledger.quarantine.list" => handle_quarantine_list(req.id, state).await,
+        "ledger.quarantine.list" => handle_quarantine_list(req.id, &req.params, state).await,
         "ledger.quarantine.get" => handle_quarantine_get(req.id, &req.params, state).await,
         "ledger.quarantine.release" => handle_quarantine_release(req.id, &req.params, state).await,
         "ledger.quarantine.drop" => handle_quarantine_drop(req.id, &req.params, state).await,
         "ledger.quarantine.purge" => handle_quarantine_purge(req.id, state).await,
         "contract.deploy" => handle_contract_deploy(req.id, &req.params, state).await,
         "contract.call" => handle_contract_call(req.id, &req.params, state).await,
-        "contract.list" => handle_contract_list(req.id, state).await,
+        "contract.list" => handle_contract_list(req.id, &req.params, state).await,
+        "receipt.get" => handle_receipt_get(req.id, &req.params, state).await,
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -402,7 +406,7 @@ async fn handle_ledger_balance(
     }
 }
 
-/// Handle ledger.history RPC call - get recent ledger entries
+/// Handle ledger.history RPC call - get recent ledger entries (paginated)
 async fn handle_ledger_history(
     id: u64,
     params: &serde_json::Value,
@@ -419,26 +423,19 @@ async fn handle_ledger_history(
         }
     };
 
-    // Parse parameters
-    #[derive(serde::Deserialize)]
-    struct HistoryParams {
-        limit: Option<usize>,
-    }
-
-    let history_params: HistoryParams = match serde_json::from_value(params.clone()) {
+    // Parse pagination parameters
+    let page_request: crate::PageRequest = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
-        Err(_) => HistoryParams { limit: None }, // Use default if params are empty
+        Err(_) => crate::PageRequest::default(), // Use default if params are empty
     };
-
-    let limit = history_params.limit.unwrap_or(10);
 
     let ledger = ledger_handle.read().await;
     match ledger.get_all_entries() {
         Ok(entries) => {
-            let recent_entries: Vec<LedgerEntry> = entries
+            // Convert all entries (in reverse order - most recent first)
+            let all_entries: Vec<LedgerEntry> = entries
                 .iter()
-                .rev() // Reverse to get most recent first
-                .take(limit)
+                .rev()
                 .map(|entry| {
                     let hash = entry.id.as_ref()
                         .map(|h| h.to_hex())
@@ -460,7 +457,10 @@ async fn handle_ledger_history(
                 })
                 .collect();
 
-            match serde_json::to_value(&recent_entries) {
+            // Apply pagination
+            let page = crate::paginate(all_entries, &page_request, crate::DEFAULT_MAX_PAGE_SIZE);
+
+            match serde_json::to_value(&page) {
                 Ok(value) => RpcResponse::success(id, value),
                 Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
             }
@@ -531,14 +531,38 @@ async fn handle_contract_deploy(
     match gossip.publish("contracts:deploy", message_bytes) {
         Ok(_) => {
             info!("Contract deployment published to gossip: {}", code_hash.to_hex());
+
+            // Create receipt for successful deployment
+            let receipt = crate::receipt::Receipt::new(
+                deployment_msg.installation.installed_by.clone(),
+                crate::receipt::Operation::ContractDeploy {
+                    code_hash: code_hash.to_hex(),
+                },
+                crate::receipt::Outcome::success(Some(code_hash.to_hex())),
+            );
+            let receipt_id = receipt.id.clone();
+            state.receipt_store.insert(receipt).await;
+
             let response = serde_json::json!({
                 "code_hash": code_hash.to_hex(),
+                "receipt_id": receipt_id.to_string(),
                 "success": true,
             });
             RpcResponse::success(id, response)
         }
         Err(e) => {
             error!("Failed to publish contract deployment to gossip: {}", e);
+
+            // Create receipt for failed deployment
+            let receipt = crate::receipt::Receipt::new(
+                deployment_msg.installation.installed_by.clone(),
+                crate::receipt::Operation::ContractDeploy {
+                    code_hash: code_hash.to_hex(),
+                },
+                crate::receipt::Outcome::failure(e.to_string()),
+            );
+            state.receipt_store.insert(receipt).await;
+
             RpcResponse::error(id, -32000, format!("Failed to publish deployment: {}", e))
         }
     }
@@ -591,7 +615,7 @@ async fn handle_contract_call(
     let code_hash = icn_ledger::ContentHash::from_bytes(hash_bytes);
 
     // Parse caller DID
-    let caller_did = match serde_json::from_value(serde_json::Value::String(call_params.caller.clone())) {
+    let caller_did: icn_identity::Did = match serde_json::from_value(serde_json::Value::String(call_params.caller.clone())) {
         Ok(d) => d,
         Err(e) => {
             return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
@@ -608,7 +632,7 @@ async fn handle_contract_call(
 
     // Create execution context with generous fuel
     let context = icn_ccl::ExecutionContext::new(
-        caller_did,
+        caller_did.clone(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -625,23 +649,63 @@ async fn handle_contract_call(
             let response_value = serde_json::to_value(&result.value)
                 .unwrap_or_else(|_| serde_json::json!(null));
 
+            // Create receipt for successful execution
+            let resources = crate::receipt::Resources {
+                fuel_used: result.fuel_consumed,
+                bytes_processed: 0, // TODO: Track bytes processed
+                wall_time_ms: 0,    // TODO: Track wall time
+            };
+
+            let receipt = crate::receipt::Receipt::with_resources(
+                caller_did.clone(),
+                crate::receipt::Operation::ContractExecute {
+                    code_hash: call_params.code_hash.clone(),
+                    rule: call_params.rule_name.clone(),
+                },
+                crate::receipt::Outcome::success(None),
+                resources,
+            );
+            let receipt_id = receipt.id.clone();
+            state.receipt_store.insert(receipt).await;
+
             let response = ContractExecutionResponse {
                 success: true,
                 fuel_consumed: result.fuel_consumed,
                 return_value: response_value,
             };
 
-            match serde_json::to_value(&response) {
-                Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
-            }
+            // Add receipt_id to response
+            let mut value = serde_json::to_value(&response).unwrap();
+            value.as_object_mut().unwrap().insert(
+                "receipt_id".to_string(),
+                serde_json::Value::String(receipt_id.to_string()),
+            );
+
+            RpcResponse::success(id, value)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Contract execution failed: {}", e)),
+        Err(e) => {
+            // Create receipt for failed execution
+            let receipt = crate::receipt::Receipt::new(
+                caller_did,
+                crate::receipt::Operation::ContractExecute {
+                    code_hash: call_params.code_hash.clone(),
+                    rule: call_params.rule_name.clone(),
+                },
+                crate::receipt::Outcome::failure(e.to_string()),
+            );
+            state.receipt_store.insert(receipt).await;
+
+            RpcResponse::error(id, -32000, format!("Contract execution failed: {}", e))
+        }
     }
 }
 
-/// Handle contract.list RPC call - list all installed contracts
-async fn handle_contract_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+/// Handle contract.list RPC call - list all installed contracts (paginated)
+async fn handle_contract_list(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
     let contract_runtime = match &state.contract_runtime {
         Some(handle) => handle,
         None => {
@@ -651,6 +715,12 @@ async fn handle_contract_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
                 "Contract runtime not available".to_string(),
             );
         }
+    };
+
+    // Parse pagination parameters
+    let page_request: crate::PageRequest = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(_) => crate::PageRequest::default(), // Use default if params are empty
     };
 
     let runtime = contract_runtime.read().await;
@@ -668,16 +738,32 @@ async fn handle_contract_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
         })
         .collect();
 
-    RpcResponse::success(id, serde_json::json!({ "contracts": contracts_rpc }))
+    // Apply pagination
+    let page = crate::paginate(contracts_rpc, &page_request, crate::DEFAULT_MAX_PAGE_SIZE);
+
+    match serde_json::to_value(&page) {
+        Ok(value) => RpcResponse::success(id, value),
+        Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+    }
 }
 
-/// Handle ledger.quarantine.list RPC call - list all quarantined entries
-async fn handle_quarantine_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+/// Handle ledger.quarantine.list RPC call - list all quarantined entries (paginated)
+async fn handle_quarantine_list(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
     let ledger_handle = match &state.ledger_handle {
         Some(handle) => handle,
         None => {
             return RpcResponse::error(id, -32000, "Ledger not available".to_string());
         }
+    };
+
+    // Parse pagination parameters
+    let page_request: crate::PageRequest = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(_) => crate::PageRequest::default(), // Use default if params are empty
     };
 
     let ledger = ledger_handle.read().await;
@@ -696,7 +782,13 @@ async fn handle_quarantine_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse 
                 })
                 .collect();
 
-            RpcResponse::success(id, serde_json::json!({ "quarantined": items_json }))
+            // Apply pagination
+            let page = crate::paginate(items_json, &page_request, crate::DEFAULT_MAX_PAGE_SIZE);
+
+            match serde_json::to_value(&page) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to list quarantine: {}", e)),
     }
@@ -904,6 +996,36 @@ async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResponse
             }),
         ),
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to purge expired entries: {}", e)),
+    }
+}
+
+/// Handle receipt.get RPC call - get a receipt by ID
+async fn handle_receipt_get(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct GetReceiptParams {
+        receipt_id: String,
+    }
+
+    let get_params: GetReceiptParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    let receipt_id = crate::receipt::ReceiptId::from_string(get_params.receipt_id);
+
+    match state.receipt_store.get(&receipt_id).await {
+        Some(receipt) => match serde_json::to_value(&receipt) {
+            Ok(value) => RpcResponse::success(id, value),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+        },
+        None => RpcResponse::error(id, -32000, "Receipt not found".to_string()),
     }
 }
 
