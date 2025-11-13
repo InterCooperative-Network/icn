@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use icn_gossip::GossipActor;
-use icn_identity::{Did, KeyPair};
+use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_ledger::Ledger;
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
@@ -258,6 +258,10 @@ impl Supervisor {
                     icn_net::MessagePayload::HandshakeAck => {
                         // Handshake ack handled internally by network actor
                     }
+
+                    icn_net::MessagePayload::Hello { .. } => {
+                        // Hello message with DID-TLS binding handled internally by network actor
+                    }
                 }
             });
 
@@ -272,8 +276,12 @@ impl Supervisor {
                 (None, None, None) // Disable trust-gated rate limiting
             };
 
+            // Create identity bundle with DID-TLS binding
+            let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
+            info!("Created identity bundle with DID-TLS binding");
+
             let network_handle = icn_net::NetworkActor::spawn(
-                keypair,
+                identity_bundle,
                 listen_addr,
                 self.shutdown_tx.clone(),
                 Some(incoming_handler),

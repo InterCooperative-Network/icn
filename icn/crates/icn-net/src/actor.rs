@@ -7,7 +7,9 @@
 //! - Connection lifecycle management
 
 use anyhow::{Context, Result};
-use icn_identity::{Did, KeyPair};
+use icn_identity::{Did, IdentityBundle};
+#[cfg(test)]
+use icn_identity::KeyPair;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
@@ -157,6 +159,7 @@ pub struct NetworkActor {
     incoming_handler: Option<IncomingMessageHandler>,
     rate_limiter: Arc<RateLimiter>,
     own_did: Did,
+    identity_bundle: IdentityBundle,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
     topology_config: Option<TopologyConfig>,
     trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
@@ -170,7 +173,7 @@ impl NetworkActor {
     /// limits for different trust classes.
     /// If topology_config is provided, enables topology-aware neighbor management.
     pub async fn spawn(
-        keypair: &KeyPair,
+        identity_bundle: IdentityBundle,
         listen_addr: SocketAddr,
         shutdown_tx: tokio::sync::broadcast::Sender<()>,
         incoming_handler: Option<IncomingMessageHandler>,
@@ -179,7 +182,7 @@ impl NetworkActor {
         fallback_config: Option<RateLimitConfig>,
         topology_config: Option<TopologyConfig>,
     ) -> Result<NetworkHandle> {
-        let did = keypair.did().clone();
+        let did = identity_bundle.did().clone();
 
         info!("Network actor starting for DID: {}", did);
 
@@ -194,7 +197,7 @@ impl NetworkActor {
         let mut session_manager = SessionManager::new();
         let tls_trust_threshold = trust_gated_config.as_ref().map(|cfg| cfg.min_trust_threshold);
         session_manager
-            .start(keypair, listen_addr, trust_graph.clone(), tls_trust_threshold)
+            .start(identity_bundle.keypair(), listen_addr, trust_graph.clone(), tls_trust_threshold)
             .await
             .context("Failed to start session manager")?;
 
@@ -279,6 +282,7 @@ impl NetworkActor {
             incoming_handler,
             rate_limiter,
             own_did: did.clone(),
+            identity_bundle,
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
             trust_graph: trust_graph.clone(),
@@ -390,23 +394,29 @@ impl NetworkActor {
                             });
                         }
 
-                        // Send handshake if topology is enabled
-                        if let Some(ref topo_cfg) = self.topology_config {
-                            let handshake_msg = NetworkMessage::handshake(
-                                self.own_did.clone(),
-                                did.clone(),
-                                topo_cfg.region.clone(),
-                                topo_cfg.cluster_id.clone(),
-                                format!("{:?}", topo_cfg.role),
-                            );
+                        // Send Hello message with DID-TLS binding
+                        let binding_info = self.identity_bundle.binding_info();
+                        let topology_info = self.topology_config.as_ref().map(|topo_cfg| {
+                            TopologyInfo {
+                                region: topo_cfg.region.clone(),
+                                cluster_id: topo_cfg.cluster_id.clone(),
+                                role: topo_cfg.role,
+                            }
+                        });
 
-                            let session_mgr = self.session_manager.clone();
-                            tokio::spawn(async move {
-                                if let Err(e) = Self::send_handshake_internal(session_mgr, &did, handshake_msg).await {
-                                    warn!("Failed to send handshake to {}: {}", did, e);
-                                }
-                            });
-                        }
+                        let hello_msg = NetworkMessage::hello(
+                            self.own_did.clone(),
+                            did.clone(),
+                            binding_info,
+                            topology_info,
+                        );
+
+                        let session_mgr = self.session_manager.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = Self::send_handshake_internal(session_mgr, &did, hello_msg).await {
+                                warn!("Failed to send Hello to {}: {}", did, e);
+                            }
+                        });
                     });
 
                 let _ = response.send(result);
@@ -671,6 +681,85 @@ impl NetworkActor {
 
                             // Handle handshake messages internally
                             match &message.payload {
+                                MessagePayload::Hello { binding_info: _, topology_info } => {
+                                    info!("Received Hello from {}", message.from);
+
+                                    // Get peer certificate for DID-TLS binding verification
+                                    // QUIC connections use rustls, so peer_identity returns Box<dyn Any>
+                                    // which we can downcast to Vec<CertificateDer>
+                                    let verified = if let Some(identity) = connection.peer_identity() {
+                                        if let Some(cert_chain) = identity.downcast_ref::<Vec<rustls::pki_types::CertificateDer>>() {
+                                            if let Some(peer_cert) = cert_chain.first() {
+                                                // Verify DID-TLS binding
+                                                match message.verify_hello(peer_cert) {
+                                                    Ok(()) => {
+                                                        info!("DID-TLS binding verified for {}", message.from);
+                                                        true
+                                                    }
+                                                    Err(e) => {
+                                                        warn!("DID-TLS binding verification failed for {}: {}", message.from, e);
+                                                        false
+                                                    }
+                                                }
+                                            } else {
+                                                warn!("No certificate in peer certificate chain from {}", message.from);
+                                                false
+                                            }
+                                        } else {
+                                            warn!("Failed to downcast peer identity from {}", message.from);
+                                            false
+                                        }
+                                    } else {
+                                        warn!("No peer identity available from {}", message.from);
+                                        false
+                                    };
+
+                                    if !verified {
+                                        continue; // Drop messages from unverified peers
+                                    }
+
+                                    // Add peer to neighbor sets if topology is enabled
+                                    if let Some(ref sets) = neighbor_sets {
+                                        if let Some(peer_topology) = topology_info {
+                                            // Get trust score if available
+                                            let trust_score = if let Some(ref tg) = trust_graph {
+                                                tg.read().await.compute_trust_score(&message.from).unwrap_or(0.0) as f32
+                                            } else {
+                                                0.5 // Default if no trust graph
+                                            };
+
+                                            // Add to neighbor sets
+                                            let limits = topology_config.as_ref()
+                                                .map(|cfg| cfg.neighbor_limits.clone())
+                                                .unwrap_or_else(|| NeighborLimitsConfig {
+                                                    max_local_cluster: 50,
+                                                    max_regional: 30,
+                                                    max_backbone: 20,
+                                                    max_trusted: 10,
+                                                });
+
+                                            sets.write().await.add_neighbor(
+                                                PeerId(message.from.clone()),
+                                                peer_topology.clone(),
+                                                None, // RTT not measured yet
+                                                trust_score,
+                                                &limits,
+                                            );
+
+                                            // Update metrics
+                                            let sets_read = sets.read().await;
+                                            icn_obs::metrics::topology::neighbors_by_set_update(
+                                                sets_read.local_cluster.len(),
+                                                sets_read.regional.len(),
+                                                sets_read.backbone.len(),
+                                                sets_read.trusted.len(),
+                                            );
+                                        }
+                                    }
+
+                                    // Send Hello response (not implemented here yet - will send during connection establishment)
+                                    info!("Processed Hello from {}", message.from);
+                                }
                                 MessagePayload::Handshake { region, cluster_id, role } => {
                                     info!("Received handshake from {} (region={}, cluster={})",
                                           message.from, region, cluster_id);
@@ -806,10 +895,11 @@ mod tests {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         let keypair = KeyPair::generate().unwrap();
+        let identity_bundle = IdentityBundle::from_keypair(keypair).unwrap();
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
-        let handle = NetworkActor::spawn(&keypair, addr, shutdown_tx.clone(), None, None, None, None, None)
+        let handle = NetworkActor::spawn(identity_bundle, addr, shutdown_tx.clone(), None, None, None, None, None)
             .await
             .unwrap();
 

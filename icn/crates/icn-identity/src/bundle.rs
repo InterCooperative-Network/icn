@@ -69,12 +69,20 @@ impl IdentityBundle {
     pub fn generate() -> Result<Self> {
         // 1. Generate Ed25519 keypair for DID
         let did_keypair = KeyPair::generate()?;
+        Self::from_keypair(did_keypair)
+    }
+
+    /// Create identity bundle from an existing keypair
+    ///
+    /// This generates a new TLS certificate for the given keypair and creates
+    /// the cryptographic binding signature.
+    pub fn from_keypair(did_keypair: KeyPair) -> Result<Self> {
         let did = did_keypair.did().clone();
 
-        // 2. Generate TLS certificate with DID as subject
+        // Generate TLS certificate with DID as subject
         let (tls_cert, tls_key_der) = Self::generate_tls_cert(&did)?;
 
-        // 3. Compute cert hash and sign with DID key
+        // Compute cert hash and sign with DID key
         let cert_hash = Self::hash_certificate(&tls_cert);
         let tls_binding_sig = did_keypair.sign(&cert_hash).to_vec();
 

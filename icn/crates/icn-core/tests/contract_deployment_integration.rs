@@ -2,7 +2,7 @@
 
 use icn_ccl::{BinOp, Capability, Contract, ContractActor, ContractExecutionRequest, ContractInstallation, ContractRuntime, Expr, Rule, Stmt, Value};
 use icn_gossip::GossipActor;
-use icn_identity::KeyPair;
+use icn_identity::{IdentityBundle, KeyPair};
 use icn_ledger::{ContentHash, Ledger};
 use icn_net::NetworkActor;
 use icn_store::SledStore;
@@ -104,8 +104,9 @@ impl TestNode {
             }
         });
 
+        let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
-            &keypair,
+            identity_bundle,
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),

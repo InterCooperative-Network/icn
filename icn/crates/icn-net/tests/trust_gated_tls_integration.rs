@@ -4,7 +4,7 @@
 //! access control by rejecting connections from peers with insufficient trust.
 
 use anyhow::Result;
-use icn_identity::KeyPair;
+use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{NetworkActor, NetworkMessage};
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
@@ -51,9 +51,12 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     // Create shutdown channels
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
+    // Create IdentityBundle for Alice
+    let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
+
     // Spawn Alice's network actor with trust-gated TLS (min threshold 0.4 = Partner)
     let alice_handle = NetworkActor::spawn(
-        &alice_keypair,
+        alice_identity_bundle,
         "127.0.0.1:15400".parse()?,
         alice_shutdown_tx.clone(),
         None,
@@ -71,8 +74,9 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
 
     // Bob dials Alice - should succeed because Alice trusts Bob with score 0.8
     let bob_shutdown_tx = tokio::sync::broadcast::channel(16).0;
+    let bob_identity_bundle = IdentityBundle::from_keypair(bob_keypair).unwrap();
     let bob_handle = NetworkActor::spawn(
-        &bob_keypair,
+        bob_identity_bundle,
         "127.0.0.1:15401".parse()?,
         bob_shutdown_tx.clone(),
         None,
@@ -137,8 +141,9 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
 
     // Spawn Alice with trust-gated TLS (min threshold 0.1 = Known)
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
+    let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
     let alice_handle = NetworkActor::spawn(
-        &alice_keypair,
+        alice_identity_bundle,
         "127.0.0.1:15500".parse()?,
         alice_shutdown_tx.clone(),
         None,
@@ -159,8 +164,9 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
 
     // Mallory dials Alice - should FAIL because Alice doesn't trust Mallory
     let mallory_shutdown_tx = tokio::sync::broadcast::channel(16).0;
+    let mallory_identity_bundle = IdentityBundle::from_keypair(mallory_keypair).unwrap();
     let mallory_handle = NetworkActor::spawn(
-        &mallory_keypair,
+        mallory_identity_bundle,
         "127.0.0.1:15501".parse()?,
         mallory_shutdown_tx.clone(),
         None,
@@ -226,8 +232,9 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     // Spawn Alice with threshold 0.4
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
+    let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
     let alice_handle = NetworkActor::spawn(
-        &alice_keypair,
+        alice_identity_bundle,
         "127.0.0.1:15600".parse()?,
         alice_shutdown_tx.clone(),
         None,
@@ -245,8 +252,9 @@ async fn test_trust_threshold_boundary() -> Result<()> {
 
     // Bob dials Alice - should succeed at exact threshold
     let bob_shutdown_tx = tokio::sync::broadcast::channel(16).0;
+    let bob_identity_bundle = IdentityBundle::from_keypair(bob_keypair).unwrap();
     let bob_handle = NetworkActor::spawn(
-        &bob_keypair,
+        bob_identity_bundle,
         "127.0.0.1:15601".parse()?,
         bob_shutdown_tx.clone(),
         None,

@@ -13,7 +13,7 @@
 
 use anyhow::Result;
 use icn_gossip::{GossipActor, GossipMessage, Topic, AccessControl};
-use icn_identity::KeyPair;
+use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_trust::TrustClass;
 use std::net::SocketAddr;
@@ -145,8 +145,9 @@ impl TestNode {
 
         // Spawn network actor
         let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
-            &keypair,
+            identity_bundle,
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),

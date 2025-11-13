@@ -65,7 +65,7 @@ struct PeerMetadata {
 }
 
 /// Geographic and organizational topology information
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopologyInfo {
     pub region: String,
     pub cluster_id: String,

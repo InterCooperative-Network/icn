@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use icn_gossip::GossipMessage;
-use icn_identity::Did;
+use icn_identity::{BindingInfo, Did};
 use serde::{Deserialize, Serialize};
 
 /// Network protocol version
@@ -50,7 +50,16 @@ pub enum MessagePayload {
     /// Ack subscription
     SubscribeAck { topics: Vec<String> },
 
-    /// Handshake with topology information
+    /// Hello message with DID-TLS binding verification
+    /// This is the initial handshake message that proves identity
+    Hello {
+        /// DID-TLS binding information for verification
+        binding_info: BindingInfo,
+        /// Optional topology information (if topology is enabled)
+        topology_info: Option<crate::TopologyInfo>,
+    },
+
+    /// Handshake with topology information (legacy, kept for compatibility)
     Handshake {
         region: String,
         cluster_id: String,
@@ -112,6 +121,14 @@ impl NetworkMessage {
         Self::new(from, Some(to), MessagePayload::HandshakeAck)
     }
 
+    /// Create a Hello message with DID-TLS binding verification
+    pub fn hello(from: Did, to: Did, binding_info: BindingInfo, topology_info: Option<crate::TopologyInfo>) -> Self {
+        Self::new(from, Some(to), MessagePayload::Hello {
+            binding_info,
+            topology_info,
+        })
+    }
+
     /// Serialize to bytes using bincode
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let bytes = bincode::serialize(self).context("Failed to serialize network message")?;
@@ -151,6 +168,30 @@ impl NetworkMessage {
     /// Check if this is a broadcast message
     pub fn is_broadcast(&self) -> bool {
         self.to.is_none()
+    }
+
+    /// Verify DID-TLS binding if this is a Hello message
+    ///
+    /// # Arguments
+    /// * `peer_cert` - The TLS certificate received from the peer
+    ///
+    /// # Returns
+    /// * `Ok(())` if verification succeeds or if not a Hello message
+    /// * `Err` if Hello message but verification fails
+    pub fn verify_hello(&self, peer_cert: &rustls::pki_types::CertificateDer) -> Result<()> {
+        if let MessagePayload::Hello { binding_info, .. } = &self.payload {
+            icn_identity::verify_binding_info(binding_info, peer_cert)
+                .context("DID-TLS binding verification failed")?;
+        }
+        Ok(())
+    }
+
+    /// Extract topology info from Hello or Handshake message
+    pub fn topology_info(&self) -> Option<&crate::TopologyInfo> {
+        match &self.payload {
+            MessagePayload::Hello { topology_info, .. } => topology_info.as_ref(),
+            _ => None,
+        }
     }
 }
 
