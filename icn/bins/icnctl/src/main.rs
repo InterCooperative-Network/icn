@@ -167,10 +167,37 @@ enum QuarantineCommands {
 
 #[derive(Subcommand, Debug)]
 enum ContractCommands {
-    /// Deploy a contract from JSON file
+    /// Deploy a contract from JSON file (single-party deployment)
     Deploy {
         /// Path to contract JSON file
         contract_file: PathBuf,
+    },
+
+    /// Prepare a contract for multi-party deployment (Phase 10C)
+    /// Creates a deployment message with your signature
+    Prepare {
+        /// Path to contract JSON file
+        contract_file: PathBuf,
+
+        /// Output file for partial deployment message
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+
+    /// Add your signature to a partial deployment (Phase 10C)
+    Sign {
+        /// Path to partial deployment JSON file
+        deployment_file: PathBuf,
+
+        /// Output file for updated deployment message
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+
+    /// Deploy a fully-signed contract (Phase 10C)
+    DeploySigned {
+        /// Path to fully-signed deployment JSON file
+        deployment_file: PathBuf,
     },
 
     /// Call a contract rule
@@ -1001,6 +1028,18 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             }
         }
 
+        ContractCommands::Prepare { contract_file, output } => {
+            handle_contract_prepare(&contract_file, &output, data_dir)?;
+        }
+
+        ContractCommands::Sign { deployment_file, output } => {
+            handle_contract_sign(&deployment_file, &output, data_dir)?;
+        }
+
+        ContractCommands::DeploySigned { deployment_file } => {
+            handle_contract_deploy_signed(&deployment_file, &mut client).await?;
+        }
+
         ContractCommands::List => {
             match client
                 .list_contracts()
@@ -1029,6 +1068,249 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
                     println!("\nYou can still deploy and call contracts by code hash.");
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle contract prepare command - create initial deployment message with first signature
+fn handle_contract_prepare(contract_file: &PathBuf, output: &PathBuf, data_dir: &PathBuf) -> Result<()> {
+    // Read and validate contract
+    let contract_json = std::fs::read_to_string(contract_file)
+        .with_context(|| format!("Failed to read contract file: {}", contract_file.display()))?;
+
+    println!("Preparing contract from {}...\n", contract_file.display());
+
+    let contract: icn_ccl::Contract = serde_json::from_str(&contract_json)
+        .context("Failed to parse contract JSON")?;
+
+    contract.validate()
+        .context("Contract validation failed")?;
+
+    println!("✓ Contract validated");
+    println!("  Name: {}", contract.name);
+    println!("  Participants: {}", contract.participants.len());
+    for (i, did) in contract.participants.iter().enumerate() {
+        println!("    {}. {}", i + 1, did);
+    }
+    println!("  Rules: {}", contract.rules.len());
+    println!();
+
+    // Load keystore to sign
+    let keystore_path = get_keystore_path(data_dir);
+    if !keystore_path.exists() {
+        bail!("No identity found. Run 'icnctl id init' to create one first.");
+    }
+
+    let passphrase = read_passphrase("Enter passphrase to sign deployment: ")?;
+
+    let mut keystore = AgeKeyStore::open(&keystore_path)?;
+    keystore.unlock(&passphrase)?;
+    let keypair = keystore.get_keypair()?;
+    let signer_did = keypair.did().clone();
+
+    // Check if signer is a participant
+    if !contract.participants.contains(&signer_did) {
+        bail!("You ({}) are not a participant in this contract", signer_did);
+    }
+
+    println!("Signing as {} ({} of {} participants)",
+             signer_did,
+             1,
+             contract.participants.len());
+
+    // Compute code hash
+    let code_hash = {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(contract.name.as_bytes());
+        for participant in &contract.participants {
+            hasher.update(format!("{:?}", participant).as_bytes());
+        }
+        icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
+    };
+
+    // Create installation record
+    let installed_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+
+    // Generate signature
+    let signing_bytes = icn_ccl::ContractDeploymentMessage::compute_signing_bytes(
+        &code_hash,
+        installed_at,
+    );
+    let signature = keypair.sign(&signing_bytes);
+
+    let installation = icn_ccl::ContractInstallation {
+        code_hash: code_hash.clone(),
+        installed_by: signer_did.clone(),
+        capabilities: vec![],
+        participants: contract.participants.clone(),
+        signatures: vec![(signer_did.clone(), signature.to_bytes().to_vec())],
+        installed_at,
+        min_caller_trust: None,
+    };
+
+    let deployment_msg = icn_ccl::ContractDeploymentMessage {
+        code_hash: code_hash.clone(),
+        contract: contract.clone(),
+        installation,
+        deployer_signature: signature.to_bytes().to_vec(),
+    };
+
+    // Write to output file
+    let deployment_json = serde_json::to_string_pretty(&deployment_msg)
+        .context("Failed to serialize deployment message")?;
+
+    std::fs::write(output, deployment_json)
+        .with_context(|| format!("Failed to write to {}", output.display()))?;
+
+    println!("✓ Deployment message created: {}", output.display());
+    println!();
+    println!("Signatures collected: 1/{}", contract.participants.len());
+    println!("Signed by:");
+    println!("  ✓ {}", signer_did);
+    println!();
+    println!("Next steps:");
+    if contract.participants.len() > 1 {
+        println!("  1. Send {} to other participants", output.display());
+        println!("  2. They run: icnctl contract sign {} -o <output>", output.display());
+        println!("  3. Once all {} signatures collected, deploy with:", contract.participants.len());
+        println!("     icnctl contract deploy-signed <fully-signed.json>");
+    } else {
+        println!("  This is a single-participant contract. Deploy with:");
+        println!("     icnctl contract deploy-signed {}", output.display());
+    }
+
+    Ok(())
+}
+
+/// Handle contract sign command - add your signature to a partial deployment
+fn handle_contract_sign(deployment_file: &PathBuf, output: &PathBuf, data_dir: &PathBuf) -> Result<()> {
+    // Read partial deployment
+    let deployment_json = std::fs::read_to_string(deployment_file)
+        .with_context(|| format!("Failed to read deployment file: {}", deployment_file.display()))?;
+
+    println!("Adding signature to {}...\n", deployment_file.display());
+
+    let mut deployment_msg: icn_ccl::ContractDeploymentMessage = serde_json::from_str(&deployment_json)
+        .context("Failed to parse deployment JSON")?;
+
+    println!("Contract: {}", deployment_msg.contract.name);
+    println!("Participants: {}", deployment_msg.contract.participants.len());
+    println!();
+
+    // Load keystore
+    let keystore_path = get_keystore_path(data_dir);
+    if !keystore_path.exists() {
+        bail!("No identity found. Run 'icnctl id init' to create one first.");
+    }
+
+    let passphrase = read_passphrase("Enter passphrase to sign: ")?;
+
+    let mut keystore = AgeKeyStore::open(&keystore_path)?;
+    keystore.unlock(&passphrase)?;
+    let keypair = keystore.get_keypair()?;
+    let signer_did = keypair.did().clone();
+
+    // Check if signer is a participant
+    if !deployment_msg.contract.participants.contains(&signer_did) {
+        bail!("You ({}) are not a participant in this contract", signer_did);
+    }
+
+    // Check if already signed
+    if deployment_msg.installation.signatures.iter().any(|(did, _)| did == &signer_did) {
+        bail!("You ({}) have already signed this deployment", signer_did);
+    }
+
+    // Generate signature
+    let signing_bytes = deployment_msg.signing_bytes();
+    let signature = keypair.sign(&signing_bytes);
+
+    // Add signature
+    deployment_msg.installation.signatures.push((signer_did.clone(), signature.to_bytes().to_vec()));
+
+    // Write to output
+    let updated_json = serde_json::to_string_pretty(&deployment_msg)
+        .context("Failed to serialize updated deployment")?;
+
+    std::fs::write(output, updated_json)
+        .with_context(|| format!("Failed to write to {}", output.display()))?;
+
+    let signatures_count = deployment_msg.installation.signatures.len();
+    let total_participants = deployment_msg.contract.participants.len();
+
+    println!("✓ Signature added: {}", output.display());
+    println!();
+    println!("Signatures collected: {}/{}", signatures_count, total_participants);
+    println!("Signed by:");
+    for (did, _) in &deployment_msg.installation.signatures {
+        println!("  ✓ {}", did);
+    }
+
+    if signatures_count < total_participants {
+        println!();
+        println!("Still waiting for signatures from:");
+        for participant in &deployment_msg.contract.participants {
+            if !deployment_msg.installation.signatures.iter().any(|(did, _)| did == participant) {
+                println!("  ⏳ {}", participant);
+            }
+        }
+        println!();
+        println!("Next steps:");
+        println!("  Send {} to remaining participants", output.display());
+    } else {
+        println!();
+        println!("✓ All signatures collected! Ready to deploy.");
+        println!();
+        println!("Deploy with:");
+        println!("  icnctl contract deploy-signed {}", output.display());
+    }
+
+    Ok(())
+}
+
+/// Handle deploy-signed command - deploy a fully-signed contract
+async fn handle_contract_deploy_signed(deployment_file: &PathBuf, client: &mut icn_rpc::RpcClient) -> Result<()> {
+    // Read deployment
+    let deployment_json = std::fs::read_to_string(deployment_file)
+        .with_context(|| format!("Failed to read deployment file: {}", deployment_file.display()))?;
+
+    println!("Deploying signed contract from {}...\n", deployment_file.display());
+
+    let deployment_msg: icn_ccl::ContractDeploymentMessage = serde_json::from_str(&deployment_json)
+        .context("Failed to parse deployment JSON")?;
+
+    println!("Contract: {}", deployment_msg.contract.name);
+    println!("Participants: {}", deployment_msg.contract.participants.len());
+    println!("Signatures: {}", deployment_msg.installation.signatures.len());
+    println!();
+
+    // Validate all participants have signed
+    let participant_set: std::collections::HashSet<_> = deployment_msg.contract.participants.iter().collect();
+    let signature_set: std::collections::HashSet<_> = deployment_msg.installation.signatures.iter().map(|(did, _)| did).collect();
+
+    if participant_set != signature_set {
+        let missing: Vec<_> = participant_set.difference(&signature_set).collect();
+        bail!("Missing signatures from: {:?}", missing);
+    }
+
+    println!("✓ All {} participants have signed", deployment_msg.contract.participants.len());
+    println!();
+
+    // Send to daemon
+    match client
+        .deploy_contract(deployment_json)
+        .await
+        .context("Failed to deploy contract to daemon. Is icnd running?")?
+    {
+        code_hash => {
+            println!("✓ Contract deployed successfully!");
+            println!("  Code Hash: {}", code_hash);
+            println!("\nYou can now call contract rules using:");
+            println!("  icnctl contract call {} <rule_name> <caller_did> --args '{{}}'", code_hash);
         }
     }
 

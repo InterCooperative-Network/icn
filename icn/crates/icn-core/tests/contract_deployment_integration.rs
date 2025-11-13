@@ -221,11 +221,12 @@ impl TestNode {
         Ok(())
     }
 
-    /// Deploy a contract from this node
+    /// Deploy a contract from this node (Phase 10C: Multi-party signature collection)
     async fn deploy_contract(
         &self,
         contract: Contract,
         capabilities: Vec<Capability>,
+        other_participants: Vec<&TestNode>,  // Other participant nodes to collect signatures from
         announce_to: Vec<&icn_identity::Did>,
     ) -> anyhow::Result<ContentHash> {
         // Compute code hash (must match ContractActor::compute_code_hash)
@@ -248,12 +249,21 @@ impl TestNode {
         );
         let deployer_signature = self.keypair.sign(&signing_bytes);
 
+        // Collect signatures from all participants (Phase 10C)
+        let mut signatures = vec![(self.did.clone(), deployer_signature.to_bytes().to_vec())];
+
+        // Add signatures from other participants
+        for participant_node in &other_participants {
+            let participant_signature = participant_node.keypair.sign(&signing_bytes);
+            signatures.push((participant_node.did.clone(), participant_signature.to_bytes().to_vec()));
+        }
+
         let installation = ContractInstallation {
             code_hash: code_hash.clone(),
             installed_by: self.did.clone(),
             capabilities,
             participants: contract.participants.clone(),
-            signatures: vec![(self.did.clone(), deployer_signature.to_bytes().to_vec())],
+            signatures,  // Now contains all participant signatures
             installed_at,
             min_caller_trust: None,
         };
@@ -375,9 +385,9 @@ async fn test_two_node_contract_deployment() {
                 }),
         );
 
-    // Deploy from node A and announce to node B
+    // Deploy from node A (with node B's signature collected)
     let code_hash = node_a
-        .deploy_contract(contract, vec![], vec![&node_b.did])
+        .deploy_contract(contract, vec![], vec![&node_b], vec![&node_b.did])
         .await
         .expect("Failed to deploy contract");
 
@@ -444,9 +454,9 @@ async fn test_contract_execution_after_deployment() {
                 }),
         );
 
-    // Deploy from node A and announce to node B
+    // Deploy from node A (with node B's signature collected)
     let code_hash = node_a
-        .deploy_contract(contract, vec![], vec![&node_b.did])
+        .deploy_contract(contract, vec![], vec![&node_b], vec![&node_b.did])
         .await
         .expect("Failed to deploy contract");
 
@@ -509,8 +519,9 @@ async fn test_untrusted_deployer_rejected() {
         );
 
     // Deploy from node A and announce to node B (trust score 0.2 < 0.4, should be rejected by B)
+    // Single-participant contract, no other signatures needed
     let _code_hash = node_a
-        .deploy_contract(contract, vec![], vec![&node_b.did])
+        .deploy_contract(contract, vec![], vec![], vec![&node_b.did])
         .await
         .expect("Node A should deploy locally");
 

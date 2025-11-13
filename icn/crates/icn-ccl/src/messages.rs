@@ -77,27 +77,23 @@ impl ContractDeploymentMessage {
             );
         }
 
-        // TODO(Phase 10C): Re-enable multi-party signature requirement
-        // For now, only deployer signature is required. Multi-party signature
-        // collection workflow will be implemented in Phase 10C.
-        //
-        // Future: Verify all participants have signed
-        // let participant_set: std::collections::HashSet<_> =
-        //     self.contract.participants.iter().collect();
-        // let signature_set: std::collections::HashSet<_> = self
-        //     .installation
-        //     .signatures
-        //     .iter()
-        //     .map(|(did, _)| did)
-        //     .collect();
-        //
-        // if participant_set != signature_set {
-        //     bail!(
-        //         "Participant signatures incomplete: need {:?}, got {:?}",
-        //         participant_set,
-        //         signature_set
-        //     );
-        // }
+        // Verify all participants have signed (Phase 10C)
+        let participant_set: std::collections::HashSet<_> =
+            self.contract.participants.iter().collect();
+        let signature_set: std::collections::HashSet<_> = self
+            .installation
+            .signatures
+            .iter()
+            .map(|(did, _)| did)
+            .collect();
+
+        if participant_set != signature_set {
+            bail!(
+                "Participant signatures incomplete: need {:?}, got {:?}",
+                participant_set,
+                signature_set
+            );
+        }
 
         // Get canonical signing bytes
         let signing_bytes = self.signing_bytes();
