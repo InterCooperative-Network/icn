@@ -26,6 +26,11 @@ pub type SendMessageCallback = Arc<dyn Fn(Option<Did>, GossipMessage) + Send + S
 /// Called when a new entry is stored in a topic that has subscribers
 pub type EntryNotificationCallback = Arc<dyn Fn(String, GossipEntry, Did) + Send + Sync>;
 
+/// Callback for sampling peers based on scope
+/// Parameters: (scope, count) -> Vec<Did>
+/// Returns a list of peer DIDs to send messages to
+pub type PeerSamplingCallback = Arc<dyn Fn(crate::types::Scope, usize) -> Vec<Did> + Send + Sync>;
+
 /// Maximum subscribers per topic to prevent unbounded memory growth
 const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 
@@ -62,6 +67,9 @@ pub struct GossipActor {
     /// Entry notification callback (optional, for notifying subscribers)
     notification_callback: Option<EntryNotificationCallback>,
 
+    /// Peer sampling callback (optional, for scope-aware peer selection)
+    peer_sampling: Option<PeerSamplingCallback>,
+
     /// Per-peer sync state manager
     peer_sync: PeerSyncManager,
 }
@@ -92,6 +100,7 @@ impl GossipActor {
             trust_graph,
             send_callback: None,
             notification_callback: None,
+            peer_sampling: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
         };
 
@@ -137,12 +146,49 @@ impl GossipActor {
         self.notification_callback = Some(callback);
     }
 
+    /// Set the peer sampling callback for scope-aware peer selection
+    pub fn set_peer_sampling(&mut self, callback: PeerSamplingCallback) {
+        self.peer_sampling = Some(callback);
+    }
+
     /// Send a message to a peer (if callback is set)
     fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
         if let Some(callback) = &self.send_callback {
             callback(recipient, message);
         } else {
             debug!("Cannot send message - no send callback set");
+        }
+    }
+
+    /// Send a message with scope-aware peer selection
+    /// If peer_sampling is set, samples peers based on scope. Otherwise falls back to broadcast.
+    fn send_message_scoped(&self, scope: crate::types::Scope, fanout: usize, message: GossipMessage) {
+        if let Some(sampling) = &self.peer_sampling {
+            // Use scope-aware peer selection
+            let peers = sampling(scope, fanout);
+
+            if peers.is_empty() {
+                debug!("No peers available for scope {:?}", scope);
+                return;
+            }
+
+            // Send to each selected peer
+            for peer in peers {
+                self.send_message(Some(peer), message.clone());
+            }
+
+            // Track fanout metrics
+            icn_obs::metrics::topology::gossip_fanout_record(
+                match scope {
+                    crate::types::Scope::LocalCluster => "local_cluster",
+                    crate::types::Scope::Regional => "regional",
+                    crate::types::Scope::Global => "global",
+                },
+                fanout,
+            );
+        } else {
+            // Fall back to broadcast (backward compatibility)
+            self.send_message(None, message);
         }
     }
 
@@ -950,9 +996,19 @@ impl GossipActor {
             nonce,
         };
 
-        // Broadcast to all peers (None = broadcast)
-        debug!("Emitting digest for topic {}: {} entries, nonce={}", topic, entry_count, nonce);
-        self.send_message(None, digest);
+        // Get topic scope and fanout
+        let topic_obj = self.topics.get(topic).unwrap(); // Safe: checked above
+        let scope = topic_obj.scope;
+        let fanout = match scope {
+            crate::types::Scope::LocalCluster => 8,  // Default local fanout
+            crate::types::Scope::Regional => 6,       // Default regional fanout
+            crate::types::Scope::Global => 4,         // Default global fanout
+        };
+
+        // Send with scope-aware peer selection
+        debug!("Emitting digest for topic {} ({:?} scope, fanout={}): {} entries, nonce={}",
+               topic, scope, fanout, entry_count, nonce);
+        self.send_message_scoped(scope, fanout, digest);
 
         // Track metrics
         icn_obs::metrics::gossip::digests_sent_inc();

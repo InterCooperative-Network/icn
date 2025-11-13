@@ -393,6 +393,20 @@ impl Supervisor {
 
                 gossip.set_notification_callback(notification_callback);
 
+                // Set up peer sampling callback for scope-aware gossip fanout
+                let network_handle_for_sampling = network_handle.clone();
+                let peer_sampling_callback: icn_gossip::PeerSamplingCallback = Arc::new(move |scope, count| {
+                    let net_handle = network_handle_for_sampling.clone();
+                    // Use tokio::task::block_in_place to safely block in async context
+                    tokio::task::block_in_place(move || {
+                        tokio::runtime::Handle::current().block_on(async move {
+                            net_handle.sample_peers(scope, count).await
+                        })
+                    })
+                });
+
+                gossip.set_peer_sampling(peer_sampling_callback);
+
                 // Subscribe to trust attestations topic
                 if let Err(e) = gossip.subscribe(crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC, did.clone()) {
                     warn!("Failed to subscribe to trust attestations topic: {}", e);

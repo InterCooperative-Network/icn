@@ -65,6 +65,7 @@ pub struct NetworkStats {
 #[derive(Clone)]
 pub struct NetworkHandle {
     tx: mpsc::Sender<NetworkMsg>,
+    neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
 }
 
 impl NetworkHandle {
@@ -127,6 +128,18 @@ impl NetworkHandle {
             .await
             .context("Network actor closed")?;
         rx.await.context("Response channel closed")
+    }
+
+    /// Sample peers based on scope (for gossip fanout)
+    /// Returns a list of peer DIDs suitable for the given scope
+    pub async fn sample_peers(&self, scope: icn_gossip::Scope, count: usize) -> Vec<Did> {
+        if let Some(ref sets) = self.neighbor_sets {
+            let sets_read = sets.read().await;
+            sets_read.sample(scope, count).into_iter().map(|peer_id| peer_id.0).collect()
+        } else {
+            // No topology support - return empty list (fall back to broadcast)
+            Vec::new()
+        }
     }
 }
 
@@ -274,7 +287,7 @@ impl NetworkActor {
             }
         });
 
-        Ok(NetworkHandle { tx })
+        Ok(NetworkHandle { tx, neighbor_sets: neighbor_sets.clone() })
     }
 
     /// Run the network actor event loop
