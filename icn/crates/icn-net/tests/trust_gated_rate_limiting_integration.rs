@@ -10,7 +10,7 @@ use anyhow::Result;
 use icn_identity::{Did, KeyPair};
 use icn_net::{RateLimiter, TrustGatedRateLimitConfig};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

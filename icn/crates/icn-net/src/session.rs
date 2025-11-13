@@ -7,7 +7,7 @@
 //! - DID-based peer authentication
 
 use anyhow::{Context, Result};
-use icn_identity::{Did, KeyPair};
+use icn_identity::KeyPair;
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
