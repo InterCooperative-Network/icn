@@ -38,9 +38,31 @@ impl ContractDeploymentMessage {
         }
     }
 
+    /// Compute canonical bytes for signing
+    ///
+    /// Returns SHA-256 hash of: code_hash || installed_at_timestamp
+    /// This ensures signatures are bound to specific deployments.
+    pub fn signing_bytes(&self) -> Vec<u8> {
+        Self::compute_signing_bytes(&self.code_hash, self.installation.installed_at)
+    }
+
+    /// Helper to compute signing bytes for a contract before deployment
+    ///
+    /// This static method allows clients to compute what to sign
+    /// before creating the full deployment message.
+    pub fn compute_signing_bytes(code_hash: &ContentHash, installed_at: u64) -> Vec<u8> {
+        use sha2::{Digest, Sha256};
+
+        let mut hasher = Sha256::new();
+        hasher.update(code_hash.as_bytes());
+        hasher.update(&installed_at.to_le_bytes());
+        hasher.finalize().to_vec()
+    }
+
     /// Verify the deployment message
     pub fn verify(&self) -> anyhow::Result<()> {
         use anyhow::{bail, Context};
+        use ed25519_dalek::{Signature, Verifier};
 
         // Validate contract structure
         self.contract
@@ -73,7 +95,40 @@ impl ContractDeploymentMessage {
             );
         }
 
-        // TODO: Verify cryptographic signatures (requires KeyPair integration)
+        // Get canonical signing bytes
+        let signing_bytes = self.signing_bytes();
+
+        // Verify deployer signature
+        let deployer_key = self.installation.installed_by.to_verifying_key()
+            .context("Failed to extract deployer verifying key")?;
+        let deployer_sig = Signature::from_bytes(
+            self.deployer_signature.as_slice().try_into()
+                .map_err(|_| anyhow::anyhow!("Invalid deployer signature length: expected 64 bytes"))?
+        );
+        deployer_key.verify(&signing_bytes, &deployer_sig)
+            .map_err(|e| anyhow::anyhow!("Deployer signature verification failed: {}", e))?;
+
+        // Verify each participant signature
+        for (participant_did, sig_bytes) in &self.installation.signatures {
+            let participant_key = participant_did.to_verifying_key()
+                .context(format!("Failed to extract verifying key for {}", participant_did))?;
+
+            if sig_bytes.len() != 64 {
+                bail!("Invalid signature length for {}: expected 64 bytes, got {}",
+                      participant_did, sig_bytes.len());
+            }
+
+            let signature = Signature::from_bytes(
+                sig_bytes.as_slice().try_into()
+                    .map_err(|_| anyhow::anyhow!("Failed to parse signature for {}", participant_did))?
+            );
+
+            participant_key.verify(&signing_bytes, &signature)
+                .map_err(|e| anyhow::anyhow!(
+                    "Participant signature verification failed for {}: {}",
+                    participant_did, e
+                ))?;
+        }
 
         Ok(())
     }

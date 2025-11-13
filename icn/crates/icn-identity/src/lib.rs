@@ -69,6 +69,28 @@ impl Did {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// Extract the Ed25519 verifying key from this DID
+    ///
+    /// This decodes the DID's multibase-encoded public key and returns
+    /// the VerifyingKey for signature verification.
+    pub fn to_verifying_key(&self) -> Result<VerifyingKey> {
+        // Extract multibase-encoded part
+        let encoded_part = &self.0[8..]; // Skip "did:icn:"
+
+        // Decode multibase
+        let (_base, decoded_bytes) = multibase::decode(encoded_part)
+            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {}", e))?;
+
+        // Convert to VerifyingKey
+        let key_bytes: [u8; 32] = decoded_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Invalid key length"))?;
+
+        VerifyingKey::from_bytes(&key_bytes)
+            .map_err(|e| anyhow::anyhow!("Invalid Ed25519 public key: {}", e))
+    }
 }
 
 impl std::fmt::Display for Did {
@@ -243,5 +265,34 @@ mod tests {
         if result.is_err() {
             assert!(result.unwrap_err().to_string().contains("Ed25519"));
         }
+    }
+
+    #[test]
+    fn test_did_to_verifying_key() {
+        // Generate a keypair and DID
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did();
+
+        // Extract verifying key from DID
+        let extracted_key = did.to_verifying_key().unwrap();
+
+        // Should match the original keypair's verifying key
+        assert_eq!(extracted_key, *kp.verifying_key());
+    }
+
+    #[test]
+    fn test_did_signature_verification() {
+        use ed25519_dalek::Verifier;
+
+        // Generate keypair and sign a message
+        let kp = KeyPair::generate().unwrap();
+        let message = b"contract deployment";
+        let signature = kp.sign(message);
+
+        // Extract verifying key from DID and verify
+        let did = kp.did();
+        let verifying_key = did.to_verifying_key().unwrap();
+
+        assert!(verifying_key.verify(message, &signature).is_ok());
     }
 }

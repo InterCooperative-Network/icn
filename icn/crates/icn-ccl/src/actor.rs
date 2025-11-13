@@ -288,6 +288,7 @@ impl ContractActor {
 mod tests {
     use super::*;
     use crate::ast::{Expr, Rule, Stmt};
+    use crate::messages::ContractDeploymentMessage;
     use crate::types::{Capability, Value};
     use icn_identity::KeyPair;
     use icn_ledger::Ledger;
@@ -308,30 +309,67 @@ mod tests {
         (actor, runtime)
     }
 
+    /// Helper to compute code hash (same algorithm as ContractActor)
+    fn compute_code_hash(contract: &Contract) -> ContentHash {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(contract.name.as_bytes());
+        for participant in &contract.participants {
+            hasher.update(format!("{:?}", participant).as_bytes());
+        }
+        ContentHash::from_bytes(hasher.finalize().into())
+    }
+
+    /// Helper to create valid signatures for contract deployment
+    fn create_signatures(
+        code_hash: &ContentHash,
+        installed_at: u64,
+        keypairs: &[&KeyPair],
+    ) -> Vec<(icn_identity::Did, Vec<u8>)> {
+        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(code_hash, installed_at);
+
+        keypairs
+            .iter()
+            .map(|kp| {
+                let signature = kp.sign(&signing_bytes);
+                (kp.did().clone(), signature.to_bytes().to_vec())
+            })
+            .collect()
+    }
+
     #[tokio::test]
     async fn test_deploy_contract_without_trust_graph() {
         let (actor, _runtime) = create_test_actor();
 
-        let alice = KeyPair::generate().unwrap().did().clone();
-        let bob = KeyPair::generate().unwrap().did().clone();
+        let alice_kp = KeyPair::generate().unwrap();
+        let bob_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob = bob_kp.did().clone();
 
         let contract = Contract::new("test".to_string())
             .add_participant(alice.clone())
             .add_participant(bob.clone())
             .with_currency("hours".to_string());
 
+        let code_hash = compute_code_hash(&contract);
+        let installed_at = 1234567890u64;
+        let signatures = create_signatures(&code_hash, installed_at, &[&alice_kp, &bob_kp]);
+
         let installation = ContractInstallation {
-            code_hash: ContentHash::from_bytes([0u8; 32]),
+            code_hash: code_hash.clone(),
             installed_by: alice.clone(),
             capabilities: vec![],
             participants: vec![alice.clone(), bob.clone()],
-            signatures: vec![(alice.clone(), vec![]), (bob.clone(), vec![])],
-            installed_at: 1234567890,
+            signatures,
+            installed_at,
             min_caller_trust: None,
         };
 
+        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
+
         let result = actor
-            .deploy_contract(contract, installation, vec![])
+            .deploy_contract(contract, installation, deployer_signature)
             .await;
 
         // Should succeed even without trust graph (warning logged)
@@ -342,8 +380,10 @@ mod tests {
     async fn test_execute_rule_as_participant() {
         let (actor, _runtime) = create_test_actor();
 
-        let alice = KeyPair::generate().unwrap().did().clone();
-        let bob = KeyPair::generate().unwrap().did().clone();
+        let alice_kp = KeyPair::generate().unwrap();
+        let bob_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob = bob_kp.did().clone();
 
         // Create and deploy a simple contract
         let contract = Contract::new("test".to_string())
@@ -362,20 +402,27 @@ mod tests {
                     }),
             );
 
+        let code_hash = compute_code_hash(&contract);
+        let installed_at = 1234567890u64;
+        let signatures = create_signatures(&code_hash, installed_at, &[&alice_kp, &bob_kp]);
+
         let installation = ContractInstallation {
-            code_hash: ContentHash::from_bytes([1u8; 32]),
+            code_hash: code_hash.clone(),
             installed_by: alice.clone(),
             capabilities: vec![Capability::WriteLedger {
                 accounts: vec![alice.clone(), bob.clone()],
             }],
             participants: vec![alice.clone(), bob.clone()],
-            signatures: vec![(alice.clone(), vec![]), (bob.clone(), vec![])],
-            installed_at: 1234567890,
+            signatures,
+            installed_at,
             min_caller_trust: None,
         };
 
-        let code_hash = actor
-            .deploy_contract(contract, installation, vec![])
+        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
+
+        let returned_code_hash = actor
+            .deploy_contract(contract, installation, deployer_signature)
             .await
             .unwrap();
 
@@ -385,7 +432,7 @@ mod tests {
         args.insert("amount".to_string(), Value::Int(10));
 
         let request = ContractExecutionRequest {
-            code_hash,
+            code_hash: returned_code_hash,
             rule_name: "transfer".to_string(),
             args,
             caller: alice.clone(),
@@ -406,9 +453,11 @@ mod tests {
     async fn test_execute_rule_as_non_participant_fails() {
         let (actor, _runtime) = create_test_actor();
 
-        let alice = KeyPair::generate().unwrap().did().clone();
-        let bob = KeyPair::generate().unwrap().did().clone();
+        let alice_kp = KeyPair::generate().unwrap();
+        let bob_kp = KeyPair::generate().unwrap();
         let charlie = KeyPair::generate().unwrap().did().clone(); // Not a participant
+        let alice = alice_kp.did().clone();
+        let bob = bob_kp.did().clone();
 
         // Create and deploy contract
         let contract = Contract::new("test".to_string())
@@ -422,24 +471,31 @@ mod tests {
                     }),
             );
 
+        let code_hash = compute_code_hash(&contract);
+        let installed_at = 1234567890u64;
+        let signatures = create_signatures(&code_hash, installed_at, &[&alice_kp, &bob_kp]);
+
         let installation = ContractInstallation {
-            code_hash: ContentHash::from_bytes([2u8; 32]),
+            code_hash: code_hash.clone(),
             installed_by: alice.clone(),
             capabilities: vec![],
             participants: vec![alice.clone(), bob.clone()],
-            signatures: vec![(alice.clone(), vec![]), (bob.clone(), vec![])],
-            installed_at: 1234567890,
+            signatures,
+            installed_at,
             min_caller_trust: None, // Participant-only
         };
 
-        let code_hash = actor
-            .deploy_contract(contract, installation, vec![])
+        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
+
+        let returned_code_hash = actor
+            .deploy_contract(contract, installation, deployer_signature)
             .await
             .unwrap();
 
         // Try to execute as non-participant Charlie
         let request = ContractExecutionRequest {
-            code_hash,
+            code_hash: returned_code_hash,
             rule_name: "noop".to_string(),
             args: HashMap::new(),
             caller: charlie.clone(),
@@ -458,42 +514,57 @@ mod tests {
     async fn test_list_contracts() {
         let (actor, _runtime) = create_test_actor();
 
-        let alice = KeyPair::generate().unwrap().did().clone();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
 
         // Deploy two contracts
         let contract1 = Contract::new("contract1".to_string())
             .add_participant(alice.clone());
 
+        let code_hash1 = compute_code_hash(&contract1);
+        let installed_at1 = 1234567890u64;
+        let signatures1 = create_signatures(&code_hash1, installed_at1, &[&alice_kp]);
+
         let installation1 = ContractInstallation {
-            code_hash: ContentHash::from_bytes([10u8; 32]),
+            code_hash: code_hash1.clone(),
             installed_by: alice.clone(),
             capabilities: vec![],
             participants: vec![alice.clone()],
-            signatures: vec![(alice.clone(), vec![])],
-            installed_at: 1234567890,
+            signatures: signatures1,
+            installed_at: installed_at1,
             min_caller_trust: None,
         };
 
+        let signing_bytes1 = ContractDeploymentMessage::compute_signing_bytes(&code_hash1, installed_at1);
+        let deployer_signature1 = alice_kp.sign(&signing_bytes1).to_bytes().to_vec();
+
         actor
-            .deploy_contract(contract1, installation1, vec![])
+            .deploy_contract(contract1, installation1, deployer_signature1)
             .await
             .unwrap();
 
         let contract2 = Contract::new("contract2".to_string())
             .add_participant(alice.clone());
 
+        let code_hash2 = compute_code_hash(&contract2);
+        let installed_at2 = 1234567891u64;
+        let signatures2 = create_signatures(&code_hash2, installed_at2, &[&alice_kp]);
+
         let installation2 = ContractInstallation {
-            code_hash: ContentHash::from_bytes([20u8; 32]),
+            code_hash: code_hash2.clone(),
             installed_by: alice.clone(),
             capabilities: vec![],
             participants: vec![alice.clone()],
-            signatures: vec![(alice.clone(), vec![])],
-            installed_at: 1234567891,
+            signatures: signatures2,
+            installed_at: installed_at2,
             min_caller_trust: None,
         };
 
+        let signing_bytes2 = ContractDeploymentMessage::compute_signing_bytes(&code_hash2, installed_at2);
+        let deployer_signature2 = alice_kp.sign(&signing_bytes2).to_bytes().to_vec();
+
         actor
-            .deploy_contract(contract2, installation2, vec![])
+            .deploy_contract(contract2, installation2, deployer_signature2)
             .await
             .unwrap();
 

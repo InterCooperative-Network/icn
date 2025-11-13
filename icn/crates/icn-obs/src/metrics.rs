@@ -278,6 +278,10 @@ pub fn init_descriptions() {
         "Total number of contract deployments rejected due to insufficient trust"
     );
     describe_counter!(
+        "icn_contract_deployments_rejected_signature_total",
+        "Total number of contract deployments rejected due to invalid signatures"
+    );
+    describe_counter!(
         "icn_contract_executions_total",
         "Total number of contract rule executions"
     );
@@ -620,6 +624,13 @@ pub mod contract {
             "icn_contract_deployments_rejected_trust_total",
             "deployer" => deployer.to_string(),
             "trust_score" => format!("{:.2}", trust_score)
+        ).increment(1);
+    }
+
+    pub fn deployments_rejected_signature_inc(signer: &str) {
+        counter!(
+            "icn_contract_deployments_rejected_signature_total",
+            "signer" => signer.to_string()
         ).increment(1);
     }
 

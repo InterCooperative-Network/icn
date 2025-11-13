@@ -350,10 +350,17 @@ impl Supervisor {
                             // Deserialize contract deployment message
                             match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
                                 Ok(deployment_msg) => {
-                                    let mut actor = contract_actor.write().await;
+                                    let deployer = deployment_msg.installation.installed_by.to_string();
+                                    let actor = contract_actor.write().await;
                                     if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
-                                        warn!("Failed to handle contract deployment: {}", e);
-                                        icn_obs::metrics::contract::deployments_rejected_inc("handling_error");
+                                        let error_str = e.to_string();
+                                        if error_str.contains("signature") {
+                                            warn!("Contract deployment signature verification failed from {}: {}", deployer, e);
+                                            icn_obs::metrics::contract::deployments_rejected_signature_inc(&deployer);
+                                        } else {
+                                            warn!("Failed to handle contract deployment: {}", e);
+                                            icn_obs::metrics::contract::deployments_rejected_inc("handling_error");
+                                        }
                                     } else {
                                         info!("Contract deployment processed successfully");
                                         icn_obs::metrics::contract::deployments_received_inc();
