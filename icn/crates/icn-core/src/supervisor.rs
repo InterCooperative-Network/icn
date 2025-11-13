@@ -261,6 +261,16 @@ impl Supervisor {
                     icn_net::MessagePayload::Hello { .. } => {
                         // Hello message with DID-TLS binding handled internally by network actor
                     }
+
+                    icn_net::MessagePayload::Signed(ref envelope) => {
+                        // Signed messages have been verified by NetworkActor
+                        // The signature and replay protection checks have passed
+                        info!("Received verified signed message from {} (seq={})", envelope.from, envelope.sequence);
+
+                        // Decode and handle the inner payload based on PayloadType
+                        // For now, we just log since we don't have typed payloads yet
+                        // Future: decode based on envelope.payload_type and route accordingly
+                    }
                 }
             });
 

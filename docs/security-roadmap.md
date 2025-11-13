@@ -4,9 +4,10 @@
 
 This document outlines the security architecture and implementation plan for ICN. It addresses critical vulnerabilities in the current implementation and provides a phased approach to building a secure, production-ready cooperative network.
 
-**Status:** Planning phase - Not yet implemented
+**Status:** In Progress - Phases 7-9 Complete
 
-**Target:** Phase 8 - Security & Production Hardening
+**Latest:** Phase 9 - Message & Identity Integrity (Complete)
+**Target:** Phase 10 - Payload Encryption & Forward Secrecy
 
 ## Sequencing Strategy
 
@@ -17,10 +18,10 @@ Security work follows a layered approach, building from network foundations to a
 - Basic peer admission/rate limiting
 - Bind TLS to DIDs
 
-### 2. Message & Identity Integrity
-- Signed envelopes at the protocol layer
-- Basic replay protection window
-- Clear story for internal vs external message trust
+### 2. Message & Identity Integrity ✅ COMPLETE (Phase 9)
+- ✅ Signed envelopes at the protocol layer (SignedEnvelope with Ed25519)
+- ✅ Replay protection window (ReplayGuard with Bloom filters)
+- ✅ Clear story for internal vs external message trust (NetworkActor verifies all Signed messages)
 
 ### 3. Trust System Hardening
 - Cap/shape transitive trust

@@ -2,6 +2,7 @@
 //!
 //! Defines wire-format messages sent over QUIC connections.
 
+use crate::envelope::SignedEnvelope;
 use anyhow::{Context, Result};
 use icn_gossip::GossipMessage;
 use icn_identity::{BindingInfo, Did};
@@ -68,6 +69,10 @@ pub enum MessagePayload {
 
     /// Handshake acknowledgement
     HandshakeAck,
+
+    /// Signed application-level message (authenticated + replay protected)
+    /// This wraps any message that requires cryptographic proof of authenticity
+    Signed(SignedEnvelope),
 }
 
 impl NetworkMessage {
@@ -127,6 +132,15 @@ impl NetworkMessage {
             binding_info,
             topology_info,
         })
+    }
+
+    /// Create a signed message (authenticated + replay protected)
+    ///
+    /// This wraps a SignedEnvelope in a NetworkMessage. The `from` field is
+    /// taken from the envelope's authenticated sender, and `to` is the routing hint.
+    pub fn signed(to: Option<Did>, envelope: SignedEnvelope) -> Self {
+        let from = envelope.from.clone();
+        Self::new(from, to, MessagePayload::Signed(envelope))
     }
 
     /// Serialize to bytes using bincode
@@ -335,6 +349,49 @@ mod tests {
         // This should fail during serialization
         // (We can't easily test this without a huge message, so just check the constant)
         assert_eq!(MAX_MESSAGE_SIZE, 10 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_signed_message_roundtrip() {
+        use crate::envelope::{PayloadType, SignedEnvelope};
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a signed envelope
+        let envelope = SignedEnvelope::new(
+            &alice,
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"test payload".to_vec(),
+        )
+        .unwrap();
+
+        // Wrap it in a NetworkMessage
+        let net_msg = NetworkMessage::signed(Some(bob.clone()), envelope.clone());
+
+        // Serialize and deserialize
+        let bytes = net_msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        // Verify structure
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+        assert!(matches!(decoded.payload, MessagePayload::Signed(_)));
+
+        // Extract and verify the signed envelope
+        if let MessagePayload::Signed(decoded_envelope) = decoded.payload {
+            assert_eq!(decoded_envelope.from, alice);
+            assert_eq!(decoded_envelope.sequence, 1);
+            assert_eq!(decoded_envelope.payload, b"test payload");
+
+            // Verify signature (should still be valid)
+            assert!(decoded_envelope.verify(300).is_ok());
+        } else {
+            panic!("Expected Signed payload");
+        }
     }
 
     #[test]

@@ -203,9 +203,40 @@ Each subscriber receives individual notifications. This enables reactive pattern
 
 **Network Protocol** (`icn-net/src/protocol.rs`):
 - `NetworkMessage` envelope with `from_did`, `to_did`, `payload`
-- Payload types: `Gossip`, `Rpc`, `Custom`
+- Payload types: `Gossip`, `Rpc`, `Subscribe`, `Hello`, `Signed` (+ others)
 - Length-prefixed framing over QUIC streams
 - TLS certificates derived from DID Ed25519 keys
+
+**Signed Messages** (`icn-net/src/envelope.rs`, `icn-net/src/replay_guard.rs`):
+- **SignedEnvelope**: Application-level signed messages with Ed25519 signatures
+- **Security properties**: Authenticity, integrity, freshness, replay protection
+- **ReplayGuard**: Per-peer sequence tracking with Bloom filters
+- **Automatic verification**: NetworkActor verifies all `Signed` messages before forwarding
+
+Creating signed messages:
+```rust
+use icn_net::{SignedEnvelope, PayloadType, NetworkMessage};
+
+// Create signed envelope
+let envelope = SignedEnvelope::new(
+    &sender_did,
+    &sender_keypair,
+    sequence_number,     // Monotonic per-sender
+    PayloadType::Gossip, // Or Ledger, Trust, Contract, etc.
+    payload_bytes,
+)?;
+
+// Wrap in NetworkMessage and send
+let msg = NetworkMessage::signed(Some(recipient_did), envelope);
+network_handle.send_message(recipient_did, msg).await?;
+```
+
+Verification is automatic:
+- NetworkActor checks Ed25519 signature
+- Validates timestamp age (default: 300s clock skew)
+- Detects replay attacks via sequence number
+- Forwards verified messages to handler
+- Drops invalid messages (logs warning)
 
 ## Cooperative Contract Language (CCL)
 
@@ -267,7 +298,20 @@ icnctl id import backup.age
 
 ## Current Phase
 
-**Phase 7 - Polish & Production (Complete ✓)**:
+**Phase 9 - Message & Identity Integrity (Complete ✓)** (2025-01-13):
+- [x] SignedEnvelope with Ed25519 signatures (envelope.rs)
+- [x] ReplayGuard with sequence tracking and Bloom filters (replay_guard.rs)
+- [x] Protocol integration (MessagePayload::Signed)
+- [x] NetworkActor automatic verification
+- [x] Comprehensive test coverage (16 new tests, 261 total)
+
+**Phase 8 - DID-TLS Binding & Keystore Integration (Complete ✓)** (2025-01-13):
+- [x] IdentityBundle with persistent DID-TLS binding
+- [x] Keystore v2 format with automatic migration
+- [x] Runtime/Supervisor integration
+- [x] DID-TLS binding verification tests
+
+**Phase 7 - Polish & Production (Complete ✓)** (2025-01-11):
 - [x] Metrics exporter (Prometheus)
 - [x] Complete pull protocol (Request/Response)
 - [x] Topic subscriptions & routing with notification callbacks

@@ -18,6 +18,7 @@ use tracing::{info, warn};
 use crate::{
     protocol::{NetworkMessage, read_message, write_message, MessagePayload},
     rate_limit::{RateLimitConfig, RateLimiter},
+    replay_guard::ReplayGuard,
     topology::{NeighborLimitsConfig, NeighborSets, NodeRole, PeerId, TopologyConfig, TopologyInfo},
     Discovery, PeerInfo, SessionManager,
 };
@@ -158,6 +159,7 @@ pub struct NetworkActor {
     rx: mpsc::Receiver<NetworkMsg>,
     incoming_handler: Option<IncomingMessageHandler>,
     rate_limiter: Arc<RateLimiter>,
+    replay_guard: Arc<RwLock<ReplayGuard>>,
     own_did: Did,
     identity_bundle: IdentityBundle,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
@@ -231,6 +233,11 @@ impl NetworkActor {
             Arc::new(RateLimiter::new(config))
         };
 
+        // Create replay guard for signed message verification
+        // 300 second clock skew tolerance, 3600 second peer age limit
+        let replay_guard = Arc::new(RwLock::new(ReplayGuard::new(300, 3600)));
+        info!("Replay protection enabled (300s clock skew, 3600s peer age limit)");
+
         // Initialize neighbor sets if topology is enabled
         let neighbor_sets = if let Some(ref topo_cfg) = topology_config {
             let own_topology = TopologyInfo {
@@ -250,6 +257,7 @@ impl NetworkActor {
         if let Some(handler) = incoming_handler.clone() {
             let session_manager_clone = session_manager.clone();
             let rate_limiter_clone = rate_limiter.clone();
+            let replay_guard_clone = replay_guard.clone();
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
             let trust_graph_clone = trust_graph.clone();
@@ -260,6 +268,7 @@ impl NetworkActor {
                     session_manager_clone,
                     handler,
                     rate_limiter_clone,
+                    replay_guard_clone,
                     neighbor_sets_clone,
                     topology_config_clone,
                     trust_graph_clone,
@@ -281,6 +290,7 @@ impl NetworkActor {
             rx,
             incoming_handler,
             rate_limiter,
+            replay_guard: replay_guard.clone(),
             own_did: did.clone(),
             identity_bundle,
             neighbor_sets: neighbor_sets.clone(),
@@ -372,6 +382,7 @@ impl NetworkActor {
                         // Spawn connection handler for outbound connection if handler is available
                         if let Some(handler) = self.incoming_handler.clone() {
                             let rate_limiter = self.rate_limiter.clone();
+                            let replay_guard = self.replay_guard.clone();
                             let neighbor_sets = self.neighbor_sets.clone();
                             let topology_config = self.topology_config.clone();
                             let trust_graph = self.trust_graph.clone();
@@ -383,6 +394,7 @@ impl NetworkActor {
                                     connection.clone(),
                                     handler,
                                     rate_limiter,
+                                    replay_guard,
                                     neighbor_sets,
                                     topology_config,
                                     trust_graph,
@@ -546,6 +558,7 @@ impl NetworkActor {
         session_manager: Arc<RwLock<SessionManager>>,
         handler: IncomingMessageHandler,
         rate_limiter: Arc<RateLimiter>,
+        replay_guard: Arc<RwLock<ReplayGuard>>,
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
@@ -582,6 +595,7 @@ impl NetworkActor {
                         // Spawn handler for this connection
                         let handler_clone = handler.clone();
                         let rate_limiter_clone = rate_limiter.clone();
+                        let replay_guard_clone = replay_guard.clone();
                         let neighbor_sets_clone = neighbor_sets.clone();
                         let topology_config_clone = topology_config.clone();
                         let trust_graph_clone = trust_graph.clone();
@@ -592,6 +606,7 @@ impl NetworkActor {
                                 connection,
                                 handler_clone,
                                 rate_limiter_clone,
+                                replay_guard_clone,
                                 neighbor_sets_clone,
                                 topology_config_clone,
                                 trust_graph_clone,
@@ -643,6 +658,7 @@ impl NetworkActor {
         connection: quinn::Connection,
         handler: IncomingMessageHandler,
         rate_limiter: Arc<RateLimiter>,
+        replay_guard: Arc<RwLock<ReplayGuard>>,
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
@@ -855,6 +871,20 @@ impl NetworkActor {
                                 MessagePayload::HandshakeAck => {
                                     info!("Received handshake ack from {}", message.from);
                                     // Nothing to do, just acknowledgement
+                                }
+                                MessagePayload::Signed(ref envelope) => {
+                                    // Verify SignedEnvelope (signature + replay protection)
+                                    match replay_guard.write().await.check(envelope) {
+                                        Ok(()) => {
+                                            info!("Verified signed message from {} (seq={})", envelope.from, envelope.sequence);
+                                            // Forward verified message to handler
+                                            handler(message);
+                                        }
+                                        Err(e) => {
+                                            warn!("Rejecting signed message from {}: {}", envelope.from, e);
+                                            // Drop message (don't forward to handler)
+                                        }
+                                    }
                                 }
                                 _ => {
                                     // Forward other messages to the external handler
