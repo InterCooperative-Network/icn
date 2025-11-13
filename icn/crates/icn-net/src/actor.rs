@@ -355,7 +355,7 @@ impl NetworkActor {
                     .await
                     .context("Timeout dialing peer")
                     .and_then(|r| r)
-                    .map(|_| {
+                    .map(|connection| {
                         // Increment connection counter
                         let stats = self.stats.clone();
                         tokio::spawn(async move {
@@ -364,6 +364,31 @@ impl NetworkActor {
 
                         // Track metrics
                         icn_obs::metrics::network::connections_total_inc();
+
+                        // Spawn connection handler for outbound connection if handler is available
+                        if let Some(handler) = self.incoming_handler.clone() {
+                            let rate_limiter = self.rate_limiter.clone();
+                            let neighbor_sets = self.neighbor_sets.clone();
+                            let topology_config = self.topology_config.clone();
+                            let trust_graph = self.trust_graph.clone();
+                            let session_manager = self.session_manager.clone();
+                            let own_did = self.own_did.clone();
+
+                            tokio::spawn(async move {
+                                if let Err(e) = Self::handle_connection(
+                                    connection.clone(),
+                                    handler,
+                                    rate_limiter,
+                                    neighbor_sets,
+                                    topology_config,
+                                    trust_graph,
+                                    session_manager,
+                                    own_did,
+                                ).await {
+                                    warn!("Outbound connection handler error: {}", e);
+                                }
+                            });
+                        }
 
                         // Send handshake if topology is enabled
                         if let Some(ref topo_cfg) = self.topology_config {
@@ -698,11 +723,45 @@ impl NetworkActor {
                                         );
                                     }
 
-                                    // Send handshake ack
-                                    let ack_msg = NetworkMessage::handshake_ack(own_did.clone(), message.from.clone());
-                                    if let Err(e) = write_message(&mut send, &ack_msg).await {
-                                        warn!("Failed to send handshake ack: {}", e);
-                                    }
+                                    // Send our own handshake back (bidirectional exchange)
+                                    // Open a new stream since the original stream is finished
+                                    let connection_clone = connection.clone();
+                                    let from_did = message.from.clone();
+                                    let own_did_clone = own_did.clone();
+                                    let topo_cfg_clone = topology_config.clone();
+
+                                    tokio::spawn(async move {
+                                        match connection_clone.open_bi().await {
+                                            Ok((mut new_send, _new_recv)) => {
+                                                let response_msg = if let Some(ref topo_cfg) = topo_cfg_clone {
+                                                    // Send full handshake if topology is enabled
+                                                    NetworkMessage::handshake(
+                                                        own_did_clone,
+                                                        from_did.clone(),
+                                                        topo_cfg.region.clone(),
+                                                        topo_cfg.cluster_id.clone(),
+                                                        format!("{:?}", topo_cfg.role),
+                                                    )
+                                                } else {
+                                                    // Send ack if topology is disabled
+                                                    NetworkMessage::handshake_ack(own_did_clone, from_did.clone())
+                                                };
+
+                                                if let Err(e) = write_message(&mut new_send, &response_msg).await {
+                                                    warn!("Failed to send handshake response to {}: {}", from_did, e);
+                                                } else {
+                                                    if let Err(e) = new_send.finish() {
+                                                        warn!("Failed to finish handshake response stream to {}: {}", from_did, e);
+                                                    } else {
+                                                        info!("Sent handshake response to {}", from_did);
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to open stream for handshake response to {}: {}", from_did, e);
+                                            }
+                                        }
+                                    });
                                 }
                                 MessagePayload::HandshakeAck => {
                                     info!("Received handshake ack from {}", message.from);

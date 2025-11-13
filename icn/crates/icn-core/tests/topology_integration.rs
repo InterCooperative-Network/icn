@@ -35,6 +35,15 @@ impl TestNode {
         region: String,
         cluster_id: String,
     ) -> Result<Self> {
+        Self::spawn_with_limits(port, region, cluster_id, None).await
+    }
+
+    async fn spawn_with_limits(
+        port: u16,
+        region: String,
+        cluster_id: String,
+        custom_limits: Option<NeighborLimitsConfig>,
+    ) -> Result<Self> {
         let keypair = KeyPair::generate()?;
         let did = keypair.did().clone();
         let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
@@ -66,19 +75,20 @@ impl TestNode {
             }
         });
 
-        // Create topology config
+        // Create topology config with custom or default limits
         let topology_region = region.clone();
         let topology_cluster = cluster_id.clone();
+        let neighbor_limits = custom_limits.unwrap_or(NeighborLimitsConfig {
+            max_local_cluster: 10,
+            max_regional: 10,
+            max_backbone: 5,
+            max_trusted: 20,
+        });
         let topology_config = TopologyConfig {
             region,
             cluster_id,
             role: icn_net::NodeRole::Edge,
-            neighbor_limits: NeighborLimitsConfig {
-                max_local_cluster: 10,
-                max_regional: 10,
-                max_backbone: 5,
-                max_trusted: 20,
-            },
+            neighbor_limits,
             fanout: FanoutConfig {
                 local_cluster: 8,
                 regional: 6,
@@ -373,27 +383,21 @@ async fn test_neighbor_set_lru_eviction() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
 
-    // Create node with very small limits
-    let mut node_a = TestNode::spawn(23500, "us-west".to_string(), "sfo-1".to_string()).await?;
-
-    // Manually set strict limits for testing eviction
-    // This would normally be done via config
-    let topology_config = TopologyConfig {
-        region: "us-west".to_string(),
-        cluster_id: "sfo-1".to_string(),
-        role: icn_net::NodeRole::Edge,
-        neighbor_limits: NeighborLimitsConfig {
-            max_local_cluster: 2, // Only allow 2 local cluster peers
-            max_regional: 2,
-            max_backbone: 2,
-            max_trusted: 20,
-        },
-        fanout: FanoutConfig {
-            local_cluster: 8,
-            regional: 6,
-            global: 4,
-        },
+    // Create node with very small limits for testing eviction
+    let custom_limits = NeighborLimitsConfig {
+        max_local_cluster: 2, // Only allow 2 local cluster peers
+        max_regional: 2,
+        max_backbone: 2,
+        max_trusted: 20,
     };
+
+    let node_a = TestNode::spawn_with_limits(
+        23500,
+        "us-west".to_string(),
+        "sfo-1".to_string(),
+        Some(custom_limits),
+    )
+    .await?;
 
     // Spawn 3 nodes in same local cluster
     let node_b = TestNode::spawn(23501, "us-west".to_string(), "sfo-1".to_string()).await?;
