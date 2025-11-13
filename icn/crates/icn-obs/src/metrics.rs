@@ -58,6 +58,16 @@ pub fn init_descriptions() {
         "Total number of connections rejected by trust class"
     );
 
+    // Topology metrics
+    describe_gauge!(
+        "icn_topology_neighbors_by_set",
+        "Number of neighbors in each neighbor set (local_cluster, regional, backbone, trusted)"
+    );
+    describe_histogram!(
+        "icn_topology_gossip_fanout",
+        "Gossip fanout count by scope (local_cluster, regional, global)"
+    );
+
     // Gossip metrics
     describe_gauge!(
         "icn_gossip_topics_total",
@@ -681,5 +691,29 @@ pub mod system {
 
     pub fn actors_active_set(value: u64) {
         gauge!("icn_system_actors_active").set(value as f64);
+    }
+}
+
+/// Topology metrics
+pub mod topology {
+    use metrics::{gauge, histogram};
+
+    /// Update neighbor count gauges for all sets
+    pub fn neighbors_by_set_update(
+        local_cluster: usize,
+        regional: usize,
+        backbone: usize,
+        trusted: usize,
+    ) {
+        gauge!("icn_topology_neighbors_by_set", "set" => "local_cluster").set(local_cluster as f64);
+        gauge!("icn_topology_neighbors_by_set", "set" => "regional").set(regional as f64);
+        gauge!("icn_topology_neighbors_by_set", "set" => "backbone").set(backbone as f64);
+        gauge!("icn_topology_neighbors_by_set", "set" => "trusted").set(trusted as f64);
+    }
+
+    /// Record gossip fanout for a specific scope
+    pub fn gossip_fanout_record(scope: &str, count: usize) {
+        histogram!("icn_topology_gossip_fanout", "scope" => scope.to_string())
+            .record(count as f64);
     }
 }
