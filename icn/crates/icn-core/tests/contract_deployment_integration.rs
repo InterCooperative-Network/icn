@@ -371,8 +371,8 @@ async fn test_two_node_contract_deployment() {
         .await
         .expect("Failed to dial node A");
 
-    // Give connections time to establish
-    sleep(Duration::from_millis(300)).await;
+    // Give connections time to establish (bidirectional)
+    sleep(Duration::from_millis(500)).await;
 
     // Create a simple contract
     let contract = Contract::new("TestContract".to_string())
@@ -394,7 +394,7 @@ async fn test_two_node_contract_deployment() {
     println!("Contract deployed from node A: {}", code_hash);
 
     // Wait for gossip propagation
-    sleep(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(800)).await;
 
     // Verify node A has the contract
     let contracts_a = node_a.list_contracts().await;
@@ -435,7 +435,8 @@ async fn test_contract_execution_after_deployment() {
         .await
         .expect("Failed to dial node A");
 
-    sleep(Duration::from_millis(300)).await;
+    // Give connections time to establish (bidirectional)
+    sleep(Duration::from_millis(500)).await;
 
     // Create contract with a rule
     let contract = Contract::new("Calculator".to_string())
@@ -461,7 +462,7 @@ async fn test_contract_execution_after_deployment() {
         .expect("Failed to deploy contract");
 
     // Wait for propagation
-    sleep(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(800)).await;
 
     // Execute on node A
     let mut args_a = std::collections::HashMap::new();
@@ -506,7 +507,8 @@ async fn test_untrusted_deployer_rejected() {
         .await
         .expect("Failed to dial node B");
 
-    sleep(Duration::from_millis(200)).await;
+    // Give connection time to establish
+    sleep(Duration::from_millis(400)).await;
 
     // Create contract
     let contract = Contract::new("UntrustedContract".to_string())
@@ -525,8 +527,8 @@ async fn test_untrusted_deployer_rejected() {
         .await
         .expect("Node A should deploy locally");
 
-    // Wait for potential propagation
-    sleep(Duration::from_millis(500)).await;
+    // Wait for potential propagation (or rejection)
+    sleep(Duration::from_millis(800)).await;
 
     // Verify node A has it
     let contracts_a = node_a.list_contracts().await;
@@ -541,4 +543,162 @@ async fn test_untrusted_deployer_rejected() {
     );
 
     println!("✓ Untrusted deployer correctly rejected");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_three_participant_contract_deployment() {
+    // Create three nodes (Alice, Bob, Carol)
+    let node_a = TestNode::new(19007).await.expect("Failed to create node A (Alice)");
+    let node_b = TestNode::new(19008).await.expect("Failed to create node B (Bob)");
+    let node_c = TestNode::new(19009).await.expect("Failed to create node C (Carol)");
+
+    // Establish mutual trust between all pairs (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
+    // A ↔ B
+    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
+    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+
+    // B ↔ C
+    node_b.trust_peer(&node_c.did, 0.6).await.expect("Failed to trust C from B");
+    node_c.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from C");
+
+    // A ↔ C
+    node_a.trust_peer(&node_c.did, 0.6).await.expect("Failed to trust C from A");
+    node_c.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from C");
+
+    // Connect nodes bidirectionally (full mesh)
+    // A ↔ B
+    let addr_a: std::net::SocketAddr = "127.0.0.1:19007".parse().unwrap();
+    let addr_b: std::net::SocketAddr = "127.0.0.1:19008".parse().unwrap();
+    let addr_c: std::net::SocketAddr = "127.0.0.1:19009".parse().unwrap();
+
+    node_a.network_handle
+        .dial(addr_b, node_b.did.clone())
+        .await
+        .expect("Failed to dial B from A");
+    node_b.network_handle
+        .dial(addr_a, node_a.did.clone())
+        .await
+        .expect("Failed to dial A from B");
+
+    // B ↔ C
+    node_b.network_handle
+        .dial(addr_c, node_c.did.clone())
+        .await
+        .expect("Failed to dial C from B");
+    node_c.network_handle
+        .dial(addr_b, node_b.did.clone())
+        .await
+        .expect("Failed to dial B from C");
+
+    // A ↔ C
+    node_a.network_handle
+        .dial(addr_c, node_c.did.clone())
+        .await
+        .expect("Failed to dial C from A");
+    node_c.network_handle
+        .dial(addr_a, node_a.did.clone())
+        .await
+        .expect("Failed to dial A from C");
+
+    // Give connections time to establish (full mesh = 6 connections)
+    sleep(Duration::from_millis(800)).await;
+
+    // Create contract with all 3 participants
+    let contract = Contract::new("TriPartyAgreement".to_string())
+        .add_participant(node_a.did.clone())
+        .add_participant(node_b.did.clone())
+        .add_participant(node_c.did.clone())
+        .add_rule(
+            Rule::new("multiply".to_string())
+                .add_param("x".to_string())
+                .add_param("y".to_string())
+                .add_stmt(Stmt::Return {
+                    value: Expr::BinOp {
+                        op: BinOp::Mul,
+                        left: Box::new(Expr::Var("x".to_string())),
+                        right: Box::new(Expr::Var("y".to_string())),
+                    },
+                }),
+        );
+
+    println!("Deploying 3-participant contract from node A...");
+
+    // Deploy from node A (collects signatures from B and C)
+    let code_hash = node_a
+        .deploy_contract(
+            contract,
+            vec![],
+            vec![&node_b, &node_c],  // Phase 10C: collect all participant signatures
+            vec![&node_b.did, &node_c.did],  // Announce to all other participants
+        )
+        .await
+        .expect("Failed to deploy 3-participant contract");
+
+    // Wait for propagation across all 3 nodes
+    sleep(Duration::from_millis(1000)).await;
+
+    // Verify all 3 nodes have the contract
+    let contracts_a = node_a.list_contracts().await;
+    assert_eq!(contracts_a.len(), 1, "Node A should have the contract");
+    assert_eq!(
+        contracts_a[0].code_hash, code_hash,
+        "Node A should have the correct contract hash"
+    );
+    assert_eq!(contracts_a[0].name, "TriPartyAgreement");
+
+    let contracts_b = node_b.list_contracts().await;
+    assert_eq!(contracts_b.len(), 1, "Node B should have received the contract");
+    assert_eq!(
+        contracts_b[0].code_hash, code_hash,
+        "Node B should have the correct contract hash"
+    );
+    assert_eq!(contracts_b[0].name, "TriPartyAgreement");
+
+    let contracts_c = node_c.list_contracts().await;
+    assert_eq!(contracts_c.len(), 1, "Node C should have received the contract");
+    assert_eq!(
+        contracts_c[0].code_hash, code_hash,
+        "Node C should have the correct contract hash"
+    );
+    assert_eq!(contracts_c[0].name, "TriPartyAgreement");
+
+    println!("✓ Contract propagated to all 3 nodes");
+
+    // Execute on node A
+    let mut args_a = std::collections::HashMap::new();
+    args_a.insert("x".to_string(), Value::Int(6));
+    args_a.insert("y".to_string(), Value::Int(7));
+
+    let result_a = node_a
+        .execute_contract(code_hash.clone(), "multiply".to_string(), args_a)
+        .await
+        .expect("Failed to execute on node A");
+
+    assert_eq!(result_a.value, Value::Int(42), "Node A execution result incorrect");
+
+    // Execute on node B
+    let mut args_b = std::collections::HashMap::new();
+    args_b.insert("x".to_string(), Value::Int(5));
+    args_b.insert("y".to_string(), Value::Int(9));
+
+    let result_b = node_b
+        .execute_contract(code_hash.clone(), "multiply".to_string(), args_b)
+        .await
+        .expect("Failed to execute on node B");
+
+    assert_eq!(result_b.value, Value::Int(45), "Node B execution result incorrect");
+
+    // Execute on node C
+    let mut args_c = std::collections::HashMap::new();
+    args_c.insert("x".to_string(), Value::Int(8));
+    args_c.insert("y".to_string(), Value::Int(4));
+
+    let result_c = node_c
+        .execute_contract(code_hash, "multiply".to_string(), args_c)
+        .await
+        .expect("Failed to execute on node C");
+
+    assert_eq!(result_c.value, Value::Int(32), "Node C execution result incorrect");
+
+    println!("✓ Contract executed successfully on all 3 nodes");
 }
