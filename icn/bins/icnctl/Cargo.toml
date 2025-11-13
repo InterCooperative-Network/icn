@@ -18,6 +18,7 @@ zeroize.workspace = true
 serde_json = "1.0"
 rpassword = "7.3"
 dirs = "5.0"
+sha2 = "0.10"
 
 # ICN crates
 icn-core.workspace = true
@@ -26,3 +27,5 @@ icn-store.workspace = true
 icn-trust.workspace = true
 icn-obs.workspace = true
 icn-rpc.workspace = true
+icn-ccl.workspace = true
+icn-ledger.workspace = true

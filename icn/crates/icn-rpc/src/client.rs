@@ -174,10 +174,10 @@ impl RpcClient {
         self.call("ledger.quarantine.purge", serde_json::json!({})).await
     }
 
-    /// Deploy a contract
-    pub async fn deploy_contract(&mut self, contract_json: String) -> Result<String> {
+    /// Deploy a contract with signed deployment message
+    pub async fn deploy_contract(&mut self, deployment_message: String) -> Result<String> {
         let params = serde_json::json!({
-            "contract_json": contract_json,
+            "deployment_message": deployment_message,
         });
 
         let result = self.call("contract.deploy", params).await?;

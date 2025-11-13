@@ -413,13 +413,14 @@ impl Supervisor {
                 }
             }
 
-            // Spawn RPC server with network, ledger, and contract handles
+            // Spawn RPC server with network, ledger, contract, and gossip handles
             let rpc_port = self.config.network.rpc_port;
             let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
             let mut rpc_server = RpcServer::new(rpc_addr);
             rpc_server.set_network_handle(network_handle.clone());
             rpc_server.set_ledger_handle(ledger_handle.clone());
             rpc_server.set_contract_runtime(contract_runtime_handle.clone());
+            rpc_server.set_gossip_handle(gossip_handle.clone());
 
             tokio::spawn(async move {
                 if let Err(e) = rpc_server.run().await {

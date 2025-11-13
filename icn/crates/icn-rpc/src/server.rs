@@ -20,11 +20,14 @@ use icn_ccl::ContractRuntime;
 
 use crate::types::{ContractExecutionResponse, ContractInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
 
+use icn_gossip::GossipActor;
+
 /// RPC server state
 pub struct RpcServer {
     network_handle: Option<Arc<RwLock<NetworkHandle>>>,
     ledger_handle: Option<Arc<RwLock<Ledger>>>,
     contract_runtime: Option<Arc<RwLock<ContractRuntime>>>,
+    gossip_handle: Option<Arc<RwLock<GossipActor>>>,
     listen_addr: SocketAddr,
 }
 
@@ -35,6 +38,7 @@ impl RpcServer {
             network_handle: None,
             ledger_handle: None,
             contract_runtime: None,
+            gossip_handle: None,
             listen_addr,
         }
     }
@@ -52,6 +56,11 @@ impl RpcServer {
     /// Set the contract runtime handle (called after ContractRuntime initializes)
     pub fn set_contract_runtime(&mut self, handle: Arc<RwLock<ContractRuntime>>) {
         self.contract_runtime = Some(handle);
+    }
+
+    /// Set the gossip handle (called after GossipActor initializes)
+    pub fn set_gossip_handle(&mut self, handle: Arc<RwLock<GossipActor>>) {
+        self.gossip_handle = Some(handle);
     }
 
     /// Start the RPC server
@@ -460,27 +469,27 @@ async fn handle_ledger_history(
     }
 }
 
-/// Handle contract.deploy RPC call - deploy a new contract
+/// Handle contract.deploy RPC call - deploy a new contract with signature verification
 async fn handle_contract_deploy(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
 ) -> RpcResponse {
-    let contract_runtime = match &state.contract_runtime {
+    let gossip_handle = match &state.gossip_handle {
         Some(handle) => handle,
         None => {
             return RpcResponse::error(
                 id,
                 -32000,
-                "Contract runtime not available".to_string(),
+                "Gossip not available".to_string(),
             );
         }
     };
 
-    // Parse parameters
+    // Parse parameters - expect full ContractDeploymentMessage
     #[derive(serde::Deserialize)]
     struct DeployParams {
-        contract_json: String,
+        deployment_message: String, // JSON-encoded ContractDeploymentMessage
     }
 
     let deploy_params: DeployParams = match serde_json::from_value(params.clone()) {
@@ -490,38 +499,48 @@ async fn handle_contract_deploy(
         }
     };
 
-    // Parse contract from JSON
-    let contract: icn_ccl::Contract = match serde_json::from_str(&deploy_params.contract_json) {
-        Ok(c) => c,
+    // Parse deployment message from JSON
+    let deployment_msg: icn_ccl::ContractDeploymentMessage = match serde_json::from_str(&deploy_params.deployment_message) {
+        Ok(m) => m,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid contract JSON: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid deployment message JSON: {}", e));
         }
     };
 
-    // Compute contract hash (simplified - in production would use proper content addressing)
-    let contract_bytes = deploy_params.contract_json.as_bytes();
-    let hash_bytes = {
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(contract_bytes);
-        let result = hasher.finalize();
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&result[..]);
-        arr
-    };
-    let code_hash = icn_ledger::ContentHash::from_bytes(hash_bytes);
+    // Pre-verify signatures before publishing to gossip (early rejection of invalid sigs)
+    if let Err(e) = deployment_msg.verify() {
+        return RpcResponse::error(
+            id,
+            -32602,
+            format!("Signature verification failed: {}", e)
+        );
+    }
 
-    // Install contract
-    let mut runtime = contract_runtime.write().await;
-    match runtime.install_contract(code_hash.clone(), contract) {
+    let code_hash = deployment_msg.installation.code_hash.clone();
+
+    // Serialize deployment message for gossip
+    let message_bytes = match serde_json::to_vec(&deployment_msg) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return RpcResponse::error(id, -32603, format!("Failed to serialize deployment: {}", e));
+        }
+    };
+
+    // Publish to contracts:deploy gossip topic
+    let mut gossip = gossip_handle.write().await;
+    match gossip.publish("contracts:deploy", message_bytes) {
         Ok(_) => {
+            info!("Contract deployment published to gossip: {}", code_hash.to_hex());
             let response = serde_json::json!({
                 "code_hash": code_hash.to_hex(),
                 "success": true,
             });
             RpcResponse::success(id, response)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to deploy contract: {}", e)),
+        Err(e) => {
+            error!("Failed to publish contract deployment to gossip: {}", e);
+            RpcResponse::error(id, -32000, format!("Failed to publish deployment: {}", e))
+        }
     }
 }
 

@@ -283,7 +283,7 @@ async fn main() -> Result<()> {
 
         Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
 
-        Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint)?,
+        Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
     }
@@ -861,7 +861,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
 }
 
 #[tokio::main]
-async fn handle_contract_command(cmd: ContractCommands, endpoint: &str) -> Result<()> {
+async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir: &PathBuf) -> Result<()> {
     // Contract commands communicate with daemon via RPC
     let rpc_addr = endpoint.parse()?;
     let mut client = icn_rpc::RpcClient::new(rpc_addr);
@@ -874,8 +874,88 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str) -> Resul
 
             println!("Deploying contract from {}...\n", contract_file.display());
 
+            // Parse contract to validate
+            let contract: icn_ccl::Contract = serde_json::from_str(&contract_json)
+                .context("Failed to parse contract JSON")?;
+
+            // Validate contract
+            contract.validate()
+                .context("Contract validation failed")?;
+
+            println!("✓ Contract validated");
+            println!("  Name: {}", contract.name);
+            println!("  Participants: {}", contract.participants.len());
+            println!("  Rules: {}", contract.rules.len());
+            println!();
+
+            // Load keystore to sign deployment
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase to sign deployment: ")?;
+
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let deployer_did = keypair.did().clone();
+
+            println!("Signing deployment as {}", deployer_did);
+
+            // Compute code hash
+            let code_hash = {
+                use sha2::{Sha256, Digest};
+                let mut hasher = Sha256::new();
+                hasher.update(contract.name.as_bytes());
+                for participant in &contract.participants {
+                    hasher.update(participant.as_str().as_bytes());
+                }
+                for rule in &contract.rules {
+                    hasher.update(rule.name.as_bytes());
+                }
+                icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
+            };
+
+            // Create installation record
+            let installed_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs();
+
+            // For now, only deployer signs (multi-party signing is future work)
+            let signing_bytes = icn_ccl::ContractDeploymentMessage::compute_signing_bytes(
+                &code_hash,
+                installed_at,
+            );
+            let deployer_signature = keypair.sign(&signing_bytes);
+
+            let installation = icn_ccl::ContractInstallation {
+                code_hash: code_hash.clone(),
+                installed_by: deployer_did.clone(),
+                capabilities: vec![], // No special capabilities for now
+                participants: contract.participants.clone(),
+                signatures: vec![(deployer_did.clone(), deployer_signature.to_bytes().to_vec())],
+                installed_at,
+                min_caller_trust: None, // Only participants can invoke
+            };
+
+            let deployment_msg = icn_ccl::ContractDeploymentMessage {
+                code_hash: code_hash.clone(),
+                contract: contract.clone(),
+                installation,
+                deployer_signature: deployer_signature.to_bytes().to_vec(),
+            };
+
+            // Serialize deployment message
+            let deployment_json = serde_json::to_string(&deployment_msg)
+                .context("Failed to serialize deployment message")?;
+
+            println!("✓ Deployment message signed");
+            println!();
+
+            // Send to daemon
             match client
-                .deploy_contract(contract_json)
+                .deploy_contract(deployment_json)
                 .await
                 .context("Failed to deploy contract to daemon. Is icnd running?")?
             {

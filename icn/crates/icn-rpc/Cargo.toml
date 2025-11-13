@@ -22,3 +22,4 @@ icn-identity.workspace = true
 icn-net.workspace = true
 icn-ledger.workspace = true
 icn-ccl.workspace = true
+icn-gossip.workspace = true

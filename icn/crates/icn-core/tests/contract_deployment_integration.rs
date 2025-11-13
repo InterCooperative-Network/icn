@@ -16,7 +16,7 @@ use tokio::time::sleep;
 /// Helper to create a test node with full actor stack
 struct TestNode {
     did: icn_identity::Did,
-    _keypair: KeyPair,
+    keypair: KeyPair,
     _network_handle: icn_net::NetworkHandle,
     _gossip_handle: Arc<RwLock<GossipActor>>,
     contract_actor: Arc<RwLock<ContractActor>>,
@@ -176,7 +176,7 @@ impl TestNode {
 
         Ok(TestNode {
             did,
-            _keypair: keypair,
+            keypair,
             _network_handle: network_handle,
             _gossip_handle: gossip_handle,
             contract_actor: contract_actor_handle,
@@ -201,20 +201,41 @@ impl TestNode {
         contract: Contract,
         capabilities: Vec<Capability>,
     ) -> anyhow::Result<ContentHash> {
+        // Compute code hash
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(contract.name.as_bytes());
+        for participant in &contract.participants {
+            hasher.update(participant.as_str().as_bytes());
+        }
+        for rule in &contract.rules {
+            hasher.update(rule.name.as_bytes());
+        }
+        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+
+        let installed_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+
+        // Generate deployer signature
+        let signing_bytes = icn_ccl::ContractDeploymentMessage::compute_signing_bytes(
+            &code_hash,
+            installed_at,
+        );
+        let deployer_signature = self.keypair.sign(&signing_bytes);
+
         let installation = ContractInstallation {
-            code_hash: ContentHash::from_bytes([0u8; 32]), // Will be replaced
+            code_hash: code_hash.clone(),
             installed_by: self.did.clone(),
             capabilities,
             participants: contract.participants.clone(),
-            signatures: vec![(self.did.clone(), vec![])],
-            installed_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_secs(),
+            signatures: vec![(self.did.clone(), deployer_signature.to_bytes().to_vec())],
+            installed_at,
             min_caller_trust: None,
         };
 
         let actor = self.contract_actor.read().await;
-        actor.deploy_contract(contract, installation, vec![]).await
+        actor.deploy_contract(contract, installation, deployer_signature.to_bytes().to_vec()).await
     }
 
     /// Execute a contract rule
