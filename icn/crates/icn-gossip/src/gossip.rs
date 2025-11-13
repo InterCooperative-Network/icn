@@ -95,19 +95,22 @@ impl GossipActor {
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
         };
 
-        // Create default topics
-        gossip.create_topic(Topic::new(
-            "global:identity".to_string(),
-            AccessControl::Public,
-        ));
-        gossip.create_topic(Topic::new(
-            "global:rendezvous".to_string(),
-            AccessControl::Public,
-        ));
-        gossip.create_topic(Topic::new(
-            "trust:attestations".to_string(),
-            AccessControl::TrustClass(TrustClass::Known), // Require Known or higher
-        ));
+        // Create default topics with appropriate scopes
+        gossip.create_topic(
+            Topic::new("global:identity".to_string(), AccessControl::Public)
+                .with_scope(crate::types::Scope::Global), // Identity propagates globally
+        );
+        gossip.create_topic(
+            Topic::new("global:rendezvous".to_string(), AccessControl::Public)
+                .with_scope(crate::types::Scope::Global), // Rendezvous nodes need global visibility
+        );
+        gossip.create_topic(
+            Topic::new(
+                "trust:attestations".to_string(),
+                AccessControl::TrustClass(TrustClass::Known),
+            )
+            .with_scope(crate::types::Scope::Regional), // Trust attestations are regional
+        );
 
         gossip
     }

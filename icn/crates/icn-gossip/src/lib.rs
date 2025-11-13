@@ -40,7 +40,7 @@ pub use gossip::{
 };
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
-    AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic,
+    AccessControl, ContentHash, GossipEntry, GossipMessage, Scope, Subscription, Topic,
     TrustResourceLimits,
 };
 pub use vector_clock::VectorClock;

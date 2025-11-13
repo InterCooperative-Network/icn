@@ -10,6 +10,7 @@
 //!
 //! Each set has configurable size limits with LRU eviction based on trust scores.
 
+use icn_gossip::Scope;
 use icn_identity::Did;
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
@@ -117,17 +118,6 @@ pub struct NeighborMetrics {
     pub regional_count: usize,
     pub backbone_count: usize,
     pub trusted_count: usize,
-}
-
-/// Gossip scope for targeted message propagation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Scope {
-    /// Local cluster only (same region + cluster)
-    LocalCluster,
-    /// Regional scope (same region)
-    Regional,
-    /// Global scope (all neighbors)
-    Global,
 }
 
 impl NeighborSets {

@@ -13,4 +13,4 @@ pub use discovery::{Discovery, PeerInfo};
 pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use session::SessionManager;
-pub use topology::{NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId, Scope, TopologyInfo};
+pub use topology::{NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId, TopologyInfo};

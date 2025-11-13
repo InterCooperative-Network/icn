@@ -12,6 +12,26 @@ pub type ContentHash = [u8; 32];
 /// Minimum size (in bytes) for compression to be worthwhile
 const COMPRESSION_THRESHOLD: usize = 1024; // 1 KB
 
+/// Gossip scope for targeted message propagation
+///
+/// Determines how far gossip messages should propagate based on
+/// geographic/organizational proximity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Scope {
+    /// Local cluster only (same region + cluster)
+    LocalCluster,
+    /// Regional scope (same region, may span clusters)
+    Regional,
+    /// Global scope (all neighbors, cross-region)
+    Global,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Scope::Global
+    }
+}
+
 /// Gossip entry metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GossipEntry {
@@ -165,6 +185,10 @@ pub struct Topic {
     /// Access control for this topic
     pub acl: AccessControl,
 
+    /// Gossip scope for this topic (determines propagation distance)
+    #[allow(dead_code)] // Will be used in Phase 1C gossip fanout
+    pub scope: Scope,
+
     /// Minimum trust score required for subscription (0.0 - 1.0)
     /// When set, overrides coarse-grained AccessControl with fine-grained trust score check
     /// Requires GossipActor to have trust_graph configured
@@ -184,6 +208,7 @@ impl Topic {
         Topic {
             name,
             acl,
+            scope: Scope::Global,                       // Default to global scope
             min_trust_threshold: None,                  // No fine-grained threshold by default
             retention: Duration::from_secs(86400 * 30), // 30 days default
             max_entries: 10000,                         // Default limit
@@ -199,6 +224,12 @@ impl Topic {
     /// Set max entries
     pub fn with_max_entries(mut self, max: usize) -> Self {
         self.max_entries = max;
+        self
+    }
+
+    /// Set gossip scope for this topic
+    pub fn with_scope(mut self, scope: Scope) -> Self {
+        self.scope = scope;
         self
     }
 
