@@ -234,6 +234,26 @@ impl NeighborSets {
             .collect()
     }
 
+    /// Get count of local cluster neighbors
+    pub fn local_cluster_count(&self) -> usize {
+        self.local_cluster.len()
+    }
+
+    /// Get count of regional neighbors
+    pub fn regional_count(&self) -> usize {
+        self.regional.len()
+    }
+
+    /// Get count of backbone neighbors
+    pub fn backbone_count(&self) -> usize {
+        self.backbone.len()
+    }
+
+    /// Get count of trusted neighbors
+    pub fn trusted_count(&self) -> usize {
+        self.trusted.len()
+    }
+
     /// Get metrics for observability
     pub fn metrics(&self) -> NeighborMetrics {
         NeighborMetrics {

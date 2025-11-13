@@ -141,6 +141,11 @@ impl NetworkHandle {
             Vec::new()
         }
     }
+
+    /// Get reference to neighbor sets (for testing and inspection)
+    pub fn neighbor_sets(&self) -> &Option<Arc<RwLock<NeighborSets>>> {
+        &self.neighbor_sets
+    }
 }
 
 /// Network actor state
