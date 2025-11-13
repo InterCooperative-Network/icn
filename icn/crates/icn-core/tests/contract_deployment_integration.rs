@@ -17,7 +17,7 @@ use tokio::time::sleep;
 struct TestNode {
     did: icn_identity::Did,
     keypair: KeyPair,
-    _network_handle: icn_net::NetworkHandle,
+    network_handle: icn_net::NetworkHandle,
     gossip_handle: Arc<RwLock<GossipActor>>,
     contract_actor: Arc<RwLock<ContractActor>>,
     contract_runtime: Arc<RwLock<ContractRuntime>>,
@@ -116,6 +116,7 @@ impl TestNode {
         .await?;
 
         // Set gossip send callback
+        // This is needed for the pull protocol (Pull requests and Responses)
         {
             let mut gossip = gossip_handle.write().await;
             let network_handle_clone = network_handle.clone();
@@ -126,22 +127,40 @@ impl TestNode {
                 let from_did = own_did_clone.clone();
 
                 tokio::spawn(async move {
+                    let msg_type = match &gossip_msg {
+                        icn_gossip::GossipMessage::Announce { .. } => "Announce",
+                        icn_gossip::GossipMessage::Request { .. } => "Request",
+                        icn_gossip::GossipMessage::Response { .. } => "Response",
+                        icn_gossip::GossipMessage::RequestBloomFilter { .. } => "RequestBloomFilter",
+                        icn_gossip::GossipMessage::SendBloomFilter { .. } => "SendBloomFilter",
+                        icn_gossip::GossipMessage::RequestMissing { .. } => "RequestMissing",
+                        icn_gossip::GossipMessage::Digest { .. } => "Digest",
+                        icn_gossip::GossipMessage::PullRequest { .. } => "PullRequest",
+                        icn_gossip::GossipMessage::PullResponse { .. } => "PullResponse",
+                    };
+
                     let result = if let Some(target_did) = recipient {
-                        let net_msg = icn_net::NetworkMessage::gossip(from_did, Some(target_did.clone()), gossip_msg);
+                        eprintln!("Sending {} from {} to {}", msg_type, from_did, target_did);
+                        let net_msg = icn_net::NetworkMessage::gossip(from_did.clone(), Some(target_did.clone()), gossip_msg);
                         net_handle.send_message(target_did, net_msg).await
                     } else {
-                        let net_msg = icn_net::NetworkMessage::gossip(from_did, None, gossip_msg);
-                        net_handle.broadcast(net_msg).await
+                        // Skip broadcast in tests - we don't have peer tracking
+                        eprintln!("Skipping broadcast {} from {}", msg_type, from_did);
+                        return;
                     };
-                    if let Err(e) = result {
-                        eprintln!("Failed to send gossip message: {}", e);
+                    match result {
+                        Ok(_) => eprintln!("✓ {} sent successfully", msg_type),
+                        Err(e) => eprintln!("✗ Failed to send {}: {}", msg_type, e),
                     }
                 });
             });
 
             gossip.set_send_callback(send_callback);
+        }
 
-            // Set up contract deployment notification callback
+        // Set up contract deployment notification callback
+        {
+            let mut gossip = gossip_handle.write().await;
             let contract_actor_for_notifications = contract_actor_handle.clone();
             let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
                 if topic == "contracts:deploy" {
@@ -184,7 +203,7 @@ impl TestNode {
         Ok(TestNode {
             did,
             keypair,
-            _network_handle: network_handle,
+            network_handle,
             gossip_handle,
             contract_actor: contract_actor_handle,
             contract_runtime: contract_runtime_handle,
@@ -207,6 +226,7 @@ impl TestNode {
         &self,
         contract: Contract,
         capabilities: Vec<Capability>,
+        announce_to: Vec<&icn_identity::Did>,
     ) -> anyhow::Result<ContentHash> {
         // Compute code hash (must match ContractActor::compute_code_hash)
         use sha2::{Sha256, Digest};
@@ -261,15 +281,28 @@ impl TestNode {
             (hash, entry.clock)
         };
 
-        // Broadcast Announce message to all peers via network
-        let announce_msg = icn_gossip::GossipMessage::Announce {
-            hash,
-            author: self.did.clone(),
-            clock,
-            topic: "contracts:deploy".to_string(),
-        };
-        let net_msg = icn_net::NetworkMessage::gossip(self.did.clone(), None, announce_msg);
-        self._network_handle.broadcast(net_msg).await?;
+        // Send Announce message to each connected peer
+        for peer_did in announce_to {
+            eprintln!("Sending Announce for contract {} to {}", hash.iter().take(8).map(|b| format!("{:02x}", b)).collect::<String>(), peer_did);
+            let announce_msg = icn_gossip::GossipMessage::Announce {
+                hash,
+                author: self.did.clone(),
+                clock: clock.clone(),
+                topic: "contracts:deploy".to_string(),
+            };
+            let net_msg = icn_net::NetworkMessage::gossip(
+                self.did.clone(),
+                Some(peer_did.clone()),
+                announce_msg
+            );
+            match self.network_handle.send_message(peer_did.clone(), net_msg).await {
+                Ok(_) => eprintln!("✓ Announce sent successfully to {}", peer_did),
+                Err(e) => {
+                    eprintln!("✗ Failed to send Announce to {}: {}", peer_did, e);
+                    return Err(e.into());
+                }
+            }
+        }
 
         Ok(result_hash)
     }
@@ -308,19 +341,28 @@ async fn test_two_node_contract_deployment() {
     let node_a = TestNode::new(19001).await.expect("Failed to create node A");
     let node_b = TestNode::new(19002).await.expect("Failed to create node B");
 
-    // Establish mutual trust (score 0.5 > MIN_DEPLOYER_TRUST 0.4)
-    node_a.trust_peer(&node_b.did, 0.5).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.5).await.expect("Failed to trust A from B");
+    // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
+    // Note: Trust graph applies 70% direct + 30% transitive weighting
+    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
+    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
 
-    // Connect nodes
+    // Connect nodes bidirectionally
+    // Node A dials Node B
     let addr_b: std::net::SocketAddr = "127.0.0.1:19002".parse().unwrap();
-    node_a._network_handle
+    node_a.network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
-    // Give connection time to establish
-    sleep(Duration::from_millis(100)).await;
+    // Node B dials Node A
+    let addr_a: std::net::SocketAddr = "127.0.0.1:19001".parse().unwrap();
+    node_b.network_handle
+        .dial(addr_a, node_a.did.clone())
+        .await
+        .expect("Failed to dial node A");
+
+    // Give connections time to establish
+    sleep(Duration::from_millis(300)).await;
 
     // Create a simple contract
     let contract = Contract::new("TestContract".to_string())
@@ -333,16 +375,16 @@ async fn test_two_node_contract_deployment() {
                 }),
         );
 
-    // Deploy from node A
+    // Deploy from node A and announce to node B
     let code_hash = node_a
-        .deploy_contract(contract, vec![])
+        .deploy_contract(contract, vec![], vec![&node_b.did])
         .await
         .expect("Failed to deploy contract");
 
     println!("Contract deployed from node A: {}", code_hash);
 
-    // Wait for gossip propagation (longer wait for anti-entropy to kick in)
-    sleep(Duration::from_millis(2000)).await;
+    // Wait for gossip propagation
+    sleep(Duration::from_millis(500)).await;
 
     // Verify node A has the contract
     let contracts_a = node_a.list_contracts().await;
@@ -363,18 +405,27 @@ async fn test_contract_execution_after_deployment() {
     let node_a = TestNode::new(19003).await.expect("Failed to create node A");
     let node_b = TestNode::new(19004).await.expect("Failed to create node B");
 
-    // Establish mutual trust
-    node_a.trust_peer(&node_b.did, 0.5).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.5).await.expect("Failed to trust A from B");
+    // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
+    // Note: Trust graph applies 70% direct + 30% transitive weighting
+    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
+    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
 
-    // Connect nodes
+    // Connect nodes bidirectionally
+    // Node A dials Node B
     let addr_b: std::net::SocketAddr = "127.0.0.1:19004".parse().unwrap();
-    node_a._network_handle
+    node_a.network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
-    sleep(Duration::from_millis(100)).await;
+    // Node B dials Node A
+    let addr_a: std::net::SocketAddr = "127.0.0.1:19003".parse().unwrap();
+    node_b.network_handle
+        .dial(addr_a, node_a.did.clone())
+        .await
+        .expect("Failed to dial node A");
+
+    sleep(Duration::from_millis(300)).await;
 
     // Create contract with a rule
     let contract = Contract::new("Calculator".to_string())
@@ -393,9 +444,9 @@ async fn test_contract_execution_after_deployment() {
                 }),
         );
 
-    // Deploy from node A
+    // Deploy from node A and announce to node B
     let code_hash = node_a
-        .deploy_contract(contract, vec![])
+        .deploy_contract(contract, vec![], vec![&node_b.did])
         .await
         .expect("Failed to deploy contract");
 
@@ -440,12 +491,12 @@ async fn test_untrusted_deployer_rejected() {
 
     // Connect nodes
     let addr_b: std::net::SocketAddr = "127.0.0.1:19006".parse().unwrap();
-    node_a._network_handle
+    node_a.network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
-    sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(200)).await;
 
     // Create contract
     let contract = Contract::new("UntrustedContract".to_string())
@@ -457,9 +508,9 @@ async fn test_untrusted_deployer_rejected() {
                 }),
         );
 
-    // Deploy from node A (trust score 0.2 < 0.4, should be rejected by B)
+    // Deploy from node A and announce to node B (trust score 0.2 < 0.4, should be rejected by B)
     let _code_hash = node_a
-        .deploy_contract(contract, vec![])
+        .deploy_contract(contract, vec![], vec![&node_b.did])
         .await
         .expect("Node A should deploy locally");
 

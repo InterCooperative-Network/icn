@@ -498,12 +498,10 @@ impl GossipActor {
                 // Find entry across all topics
                 for (_topic_name, entries) in &self.entries {
                     if let Some(entry) = entries.get(&hash) {
-                        debug!("Found entry in topic: {}, sending Response", entry.topic);
+                        debug!("Found entry in topic: {}, sending Response to {}", entry.topic, sender);
 
-                        // Send Response with the entry
-                        // Note: We send to None (broadcast) since we don't know who requested it
-                        // In a full implementation, Request would include sender DID
-                        self.send_message(None, GossipMessage::Response {
+                        // Send Response back to the requester
+                        self.send_message(Some(sender.clone()), GossipMessage::Response {
                             entry: entry.clone(),
                         });
 
@@ -539,10 +537,10 @@ impl GossipActor {
                 // Get bloom filter for the topic
                 if let Some(filter) = self.bloom_filters.get(&topic) {
                     let filter_data = filter.to_data();
-                    debug!("Sending bloom filter for topic: {} ({} bits)", topic, filter_data.size);
+                    debug!("Sending bloom filter for topic: {} ({} bits) to {}", topic, filter_data.size, sender);
 
-                    // Send bloom filter back
-                    self.send_message(None, GossipMessage::SendBloomFilter {
+                    // Send bloom filter back to the requester
+                    self.send_message(Some(sender.clone()), GossipMessage::SendBloomFilter {
                         topic: topic.clone(),
                         filter: filter_data,
                     });
@@ -1211,15 +1209,16 @@ mod tests {
         let request = GossipMessage::Request { hash };
         gossip1.handle_message(&did2, request).unwrap();
 
-        // Gossip1 should have sent a Response message
+        // Gossip1 should have sent a Response message directly to gossip2 (not broadcast)
         let messages1 = sent_messages1.lock().unwrap();
         assert_eq!(messages1.len(), 1);
 
-        if let (None, GossipMessage::Response { entry: resp_entry }) = &messages1[0] {
+        if let (Some(recipient), GossipMessage::Response { entry: resp_entry }) = &messages1[0] {
+            assert_eq!(recipient, &did2, "Response should be sent directly to requester");
             assert_eq!(resp_entry.hash, hash);
             assert_eq!(resp_entry.data, data);
         } else {
-            panic!("Expected Response message");
+            panic!("Expected Response message with recipient");
         }
     }
 
