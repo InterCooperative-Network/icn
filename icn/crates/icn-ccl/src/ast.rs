@@ -696,4 +696,73 @@ mod tests {
 
         assert!(contract.validate().is_ok());
     }
+
+    // Security tests for participant validation (H1)
+    #[test]
+    fn test_empty_participants() {
+        let contract = Contract::new("test".to_string());
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("at least one participant"));
+    }
+
+    #[test]
+    fn test_duplicate_participants() {
+        let kp = KeyPair::generate().unwrap();
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_participant(kp.did().clone()); // Duplicate!
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Duplicate participant"));
+    }
+
+    #[test]
+    fn test_too_many_participants() {
+        let mut contract = Contract::new("test".to_string());
+
+        // Add MAX_PARTICIPANTS + 1 participants
+        for _ in 0..=MAX_PARTICIPANTS {
+            let kp = KeyPair::generate().unwrap();
+            contract = contract.add_participant(kp.did().clone());
+        }
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Too many participants"));
+    }
+
+    #[test]
+    fn test_too_many_state_vars() {
+        let kp = KeyPair::generate().unwrap();
+        let mut contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone());
+
+        // Add MAX_STATE_VARS + 1 state variables
+        for i in 0..=MAX_STATE_VARS {
+            contract = contract.add_state_var(format!("var{}", i), Value::Int(0));
+        }
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Too many state variables"));
+    }
+
+    #[test]
+    fn test_too_many_rules() {
+        let kp = KeyPair::generate().unwrap();
+        let mut contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone());
+
+        // Add MAX_RULES + 1 rules
+        for i in 0..=MAX_RULES {
+            let rule = Rule::new(format!("rule{}", i));
+            contract = contract.add_rule(rule);
+        }
+
+        let result = contract.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Too many rules"));
+    }
 }
