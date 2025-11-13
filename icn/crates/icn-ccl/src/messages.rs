@@ -6,6 +6,9 @@ use icn_identity::Did;
 use icn_ledger::ContentHash;
 use serde::{Deserialize, Serialize};
 
+/// Maximum number of participants/signatures (must match ast::MAX_PARTICIPANTS)
+const MAX_PARTICIPANTS: usize = 100;
+
 /// Message announcing a new contract deployment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractDeploymentMessage {
@@ -77,6 +80,15 @@ impl ContractDeploymentMessage {
             );
         }
 
+        // Prevent DoS: validate signature count before creating HashSet (H2: Security fix)
+        if self.installation.signatures.len() > MAX_PARTICIPANTS {
+            bail!(
+                "Too many signatures: {} (max {})",
+                self.installation.signatures.len(),
+                MAX_PARTICIPANTS
+            );
+        }
+
         // Verify all participants have signed (Phase 10C)
         let participant_set: std::collections::HashSet<_> =
             self.contract.participants.iter().collect();
@@ -107,6 +119,17 @@ impl ContractDeploymentMessage {
         );
         deployer_key.verify(&signing_bytes, &deployer_sig)
             .map_err(|e| anyhow::anyhow!("Deployer signature verification failed: {}", e))?;
+
+        // Verify deployer signature matches installation.signatures (M2: Security fix)
+        let deployer_sig_in_installation = self.installation.signatures
+            .iter()
+            .find(|(did, _)| did == &self.installation.installed_by)
+            .map(|(_, sig)| sig)
+            .context("Deployer signature missing from installation.signatures")?;
+
+        if &self.deployer_signature != deployer_sig_in_installation {
+            bail!("Deployer signature mismatch: deployer_signature field doesn't match installation.signatures");
+        }
 
         // Verify each participant signature
         for (participant_did, sig_bytes) in &self.installation.signatures {

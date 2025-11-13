@@ -13,6 +13,15 @@ const MAX_LOOP_DEPTH: usize = 5;
 /// Maximum expression depth
 const MAX_EXPR_DEPTH: usize = 50;
 
+/// Maximum number of participants in a contract
+const MAX_PARTICIPANTS: usize = 100;
+
+/// Maximum number of state variables
+const MAX_STATE_VARS: usize = 100;
+
+/// Maximum number of rules
+const MAX_RULES: usize = 50;
+
 /// Reserved keywords that cannot be used as variable names
 const RESERVED_KEYWORDS: &[&str] = &[
     "if", "else", "for", "return", "true", "false", "none",
@@ -281,6 +290,42 @@ impl Contract {
             }
         }
 
+        // Validate participants (H1: Security fix)
+        if self.participants.is_empty() {
+            bail!("Contract must have at least one participant");
+        }
+        if self.participants.len() > MAX_PARTICIPANTS {
+            bail!(
+                "Too many participants: {} (max {})",
+                self.participants.len(),
+                MAX_PARTICIPANTS
+            );
+        }
+
+        // Check for duplicate participants
+        let mut participant_set = HashSet::new();
+        for participant in &self.participants {
+            if !participant_set.insert(participant) {
+                bail!("Duplicate participant: {}", participant);
+            }
+        }
+
+        // Validate bounded counts (L1: Security fix)
+        if self.state_vars.len() > MAX_STATE_VARS {
+            bail!(
+                "Too many state variables: {} (max {})",
+                self.state_vars.len(),
+                MAX_STATE_VARS
+            );
+        }
+        if self.rules.len() > MAX_RULES {
+            bail!(
+                "Too many rules: {} (max {})",
+                self.rules.len(),
+                MAX_RULES
+            );
+        }
+
         // Check for duplicate state variable names
         let mut state_names = HashSet::new();
         for var in &self.state_vars {
@@ -494,7 +539,9 @@ mod tests {
 
     #[test]
     fn test_duplicate_state_var() {
+        let kp = KeyPair::generate().unwrap();
         let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
             .add_state_var("count".to_string(), Value::Int(0))
             .add_state_var("count".to_string(), Value::Int(1));
         let result = contract.validate();
@@ -523,10 +570,12 @@ mod tests {
 
     #[test]
     fn test_duplicate_rule_name() {
+        let kp = KeyPair::generate().unwrap();
         let rule1 = Rule::new("transfer".to_string());
         let rule2 = Rule::new("transfer".to_string());
 
         let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
             .add_rule(rule1)
             .add_rule(rule2);
 
@@ -538,6 +587,7 @@ mod tests {
     #[test]
     fn test_deep_field_access_chain() {
         // Create deeply nested FieldAccess: obj.a.b.c.d...
+        let kp = KeyPair::generate().unwrap();
         let mut expr = Expr::Var("obj".to_string());
         for _ in 0..MAX_EXPR_DEPTH + 5 {
             expr = Expr::FieldAccess {
@@ -549,7 +599,9 @@ mod tests {
         let rule = Rule::new("test".to_string())
             .add_stmt(Stmt::Return { value: expr });
 
-        let contract = Contract::new("test".to_string()).add_rule(rule);
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_rule(rule);
 
         let result = contract.validate();
         assert!(result.is_err());
@@ -560,6 +612,7 @@ mod tests {
     #[test]
     fn test_deep_set_nesting() {
         // Create deeply nested Set expressions
+        let kp = KeyPair::generate().unwrap();
         let mut expr = Expr::Literal(Value::Int(1));
         for _ in 0..MAX_EXPR_DEPTH + 5 {
             expr = Expr::Set(vec![expr]);
@@ -568,7 +621,9 @@ mod tests {
         let rule = Rule::new("test".to_string())
             .add_stmt(Stmt::Return { value: expr });
 
-        let contract = Contract::new("test".to_string()).add_rule(rule);
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_rule(rule);
 
         let result = contract.validate();
         assert!(result.is_err());
@@ -579,6 +634,7 @@ mod tests {
     #[test]
     fn test_deep_map_nesting() {
         // Create deeply nested Map expressions
+        let kp = KeyPair::generate().unwrap();
         let mut expr = Expr::Literal(Value::Int(1));
         for _ in 0..MAX_EXPR_DEPTH + 5 {
             expr = Expr::Map(vec![("key".to_string(), expr)]);
@@ -587,7 +643,9 @@ mod tests {
         let rule = Rule::new("test".to_string())
             .add_stmt(Stmt::Return { value: expr });
 
-        let contract = Contract::new("test".to_string()).add_rule(rule);
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_rule(rule);
 
         let result = contract.validate();
         assert!(result.is_err());
@@ -598,6 +656,7 @@ mod tests {
     #[test]
     fn test_deep_in_expression() {
         // Create deeply nested In expressions
+        let kp = KeyPair::generate().unwrap();
         let mut expr = Expr::Literal(Value::Int(1));
         for _ in 0..MAX_EXPR_DEPTH + 5 {
             expr = Expr::In {
@@ -609,7 +668,9 @@ mod tests {
         let rule = Rule::new("test".to_string())
             .add_stmt(Stmt::Return { value: expr });
 
-        let contract = Contract::new("test".to_string()).add_rule(rule);
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_rule(rule);
 
         let result = contract.validate();
         assert!(result.is_err());
@@ -620,6 +681,7 @@ mod tests {
     #[test]
     fn test_shallow_expressions_accepted() {
         // Normal shallow expressions should pass validation
+        let kp = KeyPair::generate().unwrap();
         let expr = Expr::FieldAccess {
             object: Box::new(Expr::Var("obj".to_string())),
             field: "name".to_string(),
@@ -628,7 +690,9 @@ mod tests {
         let rule = Rule::new("test".to_string())
             .add_stmt(Stmt::Return { value: expr });
 
-        let contract = Contract::new("test".to_string()).add_rule(rule);
+        let contract = Contract::new("test".to_string())
+            .add_participant(kp.did().clone())
+            .add_rule(rule);
 
         assert!(contract.validate().is_ok());
     }
