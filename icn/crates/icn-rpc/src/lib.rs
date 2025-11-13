@@ -4,11 +4,16 @@
 //! The RPC server exposes NetworkActor operations for CLI access.
 
 pub mod client;
+pub mod pagination;
 pub mod receipt;
 pub mod server;
 pub mod types;
 
 pub use client::RpcClient;
+pub use pagination::{
+    paginate, paginate_owned, PageRequest, PageResponse, ABSOLUTE_MAX_PAGE_SIZE,
+    DEFAULT_MAX_PAGE_SIZE,
+};
 pub use receipt::{Operation, Outcome, Receipt, ReceiptId, ReceiptStore, Resources};
 pub use server::RpcServer;
 pub use types::{RpcError, RpcRequest, RpcResponse};
