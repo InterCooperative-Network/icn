@@ -228,10 +228,18 @@ impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
         Self::check_expiration(end_entity, now)?;
 
         // Query trust graph for peer's trust score
-        // Use blocking_read since we're in a sync context (rustls callback)
+        // Use try_read since we're in a sync context (rustls callback) but may be
+        // called from within a tokio runtime where blocking is not allowed
         let trust_score = {
-            let graph = self.trust_graph.blocking_read();
-            graph.compute_trust_score(&peer_did).unwrap_or(0.0)
+            match self.trust_graph.try_read() {
+                Ok(graph) => graph.compute_trust_score(&peer_did).unwrap_or(0.0),
+                Err(_) => {
+                    // Lock is held - use default trust score of 0.0
+                    // This allows min_trust_threshold to determine outcome
+                    warn!("Trust graph lock unavailable during TLS verification for {}, using default trust score 0.0", did_str);
+                    0.0
+                }
+            }
         };
 
         // Enforce trust threshold

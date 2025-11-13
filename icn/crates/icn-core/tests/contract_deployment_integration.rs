@@ -18,7 +18,7 @@ struct TestNode {
     did: icn_identity::Did,
     keypair: KeyPair,
     _network_handle: icn_net::NetworkHandle,
-    _gossip_handle: Arc<RwLock<GossipActor>>,
+    gossip_handle: Arc<RwLock<GossipActor>>,
     contract_actor: Arc<RwLock<ContractActor>>,
     contract_runtime: Arc<RwLock<ContractRuntime>>,
     trust_graph: Arc<RwLock<TrustGraph>>,
@@ -146,12 +146,19 @@ impl TestNode {
             let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
                 if topic == "contracts:deploy" {
                     let contract_actor = contract_actor_for_notifications.clone();
-                    let entry_data = entry.data.clone();
+                    // Use get_data() to handle decompression if needed
+                    let entry_data = match entry.get_data() {
+                        Ok(data) => data,
+                        Err(e) => {
+                            eprintln!("Failed to get entry data: {}", e);
+                            return;
+                        }
+                    };
 
                     tokio::spawn(async move {
                         match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
                             Ok(deployment_msg) => {
-                                let mut actor = contract_actor.write().await;
+                                let actor = contract_actor.write().await;
                                 if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
                                     eprintln!("Failed to handle contract deployment: {}", e);
                                 }
@@ -178,7 +185,7 @@ impl TestNode {
             did,
             keypair,
             _network_handle: network_handle,
-            _gossip_handle: gossip_handle,
+            gossip_handle,
             contract_actor: contract_actor_handle,
             contract_runtime: contract_runtime_handle,
             trust_graph: trust_graph_handle,
@@ -201,15 +208,12 @@ impl TestNode {
         contract: Contract,
         capabilities: Vec<Capability>,
     ) -> anyhow::Result<ContentHash> {
-        // Compute code hash
+        // Compute code hash (must match ContractActor::compute_code_hash)
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(participant.as_str().as_bytes());
-        }
-        for rule in &contract.rules {
-            hasher.update(rule.name.as_bytes());
+            hasher.update(format!("{:?}", participant).as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 
@@ -234,8 +238,40 @@ impl TestNode {
             min_caller_trust: None,
         };
 
+        // Deploy locally first
         let actor = self.contract_actor.read().await;
-        actor.deploy_contract(contract, installation, deployer_signature.to_bytes().to_vec()).await
+        let result_hash = actor.deploy_contract(contract.clone(), installation.clone(), deployer_signature.to_bytes().to_vec()).await?;
+
+        // Publish deployment message to gossip for distribution
+        let deployment_msg = icn_ccl::ContractDeploymentMessage {
+            code_hash: code_hash.clone(),
+            contract,
+            installation,
+            deployer_signature: deployer_signature.to_bytes().to_vec(),
+        };
+
+        let message_bytes = serde_json::to_vec(&deployment_msg)?;
+
+        // Publish locally and get the entry to announce
+        let (hash, clock) = {
+            let mut gossip = self.gossip_handle.write().await;
+            let hash = gossip.publish("contracts:deploy", message_bytes)?;
+            let entry = gossip.get_entry("contracts:deploy", &hash)
+                .ok_or_else(|| anyhow::anyhow!("Published entry not found"))?;
+            (hash, entry.clock)
+        };
+
+        // Broadcast Announce message to all peers via network
+        let announce_msg = icn_gossip::GossipMessage::Announce {
+            hash,
+            author: self.did.clone(),
+            clock,
+            topic: "contracts:deploy".to_string(),
+        };
+        let net_msg = icn_net::NetworkMessage::gossip(self.did.clone(), None, announce_msg);
+        self._network_handle.broadcast(net_msg).await?;
+
+        Ok(result_hash)
     }
 
     /// Execute a contract rule
@@ -305,8 +341,8 @@ async fn test_two_node_contract_deployment() {
 
     println!("Contract deployed from node A: {}", code_hash);
 
-    // Wait for gossip propagation
-    sleep(Duration::from_millis(500)).await;
+    // Wait for gossip propagation (longer wait for anti-entropy to kick in)
+    sleep(Duration::from_millis(2000)).await;
 
     // Verify node A has the contract
     let contracts_a = node_a.list_contracts().await;

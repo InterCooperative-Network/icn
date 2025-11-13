@@ -903,16 +903,13 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
 
             println!("Signing deployment as {}", deployer_did);
 
-            // Compute code hash
+            // Compute code hash (must match ContractActor::compute_code_hash)
             let code_hash = {
                 use sha2::{Sha256, Digest};
                 let mut hasher = Sha256::new();
                 hasher.update(contract.name.as_bytes());
                 for participant in &contract.participants {
-                    hasher.update(participant.as_str().as_bytes());
-                }
-                for rule in &contract.rules {
-                    hasher.update(rule.name.as_bytes());
+                    hasher.update(format!("{:?}", participant).as_bytes());
                 }
                 icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
             };

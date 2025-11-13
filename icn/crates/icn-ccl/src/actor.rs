@@ -65,7 +65,10 @@ impl ContractActor {
         contract.validate().context("Contract validation failed")?;
 
         // Check deployer authorization via trust graph
-        if let Some(ref trust_graph) = self.trust_graph {
+        // Skip trust check if deploying locally (deployer is self)
+        if installation.installed_by == self.did {
+            debug!("Local deployment by {}, skipping trust check", self.did);
+        } else if let Some(ref trust_graph) = self.trust_graph {
             let trust_score = {
                 let graph = trust_graph.read().await;
                 graph
@@ -189,7 +192,10 @@ impl ContractActor {
         msg.verify().context("Invalid deployment message")?;
 
         // Check deployer trust
-        if let Some(ref trust_graph) = self.trust_graph {
+        // Skip trust check if deployment is from local node (self-deployment via gossip)
+        if msg.installation.installed_by == self.did {
+            debug!("Deployment from local node {}, skipping trust check", self.did);
+        } else if let Some(ref trust_graph) = self.trust_graph {
             let trust_score = {
                 let graph = trust_graph.read().await;
                 graph

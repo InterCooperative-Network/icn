@@ -344,7 +344,14 @@ impl Supervisor {
                     // Handle contract deployments
                     else if topic == "contracts:deploy" {
                         let contract_actor = contract_actor_for_notifications.clone();
-                        let entry_data = entry.data.clone();
+                        // Use get_data() to handle decompression if needed
+                        let entry_data = match entry.get_data() {
+                            Ok(data) => data,
+                            Err(e) => {
+                                warn!("Failed to get entry data: {}", e);
+                                return;
+                            }
+                        };
 
                         tokio::spawn(async move {
                             // Deserialize contract deployment message
