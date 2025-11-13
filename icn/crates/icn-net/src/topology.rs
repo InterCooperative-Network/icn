@@ -12,6 +12,7 @@
 
 use icn_gossip::Scope;
 use icn_identity::Did;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
 
@@ -72,7 +73,8 @@ pub struct TopologyInfo {
 }
 
 /// Node role in the network topology
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum NodeRole {
     /// Edge node (standard peer)
     Edge,
@@ -82,8 +84,14 @@ pub enum NodeRole {
     Archive,
 }
 
+impl Default for NodeRole {
+    fn default() -> Self {
+        NodeRole::Edge
+    }
+}
+
 /// Neighbor set size limits
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NeighborLimitsConfig {
     pub max_local_cluster: usize,
     pub max_regional: usize,
@@ -311,6 +319,60 @@ impl NeighborSets {
         }
     }
 
+}
+
+/// Topology configuration for regional/cluster-based networking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyConfig {
+    /// Geographic region identifier (e.g., "na-east", "eu-west", "ap-south")
+    pub region: String,
+
+    /// Cluster identifier within region (e.g., "coop-mesh-1", "timebank-cluster")
+    pub cluster_id: String,
+
+    /// Node role in the network
+    pub role: NodeRole,
+
+    /// Maximum neighbors per set
+    pub neighbor_limits: NeighborLimitsConfig,
+
+    /// Gossip fanout per scope
+    pub fanout: FanoutConfig,
+}
+
+/// Gossip fanout configuration per scope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanoutConfig {
+    /// Fanout for local cluster scope
+    pub local_cluster: usize,
+
+    /// Fanout for regional scope
+    pub regional: usize,
+
+    /// Fanout for global scope
+    pub global: usize,
+}
+
+impl Default for FanoutConfig {
+    fn default() -> Self {
+        FanoutConfig {
+            local_cluster: 8,
+            regional: 6,
+            global: 4,
+        }
+    }
+}
+
+impl Default for TopologyConfig {
+    fn default() -> Self {
+        TopologyConfig {
+            region: "default".to_string(),
+            cluster_id: "default".to_string(),
+            role: NodeRole::default(),
+            neighbor_limits: NeighborLimitsConfig::default(),
+            fanout: FanoutConfig::default(),
+        }
+    }
 }
 
 #[cfg(test)]

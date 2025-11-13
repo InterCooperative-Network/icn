@@ -15,4 +15,7 @@ pub use global_rate_limit::GlobalRateLimiter;
 pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use session::SessionManager;
-pub use topology::{NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId, TopologyInfo};
+pub use topology::{
+    FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId,
+    TopologyConfig, TopologyInfo,
+};

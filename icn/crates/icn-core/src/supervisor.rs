@@ -250,6 +250,14 @@ impl Supervisor {
                     icn_net::MessagePayload::Pong => {
                         // Ping/Pong handled by network actor
                     }
+
+                    icn_net::MessagePayload::Handshake { .. } => {
+                        // Handshake handled internally by network actor
+                    }
+
+                    icn_net::MessagePayload::HandshakeAck => {
+                        // Handshake ack handled internally by network actor
+                    }
                 }
             });
 
@@ -272,6 +280,7 @@ impl Supervisor {
                 trust_graph_for_rate_limit,
                 trust_gated_config,
                 fallback_config,
+                Some(self.config.topology.clone()),
             )
             .await?;
 

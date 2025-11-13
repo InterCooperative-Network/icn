@@ -49,6 +49,16 @@ pub enum MessagePayload {
 
     /// Ack subscription
     SubscribeAck { topics: Vec<String> },
+
+    /// Handshake with topology information
+    Handshake {
+        region: String,
+        cluster_id: String,
+        role: String,
+    },
+
+    /// Handshake acknowledgement
+    HandshakeAck,
 }
 
 impl NetworkMessage {
@@ -90,6 +100,16 @@ impl NetworkMessage {
     /// Create a subscribe ack message
     pub fn subscribe_ack(from: Did, to: Did, topics: Vec<String>) -> Self {
         Self::new(from, Some(to), MessagePayload::SubscribeAck { topics })
+    }
+
+    /// Create a handshake message
+    pub fn handshake(from: Did, to: Did, region: String, cluster_id: String, role: String) -> Self {
+        Self::new(from, Some(to), MessagePayload::Handshake { region, cluster_id, role })
+    }
+
+    /// Create a handshake ack message
+    pub fn handshake_ack(from: Did, to: Did) -> Self {
+        Self::new(from, Some(to), MessagePayload::HandshakeAck)
     }
 
     /// Serialize to bytes using bincode
