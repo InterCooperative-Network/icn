@@ -27,6 +27,7 @@ time = "0.3"
 ed25519-dalek.workspace = true
 hostname = "0.4"
 x509-parser = "0.16"
+rand = "0.8"
 
 [dev-dependencies]
 icn-store.workspace = true
