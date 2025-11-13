@@ -638,7 +638,7 @@ dev_mode = false
 ```rust
 impl NetworkActor {
     async fn verify_peer(&self, hello: &HelloMessage, cert: &rustls::Certificate) -> Result<()> {
-        if !self.config.enforce_did_tls_binding && self.config.dev_mode {
+        if !self.config.enforce_did_tls_binding || self.config.dev_mode {
             warn!("⚠️  DID-TLS binding verification disabled (dev mode)");
             return Ok(());
         }

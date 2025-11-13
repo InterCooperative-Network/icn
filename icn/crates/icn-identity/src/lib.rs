@@ -1,5 +1,6 @@
 //! ICN Identity - DID management, key generation, and cryptographic operations
 
+pub mod bundle;
 pub mod keystore;
 
 use anyhow::Result;
@@ -8,6 +9,7 @@ use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
+pub use bundle::{BindingInfo, IdentityBundle, verify_binding_info};
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 
 /// A decentralized identifier for an ICN node
