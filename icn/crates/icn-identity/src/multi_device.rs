@@ -335,6 +335,71 @@ impl DidDocument {
         Ok(())
     }
 
+    /// Add a device with both signing (Ed25519) and encryption (X25519) keys
+    ///
+    /// This is a convenience method for adding a complete device that has both
+    /// signing and encryption capabilities. It adds two VerificationMethods
+    /// (one for each key type) but only increments the version once, since
+    /// this represents a single logical operation.
+    ///
+    /// The signing key will have the specified capabilities.
+    /// The encryption key will automatically get only the Encrypt capability.
+    pub fn add_device_with_encryption_key(
+        &mut self,
+        device_id: String,
+        label: String,
+        ed25519_public_key: Vec<u8>,
+        x25519_public_key: Vec<u8>,
+        signing_capabilities: Vec<Capability>,
+    ) -> Result<()> {
+        // Check device ID doesn't already exist (for either key)
+        if self.get_verification_method(&device_id).is_some() {
+            bail!("Device ID '{}' already exists", device_id);
+        }
+        let enc_id = format!("{}-enc", device_id);
+        if self.get_verification_method(&enc_id).is_some() {
+            bail!("Encryption key ID '{}' already exists", enc_id);
+        }
+
+        let now = current_timestamp();
+
+        // Check if this will be a signing key
+        let is_signing_key = signing_capabilities.contains(&Capability::Sign);
+
+        // Add Ed25519 signing key
+        self.verification_method.push(VerificationMethod {
+            id: device_id.clone(),
+            label: label.clone(),
+            key_type: KeyType::Ed25519,
+            public_key: ed25519_public_key,
+            capabilities: signing_capabilities,
+            added_at: now,
+            revoked_at: None,
+        });
+
+        // Add X25519 encryption key
+        self.verification_method.push(VerificationMethod {
+            id: enc_id,
+            label: format!("{} (encryption)", label),
+            key_type: KeyType::X25519,
+            public_key: x25519_public_key,
+            capabilities: vec![Capability::Encrypt],
+            added_at: now,
+            revoked_at: None,
+        });
+
+        // If it's a signing key, add to authentication list
+        if is_signing_key {
+            self.authentication.push(device_id);
+        }
+
+        // Update version and timestamp ONCE for the logical operation
+        self.version += 1;
+        self.updated_at = now;
+
+        Ok(())
+    }
+
     /// Revoke a device
     pub fn revoke_device(&mut self, device_id: &str) -> Result<()> {
         let now = current_timestamp();
@@ -640,5 +705,50 @@ mod tests {
 
         // Verify the event
         assert!(event.verify(&doc).is_ok());
+    }
+
+    #[test]
+    fn test_add_device_with_encryption_key_version_increment() {
+        let kp = crate::KeyPair::generate().unwrap();
+        let initial_x25519_key = [0u8; 32];
+        let mut doc = DidDocument::new(kp.did().clone(), kp.verifying_key(), &initial_x25519_key);
+
+        // Initial version should be 1, with 2 keys (device-1 Ed25519 + device-1-enc X25519)
+        assert_eq!(doc.version, 1);
+        assert_eq!(doc.verification_method.len(), 2);
+
+        // Add second device with both Ed25519 and X25519 keys
+        let ed25519_key = vec![1u8; 32];
+        let x25519_key = vec![2u8; 32];
+
+        doc.add_device_with_encryption_key(
+            "device-2".to_string(),
+            "Test Device".to_string(),
+            ed25519_key,
+            x25519_key,
+            vec![Capability::Sign, Capability::AddDevice],
+        )
+        .unwrap();
+
+        // Version should increment by exactly 1, even though 2 keys were added
+        assert_eq!(doc.version, 2);
+
+        // Verify both keys were added (2 from initial + 2 from new device = 4 total)
+        assert_eq!(doc.verification_method.len(), 4);
+
+        // Verify signing key
+        let signing_vm = doc.get_verification_method("device-2").unwrap();
+        assert_eq!(signing_vm.label, "Test Device");
+        assert_eq!(signing_vm.key_type, KeyType::Ed25519);
+        assert!(signing_vm.capabilities.contains(&Capability::Sign));
+
+        // Verify encryption key
+        let enc_vm = doc.get_verification_method("device-2-enc").unwrap();
+        assert_eq!(enc_vm.label, "Test Device (encryption)");
+        assert_eq!(enc_vm.key_type, KeyType::X25519);
+        assert_eq!(enc_vm.capabilities, vec![Capability::Encrypt]);
+
+        // Verify signing key is in authentication list
+        assert!(doc.authentication.contains(&"device-2".to_string()));
     }
 }

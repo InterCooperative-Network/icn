@@ -1591,7 +1591,6 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
                 .unwrap_or(0);
 
             let new_device_id = format!("device-{}", max_device_num + 1);
-            let new_enc_id = format!("enc-{}", max_device_num + 1);
 
             println!("Adding device as: {}", new_device_id);
 
@@ -1629,28 +1628,19 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
             // Update DID document and save
             println!("Updating DID document...");
             let new_device_id_clone = new_device_id.clone();
-            let new_enc_id_clone = new_enc_id.clone();
             let request_label = request.label.clone();
             let request_caps = request.capabilities.clone();
 
             keystore.update_did_document(
                 |did_doc| {
-                    // Add Ed25519 signing key
-                    did_doc.add_device(
-                        new_device_id_clone.clone(),
-                        request_label.clone(),
-                        ed25519_bytes.clone(),
-                        KeyType::Ed25519,
-                        request_caps.clone(),
-                    )?;
-
-                    // Add X25519 encryption key
-                    did_doc.add_device(
-                        new_enc_id_clone,
-                        format!("{} (encryption)", request_label),
+                    // Add both Ed25519 signing key and X25519 encryption key
+                    // This increments the version only once, matching the rotation event
+                    did_doc.add_device_with_encryption_key(
+                        new_device_id_clone,
+                        request_label,
+                        ed25519_bytes,
                         x25519_bytes,
-                        KeyType::X25519,
-                        vec![Capability::Encrypt],
+                        request_caps,
                     )?;
 
                     Ok(())
