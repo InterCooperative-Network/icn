@@ -860,10 +860,15 @@ impl NetworkActor {
                                                 "Version negotiation failed: {}",
                                                 e
                                             );
+                                            // Track failure metric
+                                            icn_obs::metrics::network::version_negotiation_failure_inc("incompatible_version");
                                             // Drop the connection - incompatible versions
                                             return Err(anyhow::anyhow!("Incompatible protocol version"));
                                         }
                                     };
+
+                                    // Track successful negotiation
+                                    icn_obs::metrics::network::version_negotiation_success_inc(negotiated_version);
 
                                     // Calculate common capabilities
                                     let common_caps = crate::common_capabilities(&local_version_info, version_info);

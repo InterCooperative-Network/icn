@@ -69,6 +69,22 @@ pub fn init_descriptions() {
         "icn_network_protocol_version_too_new_total",
         "Total number of messages rejected because version is too new"
     );
+    describe_gauge!(
+        "icn_network_peer_versions",
+        "Number of peers running each protocol version"
+    );
+    describe_gauge!(
+        "icn_network_peer_capabilities",
+        "Number of peers supporting each capability"
+    );
+    describe_counter!(
+        "icn_network_version_negotiation_failures_total",
+        "Total number of version negotiation failures by reason"
+    );
+    describe_counter!(
+        "icn_network_version_negotiation_success_total",
+        "Total number of successful version negotiations"
+    );
 
     // Topology metrics
     describe_gauge!(
@@ -464,6 +480,22 @@ pub mod network {
 
     pub fn protocol_version_too_new_inc() {
         counter!("icn_network_protocol_version_too_new_total").increment(1);
+    }
+
+    pub fn peer_version_set(version: u32, count: u64) {
+        gauge!("icn_network_peer_versions", "version" => version.to_string()).set(count as f64);
+    }
+
+    pub fn peer_capability_set(capability: &str, count: u64) {
+        gauge!("icn_network_peer_capabilities", "capability" => capability.to_string()).set(count as f64);
+    }
+
+    pub fn version_negotiation_failure_inc(reason: &str) {
+        counter!("icn_network_version_negotiation_failures_total", "reason" => reason.to_string()).increment(1);
+    }
+
+    pub fn version_negotiation_success_inc(negotiated_version: u32) {
+        counter!("icn_network_version_negotiation_success_total", "negotiated_version" => negotiated_version.to_string()).increment(1);
     }
 }
 
