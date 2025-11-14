@@ -10,7 +10,7 @@ use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -114,6 +114,14 @@ impl Supervisor {
             );
 
             info!("Gossip actor spawned with trust-gated subscription support");
+
+            // Set keypair for signing outgoing gossip messages
+            {
+                let mut gossip = gossip_handle.blocking_write();
+                gossip.set_keypair(identity_bundle.keypair().clone());
+            }
+
+            info!("Gossip actor configured with signing keypair");
 
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
@@ -265,11 +273,37 @@ impl Supervisor {
                     icn_net::MessagePayload::Signed(ref envelope) => {
                         // Signed messages have been verified by NetworkActor
                         // The signature and replay protection checks have passed
-                        info!("Received verified signed message from {} (seq={})", envelope.from, envelope.sequence);
+                        debug!("Received verified signed message from {} (seq={}, type={:?})",
+                               envelope.from, envelope.sequence, envelope.payload_type);
 
-                        // Decode and handle the inner payload based on PayloadType
-                        // For now, we just log since we don't have typed payloads yet
-                        // Future: decode based on envelope.payload_type and route accordingly
+                        // Route based on payload type
+                        match envelope.payload_type {
+                            icn_net::PayloadType::Gossip => {
+                                // Decode gossip message from signed envelope
+                                let gossip_msg: icn_gossip::GossipMessage = match envelope.decode_payload() {
+                                    Ok(msg) => msg,
+                                    Err(e) => {
+                                        warn!("Failed to decode gossip payload from {}: {}", envelope.from, e);
+                                        return;
+                                    }
+                                };
+
+                                // Handle gossip message (sender is authenticated via signature)
+                                let gossip_handle = gossip_handle_clone.clone();
+                                let sender = envelope.from.clone();
+                                tokio::spawn(async move {
+                                    let mut gossip = gossip_handle.write().await;
+                                    if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                                        warn!("Failed to handle gossip message from {}: {}", sender, e);
+                                    }
+                                });
+                            }
+
+                            _ => {
+                                // Other payload types not yet implemented
+                                debug!("Received signed message with unhandled payload type: {:?}", envelope.payload_type);
+                            }
+                        }
                     }
                 }
             });
@@ -310,10 +344,14 @@ impl Supervisor {
                 let mut gossip = gossip_handle.write().await;
                 let network_handle_clone = network_handle.clone();
                 let own_did_clone = did.clone();
+                let keypair_clone = identity_bundle.keypair().clone();
+                let sequence_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
                 let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient, gossip_msg| {
                     let net_handle = network_handle_clone.clone();
                     let from_did = own_did_clone.clone();
+                    let keypair = keypair_clone.clone();
+                    let sequence_ctr = sequence_counter.clone();
 
                     // Track metrics based on message type
                     use icn_gossip::GossipMessage;
@@ -326,13 +364,32 @@ impl Supervisor {
 
                     // Spawn async task to send message
                     tokio::spawn(async move {
+                        // Get next sequence number
+                        let sequence = sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+                        // Create signed envelope
+                        let envelope = match icn_net::SignedEnvelope::from_payload(
+                            &from_did,
+                            &keypair,
+                            sequence,
+                            icn_net::PayloadType::Gossip,
+                            &gossip_msg,
+                        ) {
+                            Ok(env) => env,
+                            Err(e) => {
+                                warn!("Failed to create signed envelope: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Send signed message
                         let result = if let Some(target_did) = recipient {
                             // Unicast
-                            let net_msg = icn_net::NetworkMessage::gossip(from_did, Some(target_did.clone()), gossip_msg);
+                            let net_msg = icn_net::NetworkMessage::signed(Some(target_did.clone()), envelope);
                             net_handle.send_message(target_did, net_msg).await
                         } else {
                             // Broadcast
-                            let net_msg = icn_net::NetworkMessage::gossip(from_did, None, gossip_msg);
+                            let net_msg = icn_net::NetworkMessage::signed(None, envelope);
                             net_handle.broadcast(net_msg).await
                         };
 

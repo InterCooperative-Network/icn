@@ -8,7 +8,7 @@ use crate::types::{
 };
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
-use icn_identity::Did;
+use icn_identity::{Did, KeyPair};
 use icn_trust::TrustClass;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -38,6 +38,12 @@ const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 pub struct GossipActor {
     /// This node's DID
     own_did: Did,
+
+    /// Keypair for signing outgoing messages (optional for testing)
+    keypair: Option<KeyPair>,
+
+    /// Sequence counter for signed messages (monotonically increasing)
+    sequence: u64,
 
     /// Vector clock for this node
     clock: VectorClock,
@@ -91,6 +97,8 @@ impl GossipActor {
     ) -> Self {
         let mut gossip = GossipActor {
             own_did: own_did.clone(),
+            keypair: None,
+            sequence: 0,
             clock: VectorClock::new(),
             topics: HashMap::new(),
             entries: HashMap::new(),
@@ -139,6 +147,11 @@ impl GossipActor {
     /// Set the send message callback for sending responses
     pub fn set_send_callback(&mut self, callback: SendMessageCallback) {
         self.send_callback = Some(callback);
+    }
+
+    /// Set the keypair for signing outgoing messages
+    pub fn set_keypair(&mut self, keypair: KeyPair) {
+        self.keypair = Some(keypair);
     }
 
     /// Set the entry notification callback for notifying subscribers
