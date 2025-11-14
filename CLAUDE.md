@@ -310,7 +310,15 @@ icnctl id import backup.age
 
 ## Current Phase
 
-**Critical Fix - TLS Certificate Persistence (Complete ✓)** (2025-01-13):
+**Gossip Message Authentication (Complete ✓)** (2025-11-13):
+- [x] Migrated all gossip messages to SignedEnvelope
+- [x] Added sequence counter and keypair to GossipActor
+- [x] Updated send_callback to create signed envelopes
+- [x] Updated receive path to handle PayloadType::Gossip
+- [x] All 262 library tests pass
+- [x] First major protocol using Phase 9 infrastructure
+
+**Critical Fix - TLS Certificate Persistence (Complete ✓)** (2025-11-13):
 - [x] Fixed v1-to-v2 keystore migration to persist TLS certificates
 - [x] Auto-save upgraded keystore immediately after generating TLS binding
 - [x] Added comprehensive test: `test_v1_to_v2_migration_persists_tls()`

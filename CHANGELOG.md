@@ -7,7 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed - Critical: TLS Certificate Persistence (2025-01-13)
+### Added - Gossip Message Authentication (2025-11-13)
+
+**Cryptographically Signed Gossip Messages:**
+- **MAJOR CHANGE:** All gossip messages now use SignedEnvelope for authentication
+- **Security Properties:**
+  - ✅ **Ed25519 authentication**: Every gossip message is cryptographically signed
+  - ✅ **Replay protection**: Sequence numbers with Bloom filter detection
+  - ✅ **Sender verification**: Impossible to forge messages from other DIDs
+  - ✅ **Freshness checking**: Timestamped messages with 300s max age
+  - ✅ **Non-repudiation**: Senders cannot deny sending authenticated messages
+
+**Implementation:**
+- GossipActor now holds optional keypair for signing outgoing messages
+- Sequence counter (AtomicU64) tracks monotonically increasing message numbers
+- Send callback creates SignedEnvelope with PayloadType::Gossip
+- Receive path decodes and verifies signed gossip messages
+- Automatic verification via NetworkActor's ReplayGuard
+
+**Message Flow:**
+- **Send:** `GossipActor.publish() → SignedEnvelope::from_payload() → NetworkMessage::signed() → network send`
+- **Receive:** `NetworkActor verifies → decode PayloadType::Gossip → handle_message() with authenticated sender`
+
+**Message Size Impact:**
+- SignedEnvelope overhead: ~141 bytes per message
+  - DID (from): ~60 bytes
+  - Sequence number: 8 bytes
+  - Timestamp: 8 bytes
+  - Payload type: 1 byte
+  - Ed25519 signature: 64 bytes
+- **Announce messages:** 230B → 371B (+61%)
+- **Request messages:** 32B → 173B (+441%, but small absolute size)
+- **Response messages (2KB):** 2KB → 2.1KB (+7%)
+
+**Backward Compatibility:**
+- ⚠️ **BREAKING CHANGE:** New nodes only send signed messages
+- Old MessagePayload::Gossip receive path still exists for compatibility
+- Recommended: Coordinate network-wide upgrade or implement dual-mode receiver
+
+**Testing:**
+- All 262 library tests pass
+- Gossip tests: 52 passing (signed message flow verified)
+- Network tests: 53 passing (SignedEnvelope + ReplayGuard)
+- Core integration tests: 26 passing
+
+**Impact:**
+- First major protocol to use Phase 9 SignedEnvelope infrastructure
+- Demonstrates end-to-end message authentication pattern
+- Foundation for migrating Ledger, Trust, and Contract protocols
+- Eliminates trust in "from" field (now cryptographically verified)
+
+### Fixed - Critical: TLS Certificate Persistence (2025-11-13)
 
 **Keystore Migration Bug Fix:**
 - **CRITICAL:** Fixed v1-to-v2 keystore migration to persist TLS certificates to disk
