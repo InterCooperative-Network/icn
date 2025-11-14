@@ -137,6 +137,14 @@ impl Supervisor {
                     info!("Found state snapshot (version {}, created at {}) - loaded in {:.3}s",
                           snapshot.version, snapshot.created_at, load_duration.as_secs_f64());
 
+                    // Warn if checksum file is missing (legacy snapshot)
+                    let checksum_path = data_dir.join("state.snapshot.sha256");
+                    if !checksum_path.exists() {
+                        warn!("⚠️  Snapshot loaded without checksum verification (legacy snapshot). Run 'icnctl snapshot create' to generate checksum.");
+                    } else {
+                        info!("✅ Snapshot checksum verified");
+                    }
+
                     // Record snapshot contents metrics
                     if let Some(ref gossip_state) = snapshot.gossip_state {
                         icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());

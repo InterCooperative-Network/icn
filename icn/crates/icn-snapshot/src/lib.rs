@@ -26,13 +26,17 @@
 //! }
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Filename for state snapshot
 const SNAPSHOT_FILENAME: &str = "state.snapshot";
+
+/// Filename for snapshot checksum
+const CHECKSUM_FILENAME: &str = "state.snapshot.sha256";
 
 /// Complete state snapshot for graceful restart
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,31 +111,45 @@ pub struct NetworkState {
     pub peer_addresses: HashMap<String, String>,
 }
 
-/// Save state snapshot to disk
+/// Save state snapshot to disk with SHA256 checksum
 ///
 /// Snapshot is saved to `{data_dir}/state.snapshot` as JSON
+/// Checksum is saved to `{data_dir}/state.snapshot.sha256`
 pub fn save_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<Path>) -> Result<()> {
-    let path = snapshot_path(data_dir);
+    let path = snapshot_path(&data_dir);
+    let checksum_path = checksum_path(&data_dir);
 
     // Serialize to JSON
     let json = serde_json::to_vec_pretty(snapshot)
         .context("Failed to serialize snapshot")?;
 
+    // Compute SHA256 checksum
+    let checksum = compute_checksum(&json);
+
     // Write atomically using temp file + rename
     let temp_path = path.with_extension("snapshot.tmp");
-    std::fs::write(&temp_path, json)
+    let temp_checksum_path = checksum_path.with_extension("sha256.tmp");
+
+    std::fs::write(&temp_path, &json)
         .context("Failed to write snapshot")?;
+    std::fs::write(&temp_checksum_path, &checksum)
+        .context("Failed to write checksum")?;
+
     std::fs::rename(&temp_path, &path)
         .context("Failed to rename snapshot")?;
+    std::fs::rename(&temp_checksum_path, &checksum_path)
+        .context("Failed to rename checksum")?;
 
     Ok(())
 }
 
-/// Load state snapshot from disk
+/// Load state snapshot from disk with checksum verification
 ///
 /// Returns None if snapshot doesn't exist, Some(snapshot) if it exists and is valid
+/// Returns error if snapshot is corrupted (checksum mismatch)
 pub fn load_snapshot(data_dir: impl AsRef<Path>) -> Result<Option<StateSnapshot>> {
-    let path = snapshot_path(data_dir);
+    let path = snapshot_path(&data_dir);
+    let checksum_path = checksum_path(&data_dir);
 
     if !path.exists() {
         return Ok(None);
@@ -140,29 +158,98 @@ pub fn load_snapshot(data_dir: impl AsRef<Path>) -> Result<Option<StateSnapshot>
     let json = std::fs::read(&path)
         .context("Failed to read snapshot")?;
 
+    // Verify checksum if it exists
+    if checksum_path.exists() {
+        let expected_checksum = std::fs::read_to_string(&checksum_path)
+            .context("Failed to read checksum")?;
+        let actual_checksum = compute_checksum(&json);
+
+        if expected_checksum.trim() != actual_checksum {
+            return Err(anyhow!(
+                "Snapshot checksum mismatch! Expected: {}, Actual: {}. Snapshot may be corrupted.",
+                expected_checksum.trim(),
+                actual_checksum
+            ));
+        }
+    } else {
+        // Checksum file doesn't exist - this is OK for legacy snapshots
+        // but we should log a warning (caller can do this)
+    }
+
     let snapshot: StateSnapshot = serde_json::from_slice(&json)
         .context("Failed to deserialize snapshot")?;
 
     Ok(Some(snapshot))
 }
 
-/// Delete state snapshot
+/// Delete state snapshot and checksum
 ///
 /// Used after successful restore or when explicitly clearing state
 pub fn delete_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
-    let path = snapshot_path(data_dir);
+    let path = snapshot_path(&data_dir);
+    let checksum_path = checksum_path(&data_dir);
 
     if path.exists() {
         std::fs::remove_file(&path)
             .context("Failed to delete snapshot")?;
     }
 
+    if checksum_path.exists() {
+        std::fs::remove_file(&checksum_path)
+            .context("Failed to delete checksum")?;
+    }
+
     Ok(())
+}
+
+/// Verify snapshot checksum without loading
+///
+/// Returns Ok(()) if checksum is valid, Err if corrupted or checksum missing
+pub fn verify_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
+    let path = snapshot_path(&data_dir);
+    let checksum_path = checksum_path(&data_dir);
+
+    if !path.exists() {
+        return Err(anyhow!("Snapshot does not exist"));
+    }
+
+    if !checksum_path.exists() {
+        return Err(anyhow!("Checksum file does not exist (legacy snapshot?)"));
+    }
+
+    let json = std::fs::read(&path)
+        .context("Failed to read snapshot")?;
+    let expected_checksum = std::fs::read_to_string(&checksum_path)
+        .context("Failed to read checksum")?;
+    let actual_checksum = compute_checksum(&json);
+
+    if expected_checksum.trim() != actual_checksum {
+        return Err(anyhow!(
+            "Snapshot checksum mismatch! Expected: {}, Actual: {}",
+            expected_checksum.trim(),
+            actual_checksum
+        ));
+    }
+
+    Ok(())
+}
+
+/// Compute SHA256 checksum of data
+fn compute_checksum(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let result = hasher.finalize();
+    hex::encode(result)
 }
 
 /// Get the snapshot file path
 fn snapshot_path(data_dir: impl AsRef<Path>) -> PathBuf {
     data_dir.as_ref().join(SNAPSHOT_FILENAME)
+}
+
+/// Get the checksum file path
+fn checksum_path(data_dir: impl AsRef<Path>) -> PathBuf {
+    data_dir.as_ref().join(CHECKSUM_FILENAME)
 }
 
 #[cfg(test)]
@@ -262,6 +349,118 @@ mod tests {
             net_state.peer_addresses.get("did:icn:alice"),
             Some(&"127.0.0.1:5000".to_string())
         );
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_checksum_creation() {
+        let temp = std::env::temp_dir().join("icn-snapshot-checksum");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Verify checksum file was created
+        let checksum_path = checksum_path(&temp);
+        assert!(checksum_path.exists(), "Checksum file should be created");
+
+        // Verify checksum is valid hex SHA256 (64 characters)
+        let checksum = std::fs::read_to_string(&checksum_path).unwrap();
+        assert_eq!(checksum.trim().len(), 64, "SHA256 should be 64 hex characters");
+        assert!(checksum.chars().all(|c| c.is_ascii_hexdigit() || c.is_whitespace()));
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_checksum_verification_success() {
+        let temp = std::env::temp_dir().join("icn-snapshot-verify-success");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Verify should succeed
+        verify_snapshot(&temp).unwrap();
+
+        // Load should succeed
+        let loaded = load_snapshot(&temp).unwrap();
+        assert!(loaded.is_some());
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_checksum_corruption_detected() {
+        let temp = std::env::temp_dir().join("icn-snapshot-corrupted");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Corrupt the snapshot by modifying its content
+        let snapshot_path = snapshot_path(&temp);
+        let mut content = std::fs::read_to_string(&snapshot_path).unwrap();
+        content.push_str("CORRUPTED");
+        std::fs::write(&snapshot_path, content).unwrap();
+
+        // Verify should fail
+        let verify_result = verify_snapshot(&temp);
+        assert!(verify_result.is_err(), "Verification should fail for corrupted snapshot");
+        assert!(verify_result.unwrap_err().to_string().contains("checksum mismatch"));
+
+        // Load should fail
+        let load_result = load_snapshot(&temp);
+        assert!(load_result.is_err(), "Load should fail for corrupted snapshot");
+        assert!(load_result.unwrap_err().to_string().contains("checksum mismatch"));
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_legacy_snapshot_without_checksum() {
+        let temp = std::env::temp_dir().join("icn-snapshot-legacy");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        // Create snapshot manually without checksum
+        let snapshot = StateSnapshot::new();
+        let json = serde_json::to_vec_pretty(&snapshot).unwrap();
+        std::fs::write(snapshot_path(&temp), json).unwrap();
+
+        // Verify should fail (checksum missing)
+        let verify_result = verify_snapshot(&temp);
+        assert!(verify_result.is_err());
+        assert!(verify_result.unwrap_err().to_string().contains("Checksum file does not exist"));
+
+        // But load should still succeed (backward compatibility)
+        let loaded = load_snapshot(&temp).unwrap();
+        assert!(loaded.is_some(), "Legacy snapshots without checksums should still load");
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_delete_removes_checksum() {
+        let temp = std::env::temp_dir().join("icn-snapshot-delete-checksum");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Both files should exist
+        assert!(snapshot_path(&temp).exists());
+        assert!(checksum_path(&temp).exists());
+
+        // Delete should remove both
+        delete_snapshot(&temp).unwrap();
+        assert!(!snapshot_path(&temp).exists());
+        assert!(!checksum_path(&temp).exists());
 
         // Cleanup
         std::fs::remove_dir_all(&temp).unwrap();
