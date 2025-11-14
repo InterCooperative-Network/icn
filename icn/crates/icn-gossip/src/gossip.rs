@@ -1095,7 +1095,9 @@ impl GossipActor {
                     AccessControl::Public => "Public".to_string(),
                     AccessControl::TrustClass(tc) => format!("TrustClass:{:?}", tc),
                     AccessControl::Participants(dids) => {
-                        format!("Participants:{}", dids.len())
+                        // Serialize all participant DIDs to preserve access control
+                        let did_strs: Vec<String> = dids.iter().map(|d| d.to_string()).collect();
+                        format!("Participants:[{}]", did_strs.join(","))
                     }
                 };
 
@@ -1150,6 +1152,32 @@ impl GossipActor {
                 // For now, default to Known for all TrustClass variants
                 // A more sophisticated parser could distinguish Known/Partner/Federated
                 AccessControl::TrustClass(TrustClass::Known)
+            } else if topic_meta.access_control.starts_with("Participants:[") {
+                // Parse participant DIDs from "Participants:[did1,did2,...]" format
+                let dids_part = topic_meta.access_control
+                    .strip_prefix("Participants:[")
+                    .and_then(|s| s.strip_suffix("]"))
+                    .unwrap_or("");
+
+                if dids_part.is_empty() {
+                    // Empty participants list
+                    AccessControl::Participants(Vec::new())
+                } else {
+                    // Parse comma-separated DIDs
+                    let dids: Result<Vec<Did>> = dids_part
+                        .split(',')
+                        .map(|did_str| Did::from_str(did_str.trim())
+                            .context(format!("Failed to parse participant DID: {}", did_str)))
+                        .collect();
+
+                    match dids {
+                        Ok(dids) => AccessControl::Participants(dids),
+                        Err(e) => {
+                            warn!("Failed to parse Participants ACL: {}, defaulting to Public", e);
+                            AccessControl::Public
+                        }
+                    }
+                }
             } else {
                 // Default to Public for unknown ACL types
                 warn!("Unknown AccessControl: {}, defaulting to Public", topic_meta.access_control);
@@ -1178,15 +1206,22 @@ impl GossipActor {
 
         // Restore subscriptions
         for (topic, subs) in state.subscriptions {
+            // Warn if restoring subscriptions for a topic that wasn't in the snapshot
+            if !self.topics.contains_key(&topic) {
+                warn!("Restoring subscriptions for topic '{}' which was not in snapshot topics. \
+                       Topic may have been deleted or snapshot may be corrupted.", topic);
+            }
+
             for sub_str in subs {
                 let did = Did::from_str(&sub_str)
                     .context("Failed to parse DID from subscription")?;
 
+                // Ensure subscription list exists for this topic (create if missing)
+                let sub_list = self.subscriptions.entry(topic.clone()).or_insert_with(Vec::new);
+
                 // Add subscription without access control check (we trust persisted state)
-                if let Some(sub_list) = self.subscriptions.get_mut(&topic) {
-                    if !sub_list.contains(&did) {
-                        sub_list.push(did.clone());
-                    }
+                if !sub_list.contains(&did) {
+                    sub_list.push(did.clone());
                 }
             }
         }
@@ -2061,5 +2096,168 @@ mod tests {
         let result = gossip.subscribe("test:mixed", alice.clone());
         assert!(result.is_ok(), "Trust score check should pass before ACL check");
         assert!(gossip.is_subscribed("test:mixed", &alice));
+    }
+
+    #[test]
+    fn test_participants_acl_persistence() {
+        // Test that AccessControl::Participants preserves all DIDs across export/restore
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+        gossip.set_keypair(keypair);
+
+        // Create participant DIDs
+        let participant1 = KeyPair::generate().unwrap().did().clone();
+        let participant2 = KeyPair::generate().unwrap().did().clone();
+        let participant3 = KeyPair::generate().unwrap().did().clone();
+
+        // Create topic with Participants ACL
+        let topic = Topic {
+            name: "test:private".to_string(),
+            acl: AccessControl::Participants(vec![
+                participant1.clone(),
+                participant2.clone(),
+                participant3.clone(),
+            ]),
+            scope: crate::types::Scope::Global,
+            min_trust_threshold: None,
+            retention: std::time::Duration::from_secs(86400),
+            max_entries: 1000,
+        };
+        gossip.create_topic(topic);
+
+        // Export state
+        let state = gossip.export_state();
+
+        // Verify topic metadata was exported
+        let topic_meta = state.topics.get("test:private").unwrap();
+
+        // Verify ACL string format includes all DIDs
+        assert!(
+            topic_meta.access_control.starts_with("Participants:["),
+            "ACL should be serialized as Participants:[...], got: {}",
+            topic_meta.access_control
+        );
+        assert!(
+            topic_meta.access_control.contains(&participant1.to_string()),
+            "ACL should contain participant1"
+        );
+        assert!(
+            topic_meta.access_control.contains(&participant2.to_string()),
+            "ACL should contain participant2"
+        );
+        assert!(
+            topic_meta.access_control.contains(&participant3.to_string()),
+            "ACL should contain participant3"
+        );
+
+        // Create new gossip actor and restore state
+        let mut gossip2 = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+        gossip2.restore_state(state).unwrap();
+
+        // Verify the topic was restored
+        assert!(gossip2.topics.contains_key("test:private"));
+
+        // Verify the ACL was correctly restored with all participants
+        let restored_topic = gossip2.topics.get("test:private").unwrap();
+        if let AccessControl::Participants(participants) = &restored_topic.acl {
+            assert_eq!(participants.len(), 3, "Should have 3 participants");
+            assert!(
+                participants.contains(&participant1),
+                "Should contain participant1"
+            );
+            assert!(
+                participants.contains(&participant2),
+                "Should contain participant2"
+            );
+            assert!(
+                participants.contains(&participant3),
+                "Should contain participant3"
+            );
+        } else {
+            panic!("Expected AccessControl::Participants, got: {:?}", restored_topic.acl);
+        }
+    }
+
+    #[test]
+    fn test_subscription_restore_creates_missing_entries() {
+        // Test that restoring subscriptions doesn't silently drop them if the subscription
+        // list doesn't exist yet
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+        gossip.set_keypair(keypair.clone());
+
+        // Create topic and subscribe
+        let topic = Topic::new("test:sub".to_string(), AccessControl::Public);
+        gossip.create_topic(topic);
+        gossip.subscribe("test:sub", did.clone()).unwrap();
+
+        // Create another subscriber
+        let subscriber2 = KeyPair::generate().unwrap().did().clone();
+        gossip.subscribe("test:sub", subscriber2.clone()).unwrap();
+
+        // Export state
+        let state = gossip.export_state();
+
+        // Verify subscriptions were exported
+        assert!(state.subscriptions.contains_key("test:sub"));
+        let subs = state.subscriptions.get("test:sub").unwrap();
+        assert_eq!(subs.len(), 2, "Should have 2 subscriptions");
+
+        // Create new gossip actor and restore state
+        let mut gossip2 = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+        gossip2.restore_state(state).unwrap();
+
+        // Verify subscriptions were restored
+        assert!(gossip2.subscriptions.contains_key("test:sub"));
+        let restored_subs = gossip2.subscriptions.get("test:sub").unwrap();
+        assert_eq!(restored_subs.len(), 2, "Should have 2 subscriptions");
+        assert!(restored_subs.contains(&did), "Should contain original DID");
+        assert!(
+            restored_subs.contains(&subscriber2),
+            "Should contain subscriber2"
+        );
+    }
+
+    #[test]
+    fn test_subscription_restore_warns_on_missing_topic() {
+        // Test that restoring subscriptions for a topic that wasn't in the snapshot
+        // logs a warning but doesn't fail
+        use icn_snapshot::GossipState;
+        use std::collections::HashMap;
+
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
+
+        // Create state with subscription to a topic that doesn't exist
+        let mut subscriptions = HashMap::new();
+        subscriptions.insert(
+            "nonexistent:topic".to_string(),
+            vec![did.to_string()],
+        );
+
+        let state = GossipState {
+            vector_clock: HashMap::new(),
+            subscriptions,
+            topics: HashMap::new(), // No topics in snapshot
+        };
+
+        // Restore should succeed (with warning logged)
+        let result = gossip.restore_state(state);
+        assert!(result.is_ok(), "Restore should succeed despite missing topic");
+
+        // Verify subscription was still created
+        assert!(
+            gossip.subscriptions.contains_key("nonexistent:topic"),
+            "Subscription list should be created even if topic wasn't in snapshot"
+        );
+        let subs = gossip.subscriptions.get("nonexistent:topic").unwrap();
+        assert_eq!(subs.len(), 1);
+        assert!(subs.contains(&did));
     }
 }
