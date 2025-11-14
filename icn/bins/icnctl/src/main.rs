@@ -6,9 +6,12 @@ use icn_identity::{AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType};
 use icn_store::{SledStore, Store};
 use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
-use std::io::{self, Write};
+use sha2::{Digest, Sha256};
+use std::fs::File;
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tar::{Archive, Builder};
 use zeroize::Zeroizing;
 
 #[derive(Parser, Debug)]
@@ -55,6 +58,22 @@ enum Commands {
     /// Network operations (mDNS discovery, QUIC sessions)
     #[command(subcommand)]
     Network(NetworkCommands),
+
+    /// Backup data directory
+    Backup {
+        /// Output file path for backup archive
+        output: PathBuf,
+    },
+
+    /// Restore data directory from backup
+    Restore {
+        /// Input backup archive path
+        input: PathBuf,
+
+        /// Force restore even if data directory exists
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -348,6 +367,10 @@ async fn main() -> Result<()> {
         Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
+
+        Commands::Backup { output } => handle_backup_command(&data_dir, &output)?,
+
+        Commands::Restore { input, force } => handle_restore_command(&data_dir, &input, force)?,
     }
 
     Ok(())
@@ -1741,4 +1764,223 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
     }
 
     Ok(())
+}
+
+/// Backup metadata stored with the tarball
+#[derive(Debug, Serialize, Deserialize)]
+struct BackupMetadata {
+    /// ICN version (from Cargo.toml)
+    icn_version: String,
+    /// Timestamp when backup was created
+    created_at: u64,
+    /// SHA256 checksum of the data directory content
+    checksum: String,
+}
+
+fn handle_backup_command(data_dir: &PathBuf, output: &PathBuf) -> Result<()> {
+    // Check if data directory exists
+    if !data_dir.exists() {
+        bail!("Data directory does not exist: {}", data_dir.display());
+    }
+
+    println!("Creating backup of {}...", data_dir.display());
+
+    // Create output file
+    let output_file = File::create(output)
+        .with_context(|| format!("Failed to create backup file: {}", output.display()))?;
+
+    // Create tar archive builder
+    let mut tar_builder = Builder::new(output_file);
+
+    // Add data directory to tarball
+    println!("Archiving data directory...");
+    tar_builder
+        .append_dir_all(".", data_dir)
+        .context("Failed to archive data directory")?;
+
+    // Calculate checksum of the data directory
+    println!("Calculating checksum...");
+    let checksum = calculate_dir_checksum(data_dir)?;
+
+    // Create metadata
+    let metadata = BackupMetadata {
+        icn_version: env!("CARGO_PKG_VERSION").to_string(),
+        created_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs(),
+        checksum: checksum.clone(),
+    };
+
+    // Add metadata to tarball
+    let metadata_json = serde_json::to_string_pretty(&metadata)?;
+    let metadata_bytes = metadata_json.as_bytes();
+    let mut header = tar::Header::new_gnu();
+    header.set_size(metadata_bytes.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    tar_builder
+        .append_data(&mut header, "backup_metadata.json", metadata_bytes)
+        .context("Failed to add metadata to backup")?;
+
+    // Finish the tarball
+    tar_builder.finish().context("Failed to finalize backup")?;
+
+    println!("✓ Backup created successfully");
+    println!("  Output: {}", output.display());
+    println!("  ICN version: {}", metadata.icn_version);
+    println!("  Checksum: {}", checksum);
+    println!();
+    println!("IMPORTANT: Store this backup securely. It contains your identity keystore.");
+
+    Ok(())
+}
+
+fn handle_restore_command(data_dir: &PathBuf, input: &PathBuf, force: bool) -> Result<()> {
+    // Check if input backup file exists
+    if !input.exists() {
+        bail!("Backup file not found: {}", input.display());
+    }
+
+    // Check if data directory already exists
+    if data_dir.exists() && !force {
+        bail!(
+            "Data directory already exists: {}. Use --force to overwrite.",
+            data_dir.display()
+        );
+    }
+
+    println!("Restoring backup from {}...", input.display());
+
+    // Open the backup archive
+    let input_file = File::open(input)
+        .with_context(|| format!("Failed to open backup file: {}", input.display()))?;
+    let mut archive = Archive::new(input_file);
+
+    // Extract metadata first
+    println!("Reading backup metadata...");
+    let metadata = extract_backup_metadata(&mut archive, input)?;
+
+    println!("Backup information:");
+    println!("  ICN version: {}", metadata.icn_version);
+    println!(
+        "  Created: {}",
+        chrono::DateTime::from_timestamp(metadata.created_at as i64, 0)
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| "Unknown".to_string())
+    );
+    println!("  Checksum: {}", metadata.checksum);
+    println!();
+
+    // If force, backup existing data directory
+    if data_dir.exists() {
+        println!("Backing up existing data directory...");
+        let backup_dir = format!("{}.backup-{}", data_dir.display(), metadata.created_at);
+        std::fs::rename(data_dir, &backup_dir)
+            .with_context(|| format!("Failed to backup existing data directory"))?;
+        println!("  Existing data moved to: {}", backup_dir);
+    }
+
+    // Create data directory if it doesn't exist
+    std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
+
+    // Extract the archive (excluding metadata file)
+    println!("Extracting backup...");
+    let input_file = File::open(input)
+        .with_context(|| format!("Failed to reopen backup file: {}", input.display()))?;
+    let mut archive = Archive::new(input_file);
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+
+        // Skip the metadata file - we've already read it
+        if path.to_string_lossy() == "backup_metadata.json" {
+            continue;
+        }
+
+        entry.unpack_in(data_dir)?;
+    }
+
+    // Verify checksum
+    println!("Verifying checksum...");
+    let restored_checksum = calculate_dir_checksum(data_dir)?;
+    if restored_checksum != metadata.checksum {
+        bail!(
+            "Checksum mismatch! Expected: {}, Got: {}. Restore may be corrupted.",
+            metadata.checksum,
+            restored_checksum
+        );
+    }
+
+    println!("✓ Backup restored successfully");
+    println!("  Restored to: {}", data_dir.display());
+    println!("  Checksum verified: {}", restored_checksum);
+    println!();
+    println!("You can now use 'icnctl id show' to verify your restored identity.");
+
+    Ok(())
+}
+
+/// Calculate SHA256 checksum of all files in a directory
+fn calculate_dir_checksum(dir: &PathBuf) -> Result<String> {
+    use std::collections::BTreeMap;
+
+    let mut file_hashes: BTreeMap<String, String> = BTreeMap::new();
+
+    // Walk directory and hash each file
+    for entry in walkdir::WalkDir::new(dir)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if entry.file_type().is_file() {
+            let path = entry.path();
+            let relative_path = path
+                .strip_prefix(dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string();
+
+            // Read file and calculate hash
+            let mut file = File::open(path)
+                .with_context(|| format!("Failed to open file for hashing: {}", path.display()))?;
+            let mut hasher = Sha256::new();
+            std::io::copy(&mut file, &mut hasher)?;
+            let hash = format!("{:x}", hasher.finalize());
+
+            file_hashes.insert(relative_path, hash);
+        }
+    }
+
+    // Create combined hash of all file hashes
+    let mut combined_hasher = Sha256::new();
+    for (path, hash) in file_hashes {
+        combined_hasher.update(path.as_bytes());
+        combined_hasher.update(hash.as_bytes());
+    }
+
+    Ok(format!("{:x}", combined_hasher.finalize()))
+}
+
+/// Extract backup metadata from the archive
+fn extract_backup_metadata(_archive: &mut Archive<File>, input: &PathBuf) -> Result<BackupMetadata> {
+    // Re-open to read metadata
+    let input_file = File::open(input)
+        .with_context(|| format!("Failed to reopen backup file: {}", input.display()))?;
+    let mut archive = Archive::new(input_file);
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+
+        if path.to_string_lossy() == "backup_metadata.json" {
+            let mut metadata_json = String::new();
+            entry.read_to_string(&mut metadata_json)?;
+            let metadata: BackupMetadata = serde_json::from_str(&metadata_json)
+                .context("Failed to parse backup metadata")?;
+            return Ok(metadata);
+        }
+    }
+
+    bail!("Backup metadata not found in archive. This may not be a valid ICN backup.");
 }

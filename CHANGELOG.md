@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Operational Hardening: Backup & Restore (Track B1) (2025-01-14)
+
+**Backup & Recovery Commands:**
+- `icnctl backup <output>` - Create encrypted tarball backup of ICN data directory
+- `icnctl restore <input>` - Restore ICN data directory from backup
+- `icnctl restore <input> --force` - Overwrite existing data directory (backs up old data first)
+
+**Backup Features:**
+- **Complete data directory backup:** Identity keystore, DID Document, rotation chain, trust graph, ledger database
+- **Integrity verification:** SHA256 checksums of all files ensure backup integrity
+- **Metadata tracking:** ICN version, timestamp, checksum stored in `backup_metadata.json`
+- **Automatic verification:** Restore validates checksum matches backup
+
+**Production-Ready:**
+- Tarball format (standard `.tar` archives)
+- Preserves file permissions and structure
+- Safe restore with existing directory protection
+- Comprehensive error handling
+
+**Test Coverage:**
+- 4 integration tests:
+  - Full backup/restore roundtrip
+  - Backup of nonexistent directory (error handling)
+  - Restore without --force fails on existing directory
+  - Restore with --force creates backup of old data
+
+**Documentation:**
+- New guide: `docs/backup-and-recovery.md`
+  - Best practices for regular backups
+  - Secure storage recommendations (3-2-1 rule)
+  - Recovery scenarios (lost device, corrupted data, migration)
+  - Troubleshooting guide
+
+**Use Cases:**
+- Regular backups after identity changes
+- Device migration
+- Disaster recovery
+- Identity preservation before upgrades
+
 ### Added - Multi-Device Identity & Sync (Phase 11) (2025-01-14)
 
 **Multi-Device Support:**

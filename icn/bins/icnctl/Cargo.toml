@@ -22,6 +22,9 @@ sha2 = "0.10"
 hex = "0.4"
 rand.workspace = true
 x25519-dalek.workspace = true
+tar = "0.4"
+walkdir = "2.4"
+chrono = "0.4"
 
 # ICN crates
 icn-core.workspace = true
@@ -32,3 +35,6 @@ icn-obs.workspace = true
 icn-rpc.workspace = true
 icn-ccl.workspace = true
 icn-ledger.workspace = true
+
+[dev-dependencies]
+tempfile = "3.8"
