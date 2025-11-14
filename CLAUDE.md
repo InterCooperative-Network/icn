@@ -276,17 +276,19 @@ let result = runtime.invoke_rule(&contract, "record_service", args, &sender_did)
 - **Security**: Passphrase uses `Zeroizing<Vec<u8>>` to prevent memory recovery
 - Key rotation supported with transition records
 
-**Keystore Format Migration (v1 → v2):**
+**Keystore Format Migration (v1 → v2.1):**
 - **v1 format**: Contains only Ed25519 keypair (legacy)
-- **v2 format**: Includes keypair + TLS certificate + DID-TLS binding signature
-- **Auto-migration**: v1 keystores automatically upgrade to v2 on first unlock
-- **TLS persistence**: TLS certificates are persisted to disk during migration (as of 2025-01-13)
+- **v2 format**: Adds TLS certificate + DID-TLS binding signature
+- **v2.1 format**: Adds X25519 keys for end-to-end encryption (current)
+- **Auto-migration**: v1/v2 keystores automatically upgrade to v2.1 on first unlock
+- **TLS & X25519 persistence**: Certificates and encryption keys persisted to disk
 - **Migration behavior**:
-  1. When unlocking a v1 keystore, system generates `IdentityBundle` with TLS binding
-  2. Immediately saves upgraded v2 keystore to disk with `encrypt_and_save()`
-  3. Subsequent unlocks use persisted TLS certificate (stable across restarts)
-  4. Log message: "✅ Successfully migrated and saved v2 keystore with persistent TLS binding"
-- **Test coverage**: `test_v1_to_v2_migration_persists_tls()` verifies TLS persistence
+  1. v1 → v2.1: Generates `IdentityBundle` with TLS binding + X25519 keys
+  2. v2 → v2.1: Reuses TLS binding, generates new X25519 keys
+  3. Immediately saves upgraded keystore to disk with `encrypt_and_save()`
+  4. Subsequent unlocks use persisted TLS and X25519 keys (stable across restarts)
+  5. Log message: "✅ Successfully migrated and saved v2.1 keystore with persistent TLS binding and X25519 keys"
+- **Test coverage**: `test_v1_to_v2_migration_persists_tls()` verifies persistence
 
 **icnctl commands**:
 ```bash
@@ -309,6 +311,22 @@ icnctl id import backup.age
 - Initialize in supervisor: `icn_obs::init_metrics()`, `icn_obs::start_metrics_server(9090)`
 
 ## Current Phase
+
+**Phase 10 - End-to-End Payload Encryption (Complete ✓)** (2025-01-13):
+- [x] EncryptedEnvelope with X25519-ChaCha20-Poly1305 AEAD encryption
+- [x] X25519 keys added to IdentityBundle (generation + persistence)
+- [x] Keystore v2.1 format with X25519 key storage and auto-migration
+- [x] Bidirectional X25519 public key exchange via Hello protocol
+- [x] NetworkActor stores and provides peer X25519 keys
+- [x] Full encrypt → sign → send → receive → verify → decrypt flow
+- [x] Network integration test validating complete message flow
+- [x] All 261 tests pass (7 new encryption tests)
+- [x] Comprehensive dev journal: `docs/dev-journal/2025-11-13-payload-encryption.md`
+
+**Three-Layer Security Architecture (Production Ready ✅)**:
+1. **Transport Layer**: QUIC/TLS with DID-TLS binding
+2. **Message Layer**: SignedEnvelope with Ed25519 signatures + replay protection
+3. **Application Layer**: EncryptedEnvelope with end-to-end encryption
 
 **Gossip Message Authentication (Complete ✓)** (2025-11-13):
 - [x] Migrated all gossip messages to SignedEnvelope
