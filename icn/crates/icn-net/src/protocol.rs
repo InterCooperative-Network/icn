@@ -11,6 +11,12 @@ use serde::{Deserialize, Serialize};
 /// Network protocol version
 pub const PROTOCOL_VERSION: u32 = 1;
 
+/// Minimum supported protocol version (for backward compatibility)
+pub const MIN_SUPPORTED_VERSION: u32 = 1;
+
+/// Maximum supported protocol version (for forward compatibility)
+pub const MAX_SUPPORTED_VERSION: u32 = 1;
+
 /// Maximum message size (10MB)
 pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 
@@ -177,7 +183,37 @@ impl NetworkMessage {
             );
         }
 
-        bincode::deserialize(bytes).context("Failed to deserialize network message")
+        let msg: NetworkMessage = bincode::deserialize(bytes)
+            .context("Failed to deserialize network message")?;
+
+        // Validate protocol version
+        Self::validate_version(msg.version)?;
+
+        Ok(msg)
+    }
+
+    /// Validate protocol version compatibility
+    ///
+    /// Returns Ok if the version is supported, Err otherwise.
+    /// This allows for backward and forward compatibility within a version range.
+    pub fn validate_version(version: u32) -> Result<()> {
+        if version < MIN_SUPPORTED_VERSION {
+            anyhow::bail!(
+                "Protocol version {} is too old (minimum supported: {})",
+                version,
+                MIN_SUPPORTED_VERSION
+            );
+        }
+
+        if version > MAX_SUPPORTED_VERSION {
+            anyhow::bail!(
+                "Protocol version {} is too new (maximum supported: {}). Please upgrade ICNd.",
+                version,
+                MAX_SUPPORTED_VERSION
+            );
+        }
+
+        Ok(())
     }
 
     /// Check if this message is for a specific DID
@@ -417,5 +453,48 @@ mod tests {
         } else {
             panic!("Expected Subscribe payload");
         }
+    }
+
+    #[test]
+    fn test_version_validation_current() {
+        // Current version should be accepted
+        assert!(NetworkMessage::validate_version(PROTOCOL_VERSION).is_ok());
+    }
+
+    #[test]
+    fn test_version_validation_too_old() {
+        // Version 0 should be rejected (too old)
+        let result = NetworkMessage::validate_version(MIN_SUPPORTED_VERSION - 1);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("too old"));
+    }
+
+    #[test]
+    fn test_version_validation_too_new() {
+        // Future version should be rejected (too new)
+        let result = NetworkMessage::validate_version(MAX_SUPPORTED_VERSION + 1);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("too new"));
+    }
+
+    #[test]
+    fn test_message_with_invalid_version_rejected() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a message with invalid version
+        let mut msg = NetworkMessage::ping(alice, bob);
+        msg.version = MAX_SUPPORTED_VERSION + 1;
+
+        // Serialize it
+        let bytes = bincode::serialize(&msg).unwrap();
+
+        // Deserialization should fail due to version check
+        let result = NetworkMessage::from_bytes(&bytes);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("too new"));
     }
 }

@@ -993,7 +993,20 @@ impl NetworkActor {
                             }
                         }
                         Err(e) => {
-                            warn!("Failed to read message: {}", e);
+                            let err_msg = e.to_string();
+
+                            // Track protocol version mismatches
+                            if err_msg.contains("too old") {
+                                warn!("Protocol version too old: {}", err_msg);
+                                icn_obs::metrics::network::protocol_version_too_old_inc();
+                                icn_obs::metrics::network::protocol_version_mismatch_inc();
+                            } else if err_msg.contains("too new") {
+                                warn!("Protocol version too new: {}", err_msg);
+                                icn_obs::metrics::network::protocol_version_too_new_inc();
+                                icn_obs::metrics::network::protocol_version_mismatch_inc();
+                            } else {
+                                warn!("Failed to read message: {}", e);
+                            }
                         }
                     }
 

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Operational Hardening: Protocol Version Validation (Track B1) (2025-01-14)
+
+**Versioned Network Protocol:**
+- Protocol version constants: `PROTOCOL_VERSION`, `MIN_SUPPORTED_VERSION`, `MAX_SUPPORTED_VERSION`
+- Automatic version validation on message deserialization
+- Backward compatibility within version range (v1-v1 currently)
+- Forward compatibility detection (rejects messages from future versions)
+
+**Version Mismatch Handling:**
+- Clear error messages for version incompatibility
+- Prometheus metrics for monitoring version issues:
+  - `icn_network_protocol_version_mismatch_total` - Total version mismatches
+  - `icn_network_protocol_version_too_old_total` - Messages from old versions
+  - `icn_network_protocol_version_too_new_total` - Messages from future versions
+- Network actor tracks and logs version mismatches
+
+**Upgrade Safety:**
+- Prevents communication between incompatible protocol versions
+- Protects against parsing errors from unknown message formats
+- Foundation for rolling upgrades in future versions
+
+**Implementation:**
+- Version validation in `icn-net/src/protocol.rs::NetworkMessage::from_bytes()`
+- Metrics tracking in `icn-net/src/actor.rs` message receive loop
+- 4 new unit tests for version validation scenarios
+
+**Future Work:**
+- Version negotiation handshake for compatibility announcements
+- Graceful degradation for non-breaking changes
+- Version compatibility matrix for upgrade planning
+
 ### Added - Operational Hardening: Operations Guide (Track B1) (2025-01-14)
 
 **Comprehensive Operations Documentation:**

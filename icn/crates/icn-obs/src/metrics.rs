@@ -57,6 +57,18 @@ pub fn init_descriptions() {
         "icn_network_connections_rejected_by_class_total",
         "Total number of connections rejected by trust class"
     );
+    describe_counter!(
+        "icn_network_protocol_version_mismatch_total",
+        "Total number of messages rejected due to protocol version mismatch"
+    );
+    describe_counter!(
+        "icn_network_protocol_version_too_old_total",
+        "Total number of messages rejected because version is too old"
+    );
+    describe_counter!(
+        "icn_network_protocol_version_too_new_total",
+        "Total number of messages rejected because version is too new"
+    );
 
     // Topology metrics
     describe_gauge!(
@@ -394,6 +406,18 @@ pub mod network {
 
         counter!("icn_network_connections_rejected_by_class_total", "class" => trust_class.to_string())
             .increment(1);
+    }
+
+    pub fn protocol_version_mismatch_inc() {
+        counter!("icn_network_protocol_version_mismatch_total").increment(1);
+    }
+
+    pub fn protocol_version_too_old_inc() {
+        counter!("icn_network_protocol_version_too_old_total").increment(1);
+    }
+
+    pub fn protocol_version_too_new_inc() {
+        counter!("icn_network_protocol_version_too_new_total").increment(1);
     }
 }
 
