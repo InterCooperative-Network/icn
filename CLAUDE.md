@@ -315,6 +315,31 @@ icnctl id import backup.age
 
 ## Current Phase
 
+**Track B1 - Operational Hardening (In Progress ⏳)** (2025-01-14):
+- [x] Backup & Restore - `icnctl backup/restore` commands with encrypted tarballs
+- [x] Monitoring Dashboard - Real-time web UI + health check endpoint
+- [x] Incident Response Playbook - Comprehensive procedures for 7 major incident types
+- [x] Operations Guide - Day-to-day workflows, command reference, troubleshooting
+- [x] Protocol Version Validation - Automatic version checks with metrics
+- [ ] Version Negotiation Handshake - Capability announcements (future)
+- [ ] Graceful Restart - State persistence across daemon restarts (future)
+- [ ] Schema Migrations - `icnctl migrate` for data format changes (future)
+
+**Operational Capabilities (Production Ready ✅)**:
+- **Backup/Restore**: Encrypted backup bundles (keystore + store + config)
+- **Monitoring**: Prometheus metrics + real-time dashboard (`:8080/`)
+- **Health Checks**: JSON endpoint for external monitoring (`:8080/health`)
+- **Incident Response**: 7 detailed procedures (node compromise, ledger corruption, key theft, etc.)
+- **Operations Guide**: 800+ lines covering daily/weekly/monthly tasks, troubleshooting
+- **Protocol Versioning**: Version validation prevents incompatible node communication
+
+**Next Steps:**
+- Complete Track B1 implementation features (graceful restart, migrations)
+- Phase 12: Economic Safety Rails (dynamic credit limits, dispute resolution)
+- Track C: Pilot Community Selection & Deployment
+
+---
+
 **Phase 11 - Multi-Device Identity & Sync (Complete ✓)** (2025-01-14):
 - [x] DID Document v2 with multi-device support
 - [x] VerificationMethod with capability-based permissions
