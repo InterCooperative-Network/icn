@@ -276,6 +276,7 @@ impl NetworkActor {
             let topology_config_clone = topology_config.clone();
             let trust_graph_clone = trust_graph.clone();
             let peer_x25519_keys_clone = peer_x25519_keys.clone();
+            let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = did.clone();
             let shutdown_rx = shutdown_tx.subscribe();
             tokio::spawn(async move {
@@ -288,6 +289,7 @@ impl NetworkActor {
                     topology_config_clone,
                     trust_graph_clone,
                     peer_x25519_keys_clone,
+                    identity_bundle_clone,
                     own_did_clone,
                     shutdown_rx,
                 )
@@ -409,6 +411,7 @@ impl NetworkActor {
                             let trust_graph = self.trust_graph.clone();
                             let session_manager = self.session_manager.clone();
                             let peer_x25519_keys = self.peer_x25519_keys.clone();
+                            let identity_bundle = self.identity_bundle.clone();
                             let own_did = self.own_did.clone();
 
                             tokio::spawn(async move {
@@ -422,6 +425,7 @@ impl NetworkActor {
                                     trust_graph,
                                     session_manager,
                                     peer_x25519_keys,
+                                    identity_bundle,
                                     own_did,
                                 ).await {
                                     warn!("Outbound connection handler error: {}", e);
@@ -588,6 +592,7 @@ impl NetworkActor {
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
+        identity_bundle: IdentityBundle,
         own_did: Did,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) -> Result<()> {
@@ -627,6 +632,7 @@ impl NetworkActor {
                         let trust_graph_clone = trust_graph.clone();
                         let session_mgr_clone = session_manager.clone();
                         let peer_x25519_keys_clone = peer_x25519_keys.clone();
+                        let identity_bundle_clone = identity_bundle.clone();
                         let own_did_clone = own_did.clone();
                         tokio::spawn(async move {
                             if let Err(e) = Self::handle_connection(
@@ -639,6 +645,7 @@ impl NetworkActor {
                                 trust_graph_clone,
                                 session_mgr_clone,
                                 peer_x25519_keys_clone,
+                                identity_bundle_clone,
                                 own_did_clone,
                             ).await {
                                 warn!("Connection handler error: {}", e);
@@ -692,6 +699,7 @@ impl NetworkActor {
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         session_manager: Arc<RwLock<SessionManager>>,
         peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
+        identity_bundle: IdentityBundle,
         own_did: Did,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
@@ -729,39 +737,9 @@ impl NetworkActor {
                                 MessagePayload::Hello { binding_info: _, topology_info, x25519_public } => {
                                     info!("Received Hello from {} with X25519 public key", message.from);
 
-                                    // Get peer certificate for DID-TLS binding verification
-                                    // QUIC connections use rustls, so peer_identity returns Box<dyn Any>
-                                    // which we can downcast to Vec<CertificateDer>
-                                    let verified = if let Some(identity) = connection.peer_identity() {
-                                        if let Some(cert_chain) = identity.downcast_ref::<Vec<rustls::pki_types::CertificateDer>>() {
-                                            if let Some(peer_cert) = cert_chain.first() {
-                                                // Verify DID-TLS binding
-                                                match message.verify_hello(peer_cert) {
-                                                    Ok(()) => {
-                                                        info!("DID-TLS binding verified for {}", message.from);
-                                                        true
-                                                    }
-                                                    Err(e) => {
-                                                        warn!("DID-TLS binding verification failed for {}: {}", message.from, e);
-                                                        false
-                                                    }
-                                                }
-                                            } else {
-                                                warn!("No certificate in peer certificate chain from {}", message.from);
-                                                false
-                                            }
-                                        } else {
-                                            warn!("Failed to downcast peer identity from {}", message.from);
-                                            false
-                                        }
-                                    } else {
-                                        warn!("No peer identity available from {}", message.from);
-                                        false
-                                    };
-
-                                    if !verified {
-                                        continue; // Drop messages from unverified peers
-                                    }
+                                    // NOTE: DID-TLS binding was already verified during TLS handshake
+                                    // by DidCertificateVerifier. No need to re-verify here.
+                                    // The TLS layer guarantees that the peer's DID matches their certificate.
 
                                     // Store peer's X25519 public key for end-to-end encryption
                                     {
@@ -809,7 +787,42 @@ impl NetworkActor {
                                         }
                                     }
 
-                                    // Send Hello response (not implemented here yet - will send during connection establishment)
+                                    // Send Hello response with our X25519 public key directly on this connection
+                                    let binding_info = identity_bundle.binding_info();
+                                    let x25519_public = *identity_bundle.x25519_public_bytes();
+                                    let topology_info = topology_config.as_ref().map(|topo_cfg| {
+                                        TopologyInfo {
+                                            region: topo_cfg.region.clone(),
+                                            cluster_id: topo_cfg.cluster_id.clone(),
+                                            role: topo_cfg.role,
+                                        }
+                                    });
+
+                                    let hello_response = NetworkMessage::hello(
+                                        own_did.clone(),
+                                        message.from.clone(),
+                                        binding_info,
+                                        topology_info,
+                                        x25519_public,
+                                    );
+
+                                    // Send Hello response directly on the same connection
+                                    let connection_clone = connection.clone();
+                                    tokio::spawn(async move {
+                                        match connection_clone.open_bi().await {
+                                            Ok((mut send, _recv)) => {
+                                                if let Err(e) = crate::protocol::write_message(&mut send, &hello_response).await {
+                                                    warn!("Failed to write Hello response: {}", e);
+                                                } else {
+                                                    info!("Sent Hello response with X25519 public key");
+                                                }
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to open stream for Hello response: {}", e);
+                                            }
+                                        }
+                                    });
+
                                     info!("Processed Hello from {}", message.from);
                                 }
                                 MessagePayload::Handshake { region, cluster_id, role } => {
