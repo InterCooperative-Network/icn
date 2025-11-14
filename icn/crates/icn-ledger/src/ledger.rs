@@ -11,7 +11,7 @@ use icn_identity::Did;
 use icn_store::Store;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, warn, instrument};
 
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
@@ -62,6 +62,7 @@ impl Ledger {
     }
 
     /// Append a journal entry to the ledger
+    #[instrument(skip(self, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), account_count = entry.accounts.len()))]
     pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
         // Validate the entry has a hash
         let hash = entry
@@ -110,6 +111,7 @@ impl Ledger {
     }
 
     /// Publish a journal entry to gossip for distributed synchronization
+    #[instrument(skip(self, gossip, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string())))]
     fn publish_to_gossip(&self, gossip: &GossipHandle, entry: &JournalEntry) -> Result<()> {
         use crate::sync::ledger_topic;
 
@@ -148,6 +150,11 @@ impl Ledger {
     }
 
     /// Handle an incoming sync message from gossip
+    #[instrument(skip(self, msg), fields(message_type = match &msg {
+        LedgerSyncMessage::NewEntry { .. } => "NewEntry",
+        LedgerSyncMessage::RequestEntry { .. } => "RequestEntry",
+        LedgerSyncMessage::EntryResponse { .. } => "EntryResponse",
+    }))]
     pub fn handle_sync_message(&mut self, msg: LedgerSyncMessage) -> Result<()> {
         match msg {
             LedgerSyncMessage::NewEntry { hash, mut entry } => {

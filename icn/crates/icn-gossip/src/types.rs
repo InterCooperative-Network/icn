@@ -163,6 +163,23 @@ pub enum GossipMessage {
     },
 }
 
+impl GossipMessage {
+    /// Get the variant name for logging and tracing
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            GossipMessage::Announce { .. } => "Announce",
+            GossipMessage::Request { .. } => "Request",
+            GossipMessage::Response { .. } => "Response",
+            GossipMessage::RequestBloomFilter { .. } => "RequestBloomFilter",
+            GossipMessage::SendBloomFilter { .. } => "SendBloomFilter",
+            GossipMessage::RequestMissing { .. } => "RequestMissing",
+            GossipMessage::Digest { .. } => "Digest",
+            GossipMessage::PullRequest { .. } => "PullRequest",
+            GossipMessage::PullResponse { .. } => "PullResponse",
+        }
+    }
+}
+
 /// Serialized bloom filter data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BloomFilterData {

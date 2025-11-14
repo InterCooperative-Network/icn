@@ -13,7 +13,7 @@ use icn_identity::KeyPair;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{info, warn};
+use tracing::{info, warn, instrument};
 
 use crate::{
     protocol::{NetworkMessage, read_message, write_message, MessagePayload},
@@ -594,6 +594,7 @@ impl NetworkActor {
     }
 
     /// Send a message to a specific peer
+    #[instrument(skip(self, message), fields(peer_did = %did, message_type = message.payload.variant_name()))]
     async fn send_message_to_peer(&self, did: &Did, message: NetworkMessage) -> Result<()> {
         // Timeout for the entire send operation (10 seconds)
         const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -643,6 +644,7 @@ impl NetworkActor {
     }
 
     /// Broadcast a message to all connected peers
+    #[instrument(skip(self, message), fields(message_type = message.payload.variant_name()))]
     async fn broadcast_message(&self, message: NetworkMessage) -> Result<()> {
         // Timeout for each peer send operation (5 seconds)
         const PEER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -784,6 +786,7 @@ impl NetworkActor {
     }
 
     /// Handle a single QUIC connection (process all incoming streams)
+    #[instrument(skip_all, fields(remote_addr = %connection.remote_address()))]
     async fn handle_connection(
         connection: quinn::Connection,
         handler: IncomingMessageHandler,

@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, warn, instrument};
 
 /// Callback for sending gossip messages to peers
 /// Parameters: (recipient_did, message)
@@ -554,6 +554,7 @@ impl GossipActor {
     }
 
     /// Handle incoming gossip message from network
+    #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]
     pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         match message {
             GossipMessage::Announce { hash, author, clock: _, topic } => {
