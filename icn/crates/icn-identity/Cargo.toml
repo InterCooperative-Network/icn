@@ -8,6 +8,7 @@ tokio.workspace = true
 ed25519-dalek.workspace = true
 x25519-dalek.workspace = true
 rand_core.workspace = true
+rand.workspace = true
 zeroize.workspace = true
 serde.workspace = true
 anyhow.workspace = true

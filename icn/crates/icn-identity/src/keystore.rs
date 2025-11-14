@@ -49,7 +49,7 @@ pub enum RotationReason {
     Manual,
 }
 
-/// Serialized key material (v2 format with optional TLS binding)
+/// Serialized key material (v2 format with optional TLS binding + X25519 encryption keys)
 #[derive(Serialize, Deserialize, Zeroize)]
 #[zeroize(drop)]
 struct StoredKey {
@@ -66,6 +66,12 @@ struct StoredKey {
     tls_binding_sig: Option<Vec<u8>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     created_at: Option<u64>,
+
+    // X25519 encryption keys (v2.1 addition)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    x25519_secret: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    x25519_public: Option<[u8; 32]>,
 }
 
 /// Age-encrypted key storage
@@ -119,6 +125,8 @@ impl AgeKeyStore {
             tls_key_der: Some(identity_bundle.tls_key_der_bytes().to_vec()),
             tls_binding_sig: Some(identity_bundle.binding_info().tls_binding_sig.clone()),
             created_at: Some(identity_bundle.binding_info().created_at),
+            x25519_secret: Some(identity_bundle.x25519_secret_bytes().to_vec()),
+            x25519_public: Some(*identity_bundle.x25519_public_bytes()),
         };
 
         Self::encrypt_and_save(&path, &stored, passphrase)?;
@@ -219,32 +227,72 @@ impl KeyStore for AgeKeyStore {
         // Reconstruct keypair from stored bytes
         let keypair = KeyPair::from_bytes(&stored.secret_bytes, &stored.public_bytes)?;
 
-        // Check if we have TLS binding info (v2 keystore)
+        // Check if we have TLS binding info (v2+ keystore)
         let identity_bundle = if let (Some(tls_cert_der), Some(tls_key_der), Some(tls_binding_sig), Some(created_at)) =
             (stored.tls_cert_der.clone(), stored.tls_key_der.clone(), stored.tls_binding_sig.clone(), stored.created_at) {
-            // V2 keystore: reconstruct IdentityBundle from stored TLS data
-            info!("Unlocked v2 keystore with DID-TLS binding: {}", keypair.did());
+
+            // Check if we have X25519 keys (v2.1+)
+            let (x25519_secret, x25519_public) = if let (Some(secret), Some(public)) =
+                (stored.x25519_secret.clone(), stored.x25519_public) {
+                // V2.1+ keystore: has X25519 keys
+                info!("Unlocked v2.1+ keystore with DID-TLS binding and X25519 keys: {}", keypair.did());
+                (secret, public)
+            } else {
+                // V2.0 keystore: has TLS but no X25519, generate new X25519 keys
+                info!("Unlocked v2.0 keystore (upgrading to v2.1 with X25519 keys): {}", keypair.did());
+                warn!("⚠️  Generating X25519 encryption keys for v2.1 upgrade");
+
+                // Generate X25519 keys and save upgraded keystore
+                use rand::rngs::OsRng;
+                use x25519_dalek::{PublicKey, StaticSecret};
+
+                let secret_key = StaticSecret::random_from_rng(OsRng);
+                let public_key = PublicKey::from(&secret_key);
+                let secret_bytes = secret_key.to_bytes().to_vec();
+                let public_bytes = public_key.to_bytes();
+
+                // Save upgraded keystore
+                let stored_v21 = StoredKey {
+                    secret_bytes: stored.secret_bytes,
+                    public_bytes: stored.public_bytes,
+                    did: stored.did.clone(),
+                    tls_cert_der: stored.tls_cert_der.clone(),
+                    tls_key_der: stored.tls_key_der.clone(),
+                    tls_binding_sig: stored.tls_binding_sig.clone(),
+                    created_at: stored.created_at,
+                    x25519_secret: Some(secret_bytes.clone()),
+                    x25519_public: Some(public_bytes),
+                };
+
+                Self::encrypt_and_save(&self.path, &stored_v21, passphrase)
+                    .context("Failed to save upgraded v2.1 keystore")?;
+
+                info!("✅ Successfully upgraded to v2.1 keystore with X25519 encryption keys");
+
+                (secret_bytes, public_bytes)
+            };
 
             // Reconstruct IdentityBundle using the stored data
-            // We need to access the private fields, so we'll use the from_stored method
             IdentityBundle::from_stored(
                 keypair,
                 tls_cert_der,
                 tls_key_der,
                 tls_binding_sig,
                 created_at,
+                x25519_secret,
+                x25519_public,
             )?
         } else {
-            // V1 keystore: generate new TLS certificate and binding
-            info!("Unlocked v1 keystore: {} (generating DID-TLS binding)", keypair.did());
-            warn!("⚠️  Migrating v1 keystore to v2 format with DID-TLS binding");
+            // V1 keystore: generate new TLS certificate and binding + X25519 keys
+            info!("Unlocked v1 keystore: {} (generating DID-TLS binding and X25519 keys)", keypair.did());
+            warn!("⚠️  Migrating v1 keystore to v2.1 format with DID-TLS binding and X25519 encryption");
 
-            // Generate new IdentityBundle from the keypair
+            // Generate new IdentityBundle from the keypair (includes X25519 keys)
             let bundle = IdentityBundle::from_keypair(keypair.clone())?;
 
-            // Auto-save the upgraded keystore with TLS binding
-            // This ensures TLS certificates persist across restarts
-            let stored_v2 = StoredKey {
+            // Auto-save the upgraded keystore with TLS binding and X25519 keys
+            // This ensures TLS certificates and encryption keys persist across restarts
+            let stored_v21 = StoredKey {
                 secret_bytes: *keypair.secret_bytes(),
                 public_bytes: keypair.verifying_key().to_bytes(),
                 did: bundle.did().as_str().to_string(),
@@ -252,12 +300,14 @@ impl KeyStore for AgeKeyStore {
                 tls_key_der: Some(bundle.tls_key_der_bytes().to_vec()),
                 tls_binding_sig: Some(bundle.binding_info().tls_binding_sig.clone()),
                 created_at: Some(bundle.binding_info().created_at),
+                x25519_secret: Some(bundle.x25519_secret_bytes().to_vec()),
+                x25519_public: Some(*bundle.x25519_public_bytes()),
             };
 
-            Self::encrypt_and_save(&self.path, &stored_v2, passphrase)
-                .context("Failed to save upgraded v2 keystore")?;
+            Self::encrypt_and_save(&self.path, &stored_v21, passphrase)
+                .context("Failed to save upgraded v2.1 keystore")?;
 
-            info!("✅ Successfully migrated and saved v2 keystore with persistent TLS binding");
+            info!("✅ Successfully migrated and saved v2.1 keystore with persistent TLS binding and X25519 keys");
 
             bundle
         };
@@ -382,7 +432,7 @@ mod tests {
         let path = dir.path().join("keypair.age");
         let passphrase = b"test-passphrase";
 
-        // Create a v1 keystore manually (no TLS binding fields)
+        // Create a v1 keystore manually (no TLS binding fields, no X25519 keys)
         let keypair = KeyPair::generate().unwrap();
         let stored_v1 = StoredKey {
             secret_bytes: *keypair.secret_bytes(),
@@ -392,6 +442,8 @@ mod tests {
             tls_key_der: None,
             tls_binding_sig: None,
             created_at: None,
+            x25519_secret: None,
+            x25519_public: None,
         };
         AgeKeyStore::encrypt_and_save(&path, &stored_v1, passphrase).unwrap();
 

@@ -56,6 +56,9 @@ pub enum PayloadType {
     Rpc = 5,
     /// Network control message (ping, handshake, etc)
     Control = 6,
+    /// Encrypted payload (EncryptedEnvelope)
+    /// Contains end-to-end encrypted application data
+    Encrypted = 7,
 }
 
 impl SignedEnvelope {

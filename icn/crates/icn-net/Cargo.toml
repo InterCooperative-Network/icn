@@ -27,6 +27,9 @@ futures.workspace = true
 rcgen = "0.13"
 time = "0.3"
 ed25519-dalek.workspace = true
+x25519-dalek.workspace = true
+chacha20poly1305.workspace = true
+zeroize.workspace = true
 hostname = "0.4"
 x509-parser = "0.16"
 rand = "0.8"
@@ -34,3 +37,4 @@ rand = "0.8"
 [dev-dependencies]
 icn-store.workspace = true
 tracing-subscriber.workspace = true
+rand_core.workspace = true

@@ -11,11 +11,15 @@ use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
+use x25519_dalek::{PublicKey, StaticSecret};
+use zeroize::Zeroizing;
 
 /// Cryptographically bound identity bundle
 ///
 /// Combines a DID identity with a TLS certificate, proving that the holder
 /// of the TLS certificate also controls the DID's private key.
+///
+/// Also includes X25519 keys for end-to-end payload encryption.
 pub struct IdentityBundle {
     /// The DID for this identity
     did: Did,
@@ -35,6 +39,12 @@ pub struct IdentityBundle {
 
     /// Timestamp when binding was created (Unix epoch seconds)
     created_at: u64,
+
+    /// X25519 secret key for encryption (stored as bytes for cloning)
+    x25519_secret: Zeroizing<Vec<u8>>,
+
+    /// X25519 public key for encryption
+    x25519_public: [u8; 32],
 }
 
 impl Clone for IdentityBundle {
@@ -46,6 +56,8 @@ impl Clone for IdentityBundle {
             tls_key_der: self.tls_key_der.clone(),
             tls_binding_sig: self.tls_binding_sig.clone(),
             created_at: self.created_at,
+            x25519_secret: Zeroizing::new(self.x25519_secret.to_vec()),
+            x25519_public: self.x25519_public,
         }
     }
 }
@@ -75,7 +87,7 @@ impl IdentityBundle {
     /// Create identity bundle from an existing keypair
     ///
     /// This generates a new TLS certificate for the given keypair and creates
-    /// the cryptographic binding signature.
+    /// the cryptographic binding signature. Also generates X25519 keys for encryption.
     pub fn from_keypair(did_keypair: KeyPair) -> Result<Self> {
         let did = did_keypair.did().clone();
 
@@ -91,6 +103,9 @@ impl IdentityBundle {
             .context("System time before Unix epoch")?
             .as_secs();
 
+        // Generate X25519 keys for payload encryption
+        let (x25519_secret, x25519_public) = Self::generate_x25519_keypair();
+
         Ok(IdentityBundle {
             did,
             did_keypair,
@@ -98,6 +113,8 @@ impl IdentityBundle {
             tls_key_der,
             tls_binding_sig,
             created_at,
+            x25519_secret,
+            x25519_public,
         })
     }
 
@@ -111,6 +128,8 @@ impl IdentityBundle {
         tls_key_der: Vec<u8>,
         tls_binding_sig: Vec<u8>,
         created_at: u64,
+        x25519_secret_bytes: Vec<u8>,
+        x25519_public_bytes: [u8; 32],
     ) -> Result<Self> {
         let did = did_keypair.did().clone();
         let tls_cert = CertificateDer::from(tls_cert_der);
@@ -133,6 +152,8 @@ impl IdentityBundle {
             tls_key_der,
             tls_binding_sig,
             created_at,
+            x25519_secret: Zeroizing::new(x25519_secret_bytes),
+            x25519_public: x25519_public_bytes,
         })
     }
 
@@ -181,6 +202,29 @@ impl IdentityBundle {
     /// Get the raw TLS private key bytes (DER format)
     pub(crate) fn tls_key_der_bytes(&self) -> &[u8] {
         &self.tls_key_der
+    }
+
+    /// Get the X25519 secret key for encryption
+    pub fn x25519_secret(&self) -> StaticSecret {
+        // Reconstruct StaticSecret from bytes
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&self.x25519_secret[..32]);
+        StaticSecret::from(bytes)
+    }
+
+    /// Get the X25519 public key for encryption
+    pub fn x25519_public(&self) -> PublicKey {
+        PublicKey::from(self.x25519_public)
+    }
+
+    /// Get the raw X25519 secret key bytes
+    pub(crate) fn x25519_secret_bytes(&self) -> &[u8] {
+        &self.x25519_secret
+    }
+
+    /// Get the raw X25519 public key bytes
+    pub(crate) fn x25519_public_bytes(&self) -> &[u8; 32] {
+        &self.x25519_public
     }
 
     /// Get binding info for network transmission
@@ -234,6 +278,20 @@ impl IdentityBundle {
         let mut hasher = Sha256::new();
         hasher.update(cert.as_ref());
         hasher.finalize().into()
+    }
+
+    /// Generate a new X25519 keypair for encryption
+    fn generate_x25519_keypair() -> (Zeroizing<Vec<u8>>, [u8; 32]) {
+        use rand::rngs::OsRng;
+
+        let secret = StaticSecret::random_from_rng(OsRng);
+        let public = PublicKey::from(&secret);
+
+        // Store secret as bytes for serialization
+        let secret_bytes = Zeroizing::new(secret.to_bytes().to_vec());
+        let public_bytes = public.to_bytes();
+
+        (secret_bytes, public_bytes)
     }
 }
 

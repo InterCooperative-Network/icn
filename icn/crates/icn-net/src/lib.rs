@@ -2,6 +2,7 @@
 
 pub mod actor;
 pub mod discovery;
+pub mod encryption;
 pub mod envelope;
 pub mod global_rate_limit;
 pub mod protocol;
@@ -13,6 +14,7 @@ pub mod topology;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
 pub use discovery::{Discovery, PeerInfo};
+pub use encryption::EncryptedEnvelope;
 pub use envelope::{PayloadType, SignedEnvelope};
 pub use global_rate_limit::GlobalRateLimiter;
 pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};

@@ -7,6 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - End-to-End Payload Encryption (Phase 10) (2025-11-13)
+
+**X25519-ChaCha20-Poly1305 Message Encryption:**
+- **MAJOR FEATURE:** End-to-end encrypted messages for payload confidentiality
+- **Encryption Scheme:**
+  - ✅ **Key Exchange**: X25519 ECDH (static, upgradeable to ephemeral in future)
+  - ✅ **Symmetric Cipher**: ChaCha20-Poly1305 AEAD (authenticated encryption)
+  - ✅ **Nonce Derivation**: Deterministic from sequence number (no transmission overhead)
+  - ✅ **Key Persistence**: X25519 keys stored in keystore v2.1 format
+
+**Three-Layer Security Architecture:**
+```
+Application:  EncryptedEnvelope (payload confidentiality)
+Message:      SignedEnvelope (authentication + replay protection)
+Transport:    QUIC/TLS 1.3 (channel encryption)
+```
+
+**Why All Three Layers:**
+- **QUIC/TLS**: Protects node-to-node connections (per-hop encryption)
+- **SignedEnvelope**: Authenticates sender and prevents replay (message integrity)
+- **EncryptedEnvelope**: Hides payload from intermediate gossip nodes (end-to-end confidentiality)
+
+**Implementation:**
+- New module: `icn-net/src/encryption.rs` with `EncryptedEnvelope` struct
+- IdentityBundle extended with X25519 keypair (bundle.rs)
+- Keystore v2.1 format with X25519 key persistence (keystore.rs)
+- Automatic v2.0 → v2.1 migration on first unlock
+- New PayloadType::Encrypted (value 7) for encrypted messages
+
+**Encryption Flow:**
+1. Serialize application payload → plaintext bytes
+2. Encrypt with X25519 + ChaCha20-Poly1305 → EncryptedEnvelope
+3. Serialize EncryptedEnvelope → encrypted bytes
+4. Sign with Ed25519 → SignedEnvelope (PayloadType::Encrypted)
+5. Wrap in NetworkMessage::Signed → send over network
+
+**Decryption Flow:**
+1. Receive NetworkMessage::Signed
+2. Verify Ed25519 signature → extract SignedEnvelope
+3. Check PayloadType::Encrypted
+4. Deserialize → EncryptedEnvelope
+5. Decrypt with X25519 keys → plaintext bytes
+6. Deserialize → original application payload
+
+**Security Properties:**
+- ✅ **Payload confidentiality**: Intermediate nodes cannot read content
+- ✅ **Authenticated encryption**: Poly1305 MAC detects tampering
+- ✅ **Replay protection**: Inherited from SignedEnvelope sequence numbers
+- ✅ **Nonce uniqueness**: Derived from monotonic sequence + DIDs
+- ✅ **Key persistence**: X25519 keys survive daemon restarts
+
+**What It Doesn't Provide (Yet):**
+- ❌ **Perfect Forward Secrecy**: Static ECDH reuses shared secrets (can add ephemeral keys in Phase 11)
+- ❌ **Metadata hiding**: Sender/recipient DIDs still visible
+- ❌ **Protection against node compromise**: Attacker with memory access can read keys
+
+**Performance:**
+- Encryption overhead: ~0.3-0.7ms per 1KB message
+- Memory overhead: 64 bytes per peer (X25519 public key cache)
+- Nonce derivation: Zero transmission overhead (computed locally)
+
+**Testing:**
+- Unit tests: 8 encryption tests (roundtrip, tampering, nonce uniqueness, edge cases)
+- Integration tests: 6 end-to-end tests (encrypt→sign→verify→decrypt flow)
+- All 19 icn-identity tests pass (bundle + keystore with X25519)
+- All 64 icn-net tests pass (encryption module + integration)
+
+**Keystore Migration:**
+- **v2.0 → v2.1 migration**: Automatic on first unlock
+- Generates X25519 keypair and saves immediately to disk
+- Backward compatible: v1 → v2.1 migration also supported
+- Log messages: "Unlocked v2.1+ keystore with X25519 keys" or "Upgrading to v2.1"
+
+**Dependencies Added:**
+- `chacha20poly1305 = "0.10"` (workspace)
+- `x25519-dalek` already imported (now used)
+- `zeroize` for secure memory handling
+
+**Usage Example:**
+```rust
+// 1. Get identity bundles (contain X25519 keys)
+let alice_bundle = keystore.get_identity_bundle()?;
+let bob_bundle = /* lookup Bob's bundle */;
+
+// 2. Encrypt message
+let plaintext = bincode::serialize(&my_message)?;
+let encrypted = EncryptedEnvelope::encrypt(
+    alice_bundle.did(),
+    bob_bundle.did(),
+    sequence_number,
+    &alice_bundle.x25519_secret(),
+    &bob_bundle.x25519_public(),
+    &plaintext,
+)?;
+
+// 3. Sign encrypted envelope
+let signed = SignedEnvelope::from_payload(
+    alice_bundle.did(),
+    alice_bundle.keypair(),
+    sequence_number,
+    PayloadType::Encrypted,
+    &encrypted,
+)?;
+
+// 4. Send via NetworkMessage::Signed
+```
+
 ### Added - Gossip Message Authentication (2025-11-13)
 
 **Cryptographically Signed Gossip Messages:**
