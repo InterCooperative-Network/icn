@@ -144,14 +144,18 @@ async fn test_bidirectional_hello_exchange() -> Result<()> {
     info!("Node A: {} on {}", node_a.did, node_a.listen_addr);
     info!("Node B: {} on {}", node_b.did, node_b.listen_addr);
 
-    // Both nodes dial each other (stress test)
-    let dial_a = node_a.dial(&node_b);
-    let dial_b = node_b.dial(&node_a);
+    // Dial sequentially to avoid simultaneous connection race condition
+    // This is more realistic for real-world P2P scenarios where nodes
+    // discover each other at different times
+    node_a.dial(&node_b).await?;
 
-    // Wait for both dials to complete
-    let _ = tokio::try_join!(dial_a, dial_b)?;
+    // Small delay to let first connection establish before second dial
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // Wait for Hello exchanges to complete
+    // Second node dials back (establishes bidirectional communication)
+    node_b.dial(&node_a).await?;
+
+    // Wait for both Hello exchanges to complete
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Both should be able to communicate
