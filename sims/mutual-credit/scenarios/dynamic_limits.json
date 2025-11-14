@@ -1,0 +1,37 @@
+{
+  "name": "Dynamic Credit Limits",
+  "description": "Trust-gated credit limits with 2x multiplier to prevent gaming and reward trustworthiness.",
+  "parameters": {
+    "n_agents": 100,
+    "simulation_months": 12,
+    "seed": 42,
+    "credit_policy": {
+      "initial_limit": -20,
+      "max_limit": -200,
+      "growth_rate": 0.1,
+      "trust_multiplier": 2.0,
+      "demurrage_rate": 0.0,
+      "demurrage_threshold": 50,
+      "default_threshold": 100,
+      "default_period_days": 90,
+      "write_off_threshold": 200,
+      "ramp_period_months": 3,
+      "contribution_requirement": 10
+    },
+    "agent_type_distribution": {
+      "reciprocator": 0.65,
+      "hoarder": 0.15,
+      "free_rider": 0.08,
+      "opportunist": 0.07,
+      "super_contributor": 0.05
+    },
+    "trust_network_density": 0.6
+  },
+  "hypothesis": "Trust-based limits prevent opportunists from borrow-and-bail attacks",
+  "compare_to": "baseline",
+  "expected_outcomes": {
+    "default_rate": "lower than baseline",
+    "opportunist_success": "reduced exploitation",
+    "credit_limit_variance": "high (reflects trust differentiation)"
+  }
+}
