@@ -748,6 +748,22 @@ impl Supervisor {
 
                     info!("✅ State snapshot saved to {}/state.snapshot in {:.3}s",
                           data_dir.display(), save_duration.as_secs_f64());
+
+                    // Save timestamped backup for archival
+                    if let Err(e) = icn_snapshot::save_timestamped_snapshot(&snapshot, &data_dir) {
+                        warn!("Failed to save timestamped snapshot backup: {}", e);
+                    }
+
+                    // Cleanup old snapshots (keep last 3)
+                    match icn_snapshot::cleanup_old_snapshots(&data_dir, 3) {
+                        Ok(deleted) if deleted > 0 => {
+                            info!("Cleaned up {} old snapshot(s)", deleted);
+                        }
+                        Ok(_) => {},
+                        Err(e) => {
+                            warn!("Failed to cleanup old snapshots: {}", e);
+                        }
+                    }
                 }
                 Err(e) => {
                     icn_obs::metrics::snapshot::save_errors_inc();

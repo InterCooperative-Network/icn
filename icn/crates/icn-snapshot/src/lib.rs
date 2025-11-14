@@ -38,6 +38,9 @@ const SNAPSHOT_FILENAME: &str = "state.snapshot";
 /// Filename for snapshot checksum
 const CHECKSUM_FILENAME: &str = "state.snapshot.sha256";
 
+/// Default number of snapshots to keep
+const DEFAULT_SNAPSHOT_RETENTION: usize = 3;
+
 /// Complete state snapshot for graceful restart
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateSnapshot {
@@ -230,6 +233,101 @@ pub fn verify_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
             actual_checksum
         ));
     }
+
+    Ok(())
+}
+
+/// List all timestamped snapshots in data directory
+///
+/// Returns (filename, timestamp, size_bytes) sorted by timestamp (newest first)
+pub fn list_snapshots(data_dir: impl AsRef<Path>) -> Result<Vec<(String, u64, u64)>> {
+    let data_dir = data_dir.as_ref();
+
+    if !data_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut snapshots = Vec::new();
+
+    for entry in std::fs::read_dir(data_dir).context("Failed to read data directory")? {
+        let entry = entry.context("Failed to read directory entry")?;
+        let filename = entry.file_name();
+        let filename_str = filename.to_string_lossy();
+
+        // Match pattern: state.snapshot.{timestamp}
+        if filename_str.starts_with("state.snapshot.") && !filename_str.ends_with(".sha256") {
+            if let Some(timestamp_str) = filename_str.strip_prefix("state.snapshot.") {
+                if let Ok(timestamp) = timestamp_str.parse::<u64>() {
+                    let metadata = entry.metadata().context("Failed to read file metadata")?;
+                    snapshots.push((filename_str.to_string(), timestamp, metadata.len()));
+                }
+            }
+        }
+    }
+
+    // Sort by timestamp descending (newest first)
+    snapshots.sort_by(|a, b| b.1.cmp(&a.1));
+
+    Ok(snapshots)
+}
+
+/// Clean up old timestamped snapshots, keeping only the most recent N
+///
+/// This does NOT delete the primary snapshot (state.snapshot)
+pub fn cleanup_old_snapshots(data_dir: impl AsRef<Path>, keep_count: usize) -> Result<usize> {
+    let data_dir = data_dir.as_ref();
+    let snapshots = list_snapshots(data_dir)?;
+
+    if snapshots.len() <= keep_count {
+        return Ok(0);
+    }
+
+    let mut deleted_count = 0;
+
+    // Delete all snapshots beyond the keep_count
+    for (filename, _, _) in snapshots.iter().skip(keep_count) {
+        let snapshot_path = data_dir.join(filename);
+        let checksum_path = data_dir.join(format!("{}.sha256", filename));
+
+        // Delete snapshot file
+        if snapshot_path.exists() {
+            std::fs::remove_file(&snapshot_path)
+                .context(format!("Failed to delete snapshot: {}", filename))?;
+            deleted_count += 1;
+        }
+
+        // Delete associated checksum file
+        if checksum_path.exists() {
+            std::fs::remove_file(&checksum_path)
+                .context(format!("Failed to delete checksum: {}.sha256", filename))?;
+        }
+    }
+
+    Ok(deleted_count)
+}
+
+/// Save a timestamped backup snapshot in addition to the primary snapshot
+///
+/// Creates state.snapshot.{unix_timestamp} for archival purposes
+pub fn save_timestamped_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<Path>) -> Result<()> {
+    let data_dir = data_dir.as_ref();
+    let timestamp = snapshot.created_at;
+    let timestamped_filename = format!("state.snapshot.{}", timestamp);
+    let timestamped_path = data_dir.join(&timestamped_filename);
+    let timestamped_checksum_path = data_dir.join(format!("{}.sha256", timestamped_filename));
+
+    // Serialize to JSON
+    let json = serde_json::to_vec_pretty(snapshot)
+        .context("Failed to serialize snapshot")?;
+
+    // Compute SHA256 checksum
+    let checksum = compute_checksum(&json);
+
+    // Write timestamped snapshot
+    std::fs::write(&timestamped_path, &json)
+        .context("Failed to write timestamped snapshot")?;
+    std::fs::write(&timestamped_checksum_path, &checksum)
+        .context("Failed to write timestamped checksum")?;
 
     Ok(())
 }
@@ -463,6 +561,99 @@ mod tests {
         assert!(!checksum_path(&temp).exists());
 
         // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_list_snapshots_empty() {
+        let temp = std::env::temp_dir().join("icn-snapshot-list-empty");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshots = list_snapshots(&temp).unwrap();
+        assert_eq!(snapshots.len(), 0);
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_save_timestamped_snapshot() {
+        let temp = std::env::temp_dir().join("icn-snapshot-timestamped");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        let timestamp = snapshot.created_at;
+
+        save_timestamped_snapshot(&snapshot, &temp).unwrap();
+
+        // Verify timestamped snapshot was created
+        let expected_filename = format!("state.snapshot.{}", timestamp);
+        let expected_path = temp.join(&expected_filename);
+        let expected_checksum_path = temp.join(format!("{}.sha256", expected_filename));
+
+        assert!(expected_path.exists(), "Timestamped snapshot should exist");
+        assert!(expected_checksum_path.exists(), "Timestamped checksum should exist");
+
+        // Verify it appears in list
+        let snapshots = list_snapshots(&temp).unwrap();
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].0, expected_filename);
+        assert_eq!(snapshots[0].1, timestamp);
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_cleanup_old_snapshots() {
+        let temp = std::env::temp_dir().join("icn-snapshot-cleanup");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        // Create 5 timestamped snapshots with different timestamps
+        for i in 0..5 {
+            let mut snapshot = StateSnapshot::new();
+            snapshot.created_at = 1000 + i; // Increasing timestamps
+            save_timestamped_snapshot(&snapshot, &temp).unwrap();
+        }
+
+        // Verify all 5 exist
+        let snapshots = list_snapshots(&temp).unwrap();
+        assert_eq!(snapshots.len(), 5, "Should have 5 snapshots");
+
+        // Keep only 3 most recent
+        let deleted = cleanup_old_snapshots(&temp, 3).unwrap();
+        assert_eq!(deleted, 2, "Should delete 2 old snapshots");
+
+        // Verify only 3 remain
+        let snapshots = list_snapshots(&temp).unwrap();
+        assert_eq!(snapshots.len(), 3, "Should have 3 snapshots remaining");
+
+        // Verify the kept snapshots are the newest ones (1004, 1003, 1002)
+        assert_eq!(snapshots[0].1, 1004);
+        assert_eq!(snapshots[1].1, 1003);
+        assert_eq!(snapshots[2].1, 1002);
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_cleanup_no_deletion_when_under_limit() {
+        let temp = std::env::temp_dir().join("icn-snapshot-cleanup-under");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        // Create 2 snapshots
+        for i in 0..2 {
+            let mut snapshot = StateSnapshot::new();
+            snapshot.created_at = 1000 + i;
+            save_timestamped_snapshot(&snapshot, &temp).unwrap();
+        }
+
+        // Try to keep 3 (we only have 2)
+        let deleted = cleanup_old_snapshots(&temp, 3).unwrap();
+        assert_eq!(deleted, 0, "Should delete nothing when under limit");
+
+        // Verify both still exist
+        let snapshots = list_snapshots(&temp).unwrap();
+        assert_eq!(snapshots.len(), 2);
+
         std::fs::remove_dir_all(&temp).unwrap();
     }
 }
