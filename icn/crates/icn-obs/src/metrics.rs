@@ -69,7 +69,11 @@ pub fn init_descriptions() {
         "icn_network_protocol_version_too_new_total",
         "Total number of messages rejected because version is too new"
     );
-    describe_gauge!(
+    Verify this issue exists and fix it:
+
+    Breaking protocol change: The `version_info` field added to the `Hello` enum variant is a required field, which breaks backward compatibility with existing nodes that don't have this field in their serialized Hello messages. When an old node sends a Hello message without `version_info`, new nodes will fail to deserialize it, causing communication to fail. The field should be made optional (`Option<VersionInfo>`) or the PROTOCOL_VERSION should be bumped to 2 to properly handle the version migration. @protocol.rs (62-72) Verify this issue exists and fix it:
+
+    Breaking protocol change: The `version_info` field added to the `Hello` enum variant is a required field, which breaks backward compatibility with existing nodes that don't have this field in their serialized Hello messages. When an old node sends a Hello message without `version_info`, new nodes will fail to deserialize it, causing communication to fail. The field should be made optional (`Option<VersionInfo>`) or the PROTOCOL_VERSION should be bumped to 2 to properly handle the version migration. @protocol.rs (62-72)     describe_gauge!(
         "icn_network_peer_versions",
         "Number of peers running each protocol version"
     );
