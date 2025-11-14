@@ -157,13 +157,19 @@ class MutualCreditAgent(Agent):
         self.model.execute_transaction(provider, self, value)
 
     def can_afford_service(self):
-        """Check if agent has room in credit limit."""
+        """Check if agent has room in credit limit for a transaction.
+
+        Since transaction values are randomized (5-20), we check with a buffer
+        of 20 credits to ensure the limit won't be exceeded.
+        """
         # Hoarders rarely spend even when they can
         if self.agent_type == AgentType.HOARDER and self.balance > 0:
             return random.random() < self.spend_when_positive
 
-        # Others check credit limit
-        return self.balance > self.credit_limit
+        # Others check credit limit with buffer for max transaction size (20)
+        # This prevents balance from going below limit after transaction
+        # Use >= instead of > to allow transactions up to the limit
+        return (self.balance - 20) >= self.credit_limit
 
     def select_partner(self, candidates, prefer_high_trust=True):
         """
