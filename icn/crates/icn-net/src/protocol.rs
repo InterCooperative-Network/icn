@@ -3,6 +3,7 @@
 //! Defines wire-format messages sent over QUIC connections.
 
 use crate::envelope::SignedEnvelope;
+use crate::VersionInfo;
 use anyhow::{Context, Result};
 use icn_gossip::GossipMessage;
 use icn_identity::{BindingInfo, Did};
@@ -62,6 +63,8 @@ pub enum MessagePayload {
     Hello {
         /// DID-TLS binding information for verification
         binding_info: BindingInfo,
+        /// Version and capability information for protocol negotiation
+        version_info: VersionInfo,
         /// Optional topology information (if topology is enabled)
         topology_info: Option<crate::TopologyInfo>,
         /// X25519 public key for end-to-end encryption (Phase 10)
@@ -157,11 +160,13 @@ impl NetworkMessage {
         from: Did,
         to: Did,
         binding_info: BindingInfo,
+        version_info: VersionInfo,
         topology_info: Option<crate::TopologyInfo>,
         x25519_public: [u8; 32],
     ) -> Self {
         Self::new(from, Some(to), MessagePayload::Hello {
             binding_info,
+            version_info,
             topology_info,
             x25519_public,
         })

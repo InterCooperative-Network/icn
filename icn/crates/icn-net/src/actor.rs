@@ -531,6 +531,9 @@ impl NetworkActor {
                         // Send Hello message with DID-TLS binding and X25519 public key
                         let binding_info = self.identity_bundle.binding_info();
                         let x25519_public = *self.identity_bundle.x25519_public_bytes();
+                        let version_info = crate::VersionInfo::new(
+                            format!("icnd-{}", env!("CARGO_PKG_VERSION"))
+                        );
                         let topology_info = self.topology_config.as_ref().map(|topo_cfg| {
                             TopologyInfo {
                                 region: topo_cfg.region.clone(),
@@ -543,6 +546,7 @@ impl NetworkActor {
                             self.own_did.clone(),
                             did.clone(),
                             binding_info,
+                            version_info,
                             topology_info,
                             x25519_public,
                         );
@@ -836,17 +840,44 @@ impl NetworkActor {
 
                             // Handle handshake messages internally
                             match &message.payload {
-                                MessagePayload::Hello { binding_info: _, topology_info, x25519_public } => {
-                                    info!(
-                                        peer_did = %message.from,
-                                        has_topology = topology_info.is_some(),
-                                        message_type = "Hello",
-                                        "Received Hello with X25519 public key"
-                                    );
-
+                                MessagePayload::Hello { binding_info: _, version_info, topology_info, x25519_public } => {
                                     // NOTE: DID-TLS binding was already verified during TLS handshake
                                     // by DidCertificateVerifier. No need to re-verify here.
                                     // The TLS layer guarantees that the peer's DID matches their certificate.
+
+                                    // Perform version negotiation
+                                    let local_version_info = crate::VersionInfo::new(
+                                        format!("icnd-{}", env!("CARGO_PKG_VERSION"))
+                                    );
+
+                                    let negotiated_version = match crate::negotiate_version(&local_version_info, version_info) {
+                                        Ok(v) => v,
+                                        Err(e) => {
+                                            warn!(
+                                                peer_did = %message.from,
+                                                local_range = format!("[{}-{}]", local_version_info.min_supported, local_version_info.max_supported),
+                                                peer_range = format!("[{}-{}]", version_info.min_supported, version_info.max_supported),
+                                                "Version negotiation failed: {}",
+                                                e
+                                            );
+                                            // Drop the connection - incompatible versions
+                                            return Err(anyhow::anyhow!("Incompatible protocol version"));
+                                        }
+                                    };
+
+                                    // Calculate common capabilities
+                                    let common_caps = crate::common_capabilities(&local_version_info, version_info);
+
+                                    info!(
+                                        peer_did = %message.from,
+                                        peer_software = %version_info.software_version,
+                                        negotiated_version = negotiated_version,
+                                        peer_capabilities = ?version_info.capabilities.describe(),
+                                        common_capabilities = ?common_caps.describe(),
+                                        has_topology = topology_info.is_some(),
+                                        message_type = "Hello",
+                                        "Received Hello with version negotiation"
+                                    );
 
                                     // Store peer's X25519 public key for end-to-end encryption
                                     {
@@ -901,6 +932,9 @@ impl NetworkActor {
                                     // Send Hello response with our X25519 public key directly on this connection
                                     let binding_info = identity_bundle.binding_info();
                                     let x25519_public = *identity_bundle.x25519_public_bytes();
+                                    let version_info = crate::VersionInfo::new(
+                                        format!("icnd-{}", env!("CARGO_PKG_VERSION"))
+                                    );
                                     let topology_info = topology_config.as_ref().map(|topo_cfg| {
                                         TopologyInfo {
                                             region: topo_cfg.region.clone(),
@@ -913,6 +947,7 @@ impl NetworkActor {
                                         own_did.clone(),
                                         message.from.clone(),
                                         binding_info,
+                                        version_info,
                                         topology_info,
                                         x25519_public,
                                     );
