@@ -38,3 +38,22 @@ Cargo.lock
 # Misc
 .env
 .env.local
+venv/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Simulation results
+sims/mutual-credit/results/
+sims/mutual-credit/*.csv
+sims/mutual-credit/*.png
