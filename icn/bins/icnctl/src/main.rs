@@ -74,6 +74,10 @@ enum Commands {
         #[arg(short, long)]
         force: bool,
     },
+
+    /// Snapshot management
+    #[command(subcommand)]
+    Snapshot(SnapshotCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -294,6 +298,34 @@ enum NetworkCommands {
     Status,
 }
 
+#[derive(Subcommand, Debug)]
+enum SnapshotCommands {
+    /// Create a manual snapshot
+    Create,
+
+    /// List all available snapshots
+    List,
+
+    /// Verify snapshot integrity
+    Verify {
+        /// Snapshot filename (optional, defaults to state.snapshot)
+        snapshot: Option<String>,
+    },
+
+    /// Delete a snapshot
+    Delete {
+        /// Snapshot filename to delete
+        snapshot: String,
+    },
+
+    /// Delete all old snapshots
+    Cleanup {
+        /// Number of snapshots to keep (default: 3)
+        #[arg(short, long, default_value = "3")]
+        keep: usize,
+    },
+}
+
 fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(dir) = data_dir {
         Ok(dir)
@@ -367,6 +399,8 @@ async fn main() -> Result<()> {
         Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
+
+        Commands::Snapshot(snapshot_cmd) => handle_snapshot_command(snapshot_cmd, &data_dir)?,
 
         Commands::Backup { output } => handle_backup_command(&data_dir, &output)?,
 
@@ -1983,4 +2017,177 @@ fn extract_backup_metadata(_archive: &mut Archive<File>, input: &PathBuf) -> Res
     }
 
     bail!("Backup metadata not found in archive. This may not be a valid ICN backup.");
+}
+
+fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<()> {
+    // Snapshots are stored in the store subdirectory
+    let store_dir = data_dir.join("store");
+
+    match cmd {
+        SnapshotCommands::Create => {
+            println!("Creating manual snapshot...");
+
+            // Check if store directory exists
+            if !store_dir.exists() {
+                bail!("Store directory does not exist: {}. Has the daemon been run?", store_dir.display());
+            }
+
+            // Load current snapshot (if it exists)
+            match icn_snapshot::load_snapshot(&store_dir) {
+                Ok(Some(snapshot)) => {
+                    // Create timestamped backup
+                    icn_snapshot::save_timestamped_snapshot(&snapshot, &store_dir)
+                        .context("Failed to create timestamped snapshot")?;
+
+                    // Also save as main snapshot with updated checksum
+                    icn_snapshot::save_snapshot(&snapshot, &store_dir)
+                        .context("Failed to save snapshot with checksum")?;
+
+                    println!("✓ Snapshot created successfully");
+                    println!("  Location: {}/state.snapshot.{}",
+                             store_dir.display(), snapshot.created_at);
+
+                    let gossip_peers = snapshot.gossip_state.as_ref()
+                        .map_or(0, |g| g.vector_clock.len());
+                    let network_peers = snapshot.network_state.as_ref()
+                        .map_or(0, |n| n.peer_x25519_keys.len());
+
+                    println!("  Gossip peers: {}", gossip_peers);
+                    println!("  Network peers: {}", network_peers);
+                    println!("  SHA256 checksum: generated");
+                }
+                Ok(None) => {
+                    println!("⚠ No snapshot exists yet. Start the daemon to generate initial state.");
+                }
+                Err(e) => {
+                    bail!("Failed to load snapshot: {}", e);
+                }
+            }
+        }
+
+        SnapshotCommands::List => {
+            println!("Available snapshots in {}:", store_dir.display());
+            println!();
+
+            match icn_snapshot::list_snapshots(&store_dir) {
+                Ok(snapshots) => {
+                    if snapshots.is_empty() {
+                        println!("No snapshots found.");
+                    } else {
+                        println!("{:<30} {:<20} {:<15}", "Snapshot", "Created", "Size");
+                        println!("{}", "-".repeat(65));
+
+                        for (filename, timestamp, size) in snapshots {
+                            // Format timestamp as human-readable date
+                            let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
+                            let formatted_date = format!("{:?}", datetime);
+
+                            // Format size in KB/MB
+                            let formatted_size = if size < 1024 {
+                                format!("{} B", size)
+                            } else if size < 1024 * 1024 {
+                                format!("{:.1} KB", size as f64 / 1024.0)
+                            } else {
+                                format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
+                            };
+
+                            println!("{:<30} {:<20} {:<15}",
+                                     filename,
+                                     &formatted_date[..std::cmp::min(19, formatted_date.len())],
+                                     formatted_size);
+                        }
+
+                        println!();
+                        println!("Use 'icnctl snapshot verify <snapshot>' to check integrity");
+                    }
+                }
+                Err(e) => {
+                    bail!("Failed to list snapshots: {}", e);
+                }
+            }
+        }
+
+        SnapshotCommands::Verify { snapshot } => {
+            let snapshot_name = snapshot.unwrap_or_else(|| "state.snapshot".to_string());
+            println!("Verifying snapshot: {}", snapshot_name);
+
+            // If a specific snapshot was given, we need to temporarily copy it
+            if snapshot_name != "state.snapshot" {
+                // TODO: Implement verification for timestamped snapshots
+                // For now, just verify the main snapshot
+                println!("⚠ Verifying timestamped snapshots not yet implemented.");
+                println!("  Verifying main snapshot instead...");
+            }
+
+            match icn_snapshot::verify_snapshot(&store_dir) {
+                Ok(()) => {
+                    println!("✓ Snapshot checksum verified successfully");
+
+                    // Also load and display info
+                    if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&store_dir) {
+                        println!();
+                        println!("Snapshot details:");
+                        println!("  Created: {}", snapshot.created_at);
+
+                        let gossip_peers = snapshot.gossip_state.as_ref()
+                            .map_or(0, |g| g.vector_clock.len());
+                        let gossip_topics = snapshot.gossip_state.as_ref()
+                            .map_or(0, |g| g.subscriptions.len());
+                        let network_peers = snapshot.network_state.as_ref()
+                            .map_or(0, |n| n.peer_x25519_keys.len());
+
+                        println!("  Gossip peers: {}", gossip_peers);
+                        println!("  Gossip topics: {}", gossip_topics);
+                        println!("  Network peers: {}", network_peers);
+                    }
+                }
+                Err(e) => {
+                    println!("✗ Snapshot verification failed!");
+                    bail!("{}", e);
+                }
+            }
+        }
+
+        SnapshotCommands::Delete { snapshot } => {
+            println!("Deleting snapshot: {}", snapshot);
+
+            let snapshot_path = store_dir.join(&snapshot);
+            let checksum_path = store_dir.join(format!("{}.sha256", snapshot));
+
+            if !snapshot_path.exists() {
+                bail!("Snapshot not found: {}", snapshot_path.display());
+            }
+
+            // Delete snapshot file
+            std::fs::remove_file(&snapshot_path)
+                .with_context(|| format!("Failed to delete snapshot: {}", snapshot_path.display()))?;
+
+            // Delete checksum file if it exists
+            if checksum_path.exists() {
+                std::fs::remove_file(&checksum_path)
+                    .with_context(|| format!("Failed to delete checksum: {}", checksum_path.display()))?;
+            }
+
+            println!("✓ Snapshot deleted successfully");
+        }
+
+        SnapshotCommands::Cleanup { keep } => {
+            println!("Cleaning up old snapshots (keeping {} most recent)...", keep);
+
+            match icn_snapshot::cleanup_old_snapshots(&store_dir, keep) {
+                Ok(deleted) => {
+                    if deleted > 0 {
+                        println!("✓ Deleted {} old snapshot(s)", deleted);
+                    } else {
+                        println!("No snapshots to delete (under retention limit)");
+                    }
+                }
+                Err(e) => {
+                    bail!("Failed to cleanup snapshots: {}", e);
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
