@@ -276,6 +276,18 @@ let result = runtime.invoke_rule(&contract, "record_service", args, &sender_did)
 - **Security**: Passphrase uses `Zeroizing<Vec<u8>>` to prevent memory recovery
 - Key rotation supported with transition records
 
+**Keystore Format Migration (v1 → v2):**
+- **v1 format**: Contains only Ed25519 keypair (legacy)
+- **v2 format**: Includes keypair + TLS certificate + DID-TLS binding signature
+- **Auto-migration**: v1 keystores automatically upgrade to v2 on first unlock
+- **TLS persistence**: TLS certificates are persisted to disk during migration (as of 2025-01-13)
+- **Migration behavior**:
+  1. When unlocking a v1 keystore, system generates `IdentityBundle` with TLS binding
+  2. Immediately saves upgraded v2 keystore to disk with `encrypt_and_save()`
+  3. Subsequent unlocks use persisted TLS certificate (stable across restarts)
+  4. Log message: "✅ Successfully migrated and saved v2 keystore with persistent TLS binding"
+- **Test coverage**: `test_v1_to_v2_migration_persists_tls()` verifies TLS persistence
+
 **icnctl commands**:
 ```bash
 icnctl id init           # Create new identity
@@ -297,6 +309,13 @@ icnctl id import backup.age
 - Initialize in supervisor: `icn_obs::init_metrics()`, `icn_obs::start_metrics_server(9090)`
 
 ## Current Phase
+
+**Critical Fix - TLS Certificate Persistence (Complete ✓)** (2025-01-13):
+- [x] Fixed v1-to-v2 keystore migration to persist TLS certificates
+- [x] Auto-save upgraded keystore immediately after generating TLS binding
+- [x] Added comprehensive test: `test_v1_to_v2_migration_persists_tls()`
+- [x] Restored Phase 8 security requirement: TLS certificates persist across restarts
+- [x] All 19 icn-identity tests pass
 
 **Phase 9 - Message & Identity Integrity (Complete ✓)** (2025-01-13):
 - [x] SignedEnvelope with Ed25519 signatures (envelope.rs)

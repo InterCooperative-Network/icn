@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Critical: TLS Certificate Persistence (2025-01-13)
+
+**Keystore Migration Bug Fix:**
+- **CRITICAL:** Fixed v1-to-v2 keystore migration to persist TLS certificates to disk
+  - **Problem:** TLS certificates were regenerated on every daemon restart for v1 keystores
+  - **Impact:** Violated Phase 8 requirement that "TLS certificates persist across restarts"
+  - **Root Cause:** TODO at line 245 in keystore.rs was never implemented
+  - **Fix:** Auto-save upgraded v2 keystore immediately after generating TLS binding
+  - **Security Impact:** HIGH - Required for Phase 8 DID-TLS binding integrity
+
+**What Was Broken:**
+- When unlocking a v1 keystore (KeyPair-only format), the system generated an `IdentityBundle` with TLS binding in memory
+- The TODO comment indicated this should be persisted, but the code only stored the bundle in memory
+- The keystore file on disk remained in v1 format
+- Every subsequent unlock generated a new TLS certificate with different cryptographic material
+- Peers would see different TLS certificates on each daemon restart
+- TLS session stability and trust establishment were broken
+
+**How It Was Fixed:**
+- Modified `unlock()` method in `icn-identity/src/keystore.rs` (lines 245-260)
+- After generating `IdentityBundle` for v1 migration:
+  1. Create complete `StoredKey` with all TLS binding fields populated
+  2. Call `encrypt_and_save()` to persist immediately to disk
+  3. Log success message confirming migration
+- This ensures v1 keystores upgrade to v2 format on first unlock
+- TLS certificates remain stable across all subsequent unlocks and restarts
+
+**Testing:**
+- Added comprehensive test: `test_v1_to_v2_migration_persists_tls()`
+- Test verifies:
+  - v1 keystore migrates on first unlock
+  - TLS certificate is identical on second unlock (not regenerated)
+  - TLS certificate persists to disk (verified by new keystore instance)
+  - Binding signature remains stable across unlocks
+- All 19 icn-identity tests pass
+
+**Security Properties Restored:**
+- ✅ TLS certificates persist across daemon restarts
+- ✅ DID-TLS binding integrity maintained
+- ✅ Peers see consistent TLS certificates
+- ✅ Trust establishment stability ensured
+- ✅ Phase 8 security requirements met
+
 ### Added - Phase 8A: Trust Network Propagation (2025-01-12)
 
 **Trust Attestation System:**
