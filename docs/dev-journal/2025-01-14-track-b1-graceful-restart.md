@@ -457,10 +457,17 @@ if !sub_list.contains(&did) {
 - Future migrations can detect version and upgrade
 - Old snapshots can be deleted if incompatible
 
-**Backup Integration**:
-- `icnctl backup` should include `state.snapshot`
-- `icnctl restore` should restore snapshot
-- TODO: Verify backup/restore includes snapshot file
+**Backup Integration** ✅ (2025-01-14):
+- `icnctl backup` includes `state.snapshot` (uses `append_dir_all()` for entire data directory)
+- `icnctl restore` restores snapshot with all other state
+- **Verification**: Added `test_backup_includes_state_snapshot()` test (commit 43a8acf)
+  - Creates mock state.snapshot in data directory
+  - Verifies snapshot is in backup tarball
+  - Verifies snapshot is restored with correct content
+  - All 5 icnctl backup/restore tests pass ✅
+- **Implementation**: `icnctl/src/main.rs:1797-1799` (backup), `1852-1859` (restore)
+- Backup is atomic and includes checksum verification
+- Force-restore creates backup of existing data before overwrite
 
 **Monitoring** ✅ (2025-01-14):
 - Log messages: "State snapshot saved", "State snapshot restored"
@@ -510,7 +517,7 @@ if !sub_list.contains(&did) {
 - [x] Complete NetworkHandle state export ✅ (2025-01-14)
 - [x] Add integration test for restart workflow ✅ (2025-01-14)
 - [x] Add metrics for snapshot save/load time ✅ (2025-01-14)
-- [ ] Verify backup/restore includes snapshot
+- [x] Verify backup/restore includes snapshot ✅ (2025-01-14)
 
 ### Medium-term
 - [ ] Add snapshot corruption detection (checksums)
@@ -585,10 +592,12 @@ Both gossip and network layers maintain state across restarts, preserving vector
 - `f26eef2` - NetworkHandle state export/restore
 - `ae925f0` - Critical security fixes for state persistence
 - `302f626` - Comprehensive metrics for monitoring
+- `43a8acf` - Backup/restore verification test
 
 **Next Steps**:
 1. ~~Add comprehensive integration tests~~ ✅ DONE
 2. ~~Add metrics for snapshot save/load time~~ ✅ DONE
-3. Verify backup/restore includes snapshot file
+3. ~~Verify backup/restore includes snapshot file~~ ✅ DONE
 4. Document operational procedures in operations guide
-5. Consider Phase 13 (Governance Primitives) vs Track C (Pilot Community Selection)
+5. Continue Track B1 (version negotiation, schema migrations)
+6. Consider Phase 13 (Economic Safety Rails) vs Track C (Pilot Community Selection)
