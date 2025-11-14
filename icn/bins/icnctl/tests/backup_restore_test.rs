@@ -68,6 +68,10 @@ fn test_backup_and_restore_roundtrip() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
+    assert!(tar_list.status.success(),
+            "Failed to list backup contents: {}",
+            String::from_utf8_lossy(&tar_list.stderr));
+
     let tar_contents = String::from_utf8_lossy(&tar_list.stdout);
     assert!(tar_contents.contains("identity.age"), "Backup missing identity.age");
     assert!(tar_contents.contains("backup_metadata.json"), "Backup missing metadata");
@@ -266,6 +270,10 @@ fn test_backup_includes_state_snapshot() -> Result<()> {
         .arg("-tf")
         .arg(&backup_file)
         .output()?;
+
+    assert!(tar_list.status.success(),
+            "Failed to list backup contents: {}",
+            String::from_utf8_lossy(&tar_list.stderr));
 
     let tar_contents = String::from_utf8_lossy(&tar_list.stdout);
     assert!(tar_contents.contains("state.snapshot"),
