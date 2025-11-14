@@ -497,3 +497,82 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
 
     Ok(())
 }
+
+/// Test the convenience API for sending encrypted messages
+#[tokio::test]
+async fn test_send_encrypted_message_convenience_api() -> Result<()> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    let _ = tracing_subscriber::fmt::try_init();
+
+    println!("\n=== Testing send_encrypted_message() Convenience API ===\n");
+
+    // ========== SETUP: Spawn Alice and Bob test nodes ==========
+    let alice = TestNode::spawn(19100).await?;
+    let bob = TestNode::spawn(19101).await?;
+
+    println!("Alice DID: {}", alice.identity_bundle.did());
+    println!("Bob DID:   {}", bob.identity_bundle.did());
+
+    // ========== STEP 1: Alice dials Bob ==========
+    println!("\n--- Alice connecting to Bob ---");
+    alice.dial(&bob).await?;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // ========== STEP 2: Use convenience API to send encrypted message ==========
+    println!("\n--- Alice sending encrypted message using convenience API ---");
+
+    let secret_payload = b"This message was encrypted with the convenience API!";
+    let sequence = 1;
+
+    alice.network_handle.send_encrypted_message(
+        bob.identity_bundle.did(),
+        alice.identity_bundle.keypair(),
+        &alice.identity_bundle.x25519_secret(),
+        sequence,
+        secret_payload,
+    ).await?;
+
+    println!("✓ Alice sent encrypted message using send_encrypted_message()");
+
+    // ========== STEP 3: Wait for Bob to receive ==========
+    bob.wait_for_messages(1, 500).await;
+
+    // ========== STEP 4: Bob decrypts ==========
+    let bob_received = bob.messages_received.read().await;
+    assert_eq!(bob_received.len(), 1, "Bob should have received exactly one message");
+
+    let msg = &bob_received[0];
+
+    // Extract signed envelope
+    let signed_env = match &msg.payload {
+        MessagePayload::Signed(env) => env,
+        _ => panic!("Expected Signed payload"),
+    };
+
+    // Verify signature
+    signed_env.verify(300)?;
+    println!("✓ Bob verified Alice's signature");
+
+    // Extract encrypted envelope
+    let encrypted_env: EncryptedEnvelope = bincode::deserialize(&signed_env.payload)?;
+
+    // Get Alice's X25519 public key
+    let alice_x25519_public = bob.network_handle.get_peer_x25519_key(alice.identity_bundle.did()).await
+        .expect("Bob should have Alice's X25519 key from Hello exchange");
+    let alice_x25519_public_key = x25519_dalek::PublicKey::from(alice_x25519_public);
+
+    // Decrypt
+    let decrypted = encrypted_env.decrypt(
+        &bob.identity_bundle.x25519_secret(),
+        &alice_x25519_public_key,
+    )?;
+
+    println!("✓ Bob decrypted: {:?}", String::from_utf8_lossy(&decrypted));
+
+    // ========== VERIFICATION ==========
+    assert_eq!(decrypted, secret_payload);
+
+    println!("\n✓ Convenience API test successful!");
+
+    Ok(())
+}

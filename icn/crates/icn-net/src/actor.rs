@@ -111,6 +111,57 @@ impl NetworkHandle {
         rx.await.context("Response channel closed")?
     }
 
+    /// Send an encrypted message to a specific peer
+    ///
+    /// This is a convenience method that:
+    /// 1. Retrieves the peer's X25519 public key
+    /// 2. Encrypts the payload using EncryptedEnvelope
+    /// 3. Signs the encrypted envelope
+    /// 4. Sends the message
+    ///
+    /// Returns an error if the peer's X25519 key is not available (no Hello exchange yet)
+    pub async fn send_encrypted_message(
+        &self,
+        recipient: &Did,
+        sender_keypair: &icn_identity::KeyPair,
+        sender_x25519_secret: &x25519_dalek::StaticSecret,
+        sequence: u64,
+        payload: &[u8],
+    ) -> Result<()> {
+        use crate::{EncryptedEnvelope, SignedEnvelope, NetworkMessage};
+
+        // Get recipient's X25519 public key
+        let recipient_public_key_bytes = self
+            .get_peer_x25519_key(recipient)
+            .await
+            .context("Recipient X25519 public key not available - no Hello exchange yet")?;
+
+        let recipient_public_key = x25519_dalek::PublicKey::from(recipient_public_key_bytes);
+
+        // Create encrypted envelope
+        let encrypted = EncryptedEnvelope::encrypt(
+            &sender_keypair.did(),
+            recipient,
+            sequence,
+            sender_x25519_secret,
+            &recipient_public_key,
+            payload,
+        )?;
+
+        // Sign the encrypted envelope
+        let signed = SignedEnvelope::new(
+            &sender_keypair.did(),
+            sender_keypair,
+            sequence,
+            crate::PayloadType::Encrypted,
+            bincode::serialize(&encrypted)?,
+        )?;
+
+        // Send via network
+        let message = NetworkMessage::signed(Some(recipient.clone()), signed);
+        self.send_message(recipient.clone(), message).await
+    }
+
     /// Broadcast a message to all connected peers
     pub async fn broadcast(&self, message: NetworkMessage) -> Result<()> {
         let (tx, rx) = oneshot::channel();
