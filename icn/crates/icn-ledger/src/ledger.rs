@@ -75,7 +75,11 @@ impl Ledger {
         let value = serde_json::to_vec(&entry)?;
         self.store.put(key.as_bytes(), &value)?;
 
-        debug!("Appended journal entry: {}", hash);
+        debug!(
+            entry_hash = %hash,
+            account_count = entry.accounts.len(),
+            "Appended journal entry to store"
+        );
 
         // Update cached balances
         for delta in &entry.accounts {
@@ -90,7 +94,12 @@ impl Ledger {
         // Persist updated balances
         self.save_cached_balances()?;
 
-        info!("Ledger entry appended: {}", hash);
+        info!(
+            entry_hash = %hash,
+            account_count = entry.accounts.len(),
+            timestamp = entry.timestamp,
+            "Ledger entry appended"
+        );
 
         // Publish to gossip if available
         if let Some(gossip) = &self.gossip {
@@ -126,7 +135,13 @@ impl Ledger {
             let mut gossip_actor = gossip.blocking_write();
             gossip_actor.publish(&topic, data)?;
 
-            debug!("Published entry {} to topic {}", hash, topic);
+            debug!(
+                entry_hash = %hash,
+                topic = %topic,
+                currency = %currency,
+                message_type = "NewEntry",
+                "Published ledger entry to gossip"
+            );
         }
 
         Ok(())
@@ -138,7 +153,10 @@ impl Ledger {
             LedgerSyncMessage::NewEntry { hash, mut entry } => {
                 // Check if we already have this entry
                 if self.get_entry(&hash)?.is_some() {
-                    debug!("Already have entry {}, skipping", hash);
+                    debug!(
+                        entry_hash = %hash,
+                        "Already have entry, skipping duplicate"
+                    );
                     return Ok(());
                 }
 
@@ -154,11 +172,19 @@ impl Ledger {
 
                 match result {
                     Ok(h) => {
-                        info!("Received and stored entry {} via gossip", h);
+                        info!(
+                            entry_hash = %h,
+                            source = "gossip",
+                            "Received and stored ledger entry"
+                        );
                         Ok(())
                     }
                     Err(e) => {
-                        warn!("Failed to store received entry: {}", e);
+                        warn!(
+                            entry_hash = %hash,
+                            error = %e,
+                            "Failed to store received entry"
+                        );
                         Ok(()) // Don't propagate error, just log it
                     }
                 }
@@ -166,7 +192,11 @@ impl Ledger {
 
             LedgerSyncMessage::RequestEntry { hash } => {
                 // Handle request for specific entry
-                debug!("Received request for entry {}", hash);
+                debug!(
+                    entry_hash = %hash,
+                    message_type = "RequestEntry",
+                    "Received entry request"
+                );
 
                 if let Some(gossip) = &self.gossip {
                     let entry_opt = self.get_entry(&hash)?;
@@ -298,7 +328,10 @@ impl Ledger {
 
     /// Recompute all balances from journal entries (for verification)
     pub fn recompute_balances(&mut self) -> Result<()> {
-        info!("Recomputing all balances from journal");
+        info!(
+            cached_account_count = self.cached_balances.len(),
+            "Recomputing all balances from journal"
+        );
 
         let entries = self.get_all_entries()?;
         let balances = compute_all_balances(&entries);
@@ -306,7 +339,11 @@ impl Ledger {
         self.cached_balances = balances;
         self.save_cached_balances()?;
 
-        info!("Balance recomputation complete");
+        info!(
+            entry_count = entries.len(),
+            account_count = self.cached_balances.len(),
+            "Balance recomputation complete"
+        );
         Ok(())
     }
 
@@ -322,13 +359,21 @@ impl Ledger {
 
         // Compare with cached balances
         if computed_balances != self.cached_balances {
-            warn!("Balance mismatch detected!");
+            warn!(
+                cached_accounts = self.cached_balances.len(),
+                computed_accounts = computed_balances.len(),
+                "Balance mismatch detected!"
+            );
             return Err(anyhow::anyhow!(
                 "Cached balances do not match computed balances"
             ));
         }
 
-        info!("Ledger integrity verified: {} entries", entries.len());
+        info!(
+            entry_count = entries.len(),
+            account_count = self.cached_balances.len(),
+            "Ledger integrity verified"
+        );
         Ok(())
     }
 
