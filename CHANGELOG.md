@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Operational Hardening: Operations Guide (Track B1) (2025-01-14)
+
+**Comprehensive Operations Documentation:**
+- Day-to-day operational workflows and procedures
+- Consolidates all operational documentation into one reference
+- Detailed command reference for all operational tasks
+- Troubleshooting workflows for common issues
+
+**Operations Workflows:**
+1. **Daily Operations** - Morning health checks (5 min), routine monitoring
+2. **Weekly Maintenance** - Backups, metrics review, disk usage checks (15-30 min)
+3. **Monthly Tasks** - Backup archival, device audits, update checks
+4. **Upgrade Procedures** - Current manual process + future automation plans
+5. **Capacity Planning** - Storage, memory, bandwidth growth estimates
+6. **Performance Tuning** - Configuration optimization for different use cases
+
+**Monitoring & Health:**
+- Dashboard interpretation guide
+- Health check endpoint integration examples
+- Key metrics to monitor with thresholds
+- Prometheus alerting rule examples
+
+**Operational Command Reference:**
+- Identity management commands
+- Device management commands
+- Node operations (start/stop/restart/logs)
+- Network diagnostics (peers, connectivity)
+- Gossip operations (topics, subscriptions, entries)
+- Ledger operations (balances, transactions, quarantine)
+- Metrics queries
+
+**Troubleshooting Workflows:**
+- Node won't start (port conflicts, keystore issues, permissions)
+- No peer connections (mDNS, firewall, TLS issues)
+- High quarantine size (conflicts, clock skew, attacks)
+- High memory usage (gossip growth, cache tuning)
+- Slow transaction processing (network latency, conflicts)
+
+**Implementation:**
+- New document: `docs/operations-guide.md` (800+ lines)
+- References deployment guide, incident response playbook, architecture docs
+- Ready for operational teams and community node operators
+
 ### Added - Operational Hardening: Incident Response Playbook (Track B1) (2025-01-14)
 
 **Comprehensive Incident Response Documentation:**
