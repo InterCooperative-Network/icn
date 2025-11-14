@@ -91,6 +91,7 @@ All scenarios remained stable with:
 2. **Demurrage Timing**: Moved from agent.step() to model's monthly bookkeeping
 3. **Credit Limit Updates**: Moved to monthly bookkeeping to fix timing issue
 4. **Credit Limit Comparison**: Changed `min()` to `max()` for negative limit values
+5. **Credit Limit Enforcement** (Critical): Added 20-credit buffer to `can_afford_service()` to prevent agents from exceeding limits during transactions. Before fix: 48 agents exceeded -500 limit. After fix: 0 violations across 18,683 transactions.
 
 ### Key Learnings
 
