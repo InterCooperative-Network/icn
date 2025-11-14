@@ -1,7 +1,7 @@
 # ICN Roadmap
 
-**Status**: Phase 12 ✅ & Track B1 ✅ COMPLETE - All 268 Tests Passing
-**Next**: Phase 13 (Governance Primitives) or Track C (Pilot Community Selection)
+**Status**: Phase 12 ✅ & Track B1 ✅ & Track B3 ✅ COMPLETE - All 268 Tests Passing
+**Next**: Phase 13 (Governance Primitives) + Track C1 (Pilot Selection)
 
 ## Roadmap Structure
 
@@ -190,6 +190,49 @@ on_proposal_execute(callback)
 
 ---
 
+### Intentional Deferments (Pending Pilot Feedback)
+
+These features are **NOT on the roadmap** until pilot communities demonstrate need. Based on gap assessment (2025-01-14):
+
+**Federation/Interoperability** (Deferred):
+- **Status**: ICN is pure P2P with mDNS local discovery
+- **Gap**: No ActivityPub, OIDC, SAML, or other federation protocols
+- **Interim**: Manual peer connection works over internet (`icnctl network add-peer`)
+- **Decision**: Wait for 2+ successful pilots wanting to interconnect before building cross-network discovery
+- **Rationale**: Single 50-member pilot doesn't need federation; premature complexity
+
+**Integrated Messaging** (Deferred):
+- **Status**: Gossip provides pub/sub bulletin board, not real-time chat
+- **Gap**: No Signal Protocol, OMEMO, or private messaging
+- **Interim**: Use external tools (Signal, email) for chat; gossip for announcements
+- **Decision**: Pilot first, add messaging in Phase 14+ if bulletin board insufficient
+- **Rationale**: Tight scope enables pilot success; messaging is scope creep
+
+**Advanced Privacy** (Deferred):
+- **Status**: QUIC/TLS transport + X25519 end-to-end encryption for payloads
+- **Gap**: No zero-knowledge proofs, selective disclosure, anonymous credentials
+- **Decision**: Trust-first communities don't need advanced privacy tech
+- **Rationale**: Cooperatives share resources among known members; ZK is solution looking for problem
+
+**Cross-Network Standards** (Deferred):
+- **Status**: QUIC/TLS works over internet, only discovery is LAN-only (mDNS)
+- **Gap**: No standardized discovery protocol for ICN-to-ICN across regions
+- **Interim**: Manual peer connection (`icnctl network add-peer <addr> <did>`)
+- **Decision**: Add lightweight discovery (DNS TXT records?) in Phase 14+ if pilots demand it
+- **Rationale**: Manual peering validates need before building full discovery infrastructure
+
+**Explicitly Out of Scope**:
+
+**Formal Verification** (Never):
+- **Status**: CCL has fuel metering, type checking, comprehensive tests (268 passing)
+- **Gap**: No formal proofs of contract correctness
+- **Decision**: Too expensive for 1-2 developer team; tests + code review sufficient for cooperative-scale (10-1000 members)
+- **Rationale**: Formal verification targets financial infrastructure at nation-scale; ICN serves community-scale mutual credit
+
+**Philosophy**: Build what communities need, not what the architecture diagram suggests. Pilot feedback drives roadmap.
+
+---
+
 ### Future Phases (Driven by Pilot Learnings)
 
 **Phase 14+: Cooperation Layer**
@@ -280,35 +323,35 @@ on_proposal_execute(callback)
 
 ---
 
-### B3: Economic Modeling (parallel research track)
-**Status**: Not Started
+### B3: Economic Modeling ✅ COMPLETE
+**Status**: Complete (2025-01-14)
 **Purpose**: Validate economic assumptions before they blow up in production
 
-**Known Failure Modes of Mutual Credit**:
-1. **Tragedy of the credits**: Users hoard positive balances → deflation
-2. **Free-rider problem**: Extract value, never contribute
-3. **Credit limit gaming**: Max out borrowing, ghost the network
-4. **Velocity collapse**: Low trust → no one spends → credits stagnate
+**Implementation**: Agent-based simulation using Mesa 3.3.1
+- **Agents**: 100 per scenario with 5 behavioral types
+- **Duration**: 12 months (360 days) per simulation
+- **Scenarios**: 5 configurations testing different policy parameters
+- **Results**: ~13,000 transactions per scenario, comprehensive metrics
 
-**Approach**:
-- Build agent-based simulation (Python or Rust)
-- Model agents with different behaviors: hoarders, reciprocators, free riders, etc.
-- Experiment with:
-  - Demurrage (negative interest on positive balances)
-  - Credit limits (fixed vs. dynamic)
-  - Default handling (write-offs, reputation impact)
-  - Trust-based risk adjustment
-- Output: Recommended default parameters for Phase 12 credit policies
+**Key Findings**:
+1. ✅ **Dynamic credit limits work**: -33% defaults, -16% velocity (stability vs growth tradeoff)
+2. ✅ **Demurrage highly effective**: -22% inequality (Gini) without harming velocity
+3. ✅ **System tolerates free-riders**: Up to 20% before serious stress (4.1% defaults)
+4. ⚠️ **Sparse trust networks increase hoarding**: 2x hoarding at 30% density vs 60% (counterintuitive)
 
-**Deliverables**:
-- `sims/mutual-credit/` directory with simulation code
-- `docs/econ-modeling.md` with:
-  - Failure mode catalog
-  - Simulation results
-  - Recommended defaults (starting credit, max exposure, demurrage rate)
-- Validation against pilot community data (Phase C3)
+**Validated Defaults** (now implemented in Phase 12):
+- Credit limits: -20 initial → -500 max, +10 per 50 cleared, 2x trust multiplier
+- Demurrage: -2% monthly on balances >50
+- New member protection: 3-month ramp, 10 credit contribution requirement
 
-**Timeline**: Start during Phase 11, inform Phase 12 design
+**Deliverables**: ✅
+- [x] `sims/mutual-credit/` - Complete simulation framework (agents, economy, trust, model)
+- [x] 5 JSON scenario configurations (baseline, dynamic limits, demurrage, free riders, low trust)
+- [x] `sims/mutual-credit/RESULTS_SUMMARY.md` - Comprehensive analysis
+- [x] `docs/econ-modeling.md` - Updated with simulation results
+- [x] Analysis notebooks for visualization
+
+**Next**: Calibrate against pilot data (Track C3) to validate real-world applicability
 
 ---
 

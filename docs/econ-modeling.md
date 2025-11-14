@@ -1,7 +1,8 @@
 # Economic Modeling for Mutual Credit Systems
 
-**Status**: Research Phase (Track B3)
-**Last Updated**: 2025-01-13
+**Status**: ✅ **COMPLETE** (Track B3)
+**Last Updated**: 2025-01-14
+**Simulation Results**: [sims/mutual-credit/RESULTS_SUMMARY.md](../sims/mutual-credit/RESULTS_SUMMARY.md)
 
 ## Purpose
 
@@ -13,6 +14,57 @@ Mutual credit systems have well-documented failure modes. Before deploying ICN's
 4. **Recommend defaults** for Phase 12 (Economic Safety Rails)
 
 This document guides the economic modeling parallel research track.
+
+---
+
+## Simulation Results Summary (January 2025)
+
+**Framework Implemented**: Agent-based model using Mesa 3.3.1 with 100 agents over 12 months across 5 scenarios.
+
+### Key Findings
+
+| Intervention | Effect | Recommendation |
+|--------------|--------|----------------|
+| **Dynamic Credit Limits** (2x trust multiplier) | -16% velocity, -33% defaults | ✅ Use for stability, accept lower volume |
+| **Demurrage** (-2% monthly on >50) | -22% inequality (Gini), no velocity harm | ✅ Highly effective redistribution |
+| **High Free-Riders** (20% vs 8%) | +51% defaults, system stressed but stable | ⚠️ System tolerates up to ~20% |
+| **Low Trust Network** (30% density) | +100% hoarding, conservative behavior | ⚠️ Network density critical |
+
+### Validated Hypotheses
+
+1. ✅ **Demurrage works**: Reduced Gini from 0.36 to 0.28 without harming velocity
+2. ✅ **Trust-gated limits reduce defaults**: 1.8% vs 2.7% baseline
+3. ✅ **System can tolerate free-riders**: Up to 20% before serious stress
+4. ❌ **Sparse networks reduce hoarding**: WRONG - they increase it (counterintuitive but economically sound)
+
+### Recommended Defaults (Updated with Simulation Data)
+
+Based on 5 scenarios with ~13,000 transactions each:
+
+**Credit Limits**:
+- Initial: -20 (validated - allows 2-4 small transactions)
+- Maximum: -500 (validated - caps extreme exposure)
+- Growth: +10 per 50 cleared (validated - agents reached -500 in 3-4 months)
+- Trust multiplier: 2.0 (tested - provides meaningful differentiation)
+
+**Demurrage**:
+- Rate: -2% monthly on balances >50 (validated - reduces inequality 22%)
+- Threshold: 50 credits (tested - exempts small savers)
+- Application: Monthly (timing critical - must be synchronized)
+
+**New Member Protection**:
+- Initial limit: -20 (conservative, validated)
+- Ramp period: 3 months (implemented in Phase 12)
+- Contribution requirement: 10 credits cleared (Phase 12 feature)
+
+### Implementation Notes
+
+All economic safety features from simulation are now implemented in ICN:
+- Phase 12: Dynamic credit limits, new member throttling, dispute resolution
+- Ledger: Double-entry with quarantine for conflicts
+- Trust graph: Transitive trust computation with decay
+
+See [sims/mutual-credit/](../sims/mutual-credit/) for complete framework, scenarios, and analysis notebooks.
 
 ---
 
