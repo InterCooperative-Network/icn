@@ -656,4 +656,344 @@ mod tests {
 
         std::fs::remove_dir_all(&temp).unwrap();
     }
+
+    // ========== Fuzzing / Property-Based Tests ==========
+
+    use proptest::prelude::*;
+
+    // Strategy for generating arbitrary StateSnapshot
+    prop_compose! {
+        fn arb_gossip_state()(
+            vector_clock in prop::collection::hash_map(
+                "[a-z]{3,10}",  // Random DID-like strings
+                0u64..1000,     // Clock values
+                0..50           // Up to 50 entries
+            ),
+            subscriptions in prop::collection::hash_map(
+                "[a-z]{3,10}",  // Topic names
+                prop::collection::vec("[a-z]{3,10}", 0..10),  // Subscriber DIDs
+                0..50
+            ),
+            topics in prop::collection::hash_map(
+                "[a-z]{3,10}",  // Topic names
+                (
+                    "[a-z]{3,10}",  // name
+                    "(Public|Private|TrustGated)",  // access_control
+                    0usize..10000,   // max_entries
+                    "(Global|Regional|Local)",  // scope
+                ),
+                0..50
+            ),
+        ) -> GossipState {
+            GossipState {
+                vector_clock,
+                subscriptions,
+                topics: topics.into_iter().map(|(k, (name, ac, max, scope))| {
+                    (k, TopicMetadata {
+                        name,
+                        access_control: ac,
+                        max_entries: max,
+                        scope,
+                    })
+                }).collect(),
+            }
+        }
+    }
+
+    prop_compose! {
+        fn arb_network_state()(
+            peer_x25519_keys in prop::collection::hash_map(
+                "[a-z]{3,10}",  // DID-like strings
+                prop::array::uniform32(0u8..),  // Random 32-byte keys
+                0..100
+            ),
+            peer_addresses in prop::collection::hash_map(
+                "[a-z]{3,10}",
+                "127\\.0\\.0\\.1:[0-9]{4,5}",  // IP:port
+                0..100
+            ),
+        ) -> NetworkState {
+            NetworkState {
+                peer_x25519_keys,
+                peer_addresses,
+            }
+        }
+    }
+
+    prop_compose! {
+        fn arb_state_snapshot()(
+            version in 1u32..10,
+            created_at in 0u64..2000000000,
+            has_gossip in prop::bool::ANY,
+            has_network in prop::bool::ANY,
+            gossip_state in arb_gossip_state(),
+            network_state in arb_network_state(),
+        ) -> StateSnapshot {
+            StateSnapshot {
+                version,
+                created_at,
+                gossip_state: if has_gossip { Some(gossip_state) } else { None },
+                network_state: if has_network { Some(network_state) } else { None },
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn fuzz_serialize_deserialize_roundtrip(snapshot in arb_state_snapshot()) {
+            // Property: Any StateSnapshot should serialize and deserialize correctly
+            let json = serde_json::to_vec(&snapshot).unwrap();
+            let deserialized: StateSnapshot = serde_json::from_slice(&json).unwrap();
+
+            // Verify version and timestamp
+            assert_eq!(snapshot.version, deserialized.version);
+            assert_eq!(snapshot.created_at, deserialized.created_at);
+
+            // Verify gossip state if present
+            if let Some(ref gossip) = snapshot.gossip_state {
+                let deser_gossip = deserialized.gossip_state.as_ref().unwrap();
+                assert_eq!(gossip.vector_clock.len(), deser_gossip.vector_clock.len());
+                assert_eq!(gossip.subscriptions.len(), deser_gossip.subscriptions.len());
+                assert_eq!(gossip.topics.len(), deser_gossip.topics.len());
+            } else {
+                assert!(deserialized.gossip_state.is_none());
+            }
+
+            // Verify network state if present
+            if let Some(ref network) = snapshot.network_state {
+                let deser_network = deserialized.network_state.as_ref().unwrap();
+                assert_eq!(network.peer_x25519_keys.len(), deser_network.peer_x25519_keys.len());
+                assert_eq!(network.peer_addresses.len(), deser_network.peer_addresses.len());
+            } else {
+                assert!(deserialized.network_state.is_none());
+            }
+        }
+
+        #[test]
+        fn fuzz_save_load_roundtrip(snapshot in arb_state_snapshot()) {
+            // Property: Any StateSnapshot should save and load correctly with checksum
+            let temp = std::env::temp_dir().join(format!("icn-fuzz-{}", snapshot.created_at));
+            std::fs::create_dir_all(&temp).unwrap();
+
+            // Save
+            save_snapshot(&snapshot, &temp).unwrap();
+
+            // Verify snapshot file exists
+            assert!(snapshot_path(&temp).exists());
+            assert!(checksum_path(&temp).exists());
+
+            // Verify checksum is valid
+            verify_snapshot(&temp).unwrap();
+
+            // Load and compare
+            let loaded = load_snapshot(&temp).unwrap().unwrap();
+            assert_eq!(snapshot.version, loaded.version);
+            assert_eq!(snapshot.created_at, loaded.created_at);
+
+            // Cleanup
+            std::fs::remove_dir_all(&temp).unwrap_or(());
+        }
+
+        #[test]
+        fn fuzz_malformed_json_fails_gracefully(
+            random_bytes in prop::collection::vec(any::<u8>(), 0..1000)
+        ) {
+            // Property: Random bytes should fail to deserialize (not panic)
+            let result: Result<StateSnapshot, _> = serde_json::from_slice(&random_bytes);
+            // Should fail, not panic
+            if result.is_ok() {
+                // Very unlikely, but if it succeeds, ensure it's valid
+                let _ = result.unwrap();
+            }
+        }
+
+        #[test]
+        fn fuzz_corrupted_snapshot_detected(snapshot in arb_state_snapshot()) {
+            // Property: Any corruption should be detected by checksum
+            let temp = std::env::temp_dir().join(format!("icn-fuzz-corrupt-{}", snapshot.created_at));
+            std::fs::create_dir_all(&temp).unwrap();
+
+            save_snapshot(&snapshot, &temp).unwrap();
+
+            // Read and corrupt the snapshot
+            let snapshot_path = snapshot_path(&temp);
+            let mut content = std::fs::read(&snapshot_path).unwrap();
+
+            // Flip some bits (if there's content)
+            if !content.is_empty() {
+                for i in (0..content.len()).step_by(content.len() / 10 + 1).take(5) {
+                    content[i] ^= 0xFF;  // Flip all bits
+                }
+                std::fs::write(&snapshot_path, content).unwrap();
+
+                // Verification should fail
+                let result = verify_snapshot(&temp);
+                assert!(result.is_err(), "Corrupted snapshot should fail verification");
+
+                // Load should also fail
+                let load_result = load_snapshot(&temp);
+                assert!(load_result.is_err(), "Corrupted snapshot should fail to load");
+            }
+
+            // Cleanup
+            std::fs::remove_dir_all(&temp).unwrap_or(());
+        }
+
+        #[test]
+        fn fuzz_large_collections_handled(
+            large_clock_size in 0usize..500,
+            large_sub_size in 0usize..500,
+        ) {
+            // Property: Large collections should be handled without panic
+            let mut gossip = GossipState {
+                vector_clock: HashMap::new(),
+                subscriptions: HashMap::new(),
+                topics: HashMap::new(),
+            };
+
+            // Create large vector clock
+            for i in 0..large_clock_size {
+                gossip.vector_clock.insert(format!("did:icn:peer{}", i), i as u64);
+            }
+
+            // Create large subscriptions
+            for i in 0..large_sub_size {
+                let subs: Vec<String> = (0..10).map(|j| format!("sub{}", j)).collect();
+                gossip.subscriptions.insert(format!("topic{}", i), subs);
+            }
+
+            let mut snapshot = StateSnapshot::new();
+            snapshot.gossip_state = Some(gossip);
+
+            // Should serialize without panic
+            let json = serde_json::to_vec(&snapshot).unwrap();
+
+            // Should deserialize without panic
+            let _deserialized: StateSnapshot = serde_json::from_slice(&json).unwrap();
+        }
+
+        #[test]
+        fn fuzz_extreme_values(
+            version in any::<u32>(),
+            created_at in any::<u64>(),
+        ) {
+            // Property: Extreme u32/u64 values should be handled
+            let mut snapshot = StateSnapshot::new();
+            snapshot.version = version;
+            snapshot.created_at = created_at;
+
+            // Should serialize
+            let json = serde_json::to_vec(&snapshot).unwrap();
+
+            // Should deserialize with same values
+            let deserialized: StateSnapshot = serde_json::from_slice(&json).unwrap();
+            assert_eq!(snapshot.version, deserialized.version);
+            assert_eq!(snapshot.created_at, deserialized.created_at);
+        }
+    }
+
+    #[test]
+    fn test_empty_collections() {
+        // Edge case: Empty collections should work
+        let mut snapshot = StateSnapshot::new();
+        snapshot.gossip_state = Some(GossipState {
+            vector_clock: HashMap::new(),
+            subscriptions: HashMap::new(),
+            topics: HashMap::new(),
+        });
+        snapshot.network_state = Some(NetworkState {
+            peer_x25519_keys: HashMap::new(),
+            peer_addresses: HashMap::new(),
+        });
+
+        let temp = std::env::temp_dir().join("icn-snapshot-empty-colls");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        save_snapshot(&snapshot, &temp).unwrap();
+        let loaded = load_snapshot(&temp).unwrap().unwrap();
+
+        assert!(loaded.gossip_state.is_some());
+        assert!(loaded.network_state.is_some());
+        assert_eq!(loaded.gossip_state.unwrap().vector_clock.len(), 0);
+        assert_eq!(loaded.network_state.unwrap().peer_x25519_keys.len(), 0);
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_invalid_utf8_in_json() {
+        // Edge case: Invalid UTF-8 should fail gracefully
+        let invalid_utf8 = vec![0xFF, 0xFE, 0xFD];
+        let result: Result<StateSnapshot, _> = serde_json::from_slice(&invalid_utf8);
+        assert!(result.is_err(), "Invalid UTF-8 should fail deserialization");
+    }
+
+    #[test]
+    fn test_truncated_json() {
+        // Edge case: Truncated JSON should fail gracefully
+        let snapshot = StateSnapshot::new();
+        let json = serde_json::to_string(&snapshot).unwrap();
+
+        // Take only first half
+        let truncated = &json[..json.len() / 2];
+        let result: Result<StateSnapshot, _> = serde_json::from_str(truncated);
+        assert!(result.is_err(), "Truncated JSON should fail deserialization");
+    }
+
+    #[test]
+    fn test_malicious_checksum() {
+        // Security: Attacker modifies checksum to match corrupted data
+        let temp = std::env::temp_dir().join("icn-snapshot-malicious");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Corrupt both snapshot and checksum
+        let snapshot_path = snapshot_path(&temp);
+        let checksum_path = checksum_path(&temp);
+
+        let mut content = std::fs::read(&snapshot_path).unwrap();
+        content.extend_from_slice(b"MALICIOUS");
+        std::fs::write(&snapshot_path, &content).unwrap();
+
+        // Compute new checksum for corrupted data
+        let malicious_checksum = super::compute_checksum(&content);
+        std::fs::write(&checksum_path, malicious_checksum).unwrap();
+
+        // Checksum will match, but JSON will be invalid
+        verify_snapshot(&temp).unwrap(); // Checksum matches
+
+        // But deserialization should fail (invalid JSON)
+        let load_result = load_snapshot(&temp);
+        assert!(load_result.is_err(), "Malicious payload should fail deserialization");
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_very_long_strings() {
+        // Edge case: Very long DID strings and topics
+        let mut gossip = GossipState {
+            vector_clock: HashMap::new(),
+            subscriptions: HashMap::new(),
+            topics: HashMap::new(),
+        };
+
+        let long_did = "a".repeat(10000);
+        let long_topic = "topic".to_string() + &"x".repeat(5000);
+
+        gossip.vector_clock.insert(long_did.clone(), 42);
+        gossip.subscriptions.insert(long_topic, vec![long_did]);
+
+        let mut snapshot = StateSnapshot::new();
+        snapshot.gossip_state = Some(gossip);
+
+        // Should serialize without panic
+        let json = serde_json::to_vec(&snapshot).unwrap();
+
+        // Should deserialize without panic
+        let deserialized: StateSnapshot = serde_json::from_slice(&json).unwrap();
+        assert!(deserialized.gossip_state.is_some());
+    }
 }
