@@ -1607,15 +1607,15 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
                 bail!("Invalid X25519 key length: expected 32 bytes, got {}", x25519_bytes.len());
             }
 
-            // Create rotation event for this device add
+            // Create rotation event for this device add (with both keys)
             let rotation_event = icn_identity::RotationEvent {
                 did: own_did.clone(),
-                event_type: icn_identity::RotationEventType::AddDevice {
+                event_type: icn_identity::RotationEventType::AddDeviceWithEncryption {
                     device_id: new_device_id.clone(),
                     label: request.label.clone(),
-                    public_key: ed25519_bytes.clone(),
-                    key_type: KeyType::Ed25519,
-                    capabilities: request.capabilities.clone(),
+                    ed25519_public_key: ed25519_bytes.clone(),
+                    x25519_public_key: x25519_bytes.clone(),
+                    signing_capabilities: request.capabilities.clone(),
                 },
                 proof: vec![], // TODO: Sign this event with current device's key
                 signed_by: device_id.to_string(),

@@ -167,6 +167,25 @@ pub enum RotationEventType {
         capabilities: Vec<Capability>,
     },
 
+    /// Add a new device with both signing and encryption keys
+    ///
+    /// This represents the complete addition of a device that has both
+    /// Ed25519 (signing) and X25519 (encryption) keys. Using this variant
+    /// ensures that remote nodes applying this event will have the same
+    /// DID Document state as the local node that created the event.
+    AddDeviceWithEncryption {
+        /// Device identifier (Ed25519 key will use this ID, X25519 will be {device_id}-enc)
+        device_id: String,
+        /// Device label
+        label: String,
+        /// Ed25519 public key for signing (serialized)
+        ed25519_public_key: Vec<u8>,
+        /// X25519 public key for encryption (serialized)
+        x25519_public_key: Vec<u8>,
+        /// Capabilities granted to the signing key
+        signing_capabilities: Vec<Capability>,
+    },
+
     /// Revoke a device
     RevokeDevice {
         /// Device identifier to revoke
@@ -249,8 +268,8 @@ impl DidDocument {
                     revoked_at: None,
                 },
                 VerificationMethod {
-                    id: "enc-1".to_string(),
-                    label: "Encryption Key".to_string(),
+                    id: "device-1-enc".to_string(),
+                    label: "Primary Device (encryption)".to_string(),
                     key_type: KeyType::X25519,
                     public_key: initial_x25519_key.to_vec(),
                     capabilities: vec![Capability::Encrypt],
@@ -523,6 +542,7 @@ impl RotationEvent {
         // Check signer has appropriate capability
         let required_cap = match &self.event_type {
             RotationEventType::AddDevice { .. } => Capability::AddDevice,
+            RotationEventType::AddDeviceWithEncryption { .. } => Capability::AddDevice,
             RotationEventType::RevokeDevice { .. } => Capability::RevokeDevice,
             RotationEventType::RotateKey { .. } => Capability::RotateKey,
             RotationEventType::Recover { .. } => Capability::Recover,
@@ -665,8 +685,8 @@ mod tests {
 
         assert!(doc.has_capability("device-1", Capability::Sign));
         assert!(doc.has_capability("device-1", Capability::AddDevice));
-        assert!(doc.has_capability("enc-1", Capability::Encrypt));
-        assert!(!doc.has_capability("enc-1", Capability::Sign)); // Encryption key can't sign
+        assert!(doc.has_capability("device-1-enc", Capability::Encrypt));
+        assert!(!doc.has_capability("device-1-enc", Capability::Sign)); // Encryption key can't sign
         assert!(!doc.has_capability("nonexistent", Capability::Sign));
     }
 

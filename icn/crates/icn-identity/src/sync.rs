@@ -199,6 +199,21 @@ impl DidDocumentCache {
                     capabilities.clone(),
                 )?;
             }
+            crate::RotationEventType::AddDeviceWithEncryption {
+                device_id,
+                label,
+                ed25519_public_key,
+                x25519_public_key,
+                signing_capabilities,
+            } => {
+                updated_doc.add_device_with_encryption_key(
+                    device_id.clone(),
+                    label.clone(),
+                    ed25519_public_key.clone(),
+                    x25519_public_key.clone(),
+                    signing_capabilities.clone(),
+                )?;
+            }
             crate::RotationEventType::RevokeDevice { device_id, .. } => {
                 updated_doc.revoke_device(device_id)?;
             }
