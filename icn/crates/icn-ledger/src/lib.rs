@@ -44,6 +44,7 @@
 
 pub mod balance;
 pub mod credit_policy;
+pub mod dispute;
 pub mod entry;
 pub mod hash;
 pub mod ledger;
@@ -53,11 +54,12 @@ pub mod sync;
 pub mod types;
 
 pub use credit_policy::{CreditPolicy, CreditPolicyManager, NewMemberPolicy};
+pub use dispute::DisputeManager;
 pub use ledger::Ledger;
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use quarantine::QuarantineStore;
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use types::{
-    AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, JournalEntry, QuarantinedEntry,
-    QuarantineReason, Resolution, Signature,
+    AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
+    DisputeStatus, JournalEntry, QuarantinedEntry, QuarantineReason, Resolution, Signature,
 };

@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Economic Safety Rails: Dispute Resolution System (Phase 12) (2025-01-14)
+
+**Dispute Management:**
+- `DisputeManager` for tracking and resolving entry disputes
+- File disputes against journal entries with reason and evidence
+- Assign mediators to disputes
+- Resolve disputes with multiple outcome types
+- Track dispute history and status
+
+**Dispute Types:**
+- `Dispute` record with filed_by, reason, evidence, mediator
+- `DisputeStatus`: Normal, Contested, Resolved
+- `DisputeOutcome`: Upheld, Reversed, Settlement, WriteOff
+- Persistent storage of all disputes
+
+**Dispute Operations:**
+- `file_dispute()` - Create new dispute with reason
+- `add_evidence()` - Attach supporting documentation
+- `assign_mediator()` - Assign trusted mediator
+- `resolve_dispute()` - Record resolution with outcome
+- `get_active_disputes()` - Query all active disputes
+- `get_disputes_by_filer()` - Filter by who filed
+
+**Implementation:**
+- New module: `icn-ledger/src/dispute.rs` (380 lines)
+- DisputeManager with persistent storage backend
+- Active disputes cached in memory
+- 6 unit tests covering dispute lifecycle
+
+**Use Cases:**
+- Member contests incorrect charge
+- Mediator investigates and resolves
+- Debt write-off for defaults
+- Settlement agreements between parties
+- Audit trail of all dispute activity
+
+**Example:**
+```rust
+let mut manager = DisputeManager::new(store)?;
+
+// File dispute
+manager.file_dispute(entry_hash, member_did, "Wrong amount".to_string(), timestamp)?;
+
+// Add evidence
+manager.add_evidence(&entry_hash, "Receipt shows $50, not $100".to_string())?;
+
+// Mediator resolves
+let outcome = DisputeOutcome::Settlement {
+    terms: "Split difference: $75".to_string(),
+    replacement_entry: Some(new_entry_hash),
+};
+manager.resolve_dispute(&entry_hash, mediator_did, outcome, timestamp)?;
+```
+
 ### Added - Economic Safety Rails: Dynamic Credit Limits (Phase 12) (2025-01-14)
 
 **Credit Policy System:**

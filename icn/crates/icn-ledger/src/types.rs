@@ -244,3 +244,84 @@ pub enum Resolution {
     /// Merge with modifications
     Merge(JournalEntry),
 }
+
+/// Dispute status for a journal entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DisputeStatus {
+    /// Normal entry, no disputes
+    Normal,
+
+    /// Entry is being contested
+    Contested {
+        /// Who filed the dispute
+        filed_by: Did,
+
+        /// Reason for the dispute
+        reason: String,
+
+        /// When the dispute was filed (Unix timestamp)
+        filed_at: u64,
+    },
+
+    /// Dispute has been resolved
+    Resolved {
+        /// Who mediated the resolution
+        mediator: Did,
+
+        /// Outcome of the dispute
+        outcome: DisputeOutcome,
+
+        /// When the dispute was resolved (Unix timestamp)
+        resolved_at: u64,
+    },
+}
+
+/// Outcome of a dispute resolution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DisputeOutcome {
+    /// Entry is valid, dispute was invalid
+    Upheld,
+
+    /// Entry is invalid, should be reversed
+    Reversed,
+
+    /// Partial settlement agreed upon
+    Settlement {
+        /// Description of the settlement
+        terms: String,
+
+        /// Optional replacement entry
+        replacement_entry: Option<ContentHash>,
+    },
+
+    /// Write-off (debt forgiven or written off)
+    WriteOff {
+        /// Reason for write-off
+        reason: String,
+    },
+}
+
+/// Dispute record (stored separately from journal entries)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Dispute {
+    /// Hash of the disputed entry
+    pub entry_hash: ContentHash,
+
+    /// Who filed the dispute
+    pub filed_by: Did,
+
+    /// Reason for the dispute
+    pub reason: String,
+
+    /// When the dispute was filed
+    pub filed_at: u64,
+
+    /// Current status
+    pub status: DisputeStatus,
+
+    /// Optional evidence or documentation
+    pub evidence: Vec<String>,
+
+    /// Optional mediator assigned
+    pub mediator: Option<Did>,
+}
