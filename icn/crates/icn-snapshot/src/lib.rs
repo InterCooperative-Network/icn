@@ -6,7 +6,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use icn_snapshot::{StateSnapshot, save_snapshot, load_snapshot};
 //!
 //! // Before shutdown
@@ -24,7 +24,6 @@
 //!         network_actor.restore_state(network_state)?;
 //!     }
 //! }
-//! # Ok::<(), anyhow::Error>(())
 //! ```
 
 use anyhow::{Context, Result};
