@@ -409,10 +409,10 @@ icnctl id import backup.age
 ---
 
 **What's Next**: See [ROADMAP.md](/ROADMAP.md) for strategic roadmap. Critical path:
-- **Phase 12**: Operational Hardening (monitoring, backups, disaster recovery)
-- **Phase 13**: Economic Safety Rails (dynamic credit limits, dispute resolution)
-- **Phase 14**: Governance Primitives v1 (driven by pilot community needs)
-- **Track C**: Pilot Community Selection & Deployment (begins after Phase 12)
+- **Phase 13**: Governance Primitives v1 (driven by pilot community needs)
+- **Track C**: Pilot Community Selection & Deployment (ready to begin)
+- **Track B2**: Legal & Regulatory Radar (lightweight, ongoing)
+- **Track B3**: Economic Modeling (research track)
 
 **Three-Layer Security Architecture (Production Ready ✅)**:
 1. **Transport Layer**: QUIC/TLS with DID-TLS binding
