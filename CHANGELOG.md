@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Multi-Device Identity & Sync (Phase 11) (2025-01-14)
+
+**Multi-Device Support:**
+- **MAJOR FEATURE:** One DID controlled by multiple devices with different keys
+- **DID Document v2:** Multiple VerificationMethods per DID with capability-based permissions
+- **Capability System:**
+  - ✅ Sign - Sign messages and contracts
+  - ✅ AddDevice - Authorize new devices
+  - ✅ RevokeDevice - Revoke other devices
+  - ✅ RotateKey - Rotate device key
+  - ✅ Recover - Use recovery mechanisms
+  - ✅ Encrypt - Decrypt messages (X25519)
+- **Rotation Events:** Audit trail for device lifecycle (add, revoke, rotate)
+- **Keystore v3 Format:**
+  - DID Document storage
+  - Device ID tracking
+  - Rotation chain history
+  - Automatic migration from v1/v2.1
+
+**Identity Sync Protocol:**
+- Gossip topic: `identity:updates` for broadcasting DID Document changes
+- IdentityUpdateMessage: Bincode-serialized rotation events (~280 bytes)
+- DidDocumentCache: Peer identity verification with version ordering
+- Version-based conflict resolution
+
+**CLI Device Management:**
+- `icnctl device list` - Show all devices for current identity
+- `icnctl device add <name>` - Generate keys and request file for new device
+- `icnctl device approve <file>` - Approve device add request
+- `icnctl device revoke <id>` - Revoke device access
+
+**Implementation:**
+- New module: `icn-identity/src/multi_device.rs` (DID Document v2)
+- New module: `icn-identity/src/sync.rs` (Identity sync protocol)
+- Enhanced: `icn-identity/src/keystore.rs` (v3 format)
+- Enhanced: `icnctl/src/main.rs` (Device commands)
+
+**Test Coverage:**
+- 31 unit tests (multi_device, keystore, sync)
+- 2 integration tests (end-to-end workflow, version ordering)
+- 1 doc test
+
+### Fixed
+
+**Critical: Version Mismatch in Device Approval (2025-01-14)**
+- Fixed bug where device approval incremented DID Document version twice (once per key) but rotation event expected single increment
+- Added `DidDocument::add_device_with_encryption_key()` to add both Ed25519 and X25519 keys with single version increment
+- Added test `test_add_device_with_encryption_key_version_increment()` to verify correct behavior
+- Impact: Would have caused identity sync verification failures when peers tried to apply rotation events
+- Resolution: Rotation event version now matches DID Document version after device approval
+
 ### Added - End-to-End Payload Encryption (Phase 10) (2025-11-13)
 
 **X25519-ChaCha20-Poly1305 Message Encryption:**
