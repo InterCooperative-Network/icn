@@ -393,7 +393,7 @@ sudo systemctl start icnd
 
 **Planned features (Track B1: Upgrade Mechanism):**
 - Versioned network protocol (automatic version negotiation)
-- Graceful restart semantics (preserve in-memory state across restarts)
+- ✅ **Graceful restart semantics** (IMPLEMENTED - preserves vector clocks, subscriptions, X25519 keys)
 - `icnctl migrate` command for schema changes
 - Rolling upgrade strategy for multi-node communities
 
@@ -664,18 +664,167 @@ journalctl -u icnd -f
 journalctl -u icnd --since "1 hour ago"
 ```
 
+### Graceful Restart & State Persistence
+
+ICN nodes automatically preserve critical runtime state across restarts, enabling zero-downtime maintenance and upgrades.
+
+**What's Preserved:**
+- **Vector Clocks**: Causal ordering state prevents duplicate message processing
+- **Topic Subscriptions**: No need to re-subscribe after restart
+- **Topic Metadata**: Topic names, access control policies (Public/Private/TrustGated/Participants)
+- **Peer X25519 Keys**: Immediate end-to-end encrypted communication after restart
+
+**What's NOT Preserved (by design):**
+- Gossip entries (fetched from peers via anti-entropy within seconds)
+- Active network connections (re-established via mDNS within ~5s)
+- Connection statistics (acceptable reset)
+
+**Snapshot Location:**
+```bash
+# Default location
+~/.icn/state.snapshot
+
+# Custom location (via config)
+<data-dir>/state.snapshot
+```
+
+**Restart Best Practices:**
+
+```bash
+# 1. Check node health before restart
+icnctl status
+curl http://localhost:8080/health | jq
+
+# 2. Check recent metrics (optional)
+curl -s http://localhost:9090/metrics | grep icn_snapshot
+
+# 3. Perform graceful restart
+sudo systemctl restart icnd
+
+# 4. Verify state restoration in logs
+journalctl -u icnd --since "1 minute ago" | grep -E "(snapshot|restored)"
+# Look for: "State snapshot saved" and "Gossip/Network state restored"
+
+# 5. Verify health after restart
+icnctl status
+curl http://localhost:8080/health | jq
+
+# 6. Check that subscriptions were restored
+icnctl gossip topics
+```
+
+**Monitoring State Snapshots:**
+
+Prometheus metrics for operational visibility:
+```bash
+# Snapshot operation timing
+curl -s http://localhost:9090/metrics | grep icn_snapshot_save_duration
+curl -s http://localhost:9090/metrics | grep icn_snapshot_load_duration
+
+# Snapshot contents
+curl -s http://localhost:9090/metrics | grep icn_snapshot_gossip_vector_clock_entries
+curl -s http://localhost:9090/metrics | grep icn_snapshot_gossip_subscriptions
+curl -s http://localhost:9090/metrics | grep icn_snapshot_network_x25519_keys
+
+# Snapshot file size
+curl -s http://localhost:9090/metrics | grep icn_snapshot_size_bytes
+
+# Operation counters
+curl -s http://localhost:9090/metrics | grep icn_snapshot_save_total
+curl -s http://localhost:9090/metrics | grep icn_snapshot_load_total
+curl -s http://localhost:9090/metrics | grep icn_snapshot_errors_total
+```
+
+**Snapshot Alerts (Recommended):**
+
+Add these Prometheus alerts to detect snapshot issues:
+```yaml
+# Alert if snapshot save fails
+- alert: SnapshotSaveFailed
+  expr: rate(icn_snapshot_save_errors_total[5m]) > 0
+  annotations:
+    summary: "Snapshot save operations failing"
+    description: "Node {{ $labels.instance }} failed to save state snapshot"
+
+# Alert if snapshot is very large (possible issue)
+- alert: SnapshotTooLarge
+  expr: icn_snapshot_size_bytes > 10485760  # 10MB
+  annotations:
+    summary: "State snapshot unusually large"
+    description: "Snapshot size {{ $value }} bytes on {{ $labels.instance }}"
+
+# Alert if snapshot save is slow
+- alert: SnapshotSaveSlow
+  expr: histogram_quantile(0.99, rate(icn_snapshot_save_duration_seconds_bucket[5m])) > 1.0
+  annotations:
+    summary: "Snapshot saves taking over 1 second"
+    description: "P99 snapshot save time: {{ $value }}s"
+```
+
+**Troubleshooting:**
+
+```bash
+# Snapshot not being created
+# 1. Check disk space
+df -h ~/.icn
+# 2. Check permissions
+ls -la ~/.icn/state.snapshot
+# 3. Check logs for errors
+journalctl -u icnd | grep -i "snapshot.*error"
+
+# Snapshot not being restored
+# 1. Check if snapshot exists
+ls -lh ~/.icn/state.snapshot
+# 2. Verify JSON format
+jq . ~/.icn/state.snapshot
+# 3. Check for corruption
+cat ~/.icn/state.snapshot | jq '.version'
+
+# State not preserved after restart
+# 1. Verify snapshot was created before shutdown
+journalctl -u icnd | grep "State snapshot saved"
+# 2. Verify snapshot was loaded on startup
+journalctl -u icnd | grep "State snapshot restored"
+# 3. Check snapshot contents
+jq '.gossip_state.vector_clock' ~/.icn/state.snapshot
+```
+
+**Security Considerations:**
+
+The state snapshot contains **public information only**:
+- DIDs (public identifiers)
+- Vector clock counters
+- Topic names and access control policies
+- X25519 public keys (not private keys)
+
+**No sensitive data** is persisted:
+- Private keys remain in encrypted keystore
+- Passphrases never written to disk
+- Message content not persisted
+
+**File permissions** use OS defaults (typically 644). For defense-in-depth:
+```bash
+# Tighten permissions (optional)
+chmod 600 ~/.icn/state.snapshot
+```
+
 ### Backup & Restore
 
 ```bash
-# Create backup
+# Create backup (includes state.snapshot automatically)
 icnctl backup <output-path>
 
-# Restore from backup
+# Restore from backup (includes state.snapshot)
 icnctl restore <backup-path>
 
 # Verify backup integrity
 icnctl backup verify <backup-path>
+
+# Verify state.snapshot is included
+tar -tf backup.tar | grep state.snapshot
 ```
+
+**Note:** Backups automatically include `state.snapshot` for full state restoration. When you restore from backup, both your identity and runtime state (vector clocks, subscriptions, X25519 keys) are restored together.
 
 ### Network Diagnostics
 
