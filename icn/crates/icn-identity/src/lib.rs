@@ -2,6 +2,8 @@
 
 pub mod bundle;
 pub mod keystore;
+pub mod multi_device;
+pub mod sync;
 
 use anyhow::Result;
 use ed25519_dalek::{SigningKey, VerifyingKey};
@@ -11,6 +13,11 @@ use zeroize::Zeroizing;
 
 pub use bundle::{BindingInfo, IdentityBundle, verify_binding_info};
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
+pub use multi_device::{
+    Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
+    RevocationReason, RotationEvent, RotationEventType, VerificationMethod,
+};
+pub use sync::{DidDocumentCache, IdentityUpdateMessage, IDENTITY_UPDATES_TOPIC};
 
 /// A decentralized identifier for an ICN node
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
