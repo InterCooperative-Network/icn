@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Operational Hardening: Incident Response Playbook (Track B1) (2025-01-14)
+
+**Comprehensive Incident Response Documentation:**
+- Detailed procedures for 7 major incident scenarios
+- General incident response framework with P0-P3 severity levels
+- Step-by-step workflows with command examples
+- Monitoring and detection guidance
+
+**Incident Scenarios Covered:**
+1. **Node Compromise (P0)** - Immediate isolation, evidence preservation, device revocation
+2. **Ledger Corruption (P1)** - Quarantine assessment, recovery procedures, backup restoration
+3. **Key Suspected Stolen (P0)** - Emergency device revocation, key rotation ceremony
+4. **Network Partition (P1)** - Connectivity diagnosis, split-brain detection
+5. **Gossip Storm (P2)** - Rate limiting verification, peer blocking
+6. **Quarantine Growth (P2)** - Entry inspection, manual review vs automated cleanup
+7. **Monitoring and Detection** - Critical/warning/info alert definitions
+
+**Each Scenario Includes:**
+- Symptoms and diagnosis procedures
+- Immediate actions (first 15 minutes)
+- Recovery steps
+- Investigation and root cause analysis
+- Prevention strategies
+
+**Operations Support:**
+- Post-incident review template
+- Emergency contact information structure
+- Integration with monitoring dashboard
+- Balance between current v0.1 capabilities and future features
+
+**Implementation:**
+- New document: `docs/incident-response.md` (630+ lines)
+- Ready for operational deployment
+- Supports Track C pilot deployment readiness
+
 ### Added - Operational Hardening: Monitoring Dashboard (Track B1) (2025-01-14)
 
 **Health Check Endpoint:**
