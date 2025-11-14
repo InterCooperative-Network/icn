@@ -39,6 +39,7 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 **Project root `/home/matt/projects/icn/`:**
 - `CLAUDE.md` - This file; guidance for Claude Code when working on the project
 - `README.md` - Project overview and quick start guide for users
+- `ROADMAP.md` - Strategic roadmap and future development plans (see this for "what's next")
 - `CHANGELOG.md` - Formal, user-facing changelog following Keep a Changelog format
 
 **Documentation directory `/home/matt/projects/icn/docs/`:**
@@ -46,6 +47,8 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `production-hardening.md` - Security hardening measures and vulnerability fixes
 - `deployment-guide.md` - Installation, configuration, monitoring, and operations
 - `topic-subscriptions-api.md` - API reference for gossip subscriptions
+- `governance-primitives.md` - Design spec for governance layer (Phase 13)
+- `econ-modeling.md` - Economic modeling research for mutual credit systems
 - `dev-journal/` - Detailed development journals (see below)
 
 ### Development Journal (`docs/dev-journal/`)
@@ -312,6 +315,47 @@ icnctl id import backup.age
 
 ## Current Phase
 
+**Phase 11 - Multi-Device Identity & Sync (Complete ✓)** (2025-01-14):
+- [x] DID Document v2 with multi-device support
+- [x] VerificationMethod with capability-based permissions
+- [x] RotationEvent chain for device lifecycle audit trail
+- [x] Keystore v3 format with DID Document + automatic migration
+- [x] `update_did_document()` method for atomic updates
+- [x] CLI device management (list, add, approve, revoke)
+- [x] Identity sync protocol via gossip (`identity:updates` topic)
+- [x] DidDocumentCache for peer identity verification
+- [x] All 33 tests pass (30 unit + 2 integration + 1 doc test)
+- [x] Complete end-to-end workflow tested
+- [x] Comprehensive design doc: `docs/multi-device-identity-design.md`
+
+**Multi-Device Identity Features**:
+- Single DID across multiple devices (laptop, phone, etc.)
+- Per-device capabilities (Sign, AddDevice, RevokeDevice, RotateKey, Recover, Encrypt)
+- Device revocation with timestamps and audit trail
+- Gossip-based DID Document synchronization (280 bytes per update)
+- Version-ordered cache prevents replay attacks
+
+**Identity Sync Protocol**:
+- `IdentityUpdateMessage` broadcasts rotation events
+- `DidDocumentCache` maintains peer identity state
+- NetworkActor verifies signatures against cached DID Documents
+- Automatic version conflict resolution
+
+---
+
+**What's Next**: See [ROADMAP.md](/ROADMAP.md) for strategic roadmap. Critical path:
+- **Phase 12**: Operational Hardening (monitoring, backups, disaster recovery)
+- **Phase 13**: Economic Safety Rails (dynamic credit limits, dispute resolution)
+- **Phase 14**: Governance Primitives v1 (driven by pilot community needs)
+- **Track C**: Pilot Community Selection & Deployment (begins after Phase 12)
+
+**Three-Layer Security Architecture (Production Ready ✅)**:
+1. **Transport Layer**: QUIC/TLS with DID-TLS binding
+2. **Message Layer**: SignedEnvelope with Ed25519 signatures + replay protection
+3. **Application Layer**: EncryptedEnvelope with end-to-end encryption
+
+---
+
 **Phase 10 - End-to-End Payload Encryption (Complete ✓)** (2025-01-13):
 - [x] EncryptedEnvelope with X25519-ChaCha20-Poly1305 AEAD encryption
 - [x] X25519 keys added to IdentityBundle (generation + persistence)
@@ -321,12 +365,6 @@ icnctl id import backup.age
 - [x] Full encrypt → sign → send → receive → verify → decrypt flow
 - [x] Network integration test validating complete message flow
 - [x] All 261 tests pass (7 new encryption tests)
-- [x] Comprehensive dev journal: `docs/dev-journal/2025-11-13-payload-encryption.md`
-
-**Three-Layer Security Architecture (Production Ready ✅)**:
-1. **Transport Layer**: QUIC/TLS with DID-TLS binding
-2. **Message Layer**: SignedEnvelope with Ed25519 signatures + replay protection
-3. **Application Layer**: EncryptedEnvelope with end-to-end encryption
 
 **Gossip Message Authentication (Complete ✓)** (2025-11-13):
 - [x] Migrated all gossip messages to SignedEnvelope
