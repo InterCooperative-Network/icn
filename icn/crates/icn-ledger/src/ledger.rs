@@ -269,6 +269,33 @@ impl Ledger {
         self.cached_balances.clone()
     }
 
+    /// Get total cleared volume for an account in a currency
+    ///
+    /// This sums all credit (positive contribution) deltas for the account,
+    /// which represents their total historical contributions to the system.
+    /// Used for calculating credit limit bonuses based on transaction history.
+    ///
+    /// Example: If Alice has received 500 hours of credits over time,
+    /// this returns 500 (even if her current balance is lower due to debits).
+    pub fn total_cleared_by(&self, account_id: &Did, currency: &str) -> Result<i64> {
+        let entries = self.get_all_entries()?;
+
+        let mut total_credits: i64 = 0;
+
+        for entry in entries {
+            for delta in &entry.accounts {
+                if delta.account_id == *account_id && delta.currency == currency {
+                    // Sum only credits (positive contributions)
+                    if let Some(credit) = delta.credit {
+                        total_credits += credit;
+                    }
+                }
+            }
+        }
+
+        Ok(total_credits)
+    }
+
     /// Recompute all balances from journal entries (for verification)
     pub fn recompute_balances(&mut self) -> Result<()> {
         info!("Recomputing all balances from journal");

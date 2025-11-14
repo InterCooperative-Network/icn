@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Economic Safety Rails: Dynamic Credit Limits (Phase 12) (2025-01-14)
+
+**Credit Policy System:**
+- Dynamic credit limits based on trust score + transaction history
+- `CreditPolicy` calculates limits using formula: baseline + trust_bonus + history_bonus
+- Conservative and permissive policy presets
+- Trust bonus scales with trust graph score (0.0-1.0)
+- History bonus rewards cleared transaction volume
+
+**New Member Protection:**
+- `NewMemberPolicy` implements protective throttling for new participants
+- Initial low credit limit (10 hours default)
+- Contribution threshold before ramping starts (50 hours default)
+- Linear ramp over 90 days to full credit limit
+- Prevents "extract value and disappear" attacks
+
+**Credit Limit Calculation:**
+- `CreditPolicyManager` combines base policy + new member throttling
+- Effective limit is minimum of both policies
+- `total_cleared_by()` method tracks historical contributions
+- `check_transaction()` validates against calculated limits
+
+**Implementation:**
+- New module: `icn-ledger/src/credit_policy.rs`
+- `CreditPolicy::calculate_limit()` - Dynamic limit calculation
+- `NewMemberPolicy::calculate_effective_limit()` - Tenure-based ramping
+- `Ledger::total_cleared_by()` - Sum all credits for an account
+- 4 unit tests covering policy defaults, ramping, and limit checks
+
+**Economic Protection:**
+- Protects communities from free riders
+- Rewards trusted, active participants with higher limits
+- Gradual onboarding prevents new member exploitation
+- Foundation for Phase 12 dispute resolution and default handling
+
+**Example:**
+```rust
+// Conservative policy for new communities
+let policy = CreditPolicyManager::conservative("hours".to_string());
+
+// Calculate limit: baseline 100h + trust 24h + history 50h = 174h
+let limit = policy.calculate_credit_limit(
+    &member_did,
+    member_since,
+    current_time,
+    &ledger,
+    &trust_graph,
+)?;
+```
+
 ### Added - Operational Hardening: Protocol Version Validation (Track B1) (2025-01-14)
 
 **Versioned Network Protocol:**
