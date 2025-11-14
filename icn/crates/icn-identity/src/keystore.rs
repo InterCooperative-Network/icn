@@ -240,10 +240,24 @@ impl KeyStore for AgeKeyStore {
             warn!("⚠️  Migrating v1 keystore to v2 format with DID-TLS binding");
 
             // Generate new IdentityBundle from the keypair
-            let bundle = IdentityBundle::from_keypair(keypair)?;
+            let bundle = IdentityBundle::from_keypair(keypair.clone())?;
 
-            // TODO: Auto-save the upgraded keystore with TLS binding
-            // For now, we just log the migration - the next write will save the new format
+            // Auto-save the upgraded keystore with TLS binding
+            // This ensures TLS certificates persist across restarts
+            let stored_v2 = StoredKey {
+                secret_bytes: *keypair.secret_bytes(),
+                public_bytes: keypair.verifying_key().to_bytes(),
+                did: bundle.did().as_str().to_string(),
+                tls_cert_der: Some(bundle.tls_cert().as_ref().to_vec()),
+                tls_key_der: Some(bundle.tls_key_der_bytes().to_vec()),
+                tls_binding_sig: Some(bundle.binding_info().tls_binding_sig.clone()),
+                created_at: Some(bundle.binding_info().created_at),
+            };
+
+            Self::encrypt_and_save(&self.path, &stored_v2, passphrase)
+                .context("Failed to save upgraded v2 keystore")?;
+
+            info!("✅ Successfully migrated and saved v2 keystore with persistent TLS binding");
 
             bundle
         };
@@ -360,5 +374,55 @@ mod tests {
         assert_eq!(rotation.old_did, old_did);
         assert_eq!(rotation.new_did, new_did);
         assert_eq!(ks.get_keypair().unwrap().did(), &new_did);
+    }
+
+    #[test]
+    fn test_v1_to_v2_migration_persists_tls() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Create a v1 keystore manually (no TLS binding fields)
+        let keypair = KeyPair::generate().unwrap();
+        let stored_v1 = StoredKey {
+            secret_bytes: *keypair.secret_bytes(),
+            public_bytes: keypair.verifying_key().to_bytes(),
+            did: keypair.did().as_str().to_string(),
+            tls_cert_der: None,
+            tls_key_der: None,
+            tls_binding_sig: None,
+            created_at: None,
+        };
+        AgeKeyStore::encrypt_and_save(&path, &stored_v1, passphrase).unwrap();
+
+        // First unlock: should trigger v1->v2 migration
+        let mut ks = AgeKeyStore::open(&path).unwrap();
+        ks.unlock(passphrase).unwrap();
+
+        // Get TLS certificate from migrated bundle
+        let bundle1 = ks.get_identity_bundle().unwrap();
+        let cert1_der = bundle1.tls_cert().as_ref().to_vec();
+        let binding_sig1 = bundle1.binding_info().tls_binding_sig.clone();
+
+        // Lock and unlock again
+        ks.lock();
+        ks.unlock(passphrase).unwrap();
+
+        // Get TLS certificate again
+        let bundle2 = ks.get_identity_bundle().unwrap();
+        let cert2_der = bundle2.tls_cert().as_ref().to_vec();
+        let binding_sig2 = bundle2.binding_info().tls_binding_sig.clone();
+
+        // TLS certificates should be IDENTICAL (not regenerated)
+        assert_eq!(cert1_der, cert2_der, "TLS certificate should persist across unlocks");
+        assert_eq!(binding_sig1, binding_sig2, "TLS binding signature should persist across unlocks");
+
+        // Open in a new keystore instance to verify disk persistence
+        let mut ks3 = AgeKeyStore::open(&path).unwrap();
+        ks3.unlock(passphrase).unwrap();
+        let bundle3 = ks3.get_identity_bundle().unwrap();
+        let cert3_der = bundle3.tls_cert().as_ref().to_vec();
+
+        assert_eq!(cert1_der, cert3_der, "TLS certificate should persist to disk");
     }
 }
