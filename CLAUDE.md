@@ -351,9 +351,20 @@ icnctl id import backup.age
 - [x] Protocol Version Validation - Automatic version checks with metrics
 - [x] Graceful Restart - Production-ready state persistence (vector clocks, subscriptions, X25519 keys, ACL security, 11 Prometheus metrics)
 
-**Advanced Features (Future):**
-- [ ] Version Negotiation Handshake - Capability announcements
+**Advanced Features:**
+- [x] Version Negotiation Handshake - Capability announcements (Complete ✓)
 - [ ] Schema Migrations - `icnctl migrate` for data format changes
+
+**Version Negotiation Features (Complete ✓)** (2025-01-14):
+- **VersionInfo Protocol**: Automatic exchange during Hello handshake with current/min/max protocol versions
+- **CapabilityFlags**: 8 capability flags (E2E_ENCRYPTION, SIGNED_MESSAGES, GRACEFUL_RESTART, TOPOLOGY_AWARE, TRUST_RATE_LIMITING, GOSSIP_PULL, MULTI_DEVICE, ECONOMIC_SAFETY)
+- **Per-Connection Tracking**: PeerConnectionInfo maintains negotiated version and peer capabilities
+- **Capability-Based Feature Gating**: NetworkHandle API for querying peer capabilities and conditional feature usage
+- **Backward Compatibility**: Legacy nodes (missing version_info) treated as version 1 with empty capabilities
+- **Prometheus Metrics**: 5 metrics tracking version negotiation outcomes and capability distribution
+- **Graceful Degradation**: Applications can fallback to basic features when advanced ones unavailable
+- **Test Coverage**: 16 comprehensive tests covering negotiation, incompatibility detection, capability checking
+- **Documentation**: Complete developer guide with patterns for feature gating ([capability-based-features.md](docs/capability-based-features.md))
 
 **Operational Capabilities (Production Ready ✅)**:
 - **Backup/Restore**: Encrypted backup bundles (keystore + store + config)
