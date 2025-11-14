@@ -88,10 +88,11 @@ impl HealthService {
             .as_secs();
 
         // Determine health state based on metrics
-        status.status = if ledger_quarantine_size > 100 {
-            HealthState::Degraded
-        } else if ledger_quarantine_size > 1000 {
+        // Check most restrictive condition first
+        status.status = if ledger_quarantine_size > 1000 {
             HealthState::Unhealthy
+        } else if ledger_quarantine_size > 100 {
+            HealthState::Degraded
         } else {
             HealthState::Healthy
         };
@@ -149,4 +150,70 @@ pub async fn start_monitoring_server(port: u16, health: HealthService) -> anyhow
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_health_state_healthy() {
+        let health = HealthService::new();
+
+        // Quarantine size <= 100 should be Healthy
+        health.update(5, 10, 50);
+
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Healthy);
+        assert_eq!(status.ledger_quarantine_size, 50);
+    }
+
+    #[test]
+    fn test_health_state_degraded() {
+        let health = HealthService::new();
+
+        // Quarantine size > 100 but <= 1000 should be Degraded
+        health.update(5, 10, 500);
+
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Degraded);
+        assert_eq!(status.ledger_quarantine_size, 500);
+    }
+
+    #[test]
+    fn test_health_state_unhealthy() {
+        let health = HealthService::new();
+
+        // Quarantine size > 1000 should be Unhealthy
+        health.update(5, 10, 1500);
+
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Unhealthy);
+        assert_eq!(status.ledger_quarantine_size, 1500);
+    }
+
+    #[test]
+    fn test_health_state_boundary_conditions() {
+        let health = HealthService::new();
+
+        // Test boundary: exactly 100 should be Healthy
+        health.update(5, 10, 100);
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Healthy);
+
+        // Test boundary: 101 should be Degraded
+        health.update(5, 10, 101);
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Degraded);
+
+        // Test boundary: exactly 1000 should be Degraded
+        health.update(5, 10, 1000);
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Degraded);
+
+        // Test boundary: 1001 should be Unhealthy
+        health.update(5, 10, 1001);
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Unhealthy);
+    }
 }
