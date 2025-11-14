@@ -178,7 +178,56 @@ let keypair = KeyPair::generate()?;
 
 **Lesson**: Multi-device is about key management, not identity creation.
 
-### Challenge 3: Borrow Checker in Migration Test
+### Challenge 3: Version Mismatch in Device Approval (Critical Bug)
+
+**Problem**: Device approval was calling `add_device()` twice (once for Ed25519, once for X25519), incrementing the version from 1→2→3, but the rotation event was created with `new_version = did_doc.version + 1 = 2`.
+
+**Error**: Version mismatch between rotation event and actual DID Document state.
+
+**Example**:
+```rust
+// rotation_event created BEFORE applying update
+let rotation_event = RotationEvent {
+    new_version: did_doc.version + 1,  // e.g., 2
+    // ...
+};
+
+// Then update function called add_device() TWICE
+keystore.update_did_document(|did_doc| {
+    did_doc.add_device(...)?;  // version: 1 → 2
+    did_doc.add_device(...)?;  // version: 2 → 3 ⚠️ MISMATCH!
+}, Some(rotation_event), &passphrase)?;
+```
+
+**Impact**: This would cause verification failures in identity sync when peers try to apply rotation events, because the version check at `multi_device.rs:450` expects `new_version` to be `did_doc.version + 1`.
+
+**Solution**: Created `add_device_with_encryption_key()` method that adds both keys with single version increment:
+```rust
+pub fn add_device_with_encryption_key(
+    &mut self,
+    device_id: String,
+    label: String,
+    ed25519_public_key: Vec<u8>,
+    x25519_public_key: Vec<u8>,
+    signing_capabilities: Vec<Capability>,
+) -> Result<()> {
+    // Add Ed25519 signing key
+    self.verification_method.push(...);
+
+    // Add X25519 encryption key
+    self.verification_method.push(...);
+
+    // Update version ONCE for the logical operation
+    self.version += 1;
+    Ok(())
+}
+```
+
+**Test coverage**: Added `test_add_device_with_encryption_key_version_increment()` to verify version increments by exactly 1.
+
+**Lesson**: When creating rotation events, ensure the version increment matches the semantic operation being performed. A device addition is a single logical operation, even if it involves multiple keys.
+
+### Challenge 4: Borrow Checker in Migration Test
 
 **Problem**: Held reference to DID Document while trying to lock/unlock keystore.
 
@@ -200,8 +249,8 @@ ks.unlock(passphrase).unwrap();
 
 ## Test Coverage
 
-**Unit tests** (30 total in icn-identity):
-- `multi_device.rs`: DID Document creation, device add/revoke, capability checks
+**Unit tests** (31 total in icn-identity):
+- `multi_device.rs`: DID Document creation, device add/revoke, capability checks, version increment behavior
 - `keystore.rs`: v3 creation, unlock, v2.1→v3 migration, update_did_document()
 - `sync.rs`: IdentityUpdateMessage serialization, cache apply_event(), version ordering
 
@@ -211,7 +260,7 @@ ks.unlock(passphrase).unwrap();
 
 **Doc tests**: 1 in sync.rs
 
-**Test results**: All 264 workspace tests pass (33 in icn-identity).
+**Test results**: All 34 tests pass in icn-identity (31 unit + 2 integration + 1 doc).
 
 ## Security Considerations
 
@@ -419,6 +468,8 @@ Phase 11 is complete. See [ROADMAP.md](../ROADMAP.md) for next phases:
 2. `c405c23` - feat: Implement identity sync protocol via gossip
 3. `085c59e` - feat: Add device management CLI commands
 4. `857eec3` - docs: Add multi-device identity design doc and roadmap
+5. `0247acc` - docs: Add Phase 11 dev journal and update CLAUDE.md
+6. `c705831` - fix: Correct DID Document version increment in device approval
 
 ## References
 
