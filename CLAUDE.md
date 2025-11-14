@@ -315,15 +315,45 @@ icnctl id import backup.age
 
 ## Current Phase
 
-**Track B1 - Operational Hardening (In Progress ⏳)** (2025-01-14):
+**Phase 12 - Economic Safety Rails (Complete ✓)** (2025-01-14):
+- [x] Dynamic Credit Limits - Trust + history-based limit calculation
+- [x] New Member Protection - Progressive ramping with contribution threshold
+- [x] Dispute Resolution - Full lifecycle management (file, mediate, resolve)
+- [x] Credit Policy Manager - Conservative/permissive presets
+- [x] Dispute Manager - Persistent storage with mediation workflow
+- [x] Economic Safety Documentation - Comprehensive guide with examples
+- [x] All 10 tests pass (4 credit policy + 6 dispute resolution)
+
+**Economic Safety Features**:
+- **Dynamic Limits**: Formula-based limits (baseline + trust_bonus + history_bonus)
+- **New Member Throttling**: 10h initial → 90-day ramp → full limit
+- **Dispute System**: File disputes, add evidence, assign mediators, resolve
+- **Write-offs**: Debt forgiveness mechanism for defaults
+- **Multi-currency**: Separate policies per currency (hours, USD, kWh)
+
+**Protection Against:**
+- Free riders (low trust = low limits)
+- "Grab and run" attacks (new member throttling)
+- Credit limit gaming (history-based bonuses)
+- Dispute abuse (mediator oversight)
+
+**Next Steps:**
+- Phase 13: Governance Primitives (driven by pilot community needs)
+- Track C: Pilot Community Selection & Deployment
+
+---
+
+**Track B1 - Operational Hardening (Complete ✓)** (2025-01-14):
 - [x] Backup & Restore - `icnctl backup/restore` commands with encrypted tarballs
 - [x] Monitoring Dashboard - Real-time web UI + health check endpoint
 - [x] Incident Response Playbook - Comprehensive procedures for 7 major incident types
 - [x] Operations Guide - Day-to-day workflows, command reference, troubleshooting
 - [x] Protocol Version Validation - Automatic version checks with metrics
-- [ ] Version Negotiation Handshake - Capability announcements (future)
-- [ ] Graceful Restart - State persistence across daemon restarts (future)
-- [ ] Schema Migrations - `icnctl migrate` for data format changes (future)
+- [x] Graceful Restart - State persistence across daemon restarts (vector clocks, subscriptions, X25519 keys)
+
+**Advanced Features (Future):**
+- [ ] Version Negotiation Handshake - Capability announcements
+- [ ] Schema Migrations - `icnctl migrate` for data format changes
 
 **Operational Capabilities (Production Ready ✅)**:
 - **Backup/Restore**: Encrypted backup bundles (keystore + store + config)
@@ -332,11 +362,16 @@ icnctl id import backup.age
 - **Incident Response**: 7 detailed procedures (node compromise, ledger corruption, key theft, etc.)
 - **Operations Guide**: 800+ lines covering daily/weekly/monthly tasks, troubleshooting
 - **Protocol Versioning**: Version validation prevents incompatible node communication
+- **Graceful Restart**: Automatic state snapshots preserve vector clocks, topic subscriptions, and peer X25519 keys
 
-**Next Steps:**
-- Complete Track B1 implementation features (graceful restart, migrations)
-- Phase 12: Economic Safety Rails (dynamic credit limits, dispute resolution)
-- Track C: Pilot Community Selection & Deployment
+**Graceful Restart Features**:
+- **State Snapshot**: JSON snapshots saved to `{data_dir}/state.snapshot` on shutdown
+- **Gossip State**: Vector clocks (causal ordering), topic subscriptions, topic metadata
+- **Network State**: Peer X25519 public keys (immediate encrypted communication after restart)
+- **Automatic**: Restore on startup, save on shutdown (via supervisor lifecycle)
+- **Gossip Entries**: NOT persisted (fetched from peers via anti-entropy)
+- **Network Connections**: NOT persisted (re-established via mDNS discovery)
+- **crates/icn-snapshot**: Standalone crate with zero dependencies (no circular deps)
 
 ---
 
