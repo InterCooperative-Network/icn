@@ -2,9 +2,10 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use icn_identity::{AgeKeyStore, Did, KeyPair, KeyStore};
+use icn_identity::{AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType};
 use icn_store::{SledStore, Store};
 use icn_trust::{TrustEdge, TrustGraph};
+use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -34,6 +35,10 @@ enum Commands {
     /// Identity management
     #[command(subcommand)]
     Id(IdCommands),
+
+    /// Device management (multi-device identity)
+    #[command(subcommand)]
+    Device(DeviceCommands),
 
     /// Trust graph management
     #[command(subcommand)]
@@ -77,6 +82,34 @@ enum IdCommands {
     Import {
         /// Input file path
         input: PathBuf,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DeviceCommands {
+    /// List all devices for this identity
+    List,
+
+    /// Create a device-add request for a new device
+    Add {
+        /// Device name/label
+        name: String,
+    },
+
+    /// Approve a device-add request (from an existing authorized device)
+    Approve {
+        /// Path to device-add request file
+        request_file: PathBuf,
+    },
+
+    /// Revoke a device
+    Revoke {
+        /// Device ID to revoke
+        device_id: String,
+
+        /// Reason for revocation
+        #[arg(short, long)]
+        reason: Option<String>,
     },
 }
 
@@ -305,6 +338,8 @@ async fn main() -> Result<()> {
         }
 
         Commands::Id(id_cmd) => handle_id_command(id_cmd, &data_dir)?,
+
+        Commands::Device(device_cmd) => handle_device_command(device_cmd, &data_dir)?,
 
         Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
 
@@ -1326,4 +1361,394 @@ fn parse_did(s: &str) -> Result<Did> {
     Ok(serde_json::from_value(serde_json::Value::String(
         s.to_string(),
     ))?)
+}
+
+/// Device add request - created on new device, approved on existing device
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DeviceAddRequest {
+    /// The DID this request is for
+    did: String,
+
+    /// Device label (e.g., "Matt's Laptop")
+    label: String,
+
+    /// Ed25519 public key (hex encoded)
+    ed25519_public_key: String,
+
+    /// X25519 public key for encryption (hex encoded)
+    x25519_public_key: String,
+
+    /// Requested capabilities
+    capabilities: Vec<Capability>,
+
+    /// Timestamp when request was created
+    created_at: u64,
+}
+
+fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> {
+    let keystore_path = get_keystore_path(data_dir);
+
+    match cmd {
+        DeviceCommands::List => {
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one.");
+            }
+
+            // Get passphrase and unlock
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            // Get DID document
+            let did_doc = keystore.get_did_document()?;
+            let device_id = keystore.get_device_id()?;
+
+            println!("Identity: {}", did_doc.id);
+            println!("Version: {}", did_doc.version);
+            println!("Updated: {}", did_doc.updated_at);
+            println!("\nDevices ({}):", did_doc.verification_method.len() / 2); // Ed25519 + X25519 per device
+            println!();
+
+            // Group verification methods by device (Ed25519 + X25519 pairs)
+            let mut device_map: std::collections::HashMap<String, Vec<&icn_identity::VerificationMethod>> = std::collections::HashMap::new();
+
+            for vm in &did_doc.verification_method {
+                // Extract device number from id (e.g., "device-1" or "enc-1")
+                let base_id = if vm.id.starts_with("device-") {
+                    vm.id.clone()
+                } else if vm.id.starts_with("enc-") {
+                    format!("device-{}", &vm.id[4..])
+                } else {
+                    vm.id.clone()
+                };
+
+                device_map.entry(base_id).or_insert_with(Vec::new).push(vm);
+            }
+
+            // Display devices in order
+            let mut device_ids: Vec<_> = device_map.keys().collect();
+            device_ids.sort();
+
+            for dev_id in device_ids {
+                let vms = &device_map[dev_id];
+
+                // Find the signing key for this device
+                let signing_vm = vms.iter().find(|vm| vm.key_type == KeyType::Ed25519);
+
+                if let Some(vm) = signing_vm {
+                    let current_marker = if dev_id == device_id { " (current device)" } else { "" };
+                    let revoked_marker = if vm.revoked_at.is_some() { " [REVOKED]" } else { "" };
+
+                    println!("Device: {}{}{}", vm.id, current_marker, revoked_marker);
+                    println!("  Label: {}", vm.label);
+                    println!("  Added: {}", vm.added_at);
+
+                    if let Some(revoked) = vm.revoked_at {
+                        println!("  Revoked: {}", revoked);
+                    }
+
+                    println!("  Capabilities:");
+                    for cap in &vm.capabilities {
+                        println!("    - {:?}", cap);
+                    }
+
+                    // Show associated encryption key
+                    let enc_vm = vms.iter().find(|v| v.key_type == KeyType::X25519);
+                    if enc_vm.is_some() {
+                        println!("  Encryption: Yes");
+                    }
+
+                    println!();
+                }
+            }
+        }
+
+        DeviceCommands::Add { name } => {
+            println!("Creating device-add request for '{}'...\n", name);
+
+            // Prompt for the target DID (the identity to add this device to)
+            print!("Enter the DID to add this device to: ");
+            io::stdout().flush()?;
+            let mut did_input = String::new();
+            io::stdin().read_line(&mut did_input)?;
+            let target_did = did_input.trim();
+
+            if !target_did.starts_with("did:icn:") {
+                bail!("Invalid DID format. Expected: did:icn:<base58btc-key>");
+            }
+
+            println!("Target DID: {}", target_did);
+            println!();
+
+            // Generate new Ed25519 keypair for this device
+            println!("Generating Ed25519 keypair for this device...");
+            let keypair = KeyPair::generate()?;
+
+            // Generate X25519 encryption key
+            use rand::rngs::OsRng;
+            use x25519_dalek::{PublicKey, StaticSecret};
+
+            let x25519_secret = StaticSecret::random_from_rng(OsRng);
+            let x25519_public = PublicKey::from(&x25519_secret);
+
+            println!("✓ Generated keys for new device");
+            println!("  Ed25519 public key: {}", hex::encode(keypair.verifying_key().as_bytes()));
+            println!();
+
+            // Create request
+            let request = DeviceAddRequest {
+                did: target_did.to_string(),
+                label: name.clone(),
+                ed25519_public_key: hex::encode(keypair.verifying_key().as_bytes()),
+                x25519_public_key: hex::encode(x25519_public.as_bytes()),
+                capabilities: vec![
+                    Capability::Sign,
+                    Capability::Encrypt,
+                ],
+                created_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs(),
+            };
+
+            // Save request to file
+            let request_file = data_dir.join(format!("device-add-{}.json", name.replace(" ", "-").to_lowercase()));
+            let request_json = serde_json::to_string_pretty(&request)?;
+            std::fs::create_dir_all(data_dir)?;
+            std::fs::write(&request_file, request_json)?;
+
+            println!("✓ Device-add request created: {}", request_file.display());
+            println!();
+            println!("Next steps:");
+            println!("  1. Transfer {} to an authorized device for identity {}", request_file.display(), target_did);
+            println!("  2. On authorized device, run:");
+            println!("     icnctl device approve {}", request_file.display());
+            println!();
+            println!("⚠️  IMPORTANT:");
+            println!("  • This device will be added to identity: {}", target_did);
+            println!("  • Do NOT create a new keystore on this device");
+            println!("  • After approval, this device will share the same DID");
+        }
+
+        DeviceCommands::Approve { request_file } => {
+            // Check if request file exists
+            if !request_file.exists() {
+                bail!("Request file not found: {}", request_file.display());
+            }
+
+            // Load request
+            let request_json = std::fs::read_to_string(&request_file)
+                .with_context(|| format!("Failed to read request file: {}", request_file.display()))?;
+
+            let request: DeviceAddRequest = serde_json::from_str(&request_json)
+                .context("Failed to parse device-add request")?;
+
+            println!("Approving device-add request...\n");
+            println!("  Label: {}", request.label);
+            println!("  DID: {}", request.did);
+            println!("  Requested at: {}", request.created_at);
+            println!();
+
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one.");
+            }
+
+            // Get passphrase and unlock
+            let passphrase = read_passphrase("Enter passphrase to approve: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            // Verify DID matches
+            let own_did = keystore.get_keypair()?.did();
+            if own_did.as_str() != request.did {
+                bail!(
+                    "DID mismatch: request is for {}, but your identity is {}",
+                    request.did,
+                    own_did
+                );
+            }
+
+            // Get DID document and check capabilities
+            let did_doc = keystore.get_did_document()?;
+            let device_id = keystore.get_device_id()?;
+
+            if !did_doc.has_capability(device_id, Capability::AddDevice) {
+                bail!("This device does not have AddDevice capability");
+            }
+
+            // Determine next device ID
+            let max_device_num = did_doc.verification_method
+                .iter()
+                .filter_map(|vm| {
+                    if vm.id.starts_with("device-") {
+                        vm.id[7..].parse::<u32>().ok()
+                    } else {
+                        None
+                    }
+                })
+                .max()
+                .unwrap_or(0);
+
+            let new_device_id = format!("device-{}", max_device_num + 1);
+            let new_enc_id = format!("enc-{}", max_device_num + 1);
+
+            println!("Adding device as: {}", new_device_id);
+
+            // Decode public keys
+            let ed25519_bytes = hex::decode(&request.ed25519_public_key)
+                .context("Invalid Ed25519 public key encoding")?;
+            let x25519_bytes = hex::decode(&request.x25519_public_key)
+                .context("Invalid X25519 public key encoding")?;
+
+            if ed25519_bytes.len() != 32 {
+                bail!("Invalid Ed25519 key length: expected 32 bytes, got {}", ed25519_bytes.len());
+            }
+            if x25519_bytes.len() != 32 {
+                bail!("Invalid X25519 key length: expected 32 bytes, got {}", x25519_bytes.len());
+            }
+
+            // Create rotation event for this device add
+            let rotation_event = icn_identity::RotationEvent {
+                did: own_did.clone(),
+                event_type: icn_identity::RotationEventType::AddDevice {
+                    device_id: new_device_id.clone(),
+                    label: request.label.clone(),
+                    public_key: ed25519_bytes.clone(),
+                    key_type: KeyType::Ed25519,
+                    capabilities: request.capabilities.clone(),
+                },
+                proof: vec![], // TODO: Sign this event with current device's key
+                signed_by: device_id.to_string(),
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs(),
+                new_version: did_doc.version + 1,
+            };
+
+            // Update DID document and save
+            println!("Updating DID document...");
+            let new_device_id_clone = new_device_id.clone();
+            let new_enc_id_clone = new_enc_id.clone();
+            let request_label = request.label.clone();
+            let request_caps = request.capabilities.clone();
+
+            keystore.update_did_document(
+                |did_doc| {
+                    // Add Ed25519 signing key
+                    did_doc.add_device(
+                        new_device_id_clone.clone(),
+                        request_label.clone(),
+                        ed25519_bytes.clone(),
+                        KeyType::Ed25519,
+                        request_caps.clone(),
+                    )?;
+
+                    // Add X25519 encryption key
+                    did_doc.add_device(
+                        new_enc_id_clone,
+                        format!("{} (encryption)", request_label),
+                        x25519_bytes,
+                        KeyType::X25519,
+                        vec![Capability::Encrypt],
+                    )?;
+
+                    Ok(())
+                },
+                Some(rotation_event),
+                &passphrase,
+            )?;
+
+            println!("✓ Device approved and added to DID document");
+            println!("  Device ID: {}", new_device_id);
+            println!("  Label: {}", request.label);
+            println!();
+            println!("DID document updated:");
+            let updated_doc = keystore.get_did_document()?;
+            println!("  Version: {}", updated_doc.version);
+            println!("  Devices: {}", updated_doc.verification_method.len() / 2);
+        }
+
+        DeviceCommands::Revoke { device_id, reason } => {
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one.");
+            }
+
+            println!("Revoking device: {}", device_id);
+            if let Some(r) = &reason {
+                println!("Reason: {}", r);
+            }
+            println!();
+
+            // Get passphrase and unlock
+            let passphrase = read_passphrase("Enter passphrase to authorize revocation: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            // Get DID document and check capabilities
+            let did_doc = keystore.get_did_document()?;
+            let current_device_id = keystore.get_device_id()?;
+
+            if !did_doc.has_capability(current_device_id, Capability::RevokeDevice) {
+                bail!("This device does not have RevokeDevice capability");
+            }
+
+            // Check device exists
+            if did_doc.get_verification_method(&device_id).is_none() {
+                bail!("Device '{}' not found in DID document", device_id);
+            }
+
+            // Determine revocation reason
+            use icn_identity::RevocationReason;
+            let revocation_reason = match reason.as_deref() {
+                Some("compromised") => RevocationReason::Compromised,
+                Some("lost") => RevocationReason::Lost,
+                Some("rotated") => RevocationReason::Rotated,
+                _ => RevocationReason::Removed,
+            };
+
+            // Create rotation event for this device revocation
+            let rotation_event = icn_identity::RotationEvent {
+                did: keystore.get_keypair()?.did().clone(),
+                event_type: icn_identity::RotationEventType::RevokeDevice {
+                    device_id: device_id.clone(),
+                    reason: revocation_reason,
+                },
+                proof: vec![], // TODO: Sign this event with current device's key
+                signed_by: current_device_id.to_string(),
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs(),
+                new_version: did_doc.version + 1,
+            };
+
+            // Update DID document
+            let device_id_clone = device_id.clone();
+            keystore.update_did_document(
+                |did_doc| {
+                    did_doc.revoke_device(&device_id_clone)?;
+                    Ok(())
+                },
+                Some(rotation_event),
+                &passphrase,
+            )?;
+
+            println!("✓ Device revoked");
+            println!("  Device: {}", device_id);
+            if let Some(r) = reason {
+                println!("  Reason: {}", r);
+            }
+            println!();
+            println!("DID document updated:");
+            let updated_doc = keystore.get_did_document()?;
+            println!("  Version: {}", updated_doc.version);
+            println!("  Active devices: {}",
+                updated_doc.verification_method.iter()
+                    .filter(|vm| vm.revoked_at.is_none() && vm.key_type == KeyType::Ed25519)
+                    .count());
+        }
+    }
+
+    Ok(())
 }
