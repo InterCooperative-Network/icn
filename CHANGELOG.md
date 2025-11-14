@@ -35,6 +35,13 @@ Transport:    QUIC/TLS 1.3 (channel encryption)
 - Keystore v2.1 format with X25519 key persistence (keystore.rs)
 - Automatic v2.0 → v2.1 migration on first unlock
 - New PayloadType::Encrypted (value 7) for encrypted messages
+- **Bidirectional X25519 key exchange via Hello protocol:**
+  - Hello messages now include sender's X25519 public key
+  - Connection initiator sends Hello with X25519 key
+  - Connection responder sends Hello response with X25519 key
+  - NetworkActor stores peer X25519 keys in HashMap
+  - Public API: `NetworkHandle::get_peer_x25519_key()` to retrieve peer keys
+  - Automatic key exchange during connection establishment
 
 **Encryption Flow:**
 1. Serialize application payload → plaintext bytes
@@ -70,9 +77,12 @@ Transport:    QUIC/TLS 1.3 (channel encryption)
 
 **Testing:**
 - Unit tests: 8 encryption tests (roundtrip, tampering, nonce uniqueness, edge cases)
-- Integration tests: 6 end-to-end tests (encrypt→sign→verify→decrypt flow)
+- Integration tests: 7 end-to-end tests including:
+  - `test_network_x25519_key_exchange_and_encrypted_message()`: Full network-level test
+  - Verifies automatic key exchange during connection establishment
+  - Complete encrypt→sign→send→receive→verify→decrypt flow over real QUIC connections
 - All 19 icn-identity tests pass (bundle + keystore with X25519)
-- All 64 icn-net tests pass (encryption module + integration)
+- All 76 icn-net tests pass (encryption module + integration + network tests)
 
 **Keystore Migration:**
 - **v2.0 → v2.1 migration**: Automatic on first unlock
