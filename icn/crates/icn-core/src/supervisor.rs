@@ -123,6 +123,24 @@ impl Supervisor {
 
             info!("Gossip actor configured with signing keypair");
 
+            // Restore gossip state from snapshot if available
+            let data_dir = self.config.store_path();
+            if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&data_dir) {
+                info!("Found state snapshot (version {}, created at {})",
+                      snapshot.version, snapshot.created_at);
+
+                if let Some(gossip_state) = snapshot.gossip_state {
+                    let mut gossip = gossip_handle.blocking_write();
+                    if let Err(e) = gossip.restore_state(gossip_state) {
+                        warn!("Failed to restore gossip state: {}", e);
+                    } else {
+                        info!("✅ Gossip state restored from snapshot");
+                    }
+                }
+            } else {
+                debug!("No state snapshot found, starting with fresh state");
+            }
+
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
             let store = Arc::new(SledStore::open(&store_path)?);
@@ -626,6 +644,48 @@ impl Supervisor {
 
         // Graceful shutdown of actors
         info!("Supervisor shutting down actors");
+
+        // Save state snapshot before actors are dropped
+        if gossip_handle.is_some() || network_handle.is_some() {
+            info!("Saving state snapshot before shutdown");
+            let mut snapshot = icn_snapshot::StateSnapshot::new();
+
+            // Export gossip state
+            if let Some(ref gossip_handle) = gossip_handle {
+                let gossip = gossip_handle.blocking_read();
+                snapshot.gossip_state = Some(gossip.export_state());
+                info!("Exported gossip state: {} vector clock entries, {} subscriptions",
+                      snapshot.gossip_state.as_ref().unwrap().vector_clock.len(),
+                      snapshot.gossip_state.as_ref().unwrap().subscriptions.len());
+            }
+
+            // Export network state
+            if let Some(ref _network_handle) = network_handle {
+                // Need to use blocking context for async export_state
+                let state = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        // Access the NetworkActor from the handle
+                        // Note: NetworkHandle doesn't expose export_state directly,
+                        // so we'll need to add that method or access the actor directly
+                        // For now, we'll create an empty network state
+                        // TODO: Add export_state to NetworkHandle API
+                        icn_snapshot::NetworkState {
+                            peer_x25519_keys: std::collections::HashMap::new(),
+                            peer_addresses: std::collections::HashMap::new(),
+                        }
+                    })
+                });
+                snapshot.network_state = Some(state);
+            }
+
+            // Save snapshot to disk
+            let data_dir = self.config.store_path();
+            if let Err(e) = icn_snapshot::save_snapshot(&snapshot, &data_dir) {
+                warn!("Failed to save state snapshot: {}", e);
+            } else {
+                info!("✅ State snapshot saved to {}/state.snapshot", data_dir.display());
+            }
+        }
 
         // Network actor will shut down gracefully via the shutdown signal
         // The actor's run loop listens for shutdown_rx and cleans up properly

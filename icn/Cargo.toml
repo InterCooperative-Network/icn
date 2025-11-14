@@ -11,6 +11,7 @@ members = [
     "crates/icn-store",
     "crates/icn-rpc",
     "crates/icn-obs",
+    "crates/icn-snapshot",
     "crates/icn-testkit",
     "bins/icnd",
     "bins/icnctl",
@@ -88,4 +89,5 @@ icn-ccl = { path = "crates/icn-ccl" }
 icn-store = { path = "crates/icn-store" }
 icn-rpc = { path = "crates/icn-rpc" }
 icn-obs = { path = "crates/icn-obs" }
+icn-snapshot = { path = "crates/icn-snapshot" }
 icn-testkit = { path = "crates/icn-testkit" }

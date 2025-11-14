@@ -1057,6 +1057,143 @@ impl GossipActor {
         hash.copy_from_slice(&result);
         hash
     }
+
+    /// Export gossip actor state for persistence
+    ///
+    /// This exports the minimum state needed to restore the actor after restart:
+    /// - Vector clock for causal ordering
+    /// - Topic subscriptions (who is subscribed to what)
+    /// - Topic metadata (configuration)
+    ///
+    /// Note: Gossip entries themselves are NOT persisted - they will be re-gossiped
+    /// from peers after restart via anti-entropy.
+    pub fn export_state(&self) -> icn_snapshot::GossipState {
+        // Export vector clock
+        let vector_clock: std::collections::HashMap<String, u64> = self
+            .clock
+            .clock
+            .iter()
+            .map(|(did, count)| (did.to_string(), *count))
+            .collect();
+
+        // Export subscriptions
+        let subscriptions: std::collections::HashMap<String, Vec<String>> = self
+            .subscriptions
+            .iter()
+            .map(|(topic, subs)| {
+                let sub_strs = subs.iter().map(|did| did.to_string()).collect();
+                (topic.clone(), sub_strs)
+            })
+            .collect();
+
+        // Export topic metadata
+        let topics: std::collections::HashMap<String, icn_snapshot::TopicMetadata> = self
+            .topics
+            .iter()
+            .map(|(name, topic)| {
+                let acl_str = match &topic.acl {
+                    AccessControl::Public => "Public".to_string(),
+                    AccessControl::TrustClass(tc) => format!("TrustClass:{:?}", tc),
+                    AccessControl::Participants(dids) => {
+                        format!("Participants:{}", dids.len())
+                    }
+                };
+
+                let scope_str = format!("{:?}", topic.scope);
+
+                (
+                    name.clone(),
+                    icn_snapshot::TopicMetadata {
+                        name: topic.name.clone(),
+                        access_control: acl_str,
+                        max_entries: topic.max_entries,
+                        scope: scope_str,
+                    },
+                )
+            })
+            .collect();
+
+        icn_snapshot::GossipState {
+            vector_clock,
+            subscriptions,
+            topics,
+        }
+    }
+
+    /// Restore gossip actor state from persistence
+    ///
+    /// This restores:
+    /// - Vector clock (for causal ordering continuity)
+    /// - Topic subscriptions (automatically re-subscribe on restart)
+    /// - Topic metadata (recreate topics with same configuration)
+    ///
+    /// Note: Gossip entries are NOT restored - they will be fetched from peers
+    /// via anti-entropy once the actor reconnects to the network.
+    pub fn restore_state(&mut self, state: icn_snapshot::GossipState) -> Result<()> {
+        info!("Restoring gossip state: {} vector clock entries, {} subscriptions, {} topics",
+              state.vector_clock.len(), state.subscriptions.len(), state.topics.len());
+
+        // Restore vector clock
+        self.clock.clock.clear();
+        for (did_str, count) in state.vector_clock {
+            let did = Did::from_str(&did_str)
+                .context("Failed to parse DID from vector clock")?;
+            self.clock.clock.insert(did, count);
+        }
+
+        // Restore topic metadata (must happen before restoring subscriptions)
+        for (_name, topic_meta) in state.topics {
+            // Parse access control
+            let acl = if topic_meta.access_control == "Public" {
+                AccessControl::Public
+            } else if topic_meta.access_control.starts_with("TrustClass:") {
+                // For now, default to Known for all TrustClass variants
+                // A more sophisticated parser could distinguish Known/Partner/Federated
+                AccessControl::TrustClass(TrustClass::Known)
+            } else {
+                // Default to Public for unknown ACL types
+                warn!("Unknown AccessControl: {}, defaulting to Public", topic_meta.access_control);
+                AccessControl::Public
+            };
+
+            // Parse scope
+            let scope = if topic_meta.scope.contains("LocalCluster") {
+                crate::types::Scope::LocalCluster
+            } else if topic_meta.scope.contains("Regional") {
+                crate::types::Scope::Regional
+            } else {
+                crate::types::Scope::Global
+            };
+
+            // Recreate topic
+            let topic = Topic::new(topic_meta.name.clone(), acl)
+                .with_scope(scope)
+                .with_max_entries(topic_meta.max_entries);
+
+            // Only create if it doesn't already exist (to preserve default topics)
+            if !self.topics.contains_key(&topic.name) {
+                self.create_topic(topic);
+            }
+        }
+
+        // Restore subscriptions
+        for (topic, subs) in state.subscriptions {
+            for sub_str in subs {
+                let did = Did::from_str(&sub_str)
+                    .context("Failed to parse DID from subscription")?;
+
+                // Add subscription without access control check (we trust persisted state)
+                if let Some(sub_list) = self.subscriptions.get_mut(&topic) {
+                    if !sub_list.contains(&did) {
+                        sub_list.push(did.clone());
+                    }
+                }
+            }
+        }
+
+        info!("✅ Gossip state restored successfully");
+        Ok(())
+    }
 }
 
 /// Shared gossip actor handle

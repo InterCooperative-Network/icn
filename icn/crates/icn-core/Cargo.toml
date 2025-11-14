@@ -27,6 +27,7 @@ icn-gossip.workspace = true
 icn-ledger.workspace = true
 icn-ccl.workspace = true
 icn-obs.workspace = true
+icn-snapshot.workspace = true
 
 [dev-dependencies]
 rustls.workspace = true
