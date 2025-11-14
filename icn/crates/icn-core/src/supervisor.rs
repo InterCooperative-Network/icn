@@ -357,6 +357,16 @@ impl Supervisor {
 
             info!("Network actor spawned on {}", listen_addr);
 
+            // Restore network state from snapshot if available (re-use snapshot loaded earlier)
+            let data_dir = self.config.store_path();
+            if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&data_dir) {
+                if let Some(network_state) = snapshot.network_state {
+                    if let Err(e) = network_handle.restore_state(network_state).await {
+                        warn!("Failed to restore network state: {}", e);
+                    }
+                }
+            }
+
             // Set send callback on gossip actor to enable request/response
             {
                 let mut gossip = gossip_handle.write().await;
@@ -660,22 +670,16 @@ impl Supervisor {
             }
 
             // Export network state
-            if let Some(ref _network_handle) = network_handle {
+            if let Some(ref network_handle) = network_handle {
                 // Need to use blocking context for async export_state
                 let state = tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
-                        // Access the NetworkActor from the handle
-                        // Note: NetworkHandle doesn't expose export_state directly,
-                        // so we'll need to add that method or access the actor directly
-                        // For now, we'll create an empty network state
-                        // TODO: Add export_state to NetworkHandle API
-                        icn_snapshot::NetworkState {
-                            peer_x25519_keys: std::collections::HashMap::new(),
-                            peer_addresses: std::collections::HashMap::new(),
-                        }
+                        network_handle.export_state().await
                     })
                 });
                 snapshot.network_state = Some(state);
+                info!("Exported network state: {} peer X25519 keys",
+                      snapshot.network_state.as_ref().unwrap().peer_x25519_keys.len());
             }
 
             // Save snapshot to disk

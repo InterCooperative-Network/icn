@@ -209,6 +209,50 @@ impl NetworkHandle {
     pub fn neighbor_sets(&self) -> &Option<Arc<RwLock<NeighborSets>>> {
         &self.neighbor_sets
     }
+
+    /// Export network state for persistence
+    ///
+    /// This exports peer X25519 public keys so encrypted communication
+    /// can resume immediately after restart without new key exchange.
+    ///
+    /// Peer addresses are not exported (rediscovered via mDNS).
+    pub async fn export_state(&self) -> icn_snapshot::NetworkState {
+        let peer_x25519_keys = if let Some(ref keys) = self.peer_x25519_keys {
+            keys.read().await
+                .iter()
+                .map(|(did, key)| (did.to_string(), *key))
+                .collect()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        // Peer addresses not exported (rediscovered via mDNS)
+        let peer_addresses = std::collections::HashMap::new();
+
+        icn_snapshot::NetworkState {
+            peer_x25519_keys,
+            peer_addresses,
+        }
+    }
+
+    /// Restore network state from persistence
+    ///
+    /// This restores peer X25519 public keys so encrypted communication
+    /// works immediately after restart without new key exchange.
+    ///
+    /// Peer addresses are not restored (rediscovered via mDNS).
+    pub async fn restore_state(&self, state: icn_snapshot::NetworkState) -> Result<()> {
+        if let Some(ref keys) = self.peer_x25519_keys {
+            let mut keys_write = keys.write().await;
+            for (did_str, key) in state.peer_x25519_keys {
+                let did = Did::from_str(&did_str)
+                    .context("Failed to parse DID from network state")?;
+                keys_write.insert(did, key);
+            }
+            tracing::info!("✅ Restored {} peer X25519 keys from snapshot", keys_write.len());
+        }
+        Ok(())
+    }
 }
 
 /// Network actor state
