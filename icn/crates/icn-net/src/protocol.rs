@@ -64,7 +64,8 @@ pub enum MessagePayload {
         /// DID-TLS binding information for verification
         binding_info: BindingInfo,
         /// Version and capability information for protocol negotiation
-        version_info: VersionInfo,
+        /// None indicates a pre-version-negotiation node (treated as v1)
+        version_info: Option<VersionInfo>,
         /// Optional topology information (if topology is enabled)
         topology_info: Option<crate::TopologyInfo>,
         /// X25519 public key for end-to-end encryption (Phase 10)
@@ -166,7 +167,7 @@ impl NetworkMessage {
     ) -> Self {
         Self::new(from, Some(to), MessagePayload::Hello {
             binding_info,
-            version_info,
+            version_info: Some(version_info),
             topology_info,
             x25519_public,
         })

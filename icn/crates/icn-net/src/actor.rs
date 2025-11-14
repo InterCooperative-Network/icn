@@ -850,34 +850,52 @@ impl NetworkActor {
                                         format!("icnd-{}", env!("CARGO_PKG_VERSION"))
                                     );
 
-                                    let negotiated_version = match crate::negotiate_version(&local_version_info, version_info) {
-                                        Ok(v) => v,
-                                        Err(e) => {
-                                            warn!(
+                                    // Handle legacy nodes that don't send version_info (pre-version-negotiation)
+                                    let (negotiated_version, common_caps, peer_software) = match version_info {
+                                        Some(remote_info) => {
+                                            // Modern node with version info
+                                            let negotiated = match crate::negotiate_version(&local_version_info, remote_info) {
+                                                Ok(v) => v,
+                                                Err(e) => {
+                                                    warn!(
+                                                        peer_did = %message.from,
+                                                        local_range = format!("[{}-{}]", local_version_info.min_supported, local_version_info.max_supported),
+                                                        peer_range = format!("[{}-{}]", remote_info.min_supported, remote_info.max_supported),
+                                                        "Version negotiation failed: {}",
+                                                        e
+                                                    );
+                                                    // Track failure metric
+                                                    icn_obs::metrics::network::version_negotiation_failure_inc("incompatible_version");
+                                                    // Drop the connection - incompatible versions
+                                                    return Err(anyhow::anyhow!("Incompatible protocol version"));
+                                                }
+                                            };
+
+                                            // Track successful negotiation
+                                            icn_obs::metrics::network::version_negotiation_success_inc(negotiated);
+
+                                            // Calculate common capabilities
+                                            let caps = crate::common_capabilities(&local_version_info, remote_info);
+                                            (negotiated, caps, remote_info.software_version.clone())
+                                        }
+                                        None => {
+                                            // Legacy node without version info - treat as v1 with minimal capabilities
+                                            info!(
                                                 peer_did = %message.from,
-                                                local_range = format!("[{}-{}]", local_version_info.min_supported, local_version_info.max_supported),
-                                                peer_range = format!("[{}-{}]", version_info.min_supported, version_info.max_supported),
-                                                "Version negotiation failed: {}",
-                                                e
+                                                "Received Hello from legacy node (no version_info), treating as protocol v1"
                                             );
-                                            // Track failure metric
-                                            icn_obs::metrics::network::version_negotiation_failure_inc("incompatible_version");
-                                            // Drop the connection - incompatible versions
-                                            return Err(anyhow::anyhow!("Incompatible protocol version"));
+                                            // Track legacy connection (use negotiated_version=1 for metrics)
+                                            icn_obs::metrics::network::version_negotiation_success_inc(1);
+
+                                            // No capabilities for legacy nodes (empty set)
+                                            (1, crate::CapabilityFlags::empty(), "legacy-node".to_string())
                                         }
                                     };
 
-                                    // Track successful negotiation
-                                    icn_obs::metrics::network::version_negotiation_success_inc(negotiated_version);
-
-                                    // Calculate common capabilities
-                                    let common_caps = crate::common_capabilities(&local_version_info, version_info);
-
                                     info!(
                                         peer_did = %message.from,
-                                        peer_software = %version_info.software_version,
+                                        peer_software = %peer_software,
                                         negotiated_version = negotiated_version,
-                                        peer_capabilities = ?version_info.capabilities.describe(),
                                         common_capabilities = ?common_caps.describe(),
                                         has_topology = topology_info.is_some(),
                                         message_type = "Hello",
