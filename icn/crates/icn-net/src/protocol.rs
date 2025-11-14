@@ -83,6 +83,24 @@ pub enum MessagePayload {
     Signed(SignedEnvelope),
 }
 
+impl MessagePayload {
+    /// Get the variant name for logging
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            MessagePayload::Gossip(_) => "Gossip",
+            MessagePayload::Ping => "Ping",
+            MessagePayload::Pong => "Pong",
+            MessagePayload::Subscribe { .. } => "Subscribe",
+            MessagePayload::Unsubscribe { .. } => "Unsubscribe",
+            MessagePayload::SubscribeAck { .. } => "SubscribeAck",
+            MessagePayload::Hello { .. } => "Hello",
+            MessagePayload::Handshake { .. } => "Handshake",
+            MessagePayload::HandshakeAck => "HandshakeAck",
+            MessagePayload::Signed(_) => "Signed",
+        }
+    }
+}
+
 impl NetworkMessage {
     /// Create a new network message
     pub fn new(from: Did, to: Option<Did>, payload: MessagePayload) -> Self {

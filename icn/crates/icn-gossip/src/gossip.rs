@@ -248,7 +248,12 @@ impl GossipActor {
 
         // Compress large entries before storing/sending
         if let Err(e) = entry.compress() {
-            debug!("Failed to compress entry: {}", e);
+            debug!(
+                entry_hash = %hex::encode(&hash),
+                topic = %topic,
+                error = %e,
+                "Failed to compress entry, continuing without compression"
+            );
             // Continue without compression - not critical
         }
 
@@ -259,7 +264,12 @@ impl GossipActor {
         icn_obs::metrics::gossip::entries_published_inc();
         self.update_gauge_metrics();
 
-        debug!("Published entry {} to topic {}", hex::encode(hash), topic);
+        debug!(
+            entry_hash = %hex::encode(&hash),
+            topic = %topic,
+            author_did = %self.own_did,
+            "Published entry to topic"
+        );
 
         Ok(hash)
     }
@@ -405,7 +415,12 @@ impl GossipActor {
             }
 
             subscribers.push(subscriber.clone());
-            info!("DID {} subscribed to topic: {}", subscriber, topic);
+            info!(
+                subscriber_did = %subscriber,
+                topic = %topic,
+                subscriber_count = subscribers.len(),
+                "Subscribed to topic"
+            );
 
             // Update metrics
             self.update_gauge_metrics();
@@ -426,7 +441,12 @@ impl GossipActor {
 
         if let Some(pos) = subscribers.iter().position(|did| did == subscriber) {
             subscribers.remove(pos);
-            info!("DID {} unsubscribed from topic: {}", subscriber, topic);
+            info!(
+                subscriber_did = %subscriber,
+                topic = %topic,
+                subscriber_count = subscribers.len(),
+                "Unsubscribed from topic"
+            );
 
             // Update metrics
             self.update_gauge_metrics();
@@ -537,19 +557,36 @@ impl GossipActor {
     pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         match message {
             GossipMessage::Announce { hash, author, clock: _, topic } => {
-                debug!("Received Announce: topic={}, hash={:?}, author={}", topic, hash, author);
+                debug!(
+                    peer_did = %sender,
+                    topic = %topic,
+                    entry_hash = %hex::encode(&hash),
+                    author_did = %author,
+                    message_type = "Announce",
+                    "Received gossip Announce"
+                );
                 icn_obs::metrics::gossip::announces_received_inc();
 
                 // Check if we already have this entry
                 if let Some(entries) = self.entries.get(&topic) {
                     if entries.contains_key(&hash) {
-                        debug!("Already have entry {}", hex::encode(hash));
+                        debug!(
+                            entry_hash = %hex::encode(&hash),
+                            topic = %topic,
+                            "Already have entry, skipping"
+                        );
                         return Ok(());
                     }
                 }
 
                 // Request full entry if we don't have it
-                debug!("Requesting entry {} from {}", hex::encode(hash), author);
+                debug!(
+                    entry_hash = %hex::encode(&hash),
+                    from_did = %author,
+                    topic = %topic,
+                    message_type = "Request",
+                    "Requesting missing entry"
+                );
                 self.send_message(Some(author), GossipMessage::Request { hash });
 
                 // Store the announcement metadata for future reference
@@ -559,12 +596,23 @@ impl GossipActor {
 
             GossipMessage::Request { hash } => {
                 icn_obs::metrics::gossip::requests_received_inc();
-                debug!("Received Request for hash: {:?}", hash);
+                debug!(
+                    peer_did = %sender,
+                    entry_hash = %hex::encode(&hash),
+                    message_type = "Request",
+                    "Received gossip Request"
+                );
 
                 // Find entry across all topics
                 for (_topic_name, entries) in &self.entries {
                     if let Some(entry) = entries.get(&hash) {
-                        debug!("Found entry in topic: {}, sending Response to {}", entry.topic, sender);
+                        debug!(
+                            entry_hash = %hex::encode(&hash),
+                            topic = %entry.topic,
+                            to_did = %sender,
+                            message_type = "Response",
+                            "Found entry, sending Response"
+                        );
 
                         // Send Response back to the requester
                         self.send_message(Some(sender.clone()), GossipMessage::Response {
@@ -575,13 +623,24 @@ impl GossipActor {
                     }
                 }
 
-                debug!("Entry not found for hash: {:?}", hash);
+                debug!(
+                    entry_hash = %hex::encode(&hash),
+                    peer_did = %sender,
+                    "Entry not found for Request"
+                );
                 Ok(())
             }
 
             GossipMessage::Response { entry } => {
                 icn_obs::metrics::gossip::responses_received_inc();
-                debug!("Received Response: topic={}, hash={:?}", entry.topic, entry.hash);
+                debug!(
+                    peer_did = %sender,
+                    topic = %entry.topic,
+                    entry_hash = %hex::encode(&entry.hash),
+                    entry_size = entry.data.len(),
+                    message_type = "Response",
+                    "Received gossip Response"
+                );
 
                 // Store the entry using store_entry() to ensure:
                 // 1. Subscriber notifications are triggered

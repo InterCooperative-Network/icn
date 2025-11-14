@@ -822,7 +822,11 @@ impl NetworkActor {
                                 continue;
                             }
 
-                            info!("Received message from {}", message.from);
+                            info!(
+                                peer_did = %message.from,
+                                protocol = ?message.payload.variant_name(),
+                                "Received network message"
+                            );
 
                             // Track metrics
                             icn_obs::metrics::network::messages_received_inc();
@@ -830,7 +834,12 @@ impl NetworkActor {
                             // Handle handshake messages internally
                             match &message.payload {
                                 MessagePayload::Hello { binding_info: _, topology_info, x25519_public } => {
-                                    info!("Received Hello from {} with X25519 public key", message.from);
+                                    info!(
+                                        peer_did = %message.from,
+                                        has_topology = topology_info.is_some(),
+                                        message_type = "Hello",
+                                        "Received Hello with X25519 public key"
+                                    );
 
                                     // NOTE: DID-TLS binding was already verified during TLS handshake
                                     // by DidCertificateVerifier. No need to re-verify here.
@@ -840,7 +849,11 @@ impl NetworkActor {
                                     {
                                         let mut keys = peer_x25519_keys.write().await;
                                         keys.insert(message.from.clone(), *x25519_public);
-                                        info!("Stored X25519 public key for {}", message.from);
+                                        info!(
+                                            peer_did = %message.from,
+                                            key_size = x25519_public.len(),
+                                            "Stored X25519 public key"
+                                        );
                                     }
 
                                     // Add peer to neighbor sets if topology is enabled
