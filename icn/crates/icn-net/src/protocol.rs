@@ -58,6 +58,8 @@ pub enum MessagePayload {
         binding_info: BindingInfo,
         /// Optional topology information (if topology is enabled)
         topology_info: Option<crate::TopologyInfo>,
+        /// X25519 public key for end-to-end encryption (Phase 10)
+        x25519_public: [u8; 32],
     },
 
     /// Handshake with topology information (legacy, kept for compatibility)
@@ -126,11 +128,18 @@ impl NetworkMessage {
         Self::new(from, Some(to), MessagePayload::HandshakeAck)
     }
 
-    /// Create a Hello message with DID-TLS binding verification
-    pub fn hello(from: Did, to: Did, binding_info: BindingInfo, topology_info: Option<crate::TopologyInfo>) -> Self {
+    /// Create a Hello message with DID-TLS binding verification and X25519 key exchange
+    pub fn hello(
+        from: Did,
+        to: Did,
+        binding_info: BindingInfo,
+        topology_info: Option<crate::TopologyInfo>,
+        x25519_public: [u8; 32],
+    ) -> Self {
         Self::new(from, Some(to), MessagePayload::Hello {
             binding_info,
             topology_info,
+            x25519_public,
         })
     }
 

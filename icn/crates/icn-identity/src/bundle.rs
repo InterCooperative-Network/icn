@@ -223,7 +223,7 @@ impl IdentityBundle {
     }
 
     /// Get the raw X25519 public key bytes
-    pub(crate) fn x25519_public_bytes(&self) -> &[u8; 32] {
+    pub fn x25519_public_bytes(&self) -> &[u8; 32] {
         &self.x25519_public
     }
 

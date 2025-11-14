@@ -69,6 +69,7 @@ pub struct NetworkStats {
 pub struct NetworkHandle {
     tx: mpsc::Sender<NetworkMsg>,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
+    peer_x25519_keys: Option<Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>>,
 }
 
 impl NetworkHandle {
@@ -145,6 +146,14 @@ impl NetworkHandle {
         }
     }
 
+    /// Get a peer's X25519 public key for end-to-end encryption
+    ///
+    /// Returns None if the peer's key hasn't been received yet (no Hello message exchange)
+    pub async fn get_peer_x25519_key(&self, did: &Did) -> Option<[u8; 32]> {
+        let keys = self.peer_x25519_keys.as_ref()?;
+        keys.read().await.get(did).copied()
+    }
+
     /// Get reference to neighbor sets (for testing and inspection)
     pub fn neighbor_sets(&self) -> &Option<Arc<RwLock<NeighborSets>>> {
         &self.neighbor_sets
@@ -165,6 +174,8 @@ pub struct NetworkActor {
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
     topology_config: Option<TopologyConfig>,
     trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
+    /// Peer X25519 public keys (for end-to-end encryption)
+    peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
 }
 
 impl NetworkActor {
@@ -238,6 +249,9 @@ impl NetworkActor {
         let replay_guard = Arc::new(RwLock::new(ReplayGuard::new(300, 3600)));
         info!("Replay protection enabled (300s clock skew, 3600s peer age limit)");
 
+        // Create X25519 key store
+        let peer_x25519_keys = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
         // Initialize neighbor sets if topology is enabled
         let neighbor_sets = if let Some(ref topo_cfg) = topology_config {
             let own_topology = TopologyInfo {
@@ -261,6 +275,7 @@ impl NetworkActor {
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
             let trust_graph_clone = trust_graph.clone();
+            let peer_x25519_keys_clone = peer_x25519_keys.clone();
             let own_did_clone = did.clone();
             let shutdown_rx = shutdown_tx.subscribe();
             tokio::spawn(async move {
@@ -272,6 +287,7 @@ impl NetworkActor {
                     neighbor_sets_clone,
                     topology_config_clone,
                     trust_graph_clone,
+                    peer_x25519_keys_clone,
                     own_did_clone,
                     shutdown_rx,
                 )
@@ -296,6 +312,7 @@ impl NetworkActor {
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
             trust_graph: trust_graph.clone(),
+            peer_x25519_keys: peer_x25519_keys.clone(),
         };
 
         // Spawn actor task
@@ -306,7 +323,11 @@ impl NetworkActor {
             }
         });
 
-        Ok(NetworkHandle { tx, neighbor_sets: neighbor_sets.clone() })
+        Ok(NetworkHandle {
+            tx,
+            neighbor_sets: neighbor_sets.clone(),
+            peer_x25519_keys: Some(peer_x25519_keys),
+        })
     }
 
     /// Run the network actor event loop
@@ -387,6 +408,7 @@ impl NetworkActor {
                             let topology_config = self.topology_config.clone();
                             let trust_graph = self.trust_graph.clone();
                             let session_manager = self.session_manager.clone();
+                            let peer_x25519_keys = self.peer_x25519_keys.clone();
                             let own_did = self.own_did.clone();
 
                             tokio::spawn(async move {
@@ -399,6 +421,7 @@ impl NetworkActor {
                                     topology_config,
                                     trust_graph,
                                     session_manager,
+                                    peer_x25519_keys,
                                     own_did,
                                 ).await {
                                     warn!("Outbound connection handler error: {}", e);
@@ -406,8 +429,9 @@ impl NetworkActor {
                             });
                         }
 
-                        // Send Hello message with DID-TLS binding
+                        // Send Hello message with DID-TLS binding and X25519 public key
                         let binding_info = self.identity_bundle.binding_info();
+                        let x25519_public = *self.identity_bundle.x25519_public_bytes();
                         let topology_info = self.topology_config.as_ref().map(|topo_cfg| {
                             TopologyInfo {
                                 region: topo_cfg.region.clone(),
@@ -421,6 +445,7 @@ impl NetworkActor {
                             did.clone(),
                             binding_info,
                             topology_info,
+                            x25519_public,
                         );
 
                         let session_mgr = self.session_manager.clone();
@@ -562,6 +587,7 @@ impl NetworkActor {
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
+        peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
         own_did: Did,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) -> Result<()> {
@@ -600,6 +626,7 @@ impl NetworkActor {
                         let topology_config_clone = topology_config.clone();
                         let trust_graph_clone = trust_graph.clone();
                         let session_mgr_clone = session_manager.clone();
+                        let peer_x25519_keys_clone = peer_x25519_keys.clone();
                         let own_did_clone = own_did.clone();
                         tokio::spawn(async move {
                             if let Err(e) = Self::handle_connection(
@@ -611,6 +638,7 @@ impl NetworkActor {
                                 topology_config_clone,
                                 trust_graph_clone,
                                 session_mgr_clone,
+                                peer_x25519_keys_clone,
                                 own_did_clone,
                             ).await {
                                 warn!("Connection handler error: {}", e);
@@ -663,6 +691,7 @@ impl NetworkActor {
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         session_manager: Arc<RwLock<SessionManager>>,
+        peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
         own_did: Did,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
@@ -697,8 +726,8 @@ impl NetworkActor {
 
                             // Handle handshake messages internally
                             match &message.payload {
-                                MessagePayload::Hello { binding_info: _, topology_info } => {
-                                    info!("Received Hello from {}", message.from);
+                                MessagePayload::Hello { binding_info: _, topology_info, x25519_public } => {
+                                    info!("Received Hello from {} with X25519 public key", message.from);
 
                                     // Get peer certificate for DID-TLS binding verification
                                     // QUIC connections use rustls, so peer_identity returns Box<dyn Any>
@@ -732,6 +761,13 @@ impl NetworkActor {
 
                                     if !verified {
                                         continue; // Drop messages from unverified peers
+                                    }
+
+                                    // Store peer's X25519 public key for end-to-end encryption
+                                    {
+                                        let mut keys = peer_x25519_keys.write().await;
+                                        keys.insert(message.from.clone(), *x25519_public);
+                                        info!("Stored X25519 public key for {}", message.from);
                                     }
 
                                     // Add peer to neighbor sets if topology is enabled
