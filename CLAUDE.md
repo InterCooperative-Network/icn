@@ -355,6 +355,34 @@ icnctl id import backup.age
 - [x] Version Negotiation Handshake - Capability announcements (Complete ✓)
 - [ ] Schema Migrations - `icnctl migrate` for data format changes
 
+---
+
+**Track B3 - Economic Modeling (Complete ✓)** (2025-01-14):
+- [x] Agent-based simulation framework using Mesa 3.3.1
+- [x] 5 behavioral agent types (reciprocator, hoarder, free rider, opportunist, super contributor)
+- [x] 5 scenarios testing economic parameters (baseline, dynamic limits, demurrage, free riders, low trust)
+- [x] ~13,000 transactions per scenario over 12 months
+- [x] Comprehensive results analysis (velocity, defaults, inequality, hoarding)
+
+**Key Findings:**
+- **Dynamic Credit Limits**: -33% defaults, -16% velocity (stability vs growth tradeoff validated)
+- **Demurrage**: -22% inequality (Gini), no velocity harm (highly effective redistribution)
+- **Free-Rider Tolerance**: System stable up to 20% free-riders (4.1% defaults vs 2.7% baseline)
+- **Trust Network Density**: Low density (30%) causes 2x hoarding vs high density (60%) - counterintuitive but validated
+
+**Validated Defaults** (now in Phase 12):
+- Credit limits: -20 initial → -500 max, +10 per 50 cleared, 2x trust multiplier
+- Demurrage: -2% monthly on balances >50
+- New member throttling: 3-month ramp, 10 credit contribution requirement
+
+**Deliverables:**
+- [sims/mutual-credit/](sims/mutual-credit/) - Complete framework (agents, economy, trust, model)
+- [sims/mutual-credit/RESULTS_SUMMARY.md](sims/mutual-credit/RESULTS_SUMMARY.md) - Comprehensive analysis
+- [docs/econ-modeling.md](docs/econ-modeling.md) - Updated with findings
+- 5 JSON scenario configurations + analysis notebooks
+
+---
+
 **Version Negotiation Features (Complete ✓)** (2025-01-14):
 - **VersionInfo Protocol**: Automatic exchange during Hello handshake with current/min/max protocol versions
 - **CapabilityFlags**: 8 capability flags (E2E_ENCRYPTION, SIGNED_MESSAGES, GRACEFUL_RESTART, TOPOLOGY_AWARE, TRUST_RATE_LIMITING, GOSSIP_PULL, MULTI_DEVICE, ECONOMIC_SAFETY)
@@ -420,10 +448,10 @@ icnctl id import backup.age
 ---
 
 **What's Next**: See [ROADMAP.md](/ROADMAP.md) for strategic roadmap. Critical path:
-- **Phase 13**: Governance Primitives v1 (driven by pilot community needs)
-- **Track C**: Pilot Community Selection & Deployment (ready to begin)
+- **Phase 13**: Governance Primitives v1 (driven by pilot community needs) - PRIORITY
+- **Track C1**: Pilot Community Selection (timebank recommended)
 - **Track B2**: Legal & Regulatory Radar (lightweight, ongoing)
-- **Track B3**: Economic Modeling (research track)
+- **Track B3**: ✅ Economic Modeling COMPLETE (simulation validates Phase 12 defaults)
 
 **Three-Layer Security Architecture (Production Ready ✅)**:
 1. **Transport Layer**: QUIC/TLS with DID-TLS binding
