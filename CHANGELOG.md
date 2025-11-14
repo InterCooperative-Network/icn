@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Operational Hardening: Monitoring Dashboard (Track B1) (2025-01-14)
+
+**Health Check Endpoint:**
+- `/health` endpoint returns JSON health status
+- HTTP status codes: 200 (healthy/degraded), 503 (unhealthy)
+- Real-time metrics: uptime, active connections, gossip topics, ledger quarantine size
+- Health state determination based on system metrics
+
+**Web Monitoring Dashboard:**
+- Real-time web UI at `http://localhost:8080/`
+- Auto-refreshing every 5 seconds
+- Key metrics displayed:
+  - Network: Active peers, messages sent/received, bytes transferred, rate limiting
+  - Gossip: Topics, entries, subscriptions, pull/push activity
+  - Ledger: Accounts, transactions, conflicts, quarantine status
+  - Trust: Edges, lookups, cache hit rate, attestations
+- Clean, dark-themed UI optimized for operations monitoring
+- Fetches data directly from Prometheus `/metrics` endpoint
+
+**Health Service Integration:**
+- `HealthService` tracks node state
+- Periodic metric updates
+- Degraded state detection (>100 quarantine entries)
+- Unhealthy state detection (>1000 quarantine entries)
+
+**Implementation:**
+- New module: `icn-obs/src/health.rs`
+- Static dashboard: `icn-obs/static/dashboard.html`
+- Axum-based HTTP server for health and dashboard endpoints
+
+**Use Cases:**
+- Real-time operational monitoring
+- External health checks (Kubernetes, systemd)
+- Quick visual status overview
+- Performance troubleshooting
+
 ### Added - Operational Hardening: Backup & Restore (Track B1) (2025-01-14)
 
 **Backup & Recovery Commands:**
