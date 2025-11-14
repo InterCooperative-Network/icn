@@ -11,6 +11,7 @@ pub mod replay_guard;
 pub mod session;
 pub mod tls;
 pub mod topology;
+pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
 pub use discovery::{Discovery, PeerInfo};
@@ -25,3 +26,4 @@ pub use topology::{
     FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId,
     TopologyConfig, TopologyInfo,
 };
+pub use version::{common_capabilities, negotiate_version, CapabilityFlags, VersionInfo};
