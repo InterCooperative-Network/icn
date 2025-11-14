@@ -281,12 +281,26 @@ let state = tokio::task::block_in_place(|| {
 - ✅ `test_delete_snapshot()` - Cleanup works
 - ✅ `test_network_state()` - Network state serialization
 
-**Integration Tests** (TODO):
-- Start node, create state, shutdown
-- Verify snapshot file exists
-- Restart node
-- Verify state restored (vector clocks, subscriptions)
-- Publish to subscribed topic → verify immediate delivery
+**Integration Tests** ✅ (in `icn-core/tests/graceful_restart_integration.rs`) (2025-01-14):
+- ✅ `test_graceful_restart_preserves_state()` - Full gossip state restart workflow
+  - Creates node with topic + subscription
+  - Publishes 3 messages (creates vector clock state)
+  - Saves snapshot to disk
+  - Simulates restart with new node instance
+  - Restores state from snapshot
+  - Verifies vector clock matches (count = 3)
+  - Verifies topic and subscription restored
+  - Publishes post-restart message
+  - Verifies vector clock increments from restored state (count = 4)
+
+- ✅ `test_x25519_keys_persist_across_restart()` - Network state (X25519 keys) persistence
+  - Creates two nodes, establishes connection
+  - Exchanges X25519 keys via Hello protocol
+  - Saves node1 snapshot
+  - Simulates node1 restart
+  - Restores state from snapshot
+  - Verifies X25519 key for node2 was persisted
+  - Compares original vs restored key (exact match)
 
 **Manual Testing**:
 ```bash
@@ -391,7 +405,7 @@ icnctl gossip publish test:topic "hello"
 
 ### Short-term (Next Sprint)
 - [x] Complete NetworkHandle state export ✅ (2025-01-14)
-- [ ] Add integration test for restart workflow
+- [x] Add integration test for restart workflow ✅ (2025-01-14)
 - [ ] Add metrics for snapshot save/load time
 - [ ] Verify backup/restore includes snapshot
 
