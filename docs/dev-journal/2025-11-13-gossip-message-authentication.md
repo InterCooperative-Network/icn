@@ -451,6 +451,45 @@ This is a **BREAKING CHANGE** for network protocol:
 
 Summary: 7% overhead for typical 2KB messages, acceptable.
 
+## Protocols Protected by Signed Gossip
+
+### Ledger Sync - Already Authenticated ✅
+
+**Important Realization:** Ledger sync messages are already fully authenticated through signed gossip!
+
+**Architecture:**
+1. Ledger publishes `LedgerSyncMessage` to gossip topics (e.g., "ledger:hours")
+2. Gossip stores as GossipEntry and announces via `GossipMessage::Announce` (**signed!**)
+3. Peers request via `GossipMessage::Request` (**signed!**)
+4. Gossip responds with `GossipMessage::Response` (**signed!**) containing ledger data
+
+**Protection inherited from signed gossip:**
+- ✅ Network-level authentication (all Gossip messages signed)
+- ✅ Replay protection (gossip sequence numbers)
+- ✅ Freshness checking (gossip timestamps)
+- ✅ Sender verification (cryptographic proof)
+
+**Additional protection:**
+- JournalEntry has optional `signature` field for entry-level signing
+- This provides dual-layer protection:
+  - Author signs journal entry (proves who created the entry)
+  - Node signs gossip message (proves who transmitted the entry)
+
+**No additional work needed:** Ledger sync is already production-ready with full authentication!
+
+### Trust Attestations - Already Signed
+
+Trust attestations (`trust:attestations` topic) already have their own Ed25519 signatures embedded in `TrustAttestation` messages. With signed gossip, they now have:
+- ✅ Entry-level signatures (original design)
+- ✅ Network-level signatures (from gossip migration)
+- ✅ Dual-layer protection
+
+### Contract Deployment - Partially Protected
+
+Contracts deployed via gossip topics inherit network-level authentication. Future work:
+- Add contract-level signatures (similar to JournalEntry)
+- Verify deployer identity matches expected participant
+
 ## Future Work
 
 ### Short-Term

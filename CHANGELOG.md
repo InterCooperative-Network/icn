@@ -54,7 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Impact:**
 - First major protocol to use Phase 9 SignedEnvelope infrastructure
 - Demonstrates end-to-end message authentication pattern
-- Foundation for migrating Ledger, Trust, and Contract protocols
+- **Automatically protects all protocols that use gossip:**
+  - ✅ **Ledger sync** - Already authenticated (publishes via gossip topics)
+  - ✅ **Trust attestations** - Dual-layer protection (entry + network signatures)
+  - ✅ **Contract deployment** - Network-level authentication inherited
 - Eliminates trust in "from" field (now cryptographically verified)
 
 ### Fixed - Critical: TLS Certificate Persistence (2025-11-13)
