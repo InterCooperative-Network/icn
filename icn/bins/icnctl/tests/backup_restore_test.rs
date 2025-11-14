@@ -228,6 +228,75 @@ fn test_restore_with_force_creates_backup() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_backup_includes_state_snapshot() -> Result<()> {
+    use std::sync::Mutex;
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+    let _lock = TEST_LOCK.lock().unwrap();
+
+    let temp_dir = TempDir::new()?;
+    let data_dir = temp_dir.path().join("data");
+    let backup_file = temp_dir.path().join("backup.tar");
+
+    // Create data directory
+    fs::create_dir_all(&data_dir)?;
+
+    // Create a mock state.snapshot file
+    let snapshot_path = data_dir.join("state.snapshot");
+    fs::write(&snapshot_path, r#"{"version":1,"created_at":1234567890,"gossip_state":null,"network_state":null}"#)?;
+
+    // Also create identity.age so backup doesn't fail
+    let identity_path = data_dir.join("identity.age");
+    fs::write(&identity_path, "mock_encrypted_keystore")?;
+
+    // Create backup
+    let backup_output = Command::new(icnctl_bin())
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("backup")
+        .arg(&backup_file)
+        .output()?;
+
+    assert!(backup_output.status.success(),
+            "Failed to create backup: {}",
+            String::from_utf8_lossy(&backup_output.stderr));
+
+    // Verify backup contains state.snapshot
+    let tar_list = Command::new("tar")
+        .arg("-tf")
+        .arg(&backup_file)
+        .output()?;
+
+    let tar_contents = String::from_utf8_lossy(&tar_list.stdout);
+    assert!(tar_contents.contains("state.snapshot"),
+            "Backup missing state.snapshot file. Contents:\n{}", tar_contents);
+
+    // Restore to different directory
+    let restore_dir = temp_dir.path().join("restore");
+    let restore_output = Command::new(icnctl_bin())
+        .arg("--data-dir")
+        .arg(&restore_dir)
+        .arg("restore")
+        .arg(&backup_file)
+        .output()?;
+
+    assert!(restore_output.status.success(),
+            "Failed to restore backup: {}",
+            String::from_utf8_lossy(&restore_output.stderr));
+
+    // Verify state.snapshot was restored
+    let restored_snapshot = restore_dir.join("state.snapshot");
+    assert!(restored_snapshot.exists(),
+            "state.snapshot was not restored");
+
+    // Verify content matches
+    let restored_content = fs::read_to_string(&restored_snapshot)?;
+    assert!(restored_content.contains("\"version\":1"),
+            "Restored snapshot content doesn't match");
+
+    Ok(())
+}
+
 /// Extract DID from icnctl output
 fn extract_did(output: &str) -> Option<String> {
     for line in output.lines() {
