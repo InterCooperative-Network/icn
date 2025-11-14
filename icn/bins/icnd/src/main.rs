@@ -90,12 +90,59 @@ async fn main() -> Result<()> {
         None
     };
 
-    // Create and run runtime
-    let runtime = Runtime::new(config, identity_bundle);
-    runtime.run().await?;
+    // Create runtime
+    let runtime = Runtime::new(config.clone(), identity_bundle);
+
+    // Get shutdown signal before moving runtime
+    let shutdown_tx = runtime.shutdown_tx();
+
+    // Spawn runtime task
+    let mut runtime_handle = tokio::spawn(async move {
+        runtime.run().await
+    });
+
+    // Wait for shutdown signal or runtime completion
+    let shutdown_result = tokio::select! {
+        result = &mut runtime_handle => {
+            // Runtime exited on its own
+            tracing::info!("Runtime exited");
+            Some(result??)
+        }
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("Received Ctrl+C, shutting down gracefully...");
+            let _ = shutdown_tx.send(());
+            None
+        }
+        _ = wait_for_sigterm() => {
+            tracing::info!("Received SIGTERM, shutting down gracefully...");
+            let _ = shutdown_tx.send(());
+            None
+        }
+    };
+
+    // If we signaled shutdown, wait for runtime to finish
+    if shutdown_result.is_none() {
+        runtime_handle.await??;
+    }
 
     tracing::info!("ICNd stopped");
     Ok(())
+}
+
+/// Wait for SIGTERM signal on Unix systems
+#[cfg(unix)]
+async fn wait_for_sigterm() -> Result<()> {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut stream = signal(SignalKind::terminate())?;
+    stream.recv().await;
+    Ok(())
+}
+
+/// Wait for SIGTERM signal on non-Unix systems (no-op)
+#[cfg(not(unix))]
+async fn wait_for_sigterm() -> Result<()> {
+    // On non-Unix systems, just wait forever
+    std::future::pending().await
 }
 
 /// Read passphrase from stdin

@@ -40,6 +40,11 @@ impl Runtime {
         &self.config
     }
 
+    /// Get a clone of the shutdown sender
+    pub fn shutdown_tx(&self) -> ShutdownTx {
+        self.shutdown_tx.clone()
+    }
+
     /// Run the runtime until shutdown
     pub async fn run(self) -> Result<()> {
         info!("ICNd runtime starting");

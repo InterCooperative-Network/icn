@@ -117,7 +117,7 @@ impl Supervisor {
 
             // Set keypair for signing outgoing gossip messages
             {
-                let mut gossip = gossip_handle.blocking_write();
+                let mut gossip = gossip_handle.write().await;
                 gossip.set_keypair(identity_bundle.keypair().clone());
             }
 
@@ -148,7 +148,7 @@ impl Supervisor {
                     }
 
                     if let Some(gossip_state) = snapshot.gossip_state.clone() {
-                        let mut gossip = gossip_handle.blocking_write();
+                        let mut gossip = gossip_handle.write().await;
                         if let Err(e) = gossip.restore_state(gossip_state) {
                             warn!("Failed to restore gossip state: {}", e);
                         } else {
@@ -691,7 +691,7 @@ impl Supervisor {
 
             // Export gossip state
             if let Some(ref gossip_handle) = gossip_handle {
-                let gossip = gossip_handle.blocking_read();
+                let gossip = gossip_handle.read().await;
                 snapshot.gossip_state = Some(gossip.export_state());
                 info!("Exported gossip state: {} vector clock entries, {} subscriptions",
                       snapshot.gossip_state.as_ref().unwrap().vector_clock.len(),
