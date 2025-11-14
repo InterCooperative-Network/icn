@@ -84,8 +84,8 @@ journalctl -u icnd --since "1 hour ago" | grep -i warn
 
 **1. Create backup:**
 ```bash
-# Create encrypted backup
-sudo -u icn icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar.gz.age
+# Create backup (tarball contains encrypted keystore)
+sudo -u icn icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar
 
 # Verify backup was created
 ls -lh ~/backups/
@@ -128,7 +128,7 @@ sudo apt update && sudo apt upgrade -y
 **1. Review and archive old backups:**
 ```bash
 # Keep last 4 weekly backups, delete older
-find ~/backups/ -name "icn-backup-*.tar.gz.age" -mtime +30 -delete
+find ~/backups/ -name "icn-backup-*.tar" -mtime +30 -delete
 ```
 
 **2. Audit device list:**
@@ -246,8 +246,8 @@ groups:
 
 **Standard backup (weekly):**
 ```bash
-# Create encrypted backup with timestamp
-icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar.gz.age
+# Create backup (tarball contains encrypted keystore) with timestamp
+icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar
 
 # Backup includes:
 # - Identity keystore (~/.icn/keystore.age)
@@ -259,7 +259,7 @@ icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar.gz.age
 **Emergency backup (before risky operations):**
 ```bash
 # Before upgrades, migrations, or major changes
-icnctl backup ~/backups/icn-pre-upgrade-$(date +%Y%m%d-%H%M%S).tar.gz.age
+icnctl backup ~/backups/icn-pre-upgrade-$(date +%Y%m%d-%H%M%S).tar
 ```
 
 ### Backup Storage Strategy
@@ -283,7 +283,7 @@ rclone copy ~/backups/ remote:icn-backups/
 # Test restore in isolated environment
 mkdir /tmp/icn-restore-test
 cd /tmp/icn-restore-test
-icnctl restore ~/backups/icn-backup-latest.tar.gz.age --data-dir /tmp/icn-restore-test
+icnctl restore ~/backups/icn-backup-latest.tar --data-dir /tmp/icn-restore-test
 # Verify keystore can be unlocked
 ICN_DATA_DIR=/tmp/icn-restore-test icnctl id show
 ```
@@ -299,7 +299,7 @@ sudo systemctl stop icnd
 mv ~/.icn ~/.icn.old-$(date +%Y%m%d-%H%M%S)
 
 # Restore from backup
-icnctl restore ~/backups/icn-backup-20250114.tar.gz.age
+icnctl restore ~/backups/icn-backup-20250114.tar
 # Enter passphrase when prompted
 
 # Verify identity
@@ -315,7 +315,7 @@ icnctl status
 **Partial restoration (keystore only):**
 ```bash
 # Extract keystore from backup
-icnctl restore ~/backups/icn-backup-20250114.tar.gz.age --keystore-only
+icnctl restore ~/backups/icn-backup-20250114.tar --keystore-only
 ```
 
 **See also:**
@@ -343,7 +343,7 @@ ICN is pre-v1.0 and does not yet have automated upgrade mechanisms. Upgrades req
 sudo systemctl stop icnd
 
 # 2. Create pre-upgrade backup
-icnctl backup ~/backups/icn-pre-upgrade-$(date +%Y%m%d-%H%M%S).tar.gz.age
+icnctl backup ~/backups/icn-pre-upgrade-$(date +%Y%m%d-%H%M%S).tar
 
 # 3. Pull latest code
 cd ~/projects/icn/icn/
@@ -377,7 +377,7 @@ journalctl -u icnd -f  # Watch logs for errors
 sudo systemctl stop icnd
 
 # Restore from pre-upgrade backup
-icnctl restore ~/backups/icn-pre-upgrade-<timestamp>.tar.gz.age
+icnctl restore ~/backups/icn-pre-upgrade-<timestamp>.tar
 
 # Reinstall old binaries
 cd ~/projects/icn/icn/
@@ -824,7 +824,11 @@ icnctl backup verify <backup-path>
 tar -tf backup.tar | grep state.snapshot
 ```
 
-**Note:** Backups automatically include `state.snapshot` for full state restoration. When you restore from backup, both your identity and runtime state (vector clocks, subscriptions, X25519 keys) are restored together.
+**Notes:**
+- Backups automatically include `state.snapshot` for full state restoration
+- When you restore from backup, both your identity and runtime state (vector clocks, subscriptions, X25519 keys) are restored together
+- **Security**: Backup tarballs are **not encrypted**, but the keystore inside (`identity.age`) is Age-encrypted with your passphrase
+- **Storage**: Store backups securely with appropriate file permissions (recommended: `chmod 600 backup.tar`)
 
 ### Network Diagnostics
 
