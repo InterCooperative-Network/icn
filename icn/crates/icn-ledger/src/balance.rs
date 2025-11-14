@@ -1,6 +1,6 @@
 //! Balance computation and queries
 
-use crate::types::{AccountBalances, AccountDelta, JournalEntry};
+use crate::types::{AccountBalances, JournalEntry};
 use icn_identity::Did;
 use std::collections::HashMap;
 

@@ -697,7 +697,7 @@ impl NetworkActor {
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-        session_manager: Arc<RwLock<SessionManager>>,
+        _session_manager: Arc<RwLock<SessionManager>>,
         peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,

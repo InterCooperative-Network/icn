@@ -59,8 +59,10 @@ impl Ord for PeerId {
 #[derive(Debug, Clone)]
 struct PeerMetadata {
     topology_info: TopologyInfo,
+    #[allow(dead_code)]
     rtt_ms: Option<u64>,
     trust_score: f32,
+    #[allow(dead_code)]
     connected_at: Instant,
 }
 

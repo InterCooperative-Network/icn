@@ -103,6 +103,7 @@ impl IdentityHandle {
 pub struct IdentityActor {
     keypair: KeyPair,
     trust_graph: TrustGraph,
+    #[allow(dead_code)]
     keystore: AgeKeyStore,
     rx: mpsc::Receiver<IdentityMsg>,
 }

@@ -54,7 +54,6 @@
 //! ```
 
 use crate::vector_clock::VectorClock;
-use crate::bloom::BloomFilter;
 use crate::types::BloomFilterData;
 use icn_identity::Did;
 use std::collections::HashMap;

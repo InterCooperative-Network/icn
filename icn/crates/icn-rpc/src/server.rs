@@ -18,7 +18,7 @@ use icn_net::NetworkHandle;
 use icn_ledger::Ledger;
 use icn_ccl::ContractRuntime;
 
-use crate::types::{ContractExecutionResponse, ContractInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{ContractExecutionResponse, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
 use crate::receipt::ReceiptStore;
 
 use icn_gossip::GossipActor;

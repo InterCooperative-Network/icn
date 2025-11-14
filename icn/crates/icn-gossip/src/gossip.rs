@@ -43,6 +43,7 @@ pub struct GossipActor {
     keypair: Option<KeyPair>,
 
     /// Sequence counter for signed messages (monotonically increasing)
+    #[allow(dead_code)]
     sequence: u64,
 
     /// Vector clock for this node
@@ -485,6 +486,7 @@ impl GossipActor {
     }
 
     /// Get all entry hashes for a topic
+    #[allow(dead_code)]
     fn get_topic_hashes(&self, topic: &str) -> Vec<ContentHash> {
         self.entries
             .get(topic)
@@ -493,6 +495,7 @@ impl GossipActor {
     }
 
     /// Find entries we have that remote might not have (based on bloom filter)
+    #[allow(dead_code)]
     fn find_entries_to_push(&self, topic: &str, remote_bloom: &BloomFilter) -> Vec<ContentHash> {
         let mut to_push = Vec::new();
 
@@ -509,12 +512,13 @@ impl GossipActor {
     }
 
     /// Find entries we're missing based on remote vector clock
+    #[allow(dead_code)]
     fn find_entries_to_pull(&self, topic: &str, remote_vector: &VectorClock) -> Vec<ContentHash> {
-        let mut to_pull = Vec::new();
+        let to_pull = Vec::new();
 
         if let Some(entries) = self.entries.get(topic) {
             // Check each entry we have
-            for (hash, entry) in entries {
+            for (_hash, entry) in entries {
                 // If remote clock is ahead of this entry's clock, we might be missing entries
                 if remote_vector.happened_after(&entry.clock) {
                     // This entry is causally before remote state
@@ -532,7 +536,7 @@ impl GossipActor {
     /// Handle incoming gossip message from network
     pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         match message {
-            GossipMessage::Announce { hash, author, clock, topic } => {
+            GossipMessage::Announce { hash, author, clock: _, topic } => {
                 debug!("Received Announce: topic={}, hash={:?}, author={}", topic, hash, author);
                 icn_obs::metrics::gossip::announces_received_inc();
 
@@ -617,7 +621,7 @@ impl GossipActor {
                 debug!("Received SendBloomFilter for topic: {}", topic);
 
                 // Reconstruct remote bloom filter
-                let remote_filter = BloomFilter::from_data(&filter);
+                let _remote_filter = BloomFilter::from_data(&filter);
 
                 // Find entries we're missing (present in remote but not in local)
                 let mut _missing_hashes: Vec<ContentHash> = Vec::new();

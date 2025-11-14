@@ -30,7 +30,7 @@
 //! - Metadata visible (sender/recipient DIDs not hidden)
 //! - Requires X25519 public key exchange before encryption
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Nonce,

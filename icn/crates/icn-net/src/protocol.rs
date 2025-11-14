@@ -222,8 +222,6 @@ impl NetworkMessage {
 pub async fn read_message(
     recv: &mut quinn::RecvStream,
 ) -> Result<NetworkMessage> {
-    use tokio::io::AsyncReadExt;
-
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
