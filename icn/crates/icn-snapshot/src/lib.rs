@@ -102,15 +102,42 @@ pub struct TopicMetadata {
     pub scope: String,  // Serialized Scope enum
 }
 
+/// Serializable peer connection info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerConnectionInfo {
+    /// Peer's DID (string format)
+    pub did: String,
+
+    /// Negotiated protocol version for this connection
+    pub negotiated_version: u32,
+
+    /// Peer's announced capabilities (bitflags as u64)
+    pub peer_capabilities: u64,
+
+    /// Peer's software version string
+    pub peer_software: String,
+
+    /// X25519 public key for end-to-end encryption
+    pub x25519_key: [u8; 32],
+}
+
 /// Network actor state for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkState {
-    /// Peer X25519 public keys for end-to-end encryption
+    /// Peer connection info (DID string -> PeerConnectionInfo)
+    /// This is the modern format that includes version, capabilities, and X25519 keys
+    #[serde(default)]
+    pub peer_connections: HashMap<String, PeerConnectionInfo>,
+
+    /// Legacy: Peer X25519 public keys for end-to-end encryption
     /// Map of DID string -> 32-byte X25519 public key
+    /// Deprecated in favor of peer_connections, kept for backward compatibility
+    #[serde(default)]
     pub peer_x25519_keys: HashMap<String, [u8; 32]>,
 
     /// Known peer addresses (DID string -> last known SocketAddr string)
     /// Note: These may be stale after restart, but can help with reconnection
+    #[serde(default)]
     pub peer_addresses: HashMap<String, String>,
 }
 
@@ -422,6 +449,7 @@ mod tests {
 
         let mut snapshot = StateSnapshot::new();
         snapshot.network_state = Some(NetworkState {
+            peer_connections: HashMap::new(),
             peer_x25519_keys: [(
                 "did:icn:alice".to_string(),
                 [1u8; 32],
@@ -714,6 +742,7 @@ mod tests {
             ),
         ) -> NetworkState {
             NetworkState {
+                peer_connections: HashMap::new(),
                 peer_x25519_keys,
                 peer_addresses,
             }
@@ -902,6 +931,7 @@ mod tests {
             topics: HashMap::new(),
         });
         snapshot.network_state = Some(NetworkState {
+            peer_connections: HashMap::new(),
             peer_x25519_keys: HashMap::new(),
             peer_addresses: HashMap::new(),
         });

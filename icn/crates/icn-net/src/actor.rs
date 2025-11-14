@@ -20,8 +20,27 @@ use crate::{
     rate_limit::{RateLimitConfig, RateLimiter},
     replay_guard::ReplayGuard,
     topology::{NeighborLimitsConfig, NeighborSets, NodeRole, PeerId, TopologyConfig, TopologyInfo},
-    Discovery, PeerInfo, SessionManager,
+    Discovery, PeerInfo, SessionManager, CapabilityFlags,
 };
+
+/// Per-peer connection metadata
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PeerConnectionInfo {
+    /// Peer's DID
+    pub did: Did,
+
+    /// Negotiated protocol version for this connection
+    pub negotiated_version: u32,
+
+    /// Peer's announced capabilities
+    pub peer_capabilities: CapabilityFlags,
+
+    /// Peer's software version string
+    pub peer_software: String,
+
+    /// X25519 public key for end-to-end encryption
+    pub x25519_key: [u8; 32],
+}
 
 /// Callback for handling incoming network messages
 pub type IncomingMessageHandler = Arc<dyn Fn(NetworkMessage) + Send + Sync>;
@@ -69,7 +88,7 @@ pub struct NetworkStats {
 pub struct NetworkHandle {
     tx: mpsc::Sender<NetworkMsg>,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
-    peer_x25519_keys: Option<Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>>,
+    peer_connections: Option<Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>>,
 }
 
 impl NetworkHandle {
@@ -201,8 +220,16 @@ impl NetworkHandle {
     ///
     /// Returns None if the peer's key hasn't been received yet (no Hello message exchange)
     pub async fn get_peer_x25519_key(&self, did: &Did) -> Option<[u8; 32]> {
-        let keys = self.peer_x25519_keys.as_ref()?;
-        keys.read().await.get(did).copied()
+        let connections = self.peer_connections.as_ref()?;
+        connections.read().await.get(did).map(|info| info.x25519_key)
+    }
+
+    /// Get a peer's connection info (version, capabilities, X25519 key)
+    ///
+    /// Returns None if no Hello exchange has occurred yet
+    pub async fn get_peer_connection_info(&self, did: &Did) -> Option<PeerConnectionInfo> {
+        let connections = self.peer_connections.as_ref()?;
+        connections.read().await.get(did).cloned()
     }
 
     /// Get reference to neighbor sets (for testing and inspection)
@@ -212,24 +239,36 @@ impl NetworkHandle {
 
     /// Export network state for persistence
     ///
-    /// This exports peer X25519 public keys so encrypted communication
-    /// can resume immediately after restart without new key exchange.
+    /// This exports peer connection info (version, capabilities, X25519 keys)
+    /// so encrypted communication can resume immediately after restart without
+    /// new key exchange and version negotiation.
     ///
     /// Peer addresses are not exported (rediscovered via mDNS).
     pub async fn export_state(&self) -> icn_snapshot::NetworkState {
-        let peer_x25519_keys = if let Some(ref keys) = self.peer_x25519_keys {
-            keys.read().await
+        let peer_connections = if let Some(ref connections) = self.peer_connections {
+            connections.read().await
                 .iter()
-                .map(|(did, key)| (did.to_string(), *key))
+                .map(|(did, info)| {
+                    let snapshot_info = icn_snapshot::PeerConnectionInfo {
+                        did: did.to_string(),
+                        negotiated_version: info.negotiated_version,
+                        peer_capabilities: info.peer_capabilities.bits(),
+                        peer_software: info.peer_software.clone(),
+                        x25519_key: info.x25519_key,
+                    };
+                    (did.to_string(), snapshot_info)
+                })
                 .collect()
         } else {
             std::collections::HashMap::new()
         };
 
-        // Peer addresses not exported (rediscovered via mDNS)
+        // Legacy format (empty for new deployments)
+        let peer_x25519_keys = std::collections::HashMap::new();
         let peer_addresses = std::collections::HashMap::new();
 
         icn_snapshot::NetworkState {
+            peer_connections,
             peer_x25519_keys,
             peer_addresses,
         }
@@ -237,19 +276,55 @@ impl NetworkHandle {
 
     /// Restore network state from persistence
     ///
-    /// This restores peer X25519 public keys so encrypted communication
-    /// works immediately after restart without new key exchange.
+    /// This restores peer connection info (version, capabilities, X25519 keys)
+    /// so encrypted communication works immediately after restart without new
+    /// key exchange and version negotiation.
     ///
+    /// Supports both modern (peer_connections) and legacy (peer_x25519_keys) formats.
     /// Peer addresses are not restored (rediscovered via mDNS).
     pub async fn restore_state(&self, state: icn_snapshot::NetworkState) -> Result<()> {
-        if let Some(ref keys) = self.peer_x25519_keys {
-            let mut keys_write = keys.write().await;
-            for (did_str, key) in state.peer_x25519_keys {
+        if let Some(ref connections) = self.peer_connections {
+            let mut connections_write = connections.write().await;
+
+            // Restore modern format (peer_connections)
+            for (did_str, snapshot_info) in state.peer_connections {
                 let did = Did::from_str(&did_str)
                     .context("Failed to parse DID from network state")?;
-                keys_write.insert(did, key);
+
+                let connection_info = PeerConnectionInfo {
+                    did: did.clone(),
+                    negotiated_version: snapshot_info.negotiated_version,
+                    peer_capabilities: crate::CapabilityFlags::from_bits_truncate(snapshot_info.peer_capabilities),
+                    peer_software: snapshot_info.peer_software,
+                    x25519_key: snapshot_info.x25519_key,
+                };
+
+                connections_write.insert(did, connection_info);
             }
-            tracing::info!("✅ Restored {} peer X25519 keys from snapshot", keys_write.len());
+
+            // Legacy migration: restore old peer_x25519_keys format
+            // (for backward compatibility with old snapshots)
+            for (did_str, key) in state.peer_x25519_keys {
+                let did = Did::from_str(&did_str)
+                    .context("Failed to parse DID from legacy network state")?;
+
+                // Only restore if not already present from modern format
+                if !connections_write.contains_key(&did) {
+                    let connection_info = PeerConnectionInfo {
+                        did: did.clone(),
+                        negotiated_version: 1, // Assume v1 for legacy
+                        peer_capabilities: crate::CapabilityFlags::empty(),
+                        peer_software: "legacy-unknown".to_string(),
+                        x25519_key: key,
+                    };
+                    connections_write.insert(did, connection_info);
+                }
+            }
+
+            tracing::info!(
+                "✅ Restored {} peer connections from snapshot",
+                connections_write.len()
+            );
         }
         Ok(())
     }
@@ -269,8 +344,8 @@ pub struct NetworkActor {
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
     topology_config: Option<TopologyConfig>,
     trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-    /// Peer X25519 public keys (for end-to-end encryption)
-    peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
+    /// Per-peer connection metadata (version, capabilities, X25519 keys)
+    peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
 }
 
 impl NetworkActor {
@@ -344,8 +419,8 @@ impl NetworkActor {
         let replay_guard = Arc::new(RwLock::new(ReplayGuard::new(300, 3600)));
         info!("Replay protection enabled (300s clock skew, 3600s peer age limit)");
 
-        // Create X25519 key store
-        let peer_x25519_keys = Arc::new(RwLock::new(std::collections::HashMap::new()));
+        // Create peer connection info store (version, capabilities, X25519 keys)
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
 
         // Initialize neighbor sets if topology is enabled
         let neighbor_sets = if let Some(ref topo_cfg) = topology_config {
@@ -370,7 +445,7 @@ impl NetworkActor {
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
             let trust_graph_clone = trust_graph.clone();
-            let peer_x25519_keys_clone = peer_x25519_keys.clone();
+            let peer_connections_clone = peer_connections.clone();
             let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = did.clone();
             let shutdown_rx = shutdown_tx.subscribe();
@@ -383,7 +458,7 @@ impl NetworkActor {
                     neighbor_sets_clone,
                     topology_config_clone,
                     trust_graph_clone,
-                    peer_x25519_keys_clone,
+                    peer_connections_clone,
                     identity_bundle_clone,
                     own_did_clone,
                     shutdown_rx,
@@ -409,7 +484,7 @@ impl NetworkActor {
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
             trust_graph: trust_graph.clone(),
-            peer_x25519_keys: peer_x25519_keys.clone(),
+            peer_connections: peer_connections.clone(),
         };
 
         // Spawn actor task
@@ -423,7 +498,7 @@ impl NetworkActor {
         Ok(NetworkHandle {
             tx,
             neighbor_sets: neighbor_sets.clone(),
-            peer_x25519_keys: Some(peer_x25519_keys),
+            peer_connections: Some(peer_connections),
         })
     }
 
@@ -505,7 +580,7 @@ impl NetworkActor {
                             let topology_config = self.topology_config.clone();
                             let trust_graph = self.trust_graph.clone();
                             let session_manager = self.session_manager.clone();
-                            let peer_x25519_keys = self.peer_x25519_keys.clone();
+                            let peer_connections = self.peer_connections.clone();
                             let identity_bundle = self.identity_bundle.clone();
                             let own_did = self.own_did.clone();
 
@@ -519,7 +594,7 @@ impl NetworkActor {
                                     topology_config,
                                     trust_graph,
                                     session_manager,
-                                    peer_x25519_keys,
+                                    peer_connections,
                                     identity_bundle,
                                     own_did,
                                 ).await {
@@ -692,7 +767,7 @@ impl NetworkActor {
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-        peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
+        peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
@@ -732,7 +807,7 @@ impl NetworkActor {
                         let topology_config_clone = topology_config.clone();
                         let trust_graph_clone = trust_graph.clone();
                         let session_mgr_clone = session_manager.clone();
-                        let peer_x25519_keys_clone = peer_x25519_keys.clone();
+                        let peer_connections_clone = peer_connections.clone();
                         let identity_bundle_clone = identity_bundle.clone();
                         let own_did_clone = own_did.clone();
                         tokio::spawn(async move {
@@ -745,7 +820,7 @@ impl NetworkActor {
                                 topology_config_clone,
                                 trust_graph_clone,
                                 session_mgr_clone,
-                                peer_x25519_keys_clone,
+                                peer_connections_clone,
                                 identity_bundle_clone,
                                 own_did_clone,
                             ).await {
@@ -800,7 +875,7 @@ impl NetworkActor {
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         _session_manager: Arc<RwLock<SessionManager>>,
-        peer_x25519_keys: Arc<RwLock<std::collections::HashMap<Did, [u8; 32]>>>,
+        peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
     ) -> Result<()> {
@@ -902,14 +977,24 @@ impl NetworkActor {
                                         "Received Hello with version negotiation"
                                     );
 
-                                    // Store peer's X25519 public key for end-to-end encryption
+                                    // Store peer connection info (version, capabilities, X25519 key)
                                     {
-                                        let mut keys = peer_x25519_keys.write().await;
-                                        keys.insert(message.from.clone(), *x25519_public);
+                                        let connection_info = PeerConnectionInfo {
+                                            did: message.from.clone(),
+                                            negotiated_version,
+                                            peer_capabilities: common_caps,
+                                            peer_software: peer_software.clone(),
+                                            x25519_key: *x25519_public,
+                                        };
+
+                                        let mut connections = peer_connections.write().await;
+                                        connections.insert(message.from.clone(), connection_info);
                                         info!(
                                             peer_did = %message.from,
-                                            key_size = x25519_public.len(),
-                                            "Stored X25519 public key"
+                                            negotiated_version = negotiated_version,
+                                            peer_software = %peer_software,
+                                            capabilities = ?common_caps.describe(),
+                                            "Stored peer connection info"
                                         );
                                     }
 
@@ -1154,19 +1239,30 @@ impl NetworkActor {
     /// Note: Active connections are NOT persisted - they will be re-established
     /// via discovery and dialing after restart.
     pub async fn export_state(&self) -> icn_snapshot::NetworkState {
-        // Export peer X25519 keys
-        let peer_x25519_keys: std::collections::HashMap<String, [u8; 32]> = self
-            .peer_x25519_keys
+        // Export peer connection info (version, capabilities, X25519 keys)
+        let peer_connections: std::collections::HashMap<String, icn_snapshot::PeerConnectionInfo> = self
+            .peer_connections
             .read()
             .await
             .iter()
-            .map(|(did, key)| (did.to_string(), *key))
+            .map(|(did, info)| {
+                let snapshot_info = icn_snapshot::PeerConnectionInfo {
+                    did: did.to_string(),
+                    negotiated_version: info.negotiated_version,
+                    peer_capabilities: info.peer_capabilities.bits(),
+                    peer_software: info.peer_software.clone(),
+                    x25519_key: info.x25519_key,
+                };
+                (did.to_string(), snapshot_info)
+            })
             .collect();
 
-        // Peer addresses are not exported - they will be rediscovered via mDNS
+        // Legacy formats (empty for new deployments)
+        let peer_x25519_keys: std::collections::HashMap<String, [u8; 32]> = std::collections::HashMap::new();
         let peer_addresses: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
         icn_snapshot::NetworkState {
+            peer_connections,
             peer_x25519_keys,
             peer_addresses,
         }
@@ -1175,23 +1271,54 @@ impl NetworkActor {
     /// Restore network actor state from persistence
     ///
     /// This restores:
-    /// - Peer X25519 public keys (so encryption works immediately after restart)
+    /// - Peer connection info (version, capabilities, X25519 keys)
     /// - Known peer addresses (as a hint for reconnection)
     ///
+    /// Supports both modern (peer_connections) and legacy (peer_x25519_keys) formats.
     /// Note: Connections are NOT automatically re-established - that happens
     /// through normal discovery and connection management processes.
     pub async fn restore_state(&self, state: icn_snapshot::NetworkState) -> Result<()> {
-        info!("Restoring network state: {} peer X25519 keys, {} peer addresses",
-              state.peer_x25519_keys.len(), state.peer_addresses.len());
+        info!("Restoring network state: {} peer connections, {} legacy keys, {} peer addresses",
+              state.peer_connections.len(), state.peer_x25519_keys.len(), state.peer_addresses.len());
 
-        // Restore peer X25519 keys
-        let mut keys = self.peer_x25519_keys.write().await;
+        // Restore peer connections
+        let mut connections = self.peer_connections.write().await;
+
+        // Restore modern format (peer_connections)
+        for (did_str, snapshot_info) in state.peer_connections {
+            let did = Did::from_str(&did_str)
+                .context("Failed to parse DID from peer connections")?;
+
+            let connection_info = PeerConnectionInfo {
+                did: did.clone(),
+                negotiated_version: snapshot_info.negotiated_version,
+                peer_capabilities: crate::CapabilityFlags::from_bits_truncate(snapshot_info.peer_capabilities),
+                peer_software: snapshot_info.peer_software,
+                x25519_key: snapshot_info.x25519_key,
+            };
+
+            connections.insert(did, connection_info);
+        }
+
+        // Legacy migration: restore old peer_x25519_keys format
+        // (for backward compatibility with old snapshots)
         for (did_str, key) in state.peer_x25519_keys {
             let did = Did::from_str(&did_str)
-                .context("Failed to parse DID from peer X25519 keys")?;
-            keys.insert(did, key);
+                .context("Failed to parse DID from legacy peer X25519 keys")?;
+
+            // Only restore if not already present from modern format
+            if !connections.contains_key(&did) {
+                let connection_info = PeerConnectionInfo {
+                    did: did.clone(),
+                    negotiated_version: 1, // Assume v1 for legacy
+                    peer_capabilities: crate::CapabilityFlags::empty(),
+                    peer_software: "legacy-unknown".to_string(),
+                    x25519_key: key,
+                };
+                connections.insert(did, connection_info);
+            }
         }
-        drop(keys);
+        drop(connections);
 
         // Note: We don't restore peer addresses directly because Discovery manages
         // its own peer list. Peer addresses will be rediscovered via mDNS.
