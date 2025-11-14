@@ -337,6 +337,52 @@ pub fn init_descriptions() {
         "icn_system_actors_active",
         "Number of active actors"
     );
+
+    // Snapshot metrics (graceful restart)
+    describe_histogram!(
+        "icn_snapshot_save_duration_seconds",
+        "Duration of snapshot save operations in seconds"
+    );
+    describe_histogram!(
+        "icn_snapshot_load_duration_seconds",
+        "Duration of snapshot load operations in seconds"
+    );
+    describe_counter!(
+        "icn_snapshot_save_total",
+        "Total number of snapshots saved"
+    );
+    describe_counter!(
+        "icn_snapshot_load_total",
+        "Total number of snapshots loaded"
+    );
+    describe_counter!(
+        "icn_snapshot_save_errors_total",
+        "Total number of snapshot save errors"
+    );
+    describe_counter!(
+        "icn_snapshot_load_errors_total",
+        "Total number of snapshot load errors"
+    );
+    describe_gauge!(
+        "icn_snapshot_size_bytes",
+        "Size of the last saved snapshot in bytes"
+    );
+    describe_gauge!(
+        "icn_snapshot_gossip_vector_clock_entries",
+        "Number of vector clock entries in last snapshot"
+    );
+    describe_gauge!(
+        "icn_snapshot_gossip_subscriptions",
+        "Number of subscriptions in last snapshot"
+    );
+    describe_gauge!(
+        "icn_snapshot_gossip_topics",
+        "Number of topics in last snapshot"
+    );
+    describe_gauge!(
+        "icn_snapshot_network_x25519_keys",
+        "Number of peer X25519 keys in last snapshot"
+    );
 }
 
 /// Network metrics
@@ -739,5 +785,54 @@ pub mod topology {
     pub fn gossip_fanout_record(scope: &str, count: usize) {
         histogram!("icn_topology_gossip_fanout", "scope" => scope.to_string())
             .record(count as f64);
+    }
+}
+
+/// Snapshot metrics (graceful restart)
+pub mod snapshot {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn save_duration_record(duration_secs: f64) {
+        histogram!("icn_snapshot_save_duration_seconds").record(duration_secs);
+    }
+
+    pub fn load_duration_record(duration_secs: f64) {
+        histogram!("icn_snapshot_load_duration_seconds").record(duration_secs);
+    }
+
+    pub fn save_total_inc() {
+        counter!("icn_snapshot_save_total").increment(1);
+    }
+
+    pub fn load_total_inc() {
+        counter!("icn_snapshot_load_total").increment(1);
+    }
+
+    pub fn save_errors_inc() {
+        counter!("icn_snapshot_save_errors_total").increment(1);
+    }
+
+    pub fn load_errors_inc() {
+        counter!("icn_snapshot_load_errors_total").increment(1);
+    }
+
+    pub fn size_bytes_set(size: u64) {
+        gauge!("icn_snapshot_size_bytes").set(size as f64);
+    }
+
+    pub fn gossip_vector_clock_entries_set(count: usize) {
+        gauge!("icn_snapshot_gossip_vector_clock_entries").set(count as f64);
+    }
+
+    pub fn gossip_subscriptions_set(count: usize) {
+        gauge!("icn_snapshot_gossip_subscriptions").set(count as f64);
+    }
+
+    pub fn gossip_topics_set(count: usize) {
+        gauge!("icn_snapshot_gossip_topics").set(count as f64);
+    }
+
+    pub fn network_x25519_keys_set(count: usize) {
+        gauge!("icn_snapshot_network_x25519_keys").set(count as f64);
     }
 }

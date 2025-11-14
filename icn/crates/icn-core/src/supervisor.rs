@@ -125,21 +125,49 @@ impl Supervisor {
 
             // Restore gossip state from snapshot if available
             let data_dir = self.config.store_path();
-            if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&data_dir) {
-                info!("Found state snapshot (version {}, created at {})",
-                      snapshot.version, snapshot.created_at);
+            let load_start = std::time::Instant::now();
+            let load_result = icn_snapshot::load_snapshot(&data_dir);
+            let load_duration = load_start.elapsed();
 
-                if let Some(gossip_state) = snapshot.gossip_state {
-                    let mut gossip = gossip_handle.blocking_write();
-                    if let Err(e) = gossip.restore_state(gossip_state) {
-                        warn!("Failed to restore gossip state: {}", e);
-                    } else {
-                        info!("✅ Gossip state restored from snapshot");
+            let loaded_snapshot = match load_result {
+                Ok(Some(snapshot)) => {
+                    icn_obs::metrics::snapshot::load_total_inc();
+                    icn_obs::metrics::snapshot::load_duration_record(load_duration.as_secs_f64());
+
+                    info!("Found state snapshot (version {}, created at {}) - loaded in {:.3}s",
+                          snapshot.version, snapshot.created_at, load_duration.as_secs_f64());
+
+                    // Record snapshot contents metrics
+                    if let Some(ref gossip_state) = snapshot.gossip_state {
+                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());
+                        icn_obs::metrics::snapshot::gossip_subscriptions_set(gossip_state.subscriptions.len());
+                        icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
                     }
+                    if let Some(ref network_state) = snapshot.network_state {
+                        icn_obs::metrics::snapshot::network_x25519_keys_set(network_state.peer_x25519_keys.len());
+                    }
+
+                    if let Some(gossip_state) = snapshot.gossip_state.clone() {
+                        let mut gossip = gossip_handle.blocking_write();
+                        if let Err(e) = gossip.restore_state(gossip_state) {
+                            warn!("Failed to restore gossip state: {}", e);
+                        } else {
+                            info!("✅ Gossip state restored from snapshot");
+                        }
+                    }
+
+                    Some(snapshot)
                 }
-            } else {
-                debug!("No state snapshot found, starting with fresh state");
-            }
+                Ok(None) => {
+                    debug!("No state snapshot found, starting with fresh state");
+                    None
+                }
+                Err(e) => {
+                    icn_obs::metrics::snapshot::load_errors_inc();
+                    warn!("Failed to load state snapshot: {}", e);
+                    None
+                }
+            };
 
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
@@ -358,11 +386,12 @@ impl Supervisor {
             info!("Network actor spawned on {}", listen_addr);
 
             // Restore network state from snapshot if available (re-use snapshot loaded earlier)
-            let data_dir = self.config.store_path();
-            if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&data_dir) {
+            if let Some(snapshot) = loaded_snapshot {
                 if let Some(network_state) = snapshot.network_state {
                     if let Err(e) = network_handle.restore_state(network_state).await {
                         warn!("Failed to restore network state: {}", e);
+                    } else {
+                        info!("✅ Network state restored from snapshot");
                     }
                 }
             }
@@ -682,12 +711,40 @@ impl Supervisor {
                       snapshot.network_state.as_ref().unwrap().peer_x25519_keys.len());
             }
 
+            // Record snapshot metrics before saving
+            if let Some(ref gossip_state) = snapshot.gossip_state {
+                icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());
+                icn_obs::metrics::snapshot::gossip_subscriptions_set(gossip_state.subscriptions.len());
+                icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
+            }
+            if let Some(ref network_state) = snapshot.network_state {
+                icn_obs::metrics::snapshot::network_x25519_keys_set(network_state.peer_x25519_keys.len());
+            }
+
             // Save snapshot to disk
             let data_dir = self.config.store_path();
-            if let Err(e) = icn_snapshot::save_snapshot(&snapshot, &data_dir) {
-                warn!("Failed to save state snapshot: {}", e);
-            } else {
-                info!("✅ State snapshot saved to {}/state.snapshot", data_dir.display());
+            let save_start = std::time::Instant::now();
+            let save_result = icn_snapshot::save_snapshot(&snapshot, &data_dir);
+            let save_duration = save_start.elapsed();
+
+            match save_result {
+                Ok(()) => {
+                    icn_obs::metrics::snapshot::save_total_inc();
+                    icn_obs::metrics::snapshot::save_duration_record(save_duration.as_secs_f64());
+
+                    // Record snapshot file size
+                    let snapshot_path = data_dir.join("state.snapshot");
+                    if let Ok(metadata) = std::fs::metadata(&snapshot_path) {
+                        icn_obs::metrics::snapshot::size_bytes_set(metadata.len());
+                    }
+
+                    info!("✅ State snapshot saved to {}/state.snapshot in {:.3}s",
+                          data_dir.display(), save_duration.as_secs_f64());
+                }
+                Err(e) => {
+                    icn_obs::metrics::snapshot::save_errors_inc();
+                    warn!("Failed to save state snapshot: {}", e);
+                }
             }
         }
 
