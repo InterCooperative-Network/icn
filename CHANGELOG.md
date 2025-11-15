@@ -13,15 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Complete HTTP API server for cooperative applications
 - Actix-web 4 async framework with middleware
 - 14 endpoints (13 REST + 1 WebSocket) across 5 modules
-- 26 tests passing (9 auth, 5 coop, 5 ledger, 2 integration, 5 events/websocket)
+- 30 tests passing (9 auth, 6 coop, 6 ledger, 4 middleware/websocket, 5 events)
 
-**Authentication Module:**
+**Authentication & Authorization:**
 - DID-based challenge/verify flow
 - `POST /auth/challenge` - Request cryptographic challenge
 - `POST /auth/verify` - Verify signed challenge, receive JWT token
 - Ed25519 signature verification
-- JWT capability tokens with scoped permissions
+- JWT capability tokens with scoped permissions (coop_id + scopes)
 - 5-minute challenge TTL with automatic cleanup
+- Bearer token authentication middleware (actix-web-httpauth)
+- Protected endpoints require valid JWT in Authorization header
+- Token validation extracts claims into request extensions
+- Public endpoints: health, auth, websocket (auth handled post-connection)
 
 **Cooperative Namespace Management:**
 - `POST /coops` - Create cooperative
@@ -44,10 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Real-time Event Streaming:**
 - `GET /ws/:coop_id` - WebSocket endpoint for real-time updates
+- Post-connection JWT authentication via JSON message protocol
+- Client sends `{"type": "Auth", "token": "..."}` after connecting
+- Server validates token and coop_id match before event subscription
 - Event types: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated
 - EventBroadcaster: Pub/sub system with per-cooperative isolation
-- WsSession actor: Heartbeat/ping-pong with automatic connection cleanup
-- Tokio mpsc channels for async event distribution
+- WsSession actor: Heartbeat/ping-pong with automatic connection cleanup (60s timeout)
+- Tokio mpsc channels for async event distribution (100ms polling)
+- Server messages: AuthOk, AuthError, Event, Error (all JSON-formatted)
 
 **Infrastructure:**
 - `GET /health` - Health check endpoint
@@ -57,13 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Logging and compression middleware
 
 **Architecture:**
-- `AuthManager` - Challenge/verify flow with JWT token generation
+- `AuthManager` - Challenge/verify flow with JWT token generation and verification
 - `CoopManager` - In-memory coop namespace storage
 - `LedgerManager` - Per-coop ledgers with isolated storage
-- Thread-safe shared state via Arc<RwLock<T>>
+- `EventBroadcaster` - Per-cooperative event pub/sub with tokio channels
+- `WsSession` - Actix actor for WebSocket connection lifecycle
+- JWT middleware (`middleware::jwt_auth`) - Bearer token validation for protected routes
+- Thread-safe shared state via Arc<RwLock<T>> and web::Data
 
 **Dependencies:**
-- actix-web 4, actix-cors
+- actix-web 4, actix-web-actors, actix-web-httpauth, actix-cors
 - jsonwebtoken 9
 - hex, rand, ed25519-dalek 2
 

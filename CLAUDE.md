@@ -344,6 +344,82 @@ icnctl id import backup.age
 
 ---
 
+**Phase 14 - Gateway API (Complete ✓)** (2025-01-15):
+- [x] REST API server with actix-web framework
+- [x] JWT-based authentication with challenge-response flow
+- [x] Cooperative namespace management (CRUD operations)
+- [x] Ledger API (balances, payments, transaction history)
+- [x] WebSocket real-time event streaming
+- [x] Event broadcasting system with pub/sub
+- [x] JWT middleware protecting all endpoints
+- [x] All 30 tests pass
+
+**Gateway Features**:
+- **Authentication**: DID-based challenge-response → JWT tokens with configurable TTL
+- **Cooperative Management**: Create/read/update/delete coops, member management, role assignments
+- **Ledger Operations**: Query balances, create payments, view transaction history
+- **Real-time Events**: WebSocket subscriptions to cooperative events (member added/removed, role updated, settings changed)
+- **Security**: Bearer token authentication on all protected endpoints, token validation middleware
+
+**API Endpoints**:
+- **Public**: `/health`, `/auth/challenge`, `/auth/verify`, `/ws/{coop_id}`
+- **Protected**: `/coops/*` (cooperative management), `/ledger/*` (ledger operations)
+
+**Architecture** (`icn-gateway/`):
+- **server.rs**: Actix-web HTTP server with middleware stack
+- **auth.rs**: JWT token generation and verification, challenge-response protocol
+- **middleware.rs**: Bearer token authentication middleware
+- **coop.rs**: Cooperative state management (in-memory for Phase 14)
+- **ledger_mgr.rs**: Ledger operations wrapper
+- **events.rs**: Event broadcasting with tokio mpsc channels
+- **websocket.rs**: WebSocket session management with JWT auth
+- **api/**: REST endpoint handlers (auth, coops, ledger, websocket, health)
+- **models.rs**: Request/response DTOs
+
+**WebSocket Protocol**:
+```rust
+// Client → Server
+{"type": "Auth", "token": "eyJ0eXAi..."}
+
+// Server → Client
+{"type": "AuthOk", "did": "did:icn:abc123"}
+{"type": "Event", "MemberAdded": {"coop_id": "...", "did": "...", "role": "..."}}
+{"type": "Error", "message": "..."}
+```
+
+**Security Model**:
+- Challenge nonce expires after 5 minutes
+- JWT tokens expire after 24 hours (configurable)
+- Tokens scoped to cooperative ID + permissions
+- WebSocket connections validate coop_id matches token
+- All endpoints except auth/health require valid Bearer token
+
+**Usage Example**:
+```bash
+# Start gateway
+cargo run --bin icn-gateway -- --bind 127.0.0.1:8080 --jwt-secret mysecret
+
+# Get challenge
+curl -X POST http://localhost:8080/auth/challenge \
+  -H "Content-Type: application/json" \
+  -d '{"did": "did:icn:abc123"}'
+
+# Sign challenge and verify (returns JWT token)
+curl -X POST http://localhost:8080/auth/verify \
+  -H "Content-Type: application/json" \
+  -d '{"did": "did:icn:abc123", "signature": "...", "coop_id": "my-coop", "scopes": ["ledger:read"]}'
+
+# Use token for API calls
+curl -H "Authorization: Bearer eyJ0eXAi..." \
+  http://localhost:8080/coops/my-coop
+
+# Connect WebSocket
+wscat -c ws://localhost:8080/ws/my-coop
+> {"type": "Auth", "token": "eyJ0eXAi..."}
+```
+
+---
+
 **Track B1 - Operational Hardening (Complete ✓)** (2025-01-14):
 - [x] Backup & Restore - `icnctl backup/restore` commands with encrypted tarballs (includes state.snapshot)
 - [x] Monitoring Dashboard - Real-time web UI + health check endpoint
