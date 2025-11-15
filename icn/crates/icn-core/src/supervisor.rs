@@ -598,6 +598,34 @@ impl Supervisor {
 
             info!("RPC server spawned on {}", rpc_addr);
 
+            // Spawn Gateway API server if enabled
+            if self.config.gateway.enabled {
+                let gateway_addr: std::net::SocketAddr = self.config.gateway.bind_addr.parse()?;
+
+                // Check that JWT secret is configured
+                if self.config.gateway.jwt_secret.is_empty() {
+                    warn!("Gateway enabled but JWT secret not configured - gateway will not start");
+                    warn!("Set jwt_secret in config or ICN_GATEWAY_JWT_SECRET environment variable");
+                } else {
+                    let jwt_secret = self.config.gateway.jwt_secret.clone().into_bytes();
+
+                    // Spawn gateway in a dedicated thread (actix-web has its own runtime)
+                    std::thread::spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        rt.block_on(async move {
+                            let gateway_server = icn_gateway::GatewayServer::new(gateway_addr, jwt_secret);
+                            if let Err(e) = gateway_server.run().await {
+                                warn!("Gateway server error: {}", e);
+                            }
+                        });
+                    });
+
+                    info!("Gateway API spawned on {}", gateway_addr);
+                }
+            } else {
+                debug!("Gateway API disabled in configuration");
+            }
+
             // Spawn anti-entropy task
             let anti_entropy_config = crate::anti_entropy::AntiEntropyConfig::default();
             let _anti_entropy_handle = crate::anti_entropy::spawn_anti_entropy_task(
