@@ -29,6 +29,8 @@ pub mod domain;
 pub mod membership;
 pub mod profile;
 pub mod proposal;
+pub mod resolver;
+pub mod store;
 pub mod tally;
 pub mod vote;
 
@@ -37,6 +39,8 @@ pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use membership::{MembershipConfig, MembershipSource};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proposal::{Proposal, ProposalId, ProposalPayload, ProposalState};
+pub use resolver::{MembershipResolver, StaticMembershipResolver};
+pub use store::{GovernanceStore, InMemoryGovernanceStore};
 pub use tally::VoteTally;
 pub use vote::{Vote, VoteChoice};
 
