@@ -1,0 +1,44 @@
+//! ICN Governance - Substrate for community decision-making
+//!
+//! This crate provides governance primitives for decentralized decision-making
+//! in cooperative networks. It is designed as a substrate: democratic by default,
+//! configurable by communities, and extensible via contracts.
+//!
+//! # Core Concepts
+//!
+//! - **GovernanceDomain**: A decision space (organization, coop, etc.)
+//! - **Proposal**: A decision to be made with title, description, and payload
+//! - **Vote**: A member's choice on a proposal (for/against/abstain)
+//! - **GovernanceProfile**: Rules for evaluating votes and determining outcomes
+//! - **MembershipConfig**: Who is eligible to vote
+//!
+//! # Example
+//!
+//! ```rust
+//! use icn_governance::*;
+//!
+//! // Create a cooperative governance domain
+//! let domain = GovernanceDomain::new(
+//!     "tech-coop".to_string(),
+//!     GovernanceConfig::cooperative_default(),
+//! );
+//! ```
+
+pub mod config;
+pub mod domain;
+pub mod membership;
+pub mod profile;
+pub mod proposal;
+pub mod tally;
+pub mod vote;
+
+pub use config::{GovernanceConfig, GovernanceParams};
+pub use domain::{GovernanceDomain, GovernanceDomainId};
+pub use membership::{MembershipConfig, MembershipSource};
+pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
+pub use proposal::{Proposal, ProposalId, ProposalPayload, ProposalState};
+pub use tally::VoteTally;
+pub use vote::{Vote, VoteChoice};
+
+/// Unix timestamp in seconds
+pub type Timestamp = u64;

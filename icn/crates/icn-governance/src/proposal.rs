@@ -1,0 +1,354 @@
+//! Proposal types and state machine
+
+use crate::domain::GovernanceDomainId;
+use crate::Timestamp;
+use icn_identity::Did;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+/// Unique identifier for a proposal
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ProposalId(pub String);
+
+impl ProposalId {
+    /// Generate a new random proposal ID
+    pub fn generate() -> Self {
+        Self(Uuid::new_v4().to_string())
+    }
+
+    /// Create from an existing ID string
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+}
+
+impl std::fmt::Display for ProposalId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// State of a proposal in its lifecycle
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProposalState {
+    /// Draft proposal, not yet open for voting
+    Draft,
+
+    /// Open for voting
+    Open {
+        /// When voting opened
+        opened_at: Timestamp,
+        /// When voting closes
+        closes_at: Timestamp,
+    },
+
+    /// Voting closed, proposal accepted
+    Accepted {
+        /// When voting closed
+        closed_at: Timestamp,
+    },
+
+    /// Voting closed, proposal rejected
+    Rejected {
+        /// When voting closed
+        closed_at: Timestamp,
+    },
+
+    /// Voting closed, quorum not met
+    NoQuorum {
+        /// When voting closed
+        closed_at: Timestamp,
+    },
+
+    /// Proposal cancelled by author
+    Cancelled {
+        /// When cancelled
+        cancelled_at: Timestamp,
+    },
+}
+
+impl ProposalState {
+    /// Check if proposal is open for voting
+    pub fn is_open(&self) -> bool {
+        matches!(self, ProposalState::Open { .. })
+    }
+
+    /// Check if proposal is closed (any terminal state)
+    pub fn is_closed(&self) -> bool {
+        matches!(
+            self,
+            ProposalState::Accepted { .. }
+                | ProposalState::Rejected { .. }
+                | ProposalState::NoQuorum { .. }
+                | ProposalState::Cancelled { .. }
+        )
+    }
+
+    /// Get the timestamp when voting closes (if open)
+    pub fn closes_at(&self) -> Option<Timestamp> {
+        match self {
+            ProposalState::Open { closes_at, .. } => Some(*closes_at),
+            _ => None,
+        }
+    }
+}
+
+/// Payload of a proposal (what is being decided)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ProposalPayload {
+    /// Free-form text proposal
+    Text {
+        /// Full text of the proposal
+        body: String,
+    },
+
+    /// Budget allocation
+    Budget {
+        /// Amount to allocate
+        amount: i64,
+        /// Currency
+        currency: String,
+        /// Recipient DID
+        recipient: Did,
+        /// Purpose
+        purpose: String,
+    },
+
+    /// Membership change
+    Membership {
+        /// Add or remove
+        action: MembershipAction,
+        /// Member DID
+        member: Did,
+    },
+
+    /// Governance config change
+    ConfigChange {
+        /// New config (JSON-encoded)
+        new_config: String,
+    },
+}
+
+/// Membership action
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MembershipAction {
+    Add,
+    Remove,
+}
+
+/// A proposal for a decision
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Proposal {
+    /// Unique identifier
+    pub id: ProposalId,
+
+    /// Domain this proposal belongs to
+    pub domain_id: GovernanceDomainId,
+
+    /// DID of the proposer
+    pub proposer: Did,
+
+    /// Title of the proposal
+    pub title: String,
+
+    /// Description
+    pub description: String,
+
+    /// Proposal payload (what is being decided)
+    pub payload: ProposalPayload,
+
+    /// Current state
+    pub state: ProposalState,
+
+    /// When created
+    pub created_at: Timestamp,
+
+    /// When last updated
+    pub updated_at: Timestamp,
+}
+
+impl Proposal {
+    /// Create a new draft proposal
+    pub fn new(
+        domain_id: GovernanceDomainId,
+        proposer: Did,
+        title: String,
+        description: String,
+        payload: ProposalPayload,
+    ) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        Self {
+            id: ProposalId::generate(),
+            domain_id,
+            proposer,
+            title,
+            description,
+            payload,
+            state: ProposalState::Draft,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Open the proposal for voting
+    pub fn open(&mut self, voting_period_seconds: u64) -> anyhow::Result<()> {
+        if !matches!(self.state, ProposalState::Draft) {
+            anyhow::bail!("Can only open proposals in Draft state");
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.state = ProposalState::Open {
+            opened_at: now,
+            closes_at: now + voting_period_seconds,
+        };
+        self.updated_at = now;
+
+        Ok(())
+    }
+
+    /// Close the proposal with a final state
+    pub fn close(&mut self, final_state: ProposalState) -> anyhow::Result<()> {
+        if !self.state.is_open() {
+            anyhow::bail!("Can only close proposals in Open state");
+        }
+
+        if !final_state.is_closed() {
+            anyhow::bail!("Must close with a terminal state");
+        }
+
+        self.state = final_state;
+        self.updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        Ok(())
+    }
+
+    /// Cancel the proposal
+    pub fn cancel(&mut self) -> anyhow::Result<()> {
+        if self.state.is_closed() {
+            anyhow::bail!("Cannot cancel a closed proposal");
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.state = ProposalState::Cancelled { cancelled_at: now };
+        self.updated_at = now;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::GovernanceDomainId;
+    use icn_identity::KeyPair;
+
+    #[test]
+    fn test_proposal_creation() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Test Proposal".to_string(),
+            "A test proposal".to_string(),
+            ProposalPayload::Text {
+                body: "Should we do this?".to_string(),
+            },
+        );
+
+        assert_eq!(proposal.title, "Test Proposal");
+        assert_eq!(proposal.state, ProposalState::Draft);
+        assert!(proposal.created_at > 0);
+    }
+
+    #[test]
+    fn test_proposal_lifecycle() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let mut proposal = Proposal::new(
+            domain_id,
+            did,
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        );
+
+        // Start in Draft
+        assert_eq!(proposal.state, ProposalState::Draft);
+        assert!(!proposal.state.is_open());
+        assert!(!proposal.state.is_closed());
+
+        // Open for voting
+        proposal.open(3600).unwrap();
+        assert!(proposal.state.is_open());
+        assert!(!proposal.state.is_closed());
+        assert!(proposal.state.closes_at().is_some());
+
+        // Cannot open again
+        assert!(proposal.open(3600).is_err());
+
+        // Close as accepted
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        proposal
+            .close(ProposalState::Accepted { closed_at: now })
+            .unwrap();
+        assert!(!proposal.state.is_open());
+        assert!(proposal.state.is_closed());
+
+        // Cannot close again
+        assert!(proposal
+            .close(ProposalState::Rejected { closed_at: now })
+            .is_err());
+    }
+
+    #[test]
+    fn test_proposal_cancellation() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let mut proposal = Proposal::new(
+            domain_id,
+            did,
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        );
+
+        // Can cancel from Draft
+        proposal.cancel().unwrap();
+        assert!(matches!(
+            proposal.state,
+            ProposalState::Cancelled { .. }
+        ));
+
+        // Cannot cancel after closed
+        assert!(proposal.cancel().is_err());
+    }
+}
