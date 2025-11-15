@@ -91,6 +91,11 @@ impl Supervisor {
 
             info!("Trust graph initialized at {}", trust_store_path.display());
 
+            // Create recovery store for social recovery events
+            let recovery_store_path = self.config.store_path().join("recovery");
+            let recovery_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&recovery_store_path)?);
+            info!("Recovery store initialized at {}", recovery_store_path.display());
+
             // Create trust lookup closure for gossip actor
             let trust_graph_for_gossip = trust_graph_handle.clone();
             let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
@@ -466,10 +471,11 @@ impl Supervisor {
 
                 gossip.set_send_callback(send_callback);
 
-                // Set up notification callback for trust attestations and contract deployments
+                // Set up notification callback for trust attestations, contract deployments, and recovery events
                 let trust_graph_for_notifications = trust_graph_handle.clone();
                 let own_did_for_notifications = did.clone();
                 let contract_actor_for_notifications = contract_actor_handle.clone();
+                let recovery_store_for_notifications = recovery_store.clone();
 
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
                     // Handle trust attestations
@@ -529,6 +535,8 @@ impl Supervisor {
                     }
                     // Handle identity recovery events
                     else if topic == IDENTITY_RECOVERY_TOPIC {
+                        let recovery_store = recovery_store_for_notifications.clone();
+
                         // Use get_data() to handle decompression if needed
                         let entry_data = match entry.get_data() {
                             Ok(data) => data,
@@ -539,22 +547,133 @@ impl Supervisor {
                         };
 
                         tokio::spawn(async move {
+                            use icn_identity::RecoveryEvent;
+
                             // Deserialize recovery message
                             match RecoveryMessage::from_bytes(&entry_data) {
                                 Ok(recovery_msg) => {
                                     info!("Received recovery message: {}", recovery_msg.summary());
 
-                                    // TODO: Handle different recovery message types
-                                    // - Initiated: Log and notify operators
-                                    // - Attestation: Verify and store
-                                    // - Finalized: Update trust graph and ledger mappings
-                                    // - Cancelled: Remove from active recoveries
+                                    // Handle different recovery message types
+                                    let result: Result<()> = (|| {
+                                        match &recovery_msg {
+                                            RecoveryMessage::Initiated { id, old_did, new_did, threshold, delay_period, timestamp } => {
+                                                // Create new recovery event
+                                                let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), *threshold, *delay_period);
 
-                                    // For now, just log the message
-                                    // Full implementation requires:
-                                    // 1. Store reference to persist recovery events
-                                    // 2. Trust graph integration for DID mapping
-                                    // 3. Ledger integration for balance transfer
+                                                // Store recovery event
+                                                let key = format!("recovery:{}", id);
+                                                let value = serde_json::to_vec(&recovery).map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                recovery_store.put(key.as_bytes(), &value)?;
+
+                                                info!("Stored new recovery: {} ({} → {})", id, old_did, new_did);
+                                                Ok(())
+                                            }
+                                            RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
+                                            // Load existing recovery
+                                            let key = format!("recovery:{}", recovery_id);
+                                            match recovery_store.get(key.as_bytes())? {
+                                                Some(data) => {
+                                                    let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
+
+                                                    // Add attestation
+                                                    match recovery.add_attestation(attestation.clone()) {
+                                                        Ok(threshold_reached) => {
+                                                            // Save updated recovery
+                                                            let value = serde_json::to_vec(&recovery)
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                            recovery_store.put(key.as_bytes(), &value)?;
+
+                                                            if threshold_reached {
+                                                                info!("Recovery {} reached threshold, entering delay period", recovery_id);
+                                                            } else {
+                                                                info!("Added attestation to recovery {}: {}", recovery_id, recovery.progress_summary());
+                                                            }
+                                                            Ok(())
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to add attestation to recovery {}: {}", recovery_id, e);
+                                                            Err(e)
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    warn!("Received attestation for unknown recovery: {}", recovery_id);
+                                                    Ok(())
+                                                }
+                                            }
+                                        }
+                                        RecoveryMessage::Finalized { id, old_did, new_did, .. } => {
+                                            // Load recovery and mark as finalized
+                                            let key = format!("recovery:{}", id);
+                                            match recovery_store.get(key.as_bytes())? {
+                                                Some(data) => {
+                                                    let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
+
+                                                    // Finalize the recovery
+                                                    match recovery.finalize() {
+                                                        Ok(_) => {
+                                                            let value = serde_json::to_vec(&recovery)
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                            recovery_store.put(key.as_bytes(), &value)?;
+
+                                                            info!("✅ Recovery finalized: {} → {}", old_did, new_did);
+
+                                                            // TODO: Update trust graph and ledger mappings
+                                                            // - Trust graph: Map old_did relationships to new_did
+                                                            // - Ledger: Transfer balances from old_did to new_did
+
+                                                            Ok(())
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to finalize recovery {}: {}", id, e);
+                                                            Err(e)
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    warn!("Received finalization for unknown recovery: {}", id);
+                                                    Ok(())
+                                                }
+                                            }
+                                        }
+                                        RecoveryMessage::Cancelled { id, cancelled_by, reason, .. } => {
+                                            // Load recovery and mark as cancelled
+                                            let key = format!("recovery:{}", id);
+                                            match recovery_store.get(key.as_bytes())? {
+                                                Some(data) => {
+                                                    let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
+
+                                                    match recovery.cancel(cancelled_by.clone(), reason.clone()) {
+                                                        Ok(_) => {
+                                                            let value = serde_json::to_vec(&recovery)
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                            recovery_store.put(key.as_bytes(), &value)?;
+
+                                                            info!("⚠️  Recovery {} cancelled by {}: {}", id, cancelled_by, reason);
+                                                            Ok(())
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to cancel recovery {}: {}", id, e);
+                                                            Err(e)
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    warn!("Received cancellation for unknown recovery: {}", id);
+                                                    Ok(())
+                                                }
+                                            }
+                                        }
+                                    }
+                                    })();
+
+                                    if let Err(e) = result {
+                                        warn!("Failed to handle recovery message: {}", e);
+                                    }
                                 }
                                 Err(e) => {
                                     warn!("Failed to deserialize recovery message: {}", e);
