@@ -1,0 +1,43 @@
+[package]
+name = "icn-gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Web framework
+actix-web = "4"
+actix-cors = "0.7"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# JWT tokens
+jsonwebtoken = "9"
+
+# Cryptography
+hex = "0.4"
+rand = "0.8"
+ed25519-dalek = "2"
+
+# ICN dependencies
+icn-identity = { path = "../icn-identity" }
+icn-ledger = { path = "../icn-ledger" }
+icn-store = { path = "../icn-store" }
+icn-rpc = { path = "../icn-rpc" }
+
+[dev-dependencies]
+reqwest = "0.11"

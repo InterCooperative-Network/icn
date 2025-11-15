@@ -14,7 +14,7 @@ members = [
     "crates/icn-snapshot",
     "crates/icn-testkit",
     "bins/icnd",
-    "bins/icnctl",
+    "bins/icnctl", "crates/icn-gateway",
 ]
 
 [workspace.package]

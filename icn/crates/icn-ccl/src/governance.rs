@@ -150,10 +150,17 @@ impl GovernanceManager {
         quorum_threshold: f64,
     ) -> Result<bool> {
         let proposal = self.proposal_state(proposal_id)?;
-        let total_members = self.member_count() as f64;
-        let voters = proposal.voters().len() as f64;
+        let total_members = self.member_count();
 
-        Ok(voters / total_members >= quorum_threshold)
+        // If no members, quorum cannot be met
+        if total_members == 0 {
+            return Ok(false);
+        }
+
+        let voters = proposal.voters().len() as f64;
+        let total_members_f64 = total_members as f64;
+
+        Ok(voters / total_members_f64 >= quorum_threshold)
     }
 
     /// Check if vote threshold is met
