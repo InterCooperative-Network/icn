@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Platform Layer: REST API Gateway (Phase 14) (2025-01-15)
+
+**New Crate: icn-gateway**
+- Complete HTTP API server for cooperative applications
+- Actix-web 4 async framework with middleware
+- 13 REST endpoints across 4 modules
+- 21 tests passing (9 auth, 5 coop, 5 ledger, 2 integration)
+
+**Authentication Module:**
+- DID-based challenge/verify flow
+- `POST /auth/challenge` - Request cryptographic challenge
+- `POST /auth/verify` - Verify signed challenge, receive JWT token
+- Ed25519 signature verification
+- JWT capability tokens with scoped permissions
+- 5-minute challenge TTL with automatic cleanup
+
+**Cooperative Namespace Management:**
+- `POST /coops` - Create cooperative
+- `GET /coops/:id` - Get cooperative info
+- `PUT /coops/:id/settings` - Update governance/credit policy/currency
+- `DELETE /coops/:id` - Delete cooperative
+- `POST /coops/:id/members` - Add member with role
+- `DELETE /coops/:id/members/:did` - Remove member
+- `PUT /coops/:id/members/:did/role` - Update member role
+- Role-based access control (Owner/Admin/Member)
+- Per-coop settings (governance model, credit policy, currency)
+
+**Ledger Operations:**
+- `GET /ledger/:coop_id/balance/:did` - Get account balances
+- `POST /ledger/:coop_id/payment` - Create payment transaction
+- `GET /ledger/:coop_id/history?did=...` - Get transaction history (with optional DID filter)
+- Per-cooperative isolated mutual credit ledgers
+- Double-entry bookkeeping with validation
+- SledStore backend for persistence
+
+**Infrastructure:**
+- `GET /health` - Health check endpoint
+- Error handling with HTTP status mapping
+- JSON error responses
+- Request/response models for all endpoints
+- Logging and compression middleware
+
+**Architecture:**
+- `AuthManager` - Challenge/verify flow with JWT token generation
+- `CoopManager` - In-memory coop namespace storage
+- `LedgerManager` - Per-coop ledgers with isolated storage
+- Thread-safe shared state via Arc<RwLock<T>>
+
+**Dependencies:**
+- actix-web 4, actix-cors
+- jsonwebtoken 9
+- hex, rand, ed25519-dalek 2
+
+**Note:** This is NOT an app runtime. Apps run externally and call this API. See `docs/platform-layer-design.md` for architecture.
+
+### Fixed
+
+**Governance:**
+- Fixed division-by-zero vulnerability in `quorum_met()` when total_members == 0
+- Now returns false instead of NaN/infinity
+
 ### Added - Economic Safety Rails: Dispute Resolution System (Phase 12) (2025-01-14)
 
 **Dispute Management:**

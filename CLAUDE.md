@@ -28,6 +28,7 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `icn-store` - Persistent KV storage (Sled)
 - `icn-rpc` - gRPC API server
 - `icn-obs` - Prometheus metrics, tracing, logging
+- `icn-gateway` - REST + WebSocket API for cooperative applications (Phase 14)
 - `icn-testkit` - Test utilities for multi-node scenarios
 
 **Binaries** (in `icn/bins/`):
@@ -444,6 +445,31 @@ icnctl id import backup.age
 - `DidDocumentCache` maintains peer identity state
 - NetworkActor verifies signatures against cached DID Documents
 - Automatic version conflict resolution
+
+---
+
+**Phase 14 - Platform Layer (REST API Gateway) (Complete ✓)** (2025-01-15):
+- [x] icn-gateway crate - Actix-web HTTP server
+- [x] Authentication endpoints - Challenge/verify flow with JWT tokens
+- [x] Cooperative namespace management - CRUD + member roles
+- [x] Ledger API endpoints - Balance, payment, transaction history
+- [x] Per-coop isolation - Separate ledgers per cooperative
+- [x] All 21 tests passing (9 auth + 5 coop + 5 ledger + 2 integration)
+
+**Gateway API (13 endpoints)**:
+- **Authentication**: `POST /auth/challenge`, `POST /auth/verify`
+- **Cooperatives**: 7 endpoints (create, get, update, delete, member CRUD)
+- **Ledger**: `GET /ledger/:coop/balance/:did`, `POST /ledger/:coop/payment`, `GET /ledger/:coop/history`
+- **Health**: `GET /health`
+
+**Architecture**:
+- **AuthManager**: DID-based challenge/verify with JWT capability tokens
+- **CoopManager**: In-memory namespace storage (Owner/Admin/Member roles)
+- **LedgerManager**: Per-coop mutual credit ledgers with SledStore backend
+- **Error Handling**: HTTP status mapping, JSON error responses
+- **Middleware**: Logging, compression
+
+**This is NOT a runtime**: Apps run externally and call this API. See [docs/platform-layer-design.md](docs/platform-layer-design.md).
 
 ---
 
