@@ -558,9 +558,10 @@ impl Supervisor {
                                     info!("Received recovery message: {}", recovery_msg.summary());
 
                                     // Handle different recovery message types
-                                    let result: Result<()> = (|| {
+                                    // Returns Ok(true) if recovery was finalized, Ok(false) otherwise, Err on failure
+                                    let result: Result<bool> = (|| {
                                         match &recovery_msg {
-                                            RecoveryMessage::Initiated { id, old_did, new_did, threshold, delay_period, timestamp } => {
+                                            RecoveryMessage::Initiated { id, old_did, new_did, threshold, delay_period, timestamp: _ } => {
                                                 // Create new recovery event
                                                 let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), *threshold, *delay_period);
 
@@ -570,7 +571,7 @@ impl Supervisor {
                                                 recovery_store.put(key.as_bytes(), &value)?;
 
                                                 info!("Stored new recovery: {} ({} → {})", id, old_did, new_did);
-                                                Ok(())
+                                                Ok(false)
                                             }
                                             RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
                                             // Load existing recovery
@@ -593,7 +594,7 @@ impl Supervisor {
                                                             } else {
                                                                 info!("Added attestation to recovery {}: {}", recovery_id, recovery.progress_summary());
                                                             }
-                                                            Ok(())
+                                                            Ok(false)
                                                         }
                                                         Err(e) => {
                                                             warn!("Failed to add attestation to recovery {}: {}", recovery_id, e);
@@ -603,7 +604,7 @@ impl Supervisor {
                                                 }
                                                 None => {
                                                     warn!("Received attestation for unknown recovery: {}", recovery_id);
-                                                    Ok(())
+                                                    Ok(false)
                                                 }
                                             }
                                         }
@@ -623,7 +624,7 @@ impl Supervisor {
                                                             recovery_store.put(key.as_bytes(), &value)?;
 
                                                             info!("✅ Recovery finalized: {} → {}", old_did, new_did);
-                                                            Ok(())
+                                                            Ok(true)  // Successfully finalized - trigger trust/ledger updates
                                                         }
                                                         Err(e) => {
                                                             warn!("Failed to finalize recovery {}: {}", id, e);
@@ -633,7 +634,7 @@ impl Supervisor {
                                                 }
                                                 None => {
                                                     warn!("Received finalization for unknown recovery: {}", id);
-                                                    Ok(())
+                                                    Ok(false)  // Unknown recovery - don't trigger trust/ledger updates
                                                 }
                                             }
                                         }
@@ -652,7 +653,7 @@ impl Supervisor {
                                                             recovery_store.put(key.as_bytes(), &value)?;
 
                                                             info!("⚠️  Recovery {} cancelled by {}: {}", id, cancelled_by, reason);
-                                                            Ok(())
+                                                            Ok(false)
                                                         }
                                                         Err(e) => {
                                                             warn!("Failed to cancel recovery {}: {}", id, e);
@@ -662,18 +663,20 @@ impl Supervisor {
                                                 }
                                                 None => {
                                                     warn!("Received cancellation for unknown recovery: {}", id);
-                                                    Ok(())
+                                                    Ok(false)
                                                 }
                                             }
                                         }
                                     }
                                     })();
 
-                                    if let Err(e) = &result {
-                                        warn!("Failed to handle recovery message: {}", e);
-                                    } else if result.is_ok() {
-                                        // If recovery was successfully finalized, update trust graph and ledger
-                                        if let RecoveryMessage::Finalized { id, old_did, new_did, .. } = &recovery_msg {
+                                    match result {
+                                        Err(ref e) => {
+                                            warn!("Failed to handle recovery message: {}", e);
+                                        }
+                                        Ok(true) => {
+                                            // Recovery was successfully finalized - update trust graph and ledger
+                                            if let RecoveryMessage::Finalized { id, old_did, new_did, .. } = &recovery_msg {
                                             // Update trust graph: map old_did relationships to new_did
                                             let mut trust = trust_graph.write().await;
                                             match trust.map_did_recovery(old_did, new_did) {
@@ -697,6 +700,10 @@ impl Supervisor {
                                                 }
                                             }
                                             drop(ledger_guard); // Release write lock
+                                            }
+                                        }
+                                        Ok(false) => {
+                                            // Message handled but no finalization occurred - do nothing
                                         }
                                     }
                                 }

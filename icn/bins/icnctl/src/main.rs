@@ -725,6 +725,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
                 },
                 threshold: threshold as u8,
                 trustees: trustee_dids.clone(),
+                delay_period: delay,
             };
 
             // Update DID document with recovery config
@@ -772,6 +773,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
                     println!("  {}. {}", i + 1, trustee);
                 }
                 println!("\nThreshold: {}", recovery_config.threshold);
+                println!("Delay period: {} seconds ({} hours)", recovery_config.delay_period, recovery_config.delay_period / 3600);
 
                 match &recovery_config.method {
                     RecoveryMethod::Social { m, n } => {

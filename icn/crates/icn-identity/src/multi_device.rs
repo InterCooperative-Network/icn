@@ -107,6 +107,10 @@ pub struct RecoveryConfig {
 
     /// List of trustee DIDs who can participate in recovery
     pub trustees: Vec<Did>,
+
+    /// Delay period in seconds before recovery can be finalized
+    /// This gives the original owner time to cancel fraudulent recovery attempts
+    pub delay_period: u64,
 }
 
 /// Method of recovery
