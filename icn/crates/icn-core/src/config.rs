@@ -22,6 +22,10 @@ pub struct Config {
     /// Topology configuration for regional/cluster-based networking
     #[serde(default)]
     pub topology: TopologyConfig,
+
+    /// Gateway API configuration
+    #[serde(default)]
+    pub gateway: GatewayConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +159,55 @@ impl Default for RateLimitingConfig {
     }
 }
 
+/// Gateway API configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewayConfig {
+    /// Enable the gateway API server
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Gateway HTTP bind address (format: "IP:PORT")
+    #[serde(default = "default_gateway_bind_addr")]
+    pub bind_addr: String,
+
+    /// JWT token expiration time in hours
+    #[serde(default = "default_token_expiry_hours")]
+    pub token_expiry_hours: u64,
+
+    /// Challenge TTL in minutes
+    #[serde(default = "default_challenge_ttl_minutes")]
+    pub challenge_ttl_minutes: u64,
+
+    /// JWT secret key (should be loaded from environment variable or secure file)
+    /// If empty, gateway will fail to start
+    #[serde(default)]
+    pub jwt_secret: String,
+}
+
+fn default_gateway_bind_addr() -> String {
+    "127.0.0.1:8080".to_string()
+}
+
+fn default_token_expiry_hours() -> u64 {
+    24
+}
+
+fn default_challenge_ttl_minutes() -> u64 {
+    5
+}
+
+impl Default for GatewayConfig {
+    fn default() -> Self {
+        GatewayConfig {
+            enabled: false,
+            bind_addr: default_gateway_bind_addr(),
+            token_expiry_hours: default_token_expiry_hours(),
+            challenge_ttl_minutes: default_challenge_ttl_minutes(),
+            jwt_secret: String::new(),
+        }
+    }
+}
+
 // Re-export topology types from icn-net to avoid circular dependencies
 pub use icn_net::{FanoutConfig, NeighborLimitsConfig, NodeRole, TopologyConfig};
 
@@ -177,6 +230,7 @@ impl Default for Config {
             },
             rate_limiting: RateLimitingConfig::default(),
             topology: TopologyConfig::default(),
+            gateway: GatewayConfig::default(),
         }
     }
 }
@@ -388,5 +442,53 @@ burst_capacity = 3
         // Other fields should use defaults
         assert_eq!(config.rate_limiting.known.max_messages_per_second, 50);
         assert_eq!(config.rate_limiting.known.burst_capacity, 10);
+    }
+
+    #[test]
+    fn test_gateway_config_defaults() {
+        let config = GatewayConfig::default();
+
+        assert!(!config.enabled); // Disabled by default
+        assert_eq!(config.bind_addr, "127.0.0.1:8080");
+        assert_eq!(config.token_expiry_hours, 24);
+        assert_eq!(config.challenge_ttl_minutes, 5);
+        assert_eq!(config.jwt_secret, "");
+    }
+
+    #[test]
+    fn test_gateway_config_serialization() {
+        let toml_str = r#"
+enabled = true
+bind_addr = "0.0.0.0:8080"
+token_expiry_hours = 48
+challenge_ttl_minutes = 10
+jwt_secret = "test-secret"
+"#;
+
+        let config: GatewayConfig = toml::from_str(toml_str).unwrap();
+
+        assert!(config.enabled);
+        assert_eq!(config.bind_addr, "0.0.0.0:8080");
+        assert_eq!(config.token_expiry_hours, 48);
+        assert_eq!(config.challenge_ttl_minutes, 10);
+        assert_eq!(config.jwt_secret, "test-secret");
+    }
+
+    #[test]
+    fn test_config_with_gateway() {
+        let config = Config::default();
+
+        // Verify gateway config is present and has defaults
+        assert!(!config.gateway.enabled);
+        assert_eq!(config.gateway.bind_addr, "127.0.0.1:8080");
+
+        // Serialize to TOML
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        assert!(toml_str.contains("[gateway]"));
+
+        // Deserialize back
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+        assert!(!deserialized.gateway.enabled);
+        assert_eq!(deserialized.gateway.bind_addr, "127.0.0.1:8080");
     }
 }
