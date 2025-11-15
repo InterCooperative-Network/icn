@@ -9,10 +9,12 @@ use icn_store::{SledStore, Store};
 
 use crate::coop::CoopId;
 use crate::error::{GatewayError, Result};
+use crate::events::{EventBroadcaster, GatewayEvent};
 
 /// Ledger manager that maintains separate ledgers per cooperative
 pub struct LedgerManager {
     ledgers: Arc<RwLock<HashMap<CoopId, Arc<RwLock<Ledger>>>>>,
+    event_broadcaster: Option<Arc<EventBroadcaster>>,
 }
 
 impl LedgerManager {
@@ -20,7 +22,13 @@ impl LedgerManager {
     pub fn new() -> Self {
         Self {
             ledgers: Arc::new(RwLock::new(HashMap::new())),
+            event_broadcaster: None,
         }
+    }
+
+    /// Set the event broadcaster for real-time updates
+    pub fn set_event_broadcaster(&mut self, broadcaster: Arc<EventBroadcaster>) {
+        self.event_broadcaster = Some(broadcaster);
     }
 
     /// Get or create a ledger for a cooperative
@@ -70,7 +78,7 @@ impl LedgerManager {
         // Build the journal entry
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from.clone(), currency.clone(), amount)
-            .credit(to.clone(), currency, amount)
+            .credit(to.clone(), currency.clone(), amount)
             .build()
             .map_err(|e| GatewayError::SubstrateError(e))?;
 
@@ -81,7 +89,26 @@ impl LedgerManager {
         let hash = ledger.append_entry(entry)
             .map_err(|e| GatewayError::SubstrateError(e))?;
 
-        Ok(hash.to_hex())
+        let hash_str = hash.to_hex();
+
+        // Broadcast event if broadcaster is available
+        if let Some(broadcaster) = &self.event_broadcaster {
+            let event = GatewayEvent::PaymentCreated {
+                coop_id: coop_id.clone(),
+                hash: hash_str.clone(),
+                from: from.to_string(),
+                to: to.to_string(),
+                amount,
+                currency,
+            };
+            let broadcaster = broadcaster.clone();
+            let coop_id = coop_id.clone();
+            tokio::spawn(async move {
+                broadcaster.broadcast(&coop_id, event).await;
+            });
+        }
+
+        Ok(hash_str)
     }
 
     /// Get balance for an account

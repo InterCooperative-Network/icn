@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::coop::{CoopManager, MemberRole};
 use crate::error::Result;
+use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest};
 
 fn timestamp() -> u64 {
@@ -64,6 +65,7 @@ pub async fn get_coop(
 #[put("/coops/{id}/settings")]
 pub async fn update_settings(
     coop_mgr: web::Data<Arc<CoopManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<UpdateSettingsRequest>,
 ) -> Result<HttpResponse> {
@@ -80,6 +82,17 @@ pub async fn update_settings(
     }
 
     coop_mgr.update_coop(&id, coop.clone())?;
+
+    // Broadcast settings updated event
+    let event = GatewayEvent::SettingsUpdated {
+        coop_id: id.to_string(),
+    };
+    let broadcaster_clone = broadcaster.clone();
+    let coop_id = id.into_inner();
+    tokio::spawn(async move {
+        broadcaster_clone.broadcast(&coop_id, event).await;
+    });
+
     Ok(HttpResponse::Ok().json(coop))
 }
 
@@ -97,18 +110,31 @@ pub async fn delete_coop(
 #[post("/coops/{id}/members")]
 pub async fn add_member(
     coop_mgr: web::Data<Arc<CoopManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<AddMemberRequest>,
 ) -> Result<HttpResponse> {
     let mut coop = coop_mgr.get_coop(&id)?;
 
-    let did = req.did.parse()
+    let did: icn_identity::Did = req.did.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
 
     let role = parse_role(&req.role)?;
 
-    coop.add_member(did, role, timestamp())?;
+    coop.add_member(did.clone(), role.clone(), timestamp())?;
     coop_mgr.update_coop(&id, coop.clone())?;
+
+    // Broadcast member added event
+    let event = GatewayEvent::MemberAdded {
+        coop_id: id.to_string(),
+        did: did.to_string(),
+        role: format!("{:?}", role),
+    };
+    let broadcaster_clone = broadcaster.clone();
+    let coop_id = id.into_inner();
+    tokio::spawn(async move {
+        broadcaster_clone.broadcast(&coop_id, event).await;
+    });
 
     Ok(HttpResponse::Ok().json(coop))
 }
@@ -117,6 +143,7 @@ pub async fn add_member(
 #[delete("/coops/{id}/members/{did}")]
 pub async fn remove_member(
     coop_mgr: web::Data<Arc<CoopManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     let (coop_id, did_str) = path.into_inner();
@@ -128,6 +155,17 @@ pub async fn remove_member(
     coop.remove_member(&did)?;
     coop_mgr.update_coop(&coop_id, coop.clone())?;
 
+    // Broadcast member removed event
+    let event = GatewayEvent::MemberRemoved {
+        coop_id: coop_id.clone(),
+        did: did_str.clone(),
+    };
+    let broadcaster_clone = broadcaster.clone();
+    let coop_id_clone = coop_id.clone();
+    tokio::spawn(async move {
+        broadcaster_clone.broadcast(&coop_id_clone, event).await;
+    });
+
     Ok(HttpResponse::Ok().json(coop))
 }
 
@@ -135,6 +173,7 @@ pub async fn remove_member(
 #[put("/coops/{id}/members/{did}/role")]
 pub async fn update_member_role(
     coop_mgr: web::Data<Arc<CoopManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
     path: web::Path<(String, String)>,
     req: web::Json<UpdateRoleRequest>,
 ) -> Result<HttpResponse> {
@@ -146,8 +185,20 @@ pub async fn update_member_role(
 
     let new_role = parse_role(&req.role)?;
 
-    coop.update_role(&did, new_role)?;
+    coop.update_role(&did, new_role.clone())?;
     coop_mgr.update_coop(&coop_id, coop.clone())?;
+
+    // Broadcast role updated event
+    let event = GatewayEvent::RoleUpdated {
+        coop_id: coop_id.clone(),
+        did: did_str.clone(),
+        new_role: format!("{:?}", new_role),
+    };
+    let broadcaster_clone = broadcaster.clone();
+    let coop_id_clone = coop_id.clone();
+    tokio::spawn(async move {
+        broadcaster_clone.broadcast(&coop_id_clone, event).await;
+    });
 
     Ok(HttpResponse::Ok().json(coop))
 }
@@ -194,6 +245,7 @@ mod tests {
     #[actix_web::test]
     async fn test_add_remove_member() {
         let coop_mgr = Arc::new(CoopManager::new());
+        let broadcaster = Arc::new(EventBroadcaster::new());
         let owner = IdentityBundle::generate().unwrap();
         let member = IdentityBundle::generate().unwrap();
 
@@ -208,6 +260,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
+                .app_data(web::Data::new(broadcaster.clone()))
                 .service(add_member)
                 .service(remove_member)
         ).await;

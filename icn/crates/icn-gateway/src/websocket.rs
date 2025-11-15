@@ -4,7 +4,6 @@ use actix::{Actor, ActorContext, AsyncContext, StreamHandler};
 use actix_web_actors::ws;
 use std::time::{Duration, Instant};
 
-use crate::error::Result;
 use icn_identity::Did;
 
 /// WebSocket session for a cooperative namespace
