@@ -18,7 +18,9 @@ pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
     RevocationReason, RotationEvent, RotationEventType, VerificationMethod,
 };
-pub use recovery::{RecoveryAttestation, RecoveryEvent, RecoveryStatus};
+pub use recovery::{
+    RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
+};
 pub use sync::{DidDocumentCache, IdentityUpdateMessage, IDENTITY_UPDATES_TOPIC};
 
 /// A decentralized identifier for an ICN node

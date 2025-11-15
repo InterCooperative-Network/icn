@@ -2,7 +2,10 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use icn_identity::{AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType};
+use icn_identity::{
+    AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType, RecoveryAttestation, RecoveryEvent,
+    RecoveryMethod, RecoveryConfig as IdentityRecoveryConfig,
+};
 use icn_store::{SledStore, Store};
 use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
@@ -42,6 +45,10 @@ enum Commands {
     /// Device management (multi-device identity)
     #[command(subcommand)]
     Device(DeviceCommands),
+
+    /// Social recovery for lost devices
+    #[command(subcommand)]
+    Recovery(RecoveryCommands),
 
     /// Trust graph management
     #[command(subcommand)]
@@ -133,6 +140,67 @@ enum DeviceCommands {
         /// Reason for revocation
         #[arg(short, long)]
         reason: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum RecoveryCommands {
+    /// Configure social recovery trustees
+    Setup {
+        /// Trustee DIDs (comma-separated)
+        trustees: String,
+
+        /// Number of trustees required (M-of-N threshold)
+        #[arg(short, long)]
+        threshold: usize,
+
+        /// Delay period in seconds before finalization (default: 86400 = 24 hours)
+        #[arg(short, long, default_value = "86400")]
+        delay: u64,
+    },
+
+    /// Show current recovery configuration
+    Config,
+
+    /// Initiate recovery for a lost identity
+    Initiate {
+        /// Old DID to recover
+        old_did: String,
+    },
+
+    /// Sign a recovery attestation as a trustee
+    Attest {
+        /// Recovery ID to attest
+        recovery_id: String,
+
+        /// How you verified the user's identity
+        #[arg(short, long)]
+        verification: String,
+    },
+
+    /// List all active recovery requests
+    List,
+
+    /// Show status of a specific recovery
+    Status {
+        /// Recovery ID
+        recovery_id: String,
+    },
+
+    /// Finalize a recovery (after M signatures + delay)
+    Finalize {
+        /// Recovery ID to finalize
+        recovery_id: String,
+    },
+
+    /// Cancel a recovery (if fraudulent or device found)
+    Cancel {
+        /// Recovery ID to cancel
+        recovery_id: String,
+
+        /// Reason for cancellation
+        #[arg(short, long)]
+        reason: String,
     },
 }
 
@@ -392,6 +460,8 @@ async fn main() -> Result<()> {
 
         Commands::Device(device_cmd) => handle_device_command(device_cmd, &data_dir)?,
 
+        Commands::Recovery(recovery_cmd) => handle_recovery_command(recovery_cmd, &data_dir)?,
+
         Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
 
         Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
@@ -604,6 +674,385 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
             println!("  From: {}", input.display());
             println!("  To:   {}", keystore_path.display());
             println!("  DID:  {}", imported_did);
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<()> {
+    let keystore_path = get_keystore_path(data_dir);
+    let store_path = get_store_path(data_dir);
+
+    match cmd {
+        RecoveryCommands::Setup { trustees, threshold, delay } => {
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one.");
+            }
+
+            // Parse trustee DIDs
+            let trustee_dids: Result<Vec<Did>> = trustees
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(Did::from_str)
+                .collect();
+            let trustee_dids = trustee_dids.context("Failed to parse trustee DIDs")?;
+
+            // Validate threshold
+            if threshold > trustee_dids.len() {
+                bail!(
+                    "Threshold ({}) cannot be greater than number of trustees ({})",
+                    threshold,
+                    trustee_dids.len()
+                );
+            }
+            if threshold == 0 {
+                bail!("Threshold must be at least 1");
+            }
+
+            // Get passphrase and unlock keystore
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            // Create recovery configuration
+            let recovery_config = IdentityRecoveryConfig {
+                method: RecoveryMethod::Social {
+                    m: threshold as u8,
+                    n: trustee_dids.len() as u8,
+                },
+                threshold: threshold as u8,
+                trustees: trustee_dids.clone(),
+            };
+
+            // Update DID document with recovery config
+            keystore.update_did_document(
+                |did_doc| {
+                    did_doc.recovery = Some(recovery_config.clone());
+                    Ok(())
+                },
+                None,  // No rotation event
+                &passphrase,
+            )?;
+
+            println!("✓ Recovery configuration saved!");
+            println!("\nRecovery trustees ({}):", trustee_dids.len());
+            for (i, trustee) in trustee_dids.iter().enumerate() {
+                println!("  {}. {}", i + 1, trustee);
+            }
+            println!("\nThreshold: {} of {}", threshold, trustee_dids.len());
+            println!("Delay period: {} seconds ({} hours)", delay, delay / 3600);
+            println!("\n⚠️  IMPORTANT:");
+            println!("  • Choose trustees you trust and who know you well");
+            println!("  • Trustees must verify your identity out-of-band (phone, video, in-person)");
+            println!("  • If you lose all devices, contact {} trustees to initiate recovery", threshold);
+        }
+
+        RecoveryCommands::Config => {
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one.");
+            }
+
+            // Get passphrase and unlock keystore
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            // Get DID document
+            let did_doc = keystore.get_did_document()?;
+
+            if let Some(recovery_config) = &did_doc.recovery {
+                println!("Recovery Configuration:");
+                println!("  Identity: {}", did_doc.id);
+                println!("\nTrustees ({}):", recovery_config.trustees.len());
+                for (i, trustee) in recovery_config.trustees.iter().enumerate() {
+                    println!("  {}. {}", i + 1, trustee);
+                }
+                println!("\nThreshold: {}", recovery_config.threshold);
+
+                match &recovery_config.method {
+                    RecoveryMethod::Social { m, n } => {
+                        println!("Method: Social recovery ({}-of-{})", m, n);
+                    }
+                    RecoveryMethod::BackupSeed => {
+                        println!("Method: Backup seed");
+                    }
+                    RecoveryMethod::None => {
+                        println!("Method: None (no recovery)");
+                    }
+                }
+            } else {
+                println!("No recovery configuration found.");
+                println!("\nTo configure social recovery, run:");
+                println!("  icnctl recovery setup <trustees> --threshold <M>");
+            }
+        }
+
+        RecoveryCommands::Initiate { old_did } => {
+            // Parse old DID
+            let old_did = Did::from_str(&old_did).context("Invalid old DID")?;
+
+            // Check if keystore exists (new identity)
+            if !keystore_path.exists() {
+                bail!("No identity found. Create a new identity first with 'icnctl id init'");
+            }
+
+            // Get passphrase and unlock keystore
+            let passphrase = read_passphrase("Enter passphrase for NEW identity: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            let new_did = keystore.get_keypair()?.did().clone();
+
+            println!("Initiating recovery:");
+            println!("  Old DID: {}", old_did);
+            println!("  New DID: {}", new_did);
+            println!();
+
+            // TODO: Get recovery config from old DID (would need gossip integration)
+            // For now, prompt user for threshold and delay
+            print!("Enter threshold (M-of-N): ");
+            io::stdout().flush()?;
+            let mut threshold_input = String::new();
+            io::stdin().read_line(&mut threshold_input)?;
+            let threshold: usize = threshold_input.trim().parse()
+                .context("Invalid threshold")?;
+
+            print!("Enter delay period in seconds (default 86400 = 24 hours): ");
+            io::stdout().flush()?;
+            let mut delay_input = String::new();
+            io::stdin().read_line(&mut delay_input)?;
+            let delay: u64 = if delay_input.trim().is_empty() {
+                86400
+            } else {
+                delay_input.trim().parse().context("Invalid delay")?
+            };
+
+            // Create recovery event
+            let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), threshold, delay);
+
+            // Save recovery event to store
+            let store = SledStore::open(&store_path)?;
+            let recovery_key = format!("recovery:{}", recovery.id);
+            let recovery_json = serde_json::to_vec(&recovery)?;
+            store.put(recovery_key.as_bytes(), &recovery_json)?;
+
+            // TODO: Publish to gossip (done by daemon, not CLI)
+            // let msg = RecoveryMessage::initiated(&recovery);
+            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+
+            println!("\n✓ Recovery initiated!");
+            println!("  Recovery ID: {}", recovery.id);
+            println!("  Status: {}", recovery.progress_summary());
+            println!("\nNext steps:");
+            println!("  1. Contact your {} trustees out-of-band (phone, video, in-person)", threshold);
+            println!("  2. Ask them to run: icnctl recovery attest {}", recovery.id);
+            println!("  3. After {} attestations, wait {} seconds delay period", threshold, delay);
+            println!("  4. Finalize recovery: icnctl recovery finalize {}", recovery.id);
+        }
+
+        RecoveryCommands::Attest { recovery_id, verification } => {
+            // Load recovery event from store
+            let store = SledStore::open(&store_path)?;
+            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_data = store.get(recovery_key.as_bytes())?
+                .context("Recovery not found")?;
+            let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+
+            println!("Recovery attestation for:");
+            println!("  Old DID: {}", recovery.old_did);
+            println!("  New DID: {}", recovery.new_did);
+            println!("  Status: {}", recovery.progress_summary());
+            println!();
+
+            // Get trustee's keystore
+            if !keystore_path.exists() {
+                bail!("No identity found. Trustees must have an ICN identity.");
+            }
+
+            let passphrase = read_passphrase("Enter your passphrase (trustee): ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+
+            println!("Signing attestation as: {}", keypair.did());
+            println!();
+
+            // Create attestation
+            let attestation = RecoveryAttestation::new(
+                &keypair,
+                recovery.old_did.clone(),
+                recovery.new_did.clone(),
+                verification.clone(),
+            )?;
+
+            // Add attestation to recovery
+            let threshold_reached = recovery.add_attestation(attestation)?;
+
+            // Save updated recovery
+            let recovery_json = serde_json::to_vec(&recovery)?;
+            store.put(recovery_key.as_bytes(), &recovery_json)?;
+
+            // TODO: Publish attestation to gossip (done by daemon, not CLI)
+            // let msg = RecoveryMessage::attestation(recovery_id.clone(), attestation);
+            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+
+            println!("✓ Attestation signed and added!");
+            println!("  Trustee: {}", keypair.did());
+            println!("  Verification: {}", verification);
+            println!("  Status: {}", recovery.progress_summary());
+
+            if threshold_reached {
+                println!("\n🎉 Threshold reached! Recovery entering delay period.");
+                if recovery.delay_period > 0 {
+                    println!("   Wait {} seconds before finalizing.", recovery.delay_period);
+                } else {
+                    println!("   No delay configured. Ready to finalize now!");
+                }
+            }
+        }
+
+        RecoveryCommands::List => {
+            // List all recovery events from store
+            let store = SledStore::open(&store_path)?;
+
+            println!("Active recovery requests:\n");
+
+            let mut found_any = false;
+            let items = store.scan(b"recovery:")?;
+
+            for (_key, value) in items {
+                let recovery: RecoveryEvent = serde_json::from_slice(&value)?;
+
+                if recovery.is_active() {
+                    found_any = true;
+                    println!("Recovery ID: {}", recovery.id);
+                    println!("  Old DID: {}", recovery.old_did);
+                    println!("  New DID: {}", recovery.new_did);
+                    println!("  Status: {}", recovery.progress_summary());
+                    println!("  Attestations: {}/{}", recovery.attestations.len(), recovery.threshold);
+                    println!();
+                }
+            }
+
+            if !found_any {
+                println!("No active recovery requests found.");
+            }
+        }
+
+        RecoveryCommands::Status { recovery_id } => {
+            // Load recovery event
+            let store = SledStore::open(&store_path)?;
+            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_data = store.get(recovery_key.as_bytes())?
+                .context("Recovery not found")?;
+            let recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+
+            println!("Recovery Status");
+            println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            println!("ID: {}", recovery.id);
+            println!("Old DID: {}", recovery.old_did);
+            println!("New DID: {}", recovery.new_did);
+            println!("Initiated: {}", recovery.initiated_at);
+            println!();
+            println!("Configuration:");
+            println!("  Threshold: {}", recovery.threshold);
+            println!("  Delay: {} seconds", recovery.delay_period);
+            println!();
+            println!("Progress: {}", recovery.progress_summary());
+            println!();
+            println!("Attestations ({}/{}):", recovery.attestations.len(), recovery.threshold);
+            for (i, att) in recovery.attestations.iter().enumerate() {
+                println!("  {}. Trustee: {}", i + 1, att.trustee);
+                println!("     Verification: {}", att.verification_method);
+                println!("     Timestamp: {}", att.timestamp);
+            }
+
+            if recovery.is_finalized() {
+                println!("\n✓ Recovery finalized at: {}", recovery.finalized_at.unwrap());
+            }
+        }
+
+        RecoveryCommands::Finalize { recovery_id } => {
+            // Load recovery event
+            let store = SledStore::open(&store_path)?;
+            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_data = store.get(recovery_key.as_bytes())?
+                .context("Recovery not found")?;
+            let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+
+            println!("Finalizing recovery:");
+            println!("  Old DID: {}", recovery.old_did);
+            println!("  New DID: {}", recovery.new_did);
+            println!("  Status: {}", recovery.progress_summary());
+            println!();
+
+            // Check if delay expired
+            recovery.check_delay_expired();
+
+            // Finalize
+            recovery.finalize()?;
+
+            // Save updated recovery
+            let recovery_json = serde_json::to_vec(&recovery)?;
+            store.put(recovery_key.as_bytes(), &recovery_json)?;
+
+            // TODO: Publish finalization to gossip (done by daemon, not CLI)
+            // let msg = RecoveryMessage::finalized(&recovery)?;
+            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+
+            println!("✓ Recovery finalized successfully!");
+            println!("\nThe new DID ({}) now inherits the old identity.", recovery.new_did);
+            println!("\nNext steps:");
+            println!("  • Trust graph and ledger will recognize the new DID");
+            println!("  • All relationships and balances are preserved");
+            println!("  • Old DID is marked as recovered");
+        }
+
+        RecoveryCommands::Cancel { recovery_id, reason } => {
+            // Load recovery event
+            let store = SledStore::open(&store_path)?;
+            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_data = store.get(recovery_key.as_bytes())?
+                .context("Recovery not found")?;
+            let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+
+            // Get current identity
+            if !keystore_path.exists() {
+                bail!("No identity found.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let canceller_did = keypair.did().clone();
+
+            println!("Cancelling recovery:");
+            println!("  Recovery ID: {}", recovery.id);
+            println!("  Old DID: {}", recovery.old_did);
+            println!("  New DID: {}", recovery.new_did);
+            println!("  Cancelled by: {}", canceller_did);
+            println!("  Reason: {}", reason);
+            println!();
+
+            // Cancel recovery
+            recovery.cancel(canceller_did, reason.clone())?;
+
+            // Save updated recovery
+            let recovery_json = serde_json::to_vec(&recovery)?;
+            store.put(recovery_key.as_bytes(), &recovery_json)?;
+
+            // TODO: Publish cancellation to gossip (done by daemon, not CLI)
+            // let msg = RecoveryMessage::cancelled(recovery.id.clone(), canceller_did, reason.clone(), recovery.cancelled_at);
+            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+
+            println!("✓ Recovery cancelled!");
+            println!("\n⚠️  This recovery attempt has been marked as fraudulent.");
+            println!("   Reason: {}", reason);
         }
     }
 

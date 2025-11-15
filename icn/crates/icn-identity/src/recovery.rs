@@ -357,9 +357,253 @@ fn current_timestamp() -> u64 {
         .as_secs()
 }
 
+// ============================================================================
+// Gossip Sync Protocol
+// ============================================================================
+
+/// Gossip topic for recovery events
+pub const IDENTITY_RECOVERY_TOPIC: &str = "identity:recovery";
+
+/// Recovery message broadcast via gossip
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RecoveryMessage {
+    /// Recovery initiated by a user who lost their identity
+    Initiated {
+        /// Unique recovery ID
+        id: String,
+        /// Old DID being recovered
+        old_did: Did,
+        /// New DID that will inherit the identity
+        new_did: Did,
+        /// Recovery threshold (M-of-N)
+        threshold: usize,
+        /// Delay period in seconds
+        delay_period: u64,
+        /// When initiated
+        timestamp: u64,
+    },
+
+    /// Trustee signed an attestation
+    Attestation {
+        /// Recovery ID this attestation applies to
+        recovery_id: String,
+        /// The attestation data
+        attestation: RecoveryAttestation,
+        /// When attestation was added
+        timestamp: u64,
+    },
+
+    /// Recovery has been finalized (threshold reached + delay expired)
+    Finalized {
+        /// Recovery ID
+        id: String,
+        /// Old DID
+        old_did: Did,
+        /// New DID
+        new_did: Did,
+        /// When finalized
+        timestamp: u64,
+    },
+
+    /// Recovery was cancelled (detected fraud or user found original key)
+    Cancelled {
+        /// Recovery ID
+        id: String,
+        /// Who cancelled it
+        cancelled_by: Did,
+        /// Reason for cancellation
+        reason: String,
+        /// When cancelled
+        timestamp: u64,
+    },
+}
+
+impl RecoveryMessage {
+    /// Create an "Initiated" message from a recovery event
+    pub fn initiated(event: &RecoveryEvent) -> Self {
+        RecoveryMessage::Initiated {
+            id: event.id.clone(),
+            old_did: event.old_did.clone(),
+            new_did: event.new_did.clone(),
+            threshold: event.threshold,
+            delay_period: event.delay_period,
+            timestamp: event.initiated_at,
+        }
+    }
+
+    /// Create an "Attestation" message
+    pub fn attestation(recovery_id: String, attestation: RecoveryAttestation) -> Self {
+        RecoveryMessage::Attestation {
+            recovery_id,
+            attestation,
+            timestamp: current_timestamp(),
+        }
+    }
+
+    /// Create a "Finalized" message from a recovery event
+    pub fn finalized(event: &RecoveryEvent) -> Result<Self> {
+        match event.status {
+            RecoveryStatus::Finalized => Ok(RecoveryMessage::Finalized {
+                id: event.id.clone(),
+                old_did: event.old_did.clone(),
+                new_did: event.new_did.clone(),
+                timestamp: event.finalized_at.unwrap_or_else(current_timestamp),
+            }),
+            _ => bail!("Cannot create Finalized message from non-finalized recovery"),
+        }
+    }
+
+    /// Create a "Cancelled" message from a recovery event
+    pub fn cancelled(
+        id: String,
+        cancelled_by: Did,
+        reason: String,
+        timestamp: u64,
+    ) -> Self {
+        RecoveryMessage::Cancelled {
+            id,
+            cancelled_by,
+            reason,
+            timestamp,
+        }
+    }
+
+    /// Serialize to bytes for gossip
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(self)?)
+    }
+
+    /// Deserialize from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(bincode::deserialize(bytes)?)
+    }
+
+    /// Get a human-readable summary of this message
+    pub fn summary(&self) -> String {
+        match self {
+            RecoveryMessage::Initiated { old_did, new_did, threshold, .. } => {
+                format!("Recovery initiated: {} → {} ({})", old_did, new_did, threshold)
+            }
+            RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
+                format!("Attestation from {} for recovery {}", attestation.trustee, recovery_id)
+            }
+            RecoveryMessage::Finalized { old_did, new_did, .. } => {
+                format!("Recovery finalized: {} → {}", old_did, new_did)
+            }
+            RecoveryMessage::Cancelled { id, reason, .. } => {
+                format!("Recovery {} cancelled: {}", id, reason)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_recovery_message_serialization() {
+        let old_kp = KeyPair::generate().unwrap();
+        let new_kp = KeyPair::generate().unwrap();
+        let old_did = old_kp.did().clone();
+        let new_did = new_kp.did().clone();
+
+        // Test Initiated message
+        let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), 3, 86400);
+        let msg = RecoveryMessage::initiated(&recovery);
+
+        let bytes = msg.to_bytes().unwrap();
+        let msg2 = RecoveryMessage::from_bytes(&bytes).unwrap();
+        assert_eq!(msg, msg2);
+
+        // Test Attestation message
+        let trustee_kp = KeyPair::generate().unwrap();
+        let attestation = RecoveryAttestation::new(
+            &trustee_kp,
+            old_did.clone(),
+            new_did.clone(),
+            "video call".to_string(),
+        )
+        .unwrap();
+
+        let msg = RecoveryMessage::attestation("recovery123".to_string(), attestation.clone());
+        let bytes = msg.to_bytes().unwrap();
+        let msg2 = RecoveryMessage::from_bytes(&bytes).unwrap();
+        assert_eq!(msg, msg2);
+
+        // Test message summary
+        match msg2 {
+            RecoveryMessage::Attestation { recovery_id, .. } => {
+                assert_eq!(recovery_id, "recovery123");
+            }
+            _ => panic!("Expected Attestation message"),
+        }
+    }
+
+    #[test]
+    fn test_recovery_message_finalized() {
+        let old_kp = KeyPair::generate().unwrap();
+        let new_kp = KeyPair::generate().unwrap();
+        let old_did = old_kp.did().clone();
+        let new_did = new_kp.did().clone();
+
+        let mut recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), 1, 0);
+
+        // Add one attestation to reach threshold
+        let trustee_kp = KeyPair::generate().unwrap();
+        let attestation = RecoveryAttestation::new(
+            &trustee_kp,
+            old_did.clone(),
+            new_did.clone(),
+            "video call".to_string(),
+        )
+        .unwrap();
+        recovery.add_attestation(attestation).unwrap();
+
+        // Check delay expired (delay is 0, so should be ready immediately)
+        recovery.check_delay_expired();
+
+        // Now finalize
+        recovery.finalize().unwrap();
+
+        let msg = RecoveryMessage::finalized(&recovery).unwrap();
+
+        match msg {
+            RecoveryMessage::Finalized {
+                old_did: old,
+                new_did: new,
+                ..
+            } => {
+                assert_eq!(old, old_did);
+                assert_eq!(new, new_did);
+            }
+            _ => panic!("Expected Finalized message"),
+        }
+
+        // Should not create Finalized message from non-finalized recovery
+        let recovery2 = RecoveryEvent::new(old_did.clone(), new_did.clone(), 3, 86400);
+        assert!(RecoveryMessage::finalized(&recovery2).is_err());
+    }
+
+    #[test]
+    fn test_recovery_message_cancelled() {
+        let did = KeyPair::generate().unwrap().did().clone();
+        let msg = RecoveryMessage::cancelled(
+            "recovery123".to_string(),
+            did.clone(),
+            "Fraud detected".to_string(),
+            1234567890,
+        );
+
+        let summary = msg.summary();
+        assert!(summary.contains("cancelled"));
+        assert!(summary.contains("Fraud detected"));
+
+        // Test serialization
+        let bytes = msg.to_bytes().unwrap();
+        let msg2 = RecoveryMessage::from_bytes(&bytes).unwrap();
+        assert_eq!(msg, msg2);
+    }
 
     #[test]
     fn test_create_recovery_event() {
