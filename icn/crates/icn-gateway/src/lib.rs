@@ -16,10 +16,12 @@ pub mod coop;
 pub mod error;
 pub mod events;
 pub mod ledger_mgr;
+pub mod middleware;
 pub mod models;
 pub mod server;
 pub mod websocket;
 
+pub use auth::TokenClaims;
 pub use error::{GatewayError, Result};
 pub use events::{EventBroadcaster, GatewayEvent};
 pub use server::GatewayServer;

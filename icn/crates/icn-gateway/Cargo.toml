@@ -11,6 +11,7 @@ actix = "0.13"
 actix-web = "4"
 actix-cors = "0.7"
 actix-web-actors = "4"
+actix-web-httpauth = "0.8"
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

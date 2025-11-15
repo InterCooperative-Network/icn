@@ -13,7 +13,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use icn_identity::Did;
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{encode, decode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use ed25519_dalek::{Signature, Verifier};
 
@@ -31,7 +31,7 @@ struct Challenge {
 }
 
 /// JWT claims for capability tokens
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenClaims {
     pub sub: String,      // Subject (DID)
     pub iat: u64,         // Issued at (timestamp)
@@ -147,6 +147,20 @@ impl AuthManager {
         .map_err(|e| GatewayError::InternalError(format!("JWT encoding failed: {}", e)))?;
 
         Ok(token)
+    }
+
+    /// Verify a JWT token and extract claims
+    pub fn verify_token(&self, token: &str) -> Result<TokenClaims> {
+        let validation = Validation::default();
+
+        let token_data = decode::<TokenClaims>(
+            token,
+            &DecodingKey::from_secret(&self.jwt_secret),
+            &validation,
+        )
+        .map_err(|e| GatewayError::AuthenticationFailed(format!("Invalid token: {}", e)))?;
+
+        Ok(token_data.claims)
     }
 
     /// Generate cryptographically random nonce (32 bytes, hex-encoded)
