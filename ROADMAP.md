@@ -1,15 +1,18 @@
 # ICN Roadmap
 
-**Status**: Phase 12 ✅ & Track B1 ✅ & Track B3 ✅ COMPLETE - All 268 Tests Passing
-**Next**: Phase 13 (Governance Primitives) + Track C1 (Pilot Selection)
+**Status**: Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅ - All 268 Tests Passing
+**Next**: Track C1 (Pilot Selection) → MVC Track (13 weeks focused work)
 
 ## Executive Summary
 
-**Substrate Status**: Production-ready. Security hardened, multi-device identity, economic safety rails, operational tooling, and economic validation complete.
+**Substrate Status**: Production-ready. Security hardened, multi-device identity, economic safety rails, operational tooling, economic validation, and Gateway API complete.
 
-**Gap Analysis**: ICN is a *substrate daemon*, not a deployable product. 15 structural gaps identified between "working infrastructure" and "usable by cooperatives." See [Strategic Gap Analysis](docs/strategic-gap-analysis.md) for complete assessment.
+**Gap Analysis**: ICN is a *substrate daemon*, not a deployable product for cooperatives. Two complementary gap assessments:
+- [Strategic Gap Analysis](docs/strategic-gap-analysis.md): 15 structural gaps (substrate→system transition)
+- [Implementation Gap Analysis](docs/gap-analysis.md): Documentation vs reality audit with status markers (✅🚧📋❌)
+- [Minimal Viable Coop Track](docs/MINIMAL-VIABLE-COOP.md): Focused 13-week roadmap to pilot deployment
 
-**Critical Path**: Track C (Pilot Community) is the path forward. Select a pilot community, build minimal tools for their workflows, let real-world use drive Phase 13+.
+**Critical Path**: MVC Track (Minimal Viable Coop) - ruthlessly focused on one end-to-end use case rather than polishing individual components. Select pilot community, close only gaps blocking that pilot, deploy and learn.
 
 ---
 
@@ -151,9 +154,9 @@ pub enum EntryStatus {
 
 ---
 
-### Phase 14: Platform Layer - Gateway + SDK + Reference App (2-3 months)
-**Status**: Implementation Starting
-**Blocker For**: All pilot deployments
+### Phase 14: Gateway API ✅ COMPLETE (Core), SDK & Reference App (Pending)
+**Status**: Gateway Complete (2025-01-15), SDK/App Deferred until Pilot Selected
+**Blocker For**: Client applications - Partially Unblocked
 
 **Strategic Shift**: ICN as Cooperative Backend Platform
 
@@ -170,31 +173,48 @@ pub enum EntryStatus {
 - Early pilots: we host the reference app multi-tenant (Phase 15)
 - Later: co-ops can self-host or customize
 
-**Components**:
+**Completed Components** ✅:
 1. **icn-gateway** - REST + WebSocket API server (Actix-web)
-2. **Coop Namespaces** - Per-co-op isolation (members, roles, ledgers)
-3. **App Auth** - Capability tokens (JWT-ish, scoped)
-4. **TypeScript SDK** - `@icn/client` npm package
-5. **Reference App** - "Tiny Food Co-op Shopper's Club" (Next.js)
+   - 13 REST endpoints (health, auth, coops, ledger, governance, proposals)
+   - JWT authentication with challenge-response flow
+   - Bearer token middleware protecting sensitive endpoints
+   - WebSocket real-time event streaming with post-connection auth
+   - Cooperative namespace isolation
+2. **Runtime Integration** - Gateway integrated into icnd
+   - GatewayConfig in configuration system
+   - CLI arguments: `--gateway-enable`, `--gateway-bind`, `--gateway-jwt-secret`
+   - Environment variable support: `ICN_GATEWAY_JWT_SECRET`
+   - Dedicated thread spawn for Actix-web compatibility
 
-**Milestones**:
-1. Gateway skeleton + auth (1 week)
-2. Coop namespaces + ledger API (1 week)
-3. WebSocket events (1 week)
-4. TypeScript SDK (2 weeks)
-5. Reference app (2 weeks)
+**Still Needed** (Deferred until pilot selection):
+3. **TypeScript SDK** - `@icn/client` npm package
+4. **Reference App** - Timebank or other pilot-specific application
+5. **API Improvements**:
+   - API versioning (`/v1/` namespacing)
+   - Per-DID rate limiting
+   - WebSocket reconnection and event backfill
+   - Scope-based authorization enforcement in handlers
 
-**Success Criteria**:
-- Reference app works end-to-end (login, balance, payment, history, live updates)
-- Ready for Phase 15 (hosted pilot deployment)
+**Success Criteria**: ✅ Gateway Complete
+- ✅ Gateway API operational and integrated into icnd
+- ✅ JWT authentication working (challenge → token → protected endpoints)
+- ✅ WebSocket events streaming to connected clients
+- ✅ Cooperative namespace isolation functional
+- 🔲 TypeScript SDK (deferred)
+- 🔲 Reference application (deferred)
 
-**Deliverables**:
-- `icn-gateway` crate
-- `@icn/client` SDK (npm)
-- Reference app (deployable)
-- API docs + SDK guide
+**Deliverables**: ✅ Gateway Complete
+- ✅ `icn-gateway` crate with 30 passing tests
+- ✅ Integration into icnd supervisor
+- ✅ Configuration system and CLI support
+- ✅ Documentation: dev journals, CHANGELOG.md, example configs
+- 🔲 `@icn/client` SDK (deferred)
+- 🔲 Reference app (deferred)
 
-**Design Doc**: [docs/platform-layer-design.md](docs/platform-layer-design.md)
+**Next Steps**:
+- Select pilot community (Track C1)
+- Build SDK + reference app for pilot's specific workflows
+- Don't build generic SDK speculatively - build what pilots need
 
 ---
 
@@ -593,15 +613,22 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 
 ## Critical Path Summary
 
-**What Must Happen Before Pilot Deployment:**
-1. ✅ Phase 10 complete (security hardened, encryption working)
+**Completed Prerequisites for Pilot Deployment:**
+1. ✅ Phase 10: Security hardening, encryption (COMPLETE)
 2. ✅ Phase 11: Multi-Device Identity (COMPLETE - 2025-01-14)
-3. ⏳ B1: Operational Hardening (backup/restore, monitoring) (2 weeks) - **NEXT**
-4. ⏳ Phase 12: Economic Safety Rails (4 weeks)
-5. ⏳ C1: Select pilot community (2-4 weeks, can start NOW)
-6. ⏳ C2: Build MVP for that community's workflows (4-6 weeks)
+3. ✅ Phase 12: Economic Safety Rails (COMPLETE - 2025-01-14)
+4. ✅ Track B1: Operational Hardening (COMPLETE - 2025-01-14)
+5. ✅ Track B3: Economic Modeling (COMPLETE - 2025-01-14)
+6. ✅ Phase 14: Gateway API Core (COMPLETE - 2025-01-15)
 
-**Total time to pilot: ~8-12 weeks** (2-3 months) - reduced with Phase 11 complete
+**What Must Happen Before Pilot Deployment:**
+1. ⏳ C1: Select pilot community (2-4 weeks, can start NOW) - **CRITICAL PATH**
+2. ⏳ C2: Build MVP for that community's workflows (4-6 weeks)
+   - TypeScript SDK for pilot needs
+   - Simple web UI for pilot workflows
+   - Pilot-specific integrations (email, notifications)
+
+**Total time to pilot: ~6-10 weeks** (1.5-2.5 months) from pilot selection
 
 **Parallelization**:
 - C1 (community selection) can start immediately
@@ -708,5 +735,5 @@ ICN is ready for pilot deployment. The next phase isn't more infrastructure - it
 
 ---
 
-**Last Updated**: 2025-01-15 (Strategic Gap Analysis Complete)
-**Next Review**: After Track C1 (community selection) or midway through Phase 13
+**Last Updated**: 2025-01-15 (Phase 14 Gateway Complete, Gap Analyses Complete, MVC Track Defined)
+**Next Review**: After Track C1 (community selection) completes
