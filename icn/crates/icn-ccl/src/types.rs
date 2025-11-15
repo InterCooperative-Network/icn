@@ -28,6 +28,21 @@ pub enum Capability {
 
     /// Invoke another contract
     InvokeContract { contract: ContentHash },
+
+    /// Create proposals (governance)
+    CreateProposal,
+
+    /// Vote on proposals (governance)
+    VoteProposal,
+
+    /// Read proposal state (governance)
+    ReadProposal,
+
+    /// Execute passed proposals (governance)
+    ExecuteProposal,
+
+    /// Manage member roles (governance)
+    ManageRoles,
 }
 
 /// Contract installation record
@@ -304,4 +319,163 @@ pub enum LedgerOperation {
         currency: String,
         limit: i64,
     },
+}
+
+// ============================================================================
+// Governance Types
+// ============================================================================
+
+/// Unique proposal identifier
+pub type ProposalID = String;
+
+/// A governance proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Proposal {
+    /// Unique proposal ID
+    pub id: ProposalID,
+
+    /// Who created the proposal
+    pub author: Did,
+
+    /// When the proposal was created (unix timestamp)
+    pub created_at: u64,
+
+    /// Human-readable title
+    pub subject: String,
+
+    /// Reference to detailed proposal content (hash)
+    pub payload_ref: ContentHash,
+
+    /// Proposal category (e.g., "membership", "budget", "policy")
+    pub category: String,
+
+    /// Votes cast on this proposal
+    pub votes: Vec<(Did, Vote, u64)>, // (voter, vote, timestamp)
+
+    /// Current proposal status
+    pub status: ProposalStatus,
+
+    /// When the proposal expires (optional deadline)
+    pub expires_at: Option<u64>,
+}
+
+impl Proposal {
+    /// Create a new proposal
+    pub fn new(
+        author: Did,
+        subject: String,
+        payload_ref: ContentHash,
+        category: String,
+        created_at: u64,
+    ) -> Self {
+        let id = format!("prop_{}", created_at);
+        Proposal {
+            id,
+            author,
+            created_at,
+            subject,
+            payload_ref,
+            category,
+            votes: Vec::new(),
+            status: ProposalStatus::Open,
+            expires_at: None,
+        }
+    }
+
+    /// Add a vote to the proposal
+    pub fn add_vote(&mut self, voter: Did, vote: Vote, timestamp: u64) {
+        // Remove any existing vote from this voter
+        self.votes.retain(|(v, _, _)| v != &voter);
+        // Add new vote
+        self.votes.push((voter, vote, timestamp));
+    }
+
+    /// Count votes by type
+    pub fn count_votes(&self) -> VoteCounts {
+        let mut consent = 0u64;
+        let mut blocks: Vec<(Did, String)> = Vec::new();
+        let mut abstain = 0u64;
+
+        for (voter, vote, _) in &self.votes {
+            match vote {
+                Vote::Consent => consent += 1,
+                Vote::Block(reason) => {
+                    blocks.push((voter.clone(), reason.clone()));
+                }
+                Vote::Abstain => abstain += 1,
+            }
+        }
+
+        VoteCounts {
+            consent,
+            blocks,
+            abstain,
+        }
+    }
+
+    /// Get all voters
+    pub fn voters(&self) -> Vec<&Did> {
+        self.votes.iter().map(|(v, _, _)| v).collect()
+    }
+}
+
+/// Vote on a proposal
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Vote {
+    /// Consent / Yes / Approve
+    Consent,
+
+    /// Block / No / Object (with reason)
+    Block(String),
+
+    /// Abstain / No opinion
+    Abstain,
+}
+
+/// Proposal status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProposalStatus {
+    /// Proposal is open for voting
+    Open,
+
+    /// Proposal passed and was executed
+    Passed { executed_at: u64 },
+
+    /// Proposal was blocked
+    Blocked { reasons: Vec<String> },
+
+    /// Proposal expired without resolution
+    Expired { timeout_at: u64 },
+
+    /// Proposal is in deliberation (for consensus models with fallback)
+    Deliberation { started_at: u64 },
+}
+
+/// Vote count summary
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoteCounts {
+    /// Number of consent votes
+    pub consent: u64,
+
+    /// Block votes with reasons
+    pub blocks: Vec<(Did, String)>,
+
+    /// Number of abstentions
+    pub abstain: u64,
+}
+
+/// Member role assignment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberRole {
+    /// DID of the member
+    pub member: Did,
+
+    /// Role name (e.g., "admin", "treasurer", "council", "member")
+    pub role: String,
+
+    /// When the role was assigned
+    pub assigned_at: u64,
+
+    /// Optional expiration timestamp
+    pub expires_at: Option<u64>,
 }
