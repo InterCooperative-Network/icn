@@ -394,11 +394,45 @@ icnctl id import backup.age
 - WebSocket connections validate coop_id matches token
 - All endpoints except auth/health require valid Bearer token
 
-**Usage Example**:
-```bash
-# Start gateway
-cargo run --bin icn-gateway -- --bind 127.0.0.1:8080 --jwt-secret mysecret
+**Gateway Integration with icnd** (2025-01-15):
+The gateway is integrated into the main ICN daemon and can be enabled via configuration:
 
+```bash
+# Method 1: Using configuration file
+cat > icn.toml << EOF
+[gateway]
+enabled = true
+bind_addr = "127.0.0.1:8080"
+jwt_secret = "your-strong-secret-here"
+token_expiry_hours = 24
+challenge_ttl_minutes = 5
+EOF
+
+icnd --config icn.toml
+
+# Method 2: Using CLI arguments
+export ICN_GATEWAY_JWT_SECRET="your-strong-secret"
+icnd --gateway-enable --gateway-bind 127.0.0.1:8080
+
+# Method 3: Using environment variable only
+export ICN_GATEWAY_JWT_SECRET="your-strong-secret"
+icnd --gateway-enable
+
+# Method 4: Standalone gateway (development/testing)
+cargo run --bin icn-gateway -- --bind 127.0.0.1:8080 --jwt-secret mysecret
+```
+
+**Configuration Priority**: CLI args > Environment variables > Config file
+
+**Security Notes**:
+- Gateway disabled by default (opt-in)
+- JWT secret must be configured for gateway to start
+- Use strong random secrets (32+ characters) in production
+- Localhost binding recommended for development
+- Use reverse proxy (nginx/caddy) for production deployments
+
+**API Usage**:
+```bash
 # Get challenge
 curl -X POST http://localhost:8080/auth/challenge \
   -H "Content-Type: application/json" \
