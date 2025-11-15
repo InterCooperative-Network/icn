@@ -15,54 +15,55 @@ This document summarizes the results from our agent-based economic simulations t
 
 | Scenario | Velocity | Default Rate | Gini | Hoarding Index |
 |----------|----------|--------------|------|----------------|
-| **Baseline** | 9,505 | 2.7% | 0.36 | 7.1% |
-| **Dynamic Limits** | 7,952 | 1.8% | 0.36 | 8.8% |
-| **High Demurrage** | 9,532 | 2.7% | 0.28 | 6.9% |
-| **High Free Riders** | 9,458 | 4.1% | 0.42 | 9.5% |
-| **Low Trust Network** | 9,588 | 2.5% | 0.35 | 14.2% |
+| **Baseline** | 9,461 | 2.3% | 0.36 | 7.4% |
+| **Dynamic Limits** | 7,755 | 1.6% | 0.37 | 9.7% |
+| **High Demurrage** | 9,408 | 2.4% | 0.30 | 7.8% |
+| **High Free Riders** | 9,513 | 3.7% | 0.41 | 8.8% |
+| **Low Trust Network** | 9,444 | 2.5% | 0.36 | 7.4% |
 
 ## Key Findings
 
 ### 1. Dynamic Credit Limits (2x Trust Multiplier)
 
-**Effect**: 16% velocity reduction, 33% fewer defaults
+**Effect**: 18% velocity reduction, 30% fewer defaults
 
 **Interpretation**:
 - Trust-gated credit limits effectively constrain free-riders and opportunists
 - Lower transaction volume indicates limits are binding on some agents
-- Significantly reduces default rate (2.7% → 1.8%)
+- Significantly reduces default rate (2.3% → 1.6%)
 - **Trade-off**: Economic activity slows down in exchange for system stability
 
 ### 2. High Demurrage (-2% monthly on balances >50)
 
-**Effect**: 22% reduction in inequality (Gini: 0.36 → 0.28)
+**Effect**: 17% reduction in inequality (Gini: 0.36 → 0.30)
 
 **Interpretation**:
 - Demurrage successfully discourages hoarding
 - Creates more equal distribution of wealth
-- Velocity remains similar to baseline (9,532 vs 9,505)
-- Hoarding index slightly lower (6.9% vs 7.1%)
+- Velocity remains similar to baseline (9,408 vs 9,461)
+- Hoarding index slightly higher (7.8% vs 7.4%) - not as effective as expected
 - **Outcome**: Achieves redistribution goal without harming economic activity
 
 ### 3. High Free-Rider Ratio (20% vs 8% baseline)
 
-**Effect**: 51% increase in default rate (2.7% → 4.1%)
+**Effect**: 61% increase in default rate (2.3% → 3.7%)
 
 **Interpretation**:
 - System shows stress but does not collapse
-- Higher inequality (Gini: 0.42 vs 0.36)
-- Velocity remains relatively stable
+- Higher inequality (Gini: 0.41 vs 0.36)
+- Velocity remains stable (9,513 vs 9,461)
 - **Finding**: System can tolerate up to 20% free-riders but at cost of higher defaults
 
 ### 4. Low Trust Network (30% density vs 60%)
 
-**Effect**: 2x hoarding rate (14.2% vs 7.1%)
+**Effect**: Minimal difference from baseline (hoarding 7.4% vs 7.4%)
 
 **Interpretation**:
-- Sparse trust networks lead to MORE hoarding, not less
-- Agents hoard when they have fewer trusted trading partners
-- Slightly lower default rate (2.5% vs 2.7%) - conservative behavior
-- **Insight**: Trust network density critically affects economic behavior
+- **Corrected finding**: With proper credit limit enforcement, sparse networks do NOT cause extreme hoarding
+- Network density has minimal impact on hoarding (previous bug showed false 2x effect)
+- Default rate nearly identical (2.5% vs 2.3%)
+- Velocity stable (9,444 vs 9,461)
+- **Insight**: Proper credit limit enforcement is more critical than trust network density
 
 ## Economic Safety Mechanisms
 
@@ -76,10 +77,10 @@ This document summarizes the results from our agent-based economic simulations t
 ### Failure Modes Tested
 
 All scenarios remained stable with:
-- ✅ Velocity > 300 credits/month (range: 7,952 - 9,588)
-- ✅ Gini < 0.7 (range: 0.28 - 0.42)
-- ✅ Default rate < 15% (range: 1.8% - 4.1%)
-- ✅ Hoarding index < 80% (range: 6.9% - 14.2%)
+- ✅ Velocity > 300 credits/month (range: 7,755 - 9,513)
+- ✅ Gini < 0.7 (range: 0.30 - 0.41)
+- ✅ Default rate < 15% (range: 1.6% - 3.7%)
+- ✅ Hoarding index < 80% (range: 7.4% - 9.7%)
 
 **No critical failures observed** across any scenario.
 
