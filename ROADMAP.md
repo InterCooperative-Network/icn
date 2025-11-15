@@ -3,6 +3,16 @@
 **Status**: Phase 12 ✅ & Track B1 ✅ & Track B3 ✅ COMPLETE - All 268 Tests Passing
 **Next**: Phase 13 (Governance Primitives) + Track C1 (Pilot Selection)
 
+## Executive Summary
+
+**Substrate Status**: Production-ready. Security hardened, multi-device identity, economic safety rails, operational tooling, and economic validation complete.
+
+**Gap Analysis**: ICN is a *substrate daemon*, not a deployable product. 15 structural gaps identified between "working infrastructure" and "usable by cooperatives." See [Strategic Gap Analysis](docs/strategic-gap-analysis.md) for complete assessment.
+
+**Critical Path**: Track C (Pilot Community) is the path forward. Select a pilot community, build minimal tools for their workflows, let real-world use drive Phase 13+.
+
+---
+
 ## Roadmap Structure
 
 ICN's development follows three parallel tracks:
@@ -12,6 +22,18 @@ ICN's development follows three parallel tracks:
 - **Track C: Pilot Community** - Real-world deployment and learning (convergent)
 
 **Guiding Principle**: Track C (pilot deployment) drives priorities in Tracks A and B. We build what real communities need, not what the architecture diagram suggests.
+
+## Gap Analysis Summary
+
+**15 Structural Gaps** identified across 4 tiers (see [docs/strategic-gap-analysis.md](docs/strategic-gap-analysis.md)):
+
+**Status Breakdown**:
+- ✅ **Closed** (3): Multi-device identity, protective ledger (partial), economic simulation
+- 🚧 **Partial** (4): Ledger mechanics, security posture, storage sync, observability
+- ⏸️ **Deferred** (2): NAT traversal, federation (intentional - wait for pilot need)
+- 🔴 **Critical Path** (6): Client SDK, governance, templates, onboarding, observability UX, cooperation UX
+
+**Key Insight**: The substrate is ready. The missing pieces are *social layer*, *usability*, and *real-world workflows* - all discovered through pilot deployment.
 
 ---
 
@@ -129,9 +151,109 @@ pub enum EntryStatus {
 
 ---
 
+### Phase 14: Platform Layer - Gateway + SDK + Reference App (2-3 months)
+**Status**: Implementation Starting
+**Blocker For**: All pilot deployments
+
+**Strategic Shift**: ICN as Cooperative Backend Platform
+
+**Vision**: Co-ops build apps that use ICN under the hood. Members never see `icnd` or `icnctl`.
+
+**What This Is**:
+- Developer-facing API layer (REST + WebSocket)
+- TypeScript SDK for easy integration
+- Reference app (Shopper's Club) as starting point
+- **NOT** an app runtime (that's Phase 16+ conditional)
+
+**What This Enables**:
+- Co-ops can build custom apps (or fork reference app)
+- Early pilots: we host the reference app multi-tenant (Phase 15)
+- Later: co-ops can self-host or customize
+
+**Components**:
+1. **icn-gateway** - REST + WebSocket API server (Actix-web)
+2. **Coop Namespaces** - Per-co-op isolation (members, roles, ledgers)
+3. **App Auth** - Capability tokens (JWT-ish, scoped)
+4. **TypeScript SDK** - `@icn/client` npm package
+5. **Reference App** - "Tiny Food Co-op Shopper's Club" (Next.js)
+
+**Milestones**:
+1. Gateway skeleton + auth (1 week)
+2. Coop namespaces + ledger API (1 week)
+3. WebSocket events (1 week)
+4. TypeScript SDK (2 weeks)
+5. Reference app (2 weeks)
+
+**Success Criteria**:
+- Reference app works end-to-end (login, balance, payment, history, live updates)
+- Ready for Phase 15 (hosted pilot deployment)
+
+**Deliverables**:
+- `icn-gateway` crate
+- `@icn/client` SDK (npm)
+- Reference app (deployable)
+- API docs + SDK guide
+
+**Design Doc**: [docs/platform-layer-design.md](docs/platform-layer-design.md)
+
+---
+
+### Phase 15: Hosted Pilot Deployment (1-2 months)
+**Status**: Not Started - Blocked on Phase 14
+**Purpose**: Get real signal from actual co-ops
+
+**Approach**:
+- Deploy reference app multi-tenant (one instance, namespace-scoped)
+- Run on ICN Foundation infrastructure (or similar)
+- Onboard 1-2 pilot co-ops: "Here's your app, here's your login"
+- **Watch what hurts** - weekly feedback sessions
+
+**Learning Questions**:
+- Where do users get stuck? (onboarding, UX, concepts)
+- What do they want to customize?
+- Do they care about self-hosting?
+- Is the ledger model intuitive?
+- What governance patterns emerge?
+
+**Success Criteria**:
+- 10+ active users logging transactions weekly
+- 3+ governance decisions (or attempts at governance)
+- Community feedback informs Phase 16+ priorities
+- Clear signal on what to build next
+
+**Deliverables**:
+- Hosted multi-tenant deployment
+- Pilot onboarding guide
+- Weekly learnings documented in `docs/pilots/learnings/`
+
+**Design Doc**: [docs/pilots/hosted-approach.md](docs/pilots/hosted-approach.md)
+
+---
+
+### Phase 16: TBD - Driven by Pilot Learnings
+**Status**: Not Planned Yet
+**Approach**: Let Phase 15 pilots reveal what's actually needed
+
+**Possible Directions** (conditional on pilot feedback):
+- **App Runtime** (if co-ops need custom backend logic but can't run servers)
+- **Governance Templates** (if governance patterns are clear and repeatable)
+- **Better Self-Hosting Tools** (if co-ops want to self-host but struggle with devops)
+- **Federation** (if multiple co-ops want to interconnect)
+- **Mobile Apps** (if web-on-phone isn't sufficient)
+
+**Decision Gate**:
+Build these ONLY if pilots reveal patterns like:
+- "We need custom event-driven logic but can't run servers"
+- "We want to deploy small scripts that react to ledger changes"
+- "Self-hosting is the blocker, not the platform"
+
+**Philosophy**: Don't speculate. Build what pilots prove is necessary.
+
+---
+
 ### Phase 13: Governance Primitives v1 (6-8 weeks)
-**Status**: Not Started
-**Driven By**: Pilot community needs (Phase C2)
+**Status**: Foundation Started, Full Implementation Deferred
+**Driven By**: Platform layer enables governance features in apps
 
 **Motivation**: Cooperatives need to make collective decisions: membership, resource allocation, conflict resolution, rule changes. ICN currently has contracts but no governance patterns. We don't need "the" governance system - we need pluggable primitives that communities can compose.
 
@@ -529,5 +651,62 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 - Priorities will shift based on pilot learnings
 - We're building infrastructure for a civilizational transition, not a product roadmap
 
-**Last Updated**: 2025-01-14 (Phase 11 Complete)
-**Next Review**: After Track B1 completion or pilot community selection (whichever comes first)
+---
+
+## Strategic Assessment (2025-01-15)
+
+### What We've Built
+
+**Substrate Infrastructure** (Phases 1-12):
+- Three-layer security architecture (transport, message, application)
+- Multi-device identity with key rotation and gossip sync
+- Dynamic credit limits with new member protection
+- Dispute resolution and write-off mechanisms
+- Backup/restore, graceful restart, monitoring
+- Economic validation via agent-based simulation
+
+**All 268 tests passing** ✅
+
+### What We're Missing
+
+**Social Layer**:
+- Invitation flows, role management, consent mechanisms
+- Onboarding workflows for non-technical users
+- Social protocols (how humans coordinate, not just protocols)
+
+**Usability**:
+- Web/mobile clients (currently CLI only)
+- Intuitive UI for cooperative workflows
+- Visualization tools (trust graph, ledger browser, topology)
+
+**Real-World Integration**:
+- Guided cooperative setup (group creation → governance → ledger)
+- Email/SMS notifications
+- Export formats for accountants/treasurers
+
+See [Strategic Gap Analysis](docs/strategic-gap-analysis.md) for complete 15-gap assessment.
+
+### The Path Forward
+
+**Build with communities, not for them.**
+
+ICN is ready for pilot deployment. The next phase isn't more infrastructure - it's learning from a real cooperative what actually matters.
+
+**Success Criteria (3-month pilot)**:
+- 10+ active users logging hours/transactions weekly
+- 3+ governance decisions made using ICN primitives
+- Community prefers ICN over their previous system
+- 2-3 other communities express interest
+
+**Next Actions**:
+1. Select pilot community (timebank recommended)
+2. Build minimal MVP for their workflows
+3. Run weekly learning loop
+4. Let their needs drive Phase 13+ scope
+
+**Philosophy**: We're building infrastructure for civilizational transition. The substrate is ready. Now we listen to communities and build what they need.
+
+---
+
+**Last Updated**: 2025-01-15 (Strategic Gap Analysis Complete)
+**Next Review**: After Track C1 (community selection) or midway through Phase 13
