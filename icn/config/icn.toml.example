@@ -1,0 +1,113 @@
+# ICN Configuration Example
+# Copy this file to icn.toml and customize for your deployment
+
+# Data directory for ICN state (keystore, ledger, gossip data)
+data_dir = "~/.icn"
+
+[network]
+# Enable mDNS local network discovery
+mdns_enabled = true
+
+# QUIC/TLS listen address
+listen_addr = "0.0.0.0:7777"
+
+# RPC (JSON-RPC over HTTP) listen port
+rpc_port = 5601
+
+# Bootstrap rendezvous endpoints (icn://DID@IP:PORT format)
+bootstrap_peers = [
+    # "icn://did:icn:example@192.168.1.100:7777",
+]
+
+[observability]
+# Prometheus metrics server port
+metrics_port = 9100
+
+# Health check server port
+health_port = 8080
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+[rate_limiting]
+# Enable trust-gated rate limiting (requires trust graph)
+enabled = true
+
+# Token bucket refill interval in milliseconds
+refill_interval_ms = 100
+
+# Rate limits for isolated peers (trust score < 0.1)
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+# Rate limits for known peers (trust score 0.1-0.4)
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+# Rate limits for partner peers (trust score 0.4-0.7)
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+# Rate limits for federated peers (trust score 0.7+)
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+
+# Fallback rate limit when trust graph unavailable
+[rate_limiting.fallback]
+max_messages_per_second = 100
+burst_capacity = 20
+
+[topology]
+# Node role in the network topology (Regional, Cluster, Edge)
+role = "Edge"
+
+# Fanout configuration for gossip propagation
+[topology.fanout]
+min_eager = 6
+max_eager = 12
+min_lazy = 6
+max_lazy = 12
+
+# Neighbor limits per topology tier
+[topology.neighbor_limits]
+regional_max = 3
+cluster_max = 10
+edge_max = 20
+
+[gateway]
+# Enable the Gateway API server (REST + WebSocket)
+# Default: false (opt-in)
+enabled = false
+
+# Gateway HTTP bind address
+# Recommended: 127.0.0.1:8080 for local development
+#              0.0.0.0:8080 for production (with reverse proxy)
+bind_addr = "127.0.0.1:8080"
+
+# JWT token expiration time in hours
+token_expiry_hours = 24
+
+# Challenge TTL in minutes (how long challenges are valid)
+challenge_ttl_minutes = 5
+
+# JWT secret key for signing tokens
+# IMPORTANT: Must be set for gateway to start!
+# Options:
+#   1. Set in this config file: jwt_secret = "your-secret-here"
+#   2. Use environment variable: export ICN_GATEWAY_JWT_SECRET="your-secret"
+#   3. Use CLI argument: --gateway-jwt-secret "your-secret"
+# For production, use a strong random secret (32+ characters)
+jwt_secret = ""
+
+# Production example (uncomment and set your own secret):
+# jwt_secret = "replace-with-strong-random-secret-at-least-32-chars"
+
+# Development example:
+# [gateway]
+# enabled = true
+# bind_addr = "127.0.0.1:8080"
+# jwt_secret = "dev-secret-change-in-production"
