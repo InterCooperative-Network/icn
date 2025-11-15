@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use icn_gossip::GossipActor;
-use icn_identity::{Did, IdentityBundle};
+use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
 use icn_ledger::Ledger;
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
@@ -527,6 +527,41 @@ impl Supervisor {
                             }
                         });
                     }
+                    // Handle identity recovery events
+                    else if topic == IDENTITY_RECOVERY_TOPIC {
+                        // Use get_data() to handle decompression if needed
+                        let entry_data = match entry.get_data() {
+                            Ok(data) => data,
+                            Err(e) => {
+                                warn!("Failed to get recovery entry data: {}", e);
+                                return;
+                            }
+                        };
+
+                        tokio::spawn(async move {
+                            // Deserialize recovery message
+                            match RecoveryMessage::from_bytes(&entry_data) {
+                                Ok(recovery_msg) => {
+                                    info!("Received recovery message: {}", recovery_msg.summary());
+
+                                    // TODO: Handle different recovery message types
+                                    // - Initiated: Log and notify operators
+                                    // - Attestation: Verify and store
+                                    // - Finalized: Update trust graph and ledger mappings
+                                    // - Cancelled: Remove from active recoveries
+
+                                    // For now, just log the message
+                                    // Full implementation requires:
+                                    // 1. Store reference to persist recovery events
+                                    // 2. Trust graph integration for DID mapping
+                                    // 3. Ledger integration for balance transfer
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize recovery message: {}", e);
+                                }
+                            }
+                        });
+                    }
                 });
 
                 gossip.set_notification_callback(notification_callback);
@@ -557,6 +592,13 @@ impl Supervisor {
                     warn!("Failed to subscribe to contracts:deploy topic: {}", e);
                 } else {
                     info!("Subscribed to contracts:deploy topic");
+                }
+
+                // Subscribe to identity:recovery topic for social recovery events
+                if let Err(e) = gossip.subscribe(IDENTITY_RECOVERY_TOPIC, did.clone()) {
+                    warn!("Failed to subscribe to identity:recovery topic: {}", e);
+                } else {
+                    info!("Subscribed to identity:recovery topic");
                 }
             }
 
