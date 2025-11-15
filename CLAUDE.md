@@ -454,20 +454,26 @@ icnctl id import backup.age
 - [x] Cooperative namespace management - CRUD + member roles
 - [x] Ledger API endpoints - Balance, payment, transaction history
 - [x] Per-coop isolation - Separate ledgers per cooperative
-- [x] All 21 tests passing (9 auth + 5 coop + 5 ledger + 2 integration)
+- [x] WebSocket event streaming - Real-time updates for ledger/coop events
+- [x] All 26 tests passing (9 auth + 5 coop + 5 ledger + 2 integration + 5 events/websocket)
 
-**Gateway API (13 endpoints)**:
+**Gateway API (14 endpoints)**:
 - **Authentication**: `POST /auth/challenge`, `POST /auth/verify`
 - **Cooperatives**: 7 endpoints (create, get, update, delete, member CRUD)
 - **Ledger**: `GET /ledger/:coop/balance/:did`, `POST /ledger/:coop/payment`, `GET /ledger/:coop/history`
+- **WebSocket**: `GET /ws/:coop_id` (real-time event streaming)
 - **Health**: `GET /health`
 
 **Architecture**:
 - **AuthManager**: DID-based challenge/verify with JWT capability tokens
 - **CoopManager**: In-memory namespace storage (Owner/Admin/Member roles)
 - **LedgerManager**: Per-coop mutual credit ledgers with SledStore backend
+- **EventBroadcaster**: Pub/sub event distribution with per-coop isolation
+- **WsSession**: WebSocket actor with heartbeat/ping-pong and automatic cleanup
 - **Error Handling**: HTTP status mapping, JSON error responses
 - **Middleware**: Logging, compression
+
+**Event Types**: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated
 
 **This is NOT a runtime**: Apps run externally and call this API. See [docs/platform-layer-design.md](docs/platform-layer-design.md).
 

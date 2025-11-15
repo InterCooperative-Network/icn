@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **New Crate: icn-gateway**
 - Complete HTTP API server for cooperative applications
 - Actix-web 4 async framework with middleware
-- 13 REST endpoints across 4 modules
-- 21 tests passing (9 auth, 5 coop, 5 ledger, 2 integration)
+- 14 endpoints (13 REST + 1 WebSocket) across 5 modules
+- 26 tests passing (9 auth, 5 coop, 5 ledger, 2 integration, 5 events/websocket)
 
 **Authentication Module:**
 - DID-based challenge/verify flow
@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-cooperative isolated mutual credit ledgers
 - Double-entry bookkeeping with validation
 - SledStore backend for persistence
+
+**Real-time Event Streaming:**
+- `GET /ws/:coop_id` - WebSocket endpoint for real-time updates
+- Event types: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated
+- EventBroadcaster: Pub/sub system with per-cooperative isolation
+- WsSession actor: Heartbeat/ping-pong with automatic connection cleanup
+- Tokio mpsc channels for async event distribution
 
 **Infrastructure:**
 - `GET /health` - Health check endpoint
