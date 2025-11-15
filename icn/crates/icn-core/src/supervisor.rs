@@ -476,6 +476,7 @@ impl Supervisor {
                 let own_did_for_notifications = did.clone();
                 let contract_actor_for_notifications = contract_actor_handle.clone();
                 let recovery_store_for_notifications = recovery_store.clone();
+                let ledger_for_notifications = ledger_handle.clone();
 
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
                     // Handle trust attestations
@@ -537,6 +538,7 @@ impl Supervisor {
                     else if topic == IDENTITY_RECOVERY_TOPIC {
                         let recovery_store = recovery_store_for_notifications.clone();
                         let trust_graph = trust_graph_for_notifications.clone();
+                        let ledger = ledger_for_notifications.clone();
 
                         // Use get_data() to handle decompression if needed
                         let entry_data = match entry.get_data() {
@@ -684,8 +686,17 @@ impl Supervisor {
                                             }
                                             drop(trust); // Release write lock
 
-                                            // TODO: Ledger integration
-                                            // - Transfer balances from old_did to new_did
+                                            // Update ledger: transfer balances from old_did to new_did
+                                            let mut ledger_guard = ledger.write().await;
+                                            match ledger_guard.transfer_balances_for_recovery(old_did, new_did, id) {
+                                                Ok(count) => {
+                                                    info!("Ledger: transferred {} currencies from {} to {}", count, old_did, new_did);
+                                                }
+                                                Err(e) => {
+                                                    warn!("Failed to transfer ledger balances for recovery {}: {}", id, e);
+                                                }
+                                            }
+                                            drop(ledger_guard); // Release write lock
                                         }
                                     }
                                 }

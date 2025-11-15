@@ -429,6 +429,73 @@ impl Ledger {
         &mut self.quarantine
     }
 
+    /// Transfer balances from old_did to new_did during recovery
+    ///
+    /// Creates journal entries transferring all balances from the old DID
+    /// to the new DID, maintaining the audit trail. This is called when
+    /// a social recovery is finalized.
+    ///
+    /// Returns the number of currencies transferred.
+    pub fn transfer_balances_for_recovery(
+        &mut self,
+        old_did: &Did,
+        new_did: &Did,
+        recovery_id: &str,
+    ) -> Result<usize> {
+        info!(
+            "Transferring ledger balances from {} to {} (recovery: {})",
+            old_did, new_did, recovery_id
+        );
+
+        let balances = self.get_account_balances(old_did);
+        let mut transferred_count = 0;
+
+        // For each currency with a non-zero balance
+        for (currency, balance) in balances.balances.iter() {
+            if *balance == 0 {
+                continue; // Skip zero balances
+            }
+
+            info!(
+                "Transferring {} {} from {} to {}",
+                balance, currency, old_did, new_did
+            );
+
+            // Create journal entry for this transfer
+            // If balance is positive (credit), debit old_did and credit new_did
+            // If balance is negative (debit), credit old_did and debit new_did
+            use crate::entry::JournalEntryBuilder;
+
+            let entry = if *balance > 0 {
+                // old_did has positive balance (has given credit to others)
+                // Transfer it to new_did
+                JournalEntryBuilder::new(new_did.clone())
+                    .debit(old_did.clone(), currency.clone(), *balance)
+                    .credit(new_did.clone(), currency.clone(), *balance)
+                    .build()?
+            } else {
+                // old_did has negative balance (has received credit from others)
+                // Transfer the debt to new_did
+                let debt_amount = balance.abs();
+                JournalEntryBuilder::new(new_did.clone())
+                    .credit(old_did.clone(), currency.clone(), debt_amount)
+                    .debit(new_did.clone(), currency.clone(), debt_amount)
+                    .build()?
+            };
+
+            // Append the entry
+            self.append_entry(entry)?;
+            transferred_count += 1;
+        }
+
+        info!(
+            "Transferred {} currencies from {} to {}",
+            transferred_count, old_did, new_did
+        );
+
+        Ok(transferred_count)
+    }
+
     /// Merge a batch of entries and report the decision
     ///
     /// This processes incoming entries, validates them, and decides:
