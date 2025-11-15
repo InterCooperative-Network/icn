@@ -8,6 +8,7 @@ use tracing::info;
 use crate::api;
 use crate::auth::AuthManager;
 use crate::coop::CoopManager;
+use crate::events::EventBroadcaster;
 use crate::ledger_mgr::LedgerManager;
 use crate::error::Result;
 
@@ -31,6 +32,7 @@ impl GatewayServer {
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
         let ledger_manager = Arc::new(LedgerManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
 
         HttpServer::new(move || {
             App::new()
@@ -38,6 +40,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
                 // Middleware
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
@@ -58,6 +61,8 @@ impl GatewayServer {
                 .service(api::ledger::get_balance)
                 .service(api::ledger::create_payment)
                 .service(api::ledger::get_history)
+                // WebSocket endpoint
+                .service(api::websocket::websocket)
         })
         .bind(self.bind_addr)?
         .run()
