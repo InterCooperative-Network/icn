@@ -3,6 +3,7 @@
 pub mod bundle;
 pub mod keystore;
 pub mod multi_device;
+pub mod recovery;
 pub mod sync;
 
 use anyhow::Result;
@@ -17,6 +18,7 @@ pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
     RevocationReason, RotationEvent, RotationEventType, VerificationMethod,
 };
+pub use recovery::{RecoveryAttestation, RecoveryEvent, RecoveryStatus};
 pub use sync::{DidDocumentCache, IdentityUpdateMessage, IDENTITY_UPDATES_TOPIC};
 
 /// A decentralized identifier for an ICN node
