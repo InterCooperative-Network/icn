@@ -4,7 +4,10 @@
 
 **Target**: 10-person worker cooperative using ICN for governance + mutual credit
 
-**Timeline**: 13 weeks (3 months) from start to pilot deployment
+**Timeline**:
+- 13 weeks (3 months): Development + deployment
+- +30 days: Initial operational validation
+- +6 months: Full pilot trial
 
 **Success Metric**: Real cooperative (not ICN developers) operates for 6 months without catastrophic failure
 
@@ -323,7 +326,9 @@ ICN is a **promising prototype** with solid technical foundations, but significa
 
 ---
 
-## Success Criteria (End of 13 Weeks)
+## Success Criteria
+
+### At End of Week 13 (Deployment Complete)
 
 **Technical**:
 - ✅ Social recovery works (tested with real device loss)
@@ -332,24 +337,35 @@ ICN is a **promising prototype** with solid technical foundations, but significa
 - ✅ Governance templates deploy and execute
 - ✅ End-to-end tests pass (10+ scenarios)
 
-**Operational**:
-- ✅ Pilot coop deployed and running
-- ✅ 100+ transactions recorded
-- ✅ 10+ governance decisions made
-- ✅ Zero data loss events
-- ✅ All incidents resolved within 24 hours
+**Deployment**:
+- ✅ Pilot coop deployed and operational
+- ✅ All 10 members onboarded successfully
+- ✅ Initial governance contracts configured
+- ✅ Mutual credit ledger initialized
 
 **User Experience**:
 - ✅ New member onboards in <30 minutes
 - ✅ Non-technical members can use basic features
 - ✅ Trust and credit concepts are understood
-- ✅ No member locked out due to lost key
 
 **Community**:
 - ✅ Pilot coop commits to 6-month trial
-- ✅ Weekly feedback collected
+- ✅ Support process established (weekly check-ins)
+
+### After 30-Day Operation (Week 13 + 1 Month)
+
+**Operational Stability**:
+- ✅ 100+ transactions recorded
+- ✅ 10+ governance decisions made
+- ✅ Zero data loss events
+- ✅ All incidents resolved within 24 hours
+- ✅ No member locked out due to lost key
+
+**Community Feedback**:
+- ✅ Weekly feedback collected (4 sessions)
 - ✅ At least 3 feature requests from real use
 - ✅ Documented learnings inform next priorities
+- ✅ Pilot confirms commitment to 6-month trial
 
 ---
 

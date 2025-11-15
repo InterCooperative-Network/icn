@@ -234,15 +234,16 @@ Each section uses status markers:
 | Prometheus exporter | ✅ Implemented | /metrics endpoint on port 9090 |
 | Key metrics | ✅ Implemented | Gossip, network, ledger counters |
 | Structured logging | ✅ Implemented | tracing crate throughout |
-| Health endpoint | 🚧 Partial | Basic health check exists |
-| Dashboards | ❌ Missing | No Grafana dashboards provided |
-| Runbooks | ❌ Missing | No operator guides for incidents |
-| Alerting rules | ❌ Missing | No recommended Prometheus alerts |
+| Health endpoint | ✅ Implemented | JSON endpoint + dashboard (Track B1) |
+| Monitoring dashboard | ✅ Implemented | Real-time web UI on :8080/ (Track B1) |
+| Runbooks | ✅ Implemented | incident-response.md (733 lines, 7 incident types) + operations-guide.md (1035 lines) |
+| Alerting rules | 🚧 Partial | Example alerts in ops guide, no pre-built Prometheus config |
+| Grafana dashboards | ❌ Missing | No pre-built Grafana dashboards provided |
 
 **Critical gaps:**
-- **Operational playbooks**: No "node is slow, now what?" guides
-- **Dashboard templates**: Operators start from scratch
-- **SLO/SLI definitions**: No "what is healthy?" metrics
+- **Grafana dashboards**: No pre-built dashboards, operators start from scratch
+- **Prometheus alerting config**: Example rules documented but not shipped as .yaml
+- **SLO/SLI definitions**: No formal "what is healthy?" metrics framework
 
 ### CLI (icnctl)
 
@@ -348,14 +349,16 @@ These are gaps in **usability** - the distance between "daemon runs" and "cooper
 
 ### Operational Model
 
-**Missing:**
-- **Deployment guide**: "Here's how to run ICN for a 10-person coop"
-- **Backup strategy**: How often? Where stored? Who has access?
-- **Upgrade procedures**: How to update without breaking running coops?
-- **Member offboarding**: What happens to their data when they leave?
-- **Incident playbooks**: "Node crashed, here's what to do"
+**Implemented:**
+- ✅ **Deployment guide**: docs/deployment-guide.md (comprehensive setup instructions)
+- ✅ **Backup strategy**: icnctl backup/restore, automated daily backups
+- ✅ **Upgrade procedures**: docs/operations-guide.md covers rolling upgrades
+- ✅ **Incident playbooks**: docs/incident-response.md (7 incident types with procedures)
 
-**Consequence**: First deployment will be a mess, first incident will be catastrophic.
+**Missing:**
+- ❌ **Member offboarding**: No documented "member leaves" data handling procedure
+- ❌ **Grafana dashboards**: No visual monitoring templates
+- ❌ **Prometheus alerting config**: Example rules exist but not shipped as YAML
 
 ### App Patterns & Examples
 
@@ -376,7 +379,7 @@ These are gaps in **usability** - the distance between "daemon runs" and "cooper
 2. **NAT traversal** (Network) - Coops ARE behind routers
 3. **Ledger conflict resolution** (Ledger) - Partitions WILL happen
 4. **Onboarding UX** (Product) - Humans need to get started
-5. **Operational playbooks** (Product) - Things will go wrong
+5. **Grafana dashboards** (Observability) - Operators need visual monitoring
 
 ### Tier 2: Critical for scale
 6. **Trust lifecycle** (Trust) - Trust must evolve with relationships
@@ -418,13 +421,17 @@ Focus on one end-to-end flow that closes Tier 1 gaps:
 | Product | Onboarding wizard, member invitation, visual trust | 3 weeks |
 | Ops | Deployment guide, backup script, runbook | 1 week |
 
-**Total: ~13 weeks (3 months) to "Minimal Viable Coop"**
+**Total: ~13 weeks development + deployment, then 30-day validation + 6-month trial**
 
-**Success criteria:**
-- Real cooperative (not us) runs ICN for 6 months
+**Success criteria (after 30 days):**
+- Real cooperative (not us) deployed and operational
 - Handles 100+ transactions without manual intervention
 - Survives 1 node failure without data loss
 - Members can join/leave without technical support
+
+**Long-term success (6 months):**
+- Pilot operates continuously without catastrophic failure
+- Community provides actionable feedback for improvements
 
 ---
 
