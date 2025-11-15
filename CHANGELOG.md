@@ -80,6 +80,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** This is NOT an app runtime. Apps run externally and call this API. See `docs/platform-layer-design.md` for architecture.
 
+### Added - Gateway Integration with icnd (2025-01-15)
+
+**Runtime Integration:**
+- Gateway server integrated into icnd supervisor
+- Spawns in dedicated thread with separate Tokio runtime
+- Respects configuration enable/disable flag
+- Validates JWT secret before starting
+- Graceful error handling when misconfigured
+
+**Configuration System:**
+- `GatewayConfig` added to `icn-core/src/config.rs`
+- Fields: enabled, bind_addr, token_expiry_hours, challenge_ttl_minutes, jwt_secret
+- TOML serialization/deserialization
+- Serde defaults for all fields
+- Gateway disabled by default (opt-in)
+
+**CLI Arguments:**
+- `--gateway-enable`: Enable gateway API server
+- `--gateway-bind <IP:PORT>`: Override bind address
+- `--gateway-jwt-secret <SECRET>`: Set JWT secret
+- Environment variable support: ICN_GATEWAY_JWT_SECRET
+- Configuration priority: CLI args > env vars > config file
+
+**Example Configuration:**
+```toml
+[gateway]
+enabled = true
+bind_addr = "127.0.0.1:8080"
+token_expiry_hours = 24
+challenge_ttl_minutes = 5
+jwt_secret = "your-strong-secret-here"
+```
+
+**Documentation:**
+- Comprehensive example config file: `config/icn.toml.example`
+- Updated CLAUDE.md with 4 configuration methods
+- Security recommendations for production deployment
+- API usage examples with curl and wscat
+
+**Security Features:**
+- Opt-in by default (enabled: false)
+- Requires explicit JWT secret configuration
+- No default/fallback secrets
+- Helpful warnings when misconfigured
+- Localhost binding by default
+
+All tests pass. Gateway ready for production deployment.
+
 ### Fixed
 
 **Governance:**
