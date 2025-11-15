@@ -1,6 +1,7 @@
 //! Gateway server
 
 use actix_web::{middleware, web, App, HttpServer};
+use actix_web_httpauth::middleware::HttpAuthentication;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::info;
@@ -35,6 +36,9 @@ impl GatewayServer {
         let event_broadcaster = Arc::new(EventBroadcaster::new());
 
         HttpServer::new(move || {
+            // Create JWT authentication middleware
+            let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
+
             App::new()
                 // Shared state
                 .app_data(web::Data::new(auth_manager.clone()))
@@ -44,25 +48,33 @@ impl GatewayServer {
                 // Middleware
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
-                // Health endpoint
+                // Health endpoint (public)
                 .service(api::health::health)
-                // Auth endpoints
+                // Auth endpoints (public - needed to get tokens)
                 .service(api::auth::challenge)
                 .service(api::auth::verify)
-                // Coop endpoints
-                .service(api::coops::create_coop)
-                .service(api::coops::get_coop)
-                .service(api::coops::update_settings)
-                .service(api::coops::delete_coop)
-                .service(api::coops::add_member)
-                .service(api::coops::remove_member)
-                .service(api::coops::update_member_role)
-                // Ledger endpoints
-                .service(api::ledger::get_balance)
-                .service(api::ledger::create_payment)
-                .service(api::ledger::get_history)
-                // WebSocket endpoint
+                // WebSocket endpoint (handles auth internally)
                 .service(api::websocket::websocket)
+                // Protected coop endpoints
+                .service(
+                    web::scope("/coops")
+                        .wrap(auth.clone())
+                        .service(api::coops::create_coop)
+                        .service(api::coops::get_coop)
+                        .service(api::coops::update_settings)
+                        .service(api::coops::delete_coop)
+                        .service(api::coops::add_member)
+                        .service(api::coops::remove_member)
+                        .service(api::coops::update_member_role)
+                )
+                // Protected ledger endpoints
+                .service(
+                    web::scope("/ledger")
+                        .wrap(auth)
+                        .service(api::ledger::get_balance)
+                        .service(api::ledger::create_payment)
+                        .service(api::ledger::get_history)
+                )
         })
         .bind(self.bind_addr)?
         .run()

@@ -10,7 +10,7 @@ use crate::models::{
 };
 
 /// GET /ledger/:coop_id/balance/:did - Get account balance
-#[get("/ledger/{coop_id}/balance/{did}")]
+#[get("/{coop_id}/balance/{did}")]
 pub async fn get_balance(
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     path: web::Path<(String, String)>,
@@ -31,7 +31,7 @@ pub async fn get_balance(
 }
 
 /// POST /ledger/:coop_id/payment - Create a payment
-#[post("/ledger/{coop_id}/payment")]
+#[post("/{coop_id}/payment")]
 pub async fn create_payment(
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     coop_id: web::Path<String>,
@@ -67,7 +67,7 @@ pub async fn create_payment(
 }
 
 /// GET /ledger/:coop_id/history?did=... - Get transaction history
-#[get("/ledger/{coop_id}/history")]
+#[get("/{coop_id}/history")]
 pub async fn get_history(
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     coop_id: web::Path<String>,
@@ -124,8 +124,11 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(create_payment)
-                .service(get_balance)
+                .service(
+                    web::scope("/ledger")
+                        .service(create_payment)
+                        .service(get_balance)
+                )
         ).await;
 
         // Create payment
@@ -173,7 +176,10 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(get_history)
+                .service(
+                    web::scope("/ledger")
+                        .service(get_history)
+                )
         ).await;
 
         // Get history

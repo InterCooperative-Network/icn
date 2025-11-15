@@ -28,7 +28,7 @@ fn parse_role(role_str: &str) -> Result<MemberRole> {
 }
 
 /// POST /coops - Create a new cooperative
-#[post("/coops")]
+#[post("")]
 pub async fn create_coop(
     coop_mgr: web::Data<Arc<CoopManager>>,
     req: web::Json<CreateCoopRequest>,
@@ -52,7 +52,7 @@ pub async fn create_coop(
 }
 
 /// GET /coops/:id - Get cooperative info
-#[get("/coops/{id}")]
+#[get("/{id}")]
 pub async fn get_coop(
     coop_mgr: web::Data<Arc<CoopManager>>,
     id: web::Path<String>,
@@ -62,7 +62,7 @@ pub async fn get_coop(
 }
 
 /// PUT /coops/:id/settings - Update cooperative settings
-#[put("/coops/{id}/settings")]
+#[put("/{id}/settings")]
 pub async fn update_settings(
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
@@ -97,7 +97,7 @@ pub async fn update_settings(
 }
 
 /// DELETE /coops/:id - Delete cooperative
-#[delete("/coops/{id}")]
+#[delete("/{id}")]
 pub async fn delete_coop(
     coop_mgr: web::Data<Arc<CoopManager>>,
     id: web::Path<String>,
@@ -107,7 +107,7 @@ pub async fn delete_coop(
 }
 
 /// POST /coops/:id/members - Add a member to cooperative
-#[post("/coops/{id}/members")]
+#[post("/{id}/members")]
 pub async fn add_member(
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
@@ -140,7 +140,7 @@ pub async fn add_member(
 }
 
 /// DELETE /coops/:id/members/:did - Remove a member from cooperative
-#[delete("/coops/{id}/members/{did}")]
+#[delete("/{id}/members/{did}")]
 pub async fn remove_member(
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
@@ -170,7 +170,7 @@ pub async fn remove_member(
 }
 
 /// PUT /coops/:id/members/:did/role - Update member role
-#[put("/coops/{id}/members/{did}/role")]
+#[put("/{id}/members/{did}/role")]
 pub async fn update_member_role(
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
@@ -215,8 +215,11 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
-                .service(create_coop)
-                .service(get_coop)
+                .service(
+                    web::scope("/coops")
+                        .service(create_coop)
+                        .service(get_coop)
+                )
         ).await;
 
         // Create coop
@@ -261,8 +264,11 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
                 .app_data(web::Data::new(broadcaster.clone()))
-                .service(add_member)
-                .service(remove_member)
+                .service(
+                    web::scope("/coops")
+                        .service(add_member)
+                        .service(remove_member)
+                )
         ).await;
 
         // Add member
