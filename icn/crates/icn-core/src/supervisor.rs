@@ -536,6 +536,7 @@ impl Supervisor {
                     // Handle identity recovery events
                     else if topic == IDENTITY_RECOVERY_TOPIC {
                         let recovery_store = recovery_store_for_notifications.clone();
+                        let trust_graph = trust_graph_for_notifications.clone();
 
                         // Use get_data() to handle decompression if needed
                         let entry_data = match entry.get_data() {
@@ -620,11 +621,6 @@ impl Supervisor {
                                                             recovery_store.put(key.as_bytes(), &value)?;
 
                                                             info!("✅ Recovery finalized: {} → {}", old_did, new_did);
-
-                                                            // TODO: Update trust graph and ledger mappings
-                                                            // - Trust graph: Map old_did relationships to new_did
-                                                            // - Ledger: Transfer balances from old_did to new_did
-
                                                             Ok(())
                                                         }
                                                         Err(e) => {
@@ -671,8 +667,26 @@ impl Supervisor {
                                     }
                                     })();
 
-                                    if let Err(e) = result {
+                                    if let Err(e) = &result {
                                         warn!("Failed to handle recovery message: {}", e);
+                                    } else if result.is_ok() {
+                                        // If recovery was successfully finalized, update trust graph and ledger
+                                        if let RecoveryMessage::Finalized { id, old_did, new_did, .. } = &recovery_msg {
+                                            // Update trust graph: map old_did relationships to new_did
+                                            let mut trust = trust_graph.write().await;
+                                            match trust.map_did_recovery(old_did, new_did) {
+                                                Ok(count) => {
+                                                    info!("Trust graph: migrated {} edges from {} to {}", count, old_did, new_did);
+                                                }
+                                                Err(e) => {
+                                                    warn!("Failed to migrate trust graph for recovery {}: {}", id, e);
+                                                }
+                                            }
+                                            drop(trust); // Release write lock
+
+                                            // TODO: Ledger integration
+                                            // - Transfer balances from old_did to new_did
+                                        }
                                     }
                                 }
                                 Err(e) => {

@@ -281,6 +281,77 @@ impl TrustGraph {
             cache.clear();
         }
     }
+
+    /// Map trust relationships from old_did to new_did during recovery
+    ///
+    /// This is called when a social recovery is finalized. All trust relationships
+    /// involving the old DID are transferred to the new DID.
+    ///
+    /// Returns the number of edges migrated.
+    pub fn map_did_recovery(&mut self, old_did: &Did, new_did: &Did) -> Result<usize> {
+        info!("Mapping trust relationships: {} → {}", old_did, new_did);
+
+        let mut migrated_count = 0;
+
+        // 1. Get all outgoing edges from old_did (old_did as source)
+        let outgoing = self.get_outgoing_edges(old_did)?;
+        for edge in outgoing {
+            // Create new edge with new_did as source
+            let new_edge = TrustEdge {
+                source: new_did.clone(),
+                target: edge.target.clone(),
+                labels: edge.labels,
+                score: edge.score,
+                evidence: edge.evidence,
+                expires_at: edge.expires_at,
+                created_at: edge.created_at,
+            };
+
+            self.add_edge(new_edge)?;
+            migrated_count += 1;
+
+            // Remove old edge
+            self.remove_edge(&edge.source, &edge.target)?;
+        }
+
+        // 2. Get all incoming edges to old_did (old_did as target)
+        // We need to scan all edges and find ones where target == old_did
+        let all_edges_results = self.store.scan(b"trust/edges/")?;
+
+        for (_key, value) in all_edges_results {
+            let edge: TrustEdge = serde_json::from_slice(&value)?;
+
+            // Check if this edge points to the old_did
+            if edge.target.as_str() == old_did.as_str() {
+                // Create new edge with new_did as target
+                let new_edge = TrustEdge {
+                    source: edge.source.clone(),
+                    target: new_did.clone(),
+                    labels: edge.labels,
+                    score: edge.score,
+                    evidence: edge.evidence,
+                    expires_at: edge.expires_at,
+                    created_at: edge.created_at,
+                };
+
+                self.add_edge(new_edge)?;
+                migrated_count += 1;
+
+                // Remove old edge
+                self.remove_edge(&edge.source, &edge.target)?;
+            }
+        }
+
+        // 3. Clear cache since trust scores may have changed
+        self.clear_cache();
+
+        info!(
+            "Migrated {} trust edges from {} to {}",
+            migrated_count, old_did, new_did
+        );
+
+        Ok(migrated_count)
+    }
 }
 
 #[cfg(test)]
