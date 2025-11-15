@@ -24,6 +24,18 @@ struct Args {
     /// Log level (trace, debug, info, warn, error)
     #[arg(short, long, default_value = "info")]
     log_level: String,
+
+    /// Enable the Gateway API server
+    #[arg(long)]
+    gateway_enable: bool,
+
+    /// Gateway API bind address (format: "IP:PORT")
+    #[arg(long)]
+    gateway_bind: Option<String>,
+
+    /// Gateway JWT secret
+    #[arg(long)]
+    gateway_jwt_secret: Option<String>,
 }
 
 #[tokio::main]
@@ -53,11 +65,37 @@ async fn main() -> Result<()> {
 
     config.observability.log_level = args.log_level;
 
+    // Apply gateway CLI arguments
+    if args.gateway_enable {
+        config.gateway.enabled = true;
+    }
+
+    if let Some(bind_addr) = args.gateway_bind {
+        config.gateway.bind_addr = bind_addr;
+    }
+
+    // Read JWT secret from CLI arg, then env var ICN_GATEWAY_JWT_SECRET, then config
+    if let Some(jwt_secret) = args.gateway_jwt_secret {
+        config.gateway.jwt_secret = jwt_secret;
+    } else if let Ok(jwt_secret) = std::env::var("ICN_GATEWAY_JWT_SECRET") {
+        config.gateway.jwt_secret = jwt_secret;
+        tracing::debug!("Gateway JWT secret loaded from ICN_GATEWAY_JWT_SECRET environment variable");
+    }
+
     // Ensure data directory exists
     std::fs::create_dir_all(&config.data_dir)?;
 
     tracing::info!("Data directory: {:?}", config.data_dir);
     tracing::info!("Log level: {}", config.observability.log_level);
+
+    if config.gateway.enabled {
+        tracing::info!("Gateway API enabled on {}", config.gateway.bind_addr);
+        if config.gateway.jwt_secret.is_empty() {
+            tracing::warn!("Gateway enabled but JWT secret not configured!");
+        }
+    } else {
+        tracing::debug!("Gateway API disabled");
+    }
 
     // Check for identity keystore
     let keystore_path = config.keystore_path();
