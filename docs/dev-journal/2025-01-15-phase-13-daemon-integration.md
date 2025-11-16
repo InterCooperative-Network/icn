@@ -343,7 +343,108 @@ This avoids changing the command handler's return type while still providing the
 1. `48554ca` - feat(governance): Add write operations to GovernanceOps trait
 2. `6faea19` - feat(rpc): Add governance write operation RPC endpoints
 
-### Session 5: Trust Graph Integration (Future)
+### Session 5: icnctl RPC Migration (Complete ✅)
+
+**Implementation:**
+- [x] Added reqwest HTTP client dependency to icnctl
+- [x] Created JSON-RPC client helpers (JsonRpcRequest, JsonRpcResponse, rpc_call)
+- [x] Refactored all 11 governance commands to use daemon RPC
+- [x] Removed SledStore dependency from governance command handling
+- [x] Removed keystore access from proposal creation (daemon handles DID)
+- [x] Added helpful error messages for unsupported operations
+- [x] Build successful with no warnings
+
+**Refactored Commands:**
+1. **Domain commands (3):**
+   - `domain create` → `governance.domain.create`
+   - `domain show` → `governance.domain.get`
+   - `domain list` → `governance.domain.list`
+
+2. **Proposal commands (6):**
+   - `proposal create` → `governance.proposal.create` (returns proposal_id)
+   - `proposal open` → `governance.proposal.open`
+   - `proposal list` → `governance.proposal.list` (client-side filtering by domain)
+   - `proposal show` → `governance.proposal.get`
+   - `proposal close` → `governance.proposal.close`
+   - `proposal cancel` → Error message (not supported via RPC)
+
+3. **Vote commands (2):**
+   - `vote cast` → `governance.vote.cast`
+   - `vote show` → Error message (not supported via RPC)
+
+**RPC Client Pattern:**
+```rust
+fn rpc_call(endpoint: &str, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
+    let url = format!("http://{}/rpc", endpoint);
+    let request = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: 1,
+        method: method.to_string(),
+        params,
+    };
+
+    let client = reqwest::blocking::Client::new();
+    let response: JsonRpcResponse = client.post(&url).json(&request).send()?.json()?;
+
+    if let Some(error) = response.error {
+        bail!("RPC error ({}): {}", error.code, error.message);
+    }
+
+    response.result.ok_or_else(|| anyhow::anyhow!("RPC response missing result"))
+}
+```
+
+**Key Architectural Changes:**
+- Removed `SledStore` from `handle_gov_command()` signature
+- Added `endpoint` parameter (default: `localhost:5601`)
+- CLI is now a thin client with no direct store access
+- Daemon handles proposer DID association via authenticated session
+- Vote casting simplified (no keystore access needed in CLI)
+
+**Proposal Payload Conversion:**
+Implemented JSON payload building for all proposal types:
+- **Text proposals:** `{ "type": "text", "body": "..." }`
+- **Budget proposals:** `{ "type": "budget", "amount": 1000, "currency": "hours", "recipient": "did:icn:...", "purpose": "..." }`
+- **Membership proposals:** `{ "type": "membership", "action": "add", "member": "did:icn:..." }`
+- **Config change proposals:** `{ "type": "config_change", "new_config": {...} }`
+
+**Error Handling:**
+- Connection errors: "Failed to connect to daemon. Is icnd running?"
+- RPC errors: Display error code and message from daemon
+- Missing response: "RPC response missing result"
+- Invalid choices: Client-side validation before RPC call
+
+**Files Modified:**
+- `bins/icnctl/Cargo.toml` - Added reqwest dependency (1 line)
+- `bins/icnctl/src/main.rs` - Refactored governance commands (net: -90 lines)
+
+**Testing:**
+- Compiled cleanly with no errors or warnings
+- Removed all unused imports from icn-governance
+- Fixed unused variable warnings (proposer, proposal_id in cancel)
+- Build time: 8s
+
+**Impact:**
+- **Line count:** Net reduction of 90 lines (205 additions, 295 deletions)
+- **Dependencies:** Added reqwest (HTTP client), removed direct store access
+- **Separation of concerns:** CLI is now presentation layer, daemon is data layer
+- **Migration complete:** icnctl no longer touches governance store directly
+
+**What Works:**
+- All governance commands now go through daemon RPC
+- CLI validates input before sending to daemon
+- Daemon returns structured responses (domain_id, proposal_id, success flags)
+- Error messages guide users to alternatives when operations unsupported
+
+**Known Limitations:**
+- `proposal cancel` not implemented via RPC (requires direct store access or new RPC method)
+- `vote show` not implemented (vote tallying happens during proposal close)
+- No batch operations (create multiple proposals in one call)
+
+**Commit:**
+- `8ac72ba` - refactor(icnctl): Migrate governance commands to use daemon RPC
+
+### Future Session: Trust Graph Integration
 
 **Implementation:**
 - Add `TrustGraphHandle` to supervisor
