@@ -2,6 +2,12 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
+use icn_governance::{
+    DecisionOutcome, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceParams,
+    GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipConfig,
+    MembershipResolver, MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState,
+    StaticMembershipResolver, Vote, VoteChoice,
+};
 use icn_identity::{
     AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType, RecoveryAttestation, RecoveryEvent,
     RecoveryMethod, RecoveryConfig as IdentityRecoveryConfig,
@@ -65,6 +71,10 @@ enum Commands {
     /// Network operations (mDNS discovery, QUIC sessions)
     #[command(subcommand)]
     Network(NetworkCommands),
+
+    /// Governance operations (domains, proposals, votes)
+    #[command(subcommand)]
+    Gov(GovCommands),
 
     /// Backup data directory
     Backup {
@@ -367,6 +377,187 @@ enum NetworkCommands {
 }
 
 #[derive(Subcommand, Debug)]
+enum GovCommands {
+    /// Domain management
+    #[command(subcommand)]
+    Domain(DomainCommands),
+
+    /// Proposal management
+    #[command(subcommand)]
+    Proposal(ProposalCommands),
+
+    /// Vote on proposals
+    #[command(subcommand)]
+    Vote(VoteCommands),
+}
+
+#[derive(Subcommand, Debug)]
+enum DomainCommands {
+    /// Create a new governance domain
+    Create {
+        /// Domain ID (e.g., "coop:tiny-food")
+        #[arg(long)]
+        domain_id: String,
+
+        /// Human-readable name
+        #[arg(long)]
+        name: String,
+
+        /// Comma-separated member DIDs
+        #[arg(long)]
+        members: String,
+
+        /// Governance profile (default: cooperative_default)
+        #[arg(long, default_value = "cooperative_default")]
+        profile: String,
+
+        /// Quorum percentage (0-100)
+        #[arg(long, default_value = "50")]
+        quorum: u8,
+
+        /// Approval threshold percentage (0-100)
+        #[arg(long, default_value = "50")]
+        approval: u8,
+
+        /// Voting period in seconds (default: 7 days)
+        #[arg(long, default_value = "604800")]
+        voting_period: u64,
+    },
+
+    /// Show domain details
+    Show {
+        /// Domain ID
+        #[arg(long)]
+        domain_id: String,
+    },
+
+    /// List all domains
+    List,
+}
+
+#[derive(Subcommand, Debug)]
+enum ProposalCommands {
+    /// Create a new proposal
+    Create {
+        /// Domain ID
+        #[arg(long)]
+        domain_id: String,
+
+        /// Proposal title
+        #[arg(long)]
+        title: String,
+
+        /// Proposal description
+        #[arg(long)]
+        description: String,
+
+        /// Proposal type (text, budget, membership, config-change)
+        #[arg(long)]
+        kind: String,
+
+        /// For text proposals: body content
+        #[arg(long)]
+        body: Option<String>,
+
+        /// For budget proposals: amount
+        #[arg(long)]
+        amount: Option<i64>,
+
+        /// For budget proposals: currency
+        #[arg(long)]
+        currency: Option<String>,
+
+        /// For budget proposals: recipient DID
+        #[arg(long)]
+        recipient: Option<String>,
+
+        /// For budget proposals: purpose
+        #[arg(long)]
+        purpose: Option<String>,
+
+        /// For membership proposals: member DID
+        #[arg(long)]
+        member: Option<String>,
+
+        /// For membership proposals: action (add/remove)
+        #[arg(long)]
+        action: Option<String>,
+
+        /// For config-change proposals: new config JSON
+        #[arg(long)]
+        new_config: Option<String>,
+    },
+
+    /// Open a proposal for voting
+    Open {
+        /// Proposal ID
+        #[arg(long)]
+        proposal_id: String,
+
+        /// Optional voting duration override (seconds)
+        #[arg(long)]
+        duration: Option<u64>,
+    },
+
+    /// List proposals in a domain
+    List {
+        /// Domain ID
+        #[arg(long)]
+        domain_id: String,
+
+        /// Optional state filter (draft, open, accepted, rejected, noquorum, cancelled)
+        #[arg(long)]
+        state: Option<String>,
+    },
+
+    /// Show proposal details with current tally
+    Show {
+        /// Proposal ID
+        #[arg(long)]
+        proposal_id: String,
+    },
+
+    /// Close a proposal and compute outcome
+    Close {
+        /// Proposal ID
+        #[arg(long)]
+        proposal_id: String,
+    },
+
+    /// Cancel a proposal
+    Cancel {
+        /// Proposal ID
+        #[arg(long)]
+        proposal_id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum VoteCommands {
+    /// Cast or update a vote
+    Cast {
+        /// Proposal ID
+        #[arg(long)]
+        proposal_id: String,
+
+        /// Vote choice (for, against, abstain)
+        #[arg(long)]
+        choice: String,
+
+        /// Optional comment
+        #[arg(long)]
+        comment: Option<String>,
+    },
+
+    /// Show your vote on a proposal
+    Show {
+        /// Proposal ID
+        #[arg(long)]
+        proposal_id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum SnapshotCommands {
     /// Create a manual snapshot
     Create,
@@ -469,6 +660,8 @@ async fn main() -> Result<()> {
         Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
+
+        Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir)?,
 
         Commands::Snapshot(snapshot_cmd) => handle_snapshot_command(snapshot_cmd, &data_dir)?,
 
@@ -2468,6 +2661,439 @@ fn extract_backup_metadata(_archive: &mut Archive<File>, input: &PathBuf) -> Res
     }
 
     bail!("Backup metadata not found in archive. This may not be a valid ICN backup.");
+}
+
+fn handle_gov_command(cmd: GovCommands, data_dir: &PathBuf) -> Result<()> {
+    // Open store for governance data
+    let store_path = data_dir.join("store");
+    let store = SledStore::open(&store_path)?;
+
+    // Load keystore to get current DID
+    let keystore_path = data_dir.join("keystore.age");
+
+    match cmd {
+        GovCommands::Domain(domain_cmd) => match domain_cmd {
+            DomainCommands::Create {
+                domain_id,
+                name,
+                members,
+                profile,
+                quorum,
+                approval,
+                voting_period,
+            } => {
+                // Parse member DIDs
+                let member_dids: Vec<Did> = members
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.parse())
+                    .collect::<Result<Vec<_>, _>>()
+                    .context("Invalid member DID format")?;
+
+                if member_dids.is_empty() {
+                    bail!("At least one member DID is required");
+                }
+
+                // Create domain
+                let domain = GovernanceDomain::new(
+                    name.clone(),
+                    GovernanceConfig::new(
+                        GovernanceProfileId::builtin(&profile),
+                        MembershipConfig::static_list(member_dids.clone()),
+                        GovernanceParams::new(quorum, approval, voting_period),
+                    ),
+                );
+
+                // Store domain
+                let key = format!("gov:domain:{}", domain_id);
+                let value = serde_json::to_vec(&domain)?;
+                store.put(key.as_bytes(), &value)?;
+
+                println!("✓ Governance domain created:");
+                println!("  ID: {}", domain_id);
+                println!("  Name: {}", name);
+                println!("  Members: {}", member_dids.len());
+                println!("  Profile: {}", profile);
+                println!("  Quorum: {}%", quorum);
+                println!("  Approval: {}%", approval);
+                println!("  Voting period: {} seconds", voting_period);
+            }
+
+            DomainCommands::Show { domain_id } => {
+                let key = format!("gov:domain:{}", domain_id);
+                let data = store
+                    .get(key.as_bytes())?
+                    .context("Domain not found")?;
+                let domain: GovernanceDomain = serde_json::from_slice(&data)?;
+
+                println!("Governance Domain:");
+                println!("  ID: {}", domain.id.0);
+                println!("  Name: {}", domain.name);
+                println!("  Profile: {}", domain.config.profile.0);
+                println!("  Quorum: {}%", domain.config.params.quorum_percentage);
+                println!(
+                    "  Approval: {}%",
+                    domain.config.params.approval_threshold_percentage
+                );
+                println!(
+                    "  Voting period: {} seconds",
+                    domain.config.params.voting_period_seconds
+                );
+
+                if let MembershipSource::StaticList(members) = &domain.config.membership.source {
+                    println!("  Members ({}):", members.len());
+                    for member in members {
+                        println!("    - {}", member);
+                    }
+                }
+            }
+
+            DomainCommands::List => {
+                println!("Governance Domains:");
+                let items = store.scan(b"gov:domain:")?;
+                for (_key, value) in items {
+                    let domain: GovernanceDomain = serde_json::from_slice(&value)?;
+                    println!("  - {} ({})", domain.id.0, domain.name);
+                }
+            }
+        },
+
+        GovCommands::Proposal(proposal_cmd) => match proposal_cmd {
+            ProposalCommands::Create {
+                domain_id,
+                title,
+                description,
+                kind,
+                body,
+                amount,
+                currency,
+                recipient,
+                purpose,
+                member,
+                action,
+                new_config,
+            } => {
+                // Get current DID
+                if !keystore_path.exists() {
+                    bail!("No identity found. Create one with 'icnctl id init'");
+                }
+
+                let passphrase = read_passphrase("Enter passphrase: ")?;
+                let mut keystore = AgeKeyStore::open(&keystore_path)?;
+                keystore.unlock(&passphrase)?;
+                let proposer = keystore.get_keypair()?.did().clone();
+
+                // Build payload based on kind
+                let payload = match kind.as_str() {
+                    "text" => {
+                        let body_text = body.context("--body required for text proposals")?;
+                        ProposalPayload::Text { body: body_text }
+                    }
+                    "budget" => {
+                        let amt = amount.context("--amount required for budget proposals")?;
+                        let curr = currency.context("--currency required for budget proposals")?;
+                        let recip_str =
+                            recipient.context("--recipient required for budget proposals")?;
+                        let recip: Did = recip_str
+                            .parse()
+                            .context("Invalid recipient DID")?;
+                        let purp = purpose.unwrap_or_default();
+
+                        ProposalPayload::Budget {
+                            amount: amt,
+                            currency: curr,
+                            recipient: recip,
+                            purpose: purp,
+                        }
+                    }
+                    "membership" => {
+                        let member_str =
+                            member.context("--member required for membership proposals")?;
+                        let member_did: Did = member_str.parse().context("Invalid member DID")?;
+                        let action_str = action.unwrap_or_else(|| "add".to_string());
+
+                        let membership_action = match action_str.as_str() {
+                            "add" => icn_governance::proposal::MembershipAction::Add,
+                            "remove" => icn_governance::proposal::MembershipAction::Remove,
+                            _ => bail!("Invalid action: must be 'add' or 'remove'"),
+                        };
+
+                        ProposalPayload::Membership {
+                            action: membership_action,
+                            member: member_did,
+                        }
+                    }
+                    "config-change" => {
+                        let cfg =
+                            new_config.context("--new-config required for config-change proposals")?;
+                        ProposalPayload::ConfigChange { new_config: cfg }
+                    }
+                    _ => bail!("Invalid proposal kind. Must be: text, budget, membership, config-change"),
+                };
+
+                // Create proposal
+                let proposal = Proposal::new(
+                    GovernanceDomainId(domain_id),
+                    proposer,
+                    title,
+                    description,
+                    payload,
+                );
+
+                // Store proposal
+                let key = format!("gov:proposal:{}", proposal.id.0);
+                let value = serde_json::to_vec(&proposal)?;
+                store.put(key.as_bytes(), &value)?;
+
+                println!("✓ Proposal created:");
+                println!("  ID: {}", proposal.id.0);
+                println!("  State: {:?}", proposal.state);
+            }
+
+            ProposalCommands::Open {
+                proposal_id,
+                duration,
+            } => {
+                let key = format!("gov:proposal:{}", proposal_id);
+                let data = store.get(key.as_bytes())?.context("Proposal not found")?;
+                let mut proposal: Proposal = serde_json::from_slice(&data)?;
+
+                // Get domain to determine voting period
+                let domain_key = format!("gov:domain:{}", proposal.domain_id.0);
+                let domain_data = store.get(domain_key.as_bytes())?.context("Domain not found")?;
+                let domain: GovernanceDomain = serde_json::from_slice(&domain_data)?;
+
+                let voting_period = duration.unwrap_or(domain.config.params.voting_period_seconds);
+                proposal.open(voting_period)?;
+
+                // Save updated proposal
+                let value = serde_json::to_vec(&proposal)?;
+                store.put(key.as_bytes(), &value)?;
+
+                println!("✓ Proposal opened for voting:");
+                println!("  ID: {}", proposal.id.0);
+                if let ProposalState::Open { closes_at, .. } = proposal.state {
+                    println!("  Closes at: {} (Unix timestamp)", closes_at);
+                }
+            }
+
+            ProposalCommands::List { domain_id, state } => {
+                println!("Proposals in domain '{}':", domain_id);
+
+                let items = store.scan(b"gov:proposal:")?;
+                for (_key, value) in items {
+                    let proposal: Proposal = serde_json::from_slice(&value)?;
+
+                    if proposal.domain_id.0 != domain_id {
+                        continue;
+                    }
+
+                    if let Some(ref state_filter) = state {
+                        let matches = match proposal.state {
+                            ProposalState::Draft => state_filter == "draft",
+                            ProposalState::Open { .. } => state_filter == "open",
+                            ProposalState::Accepted { .. } => state_filter == "accepted",
+                            ProposalState::Rejected { .. } => state_filter == "rejected",
+                            ProposalState::NoQuorum { .. } => state_filter == "noquorum",
+                            ProposalState::Cancelled { .. } => state_filter == "cancelled",
+                        };
+
+                        if !matches {
+                            continue;
+                        }
+                    }
+
+                    let state_str = match proposal.state {
+                        ProposalState::Draft => "DRAFT",
+                        ProposalState::Open { .. } => "OPEN",
+                        ProposalState::Accepted { .. } => "ACCEPTED",
+                        ProposalState::Rejected { .. } => "REJECTED",
+                        ProposalState::NoQuorum { .. } => "NO_QUORUM",
+                        ProposalState::Cancelled { .. } => "CANCELLED",
+                    };
+
+                    println!("  [{}] {} - {}", state_str, proposal.id.0, proposal.title);
+                }
+            }
+
+            ProposalCommands::Show { proposal_id } => {
+                let key = format!("gov:proposal:{}", proposal_id);
+                let data = store.get(key.as_bytes())?.context("Proposal not found")?;
+                let proposal: Proposal = serde_json::from_slice(&data)?;
+
+                println!("Proposal:");
+                println!("  ID: {}", proposal.id.0);
+                println!("  Title: {}", proposal.title);
+                println!("  Description: {}", proposal.description);
+                println!("  State: {:?}", proposal.state);
+                println!("  Proposer: {}", proposal.proposer);
+
+                // Count votes
+                let vote_prefix = format!("gov:vote:{}:", proposal_id);
+                let mut for_count = 0;
+                let mut against_count = 0;
+                let mut abstain_count = 0;
+
+                let items = store.scan(vote_prefix.as_bytes())?;
+                for (_key, value) in items {
+                    let vote: Vote = serde_json::from_slice(&value)?;
+
+                    match vote.choice {
+                        VoteChoice::For => for_count += 1,
+                        VoteChoice::Against => against_count += 1,
+                        VoteChoice::Abstain => abstain_count += 1,
+                    }
+                }
+
+                println!("\nVote Tally:");
+                println!("  For:     {}", for_count);
+                println!("  Against: {}", against_count);
+                println!("  Abstain: {}", abstain_count);
+                println!("  Total:   {}", for_count + against_count + abstain_count);
+            }
+
+            ProposalCommands::Close { proposal_id } => {
+                let key = format!("gov:proposal:{}", proposal_id);
+                let data = store.get(key.as_bytes())?.context("Proposal not found")?;
+                let mut proposal: Proposal = serde_json::from_slice(&data)?;
+
+                // Get domain and resolver
+                let domain_key = format!("gov:domain:{}", proposal.domain_id.0);
+                let domain_data = store.get(domain_key.as_bytes())?.context("Domain not found")?;
+                let domain: GovernanceDomain = serde_json::from_slice(&domain_data)?;
+
+                // Count votes
+                let mut tally = icn_governance::VoteTally::empty();
+                let vote_prefix = format!("gov:vote:{}:", proposal_id);
+
+                let items = store.scan(vote_prefix.as_bytes())?;
+                for (_key, value) in items {
+                    let vote: Vote = serde_json::from_slice(&value)?;
+                    tally.add_vote(&vote);
+                }
+
+                // Get eligible voter count
+                let resolver = StaticMembershipResolver::new();
+                let eligible_count = resolver.member_count(&domain)?;
+
+                // Evaluate outcome
+                let profile = GovernanceProfile::cooperative_default();
+                let outcome = profile.evaluate(&tally, &domain.config.params, eligible_count)?;
+
+                // Update proposal state
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs();
+
+                let final_state = match outcome {
+                    DecisionOutcome::Accepted => ProposalState::Accepted { closed_at: now },
+                    DecisionOutcome::Rejected => ProposalState::Rejected { closed_at: now },
+                    DecisionOutcome::NoQuorum => ProposalState::NoQuorum { closed_at: now },
+                };
+
+                proposal.close(final_state)?;
+
+                // Save updated proposal
+                let value = serde_json::to_vec(&proposal)?;
+                store.put(key.as_bytes(), &value)?;
+
+                println!("✓ Proposal closed:");
+                println!("  ID: {}", proposal.id.0);
+                println!("  Outcome: {:?}", outcome);
+                println!("\nFinal Tally:");
+                println!("  For:     {}", tally.for_votes);
+                println!("  Against: {}", tally.against_votes);
+                println!("  Abstain: {}", tally.abstain_votes);
+                println!("  Eligible voters: {}", eligible_count);
+            }
+
+            ProposalCommands::Cancel { proposal_id } => {
+                let key = format!("gov:proposal:{}", proposal_id);
+                let data = store.get(key.as_bytes())?.context("Proposal not found")?;
+                let mut proposal: Proposal = serde_json::from_slice(&data)?;
+
+                proposal.cancel()?;
+
+                // Save updated proposal
+                let value = serde_json::to_vec(&proposal)?;
+                store.put(key.as_bytes(), &value)?;
+
+                println!("✓ Proposal cancelled: {}", proposal.id.0);
+            }
+        },
+
+        GovCommands::Vote(vote_cmd) => match vote_cmd {
+            VoteCommands::Cast {
+                proposal_id,
+                choice,
+                comment,
+            } => {
+                // Get current DID
+                if !keystore_path.exists() {
+                    bail!("No identity found. Create one with 'icnctl id init'");
+                }
+
+                let passphrase = read_passphrase("Enter passphrase: ")?;
+                let mut keystore = AgeKeyStore::open(&keystore_path)?;
+                keystore.unlock(&passphrase)?;
+                let voter = keystore.get_keypair()?.did().clone();
+
+                // Parse vote choice
+                let vote_choice = match choice.to_lowercase().as_str() {
+                    "for" => VoteChoice::For,
+                    "against" => VoteChoice::Against,
+                    "abstain" => VoteChoice::Abstain,
+                    _ => bail!("Invalid choice. Must be: for, against, abstain"),
+                };
+
+                // Create vote
+                let mut vote = Vote::new(ProposalId(proposal_id.clone()), voter.clone(), vote_choice);
+                if let Some(cmt) = comment {
+                    vote = vote.with_comment(cmt);
+                }
+
+                // Store vote (replaces previous vote if any)
+                let key = format!("gov:vote:{}:{}", proposal_id, voter);
+                let value = serde_json::to_vec(&vote)?;
+                store.put(key.as_bytes(), &value)?;
+
+                println!("✓ Vote recorded:");
+                println!("  Proposal: {}", proposal_id);
+                println!("  Choice: {:?}", vote_choice);
+            }
+
+            VoteCommands::Show { proposal_id } => {
+                // Get current DID
+                if !keystore_path.exists() {
+                    bail!("No identity found. Create one with 'icnctl id init'");
+                }
+
+                let passphrase = read_passphrase("Enter passphrase: ")?;
+                let mut keystore = AgeKeyStore::open(&keystore_path)?;
+                keystore.unlock(&passphrase)?;
+                let voter = keystore.get_keypair()?.did().clone();
+
+                // Look up vote
+                let key = format!("gov:vote:{}:{}", proposal_id, voter);
+                match store.get(key.as_bytes())? {
+                    Some(data) => {
+                        let vote: Vote = serde_json::from_slice(&data)?;
+                        println!("Your vote on proposal {}:", proposal_id);
+                        println!("  Choice: {:?}", vote.choice);
+                        if let Some(ref comment) = vote.comment {
+                            println!("  Comment: {}", comment);
+                        }
+                    }
+                    None => {
+                        println!("You have not voted on this proposal yet.");
+                    }
+                }
+            }
+        },
+    }
+
+    Ok(())
 }
 
 fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<()> {
