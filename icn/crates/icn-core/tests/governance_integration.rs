@@ -69,13 +69,17 @@ impl TestNode {
 
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             let sender_did = net_msg.from.clone();
+            let gossip_clone = gossip_handle_clone.clone();
 
             match net_msg.payload {
                 MessagePayload::Gossip(gossip_msg) => {
-                    let mut gossip = gossip_handle_clone.blocking_write();
-                    if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
-                        warn!("Failed to handle gossip message: {}", e);
-                    }
+                    // Spawn async task to avoid blocking in callback
+                    tokio::spawn(async move {
+                        let mut gossip = gossip_clone.write().await;
+                        if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
+                            warn!("Failed to handle gossip message: {}", e);
+                        }
+                    });
                 }
                 _ => {}
             }
@@ -179,6 +183,34 @@ impl TestNode {
 
         info!("Network actor spawned on {}", listen_addr);
 
+        // Wire up gossip send callback to route messages over network
+        {
+            let mut gossip = gossip_handle.write().await;
+            let network_handle_clone = network_handle.clone();
+            let from_did = did.clone();
+
+            let send_callback = Arc::new(move |recipient: Option<icn_identity::Did>, gossip_msg: icn_gossip::GossipMessage| {
+                let net_handle = network_handle_clone.clone();
+                let from = from_did.clone();
+
+                tokio::spawn(async move {
+                    let net_msg = icn_net::NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
+
+                    let result = if let Some(to_did) = recipient {
+                        net_handle.send_message(to_did, net_msg).await
+                    } else {
+                        net_handle.broadcast(net_msg).await
+                    };
+
+                    if let Err(e) = result {
+                        warn!("Failed to send gossip message: {}", e);
+                    }
+                });
+            });
+
+            gossip.set_send_callback(send_callback);
+        }
+
         Ok(TestNode {
             keypair,
             did,
@@ -207,11 +239,29 @@ impl TestNode {
         Ok(())
     }
 
-    /// Publish a governance message to gossip
+    /// Publish a governance message to gossip and broadcast Announce to peers
     async fn publish_governance(&self, msg: GovernanceMessage) -> Result<[u8; 32]> {
         let bytes = msg.to_bytes()?;
-        let mut gossip = self.gossip_handle.write().await;
-        let hash = gossip.publish(GOVERNANCE_TOPIC, bytes)?;
+
+        // Publish to local gossip store
+        let (hash, clock) = {
+            let mut gossip = self.gossip_handle.write().await;
+            let hash = gossip.publish(GOVERNANCE_TOPIC, bytes)?;
+            let entry = gossip.get_entry(GOVERNANCE_TOPIC, &hash).expect("Entry should exist");
+            (hash, entry.clock.clone())
+        };
+
+        // Broadcast Announce message to all peers
+        let announce_msg = icn_gossip::GossipMessage::Announce {
+            hash,
+            author: self.did.clone(),
+            clock,
+            topic: GOVERNANCE_TOPIC.to_string(),
+        };
+
+        let net_msg = icn_net::NetworkMessage::gossip(self.did.clone(), None, announce_msg);
+        self.network_handle.broadcast(net_msg).await?;
+
         Ok(hash)
     }
 
@@ -485,17 +535,24 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
 
     info!("✓ Node 1 created governance domain: {}", domain_id.0);
 
-    // Wait for domain propagation
+    // Wait for domain propagation (increase timeout for Request/Response cycle)
     let domain_id_check = domain_id.clone();
     let node2_domains = node2.domains.clone();
     let node3_domains = node3.domains.clone();
     wait_for_condition(
         || async {
-            node2_domains.read().await.contains_key(&domain_id_check)
-                && node3_domains.read().await.contains_key(&domain_id_check)
+            let has_node2 = node2_domains.read().await.contains_key(&domain_id_check);
+            let has_node3 = node3_domains.read().await.contains_key(&domain_id_check);
+            if !has_node2 {
+                info!("Node 2 still waiting for domain...");
+            }
+            if !has_node3 {
+                info!("Node 3 still waiting for domain...");
+            }
+            has_node2 && has_node3
         },
         "Domain propagated to all nodes",
-        20,
+        50, // Increased from 20
         Duration::from_millis(200),
     )
     .await?;
