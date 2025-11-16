@@ -16,6 +16,7 @@ use tracing::warn;
 
 use crate::auth::TokenClaims;
 use crate::error::GatewayError;
+use icn_obs::metrics::gateway;
 
 /// Token bucket for a single DID
 #[derive(Debug, Clone)]
@@ -119,6 +120,8 @@ impl RateLimiter {
                 "Rate limit exceeded for DID: {} (available: {:.2}, needed: {:.2})",
                 did, available, self.config.cost_per_request
             );
+            // Track rate limit exceeded
+            gateway::rate_limit_exceeded_inc(did);
             Err(GatewayError::RateLimitExceeded(did.to_string()))
         }
     }

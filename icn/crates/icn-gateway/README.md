@@ -198,6 +198,44 @@ Upgrade: websocket
 - **Tracking**: Independent per authenticated DID
 - **Response**: HTTP 429 Too Many Requests when exceeded
 
+## Prometheus Metrics
+
+The gateway exposes comprehensive Prometheus metrics for production monitoring:
+
+### Authentication Metrics
+- `icn_gateway_auth_challenges_total` - Total challenges issued
+- `icn_gateway_auth_verifications_total` - Total verification attempts
+- `icn_gateway_auth_successes_total` - Successful authentications
+- `icn_gateway_auth_failures_total` - Failed authentications (by reason)
+
+### Authorization & Rate Limiting
+- `icn_gateway_authorization_failures_total` - Authorization failures (by required scope)
+- `icn_gateway_rate_limit_exceeded_total` - Rate limit violations (by DID)
+
+### Request Metrics
+- `icn_gateway_requests_total` - Total requests (by endpoint and method)
+- `icn_gateway_request_duration_seconds` - Request latency histogram (by endpoint and status)
+
+### WebSocket Metrics
+- `icn_gateway_websocket_connections_active` - Current active WebSocket connections
+- `icn_gateway_websocket_connections_total` - Total WebSocket connections established
+- `icn_gateway_websocket_disconnections_total` - Total WebSocket disconnections
+- `icn_gateway_websocket_messages_sent_total` - Total messages sent to clients
+
+### Cooperative Metrics
+- `icn_gateway_coops_created_total` - Total cooperatives created
+- `icn_gateway_coops_deleted_total` - Total cooperatives deleted
+- `icn_gateway_members_added_total` - Total members added
+- `icn_gateway_members_removed_total` - Total members removed
+
+### Ledger Metrics
+- `icn_gateway_payments_created_total` - Total payments created
+- `icn_gateway_payment_amount` - Payment amount distribution (by currency)
+- `icn_gateway_balance_queries_total` - Total balance queries
+- `icn_gateway_history_queries_total` - Total transaction history queries
+
+All metrics include relevant labels for filtering and aggregation (e.g., `endpoint`, `method`, `status`, `currency`, `did`, `required_scope`, `reason`).
+
 ## Error Responses
 
 All errors return JSON with error message:
@@ -314,11 +352,13 @@ server {
 cargo test -p icn-gateway
 ```
 
-All 38 tests should pass, including:
+All 38 tests pass, including:
 - 5 rate limiting tests
 - 2 authorization tests
 - 1 ownership verification test
-- 30 existing functional tests
+- 30 functional tests (auth, coops, ledger, websocket, events)
+
+Note: Metrics are instrumented throughout the codebase but don't require additional test coverage as they're fire-and-forget counters/histograms.
 
 ### Adding New Endpoints
 
@@ -333,22 +373,30 @@ All 38 tests should pass, including:
 ```
 icn-gateway/
 ├── src/
-│   ├── api/           # REST endpoint handlers
+│   ├── api/           # REST endpoint handlers (with metrics instrumentation)
 │   │   ├── auth.rs    # Challenge/verify endpoints
 │   │   ├── coops.rs   # Cooperative management
 │   │   ├── ledger.rs  # Ledger operations
 │   │   ├── health.rs  # Health check
 │   │   └── websocket.rs # WebSocket handler
 │   ├── auth.rs        # JWT token management
-│   ├── middleware.rs  # Authentication & authorization
-│   ├── rate_limit.rs  # Token bucket rate limiter
+│   ├── middleware.rs  # Authentication & authorization (with metrics)
+│   ├── rate_limit.rs  # Token bucket rate limiter (with metrics)
 │   ├── coop.rs        # Cooperative state manager
 │   ├── ledger_mgr.rs  # Ledger operations wrapper
 │   ├── events.rs      # Event broadcasting
 │   ├── error.rs       # Error types and HTTP mapping
 │   ├── models.rs      # Request/response DTOs
+│   ├── websocket.rs   # WebSocket session management (with metrics)
 │   └── server.rs      # Actix-web server setup
 ```
+
+**Observability Integration:**
+- Uses `icn-obs` crate for Prometheus metrics
+- Metrics tracked at API layer (auth, coops, ledger)
+- Middleware layer tracks authorization and rate limit violations
+- WebSocket layer tracks connections, disconnections, and messages
+- All metrics available via daemon's `/metrics` endpoint (default: `http://localhost:9090/metrics`)
 
 ## Known Limitations
 

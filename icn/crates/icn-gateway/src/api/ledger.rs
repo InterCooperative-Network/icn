@@ -9,6 +9,7 @@ use crate::middleware::require_scope;
 use crate::models::{
     AccountDeltaResponse, BalanceResponse, CreatePaymentRequest, TransactionHistoryEntry,
 };
+use icn_obs::metrics::gateway;
 
 /// GET /ledger/:coop_id/balance/:did - Get account balance
 #[get("/{coop_id}/balance/{did}")]
@@ -26,6 +27,9 @@ pub async fn get_balance(
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let balances = ledger_mgr.get_all_balances(&coop_id, &did)?;
+
+    // Track balance query
+    gateway::balance_queries_inc();
 
     let response = BalanceResponse {
         did: did_str,
@@ -66,6 +70,10 @@ pub async fn create_payment(
         req.currency.clone(),
     )?;
 
+    // Track payment creation metrics
+    gateway::payments_created_inc();
+    gateway::payment_amount_record(&req.currency, req.amount);
+
     Ok(HttpResponse::Created().json(serde_json::json!({
         "hash": hash,
         "from": req.from,
@@ -94,6 +102,9 @@ pub async fn get_history(
     };
 
     let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref())?;
+
+    // Track history query
+    gateway::history_queries_inc();
 
     // Convert to response format
     let history: Vec<TransactionHistoryEntry> = entries

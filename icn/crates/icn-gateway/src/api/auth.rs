@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::auth::AuthManager;
 use crate::error::Result;
 use crate::models::{ChallengeRequest, ChallengeResponse, TokenResponse, VerifyRequest};
+use icn_obs::metrics::gateway;
 
 /// POST /auth/challenge - Request authentication challenge
 #[post("/auth/challenge")]
@@ -17,6 +18,9 @@ pub async fn challenge(
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let nonce = auth.create_challenge(&did)?;
+
+    // Increment challenge metric
+    gateway::auth_challenges_inc();
 
     let response = ChallengeResponse {
         nonce,
@@ -32,20 +36,35 @@ pub async fn verify(
     auth: web::Data<Arc<AuthManager>>,
     req: web::Json<VerifyRequest>,
 ) -> Result<HttpResponse> {
+    // Increment verification attempt metric
+    gateway::auth_verifications_inc();
+
     let did = req.did.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+        .map_err(|e| {
+            gateway::auth_failures_inc("invalid_did");
+            crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}"))
+        })?;
 
     let signature = hex::decode(&req.signature)
-        .map_err(|e| crate::error::GatewayError::BadRequest(
-            format!("Invalid signature encoding: {e}")
-        ))?;
+        .map_err(|e| {
+            gateway::auth_failures_inc("invalid_signature_encoding");
+            crate::error::GatewayError::BadRequest(
+                format!("Invalid signature encoding: {e}")
+            )
+        })?;
 
     let token = auth.verify_challenge(
         &did,
         &signature,
         &req.coop_id,
         req.scopes.clone(),
-    )?;
+    ).map_err(|e| {
+        gateway::auth_failures_inc("verification_failed");
+        e
+    })?;
+
+    // Track successful authentication
+    gateway::auth_successes_inc();
 
     let response = TokenResponse {
         token,

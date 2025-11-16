@@ -41,6 +41,10 @@ icn-identity = { path = "../icn-identity" }
 icn-ledger = { path = "../icn-ledger" }
 icn-store = { path = "../icn-store" }
 icn-rpc = { path = "../icn-rpc" }
+icn-obs = { path = "../icn-obs" }
+
+# Metrics
+metrics = "0.22"
 
 [dev-dependencies]
 reqwest = "0.11"

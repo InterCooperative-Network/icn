@@ -399,6 +399,88 @@ pub fn init_descriptions() {
         "icn_snapshot_network_x25519_keys",
         "Number of peer X25519 keys in last snapshot"
     );
+
+    // Gateway API metrics
+    describe_counter!(
+        "icn_gateway_requests_total",
+        "Total number of HTTP requests by endpoint and method"
+    );
+    describe_histogram!(
+        "icn_gateway_request_duration_seconds",
+        "Request duration in seconds by endpoint and status"
+    );
+    describe_counter!(
+        "icn_gateway_auth_challenges_total",
+        "Total number of authentication challenges issued"
+    );
+    describe_counter!(
+        "icn_gateway_auth_verifications_total",
+        "Total number of authentication verification attempts"
+    );
+    describe_counter!(
+        "icn_gateway_auth_failures_total",
+        "Total number of authentication failures by reason"
+    );
+    describe_counter!(
+        "icn_gateway_auth_successes_total",
+        "Total number of successful authentications"
+    );
+    describe_counter!(
+        "icn_gateway_rate_limit_exceeded_total",
+        "Total number of requests rejected due to rate limiting"
+    );
+    describe_counter!(
+        "icn_gateway_authorization_failures_total",
+        "Total number of authorization failures by required scope"
+    );
+    describe_gauge!(
+        "icn_gateway_websocket_connections_active",
+        "Current number of active WebSocket connections"
+    );
+    describe_counter!(
+        "icn_gateway_websocket_connections_total",
+        "Total number of WebSocket connections established"
+    );
+    describe_counter!(
+        "icn_gateway_websocket_disconnections_total",
+        "Total number of WebSocket disconnections"
+    );
+    describe_counter!(
+        "icn_gateway_websocket_messages_sent_total",
+        "Total number of WebSocket messages sent"
+    );
+    describe_counter!(
+        "icn_gateway_coops_created_total",
+        "Total number of cooperatives created"
+    );
+    describe_counter!(
+        "icn_gateway_coops_deleted_total",
+        "Total number of cooperatives deleted"
+    );
+    describe_counter!(
+        "icn_gateway_members_added_total",
+        "Total number of members added to cooperatives"
+    );
+    describe_counter!(
+        "icn_gateway_members_removed_total",
+        "Total number of members removed from cooperatives"
+    );
+    describe_counter!(
+        "icn_gateway_payments_created_total",
+        "Total number of payments created"
+    );
+    describe_histogram!(
+        "icn_gateway_payment_amount",
+        "Distribution of payment amounts by currency"
+    );
+    describe_counter!(
+        "icn_gateway_balance_queries_total",
+        "Total number of balance queries"
+    );
+    describe_counter!(
+        "icn_gateway_history_queries_total",
+        "Total number of transaction history queries"
+    );
 }
 
 /// Network metrics
@@ -866,5 +948,104 @@ pub mod snapshot {
 
     pub fn network_x25519_keys_set(count: usize) {
         gauge!("icn_snapshot_network_x25519_keys").set(count as f64);
+    }
+}
+
+/// Gateway API metrics
+pub mod gateway {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn requests_total_inc(endpoint: &str, method: &str) {
+        counter!("icn_gateway_requests_total",
+                 "endpoint" => endpoint.to_string(),
+                 "method" => method.to_string())
+            .increment(1);
+    }
+
+    pub fn request_duration_record(endpoint: &str, status: u16, duration_secs: f64) {
+        histogram!("icn_gateway_request_duration_seconds",
+                   "endpoint" => endpoint.to_string(),
+                   "status" => status.to_string())
+            .record(duration_secs);
+    }
+
+    pub fn auth_challenges_inc() {
+        counter!("icn_gateway_auth_challenges_total").increment(1);
+    }
+
+    pub fn auth_verifications_inc() {
+        counter!("icn_gateway_auth_verifications_total").increment(1);
+    }
+
+    pub fn auth_failures_inc(reason: &str) {
+        counter!("icn_gateway_auth_failures_total",
+                 "reason" => reason.to_string())
+            .increment(1);
+    }
+
+    pub fn auth_successes_inc() {
+        counter!("icn_gateway_auth_successes_total").increment(1);
+    }
+
+    pub fn rate_limit_exceeded_inc(did: &str) {
+        counter!("icn_gateway_rate_limit_exceeded_total",
+                 "did" => did.to_string())
+            .increment(1);
+    }
+
+    pub fn authorization_failures_inc(required_scope: &str) {
+        counter!("icn_gateway_authorization_failures_total",
+                 "required_scope" => required_scope.to_string())
+            .increment(1);
+    }
+
+    pub fn websocket_connections_active_set(count: u64) {
+        gauge!("icn_gateway_websocket_connections_active").set(count as f64);
+    }
+
+    pub fn websocket_connections_inc() {
+        counter!("icn_gateway_websocket_connections_total").increment(1);
+    }
+
+    pub fn websocket_disconnections_inc() {
+        counter!("icn_gateway_websocket_disconnections_total").increment(1);
+    }
+
+    pub fn websocket_messages_sent_inc() {
+        counter!("icn_gateway_websocket_messages_sent_total").increment(1);
+    }
+
+    pub fn coops_created_inc() {
+        counter!("icn_gateway_coops_created_total").increment(1);
+    }
+
+    pub fn coops_deleted_inc() {
+        counter!("icn_gateway_coops_deleted_total").increment(1);
+    }
+
+    pub fn members_added_inc() {
+        counter!("icn_gateway_members_added_total").increment(1);
+    }
+
+    pub fn members_removed_inc() {
+        counter!("icn_gateway_members_removed_total").increment(1);
+    }
+
+    pub fn payments_created_inc() {
+        counter!("icn_gateway_payments_created_total").increment(1);
+    }
+
+    pub fn payment_amount_record(currency: &str, amount: i64) {
+        histogram!("icn_gateway_payment_amount",
+                   "currency" => currency.to_string())
+            .record(amount.abs() as f64);
+    }
+
+    pub fn balance_queries_inc() {
+        counter!("icn_gateway_balance_queries_total").increment(1);
+    }
+
+    pub fn history_queries_inc() {
+        counter!("icn_gateway_history_queries_total").increment(1);
     }
 }

@@ -9,6 +9,7 @@ use crate::error::Result;
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::middleware::require_scope;
 use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest};
+use icn_obs::metrics::gateway;
 
 fn timestamp() -> u64 {
     SystemTime::now()
@@ -52,6 +53,9 @@ pub async fn create_coop(
         owner,
         timestamp(),
     )?;
+
+    // Track cooperative creation
+    gateway::coops_created_inc();
 
     let coop = coop_mgr.get_coop(&req.id)?;
     Ok(HttpResponse::Created().json(coop))
@@ -121,6 +125,10 @@ pub async fn delete_coop(
     require_scope(&req, "coop:admin")?;
 
     coop_mgr.delete_coop(&id)?;
+
+    // Track cooperative deletion
+    gateway::coops_deleted_inc();
+
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -145,6 +153,9 @@ pub async fn add_member(
 
     coop.add_member(did.clone(), role.clone(), timestamp())?;
     coop_mgr.update_coop(&id, coop.clone())?;
+
+    // Track member addition
+    gateway::members_added_inc();
 
     // Broadcast member added event
     let event = GatewayEvent::MemberAdded {
@@ -180,6 +191,9 @@ pub async fn remove_member(
 
     coop.remove_member(&did)?;
     coop_mgr.update_coop(&coop_id, coop.clone())?;
+
+    // Track member removal
+    gateway::members_removed_inc();
 
     // Broadcast member removed event
     let event = GatewayEvent::MemberRemoved {

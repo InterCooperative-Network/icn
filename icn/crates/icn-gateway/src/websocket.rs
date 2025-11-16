@@ -4,12 +4,17 @@ use actix::{Actor, ActorContext, ActorFutureExt, AsyncContext, StreamHandler, Wr
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use crate::auth::AuthManager;
 use crate::events::{EventBroadcaster, GatewayEvent};
 use icn_identity::Did;
+use icn_obs::metrics::gateway;
+
+/// Global counter for active WebSocket connections
+static WS_ACTIVE_CONNECTIONS: AtomicU64 = AtomicU64::new(0);
 
 /// WebSocket client message (from client to server)
 #[derive(Debug, Deserialize)]
@@ -133,6 +138,8 @@ impl WsSession {
                     let msg = ServerMessage::Event(event);
                     if let Ok(json) = serde_json::to_string(&msg) {
                         ctx.text(json);
+                        // Track message sent
+                        gateway::websocket_messages_sent_inc();
                     }
                     // Continue polling
                     ctx.run_later(Duration::from_millis(100), |act, ctx| {
@@ -170,8 +177,20 @@ impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        // Track connection
+        let active = WS_ACTIVE_CONNECTIONS.fetch_add(1, Ordering::Relaxed) + 1;
+        gateway::websocket_connections_inc();
+        gateway::websocket_connections_active_set(active);
+
         // Start heartbeat
         self.heartbeat(ctx);
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        // Track disconnection
+        let active = WS_ACTIVE_CONNECTIONS.fetch_sub(1, Ordering::Relaxed) - 1;
+        gateway::websocket_disconnections_inc();
+        gateway::websocket_connections_active_set(active);
     }
 }
 

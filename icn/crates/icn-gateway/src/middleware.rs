@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::auth::{AuthManager, TokenClaims};
 use crate::error::GatewayError;
+use icn_obs::metrics::gateway;
 
 /// Extract and verify JWT token from Authorization header
 pub async fn jwt_auth(
@@ -44,6 +45,8 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
     if !claims.scopes.contains(&required_scope.to_string()) {
+        // Track authorization failure
+        gateway::authorization_failures_inc(required_scope);
         return Err(GatewayError::AuthorizationFailed(
             format!("Missing required scope: {required_scope}")
         ));
