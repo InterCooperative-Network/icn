@@ -34,16 +34,17 @@ pub async fn create_coop(
     http_req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     req: web::Json<CreateCoopRequest>,
-    // TODO: Extract owner DID from authenticated token
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "coop:write")?;
 
-    // For now, generate a placeholder owner DID - will be replaced with auth middleware
-    use icn_identity::IdentityBundle;
-    let bundle = IdentityBundle::generate()
-        .map_err(|e| crate::error::GatewayError::InternalError(format!("{}", e)))?;
-    let owner = bundle.did().clone();
+    // Extract owner DID from authenticated token
+    use crate::middleware::get_claims;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    let owner: icn_identity::Did = claims.sub.parse()
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {}", e)))?;
 
     coop_mgr.create_coop(
         req.id.clone(),
@@ -427,5 +428,52 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_create_coop_uses_authenticated_did() {
+        let coop_mgr = Arc::new(CoopManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_mgr.clone()))
+                .service(
+                    web::scope("/coops")
+                        .service(create_coop)
+                )
+        ).await;
+
+        // Create coop with Alice's token
+        let req_body = CreateCoopRequest {
+            id: "alice-coop".to_string(),
+            name: "Alice's Cooperative".to_string(),
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "alice-coop".to_string(),
+            scopes: vec!["coop:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let mut req = test::TestRequest::post()
+            .uri("/coops")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Verify that Alice is the owner
+        let coop = coop_mgr.get_coop(&"alice-coop".to_string()).unwrap();
+        assert_eq!(coop.members.len(), 1, "Coop should have exactly one member (the owner)");
+
+        let alice_member = coop.members.iter()
+            .find(|m| m.did == *alice.did())
+            .expect("Alice should be a member");
+        assert_eq!(alice_member.role, MemberRole::Owner, "Alice should be the owner");
     }
 }

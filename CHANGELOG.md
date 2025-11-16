@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Cooperative Owner DID Extraction (Phase 14 Continued) (2025-11-16)
+
+**Ownership Fix:**
+- Cooperative creation now correctly uses authenticated user's DID as owner
+- Removed placeholder DID generation - uses JWT token's `sub` claim
+- Added explicit test: `test_create_coop_uses_authenticated_did`
+- Ensures proper ownership tracking from creation
+- Total: 38 tests passing (up from 37)
+
+**Technical Details:**
+- Uses `get_claims()` helper to extract TokenClaims from request
+- Parses `claims.sub` to get owner DID
+- Returns AuthenticationFailed if claims missing
+- Returns BadRequest if DID format invalid
+
 ### Added - Scope-Based Authorization (Phase 14 Continued) (2025-11-16)
 
 **Authorization Enforcement:**

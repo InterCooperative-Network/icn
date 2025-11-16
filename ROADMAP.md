@@ -189,7 +189,8 @@ pub enum EntryStatus {
    - ✅ API versioning (`/v1/` namespacing) - all endpoints versioned
    - ✅ Per-DID rate limiting - token bucket (100 burst, 10/sec refill)
    - ✅ Scope-based authorization - all handlers enforce JWT scope requirements
-   - 37 passing tests (5 rate limiting + 2 authorization tests)
+   - ✅ Authenticated user DID extraction for cooperative ownership
+   - 38 passing tests (5 rate limiting + 2 authorization + 1 ownership)
 
 **Still Needed** (Deferred until pilot selection):
 4. **TypeScript SDK** - `@icn/client` npm package
@@ -206,11 +207,11 @@ pub enum EntryStatus {
 - 🔲 Reference application (deferred)
 
 **Deliverables**: ✅ Gateway Complete
-- ✅ `icn-gateway` crate with 37 passing tests (updated 2025-11-16)
+- ✅ `icn-gateway` crate with 38 passing tests (updated 2025-11-16)
 - ✅ Integration into icnd supervisor
 - ✅ Configuration system and CLI support
 - ✅ Documentation: dev journals, CHANGELOG.md, example configs
-- ✅ API versioning, rate limiting, and scope-based authorization (Phase 14 production hardening)
+- ✅ API versioning, rate limiting, scope-based authorization, and authenticated ownership (Phase 14 production hardening)
 - 🔲 `@icn/client` SDK (deferred)
 - 🔲 Reference app (deferred)
 
