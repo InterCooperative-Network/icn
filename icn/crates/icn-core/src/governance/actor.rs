@@ -4,6 +4,7 @@
 //! across the ICN network.
 
 use anyhow::{bail, Result};
+use async_trait::async_trait;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
@@ -114,6 +115,26 @@ impl GovernanceHandle {
     /// Get a specific proposal
     pub async fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
         self.inner.read().await.load_proposal(id)
+    }
+}
+
+/// Implement GovernanceOps trait to allow RPC integration without circular dependencies
+#[async_trait]
+impl icn_governance::GovernanceOps for GovernanceHandle {
+    async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
+        Self::list_domains(self).await
+    }
+
+    async fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
+        Self::get_domain(self, id).await
+    }
+
+    async fn list_proposals(&self) -> Result<Vec<Proposal>> {
+        Self::list_proposals(self).await
+    }
+
+    async fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
+        Self::get_proposal(self, id).await
     }
 }
 
