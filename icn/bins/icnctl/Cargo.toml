@@ -25,6 +25,7 @@ x25519-dalek.workspace = true
 tar = "0.4"
 walkdir = "2.4"
 chrono = "0.4"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
 
 # ICN crates
 icn-core.workspace = true
