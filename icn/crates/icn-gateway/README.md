@@ -330,6 +330,32 @@ challenge_ttl_minutes = 5
 
 ## Production Deployment
 
+### Storage Configuration
+
+**IMPORTANT:** For production deployments, you **MUST** configure persistent storage to prevent data loss on restart.
+
+```rust
+use icn_gateway::server::GatewayServer;
+use std::path::PathBuf;
+
+let data_dir = PathBuf::from("/var/lib/icn-gateway");
+let server = GatewayServer::new_with_storage(
+    bind_addr,
+    jwt_secret,
+    data_dir, // Ledgers stored in {data_dir}/ledgers/{coop_id}/
+);
+server.run().await?;
+```
+
+**Storage Layout:**
+- `{data_dir}/ledgers/{coop_id}/` - Per-cooperative ledger databases (Sled format)
+- All payment transactions, balances, and history persisted across restarts
+- Cooperative metadata (in-memory for now) recreated on restart
+
+**Testing vs Production:**
+- `GatewayServer::new()` - Uses temporary storage (data lost on restart, for testing only)
+- `GatewayServer::new_with_storage()` - Uses persistent storage (production ready)
+
 ### Security Best Practices
 
 1. **Use Strong JWT Secrets**: 32+ character random strings
@@ -337,6 +363,7 @@ challenge_ttl_minutes = 5
 3. **Bind to Localhost**: For single-server deployments, bind to 127.0.0.1
 4. **Monitor Rate Limits**: Track 429 responses for abuse detection
 5. **Regular Rotation**: Rotate JWT secrets periodically
+6. **Set Data Directory Permissions**: Ensure only gateway process can read/write storage
 
 ### Example Nginx Configuration
 
@@ -421,6 +448,15 @@ icn-gateway/
 - WebSocket layer: Tracks connections, disconnections, and messages
 - All metrics available via daemon's `/metrics` endpoint (default: `http://localhost:9090/metrics`)
 
+**Background Cleanup Task:**
+- Single tokio task running every 5 minutes
+- Prevents memory leaks by cleaning up:
+  1. Expired authentication challenges (5min TTL)
+  2. Inactive rate limiter buckets (1hr inactivity threshold)
+  3. Dead WebSocket channels (closed connections)
+- Logs cleanup activity at info level when items removed
+- Zero overhead when no cleanup needed (most of the time)
+
 **Middleware Stack** (execution order - last wrapped runs first):
 1. MetricsMiddleware - Captures request count and latency for all requests
 2. Logger - Logs HTTP requests (actix-web default)
@@ -430,14 +466,14 @@ icn-gateway/
 
 ## Known Limitations
 
-- **In-Memory Storage**: Cooperative metadata and ledgers use temporary storage (Phase 14 scope)
-- **No Persistent State**: Server restart clears all data (acceptable for Phase 14)
+- **In-Memory Cooperative Metadata**: Cooperative namespace data stored in-memory (ledgers are persistent)
 - **WebSocket Reconnection**: Manual reconnection required (deferred to pilot selection)
+- **Event Backfill**: No backfill for missed WebSocket events during disconnect
 
 ## Future Enhancements (Deferred)
 
-- Persistent storage for cooperatives and ledgers
-- WebSocket reconnection handling
+- Persistent storage for cooperative metadata (ledgers already persistent)
+- WebSocket reconnection handling with automatic retry
 - Event backfill for missed WebSocket messages
 - TypeScript SDK (`@icn/client` npm package)
 - Reference application for pilot community

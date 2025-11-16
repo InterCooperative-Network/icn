@@ -119,15 +119,25 @@ pub async fn update_settings(
 pub async fn delete_coop(
     req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&req, "coop:admin")?;
 
-    coop_mgr.delete_coop(&id)?;
+    let coop_id = id.into_inner();
+
+    coop_mgr.delete_coop(&coop_id)?;
 
     // Track cooperative deletion
     gateway::coops_deleted_inc();
+
+    // Clean up any WebSocket subscribers for this deleted cooperative
+    let broadcaster_clone = broadcaster.clone();
+    let coop_id_clone = coop_id.clone();
+    tokio::spawn(async move {
+        broadcaster_clone.cleanup(&coop_id_clone).await;
+    });
 
     Ok(HttpResponse::NoContent().finish())
 }
