@@ -29,6 +29,7 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `icn-rpc` - gRPC API server
 - `icn-obs` - Prometheus metrics, tracing, logging
 - `icn-gateway` - REST + WebSocket API for cooperative applications (Phase 14)
+- `icn-governance` - Governance primitives for community decision-making (Phase 13)
 - `icn-testkit` - Test utilities for multi-node scenarios
 
 **Binaries** (in `icn/bins/`):
@@ -338,9 +339,54 @@ icnctl id import backup.age
 - Credit limit gaming (history-based bonuses)
 - Dispute abuse (mediator oversight)
 
+---
+
+**Phase 13 - Governance Primitives v1 (Complete ✓)** (2025-01-15):
+- [x] Core Types - GovernanceDomain, Proposal, Vote, VoteTally (39 tests)
+- [x] Governance Store - InMemoryGovernanceStore + GovernanceStore trait
+- [x] Membership Resolution - StaticMembershipResolver + MembershipResolver trait
+- [x] Gossip Protocol - 7 GovernanceMessage types for distributed coordination
+- [x] GovernanceProfile - cooperative_default with quorum + approval evaluation
+- [x] Documentation - Comprehensive governance.md (706 lines)
+- [x] CLI Commands - `icnctl gov` for domain/proposal/vote management
+- [x] Integration Test - Multi-node governance lifecycle validation
+
+**Governance Features**:
+- **Governance Substrate**: Democratic by default, configurable by communities, extensible via contracts
+- **Proposal Types**: Text, Budget, Membership, ConfigChange payloads
+- **Voting System**: For/Against/Abstain with optional weighted voting
+- **Decision Profiles**: cooperative_default (1-member-1-vote, quorum + majority)
+- **Membership Sources**: StaticList (explicit DIDs) or TrustThreshold (future)
+- **Gossip Coordination**: DomainCreated, ProposalCreated, ProposalOpened, VoteCast, ProposalClosed messages
+
+**CLI Commands**:
+```bash
+# Domain management
+icnctl gov domain create --domain-id "coop:food" --name "Food Coop" --members "did:icn:alice,did:icn:bob"
+icnctl gov domain list
+icnctl gov domain show --domain-id "coop:food"
+
+# Proposal lifecycle
+icnctl gov proposal create --domain-id "coop:food" --title "Approve supplier" --kind text
+icnctl gov proposal open --proposal-id <id>
+icnctl gov proposal list --domain-id "coop:food" --state open
+icnctl gov proposal close --proposal-id <id>
+
+# Voting
+icnctl gov vote cast --proposal-id <id> --choice for
+icnctl gov vote show --proposal-id <id>
+```
+
+**Integration Test**:
+- 3-node setup with gossip protocol
+- Full proposal lifecycle: create → open → vote → close
+- Distributed voting with convergence validation
+- Outcome evaluation: 2 For, 1 Against = 66% = Accepted
+- Test: `cargo test --test governance_integration -- --ignored`
+
 **Next Steps:**
-- Phase 13: Governance Primitives (driven by pilot community needs)
-- Track C: Pilot Community Selection & Deployment
+- Optional: Daemon Integration (governance actor in icnd)
+- Track C1: Pilot Community Selection & Deployment
 
 ---
 
@@ -590,8 +636,8 @@ wscat -c ws://localhost:8080/ws/my-coop
 ---
 
 **What's Next**: See [ROADMAP.md](/ROADMAP.md) for strategic roadmap. Critical path:
-- **Phase 13**: Governance Primitives v1 (driven by pilot community needs) - PRIORITY
-- **Track C1**: Pilot Community Selection (timebank recommended)
+- **Phase 13**: ✅ Governance Primitives v1 COMPLETE (CLI + integration test ready for pilot)
+- **Track C1**: Pilot Community Selection & Deployment - NEXT PRIORITY
 - **Track B2**: Legal & Regulatory Radar (lightweight, ongoing)
 - **Track B3**: ✅ Economic Modeling COMPLETE (simulation validates Phase 12 defaults)
 
