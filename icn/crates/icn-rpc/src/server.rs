@@ -17,8 +17,9 @@ use tracing::{debug, error, info, warn};
 use icn_net::NetworkHandle;
 use icn_ledger::Ledger;
 use icn_ccl::ContractRuntime;
+use icn_governance::GovernanceOps;
 
-use crate::types::{ContractExecutionResponse, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{ContractExecutionResponse, GovernanceDomainInfo, GovernanceParamsInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, ProposalInfo, RpcRequest, RpcResponse, VoteInfo};
 use crate::receipt::ReceiptStore;
 
 use icn_gossip::GossipActor;
@@ -29,6 +30,7 @@ pub struct RpcServer {
     ledger_handle: Option<Arc<RwLock<Ledger>>>,
     contract_runtime: Option<Arc<RwLock<ContractRuntime>>>,
     gossip_handle: Option<Arc<RwLock<GossipActor>>>,
+    governance_handle: Option<Box<dyn GovernanceOps>>,
     receipt_store: Arc<ReceiptStore>,
     listen_addr: SocketAddr,
 }
@@ -41,6 +43,7 @@ impl RpcServer {
             ledger_handle: None,
             contract_runtime: None,
             gossip_handle: None,
+            governance_handle: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             listen_addr,
         }
@@ -64,6 +67,11 @@ impl RpcServer {
     /// Set the gossip handle (called after GossipActor initializes)
     pub fn set_gossip_handle(&mut self, handle: Arc<RwLock<GossipActor>>) {
         self.gossip_handle = Some(handle);
+    }
+
+    /// Set the governance handle (called after GovernanceActor initializes)
+    pub fn set_governance_handle(&mut self, handle: impl GovernanceOps + 'static) {
+        self.governance_handle = Some(Box::new(handle));
     }
 
     /// Start the RPC server
@@ -147,6 +155,10 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "contract.call" => handle_contract_call(req.id, &req.params, state).await,
         "contract.list" => handle_contract_list(req.id, &req.params, state).await,
         "receipt.get" => handle_receipt_get(req.id, &req.params, state).await,
+        "governance.domain.list" => handle_governance_domain_list(req.id, state).await,
+        "governance.domain.get" => handle_governance_domain_get(req.id, &req.params, state).await,
+        "governance.proposal.list" => handle_governance_proposal_list(req.id, state).await,
+        "governance.proposal.get" => handle_governance_proposal_get(req.id, &req.params, state).await,
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -1026,6 +1038,248 @@ async fn handle_receipt_get(
             Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
         },
         None => RpcResponse::error(id, -32000, "Receipt not found".to_string()),
+    }
+}
+
+/// Handle governance.domain.list RPC call - list all governance domains
+async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let governance_handle = match &state.governance_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    match governance_handle.list_domains().await {
+        Ok(domains) => {
+            let domain_infos: Vec<GovernanceDomainInfo> = domains
+                .into_iter()
+                .map(|d| GovernanceDomainInfo {
+                    id: d.id.0,
+                    name: d.name,
+                    created_at: d.created_at,
+                    profile: d.config.profile.0,
+                    membership_type: match &d.config.membership.source {
+                        icn_governance::MembershipSource::StaticList(_) => "static_list".to_string(),
+                        icn_governance::MembershipSource::TrustThreshold(_) => "trust_threshold".to_string(),
+                    },
+                    params: GovernanceParamsInfo {
+                        quorum_percentage: d.config.params.quorum_percentage,
+                        approval_threshold_percentage: d.config.params.approval_threshold_percentage,
+                        voting_period_seconds: d.config.params.voting_period_seconds,
+                    },
+                })
+                .collect();
+
+            match serde_json::to_value(&domain_infos) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list domains: {}", e)),
+    }
+}
+
+/// Handle governance.domain.get RPC call - get a specific domain
+async fn handle_governance_domain_get(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let governance_handle = match &state.governance_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct DomainGetParams {
+        domain_id: String,
+    }
+
+    let domain_params: DomainGetParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    let domain_id = icn_governance::GovernanceDomainId(domain_params.domain_id);
+
+    match governance_handle.get_domain(&domain_id).await {
+        Ok(Some(d)) => {
+            let domain_info = GovernanceDomainInfo {
+                id: d.id.0,
+                name: d.name,
+                created_at: d.created_at,
+                profile: d.config.profile.0,
+                membership_type: match &d.config.membership.source {
+                    icn_governance::MembershipSource::StaticList(_) => "static_list".to_string(),
+                    icn_governance::MembershipSource::TrustThreshold(_) => "trust_threshold".to_string(),
+                },
+                params: GovernanceParamsInfo {
+                    quorum_percentage: d.config.params.quorum_percentage,
+                    approval_threshold_percentage: d.config.params.approval_threshold_percentage,
+                    voting_period_seconds: d.config.params.voting_period_seconds,
+                },
+            };
+
+            match serde_json::to_value(&domain_info) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
+        }
+        Ok(None) => RpcResponse::error(id, -32000, "Domain not found".to_string()),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get domain: {}", e)),
+    }
+}
+
+/// Handle governance.proposal.list RPC call - list all proposals
+async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let governance_handle = match &state.governance_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    match governance_handle.list_proposals().await {
+        Ok(proposals) => {
+            let proposal_infos: Vec<ProposalInfo> = proposals
+                .into_iter()
+                .map(|p| {
+                    let (state_str, opened_at, closes_at, closed_at) = match &p.state {
+                        icn_governance::ProposalState::Draft => ("draft".to_string(), None, None, None),
+                        icn_governance::ProposalState::Open { opened_at, closes_at } => {
+                            ("open".to_string(), Some(*opened_at), Some(*closes_at), None)
+                        }
+                        icn_governance::ProposalState::Accepted { closed_at } => {
+                            ("accepted".to_string(), None, None, Some(*closed_at))
+                        }
+                        icn_governance::ProposalState::Rejected { closed_at } => {
+                            ("rejected".to_string(), None, None, Some(*closed_at))
+                        }
+                        icn_governance::ProposalState::NoQuorum { closed_at } => {
+                            ("no_quorum".to_string(), None, None, Some(*closed_at))
+                        }
+                        icn_governance::ProposalState::Cancelled { cancelled_at } => {
+                            ("cancelled".to_string(), None, None, Some(*cancelled_at))
+                        }
+                    };
+
+                    ProposalInfo {
+                        id: p.id.0,
+                        domain_id: p.domain_id.0,
+                        proposer: p.proposer.to_string(),
+                        title: p.title,
+                        description: p.description,
+                        state: state_str,
+                        created_at: p.created_at,
+                        updated_at: p.updated_at,
+                        opened_at,
+                        closes_at,
+                        closed_at,
+                    }
+                })
+                .collect();
+
+            match serde_json::to_value(&proposal_infos) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list proposals: {}", e)),
+    }
+}
+
+/// Handle governance.proposal.get RPC call - get a specific proposal
+async fn handle_governance_proposal_get(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let governance_handle = match &state.governance_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    // Parse parameters
+    #[derive(serde::Deserialize)]
+    struct ProposalGetParams {
+        proposal_id: String,
+    }
+
+    let proposal_params: ProposalGetParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    let proposal_id = icn_governance::ProposalId(proposal_params.proposal_id);
+
+    match governance_handle.get_proposal(&proposal_id).await {
+        Ok(Some(p)) => {
+            let (state_str, opened_at, closes_at, closed_at) = match &p.state {
+                icn_governance::ProposalState::Draft => ("draft".to_string(), None, None, None),
+                icn_governance::ProposalState::Open { opened_at, closes_at } => {
+                    ("open".to_string(), Some(*opened_at), Some(*closes_at), None)
+                }
+                icn_governance::ProposalState::Accepted { closed_at } => {
+                    ("accepted".to_string(), None, None, Some(*closed_at))
+                }
+                icn_governance::ProposalState::Rejected { closed_at } => {
+                    ("rejected".to_string(), None, None, Some(*closed_at))
+                }
+                icn_governance::ProposalState::NoQuorum { closed_at } => {
+                    ("no_quorum".to_string(), None, None, Some(*closed_at))
+                }
+                icn_governance::ProposalState::Cancelled { cancelled_at } => {
+                    ("cancelled".to_string(), None, None, Some(*cancelled_at))
+                }
+            };
+
+            let proposal_info = ProposalInfo {
+                id: p.id.0,
+                domain_id: p.domain_id.0,
+                proposer: p.proposer.to_string(),
+                title: p.title,
+                description: p.description,
+                state: state_str,
+                created_at: p.created_at,
+                updated_at: p.updated_at,
+                opened_at,
+                closes_at,
+                closed_at,
+            };
+
+            match serde_json::to_value(&proposal_info) {
+                Ok(value) => RpcResponse::success(id, value),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            }
+        }
+        Ok(None) => RpcResponse::error(id, -32000, "Proposal not found".to_string()),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get proposal: {}", e)),
     }
 }
 

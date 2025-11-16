@@ -780,7 +780,7 @@ impl Supervisor {
             let gov_resolver: Arc<dyn icn_governance::MembershipResolver + Send + Sync> =
                 Arc::new(icn_governance::StaticMembershipResolver::new());
 
-            let _governance_handle = crate::governance::GovernanceActor::spawn(
+            let governance_handle = crate::governance::GovernanceActor::spawn(
                 did.clone(),
                 gov_store,
                 gossip_handle.clone(),
@@ -790,7 +790,7 @@ impl Supervisor {
 
             info!("✓ Governance actor spawned at {}", gov_store_path.display());
 
-            // Spawn RPC server with network, ledger, contract, and gossip handles
+            // Spawn RPC server with network, ledger, contract, gossip, and governance handles
             let rpc_port = self.config.network.rpc_port;
             let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
             let mut rpc_server = RpcServer::new(rpc_addr);
@@ -798,6 +798,7 @@ impl Supervisor {
             rpc_server.set_ledger_handle(ledger_handle.clone());
             rpc_server.set_contract_runtime(contract_runtime_handle.clone());
             rpc_server.set_gossip_handle(gossip_handle.clone());
+            rpc_server.set_governance_handle(governance_handle);
 
             tokio::spawn(async move {
                 if let Err(e) = rpc_server.run().await {

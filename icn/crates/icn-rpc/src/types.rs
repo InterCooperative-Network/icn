@@ -96,6 +96,55 @@ pub struct ContractExecutionResponse {
     pub return_value: serde_json::Value,
 }
 
+/// Governance domain (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceDomainInfo {
+    pub id: String,
+    pub name: String,
+    pub created_at: u64,
+    pub profile: String,
+    pub membership_type: String,
+    pub params: GovernanceParamsInfo,
+}
+
+/// Governance parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceParamsInfo {
+    pub quorum_percentage: u8,
+    pub approval_threshold_percentage: u8,
+    pub voting_period_seconds: u64,
+}
+
+/// Proposal information (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProposalInfo {
+    pub id: String,
+    pub domain_id: String,
+    pub proposer: String,
+    pub title: String,
+    pub description: String,
+    pub state: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opened_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closes_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closed_at: Option<u64>,
+}
+
+/// Vote information (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoteInfo {
+    pub proposal_id: String,
+    pub voter: String,
+    pub choice: String,
+    pub cast_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+}
+
 impl RpcResponse {
     pub fn success(id: u64, result: serde_json::Value) -> Self {
         RpcResponse {
