@@ -50,7 +50,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
-                // Middleware
+                // Middleware (order: last wrapped runs first, so metrics wraps everything)
+                .wrap(crate::middleware::MetricsMiddleware)
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
                 // API v1 - public endpoints (no auth required)

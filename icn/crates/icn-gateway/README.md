@@ -393,10 +393,18 @@ icn-gateway/
 
 **Observability Integration:**
 - Uses `icn-obs` crate for Prometheus metrics
-- Metrics tracked at API layer (auth, coops, ledger)
-- Middleware layer tracks authorization and rate limit violations
-- WebSocket layer tracks connections, disconnections, and messages
+- **MetricsMiddleware**: Wraps all requests to track count and latency
+- API layer: Tracks business operations (auth, coops, ledger)
+- Middleware layer: Tracks authorization and rate limit violations
+- WebSocket layer: Tracks connections, disconnections, and messages
 - All metrics available via daemon's `/metrics` endpoint (default: `http://localhost:9090/metrics`)
+
+**Middleware Stack** (execution order - last wrapped runs first):
+1. MetricsMiddleware - Captures request count and latency for all requests
+2. Logger - Logs HTTP requests (actix-web default)
+3. Compress - Gzip compression (actix-web default)
+4. Auth (protected routes only) - JWT validation
+5. RateLimiter (protected routes only) - Per-DID token bucket
 
 ## Known Limitations
 
