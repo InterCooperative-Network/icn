@@ -4,9 +4,11 @@
 //! across the ICN network.
 
 use anyhow::{bail, Result};
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::RwLock;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio::sync::{mpsc, RwLock};
 use tracing::{info, warn};
 
 use icn_gossip::GossipActor;
@@ -22,6 +24,29 @@ use icn_governance::{
 
 /// Gossip topic for governance messages
 const GOVERNANCE_TOPIC: &str = "governance:proposal";
+
+/// Interval for checking proposal expiration
+const SCHEDULER_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Scheduled proposal close event
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ScheduledClose {
+    closes_at: Instant,
+    proposal_id: ProposalId,
+}
+
+impl Ord for ScheduledClose {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Earlier times have higher priority
+        self.closes_at.cmp(&other.closes_at)
+    }
+}
+
+impl PartialOrd for ScheduledClose {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 /// Lightweight config for creating domains
 #[derive(Clone, Debug)]
@@ -99,6 +124,8 @@ pub struct GovernanceActor {
     gossip: Arc<RwLock<GossipActor>>,
     resolver: Arc<dyn MembershipResolver + Send + Sync>,
     profile: GovernanceProfile,
+    close_scheduler: Arc<RwLock<BinaryHeap<Reverse<ScheduledClose>>>>,
+    close_tx: mpsc::UnboundedSender<ProposalId>,
 }
 
 impl GovernanceActor {
@@ -142,17 +169,70 @@ impl GovernanceActor {
             }));
         }
 
+        // Create scheduler and channel for auto-closing proposals
+        let close_scheduler = Arc::new(RwLock::new(BinaryHeap::new()));
+        let (close_tx, mut close_rx) = mpsc::unbounded_channel();
+
         let actor = GovernanceActor {
-            did,
-            store,
-            gossip,
-            resolver,
+            did: did.clone(),
+            store: store.clone(),
+            gossip: gossip.clone(),
+            resolver: resolver.clone(),
             profile: GovernanceProfile::cooperative_default(),
+            close_scheduler: close_scheduler.clone(),
+            close_tx,
         };
 
-        Ok(GovernanceHandle {
+        let handle = GovernanceHandle {
             inner: Arc::new(RwLock::new(actor)),
-        })
+        };
+
+        // Spawn background timer task for auto-closing proposals
+        let handle_clone = handle.clone();
+        let scheduler_clone = close_scheduler.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(SCHEDULER_INTERVAL);
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        // Check for expired proposals
+                        let now = Instant::now();
+                        let mut expired = Vec::new();
+
+                        {
+                            let mut scheduler = scheduler_clone.write().await;
+                            while let Some(Reverse(scheduled)) = scheduler.peek() {
+                                if scheduled.closes_at <= now {
+                                    expired.push(scheduler.pop().unwrap().0.proposal_id.clone());
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Auto-close expired proposals
+                        for proposal_id in expired {
+                            info!("Auto-closing expired proposal: {}", proposal_id.0);
+                            if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
+                                proposal_id: proposal_id.clone(),
+                            }).await {
+                                warn!("Failed to auto-close proposal {}: {}", proposal_id.0, e);
+                            }
+                        }
+                    }
+
+                    Some(proposal_id) = close_rx.recv() => {
+                        // Manual close - remove from scheduler if present
+                        let mut scheduler = scheduler_clone.write().await;
+                        scheduler.retain(|Reverse(sc)| sc.proposal_id != proposal_id);
+                    }
+                }
+            }
+        });
+
+        info!("✓ Governance scheduler started (checking every {}s)", SCHEDULER_INTERVAL.as_secs());
+
+        Ok(handle)
     }
 
     /// Handle a governance command
@@ -242,6 +322,14 @@ impl GovernanceActor {
                     &serde_json::to_vec(&proposal)?,
                 )?;
 
+                // Schedule auto-close
+                let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
+                let scheduled = ScheduledClose {
+                    closes_at: closes_at_instant,
+                    proposal_id: proposal_id.clone(),
+                };
+                self.close_scheduler.write().await.push(Reverse(scheduled));
+
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_opened(
                     proposal_id.clone(),
@@ -250,7 +338,7 @@ impl GovernanceActor {
                 ))
                 .await?;
 
-                info!("✓ Proposal opened: {}", proposal_id.0);
+                info!("✓ Proposal opened: {} (auto-close scheduled for {}s)", proposal_id.0, voting_period_seconds);
             }
 
             GovernanceCommand::CastVote {
@@ -280,6 +368,9 @@ impl GovernanceActor {
 
             GovernanceCommand::CloseProposal { proposal_id } => {
                 info!("Closing proposal: {}", proposal_id.0);
+
+                // Notify scheduler to cancel auto-close (if scheduled)
+                let _ = self.close_tx.send(proposal_id.clone());
 
                 // Load proposal
                 let mut proposal = self
