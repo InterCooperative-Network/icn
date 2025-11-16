@@ -185,13 +185,15 @@ pub enum EntryStatus {
    - CLI arguments: `--gateway-enable`, `--gateway-bind`, `--gateway-jwt-secret`
    - Environment variable support: `ICN_GATEWAY_JWT_SECRET`
    - Dedicated thread spawn for Actix-web compatibility
+3. **Production Hardening** (2025-11-16) ✅
+   - ✅ API versioning (`/v1/` namespacing) - all endpoints versioned
+   - ✅ Per-DID rate limiting - token bucket (100 burst, 10/sec refill)
+   - 35 passing tests (5 new rate limiting tests)
 
 **Still Needed** (Deferred until pilot selection):
-3. **TypeScript SDK** - `@icn/client` npm package
-4. **Reference App** - Timebank or other pilot-specific application
-5. **API Improvements**:
-   - API versioning (`/v1/` namespacing)
-   - Per-DID rate limiting
+4. **TypeScript SDK** - `@icn/client` npm package
+5. **Reference App** - Timebank or other pilot-specific application
+6. **Remaining API Improvements**:
    - WebSocket reconnection and event backfill
    - Scope-based authorization enforcement in handlers
 
@@ -204,10 +206,11 @@ pub enum EntryStatus {
 - 🔲 Reference application (deferred)
 
 **Deliverables**: ✅ Gateway Complete
-- ✅ `icn-gateway` crate with 30 passing tests
+- ✅ `icn-gateway` crate with 35 passing tests (updated 2025-11-16)
 - ✅ Integration into icnd supervisor
 - ✅ Configuration system and CLI support
 - ✅ Documentation: dev journals, CHANGELOG.md, example configs
+- ✅ API versioning and rate limiting (Phase 14 production hardening)
 - 🔲 `@icn/client` SDK (deferred)
 - 🔲 Reference app (deferred)
 

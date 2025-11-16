@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Gateway API Improvements (Phase 14 Continued) (2025-11-16)
+
+**API Versioning:**
+- All endpoints now under `/v1` namespace for future API evolution
+- Versioned paths: `/v1/health`, `/v1/auth/*`, `/v1/coops/*`, `/v1/ledger/*`, `/v1/ws/:coop_id`
+- Enables backward-compatible API changes in future versions
+- Clean migration path for API consumers
+
+**Per-DID Rate Limiting:**
+- Token bucket algorithm prevents API abuse and resource exhaustion
+- Independent rate limits per authenticated DID
+- Default: 100 token burst capacity, 10 tokens/second refill (600 requests/minute sustained)
+- Configurable: `RateLimitConfig` allows custom capacity, refill rate, and cost per request
+- HTTP 429 Too Many Requests response when rate limit exceeded
+- Automatic cleanup of inactive buckets prevents unbounded memory growth
+- Applied to protected endpoints (`/v1/coops/*`, `/v1/ledger/*`)
+- Public endpoints (health, auth, websocket) not rate-limited
+
+**Technical Details:**
+- `RateLimiter`: Arc<RwLock<HashMap<DID, TokenBucket>>> for per-DID tracking
+- `TokenBucket`: Continuous refill based on elapsed time (Instant-based)
+- Middleware integration via `actix_web::middleware::from_fn`
+- Rate limiting applied after JWT authentication (requires valid claims)
+- 5 comprehensive tests covering bucket behavior, refill, capacity limits, DID isolation, cleanup
+
+**Benefits:**
+- Protects daemon resources from malicious or buggy clients
+- Fair resource allocation across DIDs
+- Production-ready abuse prevention
+- Configurable limits per deployment scenario
+
 ### Added - Platform Layer: REST API Gateway (Phase 14) (2025-01-15)
 
 **New Crate: icn-gateway**
