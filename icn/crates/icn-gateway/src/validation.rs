@@ -98,6 +98,10 @@ pub fn validate_memo(memo: &Option<String>) -> Result<()> {
 
 /// Validate governance model string
 pub fn validate_governance_model(model: &str) -> Result<()> {
+    if model.is_empty() {
+        return Err(GatewayError::BadRequest("Governance model cannot be empty".to_string()));
+    }
+
     if model.len() > MAX_GOVERNANCE_MODEL_LEN {
         return Err(GatewayError::BadRequest(
             format!("Governance model exceeds maximum length of {} characters", MAX_GOVERNANCE_MODEL_LEN)
@@ -109,6 +113,10 @@ pub fn validate_governance_model(model: &str) -> Result<()> {
 
 /// Validate credit policy string
 pub fn validate_credit_policy(policy: &str) -> Result<()> {
+    if policy.is_empty() {
+        return Err(GatewayError::BadRequest("Credit policy cannot be empty".to_string()));
+    }
+
     if policy.len() > MAX_CREDIT_POLICY_LEN {
         return Err(GatewayError::BadRequest(
             format!("Credit policy exceeds maximum length of {} characters", MAX_CREDIT_POLICY_LEN)
@@ -195,5 +203,21 @@ mod tests {
         assert!(validate_scopes(&many_scopes).is_ok());
         let too_many_scopes: Vec<String> = (0..21).map(|i| format!("scope:{}", i)).collect();
         assert!(validate_scopes(&too_many_scopes).is_err());
+    }
+
+    #[test]
+    fn test_validate_governance_model() {
+        assert!(validate_governance_model("consensus").is_ok());
+        assert!(validate_governance_model("majority").is_ok());
+        assert!(validate_governance_model("").is_err()); // Empty
+        assert!(validate_governance_model(&"a".repeat(65)).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_credit_policy() {
+        assert!(validate_credit_policy("conservative").is_ok());
+        assert!(validate_credit_policy("permissive").is_ok());
+        assert!(validate_credit_policy("").is_err()); // Empty
+        assert!(validate_credit_policy(&"a".repeat(65)).is_err()); // Too long
     }
 }

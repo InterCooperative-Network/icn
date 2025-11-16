@@ -71,6 +71,18 @@ impl WsSession {
         }
     }
 
+    /// Send a server message, handling serialization errors gracefully
+    fn send_message(&self, msg: ServerMessage, ctx: &mut <Self as Actor>::Context) {
+        match serde_json::to_string(&msg) {
+            Ok(json) => ctx.text(json),
+            Err(e) => {
+                tracing::error!("Failed to serialize WebSocket message: {}", e);
+                // Close connection on serialization error (should never happen)
+                ctx.stop();
+            }
+        }
+    }
+
     /// Authenticate user with JWT token
     fn authenticate(&mut self, token: &str, ctx: &mut <Self as Actor>::Context) {
         match self.auth_manager.verify_token(token) {
@@ -80,7 +92,7 @@ impl WsSession {
                     let msg = ServerMessage::AuthError {
                         message: "Token coop_id mismatch".to_string(),
                     };
-                    ctx.text(serde_json::to_string(&msg).unwrap());
+                    self.send_message(msg, ctx);
                     return;
                 }
 
@@ -109,13 +121,13 @@ impl WsSession {
                         let msg = ServerMessage::AuthOk {
                             did: did.to_string(),
                         };
-                        ctx.text(serde_json::to_string(&msg).unwrap());
+                        self.send_message(msg, ctx);
                     }
                     Err(e) => {
                         let msg = ServerMessage::AuthError {
                             message: format!("Invalid DID in token: {e}"),
                         };
-                        ctx.text(serde_json::to_string(&msg).unwrap());
+                        self.send_message(msg, ctx);
                     }
                 }
             }
@@ -123,7 +135,7 @@ impl WsSession {
                 let msg = ServerMessage::AuthError {
                     message: format!("Token verification failed: {e}"),
                 };
-                ctx.text(serde_json::to_string(&msg).unwrap());
+                self.send_message(msg, ctx);
             }
         }
     }
@@ -220,7 +232,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for WsSe
                         let msg = ServerMessage::Error {
                             message: format!("Invalid message format: {e}"),
                         };
-                        ctx.text(serde_json::to_string(&msg).unwrap());
+                        self.send_message(msg, ctx);
                     }
                 }
             }
