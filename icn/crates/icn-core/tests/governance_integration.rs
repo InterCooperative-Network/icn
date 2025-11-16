@@ -394,6 +394,36 @@ impl TestNode {
     }
 }
 
+/// Helper to wait for a condition with retry logic
+async fn wait_for_condition<F, Fut>(
+    condition: F,
+    description: &str,
+    max_retries: usize,
+    retry_delay: Duration,
+) -> Result<()>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for attempt in 0..max_retries {
+        if condition().await {
+            info!("✓ {} (took {} attempts)", description, attempt + 1);
+            return Ok(());
+        }
+
+        if attempt == max_retries - 1 {
+            bail!(
+                "{} timeout after {}ms",
+                description,
+                max_retries * retry_delay.as_millis() as usize
+            );
+        }
+
+        tokio::time::sleep(retry_delay).await;
+    }
+    Ok(())
+}
+
 #[tokio::test]
 #[ignore] // Requires network interfaces and QUIC handshake
 async fn test_governance_proposal_lifecycle() -> Result<()> {
@@ -455,24 +485,20 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
 
     info!("✓ Node 1 created governance domain: {}", domain_id.0);
 
-    // Wait for gossip propagation
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    // Verify all nodes received the domain
-    {
-        let domains2 = node2.domains.read().await;
-        let domains3 = node3.domains.read().await;
-
-        assert!(
-            domains2.contains_key(&domain_id),
-            "Node 2 should have received domain"
-        );
-        assert!(
-            domains3.contains_key(&domain_id),
-            "Node 3 should have received domain"
-        );
-    }
-    info!("✓ Domain propagated to all nodes");
+    // Wait for domain propagation
+    let domain_id_check = domain_id.clone();
+    let node2_domains = node2.domains.clone();
+    let node3_domains = node3.domains.clone();
+    wait_for_condition(
+        || async {
+            node2_domains.read().await.contains_key(&domain_id_check)
+                && node3_domains.read().await.contains_key(&domain_id_check)
+        },
+        "Domain propagated to all nodes",
+        20,
+        Duration::from_millis(200),
+    )
+    .await?;
 
     // Node 1 creates a proposal
     let proposal = node1
@@ -489,47 +515,41 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
     let proposal_id = proposal.id.clone();
     info!("✓ Node 1 created proposal: {:?}", proposal_id);
 
-    // Wait for gossip propagation
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    // Verify all nodes received the proposal
-    {
-        let proposals2 = node2.proposals.read().await;
-        let proposals3 = node3.proposals.read().await;
-
-        assert!(
-            proposals2.contains_key(&proposal_id),
-            "Node 2 should have received proposal"
-        );
-        assert!(
-            proposals3.contains_key(&proposal_id),
-            "Node 3 should have received proposal"
-        );
-    }
-    info!("✓ Proposal propagated to all nodes");
+    // Wait for proposal propagation
+    let proposal_id_check = proposal_id.clone();
+    let node2_proposals = node2.proposals.clone();
+    let node3_proposals = node3.proposals.clone();
+    wait_for_condition(
+        || async {
+            node2_proposals.read().await.contains_key(&proposal_id_check)
+                && node3_proposals.read().await.contains_key(&proposal_id_check)
+        },
+        "Proposal propagated to all nodes",
+        20,
+        Duration::from_millis(200),
+    )
+    .await?;
 
     // Node 1 opens the proposal for voting (7 days)
     node1.open_proposal(proposal_id.clone(), 604800).await?;
     info!("✓ Node 1 opened proposal for voting");
 
-    // Wait for gossip propagation
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    // Verify all nodes see proposal as open
-    {
-        let proposals2 = node2.proposals.read().await;
-        let proposals3 = node3.proposals.read().await;
-
-        assert!(
-            proposals2.get(&proposal_id).unwrap().state.is_open(),
-            "Node 2 proposal should be open"
-        );
-        assert!(
-            proposals3.get(&proposal_id).unwrap().state.is_open(),
-            "Node 3 proposal should be open"
-        );
-    }
-    info!("✓ Proposal opened on all nodes");
+    // Wait for proposal open state propagation
+    let proposal_id_open = proposal_id.clone();
+    let node2_proposals_open = node2.proposals.clone();
+    let node3_proposals_open = node3.proposals.clone();
+    wait_for_condition(
+        || async {
+            let p2 = node2_proposals_open.read().await;
+            let p3 = node3_proposals_open.read().await;
+            p2.get(&proposal_id_open).map_or(false, |p| p.state.is_open())
+                && p3.get(&proposal_id_open).map_or(false, |p| p.state.is_open())
+        },
+        "Proposal opened on all nodes",
+        20,
+        Duration::from_millis(200),
+    )
+    .await?;
 
     // All three nodes cast votes
     node1.cast_vote(proposal_id.clone(), VoteChoice::For).await?;
@@ -538,68 +558,54 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
 
     info!("✓ All nodes cast votes (2 For, 1 Against)");
 
-    // Wait for vote propagation
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for vote propagation (each node should have 3 votes)
+    let proposal_id_votes = proposal_id.clone();
+    let node1_votes = node1.votes.clone();
+    let node2_votes = node2.votes.clone();
+    let node3_votes = node3.votes.clone();
+    wait_for_condition(
+        || async {
+            let v1 = node1_votes.read().await;
+            let v2 = node2_votes.read().await;
+            let v3 = node3_votes.read().await;
 
-    // Verify all nodes received all votes
-    {
-        let votes1 = node1.votes.read().await;
-        let votes2 = node2.votes.read().await;
-        let votes3 = node3.votes.read().await;
+            let count1 = v1.iter().filter(|((pid, _), _)| pid == &proposal_id_votes).count();
+            let count2 = v2.iter().filter(|((pid, _), _)| pid == &proposal_id_votes).count();
+            let count3 = v3.iter().filter(|((pid, _), _)| pid == &proposal_id_votes).count();
 
-        // Each node should have 3 votes
-        let proposal_votes1: Vec<_> = votes1
-            .iter()
-            .filter(|((pid, _), _)| pid == &proposal_id)
-            .collect();
-        let proposal_votes2: Vec<_> = votes2
-            .iter()
-            .filter(|((pid, _), _)| pid == &proposal_id)
-            .collect();
-        let proposal_votes3: Vec<_> = votes3
-            .iter()
-            .filter(|((pid, _), _)| pid == &proposal_id)
-            .collect();
-
-        assert_eq!(proposal_votes1.len(), 3, "Node 1 should have 3 votes");
-        assert_eq!(proposal_votes2.len(), 3, "Node 2 should have 3 votes");
-        assert_eq!(proposal_votes3.len(), 3, "Node 3 should have 3 votes");
-    }
-    info!("✓ Votes propagated to all nodes");
+            count1 == 3 && count2 == 3 && count3 == 3
+        },
+        "Votes propagated to all nodes",
+        20,
+        Duration::from_millis(200),
+    )
+    .await?;
 
     // Node 1 closes the proposal and evaluates outcome
     let outcome = node1.close_proposal(proposal_id.clone()).await?;
     info!("✓ Node 1 closed proposal with outcome: {:?}", outcome);
 
-    // Wait for outcome propagation
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for outcome propagation (all nodes should show Accepted state)
+    let proposal_id_outcome = proposal_id.clone();
+    let node1_proposals_outcome = node1.proposals.clone();
+    let node2_proposals_outcome = node2.proposals.clone();
+    let node3_proposals_outcome = node3.proposals.clone();
+    wait_for_condition(
+        || async {
+            let p1 = node1_proposals_outcome.read().await;
+            let p2 = node2_proposals_outcome.read().await;
+            let p3 = node3_proposals_outcome.read().await;
 
-    // Verify all nodes converged on the same outcome
-    {
-        let proposals1 = node1.proposals.read().await;
-        let proposals2 = node2.proposals.read().await;
-        let proposals3 = node3.proposals.read().await;
-
-        let state1 = &proposals1.get(&proposal_id).unwrap().state;
-        let state2 = &proposals2.get(&proposal_id).unwrap().state;
-        let state3 = &proposals3.get(&proposal_id).unwrap().state;
-
-        // Expected: 2 For, 1 Against = 66% approval = Accepted (>50% threshold)
-        assert!(
-            matches!(state1, ProposalState::Accepted { .. }),
-            "Node 1: Proposal should be accepted"
-        );
-        assert!(
-            matches!(state2, ProposalState::Accepted { .. }),
-            "Node 2: Proposal should be accepted"
-        );
-        assert!(
-            matches!(state3, ProposalState::Accepted { .. }),
-            "Node 3: Proposal should be accepted"
-        );
-    }
-
-    info!("✓ All nodes converged on proposal outcome: Accepted");
+            // Expected: 2 For, 1 Against = 66% approval = Accepted (>50% threshold)
+            p1.get(&proposal_id_outcome).map_or(false, |p| matches!(p.state, ProposalState::Accepted { .. }))
+                && p2.get(&proposal_id_outcome).map_or(false, |p| matches!(p.state, ProposalState::Accepted { .. }))
+                && p3.get(&proposal_id_outcome).map_or(false, |p| matches!(p.state, ProposalState::Accepted { .. }))
+        },
+        "All nodes converged on proposal outcome: Accepted",
+        20,
+        Duration::from_millis(200),
+    )
+    .await?;
     info!("=== Governance integration test completed successfully ===");
 
     // Cleanup
