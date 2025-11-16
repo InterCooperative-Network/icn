@@ -190,19 +190,29 @@ Actor is constructed with `Arc<dyn MembershipResolver>` to enable future swap.
 - Reuse existing `governance_integration.rs` (no changes needed)
 - Add simple in-process smoke test in supervisor
 
-### Session 2: Time-Based Closing (Next)
+### Session 2: Time-Based Closing (Complete ✅)
 
 **Implementation:**
-- Add `BinaryHeap<(Instant, ProposalId)>` to actor
-- Background `tokio::spawn` task that wakes every 10 seconds
-- On `ProposalOpened`: enqueue `(closes_at, proposal_id)`
-- On timer wake: pop expired proposals, auto-close, broadcast outcome
-- Handle manual close: remove from heap
+- [x] Added `ScheduledClose` struct with `Instant` + `ProposalId`
+- [x] Added `BinaryHeap<Reverse<ScheduledClose>>` to actor (earliest-first priority)
+- [x] Background `tokio::spawn` task with `tokio::select!`:
+  - Timer tick (every 10s): pop expired proposals, auto-close
+  - Channel receive: cancel scheduled close on manual close
+- [x] `OpenProposal`: enqueue proposal in heap with `Instant::now() + voting_period`
+- [x] `CloseProposal`: send cancel message via `mpsc::unbounded_channel`
+- [x] Reuses existing vote tallying and outcome evaluation
 
-**Why deferred:**
-- Core actor must work first
-- Scheduler is independent feature
-- Clean separation of concerns
+**Key design decisions:**
+- `Reverse<ScheduledClose>` for min-heap behavior (earlier times first)
+- `UnboundedSender<ProposalId>` for cancellation (no blocking)
+- Scheduler state shared via `Arc<RwLock<BinaryHeap>>` for concurrency
+- No breaking API changes (GovernanceHandle unchanged)
+
+**Testing:**
+- Compiled cleanly with no errors
+- Existing integration test still passes (governance_integration.rs)
+
+**Commit:** `b6c25e5` - feat(governance): Add time-based proposal auto-closing
 
 ### Session 3: RPC Layer (Next)
 
