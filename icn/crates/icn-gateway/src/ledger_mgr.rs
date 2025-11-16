@@ -1,6 +1,7 @@
 //! Ledger manager for cooperative namespaces
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use icn_identity::Did;
@@ -15,6 +16,7 @@ use crate::events::{EventBroadcaster, GatewayEvent};
 pub struct LedgerManager {
     ledgers: Arc<RwLock<HashMap<CoopId, Arc<RwLock<Ledger>>>>>,
     event_broadcaster: Option<Arc<EventBroadcaster>>,
+    data_dir: Option<PathBuf>,
 }
 
 impl Default for LedgerManager {
@@ -24,11 +26,21 @@ impl Default for LedgerManager {
 }
 
 impl LedgerManager {
-    /// Create a new ledger manager
+    /// Create a new ledger manager with temporary storage (for testing)
     pub fn new() -> Self {
         Self {
             ledgers: Arc::new(RwLock::new(HashMap::new())),
             event_broadcaster: None,
+            data_dir: None,
+        }
+    }
+
+    /// Create a new ledger manager with persistent storage
+    pub fn new_with_storage(data_dir: PathBuf) -> Self {
+        Self {
+            ledgers: Arc::new(RwLock::new(HashMap::new())),
+            event_broadcaster: None,
+            data_dir: Some(data_dir),
         }
     }
 
@@ -57,10 +69,18 @@ impl LedgerManager {
             return Ok(ledger.clone());
         }
 
-        // Create temporary store for this coop's ledger
-        // TODO: Use persistent storage with proper paths in production
-        let store: Arc<dyn Store> = Arc::new(SledStore::temporary()
-            .map_err(GatewayError::SubstrateError)?);
+        // Create store for this coop's ledger
+        let store: Arc<dyn Store> = if let Some(ref data_dir) = self.data_dir {
+            // Use persistent storage with coop-specific subdirectory
+            let coop_ledger_path = data_dir.join("ledgers").join(coop_id);
+            Arc::new(SledStore::open(&coop_ledger_path)
+                .map_err(GatewayError::SubstrateError)?)
+        } else {
+            // Use temporary storage (for testing)
+            Arc::new(SledStore::temporary()
+                .map_err(GatewayError::SubstrateError)?)
+        };
+
         let ledger = Ledger::new(store)
             .map_err(GatewayError::SubstrateError)?;
 

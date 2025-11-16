@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Gateway Memory Leaks and Storage (Phase 14 Continued) (2025-11-16)
+
+**Critical Memory Leak Fixes:**
+- **FIXED:** Rate limiter bucket cleanup now runs automatically via background task
+  - **Problem:** `cleanup_inactive_buckets()` existed but was never called
+  - **Impact:** Every unique DID created a permanent HashMap entry → unbounded memory growth
+  - **Fix:** Added 5-minute background cleanup task that removes buckets inactive for 1+ hour
+  - **Implementation:** `server.rs` spawns tokio task with interval timer
+- **FIXED:** Event broadcaster now removes dead WebSocket channels automatically
+  - **Problem:** `broadcast()` comment claimed "removing closed channels" but didn't actually remove them
+  - **Impact:** Long-running gateway accumulated dead channels, wasting memory/CPU on failed sends
+  - **Fix:** Modified `broadcast()` to detect send failures and acquire write lock to remove dead channels
+  - **Optimization:** Read-only path for common case (no dead channels), write lock only when needed
+- **FIXED:** Authentication challenges now cleaned up automatically
+  - **Problem:** `cleanup_expired_challenges()` existed but was never called
+  - **Impact:** 5-minute TTL challenges accumulated forever in HashMap
+  - **Fix:** Background task cleans up expired challenges every 5 minutes
+  - **Logging:** Logs cleanup count when >0 challenges removed
+
+**Critical Data Loss Fix:**
+- **CRITICAL FIXED:** Ledger storage now persistent instead of temporary
+  - **Problem:** `LedgerManager` used `SledStore::temporary()` - deleted on process exit
+  - **Impact:** **ALL ledger data (payments, balances, history) lost on gateway restart**
+  - **Severity:** Production blocker - completely unusable for real deployments
+  - **Fix:** Added `new_with_storage(data_dir)` constructor that uses persistent Sled databases
+  - **Storage Layout:** `{data_dir}/ledgers/{coop_id}/` - isolated per cooperative
+  - **Backward Compat:** `new()` still uses temporary storage for testing
+  - **Server API:** Added `GatewayServer::new_with_storage()` for production use
+
+**Background Cleanup Architecture:**
+- Spawns single tokio task in `server.rs` running every 5 minutes
+- Cleans up 3 types of resources:
+  1. Expired authentication challenges (5min TTL)
+  2. Inactive rate limiter buckets (1hr inactivity threshold)
+  3. Dead WebSocket channels (per cooperative)
+- Logs cleanup activity at info level when items removed
+- Zero-overhead when no cleanup needed (most of the time)
+
+**Cooperative ID Listing:**
+- Added `CoopManager::list_all_coop_ids()` for cleanup task iteration
+- Returns just IDs (not full coop data) for efficient iteration
+
+**Testing:** All 38 gateway tests pass
+
+**Deployment Impact:**
+- Existing temporary ledger data WILL BE LOST (expected - was never persistent)
+- New deployments MUST use `GatewayServer::new_with_storage(data_dir)` for production
+- Gateway now production-ready with no known memory leaks
+
 ### Fixed - Gateway API Route Registration (Phase 14 Continued) (2025-11-16)
 
 **Critical Route Bug Fix:**

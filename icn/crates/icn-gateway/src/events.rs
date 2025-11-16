@@ -72,12 +72,34 @@ impl EventBroadcaster {
 
     /// Broadcast an event to all subscribers of a cooperative
     pub async fn broadcast(&self, coop_id: &str, event: GatewayEvent) {
-        let subscribers = self.subscribers.read().await;
+        // First try read-only send
+        {
+            let subscribers = self.subscribers.read().await;
+            if let Some(subs) = subscribers.get(coop_id) {
+                let mut any_closed = false;
+                for sub in subs {
+                    if sub.send(event.clone()).is_err() {
+                        any_closed = true;
+                    }
+                }
 
-        if let Some(subs) = subscribers.get(coop_id) {
-            // Send to all subscribers, removing closed channels
-            for sub in subs {
-                let _ = sub.send(event.clone());
+                // If no channels were closed, we're done
+                if !any_closed {
+                    return;
+                }
+            } else {
+                return; // No subscribers
+            }
+        }
+
+        // If we detected closed channels, acquire write lock and clean up
+        let mut subscribers = self.subscribers.write().await;
+        if let Some(subs) = subscribers.get_mut(coop_id) {
+            subs.retain(|sub| !sub.is_closed());
+
+            // Remove empty subscriber lists
+            if subs.is_empty() {
+                subscribers.remove(coop_id);
             }
         }
     }

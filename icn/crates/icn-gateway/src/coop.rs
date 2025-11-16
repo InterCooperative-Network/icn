@@ -243,6 +243,14 @@ impl CoopManager {
 
         Ok(coops.values().cloned().collect())
     }
+
+    /// List all cooperative IDs (for cleanup tasks)
+    pub fn list_all_coop_ids(&self) -> Result<Vec<CoopId>> {
+        let coops = self.coops.read()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        Ok(coops.keys().cloned().collect())
+    }
 }
 
 #[cfg(test)]

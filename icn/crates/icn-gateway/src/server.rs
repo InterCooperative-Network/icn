@@ -4,6 +4,7 @@ use actix_web::{middleware, web, App, HttpServer};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::info;
 
 use crate::api;
@@ -18,12 +19,26 @@ use crate::error::Result;
 pub struct GatewayServer {
     bind_addr: SocketAddr,
     jwt_secret: Vec<u8>,
+    data_dir: Option<std::path::PathBuf>,
 }
 
 impl GatewayServer {
-    /// Create a new gateway server
+    /// Create a new gateway server (uses temporary storage for testing)
     pub fn new(bind_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
-        GatewayServer { bind_addr, jwt_secret }
+        GatewayServer {
+            bind_addr,
+            jwt_secret,
+            data_dir: None,
+        }
+    }
+
+    /// Create a new gateway server with persistent storage
+    pub fn new_with_storage(bind_addr: SocketAddr, jwt_secret: Vec<u8>, data_dir: std::path::PathBuf) -> Self {
+        GatewayServer {
+            bind_addr,
+            jwt_secret,
+            data_dir: Some(data_dir),
+        }
     }
 
     /// Run the gateway server
@@ -33,11 +48,54 @@ impl GatewayServer {
         // Create shared managers
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
-        let ledger_manager = Arc::new(LedgerManager::new());
+
+        // Create ledger manager with persistent storage if data_dir is set
+        let ledger_manager = if let Some(data_dir) = self.data_dir {
+            Arc::new(LedgerManager::new_with_storage(data_dir))
+        } else {
+            Arc::new(LedgerManager::new())
+        };
+
         let event_broadcaster = Arc::new(EventBroadcaster::new());
 
         // Create rate limiter with default config
         let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+
+        // Spawn background cleanup task
+        {
+            let auth_manager_clone = auth_manager.clone();
+            let rate_limiter_clone = rate_limiter.clone();
+            let event_broadcaster_clone = event_broadcaster.clone();
+            let coop_manager_clone = coop_manager.clone();
+
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(300)); // 5 minutes
+                loop {
+                    interval.tick().await;
+
+                    // Clean up expired authentication challenges
+                    if let Ok(removed) = auth_manager_clone.cleanup_expired_challenges() {
+                        if removed > 0 {
+                            info!("Cleaned up {} expired authentication challenges", removed);
+                        }
+                    }
+
+                    // Clean up inactive rate limiter buckets (1 hour inactivity)
+                    let removed = rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(3600));
+                    if removed > 0 {
+                        info!("Cleaned up {} inactive rate limiter buckets", removed);
+                    }
+
+                    // Clean up dead WebSocket channels for all cooperatives
+                    // Get all coop IDs from coop manager
+                    if let Ok(coops) = coop_manager_clone.list_all_coop_ids() {
+                        for coop_id in coops {
+                            event_broadcaster_clone.cleanup(&coop_id).await;
+                        }
+                    }
+                }
+            });
+        }
 
         HttpServer::new(move || {
             // Create JWT authentication middleware
