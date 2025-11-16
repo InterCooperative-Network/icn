@@ -108,6 +108,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
+                // JSON payload size limit (256KB - we're not handling file uploads)
+                .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first, so metrics wraps everything)
                 .wrap(crate::middleware::MetricsMiddleware)
                 .wrap(middleware::Logger::default())
