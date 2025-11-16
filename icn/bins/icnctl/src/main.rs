@@ -1526,8 +1526,9 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 .await
                 .context("Failed to list quarantine from daemon. Is icnd running?")?;
 
+            // RPC returns PageResponse with "items" field
             let quarantined: Vec<serde_json::Value> = result
-                .get("quarantined")
+                .get("items")
                 .and_then(|v| v.as_array())
                 .cloned()
                 .unwrap_or_default();
