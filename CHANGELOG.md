@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Impact:** 5-minute TTL challenges accumulated forever in HashMap
   - **Fix:** Background task cleans up expired challenges every 5 minutes
   - **Logging:** Logs cleanup count when >0 challenges removed
+- **FIXED:** Deleted cooperatives now clean up WebSocket subscribers immediately
+  - **Problem:** Background cleanup only iterated over existing coops, so deleted coop subscribers never cleaned
+  - **Impact:** Long-running gateway with many coop create/delete cycles accumulated dead subscriber lists
+  - **Fix:** `delete_coop()` now immediately calls `broadcaster.cleanup()` for deleted coop
+  - **Implementation:** Spawns async cleanup task on coop deletion
 
 **Critical Data Loss Fix:**
 - **CRITICAL FIXED:** Ledger storage now persistent instead of temporary
@@ -55,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Existing temporary ledger data WILL BE LOST (expected - was never persistent)
 - New deployments MUST use `GatewayServer::new_with_storage(data_dir)` for production
 - Gateway now production-ready with no known memory leaks
+
+**Documentation Updates:**
+- Updated `icn-gateway/README.md` with Storage Configuration section
+- Added production deployment guide with persistent storage requirements
+- Added Background Cleanup Task architecture documentation
+- Updated Known Limitations to reflect persistent ledger storage
+- Removed outdated "No Persistent State" limitation
 
 ### Fixed - Gateway API Route Registration (Phase 14 Continued) (2025-11-16)
 
