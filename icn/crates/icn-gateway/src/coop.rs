@@ -251,6 +251,77 @@ impl CoopManager {
 
         Ok(coops.keys().cloned().collect())
     }
+
+    /// Atomically add a member to a cooperative
+    /// This prevents race conditions by holding the write lock during the entire operation
+    pub fn add_member_atomic(
+        &self,
+        coop_id: &CoopId,
+        did: Did,
+        role: MemberRole,
+        timestamp: u64,
+    ) -> Result<Coop> {
+        let mut coops = self.coops.write()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let coop = coops
+            .get_mut(coop_id)
+            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+
+        coop.add_member(did, role, timestamp)?;
+
+        Ok(coop.clone())
+    }
+
+    /// Atomically remove a member from a cooperative
+    pub fn remove_member_atomic(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
+        let mut coops = self.coops.write()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let coop = coops
+            .get_mut(coop_id)
+            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+
+        coop.remove_member(did)?;
+
+        Ok(coop.clone())
+    }
+
+    /// Atomically update a member's role
+    pub fn update_role_atomic(
+        &self,
+        coop_id: &CoopId,
+        did: &Did,
+        new_role: MemberRole,
+    ) -> Result<Coop> {
+        let mut coops = self.coops.write()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let coop = coops
+            .get_mut(coop_id)
+            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+
+        coop.update_role(did, new_role)?;
+
+        Ok(coop.clone())
+    }
+
+    /// Atomically update cooperative settings
+    pub fn update_settings_atomic<F>(&self, coop_id: &CoopId, updater: F) -> Result<Coop>
+    where
+        F: FnOnce(&mut Coop) -> Result<()>,
+    {
+        let mut coops = self.coops.write()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let coop = coops
+            .get_mut(coop_id)
+            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+
+        updater(coop)?;
+
+        Ok(coop.clone())
+    }
 }
 
 #[cfg(test)]

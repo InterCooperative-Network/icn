@@ -92,23 +92,33 @@ pub async fn update_settings(
     // Check authorization
     require_scope(&http_req, "coop:admin")?;
 
-    let mut coop = coop_mgr.get_coop(&id)?;
-
-    // Validate settings fields
+    // Validate settings fields upfront
     if let Some(gov) = &req.governance_model {
         validation::validate_governance_model(gov)?;
-        coop.settings.governance_model = gov.clone();
     }
     if let Some(policy) = &req.credit_policy {
         validation::validate_credit_policy(policy)?;
-        coop.settings.credit_policy = policy.clone();
     }
     if let Some(currency) = &req.currency {
         validation::validate_currency(currency)?;
-        coop.settings.currency = currency.clone();
     }
 
-    coop_mgr.update_coop(&id, coop.clone())?;
+    // Clone the request data for the closure
+    let req_data = req.into_inner();
+
+    // Use atomic operation to prevent race conditions
+    let coop = coop_mgr.update_settings_atomic(&id, |coop| {
+        if let Some(gov) = &req_data.governance_model {
+            coop.settings.governance_model = gov.clone();
+        }
+        if let Some(policy) = &req_data.credit_policy {
+            coop.settings.credit_policy = policy.clone();
+        }
+        if let Some(currency) = &req_data.currency {
+            coop.settings.currency = currency.clone();
+        }
+        Ok(())
+    })?;
 
     // Broadcast settings updated event
     let event = GatewayEvent::SettingsUpdated {
@@ -163,18 +173,18 @@ pub async fn add_member(
     // Check authorization
     require_scope(&http_req, "coop:admin")?;
 
-    let mut coop = coop_mgr.get_coop(&id)?;
-
-    // Validate member count before adding
-    validation::validate_member_count(coop.members.len())?;
-
+    // Parse and validate inputs first
     let did: icn_identity::Did = req.did.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let role = parse_role(&req.role)?;
 
-    coop.add_member(did.clone(), role.clone(), timestamp())?;
-    coop_mgr.update_coop(&id, coop.clone())?;
+    // Check member count (read-only check, might race but validation happens in add_member too)
+    let current_coop = coop_mgr.get_coop(&id)?;
+    validation::validate_member_count(current_coop.members.len())?;
+
+    // Use atomic operation to prevent race conditions
+    let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp())?;
 
     // Track member addition
     gateway::members_added_inc();
@@ -206,13 +216,12 @@ pub async fn remove_member(
     require_scope(&req, "coop:admin")?;
 
     let (coop_id, did_str) = path.into_inner();
-    let mut coop = coop_mgr.get_coop(&coop_id)?;
 
     let did = did_str.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    coop.remove_member(&did)?;
-    coop_mgr.update_coop(&coop_id, coop.clone())?;
+    // Use atomic operation to prevent race conditions
+    let coop = coop_mgr.remove_member_atomic(&coop_id, &did)?;
 
     // Track member removal
     gateway::members_removed_inc();
@@ -244,15 +253,14 @@ pub async fn update_member_role(
     require_scope(&http_req, "coop:admin")?;
 
     let (coop_id, did_str) = path.into_inner();
-    let mut coop = coop_mgr.get_coop(&coop_id)?;
 
     let did = did_str.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let new_role = parse_role(&req.role)?;
 
-    coop.update_role(&did, new_role.clone())?;
-    coop_mgr.update_coop(&coop_id, coop.clone())?;
+    // Use atomic operation to prevent race conditions
+    let coop = coop_mgr.update_role_atomic(&coop_id, &did, new_role.clone())?;
 
     // Broadcast role updated event
     let event = GatewayEvent::RoleUpdated {
