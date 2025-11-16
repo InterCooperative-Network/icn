@@ -69,7 +69,7 @@ impl AuthManager {
         };
 
         let mut challenges = self.challenges.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         challenges.insert(did.clone(), challenge);
 
@@ -87,7 +87,7 @@ impl AuthManager {
         // Retrieve and remove challenge
         let challenge = {
             let mut challenges = self.challenges.write()
-                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
             challenges.remove(did)
                 .ok_or_else(|| GatewayError::AuthenticationFailed(
@@ -106,17 +106,17 @@ impl AuthManager {
         // Verify signature
         let verifying_key = did.to_verifying_key()
             .map_err(|e| GatewayError::AuthenticationFailed(
-                format!("Invalid DID: {}", e)
+                format!("Invalid DID: {e}")
             ))?;
 
         let nonce_bytes = hex::decode(&challenge.nonce)
             .map_err(|e| GatewayError::InternalError(
-                format!("Invalid nonce encoding: {}", e)
+                format!("Invalid nonce encoding: {e}")
             ))?;
 
         let signature_obj = Signature::from_slice(signature)
             .map_err(|e| GatewayError::AuthenticationFailed(
-                format!("Invalid signature format: {}", e)
+                format!("Invalid signature format: {e}")
             ))?;
 
         verifying_key.verify(&nonce_bytes, &signature_obj)
@@ -144,7 +144,7 @@ impl AuthManager {
             &claims,
             &EncodingKey::from_secret(&self.jwt_secret),
         )
-        .map_err(|e| GatewayError::InternalError(format!("JWT encoding failed: {}", e)))?;
+        .map_err(|e| GatewayError::InternalError(format!("JWT encoding failed: {e}")))?;
 
         Ok(token)
     }
@@ -158,7 +158,7 @@ impl AuthManager {
             &DecodingKey::from_secret(&self.jwt_secret),
             &validation,
         )
-        .map_err(|e| GatewayError::AuthenticationFailed(format!("Invalid token: {}", e)))?;
+        .map_err(|e| GatewayError::AuthenticationFailed(format!("Invalid token: {e}")))?;
 
         Ok(token_data.claims)
     }
@@ -182,7 +182,7 @@ impl AuthManager {
     /// Clean up expired challenges (periodic task)
     pub fn cleanup_expired_challenges(&self) -> Result<usize> {
         let mut challenges = self.challenges.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let now = Self::current_timestamp();
         let ttl = self.challenge_ttl.as_secs();

@@ -14,7 +14,7 @@ pub async fn challenge(
     req: web::Json<ChallengeRequest>,
 ) -> Result<HttpResponse> {
     let did = req.did.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let nonce = auth.create_challenge(&did)?;
 
@@ -33,11 +33,11 @@ pub async fn verify(
     req: web::Json<VerifyRequest>,
 ) -> Result<HttpResponse> {
     let did = req.did.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let signature = hex::decode(&req.signature)
         .map_err(|e| crate::error::GatewayError::BadRequest(
-            format!("Invalid signature encoding: {}", e)
+            format!("Invalid signature encoding: {e}")
         ))?;
 
     let token = auth.verify_challenge(

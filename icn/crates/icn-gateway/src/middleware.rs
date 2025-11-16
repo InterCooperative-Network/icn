@@ -45,7 +45,7 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
 
     if !claims.scopes.contains(&required_scope.to_string()) {
         return Err(GatewayError::AuthorizationFailed(
-            format!("Missing required scope: {}", required_scope)
+            format!("Missing required scope: {required_scope}")
         ));
     }
 

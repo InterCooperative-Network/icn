@@ -23,7 +23,7 @@ fn parse_role(role_str: &str) -> Result<MemberRole> {
         "admin" => Ok(MemberRole::Admin),
         "member" => Ok(MemberRole::Member),
         _ => Err(crate::error::GatewayError::BadRequest(
-            format!("Invalid role: {}", role_str)
+            format!("Invalid role: {role_str}")
         )),
     }
 }
@@ -44,7 +44,7 @@ pub async fn create_coop(
         .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
     let owner: icn_identity::Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     coop_mgr.create_coop(
         req.id.clone(),
@@ -139,7 +139,7 @@ pub async fn add_member(
     let mut coop = coop_mgr.get_coop(&id)?;
 
     let did: icn_identity::Did = req.did.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let role = parse_role(&req.role)?;
 
@@ -150,7 +150,7 @@ pub async fn add_member(
     let event = GatewayEvent::MemberAdded {
         coop_id: id.to_string(),
         did: did.to_string(),
-        role: format!("{:?}", role),
+        role: format!("{role:?}"),
     };
     let broadcaster_clone = broadcaster.clone();
     let coop_id = id.into_inner();
@@ -176,7 +176,7 @@ pub async fn remove_member(
     let mut coop = coop_mgr.get_coop(&coop_id)?;
 
     let did = did_str.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     coop.remove_member(&did)?;
     coop_mgr.update_coop(&coop_id, coop.clone())?;
@@ -211,7 +211,7 @@ pub async fn update_member_role(
     let mut coop = coop_mgr.get_coop(&coop_id)?;
 
     let did = did_str.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let new_role = parse_role(&req.role)?;
 
@@ -222,7 +222,7 @@ pub async fn update_member_role(
     let event = GatewayEvent::RoleUpdated {
         coop_id: coop_id.clone(),
         did: did_str.clone(),
-        new_role: format!("{:?}", new_role),
+        new_role: format!("{new_role:?}"),
     };
     let broadcaster_clone = broadcaster.clone();
     let coop_id_clone = coop_id.clone();
@@ -269,7 +269,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::post()
+        let req = test::TestRequest::post()
             .uri("/coops")
             .set_json(&req_body)
             .to_request();
@@ -287,7 +287,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::get()
+        let req = test::TestRequest::get()
             .uri("/coops/test-coop")
             .to_request();
         req.extensions_mut().insert(claims);
@@ -336,7 +336,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::post()
+        let req = test::TestRequest::post()
             .uri("/coops/test-coop/members")
             .set_json(&req_body)
             .to_request();
@@ -347,7 +347,7 @@ mod tests {
 
         // Remove member with authorization
         let uri = format!("/coops/test-coop/members/{}", member.did());
-        let mut req = test::TestRequest::delete()
+        let req = test::TestRequest::delete()
             .uri(&uri)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -396,7 +396,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::post()
+        let req = test::TestRequest::post()
             .uri("/coops/test-coop/members")
             .set_json(&req_body)
             .to_request();
@@ -420,7 +420,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::put()
+        let req = test::TestRequest::put()
             .uri("/coops/test-coop/settings")
             .set_json(&req_body)
             .to_request();
@@ -458,7 +458,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::post()
+        let req = test::TestRequest::post()
             .uri("/coops")
             .set_json(&req_body)
             .to_request();

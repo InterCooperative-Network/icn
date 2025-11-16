@@ -17,6 +17,12 @@ pub struct LedgerManager {
     event_broadcaster: Option<Arc<EventBroadcaster>>,
 }
 
+impl Default for LedgerManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LedgerManager {
     /// Create a new ledger manager
     pub fn new() -> Self {
@@ -34,7 +40,7 @@ impl LedgerManager {
     /// Get or create a ledger for a cooperative
     pub fn get_ledger(&self, coop_id: &CoopId) -> Result<Arc<RwLock<Ledger>>> {
         let ledgers = self.ledgers.read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         if let Some(ledger) = ledgers.get(coop_id) {
             return Ok(ledger.clone());
@@ -44,7 +50,7 @@ impl LedgerManager {
 
         // Create new ledger
         let mut ledgers = self.ledgers.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         // Double-check pattern (another thread might have created it)
         if let Some(ledger) = ledgers.get(coop_id) {
@@ -54,9 +60,9 @@ impl LedgerManager {
         // Create temporary store for this coop's ledger
         // TODO: Use persistent storage with proper paths in production
         let store: Arc<dyn Store> = Arc::new(SledStore::temporary()
-            .map_err(|e| GatewayError::SubstrateError(e))?);
+            .map_err(GatewayError::SubstrateError)?);
         let ledger = Ledger::new(store)
-            .map_err(|e| GatewayError::SubstrateError(e))?;
+            .map_err(GatewayError::SubstrateError)?;
 
         let ledger_arc = Arc::new(RwLock::new(ledger));
         ledgers.insert(coop_id.clone(), ledger_arc.clone());
@@ -80,14 +86,14 @@ impl LedgerManager {
             .debit(from.clone(), currency.clone(), amount)
             .credit(to.clone(), currency.clone(), amount)
             .build()
-            .map_err(|e| GatewayError::SubstrateError(e))?;
+            .map_err(GatewayError::SubstrateError)?;
 
         // Append to ledger
         let mut ledger = ledger_arc.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let hash = ledger.append_entry(entry)
-            .map_err(|e| GatewayError::SubstrateError(e))?;
+            .map_err(GatewayError::SubstrateError)?;
 
         let hash_str = hash.to_hex();
 
@@ -115,7 +121,7 @@ impl LedgerManager {
     pub fn get_balance(&self, coop_id: &CoopId, did: &Did, currency: &str) -> Result<i64> {
         let ledger_arc = self.get_ledger(coop_id)?;
         let ledger = ledger_arc.read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         Ok(ledger.get_balance(did, currency))
     }
@@ -124,7 +130,7 @@ impl LedgerManager {
     pub fn get_all_balances(&self, coop_id: &CoopId, did: &Did) -> Result<HashMap<String, i64>> {
         let ledger_arc = self.get_ledger(coop_id)?;
         let ledger = ledger_arc.read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let account_balances = ledger.get_account_balances(did);
         Ok(account_balances.balances)
@@ -134,10 +140,10 @@ impl LedgerManager {
     pub fn get_history(&self, coop_id: &CoopId, filter_did: Option<&Did>) -> Result<Vec<icn_ledger::JournalEntry>> {
         let ledger_arc = self.get_ledger(coop_id)?;
         let ledger = ledger_arc.read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let mut entries = ledger.get_all_entries()
-            .map_err(|e| GatewayError::SubstrateError(e))?;
+            .map_err(GatewayError::SubstrateError)?;
 
         // Filter by DID if requested
         if let Some(did) = filter_did {

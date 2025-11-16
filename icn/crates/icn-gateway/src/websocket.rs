@@ -108,7 +108,7 @@ impl WsSession {
                     }
                     Err(e) => {
                         let msg = ServerMessage::AuthError {
-                            message: format!("Invalid DID in token: {}", e),
+                            message: format!("Invalid DID in token: {e}"),
                         };
                         ctx.text(serde_json::to_string(&msg).unwrap());
                     }
@@ -116,7 +116,7 @@ impl WsSession {
             }
             Err(e) => {
                 let msg = ServerMessage::AuthError {
-                    message: format!("Token verification failed: {}", e),
+                    message: format!("Token verification failed: {e}"),
                 };
                 ctx.text(serde_json::to_string(&msg).unwrap());
             }
@@ -193,7 +193,7 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for WsSe
                     }
                     Err(e) => {
                         let msg = ServerMessage::Error {
-                            message: format!("Invalid message format: {}", e),
+                            message: format!("Invalid message format: {e}"),
                         };
                         ctx.text(serde_json::to_string(&msg).unwrap());
                     }

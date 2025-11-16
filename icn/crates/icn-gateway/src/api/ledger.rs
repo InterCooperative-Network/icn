@@ -23,7 +23,7 @@ pub async fn get_balance(
     let (coop_id, did_str) = path.into_inner();
 
     let did = did_str.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let balances = ledger_mgr.get_all_balances(&coop_id, &did)?;
 
@@ -47,10 +47,10 @@ pub async fn create_payment(
     require_scope(&http_req, "ledger:write")?;
 
     let from = req.from.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid from DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid from DID: {e}")))?;
 
     let to = req.to.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid to DID: {}", e)))?;
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid to DID: {e}")))?;
 
     if req.amount <= 0 {
         return Err(crate::error::GatewayError::BadRequest(
@@ -88,7 +88,7 @@ pub async fn get_history(
 
     let filter_did = if let Some(did_str) = query.get("did") {
         Some(did_str.parse()
-            .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {}", e)))?)
+            .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?)
     } else {
         None
     };
@@ -162,7 +162,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::post()
+        let req = test::TestRequest::post()
             .uri("/ledger/test-coop/payment")
             .set_json(&req_body)
             .to_request();
@@ -181,7 +181,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::get()
+        let req = test::TestRequest::get()
             .uri(&uri)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -223,7 +223,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::get()
+        let req = test::TestRequest::get()
             .uri("/ledger/test-coop/history")
             .to_request();
         req.extensions_mut().insert(claims.clone());
@@ -234,7 +234,7 @@ mod tests {
 
         // Get history filtered by Alice with authorization
         let uri = format!("/ledger/test-coop/history?did={}", alice.did());
-        let mut req = test::TestRequest::get()
+        let req = test::TestRequest::get()
             .uri(&uri)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -275,7 +275,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::post()
+        let req = test::TestRequest::post()
             .uri("/ledger/test-coop/payment")
             .set_json(&req_body)
             .to_request();
@@ -294,7 +294,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let mut req = test::TestRequest::get()
+        let req = test::TestRequest::get()
             .uri(&uri)
             .to_request();
         req.extensions_mut().insert(claims);

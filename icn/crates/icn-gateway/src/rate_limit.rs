@@ -105,7 +105,7 @@ impl RateLimiter {
     /// Check if request should be allowed for a DID
     pub fn check_rate_limit(&self, did: &str) -> Result<(), GatewayError> {
         let mut buckets = self.buckets.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let bucket = buckets
             .entry(did.to_string())
@@ -201,7 +201,7 @@ mod tests {
         assert!(bucket.try_consume(5.0));
         let after_first = bucket.available();
         // Allow small variance due to refill during test execution
-        assert!(after_first >= 4.9 && after_first <= 5.1);
+        assert!((4.9..=5.1).contains(&after_first));
 
         // Consume another 5 tokens (accounting for potential refill)
         assert!(bucket.try_consume(5.0));
@@ -226,7 +226,7 @@ mod tests {
 
         // Should have ~5 tokens refilled
         let available = bucket.available();
-        assert!(available >= 4.5 && available <= 5.5);
+        assert!((4.5..=5.5).contains(&available));
 
         // Should be able to consume refilled tokens
         assert!(bucket.try_consume(4.0));

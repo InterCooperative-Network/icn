@@ -171,6 +171,12 @@ pub struct CoopManager {
     coops: Arc<RwLock<HashMap<CoopId, Coop>>>,
 }
 
+impl Default for CoopManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CoopManager {
     /// Create a new coop manager
     pub fn new() -> Self {
@@ -182,7 +188,7 @@ impl CoopManager {
     /// Create a new cooperative
     pub fn create_coop(&self, id: CoopId, name: String, owner: Did, timestamp: u64) -> Result<()> {
         let mut coops = self.coops.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         if coops.contains_key(&id) {
             return Err(GatewayError::BadRequest("Coop ID already exists".to_string()));
@@ -197,7 +203,7 @@ impl CoopManager {
     /// Get a cooperative
     pub fn get_coop(&self, id: &CoopId) -> Result<Coop> {
         let coops = self.coops.read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         coops
             .get(id)
@@ -208,7 +214,7 @@ impl CoopManager {
     /// Update a cooperative
     pub fn update_coop(&self, id: &CoopId, coop: Coop) -> Result<()> {
         let mut coops = self.coops.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         if !coops.contains_key(id) {
             return Err(GatewayError::NotFound("Coop not found".to_string()));
@@ -221,7 +227,7 @@ impl CoopManager {
     /// Delete a cooperative
     pub fn delete_coop(&self, id: &CoopId) -> Result<()> {
         let mut coops = self.coops.write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         coops
             .remove(id)
@@ -233,7 +239,7 @@ impl CoopManager {
     /// List all cooperatives (for testing/admin)
     pub fn list_coops(&self) -> Result<Vec<Coop>> {
         let coops = self.coops.read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {}", e)))?;
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         Ok(coops.values().cloned().collect())
     }
