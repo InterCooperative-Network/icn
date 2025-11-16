@@ -7,6 +7,180 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Gateway API Route Registration (Phase 14 Continued) (2025-11-16)
+
+**Critical Route Bug Fix:**
+- **CRITICAL:** Fixed duplicate `/v1` scope registration that made all public endpoints inaccessible
+  - **Problem:** Two separate `.service(web::scope("/v1"))` registrations
+  - **Impact:** Second registration shadowed first, blocking health, auth, and websocket endpoints
+  - **Severity:** CRITICAL - Gateway completely unusable (authentication impossible)
+  - **Resolution:** Consolidated into single `/v1` scope with nested scopes for protected routes
+- **Route Structure (Fixed):**
+  ```rust
+  web::scope("/v1")
+      // Public endpoints (no middleware)
+      .service(api::health::health)
+      .service(api::auth::challenge)
+      .service(api::auth::verify)
+      .service(api::websocket::websocket)
+      // Protected coop endpoints
+      .service(
+          web::scope("/coops")
+              .service(...)
+              .wrap(rate_limiting)
+              .wrap(auth.clone())
+      )
+      // Protected ledger endpoints
+      .service(
+          web::scope("/ledger")
+              .service(...)
+              .wrap(rate_limiting)
+              .wrap(auth)
+      )
+  ```
+- **Middleware Application:**
+  - Public endpoints: No authentication required
+  - Protected endpoints: Auth first, then rate limiting (wrapping order: last runs first)
+  - MetricsMiddleware wraps entire app for comprehensive request tracking
+- **Testing:** All 38 gateway tests pass after fix
+- **Security Impact:** HIGH - Authentication flow now accessible
+
+### Added - Gateway Production Monitoring Configurations (Phase 14 Continued) (2025-11-16)
+
+**Turnkey Monitoring Setup:**
+- **Grafana Dashboard** (`icn-gateway/grafana-dashboard.json`)
+  - 10 pre-configured panels for production monitoring
+  - Request rate by endpoint (time series)
+  - Latency percentiles (p50, p95, p99) per endpoint
+  - Error rate percentage (4xx + 5xx)
+  - Active WebSocket connections (gauge)
+  - Authentication success rate (percentage)
+  - Auth failure breakdown by reason (stacked graph)
+  - Top 10 rate-limited DIDs (leaderboard)
+  - Authorization failures by missing scope
+  - Payment volume by currency (hourly rates)
+  - Cooperative activity (created, members added/removed)
+- **Prometheus Alerts** (`icn-gateway/prometheus-alerts.yml`)
+  - 9 production-ready alerting rules with severity levels
+  - **Critical Alerts:**
+    - HighErrorRate: >5% 5xx errors for 5 minutes
+    - LowAuthSuccessRate: <50% auth success for 5 minutes
+  - **Warning Alerts:**
+    - HighLatency: p95 >1.0s for 10 minutes
+    - AuthenticationFailureSpike: >10 failures/sec for 5 minutes
+    - WebSocketConnectionDrop: >5 disconnections/sec for 5 minutes
+    - NoTraffic: Zero requests for 5 minutes
+  - **Info Alerts:**
+    - RateLimitingActive: >1 rejection/sec for 10 minutes
+    - AuthorizationFailures: >1 failure/sec by scope for 10 minutes
+    - NoPaymentActivity: Zero payments for 2 hours
+
+**Import Instructions:**
+- Grafana: Import `grafana-dashboard.json` via UI
+- Prometheus: Add to `prometheus.yml` alert rules section
+- Ready for immediate deployment use
+
+### Added - Gateway Request Metrics Middleware (Phase 14 Continued) (2025-11-16)
+
+**MetricsMiddleware Implementation:**
+- **Actix-web Transform middleware** for automatic request tracking
+- Wraps all HTTP requests to measure duration and count
+- **Metrics Captured:**
+  - Request count by endpoint and method
+  - Latency histogram by endpoint and status code
+  - Duration measured with `Instant::now()` for accuracy
+- **Architecture:**
+  - `MetricsMiddleware` - Transform implementation
+  - `MetricsMiddlewareService<S>` - Service wrapper with timing logic
+  - Async-safe with `LocalBoxFuture` for request handling
+- **Middleware Stack Order:**
+  ```
+  Request → MetricsMiddleware (outermost - measures everything)
+         → Logger (actix default)
+         → Compress (actix default)
+         → Auth (per scope)
+         → RateLimiter (per scope)
+         → Handler
+  ```
+- **Implementation:**
+  - `icn-gateway/src/middleware.rs` - MetricsMiddleware struct
+  - `icn-gateway/src/server.rs` - `.wrap(MetricsMiddleware)` at app level
+- **Dependencies:** Added `futures-util = "0.3"` for `LocalBoxFuture`
+- **Testing:** All 38 gateway tests pass
+
+### Added - Gateway Prometheus Metrics Instrumentation (Phase 14 Continued) (2025-11-16)
+
+**Comprehensive Metrics Coverage:**
+- **21 Prometheus metrics** across 6 operational categories
+- Fire-and-forget metric recording (non-blocking)
+- Integration with existing `icn-obs` metrics infrastructure
+
+**Authentication Metrics (5):**
+- `icn_gateway_auth_challenges_total` - Challenge requests issued
+- `icn_gateway_auth_verifications_total` - Verification attempts
+- `icn_gateway_auth_successes_total` - Successful authentications
+- `icn_gateway_auth_failures_total` - Failures by reason (invalid_did, invalid_signature_encoding, verification_failed)
+- Labels: `reason` for failure categorization
+
+**Authorization Metrics (1):**
+- `icn_gateway_authorization_failures_total` - Missing scope failures
+- Labels: `required_scope` (ledger:read, ledger:write, coop:admin, etc.)
+
+**Rate Limiting Metrics (1):**
+- `icn_gateway_rate_limit_exceeded_total` - Rate limit violations by DID
+- Labels: `did` for per-user tracking
+
+**Request Metrics (2):**
+- `icn_gateway_requests_total` - Total requests by endpoint and method
+- `icn_gateway_request_duration_seconds` - Latency histogram by endpoint and status
+- Labels: `endpoint`, `method`, `status`
+
+**WebSocket Metrics (4):**
+- `icn_gateway_websocket_connections_total` - Total connections (counter)
+- `icn_gateway_websocket_connections_active` - Currently active connections (gauge)
+- `icn_gateway_websocket_disconnections_total` - Disconnection events
+- `icn_gateway_websocket_messages_sent_total` - Event messages sent to clients
+- **Atomic Connection Tracking:** `AtomicU64` for lock-free active connection count
+
+**Cooperative Metrics (4):**
+- `icn_gateway_coops_created_total` - Cooperative creation events
+- `icn_gateway_coops_deleted_total` - Cooperative deletion events
+- `icn_gateway_members_added_total` - Member addition events
+- `icn_gateway_members_removed_total` - Member removal events
+
+**Ledger Metrics (4):**
+- `icn_gateway_payments_created_total` - Payment transactions created
+- `icn_gateway_payment_amount` - Payment amount histogram by currency
+- `icn_gateway_balance_queries_total` - Balance query count
+- `icn_gateway_history_queries_total` - Transaction history query count
+- Labels: `currency` for payment tracking
+
+**Instrumentation Locations:**
+- `icn-gateway/src/api/auth.rs` - Auth metrics
+- `icn-gateway/src/api/coops.rs` - Coop metrics
+- `icn-gateway/src/api/ledger.rs` - Ledger metrics
+- `icn-gateway/src/middleware.rs` - Request + authorization metrics
+- `icn-gateway/src/rate_limit.rs` - Rate limit metrics
+- `icn-gateway/src/websocket.rs` - WebSocket metrics with atomic tracking
+
+**Metrics Module:**
+- Added `gateway` submodule to `icn-obs/src/metrics.rs` (170+ lines)
+- 21 helper functions for metric recording
+- Consistent naming: `icn_gateway_{category}_{metric}_{unit}`
+
+**Dependencies:**
+- Added `icn-obs` to `icn-gateway/Cargo.toml`
+- Added `metrics = "0.22"` for metric macros
+
+**Testing:** All 38 gateway tests pass, 432 workspace tests pass
+
+**Observability Benefits:**
+- Real-time performance monitoring
+- Attack detection (auth failures, rate limiting)
+- Capacity planning (WebSocket connections, payment volume)
+- SLO tracking (latency percentiles, error rates)
+- Operational visibility into gateway health
+
 ### Fixed - Cooperative Owner DID Extraction (Phase 14 Continued) (2025-11-16)
 
 **Ownership Fix:**
