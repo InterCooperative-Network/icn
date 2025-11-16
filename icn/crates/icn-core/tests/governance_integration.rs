@@ -105,52 +105,60 @@ impl TestNode {
 
                 info!("[{}] Received {}", did_notify, gov_msg.message_type());
 
-                // Handle different message types
-                match gov_msg {
-                    GovernanceMessage::DomainCreated { domain } => {
-                        let domain_id = domain.id.clone();
-                        domains_notify.blocking_write().insert(domain_id, domain);
-                    }
-                    GovernanceMessage::ProposalCreated { proposal } => {
-                        let proposal_id = proposal.id.clone();
-                        proposals_notify
-                            .blocking_write()
-                            .insert(proposal_id, proposal);
-                    }
-                    GovernanceMessage::ProposalOpened {
-                        id,
-                        opened_at,
-                        closes_at,
-                    } => {
-                        if let Some(proposal) = proposals_notify.blocking_write().get_mut(&id) {
-                            // Calculate duration from opened_at and closes_at
-                            let duration = closes_at.saturating_sub(opened_at);
-                            let _ = proposal.open(duration);
+                // Clone Arc references for the spawned task
+                let domains_clone = domains_notify.clone();
+                let proposals_clone = proposals_notify.clone();
+                let votes_clone = votes_notify.clone();
+
+                // Spawn async task to handle the message (avoid blocking in callback)
+                tokio::spawn(async move {
+                    match gov_msg {
+                        GovernanceMessage::DomainCreated { domain } => {
+                            let domain_id = domain.id.clone();
+                            domains_clone.write().await.insert(domain_id, domain);
                         }
-                    }
-                    GovernanceMessage::VoteCast { vote, .. } => {
-                        let key = (vote.proposal_id.clone(), vote.voter.clone());
-                        votes_notify.blocking_write().insert(key, vote);
-                    }
-                    GovernanceMessage::ProposalClosed {
-                        id,
-                        outcome,
-                        closed_at,
-                        tally: _,
-                    } => {
-                        if let Some(proposal) = proposals_notify.blocking_write().get_mut(&id) {
-                            // Update proposal state based on outcome
-                            let new_state = match outcome {
-                                ProposalOutcome::Accepted => ProposalState::Accepted { closed_at },
-                                ProposalOutcome::Rejected => ProposalState::Rejected { closed_at },
-                                ProposalOutcome::NoQuorum => ProposalState::NoQuorum { closed_at },
-                            };
-                            // Use close() method to update state properly
-                            let _ = proposal.close(new_state);
+                        GovernanceMessage::ProposalCreated { proposal } => {
+                            let proposal_id = proposal.id.clone();
+                            proposals_clone
+                                .write()
+                                .await
+                                .insert(proposal_id, proposal);
                         }
+                        GovernanceMessage::ProposalOpened {
+                            id,
+                            opened_at,
+                            closes_at,
+                        } => {
+                            if let Some(proposal) = proposals_clone.write().await.get_mut(&id) {
+                                // Calculate duration from opened_at and closes_at
+                                let duration = closes_at.saturating_sub(opened_at);
+                                let _ = proposal.open(duration);
+                            }
+                        }
+                        GovernanceMessage::VoteCast { vote, .. } => {
+                            let key = (vote.proposal_id.clone(), vote.voter.clone());
+                            votes_clone.write().await.insert(key, vote);
+                        }
+                        GovernanceMessage::ProposalClosed {
+                            id,
+                            outcome,
+                            closed_at,
+                            tally: _,
+                        } => {
+                            if let Some(proposal) = proposals_clone.write().await.get_mut(&id) {
+                                // Update proposal state based on outcome
+                                let new_state = match outcome {
+                                    ProposalOutcome::Accepted => ProposalState::Accepted { closed_at },
+                                    ProposalOutcome::Rejected => ProposalState::Rejected { closed_at },
+                                    ProposalOutcome::NoQuorum => ProposalState::NoQuorum { closed_at },
+                                };
+                                // Use close() method to update state properly
+                                let _ = proposal.close(new_state);
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
-                }
+                });
             }));
         }
 
@@ -187,6 +195,14 @@ impl TestNode {
     /// Subscribe to governance topic
     async fn subscribe_governance(&self) -> Result<()> {
         let mut gossip = self.gossip_handle.write().await;
+
+        // Create the topic if it doesn't exist
+        let topic = icn_gossip::Topic::new(
+            GOVERNANCE_TOPIC.to_string(),
+            icn_gossip::AccessControl::Public,
+        );
+        gossip.create_topic(topic);
+
         gossip.subscribe(GOVERNANCE_TOPIC, self.did.clone())?;
         Ok(())
     }
