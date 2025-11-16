@@ -54,21 +54,15 @@ impl GatewayServer {
                 .wrap(crate::middleware::MetricsMiddleware)
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
-                // API v1 - public endpoints (no auth required)
+                // API v1 - single scope with public and protected routes
                 .service(
                     web::scope("/v1")
-                        // Health endpoint (public)
+                        // Public endpoints (no auth required)
                         .service(api::health::health)
-                        // Auth endpoints (public - needed to get tokens)
                         .service(api::auth::challenge)
                         .service(api::auth::verify)
-                        // WebSocket endpoint (handles auth internally)
                         .service(api::websocket::websocket)
-                )
-                // API v1 - protected endpoints (auth + rate limiting)
-                .service(
-                    web::scope("/v1")
-                        // Protected coop endpoints
+                        // Protected coop endpoints (auth + rate limiting)
                         .service(
                             web::scope("/coops")
                                 .service(api::coops::create_coop)
@@ -78,17 +72,20 @@ impl GatewayServer {
                                 .service(api::coops::add_member)
                                 .service(api::coops::remove_member)
                                 .service(api::coops::update_member_role)
+                                // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                                .wrap(auth.clone())
                         )
-                        // Protected ledger endpoints
+                        // Protected ledger endpoints (auth + rate limiting)
                         .service(
                             web::scope("/ledger")
                                 .service(api::ledger::get_balance)
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
+                                // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                                .wrap(auth)
                         )
-                        // Apply auth first, then rate limiting (wrapping order: last runs first)
-                        .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                        .wrap(auth)
                 )
         })
         .bind(self.bind_addr)?
