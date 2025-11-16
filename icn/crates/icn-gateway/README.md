@@ -236,6 +236,28 @@ The gateway exposes comprehensive Prometheus metrics for production monitoring:
 
 All metrics include relevant labels for filtering and aggregation (e.g., `endpoint`, `method`, `status`, `currency`, `did`, `required_scope`, `reason`).
 
+### Example Configurations
+
+**Grafana Dashboard** - Import `grafana-dashboard.json` for pre-built visualizations:
+- Request rate and latency percentiles (p50, p95, p99)
+- Error rate by endpoint
+- Active WebSocket connections
+- Authentication success rate and failure reasons
+- Rate limiting violations
+- Payment volume by currency
+- Cooperative activity metrics
+
+**Prometheus Alerts** - Copy `prometheus-alerts.yml` to your Prometheus configuration:
+- High error rate (>5% 5xx responses)
+- High latency (p95 >1s)
+- Authentication failure spikes
+- Rate limiting activity
+- WebSocket disconnection storms
+- Authorization failures (missing scopes)
+- Low authentication success rate (<50%)
+- No traffic detection (possible outage)
+- Payment system monitoring
+
 ## Error Responses
 
 All errors return JSON with error message:
