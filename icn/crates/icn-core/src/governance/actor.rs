@@ -66,6 +66,7 @@ pub enum GovernanceCommand {
         config: GovernanceConfigLite,
     },
     CreateProposal {
+        proposal_id: ProposalId,
         domain_id: GovernanceDomainId,
         title: String,
         description: String,
@@ -121,6 +122,8 @@ impl GovernanceHandle {
 /// Implement GovernanceOps trait to allow RPC integration without circular dependencies
 #[async_trait]
 impl icn_governance::GovernanceOps for GovernanceHandle {
+    // Read operations
+
     async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
         Self::list_domains(self).await
     }
@@ -135,6 +138,83 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
 
     async fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
         Self::get_proposal(self, id).await
+    }
+
+    // Write operations
+
+    async fn create_domain(
+        &self,
+        domain_id: GovernanceDomainId,
+        name: String,
+        profile: String,
+        params: icn_governance::GovernanceParams,
+        membership: icn_governance::MembershipConfig,
+    ) -> Result<()> {
+        let config = GovernanceConfigLite {
+            profile,
+            params,
+            membership,
+        };
+
+        self.submit(GovernanceCommand::CreateDomain {
+            domain_id,
+            name,
+            config,
+        })
+        .await
+    }
+
+    async fn create_proposal(
+        &self,
+        domain_id: GovernanceDomainId,
+        title: String,
+        description: String,
+        payload: icn_governance::ProposalPayload,
+    ) -> Result<ProposalId> {
+        // Generate a new proposal ID
+        let proposal_id = ProposalId::generate();
+
+        self.submit(GovernanceCommand::CreateProposal {
+            proposal_id: proposal_id.clone(),
+            domain_id,
+            title,
+            description,
+            payload,
+        })
+        .await?;
+
+        Ok(proposal_id)
+    }
+
+    async fn open_proposal(
+        &self,
+        proposal_id: ProposalId,
+        voting_period_seconds: u64,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::OpenProposal {
+            proposal_id,
+            voting_period_seconds,
+        })
+        .await
+    }
+
+    async fn cast_vote(
+        &self,
+        proposal_id: ProposalId,
+        choice: icn_governance::VoteChoice,
+        comment: Option<String>,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::CastVote {
+            proposal_id,
+            choice,
+            comment,
+        })
+        .await
+    }
+
+    async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
+        self.submit(GovernanceCommand::CloseProposal { proposal_id })
+            .await
     }
 }
 
@@ -284,6 +364,7 @@ impl GovernanceActor {
             }
 
             GovernanceCommand::CreateProposal {
+                proposal_id,
                 domain_id,
                 title,
                 description,
@@ -291,7 +372,7 @@ impl GovernanceActor {
             } => {
                 info!("Creating proposal: {}", title);
 
-                let proposal = Proposal::new(
+                let mut proposal = Proposal::new(
                     domain_id,
                     self.did.clone(),
                     title.clone(),
@@ -299,7 +380,8 @@ impl GovernanceActor {
                     payload,
                 );
 
-                let proposal_id = proposal.id.clone();
+                // Use the provided proposal ID instead of the generated one
+                proposal.id = proposal_id.clone();
 
                 // Persist locally
                 self.store.put(
