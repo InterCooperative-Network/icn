@@ -441,8 +441,61 @@ Implemented JSON payload building for all proposal types:
 - `vote show` not implemented (vote tallying happens during proposal close)
 - No batch operations (create multiple proposals in one call)
 
+**Commits:**
+1. `8ac72ba` - refactor(icnctl): Migrate governance commands to use daemon RPC
+2. `2249ae8` - docs: Update Phase 13 dev journal with Session 5 completion
+
+---
+
+### Post-Session 5: Bug Fixes & Integration Test Improvements (Complete ✅)
+
+**Quarantine List Bug Fix:**
+- **Issue Found:** Original bug report was backwards - governance endpoints were correct, but `ledger.quarantine.list` had the bug
+- **Root Cause:** icnctl was extracting `.get("quarantined")` but RPC server returns `PageResponse { items: [...], total, has_more }`
+- **Fix:** Changed to `.get("items")` to match actual PageResponse structure
+- **Verification:** All RPC response patterns validated:
+  - **Paginated endpoints** (return PageResponse): `ledger.history`, `contract.list`, `ledger.quarantine.list`
+  - **Direct arrays** (return `[...]`): `network.peers`, `governance.domain.list`, `governance.proposal.list`
+- **Commit:** `470679b` - fix(icnctl): Fix quarantine list to extract correct field name
+
+**Integration Test Fixes:**
+Fixed two critical issues preventing `governance_integration.rs` from running:
+
+1. **Topic Creation Bug:**
+   - **Error:** "Topic not found" when subscribing to governance topic
+   - **Cause:** Test tried to subscribe before topic was created
+   - **Fix:** Added topic creation before subscription in `subscribe_governance()`
+   ```rust
+   let topic = icn_gossip::Topic::new(
+       GOVERNANCE_TOPIC.to_string(),
+       icn_gossip::AccessControl::Public,
+   );
+   gossip.create_topic(topic);
+   ```
+
+2. **Async Runtime Blocking Bug:**
+   - **Error:** "Cannot block the current thread from within a runtime"
+   - **Cause:** Notification callback used `blocking_write()` inside tokio runtime context
+   - **Fix:** Wrapped state updates in `tokio::spawn()` with async operations
+   ```rust
+   // Clone Arc references for spawned task
+   let domains_clone = domains_notify.clone();
+   tokio::spawn(async move {
+       domains_clone.write().await.insert(domain_id, domain);
+   });
+   ```
+
+**Test Status:**
+- Test now progresses past network setup and domain creation
+- Still has timing issues with gossip propagation convergence
+- Next step: Add appropriate delays or polling logic for distributed state convergence
+
 **Commit:**
-- `8ac72ba` - refactor(icnctl): Migrate governance commands to use daemon RPC
+- `ec6ab50` - fix(governance): Fix integration test topic creation and async handling
+
+**Total Session 5 Commits:** 4 commits (1 main refactor + 1 doc update + 2 bug fixes)
+
+---
 
 ### Future Session: Trust Graph Integration
 
