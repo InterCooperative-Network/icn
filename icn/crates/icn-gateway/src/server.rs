@@ -11,6 +11,7 @@ use crate::auth::AuthManager;
 use crate::coop::CoopManager;
 use crate::events::EventBroadcaster;
 use crate::ledger_mgr::LedgerManager;
+use crate::rate_limit::{RateLimitConfig, RateLimiter};
 use crate::error::Result;
 
 /// Gateway server configuration
@@ -35,6 +36,9 @@ impl GatewayServer {
         let ledger_manager = Arc::new(LedgerManager::new());
         let event_broadcaster = Arc::new(EventBroadcaster::new());
 
+        // Create rate limiter with default config
+        let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+
         HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
@@ -45,35 +49,42 @@ impl GatewayServer {
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
+                .app_data(web::Data::new(rate_limiter.clone()))
                 // Middleware
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
-                // Health endpoint (public)
-                .service(api::health::health)
-                // Auth endpoints (public - needed to get tokens)
-                .service(api::auth::challenge)
-                .service(api::auth::verify)
-                // WebSocket endpoint (handles auth internally)
-                .service(api::websocket::websocket)
-                // Protected coop endpoints
+                // API v1 - versioned endpoints
                 .service(
-                    web::scope("/coops")
-                        .wrap(auth.clone())
-                        .service(api::coops::create_coop)
-                        .service(api::coops::get_coop)
-                        .service(api::coops::update_settings)
-                        .service(api::coops::delete_coop)
-                        .service(api::coops::add_member)
-                        .service(api::coops::remove_member)
-                        .service(api::coops::update_member_role)
-                )
-                // Protected ledger endpoints
-                .service(
-                    web::scope("/ledger")
-                        .wrap(auth)
-                        .service(api::ledger::get_balance)
-                        .service(api::ledger::create_payment)
-                        .service(api::ledger::get_history)
+                    web::scope("/v1")
+                        // Health endpoint (public)
+                        .service(api::health::health)
+                        // Auth endpoints (public - needed to get tokens)
+                        .service(api::auth::challenge)
+                        .service(api::auth::verify)
+                        // WebSocket endpoint (handles auth internally)
+                        .service(api::websocket::websocket)
+                        // Protected coop endpoints
+                        .service(
+                            web::scope("/coops")
+                                .wrap(actix_web::middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                                .wrap(auth.clone())
+                                .service(api::coops::create_coop)
+                                .service(api::coops::get_coop)
+                                .service(api::coops::update_settings)
+                                .service(api::coops::delete_coop)
+                                .service(api::coops::add_member)
+                                .service(api::coops::remove_member)
+                                .service(api::coops::update_member_role)
+                        )
+                        // Protected ledger endpoints
+                        .service(
+                            web::scope("/ledger")
+                                .wrap(actix_web::middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                                .wrap(auth)
+                                .service(api::ledger::get_balance)
+                                .service(api::ledger::create_payment)
+                                .service(api::ledger::get_history)
+                        )
                 )
         })
         .bind(self.bind_addr)?

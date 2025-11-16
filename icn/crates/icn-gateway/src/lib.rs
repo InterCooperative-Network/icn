@@ -18,10 +18,12 @@ pub mod events;
 pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;
+pub mod rate_limit;
 pub mod server;
 pub mod websocket;
 
 pub use auth::TokenClaims;
 pub use error::{GatewayError, Result};
 pub use events::{EventBroadcaster, GatewayEvent};
+pub use rate_limit::{RateLimitConfig, RateLimiter};
 pub use server::GatewayServer;

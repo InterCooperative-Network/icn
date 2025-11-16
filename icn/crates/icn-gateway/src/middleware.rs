@@ -9,7 +9,7 @@ use crate::error::GatewayError;
 
 /// Extract and verify JWT token from Authorization header
 pub async fn jwt_auth(
-    mut req: ServiceRequest,
+    req: ServiceRequest,
     credentials: BearerAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     // Get auth manager

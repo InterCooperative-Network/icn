@@ -20,6 +20,9 @@ pub enum GatewayError {
     #[error("Invalid request: {0}")]
     BadRequest(String),
 
+    #[error("Rate limit exceeded for DID: {0}")]
+    RateLimitExceeded(String),
+
     #[error("Internal server error: {0}")]
     InternalError(String),
 
@@ -37,6 +40,7 @@ impl ResponseError for GatewayError {
             GatewayError::AuthorizationFailed(_) => StatusCode::FORBIDDEN,
             GatewayError::NotFound(_) => StatusCode::NOT_FOUND,
             GatewayError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            GatewayError::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
             GatewayError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::SubstrateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
