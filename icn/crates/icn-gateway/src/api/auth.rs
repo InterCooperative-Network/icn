@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::auth::AuthManager;
 use crate::error::Result;
 use crate::models::{ChallengeRequest, ChallengeResponse, TokenResponse, VerifyRequest};
+use crate::validation;
 use icn_obs::metrics::gateway;
 
 /// POST /auth/challenge - Request authentication challenge
@@ -44,6 +45,12 @@ pub async fn verify(
             gateway::auth_failures_inc("invalid_did");
             crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}"))
         })?;
+
+    // Validate scopes
+    validation::validate_scopes(&req.scopes).map_err(|e| {
+        gateway::auth_failures_inc("invalid_scopes");
+        e
+    })?;
 
     let signature = hex::decode(&req.signature)
         .map_err(|e| {

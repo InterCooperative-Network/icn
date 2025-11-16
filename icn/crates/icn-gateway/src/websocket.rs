@@ -153,7 +153,13 @@ impl WsSession {
                     });
                 }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
-                    // Channel closed, stop polling
+                    // Channel closed - event broadcaster removed this coop or stopped
+                    // Close the WebSocket connection to prevent zombie connections
+                    tracing::warn!(
+                        "Event channel disconnected for coop {}, closing WebSocket",
+                        self.coop_id
+                    );
+                    ctx.stop();
                 }
             }
         }

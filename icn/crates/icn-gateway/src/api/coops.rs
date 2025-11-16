@@ -9,6 +9,7 @@ use crate::error::Result;
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::middleware::require_scope;
 use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest};
+use crate::validation;
 use icn_obs::metrics::gateway;
 
 fn timestamp() -> u64 {
@@ -46,6 +47,10 @@ pub async fn create_coop(
 
     let owner: icn_identity::Did = claims.sub.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
+    // Validate inputs
+    validation::validate_coop_id(&req.id)?;
+    validation::validate_coop_name(&req.name)?;
 
     coop_mgr.create_coop(
         req.id.clone(),
@@ -89,13 +94,17 @@ pub async fn update_settings(
 
     let mut coop = coop_mgr.get_coop(&id)?;
 
+    // Validate settings fields
     if let Some(gov) = &req.governance_model {
+        validation::validate_governance_model(gov)?;
         coop.settings.governance_model = gov.clone();
     }
     if let Some(policy) = &req.credit_policy {
+        validation::validate_credit_policy(policy)?;
         coop.settings.credit_policy = policy.clone();
     }
     if let Some(currency) = &req.currency {
+        validation::validate_currency(currency)?;
         coop.settings.currency = currency.clone();
     }
 
@@ -155,6 +164,9 @@ pub async fn add_member(
     require_scope(&http_req, "coop:admin")?;
 
     let mut coop = coop_mgr.get_coop(&id)?;
+
+    // Validate member count before adding
+    validation::validate_member_count(coop.members.len())?;
 
     let did: icn_identity::Did = req.did.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;

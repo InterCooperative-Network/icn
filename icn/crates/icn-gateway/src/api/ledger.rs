@@ -9,6 +9,7 @@ use crate::middleware::require_scope;
 use crate::models::{
     AccountDeltaResponse, BalanceResponse, CreatePaymentRequest, TransactionHistoryEntry,
 };
+use crate::validation;
 use icn_obs::metrics::gateway;
 
 /// GET /ledger/:coop_id/balance/:did - Get account balance
@@ -61,6 +62,10 @@ pub async fn create_payment(
             "Amount must be positive".to_string(),
         ));
     }
+
+    // Validate input fields
+    validation::validate_currency(&req.currency)?;
+    validation::validate_memo(&req.memo)?;
 
     let hash = ledger_mgr.create_payment(
         &coop_id,

@@ -20,6 +20,7 @@ pub mod middleware;
 pub mod models;
 pub mod rate_limit;
 pub mod server;
+pub mod validation;
 pub mod websocket;
 
 pub use auth::TokenClaims;
