@@ -73,6 +73,10 @@ impl TestNode {
 
             match net_msg.payload {
                 MessagePayload::Gossip(gossip_msg) => {
+                    // Log the gossip message type for debugging
+                    info!("Incoming gossip message: {} from {}",
+                          gossip_msg.variant_name(), sender_did);
+
                     // Spawn async task to avoid blocking in callback
                     tokio::spawn(async move {
                         let mut gossip = gossip_clone.write().await;
@@ -119,7 +123,9 @@ impl TestNode {
                     match gov_msg {
                         GovernanceMessage::DomainCreated { domain } => {
                             let domain_id = domain.id.clone();
-                            domains_clone.write().await.insert(domain_id, domain);
+                            info!("Storing domain with ID: {:?}", domain_id);
+                            domains_clone.write().await.insert(domain_id.clone(), domain);
+                            info!("Domain stored, total domains: {}", domains_clone.read().await.len());
                         }
                         GovernanceMessage::ProposalCreated { proposal } => {
                             let proposal_id = proposal.id.clone();
@@ -192,6 +198,9 @@ impl TestNode {
             let send_callback = Arc::new(move |recipient: Option<icn_identity::Did>, gossip_msg: icn_gossip::GossipMessage| {
                 let net_handle = network_handle_clone.clone();
                 let from = from_did.clone();
+                let msg_type = gossip_msg.variant_name();
+
+                info!("Send callback: sending {} to {:?}", msg_type, recipient);
 
                 tokio::spawn(async move {
                     let net_msg = icn_net::NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
@@ -279,13 +288,12 @@ impl TestNode {
         );
 
         let domain = GovernanceDomain::new(name, config);
-        let domain_id_obj = GovernanceDomainId(domain_id);
 
-        // Store locally
+        // Store locally using the domain's actual ID (not the parameter)
         self.domains
             .write()
             .await
-            .insert(domain_id_obj.clone(), domain.clone());
+            .insert(domain.id.clone(), domain.clone());
 
         // Broadcast
         let msg = GovernanceMessage::domain_created(domain.clone());
@@ -504,36 +512,53 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
 
     info!("✓ All nodes subscribed to governance topic");
 
-    // Connect nodes in a triangle: 1-2, 2-3, 1-3
+    // Connect nodes in a full mesh topology
+    // Node 1 → Node 2 and Node 3
     node1
         .network_handle
         .dial(node2.listen_addr, node2.did.clone())
+        .await?;
+    node1
+        .network_handle
+        .dial(node3.listen_addr, node3.did.clone())
+        .await?;
+
+    // Node 2 → Node 1 and Node 3
+    node2
+        .network_handle
+        .dial(node1.listen_addr, node1.did.clone())
         .await?;
     node2
         .network_handle
         .dial(node3.listen_addr, node3.did.clone())
         .await?;
-    node1
+
+    // Node 3 → Node 1 and Node 2
+    node3
         .network_handle
-        .dial(node3.listen_addr, node3.did.clone())
+        .dial(node1.listen_addr, node1.did.clone())
+        .await?;
+    node3
+        .network_handle
+        .dial(node2.listen_addr, node2.did.clone())
         .await?;
 
     tokio::time::sleep(Duration::from_millis(500)).await;
     info!("✓ Network connections established");
 
     // Node 1 creates a governance domain with all three members
-    let domain_id = GovernanceDomainId("tech-coop".to_string());
     let members = vec![node1.did.clone(), node2.did.clone(), node3.did.clone()];
 
-    let _domain = node1
+    let domain = node1
         .create_domain(
-            domain_id.0.clone(),
+            "tech-coop".to_string(), // Parameter is currently unused, domain gets auto-generated ID
             "Tech Cooperative".to_string(),
             members.clone(),
         )
         .await?;
 
-    info!("✓ Node 1 created governance domain: {}", domain_id.0);
+    let domain_id = domain.id.clone();
+    info!("✓ Node 1 created governance domain with ID: {:?}", domain_id);
 
     // Wait for domain propagation (increase timeout for Request/Response cycle)
     let domain_id_check = domain_id.clone();
