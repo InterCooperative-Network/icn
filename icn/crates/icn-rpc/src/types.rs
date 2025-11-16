@@ -145,6 +145,84 @@ pub struct VoteInfo {
     pub comment: Option<String>,
 }
 
+// Governance write operation requests
+
+/// Request to create a new governance domain
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateDomainRequest {
+    pub domain_id: String,
+    pub name: String,
+    pub profile: String,
+    pub params: GovernanceParamsInfo,
+    pub membership: MembershipConfigInfo,
+}
+
+/// Membership configuration for RPC
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum MembershipConfigInfo {
+    #[serde(rename = "static_list")]
+    StaticList { members: Vec<String> },
+    #[serde(rename = "trust_threshold")]
+    TrustThreshold { threshold: f64 },
+}
+
+/// Request to create a new proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProposalRequest {
+    pub domain_id: String,
+    pub title: String,
+    pub description: String,
+    pub payload: ProposalPayloadInfo,
+}
+
+/// Proposal payload for RPC
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ProposalPayloadInfo {
+    #[serde(rename = "text")]
+    Text { body: String },
+    #[serde(rename = "budget")]
+    Budget {
+        amount: i64,
+        currency: String,
+        recipient: String,
+        purpose: String,
+    },
+    #[serde(rename = "config_change")]
+    ConfigChange { new_config: String },
+    #[serde(rename = "membership")]
+    Membership { action: String, member: String },
+}
+
+/// Response from creating a proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProposalResponse {
+    pub proposal_id: String,
+}
+
+/// Request to open a proposal for voting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenProposalRequest {
+    pub proposal_id: String,
+    pub voting_period_seconds: u64,
+}
+
+/// Request to cast a vote
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CastVoteRequest {
+    pub proposal_id: String,
+    pub choice: String, // "for", "against", or "abstain"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+}
+
+/// Request to close a proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloseProposalRequest {
+    pub proposal_id: String,
+}
+
 impl RpcResponse {
     pub fn success(id: u64, result: serde_json::Value) -> Self {
         RpcResponse {
