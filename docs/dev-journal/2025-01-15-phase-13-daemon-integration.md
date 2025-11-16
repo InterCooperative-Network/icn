@@ -2,27 +2,43 @@
 
 **Date:** 2025-01-15
 **Author:** Claude (with Matt)
-**Status:** In Progress
-**Related Commits:** TBD
+**Status:** ✅ **COMPLETE** (Session 5 + Post-Session)
+**Related Commits:** 6 commits (8ac72ba, 2249ae8, 470679b, ec6ab50, e41eb99, 46aa5f1)
+
+## Completion Summary
+
+**Test Results:**
+- ✅ Unit tests: 424/424 passed (including 39 governance tests)
+- ✅ Integration test: `governance_integration` - **PASSING** (finished in 2.45s)
+- ✅ icnctl binary: Builds successfully with all 11 governance commands
+
+**What Was Accomplished:**
+- ✅ RPC endpoints for all governance write operations (domain, proposal, vote)
+- ✅ icnctl refactored to use daemon RPC instead of direct store access
+- ✅ Complete multi-node governance workflow validated (3 nodes, full lifecycle)
+- ✅ Gossip protocol integration working correctly
+- ✅ Bug fixes: quarantine list, topic creation, async handling, network topology, domain ID matching
+
+**Production Ready:** The governance implementation is ready for pilot deployment with static membership lists.
 
 ## Overview
 
-Phase 13 completed the governance substrate (types, CLI, integration test). Now we're elevating governance from a CLI-only feature to a **first-class daemonized subsystem** in `icnd`.
+Phase 13 completed the governance substrate (types, CLI, integration test). Session 5 elevated governance from a CLI-only feature to a **daemon-integrated subsystem** with full RPC support.
 
-## Current State (Before This Session)
+## Initial State (Before Session 5)
 
-**What exists:**
+**What existed:**
 - ✅ `icn-governance` crate with all core types (39 passing tests)
 - ✅ `icnctl gov` CLI commands (domain/proposal/vote CRUD)
-- ✅ Multi-node integration test (`governance_integration.rs`)
+- ✅ Multi-node integration test (`governance_integration.rs`) - NOT PASSING
 - ✅ Gossip protocol (7 `GovernanceMessage` types)
 - ✅ Storage pattern (`gov:domain:{id}`, `gov:proposal:{id}`, `gov:vote:{pid}:{voter}`)
 
-**What's missing:**
-- ❌ No `GovernanceActor` in `icn-core` runtime
-- ❌ CLI talks directly to `SledStore` (not daemon)
-- ❌ No time-based proposal closing
-- ❌ No trust graph integration for membership
+**What was missing:**
+- ❌ CLI talked directly to `SledStore` (not daemon RPC)
+- ❌ Integration test had infrastructure gaps
+- ❌ No time-based proposal closing (deferred)
+- ❌ No trust graph integration for membership (deferred)
 
 ## Design Decisions
 
@@ -485,7 +501,7 @@ Fixed two critical issues preventing `governance_integration.rs` from running:
    });
    ```
 
-**Test Status:**
+**Initial Test Status:**
 - Test now progresses past network setup and domain creation
 - Still has timing issues with gossip propagation convergence
 - Next step: Add appropriate delays or polling logic for distributed state convergence
@@ -493,7 +509,79 @@ Fixed two critical issues preventing `governance_integration.rs` from running:
 **Commit:**
 - `ec6ab50` - fix(governance): Fix integration test topic creation and async handling
 
-**Total Session 5 Commits:** 4 commits (1 main refactor + 1 doc update + 2 bug fixes)
+---
+
+### Post-Session 5 Continued: Integration Test Complete (SUCCESS ✅)
+
+After extensive debugging, the integration test now **passes completely**!
+
+**Final Root Causes Identified:**
+
+1. **Network Topology Issue (Critical)**
+   - **Problem:** Nodes 2 and 3 could receive Announce broadcasts but couldn't send Request messages back to node 1
+   - **Cause:** One-way network connections - node 1 dialed nodes 2/3, but reverse connections didn't exist
+   - **Why it matters:** Gossip uses pull-based protocol: Announce (broadcast) → Request (unicast to author) → Response (unicast back)
+   - **Solution:** Full mesh topology - all nodes dial all other nodes bidirectionally
+   ```rust
+   // Before: Triangle (node1→node2, node2→node3, node1→node3)
+   // After: Full mesh (all nodes dial each other)
+   node1.dial(node2.addr); node1.dial(node3.addr);
+   node2.dial(node1.addr); node2.dial(node3.addr);
+   node3.dial(node1.addr); node3.dial(node2.addr);
+   ```
+
+2. **Domain ID Mismatch (Final Bug)**
+   - **Problem:** Test checked for `GovernanceDomainId("tech-coop")` but domain had auto-generated UUID
+   - **Cause:** `GovernanceDomain::new(name, config)` ignores custom IDs, always generates UUID via `GovernanceDomainId::generate()`
+   - **Solution:** Use actual `domain.id` from created domain instead of hardcoded string
+   ```rust
+   // Before:
+   let domain_id = GovernanceDomainId("tech-coop".to_string());
+
+   // After:
+   let domain = node1.create_domain(...).await?;
+   let domain_id = domain.id.clone(); // Use actual UUID
+   ```
+
+3. **Gossip Infrastructure Gaps**
+   - **Missing send_callback:** Added to route gossip messages over network layer
+   - **Missing Announce broadcasts:** `publish()` only stores locally, must manually broadcast Announce
+   - **Async blocking:** Fixed incoming_handler to use `tokio::spawn()` instead of `blocking_write()`
+
+**Test Result:**
+```
+test test_governance_proposal_lifecycle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s
+```
+
+**What the Test Validates:**
+- ✅ 3-node distributed network with full mesh topology
+- ✅ Gossip protocol: Announce → Request → Response flow
+- ✅ Domain creation and cross-node propagation
+- ✅ Proposal creation, opening, voting, and closing
+- ✅ Distributed voting: 3 participants cast votes (2 For, 1 Against)
+- ✅ Vote tallying and outcome evaluation (66% approval → Accepted)
+- ✅ Notification callbacks fire correctly on all nodes
+- ✅ Complete governance workflow over gossip
+
+**Key Technical Learnings:**
+- ICN gossip is **pull-based**, not push-based - requires bidirectional connections
+- `publish()` does NOT broadcast - must manually send Announce messages
+- Network topology matters: full mesh ensures symmetric communication paths
+- GovernanceDomain IDs are auto-generated UUIDs, not custom strings
+
+**Debug Techniques Used:**
+- Added logging to trace message flow (Announce, Request, Response)
+- Logged domain storage to verify IDs match
+- Increased timeouts and added retry logic for distributed state convergence
+- Tested network connectivity before expecting gossip propagation
+
+**Commits:**
+1. `e41eb99` - fix(governance): Improve integration test gossip infrastructure
+2. `46aa5f1` - fix(governance): Complete governance integration test - ALL TESTS PASS ✅
+
+**Total Session 5 + Post-Session Commits:** 6 commits
 
 ---
 
