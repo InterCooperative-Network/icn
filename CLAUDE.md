@@ -390,7 +390,7 @@ icnctl gov vote show --proposal-id <id>
 
 ---
 
-**Phase 14 - Gateway API (Complete ✓)** (2025-01-15):
+**Phase 14 - Gateway API (Complete ✓)** (2025-01-15, Production Hardening: 2025-11-16):
 - [x] REST API server with actix-web framework
 - [x] JWT-based authentication with challenge-response flow
 - [x] Cooperative namespace management (CRUD operations)
@@ -398,29 +398,38 @@ icnctl gov vote show --proposal-id <id>
 - [x] WebSocket real-time event streaming
 - [x] Event broadcasting system with pub/sub
 - [x] JWT middleware protecting all endpoints
-- [x] All 30 tests pass
+- [x] API versioning (/v1 namespacing)
+- [x] Per-DID rate limiting (token bucket algorithm)
+- [x] Scope-based authorization enforcement
+- [x] Authenticated DID extraction for ownership
+- [x] All 38 tests pass
 
 **Gateway Features**:
 - **Authentication**: DID-based challenge-response → JWT tokens with configurable TTL
+- **Authorization**: Scope-based access control (ledger:read, ledger:write, coop:read, coop:write, coop:admin)
+- **Rate Limiting**: Per-DID token bucket (100 burst, 10/sec refill) prevents abuse
 - **Cooperative Management**: Create/read/update/delete coops, member management, role assignments
 - **Ledger Operations**: Query balances, create payments, view transaction history
 - **Real-time Events**: WebSocket subscriptions to cooperative events (member added/removed, role updated, settings changed)
-- **Security**: Bearer token authentication on all protected endpoints, token validation middleware
+- **API Versioning**: All endpoints under /v1 scope for backward compatibility
+- **Security**: Three-layer security (auth → rate limiting → authorization)
 
 **API Endpoints**:
 - **Public**: `/health`, `/auth/challenge`, `/auth/verify`, `/ws/{coop_id}`
 - **Protected**: `/coops/*` (cooperative management), `/ledger/*` (ledger operations)
 
 **Architecture** (`icn-gateway/`):
-- **server.rs**: Actix-web HTTP server with middleware stack
+- **server.rs**: Actix-web HTTP server with /v1 public/protected scopes and middleware composition
 - **auth.rs**: JWT token generation and verification, challenge-response protocol
-- **middleware.rs**: Bearer token authentication middleware
+- **middleware.rs**: JWT authentication middleware + authorization helpers (require_scope, get_claims)
+- **rate_limit.rs**: Token bucket rate limiter with per-DID tracking and automatic cleanup
 - **coop.rs**: Cooperative state management (in-memory for Phase 14)
 - **ledger_mgr.rs**: Ledger operations wrapper
 - **events.rs**: Event broadcasting with tokio mpsc channels
 - **websocket.rs**: WebSocket session management with JWT auth
-- **api/**: REST endpoint handlers (auth, coops, ledger, websocket, health)
+- **api/**: REST endpoint handlers (auth, coops, ledger, websocket, health) with scope enforcement
 - **models.rs**: Request/response DTOs
+- **error.rs**: GatewayError types with HTTP status mapping (401, 403, 429, etc.)
 
 **WebSocket Protocol**:
 ```rust
@@ -433,12 +442,25 @@ icnctl gov vote show --proposal-id <id>
 {"type": "Error", "message": "..."}
 ```
 
-**Security Model**:
-- Challenge nonce expires after 5 minutes
-- JWT tokens expire after 24 hours (configurable)
-- Tokens scoped to cooperative ID + permissions
-- WebSocket connections validate coop_id matches token
-- All endpoints except auth/health require valid Bearer token
+**Security Model** (Three-Layer Architecture):
+1. **Authentication Layer** (JWT middleware):
+   - DID-based challenge-response flow
+   - Challenge nonce expires after 5 minutes
+   - JWT tokens expire after 24 hours (configurable)
+   - Bearer token validation on protected endpoints
+   - Inserts TokenClaims into request extensions
+
+2. **Rate Limiting Layer** (per-DID middleware):
+   - Token bucket algorithm (100 burst capacity, 10 tokens/sec refill)
+   - Independent limits per authenticated DID
+   - Prevents API flooding and abuse
+   - Returns HTTP 429 when limit exceeded
+
+3. **Authorization Layer** (handler-level):
+   - Scope-based access control
+   - Fine-grained permissions (read/write/admin)
+   - Prevents privilege escalation
+   - Returns HTTP 403 when scope missing
 
 **Gateway Integration with icnd** (2025-01-15):
 The gateway is integrated into the main ICN daemon and can be enabled via configuration:
@@ -604,30 +626,36 @@ wscat -c ws://localhost:8080/ws/my-coop
 
 ---
 
-**Phase 14 - Platform Layer (REST API Gateway) (Complete ✓)** (2025-01-15):
+**Phase 14 - Platform Layer (REST API Gateway) (Complete ✓)** (2025-01-15, Production Hardening: 2025-11-16):
 - [x] icn-gateway crate - Actix-web HTTP server
 - [x] Authentication endpoints - Challenge/verify flow with JWT tokens
 - [x] Cooperative namespace management - CRUD + member roles
 - [x] Ledger API endpoints - Balance, payment, transaction history
 - [x] Per-coop isolation - Separate ledgers per cooperative
 - [x] WebSocket event streaming - Real-time updates for ledger/coop events
-- [x] All 26 tests passing (9 auth + 5 coop + 5 ledger + 2 integration + 5 events/websocket)
+- [x] API versioning - /v1 namespacing for backward compatibility
+- [x] Per-DID rate limiting - Token bucket algorithm (100 burst, 10/sec refill)
+- [x] Scope-based authorization - All protected endpoints enforce JWT scopes
+- [x] Authenticated DID extraction - Cooperative owners use real JWT claims
+- [x] All 38 tests passing (5 rate limiting + 2 authorization + 1 ownership + 30 existing)
 
-**Gateway API (14 endpoints)**:
-- **Authentication**: `POST /auth/challenge`, `POST /auth/verify`
-- **Cooperatives**: 7 endpoints (create, get, update, delete, member CRUD)
-- **Ledger**: `GET /ledger/:coop/balance/:did`, `POST /ledger/:coop/payment`, `GET /ledger/:coop/history`
-- **WebSocket**: `GET /ws/:coop_id` (real-time event streaming)
-- **Health**: `GET /health`
+**Gateway API (14 endpoints under /v1)**:
+- **Authentication**: `POST /v1/auth/challenge`, `POST /v1/auth/verify`
+- **Cooperatives**: 7 endpoints under `/v1/coops/*` (create, get, update, delete, member CRUD)
+- **Ledger**: `GET /v1/ledger/:coop/balance/:did`, `POST /v1/ledger/:coop/payment`, `GET /v1/ledger/:coop/history`
+- **WebSocket**: `GET /v1/ws/:coop_id` (real-time event streaming)
+- **Health**: `GET /v1/health`
 
 **Architecture**:
 - **AuthManager**: DID-based challenge/verify with JWT capability tokens
 - **CoopManager**: In-memory namespace storage (Owner/Admin/Member roles)
 - **LedgerManager**: Per-coop mutual credit ledgers with SledStore backend
 - **EventBroadcaster**: Pub/sub event distribution with per-coop isolation
+- **RateLimiter**: Token bucket per-DID rate limiting with automatic cleanup
 - **WsSession**: WebSocket actor with heartbeat/ping-pong and automatic cleanup
-- **Error Handling**: HTTP status mapping, JSON error responses
-- **Middleware**: Logging, compression
+- **Error Handling**: HTTP status mapping (401, 403, 429), JSON error responses
+- **Middleware**: JWT auth, rate limiting, logging, compression
+- **Authorization**: Scope-based access control (ledger:read/write, coop:read/write/admin)
 
 **Event Types**: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated
 
