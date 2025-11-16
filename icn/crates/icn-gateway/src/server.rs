@@ -53,7 +53,7 @@ impl GatewayServer {
                 // Middleware
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
-                // API v1 - versioned endpoints
+                // API v1 - public endpoints (no auth required)
                 .service(
                     web::scope("/v1")
                         // Health endpoint (public)
@@ -63,11 +63,13 @@ impl GatewayServer {
                         .service(api::auth::verify)
                         // WebSocket endpoint (handles auth internally)
                         .service(api::websocket::websocket)
+                )
+                // API v1 - protected endpoints (auth + rate limiting)
+                .service(
+                    web::scope("/v1")
                         // Protected coop endpoints
                         .service(
                             web::scope("/coops")
-                                .wrap(actix_web::middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                                .wrap(auth.clone())
                                 .service(api::coops::create_coop)
                                 .service(api::coops::get_coop)
                                 .service(api::coops::update_settings)
@@ -79,12 +81,13 @@ impl GatewayServer {
                         // Protected ledger endpoints
                         .service(
                             web::scope("/ledger")
-                                .wrap(actix_web::middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                                .wrap(auth)
                                 .service(api::ledger::get_balance)
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
                         )
+                        // Apply auth first, then rate limiting (wrapping order: last runs first)
+                        .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                        .wrap(auth)
                 )
         })
         .bind(self.bind_addr)?
