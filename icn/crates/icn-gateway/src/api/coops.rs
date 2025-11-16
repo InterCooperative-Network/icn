@@ -1,12 +1,13 @@
 //! Cooperative namespace API endpoints
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::coop::{CoopManager, MemberRole};
 use crate::error::Result;
 use crate::events::{EventBroadcaster, GatewayEvent};
+use crate::middleware::require_scope;
 use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest};
 
 fn timestamp() -> u64 {
@@ -30,10 +31,14 @@ fn parse_role(role_str: &str) -> Result<MemberRole> {
 /// POST /coops - Create a new cooperative
 #[post("")]
 pub async fn create_coop(
+    http_req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     req: web::Json<CreateCoopRequest>,
     // TODO: Extract owner DID from authenticated token
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "coop:write")?;
+
     // For now, generate a placeholder owner DID - will be replaced with auth middleware
     use icn_identity::IdentityBundle;
     let bundle = IdentityBundle::generate()
@@ -54,9 +59,13 @@ pub async fn create_coop(
 /// GET /coops/:id - Get cooperative info
 #[get("/{id}")]
 pub async fn get_coop(
+    req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&req, "coop:read")?;
+
     let coop = coop_mgr.get_coop(&id)?;
     Ok(HttpResponse::Ok().json(coop))
 }
@@ -64,11 +73,15 @@ pub async fn get_coop(
 /// PUT /coops/:id/settings - Update cooperative settings
 #[put("/{id}/settings")]
 pub async fn update_settings(
+    http_req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<UpdateSettingsRequest>,
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "coop:admin")?;
+
     let mut coop = coop_mgr.get_coop(&id)?;
 
     if let Some(gov) = &req.governance_model {
@@ -99,9 +112,13 @@ pub async fn update_settings(
 /// DELETE /coops/:id - Delete cooperative
 #[delete("/{id}")]
 pub async fn delete_coop(
+    req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&req, "coop:admin")?;
+
     coop_mgr.delete_coop(&id)?;
     Ok(HttpResponse::NoContent().finish())
 }
@@ -109,11 +126,15 @@ pub async fn delete_coop(
 /// POST /coops/:id/members - Add a member to cooperative
 #[post("/{id}/members")]
 pub async fn add_member(
+    http_req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<AddMemberRequest>,
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "coop:admin")?;
+
     let mut coop = coop_mgr.get_coop(&id)?;
 
     let did: icn_identity::Did = req.did.parse()
@@ -142,10 +163,14 @@ pub async fn add_member(
 /// DELETE /coops/:id/members/:did - Remove a member from cooperative
 #[delete("/{id}/members/{did}")]
 pub async fn remove_member(
+    req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&req, "coop:admin")?;
+
     let (coop_id, did_str) = path.into_inner();
     let mut coop = coop_mgr.get_coop(&coop_id)?;
 
@@ -172,11 +197,15 @@ pub async fn remove_member(
 /// PUT /coops/:id/members/:did/role - Update member role
 #[put("/{id}/members/{did}/role")]
 pub async fn update_member_role(
+    http_req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
     path: web::Path<(String, String)>,
     req: web::Json<UpdateRoleRequest>,
 ) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "coop:admin")?;
+
     let (coop_id, did_str) = path.into_inner();
     let mut coop = coop_mgr.get_coop(&coop_id)?;
 
@@ -206,12 +235,15 @@ pub async fn update_member_role(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App};
+    use actix_web::{test, App, HttpMessage};
+    use crate::auth::TokenClaims;
     use icn_identity::IdentityBundle;
 
     #[actix_web::test]
     async fn test_create_and_get_coop() {
         let coop_mgr = Arc::new(CoopManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
@@ -222,24 +254,42 @@ mod tests {
                 )
         ).await;
 
-        // Create coop
+        // Create coop with authorization
         let req_body = CreateCoopRequest {
             id: "test-coop".to_string(),
             name: "Test Cooperative".to_string(),
         };
 
-        let req = test::TestRequest::post()
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["coop:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let mut req = test::TestRequest::post()
             .uri("/coops")
             .set_json(&req_body)
             .to_request();
+        req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        // Get coop
-        let req = test::TestRequest::get()
+        // Get coop with authorization
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["coop:read".to_string()],
+            exp: 9999999999,
+        };
+
+        let mut req = test::TestRequest::get()
             .uri("/coops/test-coop")
             .to_request();
+        req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
@@ -271,27 +321,111 @@ mod tests {
                 )
         ).await;
 
-        // Add member
+        // Add member with authorization
         let req_body = AddMemberRequest {
             did: member.did().to_string(),
             role: "member".to_string(),
         };
 
-        let req = test::TestRequest::post()
+        let claims = TokenClaims {
+            sub: owner.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["coop:admin".to_string()],
+            exp: 9999999999,
+        };
+
+        let mut req = test::TestRequest::post()
             .uri("/coops/test-coop/members")
             .set_json(&req_body)
             .to_request();
+        req.extensions_mut().insert(claims.clone());
 
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        // Remove member
+        // Remove member with authorization
         let uri = format!("/coops/test-coop/members/{}", member.did());
-        let req = test::TestRequest::delete()
+        let mut req = test::TestRequest::delete()
             .uri(&uri)
             .to_request();
+        req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
+    }
+
+    #[actix_web::test]
+    async fn test_authorization_scope_check() {
+        let coop_mgr = Arc::new(CoopManager::new());
+        let broadcaster = Arc::new(EventBroadcaster::new());
+        let owner = IdentityBundle::generate().unwrap();
+        let member = IdentityBundle::generate().unwrap();
+
+        // Create coop directly
+        coop_mgr.create_coop(
+            "test-coop".to_string(),
+            "Test".to_string(),
+            owner.did().clone(),
+            timestamp(),
+        ).unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_mgr.clone()))
+                .app_data(web::Data::new(broadcaster.clone()))
+                .service(
+                    web::scope("/coops")
+                        .service(add_member)
+                        .service(update_settings)
+                )
+        ).await;
+
+        // Try to add member with only "coop:read" scope (should fail)
+        let req_body = AddMemberRequest {
+            did: member.did().to_string(),
+            role: "member".to_string(),
+        };
+
+        let claims = TokenClaims {
+            sub: owner.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["coop:read".to_string()], // Wrong scope!
+            exp: 9999999999,
+        };
+
+        let mut req = test::TestRequest::post()
+            .uri("/coops/test-coop/members")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+
+        // Try to update settings with "coop:read" scope (should fail)
+        let req_body = UpdateSettingsRequest {
+            governance_model: Some("consensus".to_string()),
+            credit_policy: None,
+            currency: None,
+        };
+
+        let claims = TokenClaims {
+            sub: owner.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["coop:read".to_string()], // Wrong scope!
+            exp: 9999999999,
+        };
+
+        let mut req = test::TestRequest::put()
+            .uri("/coops/test-coop/settings")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
     }
 }

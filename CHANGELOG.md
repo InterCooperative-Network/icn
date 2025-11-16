@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Scope-Based Authorization (Phase 14 Continued) (2025-11-16)
+
+**Authorization Enforcement:**
+- All protected endpoints now enforce JWT scope-based authorization
+- `require_scope()` helper function validates scopes against required permissions
+- HTTP 403 Forbidden response when required scope missing
+- Scope hierarchy:
+  - `ledger:read` - Required for balance queries and transaction history
+  - `ledger:write` - Required for creating payments
+  - `coop:read` - Required for viewing cooperative information
+  - `coop:write` - Required for creating cooperatives
+  - `coop:admin` - Required for member management and settings changes
+- 2 comprehensive authorization tests verify correct scope enforcement
+- Total: 37 tests passing (up from 35)
+
+**Security Benefits:**
+- Prevents privilege escalation (read-only tokens cannot write)
+- Fine-grained access control for API operations
+- Clear separation between read and write permissions
+- Administrative operations require explicit `coop:admin` scope
+
 ### Added - Gateway API Improvements (Phase 14 Continued) (2025-11-16)
 
 **API Versioning:**

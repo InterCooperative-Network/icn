@@ -38,6 +38,20 @@ pub fn get_claims(req: &HttpRequest) -> Option<TokenClaims> {
     req.extensions().get::<TokenClaims>().cloned()
 }
 
+/// Check if request has required scope
+pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), GatewayError> {
+    let claims = get_claims(req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    if !claims.scopes.contains(&required_scope.to_string()) {
+        return Err(GatewayError::AuthorizationFailed(
+            format!("Missing required scope: {}", required_scope)
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
