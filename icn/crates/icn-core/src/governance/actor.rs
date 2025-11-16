@@ -1,0 +1,511 @@
+//! GovernanceActor implementation
+//!
+//! This actor manages governance state and coordinates distributed decision-making
+//! across the ICN network.
+
+use anyhow::{bail, Result};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::RwLock;
+use tracing::{info, warn};
+
+use icn_gossip::GossipActor;
+use icn_identity::Did;
+use icn_store::Store;
+
+use icn_governance::{
+    DecisionOutcome, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceMessage,
+    GovernanceParams, GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipConfig,
+    MembershipResolver, Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
+    TallySnapshot, Vote, VoteChoice, VoteTally,
+};
+
+/// Gossip topic for governance messages
+const GOVERNANCE_TOPIC: &str = "governance:proposal";
+
+/// Lightweight config for creating domains
+#[derive(Clone, Debug)]
+pub struct GovernanceConfigLite {
+    pub profile: String,
+    pub params: GovernanceParams,
+    pub membership: MembershipConfig,
+}
+
+/// Commands that can be submitted to the governance actor
+#[derive(Debug)]
+pub enum GovernanceCommand {
+    CreateDomain {
+        domain_id: GovernanceDomainId,
+        name: String,
+        config: GovernanceConfigLite,
+    },
+    CreateProposal {
+        domain_id: GovernanceDomainId,
+        title: String,
+        description: String,
+        payload: ProposalPayload,
+    },
+    OpenProposal {
+        proposal_id: ProposalId,
+        voting_period_seconds: u64,
+    },
+    CastVote {
+        proposal_id: ProposalId,
+        choice: VoteChoice,
+        comment: Option<String>,
+    },
+    CloseProposal {
+        proposal_id: ProposalId,
+    },
+}
+
+/// Handle for interacting with the governance actor
+#[derive(Clone)]
+pub struct GovernanceHandle {
+    inner: Arc<RwLock<GovernanceActor>>,
+}
+
+impl GovernanceHandle {
+    /// Submit a command to the governance actor
+    pub async fn submit(&self, cmd: GovernanceCommand) -> Result<()> {
+        self.inner.write().await.handle(cmd).await
+    }
+
+    /// List all governance domains
+    pub async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
+        self.inner.read().await.list_domains()
+    }
+
+    /// List all proposals
+    pub async fn list_proposals(&self) -> Result<Vec<Proposal>> {
+        self.inner.read().await.list_proposals()
+    }
+
+    /// Get a specific domain
+    pub async fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
+        self.inner.read().await.load_domain(id)
+    }
+
+    /// Get a specific proposal
+    pub async fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
+        self.inner.read().await.load_proposal(id)
+    }
+}
+
+/// The governance actor
+pub struct GovernanceActor {
+    did: Did,
+    store: Arc<dyn Store>,
+    gossip: Arc<RwLock<GossipActor>>,
+    resolver: Arc<dyn MembershipResolver + Send + Sync>,
+    profile: GovernanceProfile,
+}
+
+impl GovernanceActor {
+    /// Spawn a new governance actor
+    pub async fn spawn(
+        did: Did,
+        store: Arc<dyn Store>,
+        gossip: Arc<RwLock<GossipActor>>,
+        resolver: Arc<dyn MembershipResolver + Send + Sync>,
+    ) -> Result<GovernanceHandle> {
+        info!("Spawning GovernanceActor for DID: {}", did);
+
+        // Subscribe to governance topic
+        {
+            let mut g = gossip.write().await;
+            g.subscribe(GOVERNANCE_TOPIC, did.clone())?;
+        }
+
+        // Set up notification callback for incoming messages
+        let store_notify = store.clone();
+        let did_notify = did.clone();
+
+        {
+            let mut g = gossip.write().await;
+            g.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
+                if topic != GOVERNANCE_TOPIC {
+                    return;
+                }
+
+                match GovernanceMessage::from_bytes(&entry.data) {
+                    Ok(msg) => {
+                        info!("[{}] Received governance message: {}", did_notify, msg.message_type());
+                        if let Err(e) = handle_incoming(store_notify.as_ref(), msg) {
+                            warn!("Failed to handle incoming governance message: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to deserialize governance message: {}", e);
+                    }
+                }
+            }));
+        }
+
+        let actor = GovernanceActor {
+            did,
+            store,
+            gossip,
+            resolver,
+            profile: GovernanceProfile::cooperative_default(),
+        };
+
+        Ok(GovernanceHandle {
+            inner: Arc::new(RwLock::new(actor)),
+        })
+    }
+
+    /// Handle a governance command
+    async fn handle(&mut self, cmd: GovernanceCommand) -> Result<()> {
+        match cmd {
+            GovernanceCommand::CreateDomain {
+                domain_id,
+                name,
+                config,
+            } => {
+                info!("Creating governance domain: {}", domain_id.0);
+
+                let profile_id = GovernanceProfileId::builtin(&config.profile);
+                let domain = GovernanceDomain::new(
+                    name,
+                    GovernanceConfig::new(profile_id, config.membership, config.params),
+                );
+
+                // Persist locally
+                self.store
+                    .put(&domain_key(&domain_id), &serde_json::to_vec(&domain)?)?;
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::domain_created(domain))
+                    .await?;
+
+                info!("✓ Domain created: {}", domain_id.0);
+            }
+
+            GovernanceCommand::CreateProposal {
+                domain_id,
+                title,
+                description,
+                payload,
+            } => {
+                info!("Creating proposal: {}", title);
+
+                let proposal = Proposal::new(
+                    domain_id,
+                    self.did.clone(),
+                    title.clone(),
+                    description,
+                    payload,
+                );
+
+                let proposal_id = proposal.id.clone();
+
+                // Persist locally
+                self.store.put(
+                    &proposal_key(&proposal_id),
+                    &serde_json::to_vec(&proposal)?,
+                )?;
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::proposal_created(proposal))
+                    .await?;
+
+                info!("✓ Proposal created: {} (ID: {})", title, proposal_id.0);
+            }
+
+            GovernanceCommand::OpenProposal {
+                proposal_id,
+                voting_period_seconds,
+            } => {
+                info!("Opening proposal: {}", proposal_id.0);
+
+                // Load proposal
+                let mut proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+                // Open it
+                proposal.open(voting_period_seconds)?;
+
+                // Extract timestamps from state
+                let (opened_at, closes_at) = match &proposal.state {
+                    ProposalState::Open {
+                        opened_at,
+                        closes_at,
+                    } => (*opened_at, *closes_at),
+                    _ => bail!("Proposal failed to transition to Open state"),
+                };
+
+                // Persist updated state
+                self.store.put(
+                    &proposal_key(&proposal_id),
+                    &serde_json::to_vec(&proposal)?,
+                )?;
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::proposal_opened(
+                    proposal_id.clone(),
+                    opened_at,
+                    closes_at,
+                ))
+                .await?;
+
+                info!("✓ Proposal opened: {}", proposal_id.0);
+            }
+
+            GovernanceCommand::CastVote {
+                proposal_id,
+                choice,
+                comment,
+            } => {
+                info!("Casting vote on proposal: {}", proposal_id.0);
+
+                let mut vote = Vote::new(proposal_id.clone(), self.did.clone(), choice);
+                if let Some(c) = comment {
+                    vote = vote.with_comment(c);
+                }
+
+                // Persist locally
+                self.store.put(
+                    &vote_key(&proposal_id, &self.did),
+                    &serde_json::to_vec(&vote)?,
+                )?;
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::vote_cast(vote, None))
+                    .await?;
+
+                info!("✓ Vote cast: {:?}", choice);
+            }
+
+            GovernanceCommand::CloseProposal { proposal_id } => {
+                info!("Closing proposal: {}", proposal_id.0);
+
+                // Load proposal
+                let mut proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+                // Load domain
+                let domain = self
+                    .load_domain(&proposal.domain_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
+
+                // Load and tally votes
+                let votes = self.load_votes(&proposal_id)?;
+                let tally = VoteTally::from(votes);
+
+                // Resolve eligible membership
+                let eligible_count = self.resolver.member_count(&domain)?;
+
+                // Evaluate outcome
+                let outcome_result =
+                    self.profile
+                        .evaluate(&tally, &domain.config.params, eligible_count)?;
+
+                // Map to proposal state
+                let now = now_seconds();
+                let new_state = match outcome_result {
+                    DecisionOutcome::Accepted => ProposalState::Accepted { closed_at: now },
+                    DecisionOutcome::Rejected => ProposalState::Rejected { closed_at: now },
+                    DecisionOutcome::NoQuorum => ProposalState::NoQuorum { closed_at: now },
+                };
+
+                // Update proposal
+                proposal.close(new_state)?;
+
+                // Persist updated state
+                self.store.put(
+                    &proposal_key(&proposal_id),
+                    &serde_json::to_vec(&proposal)?,
+                )?;
+
+                // Create tally snapshot for broadcast
+                let tally_snapshot = TallySnapshot::new(
+                    tally.for_votes,
+                    tally.against_votes,
+                    tally.abstain_votes,
+                    eligible_count,
+                );
+
+                // Map outcome for message
+                let outcome_msg = match outcome_result {
+                    DecisionOutcome::Accepted => ProposalOutcome::Accepted,
+                    DecisionOutcome::Rejected => ProposalOutcome::Rejected,
+                    DecisionOutcome::NoQuorum => ProposalOutcome::NoQuorum,
+                };
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::proposal_closed(
+                    proposal_id.clone(),
+                    outcome_msg,
+                    now,
+                    tally_snapshot,
+                ))
+                .await?;
+
+                info!("✓ Proposal closed: {} ({:?})", proposal_id.0, outcome_result);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Publish a governance message to the network
+    async fn publish(&self, msg: GovernanceMessage) -> Result<[u8; 32]> {
+        let bytes = msg.to_bytes()?;
+        let mut g = self.gossip.write().await;
+        let hash = g.publish(GOVERNANCE_TOPIC, bytes)?;
+        Ok(hash)
+    }
+
+    /// List all domains
+    fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
+        let prefix = domain_key_prefix();
+        let rows = self.store.scan(prefix)?;
+        rows.into_iter()
+            .map(|(_k, v)| Ok(serde_json::from_slice::<GovernanceDomain>(&v)?))
+            .collect()
+    }
+
+    /// List all proposals
+    fn list_proposals(&self) -> Result<Vec<Proposal>> {
+        let prefix = proposal_key_prefix();
+        let rows = self.store.scan(prefix)?;
+        rows.into_iter()
+            .map(|(_k, v)| Ok(serde_json::from_slice::<Proposal>(&v)?))
+            .collect()
+    }
+
+    /// Load a domain by ID
+    fn load_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
+        load_json(self.store.as_ref(), &domain_key(id))
+    }
+
+    /// Load a proposal by ID
+    fn load_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
+        load_json(self.store.as_ref(), &proposal_key(id))
+    }
+
+    /// Load all votes for a proposal
+    fn load_votes(&self, id: &ProposalId) -> Result<Vec<Vote>> {
+        let prefix = vote_key_prefix(id);
+        let rows = self.store.scan(&prefix)?;
+        rows.into_iter()
+            .map(|(_k, v)| Ok(serde_json::from_slice::<Vote>(&v)?))
+            .collect()
+    }
+}
+
+/// Handle incoming governance messages from gossip
+fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
+    match msg {
+        GovernanceMessage::DomainCreated { domain } => {
+            // Use domain.id as the key
+            let id = GovernanceDomainId(domain.id.0.clone());
+            store.put(&domain_key(&id), &serde_json::to_vec(&domain)?)?;
+        }
+
+        GovernanceMessage::ProposalCreated { proposal } => {
+            store.put(
+                &proposal_key(&proposal.id),
+                &serde_json::to_vec(&proposal)?,
+            )?;
+        }
+
+        GovernanceMessage::ProposalOpened {
+            id,
+            opened_at,
+            closes_at,
+        } => {
+            // Load, update state, persist
+            if let Some(proposal) = load_json::<Proposal>(store, &proposal_key(&id))? {
+                // Force state to Open (idempotent for convergence)
+                let updated = Proposal {
+                    state: ProposalState::Open {
+                        opened_at,
+                        closes_at,
+                    },
+                    updated_at: now_seconds(),
+                    ..proposal
+                };
+                store.put(&proposal_key(&id), &serde_json::to_vec(&updated)?)?;
+            }
+        }
+
+        GovernanceMessage::VoteCast { vote, .. } => {
+            store.put(
+                &vote_key(&vote.proposal_id, &vote.voter),
+                &serde_json::to_vec(&vote)?,
+            )?;
+        }
+
+        GovernanceMessage::ProposalClosed {
+            id,
+            outcome,
+            closed_at,
+            ..
+        } => {
+            if let Some(mut proposal) = load_json::<Proposal>(store, &proposal_key(&id))? {
+                let new_state = match outcome {
+                    ProposalOutcome::Accepted => ProposalState::Accepted { closed_at },
+                    ProposalOutcome::Rejected => ProposalState::Rejected { closed_at },
+                    ProposalOutcome::NoQuorum => ProposalState::NoQuorum { closed_at },
+                };
+                proposal.close(new_state)?;
+                store.put(&proposal_key(&id), &serde_json::to_vec(&proposal)?)?;
+            }
+        }
+
+        _ => {
+            // Ignore other message types for now (future: DomainUpdated, ProposalCancelled)
+        }
+    }
+
+    Ok(())
+}
+
+// ---- Storage key helpers (aligned with icnctl) ----
+
+fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
+    format!("gov:domain:{}", id.0).into_bytes()
+}
+
+fn domain_key_prefix() -> &'static [u8] {
+    b"gov:domain:"
+}
+
+fn proposal_key(id: &ProposalId) -> Vec<u8> {
+    format!("gov:proposal:{}", id.0).into_bytes()
+}
+
+fn proposal_key_prefix() -> &'static [u8] {
+    b"gov:proposal:"
+}
+
+fn vote_key(proposal_id: &ProposalId, voter: &Did) -> Vec<u8> {
+    format!("gov:vote:{}:{}", proposal_id.0, voter).into_bytes()
+}
+
+fn vote_key_prefix(proposal_id: &ProposalId) -> Vec<u8> {
+    format!("gov:vote:{}:", proposal_id.0).into_bytes()
+}
+
+// ---- Utility functions ----
+
+fn load_json<T: for<'a> serde::Deserialize<'a>>(
+    store: &dyn Store,
+    key: &[u8],
+) -> Result<Option<T>> {
+    match store.get(key)? {
+        Some(v) => Ok(Some(serde_json::from_slice::<T>(&v)?)),
+        None => Ok(None),
+    }
+}
+
+fn now_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}

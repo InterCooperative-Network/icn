@@ -29,6 +29,7 @@ icn-ccl.workspace = true
 icn-obs.workspace = true
 icn-snapshot.workspace = true
 icn-gateway.workspace = true
+icn-governance.workspace = true
 
 [dev-dependencies]
 rustls.workspace = true

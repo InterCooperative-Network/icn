@@ -774,6 +774,22 @@ impl Supervisor {
                 }
             }
 
+            // Spawn Governance actor
+            let gov_store_path = self.config.store_path().join("governance");
+            let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
+            let gov_resolver: Arc<dyn icn_governance::MembershipResolver + Send + Sync> =
+                Arc::new(icn_governance::StaticMembershipResolver::new());
+
+            let _governance_handle = crate::governance::GovernanceActor::spawn(
+                did.clone(),
+                gov_store,
+                gossip_handle.clone(),
+                gov_resolver,
+            )
+            .await?;
+
+            info!("✓ Governance actor spawned at {}", gov_store_path.display());
+
             // Spawn RPC server with network, ledger, contract, and gossip handles
             let rpc_port = self.config.network.rpc_port;
             let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
