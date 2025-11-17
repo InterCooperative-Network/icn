@@ -58,16 +58,23 @@ impl EventBroadcaster {
     }
 
     /// Subscribe to events for a cooperative
-    pub async fn subscribe(&self, coop_id: &str) -> tokio::sync::mpsc::UnboundedReceiver<GatewayEvent> {
+    /// Returns None if the subscriber limit has been reached for this cooperative
+    pub async fn subscribe(&self, coop_id: &str) -> Option<tokio::sync::mpsc::UnboundedReceiver<GatewayEvent>> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         let mut subscribers = self.subscribers.write().await;
-        subscribers
+        let subs = subscribers
             .entry(coop_id.to_string())
-            .or_insert_with(Vec::new)
-            .push(tx);
+            .or_insert_with(Vec::new);
 
-        rx
+        // Check subscriber limit to prevent DoS via unlimited WebSocket connections
+        if subs.len() >= crate::validation::MAX_SUBSCRIBERS_PER_COOP {
+            return None;
+        }
+
+        subs.push(tx);
+
+        Some(rx)
     }
 
     /// Broadcast an event to all subscribers of a cooperative
@@ -133,7 +140,7 @@ mod tests {
     async fn test_subscribe_and_broadcast() {
         let broadcaster = EventBroadcaster::new();
 
-        let mut rx = broadcaster.subscribe("test-coop").await;
+        let mut rx = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
 
         let event = GatewayEvent::PaymentCreated {
             coop_id: "test-coop".to_string(),
@@ -162,8 +169,8 @@ mod tests {
     async fn test_multiple_subscribers() {
         let broadcaster = EventBroadcaster::new();
 
-        let mut rx1 = broadcaster.subscribe("test-coop").await;
-        let mut rx2 = broadcaster.subscribe("test-coop").await;
+        let mut rx1 = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
+        let mut rx2 = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
 
         let event = GatewayEvent::MemberAdded {
             coop_id: "test-coop".to_string(),
@@ -181,7 +188,7 @@ mod tests {
     async fn test_cleanup_closed_channels() {
         let broadcaster = EventBroadcaster::new();
 
-        let rx = broadcaster.subscribe("test-coop").await;
+        let rx = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
         drop(rx); // Close the channel
 
         broadcaster.cleanup("test-coop").await;

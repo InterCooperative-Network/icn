@@ -32,6 +32,10 @@ pub const MAX_MEMBERS_PER_COOP: usize = 10_000;
 /// This prevents unbounded memory growth from cooperative creation DoS
 pub const MAX_COOPERATIVES: usize = 1_000;
 
+/// Maximum number of WebSocket subscribers per cooperative
+/// This prevents unbounded memory growth from subscription DoS
+pub const MAX_SUBSCRIBERS_PER_COOP: usize = 1_000;
+
 /// Maximum number of scopes in a token request
 pub const MAX_SCOPES: usize = 20;
 

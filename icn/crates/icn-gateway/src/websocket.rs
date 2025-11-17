@@ -109,19 +109,31 @@ impl WsSession {
                             event_broadcaster.subscribe(&coop_id).await
                         }
                         .into_actor(self)
-                        .map(|rx, act, ctx| {
-                            act.event_rx = Some(rx);
-                            // Start polling for events
-                            act.poll_events(ctx);
+                        .map(|rx_opt, act, ctx| {
+                            match rx_opt {
+                                Some(rx) => {
+                                    act.event_rx = Some(rx);
+                                    // Start polling for events
+                                    act.poll_events(ctx);
+
+                                    // Send success message
+                                    let msg = ServerMessage::AuthOk {
+                                        did: act.did.as_ref().unwrap().to_string(),
+                                    };
+                                    act.send_message(msg, ctx);
+                                }
+                                None => {
+                                    // Subscriber limit reached
+                                    let msg = ServerMessage::AuthError {
+                                        message: "Subscriber limit reached for this cooperative".to_string(),
+                                    };
+                                    act.send_message(msg, ctx);
+                                    ctx.stop();
+                                }
+                            }
                         });
 
                         ctx.wait(fut);
-
-                        // Send success message
-                        let msg = ServerMessage::AuthOk {
-                            did: did.to_string(),
-                        };
-                        self.send_message(msg, ctx);
                     }
                     Err(e) => {
                         let msg = ServerMessage::AuthError {
