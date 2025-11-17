@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - NAT Traversal Phase 3 Part 1: Candidate Cache & Connection Attempts (2025-11-17)
+
+**Hole Punching Infrastructure:**
+
+- **CandidateCache** (New module: `icn-net/src/candidate_cache.rs`, 339 lines)
+  - TTL-based cache with default 5-minute expiration
+  - **Freshness validation:** Rejects stale candidates before storage
+  - **Timestamp ordering:** Only updates if new candidate is fresher
+  - **Automatic cleanup:** `cleanup_expired()` removes stale entries
+  - **Thread-safe:** `Arc<RwLock<HashMap<Did, ConnectionCandidate>>>`
+  - **Methods:**
+    - `store(candidate) -> bool` - Returns true if candidate stored/updated
+    - `get(did) -> Option<ConnectionCandidate>` - Returns None if stale
+    - `remove(did)`, `cleanup_expired() -> usize`
+    - `len()`, `is_empty()`
+  - **Test Coverage:** 7 comprehensive tests (store, get, staleness, update priority, cleanup, remove)
+
+- **Supervisor Integration** (`icn-core/src/supervisor.rs`)
+  - Created CandidateCache instance before notification callback
+  - Captured cache and network_handle in candidate notification handler
+  - **Updated candidate handler logic:**
+    1. Store candidate in cache (early return if stale/older)
+    2. Check if peer already connected via `get_peers()` (skip dial if yes)
+    3. Attempt connection with address priority
+    4. Log success/failure for each attempt
+
+- **Connection Strategy:**
+  - **Priority 1:** Try local_addr first (LAN connectivity, same network)
+  - **Priority 2:** Try public_addr if local fails (NAT hole punching via STUN)
+  - **Priority 3:** Reserved for relay_addr (Phase 4: TURN relay)
+  - **Graceful degradation:** All failures logged, no panics
+  - **Duplicate dial prevention:** Checks `get_peers()` before attempting
+  - **Async connection attempts:** Spawned in `tokio::spawn` to avoid blocking
+
+- **Connection Logging:**
+  - `✅ Connected to <did> via local address <addr>` (LAN success)
+  - `✅ Connected to <did> via public address <addr> (NAT traversal)` (WAN success)
+  - `Could not establish direct connection to <did>` (both methods failed)
+
+**Integration Flow (Updated):**
+1. Network actor starts → STUN discovery (Phase 1)
+2. Subscribe to network:candidates topic
+3. Dial bootstrap peers (for WAN connectivity)
+4. Generate and publish own connection candidate (Phase 2)
+5. **Receive peer candidates → store in cache (Phase 3)**
+6. **Attempt connection if not already connected (Phase 3)**
+
+**Progress Tracking:**
+
+- ✅ **Phase 1 Complete:** STUN Discovery (commit 2f917c1)
+- ✅ **Phase 2 Complete:** Connection Candidate Exchange (commits 9258046, 06e2396)
+- ✅ **Phase 3 Part 1 Complete:** Candidate Cache & Connection Attempts (commit acd1793)
+- ⏳ **Phase 3 Part 2 Next:** Multi-node integration test
+- ⏳ **Phase 4 Future:** TURN relay for symmetric NAT
+
+**Test Results:** All 419 workspace tests passing (93 icn-net tests)
+
+**References:**
+- Design: `docs/nat-traversal-design.md` lines 114-155 (Hole Punching architecture)
+- MVC Track: Week 3-4, Days 5-6 (Hole Punching implementation)
+
 ### Added - NAT Traversal Phase 2: Connection Candidate Exchange (2025-11-17)
 
 **ConnectionCandidate Infrastructure** (Part 1):
