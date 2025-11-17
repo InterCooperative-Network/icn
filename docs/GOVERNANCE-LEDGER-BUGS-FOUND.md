@@ -268,50 +268,63 @@ tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
 ---
 
-## 🟢 LOW: No Unsubscribe Mechanism
+## ✅ LOW: No Unsubscribe Mechanism (FIXED)
 
 **Severity**: LOW
 **Impact**: Potential memory leak if subscribers are added dynamically
+**Status**: ✅ FIXED (2025-11-17)
 
 ### Description
 
 `EventBus` allows subscribers to be added but never removed. The `Vec<EventCallback>` grows without bounds.
 
-### Current Code
-
-```rust
-pub struct EventBus {
-    subscribers: Arc<RwLock<Vec<EventCallback>>>,  // Never shrinks!
-}
-
-pub async fn subscribe(&self, callback: EventCallback) {
-    self.subscribers.write().await.push(callback);
-    // No way to remove this callback
-}
-```
-
 ### Impact Assessment
 
 For the current use case (system-wide events registered once at startup), this is acceptable. However, if event subscriptions become dynamic, this becomes a leak.
 
-### Recommended Fix
+### ✅ Fix Applied (2025-11-17)
 
-Add subscription handles:
+**Implementation**: Added SubscriptionHandle with automatic cleanup in `events.rs:49-116`
 
+**Changes**:
+1. Created `SubscriptionHandle` struct with Drop trait
+2. Modified `EventBus.subscribers` from `Vec<EventCallback>` to `Vec<(usize, EventCallback)>` with unique IDs
+3. Added `next_id: Arc<AtomicUsize>` for thread-safe ID generation
+4. Changed `subscribe()` to return `SubscriptionHandle`
+5. Updated `emit()` to iterate over (id, callback) tuples
+6. Added test `test_event_bus_unsubscribe_on_drop`
+
+**Safety Features**:
+- Drop uses `try_write()` not `blocking_write()` to avoid panics during async runtime shutdown
+- Silently skips cleanup if lock unavailable (better than panicking)
+- Debug logging for subscription add/remove events
+
+**Code**:
 ```rust
 pub struct SubscriptionHandle {
     id: usize,
-    bus: Weak<RwLock<Vec<(usize, EventCallback)>>>,
+    subscribers: Arc<RwLock<Vec<(usize, EventCallback)>>>,
 }
 
 impl Drop for SubscriptionHandle {
     fn drop(&mut self) {
-        if let Some(bus) = self.bus.upgrade() {
-            bus.blocking_write().retain(|(id, _)| *id != self.id);
+        // Use try_write() to avoid panicking if the lock is held
+        // (this can happen during async runtime shutdown)
+        if let Ok(mut subs) = self.subscribers.try_write() {
+            let initial_count = subs.len();
+            subs.retain(|(id, _)| *id != self.id);
+            let removed_count = initial_count - subs.len();
+            if removed_count > 0 {
+                debug!("Event bus subscriber {} removed (remaining: {})", self.id, subs.len());
+            }
         }
+        // If we can't get the lock, silently skip cleanup
+        // The subscription will remain in memory, but this is better than panicking
     }
 }
 ```
+
+**Impact**: Prevents memory leaks if subscriptions become dynamic, safe cleanup during shutdown
 
 ---
 
@@ -457,7 +470,7 @@ Should use `decided_at` from the event instead.
 | ✅ MEDIUM | Shutdown race condition | **FIXED** |
 | ✅ LOW | Missing metrics | **FIXED** |
 | ✅ LOW | Audit timestamp inaccuracy | **FIXED** |
-| 🟢 LOW | No unsubscribe mechanism | **OPTIONAL** |
+| ✅ LOW | No unsubscribe mechanism | **FIXED** |
 
 ## Next Steps
 
@@ -466,12 +479,12 @@ Should use `decided_at` from the event instead.
 3. ~~**Implement graceful shutdown for in-flight tasks**~~ ✅ COMPLETE
 4. ~~**Add Prometheus metrics**~~ ✅ COMPLETE
 5. ~~**Add audit trail decision timestamp**~~ ✅ COMPLETE
-6. Implement proper task tracking with JoinSet (OPTIONAL - replaces grace period)
-7. Implement dead-letter queue for failed audit trails (OPTIONAL - automated reconciliation)
-8. Add EventBus unsubscribe mechanism (OPTIONAL - prevents memory leak)
+6. ~~**Add EventBus unsubscribe mechanism**~~ ✅ COMPLETE
+7. Implement proper task tracking with JoinSet (OPTIONAL - replaces grace period)
+8. Implement dead-letter queue for failed audit trails (OPTIONAL - automated reconciliation)
 
 ---
 
-**Status**: ✅ All critical, medium, and observability issues FIXED
-**Governance→Ledger Integration**: Production-ready with full metrics
-**Remaining Work**: Optional enhancements only (timestamps, task tracking, dead-letter queue)
+**Status**: ✅ ALL issues FIXED (critical + medium + low priority)
+**Governance→Ledger Integration**: Production-ready with full metrics & safety
+**Remaining Work**: Optional enhancements only (JoinSet task tracking, dead-letter queue)
