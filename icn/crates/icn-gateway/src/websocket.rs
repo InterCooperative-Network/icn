@@ -135,17 +135,19 @@ impl WsSession {
 
                         ctx.wait(fut);
                     }
-                    Err(e) => {
+                    Err(_e) => {
+                        // Generic error to prevent enumeration attacks
                         let msg = ServerMessage::AuthError {
-                            message: format!("Invalid DID in token: {e}"),
+                            message: "Authentication failed".to_string(),
                         };
                         self.send_message(msg, ctx);
                     }
                 }
             }
-            Err(e) => {
+            Err(_e) => {
+                // Generic error to prevent enumeration attacks
                 let msg = ServerMessage::AuthError {
-                    message: format!("Token verification failed: {e}"),
+                    message: "Authentication failed".to_string(),
                 };
                 self.send_message(msg, ctx);
             }
@@ -207,6 +209,23 @@ impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        // Check global connection limit BEFORE incrementing
+        let current_active = WS_ACTIVE_CONNECTIONS.load(Ordering::Relaxed);
+        if current_active >= crate::validation::MAX_TOTAL_WEBSOCKET_CONNECTIONS {
+            tracing::warn!(
+                "Global WebSocket connection limit reached: {} (max {})",
+                current_active,
+                crate::validation::MAX_TOTAL_WEBSOCKET_CONNECTIONS
+            );
+            // Send error and immediately close
+            let msg = ServerMessage::Error {
+                message: "Server connection limit reached".to_string(),
+            };
+            self.send_message(msg, ctx);
+            ctx.stop();
+            return;
+        }
+
         // Track connection
         let active = WS_ACTIVE_CONNECTIONS.fetch_add(1, Ordering::Relaxed) + 1;
         gateway::websocket_connections_inc();
@@ -235,6 +254,22 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for WsSe
                 self.last_heartbeat = Instant::now();
             }
             Ok(ws::Message::Text(text)) => {
+                // Validate message size BEFORE parsing to prevent memory exhaustion
+                if text.len() > crate::validation::MAX_WEBSOCKET_MESSAGE_SIZE {
+                    tracing::warn!(
+                        "WebSocket message too large: {} bytes (max {})",
+                        text.len(),
+                        crate::validation::MAX_WEBSOCKET_MESSAGE_SIZE
+                    );
+                    let msg = ServerMessage::Error {
+                        message: "Message too large".to_string(),
+                    };
+                    self.send_message(msg, ctx);
+                    // Close connection on oversized message (potential attack)
+                    ctx.stop();
+                    return;
+                }
+
                 // Parse client message
                 match serde_json::from_str::<ClientMessage>(&text) {
                     Ok(ClientMessage::Auth { token }) => {

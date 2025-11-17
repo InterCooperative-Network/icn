@@ -50,6 +50,16 @@ pub const MAX_HISTORY_LIMIT: usize = 1_000;
 /// Default number of history entries to return if not specified
 pub const DEFAULT_HISTORY_LIMIT: usize = 100;
 
+/// Maximum WebSocket message size (64KB)
+/// Prevents memory exhaustion from extremely large JSON payloads
+pub const MAX_WEBSOCKET_MESSAGE_SIZE: usize = 65_536;
+
+/// Maximum total active WebSocket connections across all cooperatives
+/// Prevents resource exhaustion from unlimited connection attacks
+/// With MAX_SUBSCRIBERS_PER_COOP=1,000 and MAX_COOPERATIVES=1,000,
+/// theoretical max is 1 million, but we limit to 10,000 total connections
+pub const MAX_TOTAL_WEBSOCKET_CONNECTIONS: u64 = 10_000;
+
 /// Validate cooperative ID
 pub fn validate_coop_id(id: &str) -> Result<()> {
     if id.is_empty() {
