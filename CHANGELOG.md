@@ -23,9 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added audit trail check before ledger execution to prevent double-counting
 - If ProposalAccepted event processed multiple times (replay, gossip duplicates, restarts), transaction only executes once
 - First execution creates audit record, subsequent attempts check for existence and skip
+- **Critical safety improvement**: Fail-safe error handling refuses execution if audit trail check fails
+  - Initial flaw: `if let Ok(Some(_))` silently treated store errors as "not executed", allowing duplicates during storage failures
+  - Fix: Explicit match on all cases (Ok(Some), Ok(None), Err) with fail-safe behavior
+  - Fail-safe principle: Refuse execution when unable to verify, preventing duplicates even during storage issues
+  - New metric: `execution_failures_inc("audit_check_failed")` tracks verification failures
 - Prevents financial integrity violations from duplicate payments
 - Test: `test_duplicate_proposal_event_is_idempotent` verifies fix
-- Location: [icn-core/src/supervisor.rs:1007-1012](icn/crates/icn-core/src/supervisor.rs#L1007-L1012)
+- Location: [icn-core/src/supervisor.rs:1010-1032](icn/crates/icn-core/src/supervisor.rs#L1010-L1032)
 
 **Medium: Enhanced error handling for partial failures:**
 - If ledger succeeds but audit trail fails, comprehensive error logging for manual reconciliation
