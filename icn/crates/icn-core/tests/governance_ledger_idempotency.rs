@@ -70,10 +70,22 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                                 use icn_ledger::entry::JournalEntryBuilder;
 
                                 // IDEMPOTENCY CHECK: Skip if proposal already executed
+                                // Uses fail-safe pattern: refuse execution if cannot verify
                                 let audit_key = format!("gov:audit:{}", prop_id.0);
-                                if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
-                                    info!("Proposal {} already executed, skipping duplicate event", prop_id.0);
-                                    return;
+                                match store.get(audit_key.as_bytes()) {
+                                    Ok(Some(_)) => {
+                                        info!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+                                        return;
+                                    }
+                                    Ok(None) => {
+                                        // Not executed yet, proceed
+                                    }
+                                    Err(e) => {
+                                        // Store read error: REFUSE to execute (fail-safe)
+                                        eprintln!("ERROR: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
+                                        eprintln!("       Refusing to execute to prevent potential duplicate");
+                                        return;
+                                    }
                                 }
 
                                 let mut ledger_guard = ledger.write().await;
