@@ -190,6 +190,10 @@ impl CoopManager {
         let mut coops = self.coops.write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
+        // Check global cooperative limit atomically (while holding write lock)
+        // This prevents TOCTOU race where multiple threads check limit concurrently
+        crate::validation::validate_coop_count(coops.len())?;
+
         if coops.contains_key(&id) {
             return Err(GatewayError::BadRequest("Coop ID already exists".to_string()));
         }

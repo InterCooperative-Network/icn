@@ -52,10 +52,8 @@ pub async fn create_coop(
     validation::validate_coop_id(&req.id)?;
     validation::validate_coop_name(&req.name)?;
 
-    // Check global cooperative limit
-    let current_count = coop_mgr.count()?;
-    validation::validate_coop_count(current_count)?;
-
+    // Note: Global cooperative limit is checked atomically inside create_coop()
+    // to prevent TOCTOU race condition
     coop_mgr.create_coop(
         req.id.clone(),
         req.name.clone(),
