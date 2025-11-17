@@ -111,6 +111,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Defense-in-Depth:** Two layers of protection (validation + saturating arithmetic)
   - **Verification:** New test coverage validates offset limits
 
+- **BUG #28 (CRITICAL):** Unbounded channel memory leak in WebSocket event polling
+  - **Problem:** WebSocket event polling only processed ONE event per 100ms poll cycle
+  - **Location:** `websocket.rs:161-196` - `poll_events()` method
+  - **Attack Scenario:**
+    1. Cooperative with 1,000 WebSocket subscribers (max allowed)
+    2. High-activity period: 100 payment events/second
+    3. Each event cloned and sent to all 1,000 channels
+    4. **Consumption**: 10 events/sec per channel (1 event per 100ms poll)
+    5. **Arrival**: 100 events/sec per channel
+    6. **Growth**: 90 events/sec × 1,000 channels = 90,000 events/sec accumulation
+  - **Memory Impact:**
+    - After 1 minute: ~5,400 events/channel × 1,000 = 5.4M events buffered
+    - After 10 minutes: 54M events buffered (~27 GB at 500 bytes/event)
+    - **Result**: OOM crash, complete service outage
+  - **Root Causes:**
+    1. Using `UnboundedSender`/`UnboundedReceiver` (no backpressure mechanism)
+    2. Processing only ONE event per poll instead of draining all available
+    3. No limit on channel buffer size
+    4. No event dropping when overwhelmed
+  - **Fix:**
+    1. Changed `poll_events()` to drain ALL available events per poll cycle using loop
+    2. Added MAX_EVENTS_PER_POLL = 1,000 safety limit to prevent actor starvation
+    3. Warning logged when limit hit (indicates backlog exists)
+    4. Maintains 100ms poll interval but processes up to 1,000 events per poll
+  - **Performance:** Can now handle 10,000 events/sec per WebSocket (vs previous 10/sec)
+  - **Remaining Risk:** Extreme sustained load >10,000 events/sec could still cause backlog
+  - **Monitoring:** Warning logs when MAX_EVENTS_PER_POLL hit indicate need for bounded channels
+
 **Earlier TOCTOU Race Condition Fixes:**
 
 - **BUG #7 (CRITICAL):** Timing attack in authentication prevented

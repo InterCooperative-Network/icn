@@ -159,39 +159,58 @@ impl WsSession {
     }
 
     /// Poll for events from the event broadcaster
+    /// SECURITY: Drains ALL available events per poll to prevent unbounded channel growth
     fn poll_events(&mut self, ctx: &mut <Self as Actor>::Context) {
         if let Some(ref mut rx) = self.event_rx {
-            // Try to receive events
-            match rx.try_recv() {
-                Ok(event) => {
-                    // Forward event to client
-                    let msg = ServerMessage::Event(event);
-                    if let Ok(json) = serde_json::to_string(&msg) {
-                        ctx.text(json);
-                        // Track message sent
-                        gateway::websocket_messages_sent_inc();
+            // CRITICAL FIX: Drain ALL available events in this poll cycle
+            // Previous code only processed ONE event per 100ms, causing unbounded buffer growth
+            // when events arrived faster than 10/second (e.g., 100 payments/sec × 1000 subscribers)
+            let mut events_processed = 0;
+            const MAX_EVENTS_PER_POLL: usize = 1000; // Safety limit to prevent starvation
+
+            loop {
+                match rx.try_recv() {
+                    Ok(event) => {
+                        // Forward event to client
+                        let msg = ServerMessage::Event(event);
+                        if let Ok(json) = serde_json::to_string(&msg) {
+                            ctx.text(json);
+                            // Track message sent
+                            gateway::websocket_messages_sent_inc();
+                        }
+
+                        events_processed += 1;
+
+                        // Safety limit: prevent infinite loop if events arrive faster than we process
+                        if events_processed >= MAX_EVENTS_PER_POLL {
+                            tracing::warn!(
+                                "WebSocket event processing hit limit ({} events/poll), backlog may exist",
+                                MAX_EVENTS_PER_POLL
+                            );
+                            break;
+                        }
                     }
-                    // Continue polling
-                    ctx.run_later(Duration::from_millis(100), |act, ctx| {
-                        act.poll_events(ctx);
-                    });
-                }
-                Err(mpsc::error::TryRecvError::Empty) => {
-                    // No events yet, poll again later
-                    ctx.run_later(Duration::from_millis(100), |act, ctx| {
-                        act.poll_events(ctx);
-                    });
-                }
-                Err(mpsc::error::TryRecvError::Disconnected) => {
-                    // Channel closed - event broadcaster removed this coop or stopped
-                    // Close the WebSocket connection to prevent zombie connections
-                    tracing::warn!(
-                        "Event channel disconnected for coop {}, closing WebSocket",
-                        self.coop_id
-                    );
-                    ctx.stop();
+                    Err(mpsc::error::TryRecvError::Empty) => {
+                        // All events drained, schedule next poll
+                        break;
+                    }
+                    Err(mpsc::error::TryRecvError::Disconnected) => {
+                        // Channel closed - event broadcaster removed this coop or stopped
+                        // Close the WebSocket connection to prevent zombie connections
+                        tracing::warn!(
+                            "Event channel disconnected for coop {}, closing WebSocket",
+                            self.coop_id
+                        );
+                        ctx.stop();
+                        return; // Don't schedule next poll
+                    }
                 }
             }
+
+            // Schedule next poll cycle
+            ctx.run_later(Duration::from_millis(100), |act, ctx| {
+                act.poll_events(ctx);
+            });
         }
     }
 
