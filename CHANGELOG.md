@@ -7,7 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed - Gateway Memory Leaks and Storage (Phase 14 Continued) (2025-11-16)
+### Fixed - Gateway Production Hardening (Phase 14 Continued) (2025-11-16)
+
+**Critical DoS & Security Fixes:**
+
+- **BUG #15 (CRITICAL):** Unbounded transaction history DoS prevented
+  - **Problem:** `GET /ledger/:coop/history` loaded ALL transactions into memory via `get_all_entries()`
+  - **Impact:** Cooperative with millions of transactions would cause OOM crash, no pagination limits
+  - **Fix:** Added pagination with `?offset=0&limit=100` query parameters (max 1,000 per request, default 100)
+  - **Validation:** New `validate_history_limit()` function enforces MAX_HISTORY_LIMIT = 1,000
+  - **Limitation:** Still loads all entries before pagination due to ledger API constraints (TODO: cursor-based pagination in icn-ledger)
+
+- **BUG #16 (HIGH):** Graceful shutdown for background cleanup task
+  - **Problem:** Background cleanup task ran indefinitely with `loop`, no shutdown handling
+  - **Impact:** Server shutdown left cleanup task running, prevented clean termination
+  - **Fix:** Added tokio::broadcast shutdown channel, cleanup task uses tokio::select! to listen for shutdown signal
+  - **Implementation:** Server awaits completion, signals cleanup task, 100ms grace period for cleanup to finish
+
+- **BUG #17 (HIGH):** HTTP timeout configuration prevents connection exhaustion
+  - **Problem:** No HTTP timeout settings configured, slow clients could hold connections indefinitely
+  - **Impact:** Connection pool exhaustion, slow-loris DoS attacks possible
+  - **Fix:** Added production-ready timeouts:
+    - `keep_alive`: 75 seconds (standard HTTP/1.1 keep-alive)
+    - `client_request_timeout`: 30 seconds (prevents slow-loris)
+    - `client_disconnect_timeout`: 5 seconds (prevents hanging on dead clients)
+
+**Input Validation Improvements:**
+
+- **BUG #18 (MEDIUM):** Signature length validation in auth verify
+  - **Problem:** `hex::decode()` called without validating Ed25519 signature length (must be 64 bytes)
+  - **Impact:** Wasted CPU on expensive verification for obviously invalid lengths (0-byte, 1000-byte, etc.)
+  - **Fix:** Validate length == 64 bytes AFTER decode, BEFORE crypto operation
+  - **Metric:** Track `auth_failures_inc("invalid_signature_length")`
+
+- **BUG #19 (LOW):** Cooperative ID validation in auth verify
+  - **Problem:** `req.coop_id` passed to `verify_challenge()` without validation
+  - **Impact:** Minor - could allow malformed coop IDs in JWT tokens (API endpoints do validate)
+  - **Fix:** Call `validate_coop_id()` before token generation
+  - **Metric:** Track `auth_failures_inc("invalid_coop_id")`
+
+**Earlier TOCTOU Race Condition Fixes:**
+
+- **BUG #7 (CRITICAL):** Timing attack in authentication prevented
+  - **Problem:** Early returns in `verify_challenge()` bypassed expensive signature verification
+  - **Impact:** Attackers could measure response times to enumerate valid DIDs
+  - **Fix:** Always perform signature verification (real or dummy) for constant-time behavior
+  - **Implementation:** Dummy verification with Ed25519 when parsing fails
+
+- **BUG #8 (CRITICAL):** Information leakage in authentication errors
+  - **Problem:** Different error messages revealed why authentication failed (parsing vs signature vs expiration)
+  - **Impact:** Enumeration attacks to discover valid DIDs, challenges, signatures
+  - **Fix:** Generic "Authentication failed" message for all failure modes
+
+- **BUG #9 (CRITICAL):** Unbounded cooperative creation DoS
+  - **Problem:** No global limit on number of cooperatives
+  - **Impact:** Memory exhaustion via unlimited coop creation
+  - **Fix:** MAX_COOPERATIVES = 1,000 limit enforced atomically
+
+- **BUG #10 (MEDIUM):** Timestamp panic on clock manipulation
+  - **Problem:** `.unwrap()` on SystemTime could panic if system clock set before Unix epoch
+  - **Fix:** Replaced with descriptive `.expect()` message
+
+- **BUG #11 (CRITICAL):** TOCTOU race in cooperative creation limit
+  - **Problem:** Count check outside atomic `create_coop()` operation
+  - **Impact:** Concurrent threads could bypass MAX_COOPERATIVES limit
+  - **Fix:** Moved `validate_coop_count()` inside `create_coop()` while holding write lock
+
+- **BUG #12 (CRITICAL):** TOCTOU race in member addition limit + false documentation
+  - **Problem:** (1) Comment claimed validation in `add_member()` but it didn't exist (2) Racy check outside atomic operation
+  - **Impact:** Concurrent threads could bypass MAX_MEMBERS_PER_COOP limit
+  - **Fix:** Added `validate_member_count()` inside `add_member()` method
+
+- **BUG #13 (HIGH):** Unbounded WebSocket subscriber DoS
+  - **Problem:** No limit on WebSocket subscriptions per cooperative
+  - **Impact:** Memory exhaustion via unlimited WebSocket connections
+  - **Fix:** MAX_SUBSCRIBERS_PER_COOP = 1,000 limit, `subscribe()` returns Option
+
+- **BUG #14 (MEDIUM):** Dummy verification logic error
+  - **Problem:** Dummy signature verification succeeded instead of failed (signed message verified against same message)
+  - **Impact:** Timing attack mitigation ineffective in edge cases
+  - **Fix:** Verify dummy signature against DIFFERENT message to ensure it always fails
+
+**Test Coverage:**
+- **51 tests passing** (49 existing + 2 new validation tests)
+- New tests: `test_verify_endpoint_invalid_signature_length`, `test_verify_endpoint_invalid_coop_id`
+
+### Fixed - Gateway Memory Leaks and Storage (2025-11-16)
 
 **Critical Memory Leak Fixes:**
 - **FIXED:** Rate limiter bucket cleanup now runs automatically via background task
