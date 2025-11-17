@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Configurable STUN Servers (2025-11-17)
+
+**Operators can now customize STUN servers via configuration:**
+
+- **NetworkConfig Extension** (`icn-core/src/config.rs:49`)
+  - New field: `stun_servers: Vec<String>` with hostname/IP:port format
+  - Default: Google's public STUN servers (`stun.l.google.com:19302`, `stun1.l.google.com:19302`)
+  - Empty list disables STUN discovery (passes `None` to SessionManager)
+
+- **Supervisor Integration** (`icn-core/src/supervisor.rs:387-413`)
+  - Parses STUN server strings from config
+  - Resolves DNS hostnames to socket addresses at startup
+  - Logs successful/failed resolution for observability
+  - Passes resolved addresses to `NetworkActor::spawn`
+
+- **Configuration Example:**
+  ```toml
+  [network]
+  stun_servers = [
+    "stun.l.google.com:19302",
+    "stun1.l.google.com:19302",
+    "stun.example.com:3478"
+  ]
+  ```
+
+- **Benefits:**
+  - **Privacy:** Use private STUN servers instead of public ones
+  - **Performance:** Configure geographically-close servers
+  - **Flexibility:** Hostname resolution supports dynamic IPs
+  - **Majority Vote:** Multiple servers enable consensus (see below)
+
+**Tests:** All 460 tests passing (updated 14 test files)
+
+---
+
 ### Improved - STUN Majority Vote for Robust NAT Discovery (2025-11-17)
 
 **Enhanced STUN reliability with parallel queries and consensus:**
