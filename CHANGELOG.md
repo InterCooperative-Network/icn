@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - NAT Traversal Phase 1: STUN Discovery (2025-11-17)
+
+**STUN Client Implementation:**
+
+- **Manual RFC 5389 STUN protocol** implementation (373 lines, zero external dependencies)
+  - **Location:** `icn-net/src/stun.rs`
+  - **Features:**
+    - IPv4 and IPv6 XOR-MAPPED-ADDRESS parsing
+    - Retry logic with exponential backoff (3 attempts, 5s timeout, 100-400ms backoff)
+    - Async DNS resolution for STUN server hostnames (tokio::net::lookup_host)
+    - Configurable timeout and retry count
+    - Google STUN servers helper: `StunClient::with_google_stun()`
+  - **Test Coverage:** 3 comprehensive tests (creation, config, integration with real server)
+  - **Decision:** Manual implementation preferred over external libraries (stun-rs, rustun) for simplicity and control
+
+**SessionManager Integration:**
+
+- Added **public endpoint discovery** on startup if STUN servers configured
+  - **New field:** `public_endpoint: Arc<RwLock<Option<SocketAddr>>>`
+  - **New parameter:** `stun_servers: Option<Vec<SocketAddr>>` in `SessionManager::start()`
+  - **Behavior:** Discovers public endpoint, logs result, stores for future use
+  - **Graceful degradation:** Logs warning but doesn't fail startup if STUN discovery fails
+  - **Public API:** `SessionManager::public_endpoint()` getter method
+
+**Integration Points:**
+
+- **NetworkActor** updated with `None` for stun_servers parameter (TODO: add config)
+- **Test updates:** All 3 SessionManager test helpers updated to pass new parameter
+- **Export:** `StunClient` publicly exported from `icn-net`
+
+**Progress Tracking:**
+
+- ✅ **Phase 1 Complete:** STUN Discovery (MVC Week 3, Days 1-2)
+- ⏳ **Next:** Phase 2 - Connection Candidate Exchange (gossip protocol)
+- See [`docs/nat-traversal-design.md`](docs/nat-traversal-design.md) for full architecture
+
+**References:**
+- RFC 5389: STUN (Session Traversal Utilities for NAT)
+- MVC Track: Week 3-4 - NAT Traversal & Testing
+- Design: `docs/nat-traversal-design.md` (369 lines, comprehensive)
+
 ### Fixed - Social Recovery & Core Stability (2025-11-17)
 
 **CRITICAL BUG FIX - Ledger Recovery Transfer:**
