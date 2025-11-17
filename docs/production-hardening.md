@@ -151,6 +151,71 @@ impl DidCertificateVerifier {
 
 ---
 
+### 8. Social Recovery Ledger Transfer Bug
+
+**Severity**: Critical
+**File**: [`icn-ledger/src/ledger.rs:469-484`](../icn/crates/icn-ledger/src/ledger.rs#L469-L484)
+**Status**: Fixed (2025-11-17)
+
+**Vulnerability**: The `transfer_balances_for_recovery()` function had inverted debit/credit logic, causing ALL social recovery operations to incorrectly transfer balances.
+
+**Broken behavior**:
+```rust
+// BEFORE (INCORRECT):
+let entry = if *balance > 0 {
+    JournalEntryBuilder::new(new_did.clone())
+        .debit(old_did.clone(), currency.clone(), *balance)   // WRONG: increases old_did!
+        .credit(new_did.clone(), currency.clone(), *balance)  // WRONG: decreases new_did!
+        .build()?
+}
+```
+
+**Impact**:
+- **Old DID**: Balance would double instead of zeroing (100 → 200)
+- **New DID**: Would receive negative balance instead of positive (-100 instead of +100)
+- **Accounting**: Every recovery would create permanent accounting errors
+- **User Experience**: Catastrophic - users would lose their balances during recovery
+
+**Example failure scenario**:
+1. Alice has +100 hours balance, loses device
+2. Creates new identity, initiates social recovery
+3. Trustees attest, recovery finalizes
+4. **Expected**: Old DID: 100→0, New DID: 0→100
+5. **Actual (broken)**: Old DID: 100→200, New DID: 0→-100
+6. Alice now has -100 hours (debt!) instead of her 100 hours credit
+
+**Fix**:
+```rust
+// AFTER (CORRECT):
+let entry = if *balance > 0 {
+    // old_did has positive balance (+100 means they have credit)
+    // Transfer it to new_did: reduce old_did's balance, increase new_did's balance
+    JournalEntryBuilder::new(new_did.clone())
+        .credit(old_did.clone(), currency.clone(), *balance)  // Reduce old_did's balance ✅
+        .debit(new_did.clone(), currency.clone(), *balance)   // Increase new_did's balance ✅
+        .build()?
+}
+```
+
+**Root cause**: Confusion between mutual credit semantics and traditional accounting:
+- In mutual credit: `debit` increases assets (receiving credit)
+- The transfer logic incorrectly debited the old account (giving it more credit)
+
+**Discovery**: Found during integration test debugging for `test_full_recovery_flow`
+
+**Test coverage**: Integration test now validates:
+- Old DID balance reduces to 0 after transfer
+- New DID receives full balance (100 hours)
+- Trust graph edges correctly migrate (2 edges)
+
+**Additional context**:
+- This bug was introduced when social recovery was first implemented (Phase 11)
+- Would have affected EVERY social recovery operation in production
+- Highlights importance of end-to-end integration tests for financial operations
+- Related to Phase 7 ledger semantics fix (which this test initially failed against)
+
+---
+
 ## High Priority Fixes
 
 ### 4. Integer Overflow in Timestamp Conversion
