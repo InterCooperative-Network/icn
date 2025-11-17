@@ -131,7 +131,7 @@ impl StunClient {
                 );
                 *addr
             })
-            .unwrap(); // Safe because results is not empty
+            .expect("vote_counts is non-empty because results was checked above");
 
         Ok(consensus)
     }

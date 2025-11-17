@@ -513,6 +513,7 @@ impl Supervisor {
                 // Create candidate cache for NAT traversal
                 let candidate_cache = Arc::new(icn_net::CandidateCache::new());
                 let candidate_cache_for_notifications = candidate_cache.clone();
+                let candidate_cache_for_cleanup = candidate_cache.clone();
                 let network_handle_for_candidates = network_handle.clone();
 
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
@@ -883,6 +884,31 @@ impl Supervisor {
                 } else {
                     info!("Subscribed to network:candidates topic");
                 }
+
+                // Spawn candidate cache cleanup task (every 5 minutes)
+                let mut cache_cleanup_shutdown = self.shutdown_tx.subscribe();
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(300)); // 5 minutes
+                    loop {
+                        tokio::select! {
+                            _ = interval.tick() => {
+                                let removed = candidate_cache_for_cleanup.cleanup_expired().await;
+                                if removed > 0 {
+                                    info!("Candidate cache cleanup removed {} stale entries", removed);
+                                }
+                                // Update metrics
+                                let cache_size = candidate_cache_for_cleanup.len().await;
+                                icn_obs::metrics::nat_traversal::candidates_cached_set(cache_size);
+                            }
+                            _ = cache_cleanup_shutdown.recv() => {
+                                info!("Candidate cache cleanup task shutting down");
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                info!("Candidate cache cleanup task spawned");
             }
 
             info!("Gossip send callback configured");
@@ -1027,8 +1053,8 @@ impl Supervisor {
                             let uptime_secs = start_time.elapsed().as_secs();
                             icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
 
-                            // Count active actors (network + gossip + ledger + rpc + anti-entropy + digest-emitter = 6)
-                            icn_obs::metrics::system::actors_active_set(6);
+                            // Count active actors (network + gossip + ledger + rpc + anti-entropy + digest-emitter + cache-cleanup = 7)
+                            icn_obs::metrics::system::actors_active_set(7);
 
                             // Update network stats (this also updates metrics via GetStats handler)
                             let _ = network_handle_metrics.get_stats().await;
