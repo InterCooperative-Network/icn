@@ -1,6 +1,7 @@
 //! ICN Net - Network transport, discovery, and session management
 
 pub mod actor;
+pub mod candidate;
 pub mod discovery;
 pub mod encryption;
 pub mod envelope;
@@ -15,6 +16,7 @@ pub mod topology;
 pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
+pub use candidate::ConnectionCandidate;
 pub use discovery::{Discovery, PeerInfo};
 pub use encryption::EncryptedEnvelope;
 pub use envelope::{PayloadType, SignedEnvelope};

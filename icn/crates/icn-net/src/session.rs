@@ -228,6 +228,35 @@ impl SessionManager {
         *self.public_endpoint.read().await
     }
 
+    /// Generate a connection candidate for gossip announcement
+    ///
+    /// Creates a ConnectionCandidate message that can be published to the
+    /// `network:candidates` gossip topic for NAT traversal peer discovery.
+    ///
+    /// Returns None if the endpoint hasn't been started yet.
+    pub async fn connection_candidate(
+        &self,
+        did: icn_identity::Did,
+    ) -> Result<crate::candidate::ConnectionCandidate> {
+        let endpoint_guard = self.endpoint.read().await;
+        let endpoint = endpoint_guard
+            .as_ref()
+            .context("Session manager not started")?;
+
+        let local_addr = endpoint.local_addr()?;
+        let public_addr = *self.public_endpoint.read().await;
+
+        // For Phase 2, relay_addr is always None (TURN relay comes in Phase 4)
+        let relay_addr = None;
+
+        Ok(crate::candidate::ConnectionCandidate::new(
+            did,
+            local_addr,
+            public_addr,
+            relay_addr,
+        ))
+    }
+
     /// Stop the session manager
     pub async fn stop(&mut self) -> Result<()> {
         info!("Session manager stopping");

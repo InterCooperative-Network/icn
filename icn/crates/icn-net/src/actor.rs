@@ -89,6 +89,8 @@ pub struct NetworkHandle {
     tx: mpsc::Sender<NetworkMsg>,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
     peer_connections: Option<Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>>,
+    session_manager: Arc<RwLock<SessionManager>>,
+    own_did: Did,
 }
 
 impl NetworkHandle {
@@ -233,6 +235,17 @@ impl NetworkHandle {
     pub async fn get_peer_x25519_key(&self, did: &Did) -> Option<[u8; 32]> {
         let connections = self.peer_connections.as_ref()?;
         connections.read().await.get(did).map(|info| info.x25519_key)
+    }
+
+    /// Get this node's connection candidate for NAT traversal
+    ///
+    /// Returns a ConnectionCandidate that can be published to the
+    /// `network:candidates` gossip topic to advertise connection information.
+    ///
+    /// Returns an error if the session manager hasn't been started yet.
+    pub async fn connection_candidate(&self) -> Result<crate::ConnectionCandidate> {
+        let session_mgr = self.session_manager.read().await;
+        session_mgr.connection_candidate(self.own_did.clone()).await
     }
 
     /// Get a peer's connection info (version, capabilities, X25519 key)
@@ -549,7 +562,7 @@ impl NetworkActor {
         // Create actor
         let actor = NetworkActor {
             discovery,
-            session_manager,
+            session_manager: session_manager.clone(),
             stats: stats.clone(),
             rx,
             incoming_handler,
@@ -575,6 +588,8 @@ impl NetworkActor {
             tx,
             neighbor_sets: neighbor_sets.clone(),
             peer_connections: Some(peer_connections),
+            session_manager,
+            own_did: did,
         })
     }
 
@@ -1468,10 +1483,14 @@ mod tests {
         );
 
         let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
         let handle = NetworkHandle {
             tx,
             neighbor_sets: None,
             peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
         };
 
         // Test peer_has_capability
@@ -1538,10 +1557,14 @@ mod tests {
         );
 
         let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
         let handle = NetworkHandle {
             tx,
             neighbor_sets: None,
             peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
         };
 
         // Get peers with E2E encryption (should be Alice and Charlie)
@@ -1598,10 +1621,14 @@ mod tests {
         );
 
         let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
         let handle = NetworkHandle {
             tx,
             neighbor_sets: None,
             peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
         };
 
         // Get versions
@@ -1632,10 +1659,14 @@ mod tests {
         peer_connections.write().await.insert(alice_did.clone(), alice_info.clone());
 
         let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
         let handle = NetworkHandle {
             tx,
             neighbor_sets: None,
             peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
         };
 
         // Get full connection info
