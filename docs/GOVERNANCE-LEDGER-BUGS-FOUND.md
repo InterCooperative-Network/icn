@@ -288,10 +288,11 @@ impl Drop for SubscriptionHandle {
 
 ---
 
-##  🟢 LOW: Missing Metrics
+## ✅ LOW: Missing Metrics (FIXED)
 
 **Severity**: LOW
 **Impact**: No observability for execution success/failure rates
+**Status**: ✅ FIXED (2025-01-17)
 
 ### Description
 
@@ -329,6 +330,45 @@ match ledger_guard.append_entry(entry) {
     }
 }
 ```
+
+### ✅ Fix Applied (2025-01-17)
+
+**Implementation**: Added comprehensive Prometheus metrics in `icn-obs/src/metrics.rs:301-321` and `supervisor.rs:1007-1107`
+
+**Metrics Added**:
+1. **`icn_governance_proposals_executed_total{payload_type}`**
+   - Counter tracking successful proposal executions by type
+   - Labels: `payload_type` (budget, config_change, membership, text)
+
+2. **`icn_governance_execution_failures_total{reason}`**
+   - Counter tracking execution failures by reason
+   - Labels: `reason` (ledger_build, ledger_append)
+
+3. **`icn_governance_execution_duration_seconds{payload_type}`**
+   - Histogram tracking execution duration by proposal type
+   - Enables performance monitoring and SLA tracking
+
+4. **`icn_governance_audit_failures_total`**
+   - Counter tracking audit trail write failures
+   - Critical for detecting partial failure scenarios
+
+5. **`icn_governance_idempotent_skips_total`**
+   - Counter tracking duplicate events prevented by idempotency check
+   - Helps detect replay attacks or system issues
+
+**Integration Points**:
+- Idempotency check: `idempotent_skips_inc()` when duplicate detected
+- Success path: `proposals_executed_inc()` + `execution_duration_record()` after audit trail stored
+- Build failures: `execution_failures_inc("ledger_build")`
+- Append failures: `execution_failures_inc("ledger_append")`
+- Audit failures: `audit_failures_inc()` on serialization or store errors
+
+**Observability Benefits**:
+- Track execution success rates by proposal type
+- Identify performance bottlenecks via duration histograms
+- Detect partial failures via audit_failures metric
+- Monitor idempotency check effectiveness
+- Alerting on execution_failures_total spike
 
 ---
 
@@ -369,8 +409,8 @@ Should use `decided_at` from the event instead.
 | ✅ CRITICAL | Idempotency bug - double execution | **FIXED** |
 | ✅ MEDIUM | Partial failure - inconsistent state | **FIXED** |
 | ✅ MEDIUM | Shutdown race condition | **FIXED** |
+| ✅ LOW | Missing metrics | **FIXED** |
 | 🟢 LOW | No unsubscribe mechanism | **OPTIONAL** |
-| 🟢 LOW | Missing metrics | **OPTIONAL** |
 | 🟢 LOW | Audit timestamp inaccuracy | **OPTIONAL** |
 
 ## Next Steps
@@ -378,13 +418,14 @@ Should use `decided_at` from the event instead.
 1. ~~**Fix idempotency bug**~~ ✅ COMPLETE
 2. ~~**Add comprehensive error handling for partial failures**~~ ✅ COMPLETE
 3. ~~**Implement graceful shutdown for in-flight tasks**~~ ✅ COMPLETE
-4. Add Prometheus metrics (OPTIONAL - future work)
+4. ~~**Add Prometheus metrics**~~ ✅ COMPLETE
 5. Add audit trail decision timestamp (OPTIONAL - future work)
 6. Implement proper task tracking with JoinSet (OPTIONAL - replaces grace period)
 7. Implement dead-letter queue for failed audit trails (OPTIONAL - automated reconciliation)
+8. Add EventBus unsubscribe mechanism (OPTIONAL - prevents memory leak)
 
 ---
 
-**Status**: ✅ All critical and medium priority bugs FIXED
-**Governance→Ledger Integration**: Production-ready
-**Remaining Work**: Low priority enhancements only
+**Status**: ✅ All critical, medium, and observability issues FIXED
+**Governance→Ledger Integration**: Production-ready with full metrics
+**Remaining Work**: Optional enhancements only (timestamps, task tracking, dead-letter queue)

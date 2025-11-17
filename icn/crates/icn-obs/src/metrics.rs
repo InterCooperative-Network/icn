@@ -298,6 +298,28 @@ pub fn init_descriptions() {
         "Current number of entries in quarantine"
     );
 
+    // Governance metrics
+    describe_counter!(
+        "icn_governance_proposals_executed_total",
+        "Total number of governance proposals executed by payload type"
+    );
+    describe_counter!(
+        "icn_governance_execution_failures_total",
+        "Total number of proposal execution failures by reason"
+    );
+    describe_histogram!(
+        "icn_governance_execution_duration_seconds",
+        "Duration of proposal execution in seconds"
+    );
+    describe_counter!(
+        "icn_governance_audit_failures_total",
+        "Total number of audit trail write failures"
+    );
+    describe_counter!(
+        "icn_governance_idempotent_skips_total",
+        "Total number of duplicate executions prevented by idempotency check"
+    );
+
     // Trust graph metrics
     describe_gauge!(
         "icn_trust_edges_total",
@@ -791,6 +813,31 @@ pub mod ledger {
 
     pub fn quarantine_size_set(size: u64) {
         gauge!("icn_ledger_quarantine_size").set(size as f64);
+    }
+}
+
+/// Governance execution metrics
+pub mod governance {
+    use metrics::{counter, histogram};
+
+    pub fn proposals_executed_inc(payload_type: &str) {
+        counter!("icn_governance_proposals_executed_total", "payload_type" => payload_type.to_string()).increment(1);
+    }
+
+    pub fn execution_failures_inc(reason: &str) {
+        counter!("icn_governance_execution_failures_total", "reason" => reason.to_string()).increment(1);
+    }
+
+    pub fn execution_duration_record(payload_type: &str, duration: f64) {
+        histogram!("icn_governance_execution_duration_seconds", "payload_type" => payload_type.to_string()).record(duration);
+    }
+
+    pub fn audit_failures_inc() {
+        counter!("icn_governance_audit_failures_total").increment(1);
+    }
+
+    pub fn idempotent_skips_inc() {
+        counter!("icn_governance_idempotent_skips_total").increment(1);
     }
 }
 

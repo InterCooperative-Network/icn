@@ -1004,10 +1004,14 @@ impl Supervisor {
                                         use icn_ledger::entry::JournalEntryBuilder;
                                         use hex;
 
+                                        // Track execution duration
+                                        let start = std::time::Instant::now();
+
                                         // IDEMPOTENCY CHECK: Skip if proposal already executed
                                         let audit_key = format!("gov:audit:{}", prop_id.0);
                                         if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
                                             debug!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+                                            icn_obs::metrics::governance::idempotent_skips_inc();
                                             return;
                                         }
 
@@ -1049,6 +1053,11 @@ impl Supervisor {
                                                                 match store.put(audit_key.as_bytes(), &audit_json) {
                                                                     Ok(_) => {
                                                                         info!("📋 Audit trail recorded for proposal {}", prop_id.0);
+
+                                                                        // Metrics: successful execution
+                                                                        let duration = start.elapsed().as_secs_f64();
+                                                                        icn_obs::metrics::governance::proposals_executed_inc("budget");
+                                                                        icn_obs::metrics::governance::execution_duration_record("budget", duration);
                                                                     }
                                                                     Err(e) => {
                                                                         // CRITICAL ERROR: Ledger updated but audit trail failed
@@ -1063,6 +1072,9 @@ impl Supervisor {
                                                                         error!("   Error: {}", e);
                                                                         error!("   ACTION REQUIRED: Manual reconciliation needed");
                                                                         // TODO: Write to dead-letter queue for automated reconciliation
+
+                                                                        // Metrics: audit trail failure
+                                                                        icn_obs::metrics::governance::audit_failures_inc();
                                                                     }
                                                                 }
                                                             }
@@ -1073,16 +1085,25 @@ impl Supervisor {
                                                                 );
                                                                 error!("   Ledger entry hash: {}", hex::encode(&entry_hash.0));
                                                                 error!("   ACTION REQUIRED: Manual reconciliation needed");
+
+                                                                // Metrics: audit trail failure
+                                                                icn_obs::metrics::governance::audit_failures_inc();
                                                             }
                                                         }
                                                     }
                                                     Err(e) => {
                                                         warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
+
+                                                        // Metrics: ledger append failure
+                                                        icn_obs::metrics::governance::execution_failures_inc("ledger_append");
                                                     }
                                                 }
                                             }
                                             Err(e) => {
                                                 warn!("❌ Failed to build ledger entry for proposal {}: {}", prop_id.0, e);
+
+                                                // Metrics: ledger build failure
+                                                icn_obs::metrics::governance::execution_failures_inc("ledger_build");
                                             }
                                         }
                                     });
