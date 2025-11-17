@@ -26,6 +26,8 @@ pub type ChallengeNonce = String;
 #[derive(Clone)]
 struct Challenge {
     nonce: ChallengeNonce,
+    /// DID that requested the challenge (reserved for additional validation)
+    #[allow(dead_code)]
     did: Did,
     created_at: u64,
 }

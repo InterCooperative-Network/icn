@@ -38,7 +38,8 @@ const SNAPSHOT_FILENAME: &str = "state.snapshot";
 /// Filename for snapshot checksum
 const CHECKSUM_FILENAME: &str = "state.snapshot.sha256";
 
-/// Default number of snapshots to keep
+/// Default number of snapshots to keep (reserved for future automatic cleanup)
+#[allow(dead_code)]
 const DEFAULT_SNAPSHOT_RETENTION: usize = 3;
 
 /// Complete state snapshot for graceful restart

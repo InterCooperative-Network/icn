@@ -62,7 +62,7 @@ impl GatewayServer {
         let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
 
         // Create shutdown channel
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
+        let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
         // Spawn background cleanup task with graceful shutdown
         {

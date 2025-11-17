@@ -135,13 +135,14 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 }
 
-/// Persistent governance store using Sled
-#[cfg(feature = "sled")]
+/// Persistent governance store using Sled (reserved for future use)
+#[cfg(feature = "governance_sled")]
+#[allow(dead_code)]
 pub struct SledGovernanceStore {
     db: sled::Db,
 }
 
-#[cfg(feature = "sled")]
+#[cfg(feature = "governance_sled")]
 impl SledGovernanceStore {
     /// Create a new Sled-based governance store
     pub fn new(db: sled::Db) -> Self {
@@ -173,7 +174,7 @@ impl SledGovernanceStore {
     }
 }
 
-#[cfg(feature = "sled")]
+#[cfg(feature = "governance_sled")]
 impl GovernanceStore for SledGovernanceStore {
     fn store_domain(&self, domain: &GovernanceDomain) -> Result<()> {
         let key = Self::domain_key(&domain.id);

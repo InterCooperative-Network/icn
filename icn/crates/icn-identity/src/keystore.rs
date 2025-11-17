@@ -333,7 +333,8 @@ impl AgeKeyStore {
         })
     }
 
-    /// Encrypt and save key material
+    /// Encrypt and save key material (legacy, used in migration tests)
+    #[allow(dead_code)]
     fn encrypt_and_save(path: &Path, stored: &StoredKey, passphrase: &[u8]) -> Result<()> {
         // Serialize key material - use Zeroizing to ensure plaintext is cleared
         let json = Zeroizing::new(serde_json::to_vec(stored)?);

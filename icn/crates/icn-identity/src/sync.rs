@@ -78,6 +78,8 @@ struct CachedDidDocument {
     last_updated: u64,
 
     /// Source of this document (local or remote DID)
+    /// Reserved for future use (e.g., trust prioritization)
+    #[allow(dead_code)]
     source: DocumentSource,
 }
 
