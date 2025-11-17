@@ -158,6 +158,10 @@ impl GatewayServer {
                         )
                 )
         })
+        // Production-ready HTTP timeout configuration
+        .keep_alive(Duration::from_secs(75))          // HTTP keep-alive timeout (75s is standard)
+        .client_request_timeout(Duration::from_secs(30))  // Max time to read request headers
+        .client_disconnect_timeout(Duration::from_secs(5)) // Max time waiting for client to read response
         .bind(self.bind_addr)?
         .run();
 
