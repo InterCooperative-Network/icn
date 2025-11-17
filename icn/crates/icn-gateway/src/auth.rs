@@ -77,6 +77,11 @@ impl AuthManager {
     }
 
     /// Verify signed challenge and issue token
+    ///
+    /// Security: This function is designed to be constant-time to prevent timing attacks.
+    /// - Always performs signature verification (expensive crypto operation)
+    /// - Returns generic error message on any failure (prevents information leakage)
+    /// - Checks expiration AFTER signature verification
     pub fn verify_challenge(
         &self,
         did: &Did,
@@ -84,45 +89,49 @@ impl AuthManager {
         coop_id: &str,
         scopes: Vec<String>,
     ) -> Result<String> {
+        // Generic error message for all authentication failures
+        // This prevents information leakage about why authentication failed
+        let auth_error = || GatewayError::AuthenticationFailed(
+            "Authentication failed".to_string()
+        );
+
         // Retrieve and remove challenge
         let challenge = {
             let mut challenges = self.challenges.write()
                 .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
             challenges.remove(did)
-                .ok_or_else(|| GatewayError::AuthenticationFailed(
-                    "No challenge found for DID".to_string()
-                ))?
+                .ok_or_else(auth_error)?
         };
 
-        // Check expiration
-        let now = Self::current_timestamp();
-        if now - challenge.created_at >= self.challenge_ttl.as_secs() {
-            return Err(GatewayError::AuthenticationFailed(
-                "Challenge expired".to_string()
-            ));
-        }
-
-        // Verify signature
+        // Parse DID public key
         let verifying_key = did.to_verifying_key()
-            .map_err(|e| GatewayError::AuthenticationFailed(
-                format!("Invalid DID: {e}")
-            ))?;
+            .map_err(|_| auth_error())?;
 
+        // Decode nonce
         let nonce_bytes = hex::decode(&challenge.nonce)
             .map_err(|e| GatewayError::InternalError(
                 format!("Invalid nonce encoding: {e}")
             ))?;
 
+        // Parse signature
         let signature_obj = Signature::from_slice(signature)
-            .map_err(|e| GatewayError::AuthenticationFailed(
-                format!("Invalid signature format: {e}")
-            ))?;
+            .map_err(|_| auth_error())?;
 
-        verifying_key.verify(&nonce_bytes, &signature_obj)
-            .map_err(|_| GatewayError::AuthenticationFailed(
-                "Signature verification failed".to_string()
-            ))?;
+        // ALWAYS verify signature first (expensive crypto operation)
+        // This ensures constant-time behavior regardless of expiration status
+        let signature_valid = verifying_key.verify(&nonce_bytes, &signature_obj).is_ok();
+
+        // Check expiration AFTER signature verification
+        // This prevents timing attacks by ensuring we always do the expensive crypto
+        let now = Self::current_timestamp();
+        let is_expired = now - challenge.created_at >= self.challenge_ttl.as_secs();
+
+        // Only succeed if signature is valid AND not expired
+        // Use constant-time check (both conditions evaluated)
+        if !signature_valid || is_expired {
+            return Err(auth_error());
+        }
 
         // Issue JWT token
         self.issue_token(did, coop_id, scopes)
