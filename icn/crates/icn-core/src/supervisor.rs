@@ -1008,11 +1008,27 @@ impl Supervisor {
                                         let start = std::time::Instant::now();
 
                                         // IDEMPOTENCY CHECK: Skip if proposal already executed
+                                        // CRITICAL: Fail-safe approach - refuse to execute if we can't verify
                                         let audit_key = format!("gov:audit:{}", prop_id.0);
-                                        if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
-                                            debug!("Proposal {} already executed, skipping duplicate event", prop_id.0);
-                                            icn_obs::metrics::governance::idempotent_skips_inc();
-                                            return;
+                                        match store.get(audit_key.as_bytes()) {
+                                            Ok(Some(_)) => {
+                                                // Already executed, skip
+                                                debug!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+                                                icn_obs::metrics::governance::idempotent_skips_inc();
+                                                return;
+                                            }
+                                            Ok(None) => {
+                                                // Not executed yet, proceed
+                                            }
+                                            Err(e) => {
+                                                // Store read error: REFUSE to execute (fail-safe)
+                                                error!("🚨 CRITICAL: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
+                                                error!("   Cannot verify if proposal was already executed");
+                                                error!("   Refusing to execute to prevent potential duplicate");
+                                                error!("   ACTION REQUIRED: Fix storage issue and manually verify proposal execution status");
+                                                icn_obs::metrics::governance::execution_failures_inc("audit_check_failed");
+                                                return;
+                                            }
                                         }
 
                                         let mut ledger_guard = ledger.write().await;

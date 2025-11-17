@@ -82,16 +82,39 @@ pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
 
 ### ✅ Fix Applied (2025-01-17)
 
-**Implementation**: Option 1 (audit trail check) implemented in `supervisor.rs:1007-1012`
+**Implementation**: Fail-safe idempotency check with explicit error handling in `supervisor.rs:1010-1032`
 
 ```rust
 // IDEMPOTENCY CHECK: Skip if proposal already executed
+// CRITICAL: Fail-safe approach - refuse to execute if we can't verify
 let audit_key = format!("gov:audit:{}", prop_id.0);
-if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
-    debug!("Proposal {} already executed, skipping duplicate event", prop_id.0);
-    return;
+match store.get(audit_key.as_bytes()) {
+    Ok(Some(_)) => {
+        // Already executed, skip
+        debug!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+        icn_obs::metrics::governance::idempotent_skips_inc();
+        return;
+    }
+    Ok(None) => {
+        // Not executed yet, proceed
+    }
+    Err(e) => {
+        // Store read error: REFUSE to execute (fail-safe)
+        error!("🚨 CRITICAL: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
+        error!("   Cannot verify if proposal was already executed");
+        error!("   Refusing to execute to prevent potential duplicate");
+        icn_obs::metrics::governance::execution_failures_inc("audit_check_failed");
+        return;
+    }
 }
 ```
+
+**Critical Safety Improvement** (2025-01-17):
+- **Initial implementation flaw**: Used `if let Ok(Some(_))` pattern which silently treated store errors as "not executed"
+- **Risk**: If `store.get()` failed, code would proceed to execute, potentially causing duplicates during storage failures
+- **Fix**: Explicit match on all three cases (Ok(Some), Ok(None), Err) with fail-safe behavior
+- **Fail-safe principle**: Refuse execution when unable to verify, preventing duplicates during storage issues
+- **New metric**: `execution_failures_inc("audit_check_failed")` tracks verification failures
 
 **Verification**:
 - Test added: `icn-core/tests/governance_ledger_idempotency.rs`
@@ -99,7 +122,11 @@ if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
 - Test verifies: Duplicate events are ignored, balances remain correct
 - Status: ✅ All 3 governance-ledger tests passing
 
-**Impact**: Duplicate ProposalAccepted events are now safely ignored. The first execution creates the audit trail, subsequent events check for existence and return early before touching the ledger.
+**Impact**:
+- Duplicate ProposalAccepted events are safely ignored
+- Storage read errors trigger fail-safe behavior (refuse execution)
+- Comprehensive error logging for operator action
+- Financial integrity protected even during storage failures
 
 ---
 
