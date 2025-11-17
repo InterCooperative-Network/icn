@@ -1,6 +1,6 @@
 # ICN Roadmap
 
-**Status**: Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅ - All 268 Tests Passing
+**Status**: Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅, NAT Traversal (Phases 1-3) ✅ - All 423 Tests Passing
 **Next**: Track C1 (Pilot Selection) → MVC Track (13 weeks focused work)
 
 ## Executive Summary
@@ -32,8 +32,8 @@ ICN's development follows three parallel tracks:
 
 **Status Breakdown**:
 - ✅ **Closed** (3): Multi-device identity, protective ledger (partial), economic simulation
-- 🚧 **Partial** (4): Ledger mechanics, security posture, storage sync, observability
-- ⏸️ **Deferred** (2): NAT traversal, federation (intentional - wait for pilot need)
+- 🚧 **Partial** (5): Ledger mechanics, security posture, storage sync, observability, NAT traversal (Phases 1-3)
+- ⏸️ **Deferred** (1): Federation (intentional - wait for pilot need)
 - 🔴 **Critical Path** (6): Client SDK, governance, templates, onboarding, observability UX, cooperation UX
 
 **Key Insight**: The substrate is ready. The missing pieces are *social layer*, *usability*, and *real-world workflows* - all discovered through pilot deployment.
@@ -359,6 +359,18 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 - **Gap**: No zero-knowledge proofs, selective disclosure, anonymous credentials
 - **Decision**: Trust-first communities don't need advanced privacy tech
 - **Rationale**: Cooperatives share resources among known members; ZK is solution looking for problem
+
+**NAT Traversal** (Phases 1-3 Complete → 2025-11-17):
+- **Status**: STUN discovery + candidate exchange + hole punching IMPLEMENTED
+- **What's Done**:
+  - Phase 1: Manual STUN protocol (RFC 5389) discovers public IP/port
+  - Phase 2: ConnectionCandidate exchange via gossip
+  - Phase 3: Automatic connection attempts (local addr → public addr priority)
+  - CandidateCache with TTL-based expiration (5 min default)
+  - 97 icn-net tests + 4 integration tests passing
+- **What's Deferred**: Phase 4 (TURN relay) awaiting pilot need
+- **Why Now**: Implemented as part of development exploration; validates architecture for when pilots need it
+- **Deployment**: Can be enabled via config; disabled by default until pilot requests it
 
 **Cross-Network Standards** (Deferred):
 - **Status**: QUIC/TLS works over internet, only discovery is LAN-only (mDNS)
