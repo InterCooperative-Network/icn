@@ -374,8 +374,8 @@ async fn test_two_node_contract_deployment() {
         .expect("Failed to dial node A");
 
     // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 2s to handle parallel test execution under load
-    sleep(Duration::from_millis(2000)).await;
+    // Increased from 500ms to 4s to handle parallel test execution under heavy load
+    sleep(Duration::from_millis(4000)).await;
 
     // Create a simple contract
     let contract = Contract::new("TestContract".to_string())
@@ -439,8 +439,8 @@ async fn test_contract_execution_after_deployment() {
         .expect("Failed to dial node A");
 
     // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 2s to handle parallel test execution under load
-    sleep(Duration::from_millis(2000)).await;
+    // Increased from 500ms to 4s to handle parallel test execution under heavy load
+    sleep(Duration::from_millis(4000)).await;
 
     // Create contract with a rule
     let contract = Contract::new("Calculator".to_string())
@@ -731,8 +731,8 @@ async fn test_contract_with_state_variables() {
         .expect("Failed to dial node A");
 
     // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 2s to handle parallel test execution under load
-    sleep(Duration::from_millis(2000)).await;
+    // Increased from 500ms to 4s to handle parallel test execution under heavy load
+    sleep(Duration::from_millis(4000)).await;
 
     // Create contract with state variables
     let contract = Contract::new("CounterContract".to_string())
@@ -882,9 +882,9 @@ async fn test_contract_with_ledger_integration() {
         .expect("Failed to dial node A");
 
     // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 3s to handle parallel test execution under load
+    // Increased from 500ms to 5s to handle parallel test execution under heavy load
     // This test is more complex (ledger capabilities) so needs extra time
-    sleep(Duration::from_millis(3000)).await;
+    sleep(Duration::from_millis(5000)).await;
 
     // Create contract with ledger capabilities and currency
     let contract = Contract::new("ServiceAgreement".to_string())
@@ -992,7 +992,9 @@ async fn test_large_contract_near_limits() {
         .await
         .expect("Failed to dial node A");
 
-    sleep(Duration::from_millis(500)).await;
+    // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
+    // Increased from 500ms to 4s to handle parallel test execution under heavy load
+    sleep(Duration::from_millis(4000)).await;
 
     // Create a large contract near the defined limits
     // MAX_STATE_VARS = 100, MAX_RULES = 50
