@@ -2,6 +2,7 @@
 
 pub mod actor;
 pub mod candidate;
+pub mod candidate_cache;
 pub mod discovery;
 pub mod encryption;
 pub mod envelope;
@@ -17,6 +18,7 @@ pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
 pub use candidate::ConnectionCandidate;
+pub use candidate_cache::CandidateCache;
 pub use discovery::{Discovery, PeerInfo};
 pub use encryption::EncryptedEnvelope;
 pub use envelope::{PayloadType, SignedEnvelope};

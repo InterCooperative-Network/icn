@@ -481,6 +481,11 @@ impl Supervisor {
                 let recovery_store_for_notifications = recovery_store.clone();
                 let ledger_for_notifications = ledger_handle.clone();
 
+                // Create candidate cache for NAT traversal
+                let candidate_cache = Arc::new(icn_net::CandidateCache::new());
+                let candidate_cache_for_notifications = candidate_cache.clone();
+                let network_handle_for_candidates = network_handle.clone();
+
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
                     // Handle trust attestations
                     if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
@@ -733,14 +738,71 @@ impl Supervisor {
                                 info!("Received connection candidate from {}: local={}, public={:?}, relay={:?}",
                                       candidate.did, candidate.local_addr, candidate.public_addr, candidate.relay_addr);
 
-                                // For Phase 2, we just log the candidate
-                                // Phase 3 (hole punching) will use this information to establish direct connections
-                                // TODO Phase 3: Store candidate and attempt connection if needed
-                                if candidate.is_fresh(300) {
-                                    debug!("Candidate is fresh (age: {}s)", candidate.age_secs());
-                                } else {
-                                    debug!("Candidate is stale (age: {}s), ignoring", candidate.age_secs());
-                                }
+                                // Store candidate in cache and attempt connection (Phase 3: Hole Punching)
+                                let cache = candidate_cache_for_notifications.clone();
+                                let net_handle = network_handle_for_candidates.clone();
+                                let did = candidate.did.clone();
+
+                                tokio::spawn(async move {
+                                    // Store the candidate
+                                    if !cache.store(candidate.clone()).await {
+                                        debug!("Ignored stale/older candidate for {}", did);
+                                        return;
+                                    }
+
+                                    info!("✓ Stored fresh candidate for {}", did);
+
+                                    // Check if already connected
+                                    match net_handle.get_peers().await {
+                                        Ok(peers) => {
+                                            if peers.iter().any(|p| p.did == did) {
+                                                debug!("Already connected to {}, skipping dial", did);
+                                                return;
+                                            }
+                                        }
+                                        Err(e) => {
+                                            warn!("Failed to get peers: {}", e);
+                                            return;
+                                        }
+                                    }
+
+                                    // Try to establish connection
+                                    // Priority: 1) local_addr, 2) public_addr (for NAT hole punching)
+                                    let mut connected = false;
+
+                                    // Try local address first (LAN connectivity)
+                                    debug!("Attempting connection to {} via local address {}", did, candidate.local_addr);
+                                    match net_handle.dial(candidate.local_addr, did.clone()).await {
+                                        Ok(_) => {
+                                            info!("✅ Connected to {} via local address {}", did, candidate.local_addr);
+                                            connected = true;
+                                        }
+                                        Err(e) => {
+                                            debug!("Failed to connect via local address: {}", e);
+                                        }
+                                    }
+
+                                    // If local connection failed, try public address (NAT hole punching)
+                                    if !connected {
+                                        if let Some(public_addr) = candidate.public_addr {
+                                            debug!("Attempting connection to {} via public address {}", did, public_addr);
+                                            match net_handle.dial(public_addr, did.clone()).await {
+                                                Ok(_) => {
+                                                    info!("✅ Connected to {} via public address {} (NAT traversal)", did, public_addr);
+                                                    connected = true;
+                                                }
+                                                Err(e) => {
+                                                    debug!("Failed to connect via public address: {}", e);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // TODO Phase 4: Try relay address (TURN relay) if both direct methods failed
+                                    if !connected {
+                                        debug!("Could not establish direct connection to {}", did);
+                                    }
+                                });
                             }
                             Err(e) => {
                                 warn!("Failed to deserialize connection candidate: {}", e);
