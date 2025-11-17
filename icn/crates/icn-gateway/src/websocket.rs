@@ -52,6 +52,9 @@ pub struct WsSession {
     event_broadcaster: Arc<EventBroadcaster>,
     /// Event receiver (subscribed after authentication)
     event_rx: Option<mpsc::UnboundedReceiver<GatewayEvent>>,
+    /// Tracks whether this connection was successfully started and incremented the global counter
+    /// This prevents counter desync when connection is rejected at limit
+    connection_tracked: bool,
 }
 
 impl WsSession {
@@ -68,6 +71,7 @@ impl WsSession {
             auth_manager,
             event_broadcaster,
             event_rx: None,
+            connection_tracked: false,
         }
     }
 
@@ -218,6 +222,7 @@ impl Actor for WsSession {
                 crate::validation::MAX_TOTAL_WEBSOCKET_CONNECTIONS
             );
             // Send error and immediately close
+            // NOTE: connection_tracked remains false, so stopped() won't decrement
             let msg = ServerMessage::Error {
                 message: "Server connection limit reached".to_string(),
             };
@@ -231,15 +236,21 @@ impl Actor for WsSession {
         gateway::websocket_connections_inc();
         gateway::websocket_connections_active_set(active);
 
+        // Mark that we successfully incremented the counter
+        self.connection_tracked = true;
+
         // Start heartbeat
         self.heartbeat(ctx);
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        // Track disconnection
-        let active = WS_ACTIVE_CONNECTIONS.fetch_sub(1, Ordering::Relaxed) - 1;
-        gateway::websocket_disconnections_inc();
-        gateway::websocket_connections_active_set(active);
+        // Only decrement if we successfully incremented in started()
+        // This prevents counter desync when connection is rejected at limit
+        if self.connection_tracked {
+            let active = WS_ACTIVE_CONNECTIONS.fetch_sub(1, Ordering::Relaxed) - 1;
+            gateway::websocket_disconnections_inc();
+            gateway::websocket_connections_active_set(active);
+        }
     }
 }
 

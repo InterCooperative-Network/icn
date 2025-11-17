@@ -145,8 +145,9 @@ impl AuthManager {
         let is_expired = now - challenge.created_at >= self.challenge_ttl.as_secs();
 
         // Only succeed if signature is valid AND not expired
-        // Use constant-time check (both conditions evaluated)
-        if !signature_valid || is_expired {
+        // Use bitwise OR to force evaluation of both conditions (constant-time)
+        // Short-circuit || would skip expiration check if signature invalid, creating timing leak
+        if !signature_valid | is_expired {
             return Err(auth_error());
         }
 
