@@ -15,6 +15,9 @@ use tracing::{debug, info, warn};
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
 
+/// Gossip topic for NAT traversal connection candidate announcements
+const NETWORK_CANDIDATES_TOPIC: &str = "network:candidates";
+
 /// Parse bootstrap peer URL in format: icn://did:icn:PUBKEY@IP:PORT
 /// Returns (DID, SocketAddr) on success
 ///
@@ -713,6 +716,37 @@ impl Supervisor {
                             }
                         });
                     }
+                    // Handle connection candidates for NAT traversal
+                    else if topic == NETWORK_CANDIDATES_TOPIC {
+                        // Use get_data() to handle decompression if needed
+                        let entry_data = match entry.get_data() {
+                            Ok(data) => data,
+                            Err(e) => {
+                                warn!("Failed to get candidate entry data: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Deserialize connection candidate
+                        match serde_json::from_slice::<icn_net::ConnectionCandidate>(&entry_data) {
+                            Ok(candidate) => {
+                                info!("Received connection candidate from {}: local={}, public={:?}, relay={:?}",
+                                      candidate.did, candidate.local_addr, candidate.public_addr, candidate.relay_addr);
+
+                                // For Phase 2, we just log the candidate
+                                // Phase 3 (hole punching) will use this information to establish direct connections
+                                // TODO Phase 3: Store candidate and attempt connection if needed
+                                if candidate.is_fresh(300) {
+                                    debug!("Candidate is fresh (age: {}s)", candidate.age_secs());
+                                } else {
+                                    debug!("Candidate is stale (age: {}s), ignoring", candidate.age_secs());
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to deserialize connection candidate: {}", e);
+                            }
+                        }
+                    }
                 });
 
                 gossip.set_notification_callback(notification_callback);
@@ -751,6 +785,13 @@ impl Supervisor {
                 } else {
                     info!("Subscribed to identity:recovery topic");
                 }
+
+                // Subscribe to network:candidates topic for NAT traversal peer discovery
+                if let Err(e) = gossip.subscribe(NETWORK_CANDIDATES_TOPIC, did.clone()) {
+                    warn!("Failed to subscribe to network:candidates topic: {}", e);
+                } else {
+                    info!("Subscribed to network:candidates topic");
+                }
             }
 
             info!("Gossip send callback configured");
@@ -771,6 +812,30 @@ impl Supervisor {
                             warn!("Failed to parse bootstrap peer URL '{}': {}", peer_url, e);
                         }
                     }
+                }
+            }
+
+            // Announce connection candidate for NAT traversal
+            {
+                info!("Announcing connection candidate for NAT traversal...");
+                match network_handle.connection_candidate().await {
+                    Ok(candidate) => {
+                        info!("Connection candidate: local={}, public={:?}, relay={:?}",
+                              candidate.local_addr, candidate.public_addr, candidate.relay_addr);
+
+                        // Serialize candidate and publish to gossip
+                        match serde_json::to_vec(&candidate) {
+                            Ok(candidate_bytes) => {
+                                let mut gossip = gossip_handle.write().await;
+                                match gossip.publish(NETWORK_CANDIDATES_TOPIC, candidate_bytes) {
+                                    Ok(_) => info!("✓ Published connection candidate to gossip"),
+                                    Err(e) => warn!("Failed to publish connection candidate: {}", e),
+                                }
+                            }
+                            Err(e) => warn!("Failed to serialize connection candidate: {}", e),
+                        }
+                    }
+                    Err(e) => warn!("Failed to get connection candidate: {}", e),
                 }
             }
 
