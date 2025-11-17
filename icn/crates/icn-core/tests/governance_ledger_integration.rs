@@ -70,7 +70,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
     info!("Created event bus");
 
     // 5. Subscribe to governance events and wire up ledger handler
-    {
+    let _handle = {
         let ledger_clone = ledger_handle.clone();
         let own_did = did.clone();
         let audit_store = gov_store.clone();
@@ -146,8 +146,8 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
                 }
                 _ => {}
             }
-        })).await;
-    }
+        })).await
+    };
 
     info!("Registered event handlers");
 
@@ -301,7 +301,7 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
     let event_bus = Arc::new(EventBus::new());
 
     // Set up event handler (same as before)
-    {
+    let _handle = {
         let ledger_clone = ledger_handle.clone();
         let own_did = did.clone();
 
@@ -336,8 +336,8 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
                 }
                 _ => {}
             }
-        })).await;
-    }
+        })).await
+    };
 
     // Create recipient
     let recipient_keypair = KeyPair::generate()?;

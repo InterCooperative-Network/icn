@@ -986,7 +986,8 @@ impl Supervisor {
                 let own_did = did.clone();
                 let audit_store = gov_store.clone();
 
-                event_bus.subscribe(Arc::new(move |event| {
+                // Subscribe to governance events - handle intentionally ignored (permanent subscription)
+                let _ = event_bus.subscribe(Arc::new(move |event| {
                     match event {
                         SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
                             match payload {

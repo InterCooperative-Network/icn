@@ -36,7 +36,7 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
     let event_bus = Arc::new(EventBus::new());
 
     // Set up event handler (same as in supervisor)
-    {
+    let _handle = {
         let ledger_clone = ledger_handle.clone();
         let own_did = did.clone();
         let audit_store = gov_store.clone();
@@ -123,8 +123,8 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                     _ => {}
                 }
             }))
-            .await;
-    }
+            .await
+    };
 
     // Create proposal event
     let proposal_id = icn_governance::ProposalId("test-proposal".to_string());
