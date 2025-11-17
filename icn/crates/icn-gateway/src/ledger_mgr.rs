@@ -51,6 +51,10 @@ impl LedgerManager {
 
     /// Get or create a ledger for a cooperative
     pub fn get_ledger(&self, coop_id: &CoopId) -> Result<Arc<RwLock<Ledger>>> {
+        // SECURITY: Validate coop_id BEFORE using in file path to prevent path traversal
+        // This prevents attacks like coop_id = "../../etc/passwd" from accessing arbitrary files
+        crate::validation::validate_coop_id(coop_id)?;
+
         let ledgers = self.ledgers.read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
@@ -72,6 +76,7 @@ impl LedgerManager {
         // Create store for this coop's ledger
         let store: Arc<dyn Store> = if let Some(ref data_dir) = self.data_dir {
             // Use persistent storage with coop-specific subdirectory
+            // coop_id has been validated above to only contain alphanumeric, hyphens, underscores
             let coop_ledger_path = data_dir.join("ledgers").join(coop_id);
             Arc::new(SledStore::open(&coop_ledger_path)
                 .map_err(GatewayError::SubstrateError)?)
