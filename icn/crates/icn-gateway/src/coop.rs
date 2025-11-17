@@ -341,7 +341,7 @@ mod tests {
         use std::time::{SystemTime, UNIX_EPOCH};
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .expect("System clock is set before Unix epoch (1970-01-01). This indicates a system misconfiguration.")
             .as_secs()
     }
 
