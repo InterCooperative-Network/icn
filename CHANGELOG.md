@@ -88,6 +88,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Impact:** Timing attack mitigation ineffective in edge cases
   - **Fix:** Verify dummy signature against DIFFERENT message to ensure it always fails
 
+**WebSocket Security Hardening:**
+
+- **BUG #20 (HIGH):** Unbounded WebSocket message size prevented
+  - **Problem:** No size validation on incoming text messages, attacker could send gigabyte payloads
+  - **Impact:** Memory exhaustion and OOM crashes
+  - **Fix:** MAX_WEBSOCKET_MESSAGE_SIZE = 65,536 bytes (64KB), validate before parsing, close connection on violation
+  - **Implementation:** Check text.len() before JSON deserialization
+
+- **BUG #21 (LOW):** Information leakage in WebSocket auth errors
+  - **Problem:** Different error messages revealed DID parsing errors and verification failures
+  - **Impact:** Enumeration attacks to discover valid tokens/DIDs
+  - **Fix:** Generic "Authentication failed" message for all failure modes
+
+- **BUG #22 (MEDIUM):** No global WebSocket connection limit
+  - **Problem:** Only per-coop limit (1,000), attacker could create 1,000 × 1,000 = 1M connections
+  - **Impact:** Resource exhaustion from unlimited connections
+  - **Fix:** MAX_TOTAL_WEBSOCKET_CONNECTIONS = 10,000, check in started() before incrementing counter
+
 **Test Coverage:**
 - **51 tests passing** (49 existing + 2 new validation tests)
 - New tests: `test_verify_endpoint_invalid_signature_length`, `test_verify_endpoint_invalid_coop_id`
