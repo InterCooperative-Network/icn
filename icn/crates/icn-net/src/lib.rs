@@ -9,6 +9,7 @@ pub mod protocol;
 pub mod rate_limit;
 pub mod replay_guard;
 pub mod session;
+pub mod stun;
 pub mod tls;
 pub mod topology;
 pub mod version;
@@ -22,6 +23,7 @@ pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;
 pub use session::SessionManager;
+pub use stun::StunClient;
 pub use topology::{
     FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId,
     TopologyConfig, TopologyInfo,

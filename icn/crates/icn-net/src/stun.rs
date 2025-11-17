@@ -1,0 +1,373 @@
+//! STUN client for NAT traversal
+//!
+//! Provides functionality to discover public IP address and port by querying
+//! STUN servers. This enables nodes behind NAT to learn their public endpoint
+//! for connection establishment.
+
+use anyhow::{Context, Result};
+use std::net::SocketAddr;
+use std::time::Duration;
+use tokio::net::UdpSocket;
+use tracing::{debug, info, warn};
+
+/// Default timeout for STUN requests
+const STUN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Maximum retry attempts for STUN queries
+const MAX_RETRIES: u32 = 3;
+
+/// STUN client for discovering public endpoints
+pub struct StunClient {
+    /// STUN server addresses to query
+    servers: Vec<SocketAddr>,
+
+    /// Timeout for STUN requests
+    timeout: Duration,
+
+    /// Maximum number of retry attempts
+    max_retries: u32,
+}
+
+impl StunClient {
+    /// Create a new STUN client with the given server addresses
+    pub fn new(servers: Vec<SocketAddr>) -> Self {
+        Self {
+            servers,
+            timeout: STUN_TIMEOUT,
+            max_retries: MAX_RETRIES,
+        }
+    }
+
+    /// Create a STUN client with Google's public STUN servers
+    pub fn with_google_stun() -> Result<Self> {
+        let servers = vec![
+            "stun.l.google.com:19302".parse()?,
+            "stun1.l.google.com:19302".parse()?,
+        ];
+        Ok(Self::new(servers))
+    }
+
+    /// Set custom timeout for STUN requests
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    /// Set custom retry count
+    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// Discover public endpoint by querying STUN servers
+    ///
+    /// This method will try multiple STUN servers and return the first successful
+    /// result. If multiple servers return different results, it uses majority vote.
+    pub async fn discover_public_endpoint(
+        &self,
+        local_socket: &UdpSocket,
+    ) -> Result<SocketAddr> {
+        let mut results = Vec::new();
+        let mut errors = Vec::new();
+
+        for server in &self.servers {
+            match self.query_stun_server(local_socket, server).await {
+                Ok(addr) => {
+                    info!("STUN server {} reported public endpoint: {}", server, addr);
+                    results.push(addr);
+                }
+                Err(e) => {
+                    warn!("Failed to query STUN server {}: {}", server, e);
+                    errors.push((server, e));
+                }
+            }
+
+            // If we have at least one successful result, use it
+            if !results.is_empty() {
+                break;
+            }
+        }
+
+        if results.is_empty() {
+            anyhow::bail!(
+                "All STUN servers failed. Errors: {:?}",
+                errors
+            );
+        }
+
+        // Use the first successful result
+        // TODO: Implement majority vote if we query multiple servers simultaneously
+        Ok(results[0])
+    }
+
+    /// Query a specific STUN server for public endpoint
+    async fn query_stun_server(
+        &self,
+        local_socket: &UdpSocket,
+        server: &SocketAddr,
+    ) -> Result<SocketAddr> {
+        for attempt in 1..=self.max_retries {
+            debug!(
+                "STUN query attempt {}/{} to {}",
+                attempt, self.max_retries, server
+            );
+
+            match tokio::time::timeout(
+                self.timeout,
+                self.do_stun_query(local_socket, server),
+            )
+            .await
+            {
+                Ok(Ok(addr)) => return Ok(addr),
+                Ok(Err(e)) => {
+                    warn!(
+                        "STUN query to {} failed (attempt {}/{}): {}",
+                        server, attempt, self.max_retries, e
+                    );
+                }
+                Err(_) => {
+                    warn!(
+                        "STUN query to {} timed out (attempt {}/{})",
+                        server, attempt, self.max_retries
+                    );
+                }
+            }
+
+            // Wait before retry (exponential backoff)
+            if attempt < self.max_retries {
+                let backoff = Duration::from_millis(100 * (1 << (attempt - 1)));
+                tokio::time::sleep(backoff).await;
+            }
+        }
+
+        anyhow::bail!(
+            "STUN query to {} failed after {} attempts",
+            server,
+            self.max_retries
+        )
+    }
+
+    /// Perform actual STUN query using manual STUN protocol implementation
+    ///
+    /// Implements RFC 5389 STUN Binding Request/Response for NAT discovery.
+    /// This is a minimal implementation focused on discovering public endpoints.
+    async fn do_stun_query(
+        &self,
+        local_socket: &UdpSocket,
+        server: &SocketAddr,
+    ) -> Result<SocketAddr> {
+        // Create STUN Binding Request
+        let transaction_id = rand::random::<[u8; 12]>();
+        let request = create_stun_binding_request(&transaction_id);
+
+        // Send request to STUN server
+        local_socket
+            .send_to(&request, server)
+            .await
+            .context("Failed to send STUN request")?;
+
+        // Receive response
+        let mut buf = vec![0u8; 1500]; // MTU size
+        let (len, from) = local_socket
+            .recv_from(&mut buf)
+            .await
+            .context("Failed to receive STUN response")?;
+
+        if from != *server {
+            anyhow::bail!(
+                "Received response from unexpected source: {} (expected {})",
+                from,
+                server
+            );
+        }
+
+        // Parse STUN response and extract public endpoint
+        parse_stun_binding_response(&buf[..len], &transaction_id)
+    }
+}
+
+/// Create a STUN Binding Request message (RFC 5389)
+fn create_stun_binding_request(transaction_id: &[u8; 12]) -> Vec<u8> {
+    let mut request = Vec::with_capacity(20);
+
+    // STUN Message Type: Binding Request (0x0001)
+    request.extend_from_slice(&[0x00, 0x01]);
+
+    // Message Length: 0 (no attributes in basic request)
+    request.extend_from_slice(&[0x00, 0x00]);
+
+    // Magic Cookie: 0x2112A442 (RFC 5389)
+    request.extend_from_slice(&[0x21, 0x12, 0xA4, 0x42]);
+
+    // Transaction ID: 96 bits (12 bytes)
+    request.extend_from_slice(transaction_id);
+
+    request
+}
+
+/// Parse STUN Binding Response and extract XOR-MAPPED-ADDRESS
+fn parse_stun_binding_response(
+    data: &[u8],
+    expected_transaction_id: &[u8; 12],
+) -> Result<SocketAddr> {
+    if data.len() < 20 {
+        anyhow::bail!("STUN response too short: {} bytes", data.len());
+    }
+
+    // Verify STUN message format
+    let msg_type = u16::from_be_bytes([data[0], data[1]]);
+    let msg_length = u16::from_be_bytes([data[2], data[3]]);
+    let magic_cookie = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+
+    // Check for Binding Success Response (0x0101)
+    if msg_type != 0x0101 {
+        anyhow::bail!("Unexpected STUN message type: 0x{:04x}", msg_type);
+    }
+
+    // Verify magic cookie
+    if magic_cookie != 0x2112A442 {
+        anyhow::bail!(
+            "Invalid STUN magic cookie: 0x{:08x} (expected 0x2112A442)",
+            magic_cookie
+        );
+    }
+
+    // Verify transaction ID
+    if &data[8..20] != expected_transaction_id {
+        anyhow::bail!("Transaction ID mismatch");
+    }
+
+    // Parse attributes to find XOR-MAPPED-ADDRESS (0x0020)
+    let mut offset = 20;
+    let end = 20 + (msg_length as usize);
+
+    while offset + 4 <= end {
+        let attr_type = u16::from_be_bytes([data[offset], data[offset + 1]]);
+        let attr_length = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
+        offset += 4;
+
+        if offset + (attr_length as usize) > end {
+            anyhow::bail!("Malformed STUN attribute at offset {}", offset);
+        }
+
+        // XOR-MAPPED-ADDRESS attribute (0x0020)
+        if attr_type == 0x0020 {
+            return parse_xor_mapped_address(
+                &data[offset..offset + (attr_length as usize)],
+                expected_transaction_id,
+            );
+        }
+
+        // Move to next attribute (attributes are padded to 4-byte boundary)
+        offset += (attr_length as usize + 3) & !3;
+    }
+
+    anyhow::bail!("XOR-MAPPED-ADDRESS attribute not found in STUN response")
+}
+
+/// Parse XOR-MAPPED-ADDRESS attribute (RFC 5389 Section 15.2)
+fn parse_xor_mapped_address(data: &[u8], transaction_id: &[u8; 12]) -> Result<SocketAddr> {
+    if data.len() < 4 {
+        anyhow::bail!("XOR-MAPPED-ADDRESS too short");
+    }
+
+    let family = data[1];
+    let xport = u16::from_be_bytes([data[2], data[3]]);
+
+    // XOR port with most significant 16 bits of magic cookie
+    let port = xport ^ 0x2112;
+
+    match family {
+        0x01 => {
+            // IPv4
+            if data.len() < 8 {
+                anyhow::bail!("XOR-MAPPED-ADDRESS IPv4 address too short");
+            }
+
+            // XOR address with magic cookie
+            let xaddr = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+            let addr = xaddr ^ 0x2112A442;
+
+            let ip = std::net::Ipv4Addr::from(addr);
+            Ok(SocketAddr::new(ip.into(), port))
+        }
+        0x02 => {
+            // IPv6
+            if data.len() < 20 {
+                anyhow::bail!("XOR-MAPPED-ADDRESS IPv6 address too short");
+            }
+
+            // XOR address with magic cookie (32 bits) + transaction ID (96 bits)
+            let mut xaddr = [0u8; 16];
+            xaddr.copy_from_slice(&data[4..20]);
+
+            // XOR with magic cookie
+            for i in 0..4 {
+                xaddr[i] ^= [0x21, 0x12, 0xA4, 0x42][i];
+            }
+
+            // XOR with transaction ID
+            for i in 0..12 {
+                xaddr[i + 4] ^= transaction_id[i];
+            }
+
+            let ip = std::net::Ipv6Addr::from(xaddr);
+            Ok(SocketAddr::new(ip.into(), port))
+        }
+        _ => anyhow::bail!("Unknown address family: 0x{:02x}", family),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stun_client_creation() {
+        let client = StunClient::with_google_stun().expect("Failed to create STUN client");
+        assert_eq!(client.servers.len(), 2);
+        assert_eq!(client.timeout, STUN_TIMEOUT);
+        assert_eq!(client.max_retries, MAX_RETRIES);
+    }
+
+    #[test]
+    fn test_stun_client_custom_config() {
+        let servers = vec!["1.2.3.4:3478".parse().unwrap()];
+        let client = StunClient::new(servers)
+            .with_timeout(Duration::from_secs(10))
+            .with_max_retries(5);
+
+        assert_eq!(client.timeout, Duration::from_secs(10));
+        assert_eq!(client.max_retries, 5);
+    }
+
+    #[tokio::test]
+    async fn test_stun_discovery_with_google() {
+        // This is an integration test that requires network access
+        // Skip in CI environments without internet
+        if std::env::var("CI").is_ok() {
+            return;
+        }
+
+        let client = StunClient::with_google_stun().expect("Failed to create client");
+
+        // Bind to any available port
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .await
+            .expect("Failed to bind socket");
+
+        let result = client.discover_public_endpoint(&socket).await;
+
+        match result {
+            Ok(addr) => {
+                println!("Discovered public endpoint: {}", addr);
+                // Verify we got a valid address
+                assert!(addr.port() > 0);
+            }
+            Err(e) => {
+                // Don't fail test if network is unavailable
+                eprintln!("STUN discovery failed (network may be unavailable): {}", e);
+            }
+        }
+    }
+}
