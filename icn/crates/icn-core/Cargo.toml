@@ -16,6 +16,7 @@ futures.workspace = true
 dirs = "5.0"
 ed25519-dalek.workspace = true
 async-trait = "0.1"
+hex = "0.4"
 
 # ICN crates
 icn-identity.workspace = true

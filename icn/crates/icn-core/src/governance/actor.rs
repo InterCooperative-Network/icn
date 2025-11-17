@@ -23,6 +23,8 @@ use icn_governance::{
     TallySnapshot, Vote, VoteChoice, VoteTally,
 };
 
+use crate::events::{EventBus, SystemEvent};
+
 /// Gossip topic for governance messages
 const GOVERNANCE_TOPIC: &str = "governance:proposal";
 
@@ -227,6 +229,7 @@ pub struct GovernanceActor {
     profile: GovernanceProfile,
     close_scheduler: Arc<RwLock<BinaryHeap<Reverse<ScheduledClose>>>>,
     close_tx: mpsc::UnboundedSender<ProposalId>,
+    event_bus: Option<Arc<EventBus>>,
 }
 
 impl GovernanceActor {
@@ -236,6 +239,7 @@ impl GovernanceActor {
         store: Arc<dyn Store>,
         gossip: Arc<RwLock<GossipActor>>,
         resolver: Arc<dyn MembershipResolver + Send + Sync>,
+        event_bus: Option<Arc<EventBus>>,
     ) -> Result<GovernanceHandle> {
         info!("Spawning GovernanceActor for DID: {}", did);
 
@@ -282,6 +286,7 @@ impl GovernanceActor {
             profile: GovernanceProfile::cooperative_default(),
             close_scheduler: close_scheduler.clone(),
             close_tx,
+            event_bus,
         };
 
         let handle = GovernanceHandle {
@@ -537,6 +542,25 @@ impl GovernanceActor {
                     tally_snapshot,
                 ))
                 .await?;
+
+                // Emit event for downstream processing (e.g., ledger transactions)
+                if let Some(ref event_bus) = self.event_bus {
+                    let event = match outcome_result {
+                        DecisionOutcome::Accepted => SystemEvent::ProposalAccepted {
+                            proposal_id: proposal_id.clone(),
+                            domain_id: proposal.domain_id.0.clone(),
+                            payload: proposal.payload.clone(),
+                            decided_at: now,
+                        },
+                        _ => SystemEvent::ProposalRejected {
+                            proposal_id: proposal_id.clone(),
+                            domain_id: proposal.domain_id.0.clone(),
+                            decided_at: now,
+                        },
+                    };
+
+                    event_bus.emit(event).await;
+                }
 
                 info!("✓ Proposal closed: {} ({:?})", proposal_id.0, outcome_result);
             }

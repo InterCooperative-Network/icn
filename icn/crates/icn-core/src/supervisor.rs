@@ -956,6 +956,10 @@ impl Supervisor {
                 }
             }
 
+            // Create event bus for inter-actor communication
+            let event_bus = Arc::new(crate::events::EventBus::new());
+            info!("Event bus created");
+
             // Spawn Governance actor
             let gov_store_path = self.config.store_path().join("governance");
             let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
@@ -964,13 +968,122 @@ impl Supervisor {
 
             let governance_handle = crate::governance::GovernanceActor::spawn(
                 did.clone(),
-                gov_store,
+                gov_store.clone(),
                 gossip_handle.clone(),
                 gov_resolver,
+                Some(event_bus.clone()),
             )
             .await?;
 
             info!("✓ Governance actor spawned at {}", gov_store_path.display());
+
+            // Subscribe to governance events for ledger execution
+            {
+                use crate::events::SystemEvent;
+                use icn_governance::ProposalPayload;
+
+                let ledger_clone = ledger_handle.clone();
+                let own_did = did.clone();
+                let audit_store = gov_store.clone();
+
+                event_bus.subscribe(Arc::new(move |event| {
+                    match event {
+                        SystemEvent::ProposalAccepted { proposal_id, payload, .. } => {
+                            match payload {
+                                ProposalPayload::Budget { amount, recipient, currency, purpose: _ } => {
+                                    info!("📊 Executing budget proposal {}: {} {} to {}",
+                                          proposal_id.0, amount, currency, recipient);
+
+                                    // Spawn async task to execute ledger transaction
+                                    let ledger = ledger_clone.clone();
+                                    let prop_id = proposal_id.clone();
+                                    let from_did = own_did.clone();
+                                    let store = audit_store.clone();
+
+                                    tokio::spawn(async move {
+                                        use icn_ledger::entry::JournalEntryBuilder;
+                                        use hex;
+
+                                        let mut ledger_guard = ledger.write().await;
+
+                                        // TODO: Use cooperative treasury DID instead of node DID
+                                        // For now, use the node's DID as the source
+                                        // Create double-entry: credit cooperative (decrease balance), debit recipient (increase balance)
+                                        let entry_result = JournalEntryBuilder::new(from_did.clone())
+                                            .credit(from_did.clone(), currency.clone(), amount)
+                                            .debit(recipient.clone(), currency.clone(), amount)
+                                            .build();
+
+                                        match entry_result {
+                                            Ok(entry) => {
+                                                match ledger_guard.append_entry(entry) {
+                                                    Ok(entry_hash) => {
+                                                        info!("✅ Budget proposal {} executed: {} {} transferred to {}",
+                                                              prop_id.0, amount, currency, recipient);
+
+                                                        // Store audit trail: governance decision → ledger entry
+                                                        let audit_key = format!("gov:audit:{}", prop_id.0);
+                                                        let audit_record = serde_json::json!({
+                                                            "proposal_id": prop_id.0,
+                                                            "ledger_entry_hash": hex::encode(entry_hash.0),
+                                                            "amount": amount,
+                                                            "currency": currency,
+                                                            "recipient": recipient.to_string(),
+                                                            "executed_at": std::time::SystemTime::now()
+                                                                .duration_since(std::time::UNIX_EPOCH)
+                                                                .unwrap()
+                                                                .as_secs(),
+                                                        });
+
+                                                        if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                                                            if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                                                                warn!("Failed to store audit trail for {}: {}", prop_id.0, e);
+                                                            } else {
+                                                                info!("📋 Audit trail recorded for proposal {}", prop_id.0);
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                warn!("❌ Failed to build ledger entry for proposal {}: {}", prop_id.0, e);
+                                            }
+                                        }
+                                    });
+                                }
+
+                                ProposalPayload::ConfigChange { new_config } => {
+                                    info!("⚙️  Config change proposal {} accepted: {:?}",
+                                          proposal_id.0, new_config);
+                                    // TODO: Apply configuration change
+                                }
+
+                                ProposalPayload::Membership { action, member } => {
+                                    info!("👥 Membership change proposal {} accepted: {:?} for {}",
+                                          proposal_id.0, action, member);
+                                    // TODO: Update membership
+                                }
+
+                                ProposalPayload::Text { .. } => {
+                                    // Text proposals don't trigger actions
+                                    info!("📝 Text proposal {} accepted (no action required)", proposal_id.0);
+                                }
+                            }
+                        }
+
+                        SystemEvent::ProposalRejected { proposal_id, .. } => {
+                            info!("❌ Proposal {} rejected - no action taken", proposal_id.0);
+                        }
+
+                        _ => {}
+                    }
+                })).await;
+            }
+
+            info!("✓ Governance event handlers registered");
 
             // Spawn RPC server with network, ledger, contract, gossip, and governance handles
             let rpc_port = self.config.network.rpc_port;
