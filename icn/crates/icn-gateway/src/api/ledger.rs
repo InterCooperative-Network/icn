@@ -110,7 +110,9 @@ pub async fn get_history(
         .and_then(|s| s.parse().ok())
         .unwrap_or(validation::DEFAULT_HISTORY_LIMIT);
 
-    // Validate limit (prevent OOM attacks from requesting billions of entries)
+    // Validate pagination parameters
+    // SECURITY: Validate offset to prevent integer overflow in pagination arithmetic
+    let offset = validation::validate_history_offset(offset)?;
     let limit = validation::validate_history_limit(limit)?;
 
     let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, limit)?;

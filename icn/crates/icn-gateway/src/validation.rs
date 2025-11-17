@@ -218,6 +218,22 @@ pub fn validate_history_limit(limit: usize) -> Result<usize> {
     Ok(limit)
 }
 
+/// Validate history offset parameter
+/// Prevents integer overflow attacks in pagination arithmetic
+pub fn validate_history_offset(offset: usize) -> Result<usize> {
+    // Maximum safe offset to prevent overflow when added to MAX_HISTORY_LIMIT
+    // Using usize::MAX / 2 as a reasonable upper bound (still allows huge offsets)
+    const MAX_HISTORY_OFFSET: usize = usize::MAX / 2;
+
+    if offset > MAX_HISTORY_OFFSET {
+        return Err(GatewayError::BadRequest(
+            "Offset exceeds maximum allowed value".to_string()
+        ));
+    }
+
+    Ok(offset)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +334,15 @@ mod tests {
         assert!(validate_history_limit(MAX_HISTORY_LIMIT).is_ok());
         assert!(validate_history_limit(0).is_err()); // Zero
         assert!(validate_history_limit(MAX_HISTORY_LIMIT + 1).is_err()); // Too large
+    }
+
+    #[test]
+    fn test_validate_history_offset() {
+        assert!(validate_history_offset(0).is_ok());
+        assert!(validate_history_offset(1000).is_ok());
+        assert!(validate_history_offset(1_000_000).is_ok());
+        assert!(validate_history_offset(usize::MAX / 2).is_ok()); // At limit
+        assert!(validate_history_offset(usize::MAX / 2 + 1).is_err()); // Over limit
+        assert!(validate_history_offset(usize::MAX).is_err()); // Way over limit
     }
 }

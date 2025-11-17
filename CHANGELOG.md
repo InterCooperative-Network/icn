@@ -90,6 +90,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Location:** `error.rs:50-81`
   - **Security Principle:** Defense in depth - never expose implementation details to untrusted clients
 
+- **BUG #27 (HIGH):** Integer overflow in history pagination arithmetic
+  - **Problem:** `offset` parameter in `GET /ledger/:coop/history` not validated, could cause integer overflow
+  - **Location:** `ledger_mgr.rs:203` - `let end = (offset + limit).min(total);`
+  - **Attack Vector:** Send request with `offset=usize::MAX-500&limit=1000`
+  - **Exploit:**
+    1. Arithmetic: `(usize::MAX - 500) + 1000` wraps around to 499 in release builds
+    2. Slice operation: `entries[(usize::MAX-500)..499]` causes out-of-bounds panic or returns wrong data
+  - **Impact:**
+    - Out-of-bounds access causing panic (DoS)
+    - Data leakage from returning wrong transaction range
+    - Bypass of pagination limits
+  - **Root Cause:**
+    1. No validation on `offset` parameter (only `limit` was validated)
+    2. Addition uses wrapping arithmetic in release builds (Rust default)
+    3. Early return at line 199 only prevents some overflow cases, not all
+  - **Fix:**
+    1. Added `validate_history_offset()` with MAX_HISTORY_OFFSET = usize::MAX / 2
+    2. Changed pagination arithmetic to use `saturating_add()` for defense in depth
+  - **Defense-in-Depth:** Two layers of protection (validation + saturating arithmetic)
+  - **Verification:** New test coverage validates offset limits
+
 **Earlier TOCTOU Race Condition Fixes:**
 
 - **BUG #7 (CRITICAL):** Timing attack in authentication prevented

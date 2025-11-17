@@ -200,7 +200,9 @@ impl LedgerManager {
             return Ok(Vec::new());
         }
 
-        let end = (offset + limit).min(total);
+        // SECURITY: Use saturating_add to prevent integer overflow
+        // Even with validation, defense in depth requires safe arithmetic
+        let end = offset.saturating_add(limit).min(total);
         Ok(entries[offset..end].to_vec())
     }
 }
