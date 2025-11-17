@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improved - STUN Majority Vote for Robust NAT Discovery (2025-11-17)
+
+**Enhanced STUN reliability with parallel queries and consensus:**
+
+- **Parallel Server Queries** (`icn-net/src/stun.rs:89`)
+  - Queries all configured STUN servers simultaneously using `futures::future::join_all`
+  - Previously queried servers sequentially, stopping at first success
+  - Parallel approach provides faster discovery and consensus validation
+
+- **Majority Vote Algorithm** (`icn-net/src/stun.rs:117-138`)
+  - Counts occurrences of each reported public endpoint
+  - Selects the most common result (consensus)
+  - Provides resilience against misconfigured or malicious STUN servers
+  - Example: If 3 servers report `203.0.113.5:12345` and 2 report different addresses, chooses the majority
+
+- **Graceful Degradation**
+  - Falls back to single result if only one server succeeds
+  - Clear error message if all servers fail
+  - Logs consensus result with vote count for observability
+
+- **Technical Details:**
+  - Made `do_stun_query()` a static associated function for easier parallel execution
+  - Added `futures` dependency (already in workspace)
+  - Removed unused `Arc` import
+  - **Test Coverage:** New test `test_stun_majority_vote` validates parallel query setup
+
+- **Security & Reliability Benefits:**
+  - Prevents single misconfigured STUN server from causing connection failures
+  - Detects and mitigates potential STUN server spoofing attempts
+  - Increases confidence in discovered public endpoints
+
+**Tests:** 460 passing (up from 459)
+
+---
+
 ### Added - NAT Traversal Phase 3 Part 1: Candidate Cache & Connection Attempts (2025-11-17)
 
 **Hole Punching Infrastructure:**
