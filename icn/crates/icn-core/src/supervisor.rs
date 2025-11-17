@@ -1004,6 +1004,13 @@ impl Supervisor {
                                         use icn_ledger::entry::JournalEntryBuilder;
                                         use hex;
 
+                                        // IDEMPOTENCY CHECK: Skip if proposal already executed
+                                        let audit_key = format!("gov:audit:{}", prop_id.0);
+                                        if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
+                                            debug!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+                                            return;
+                                        }
+
                                         let mut ledger_guard = ledger.write().await;
 
                                         // TODO: Use cooperative treasury DID instead of node DID
