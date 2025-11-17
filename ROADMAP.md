@@ -360,17 +360,19 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 - **Decision**: Trust-first communities don't need advanced privacy tech
 - **Rationale**: Cooperatives share resources among known members; ZK is solution looking for problem
 
-**NAT Traversal** (Phases 1-3 Complete → 2025-11-17):
-- **Status**: STUN discovery + candidate exchange + hole punching IMPLEMENTED
+**NAT Traversal** (Phases 1-3 Complete + Enhancements → 2025-11-17):
+- **Status**: STUN discovery + candidate exchange + hole punching + enhancements IMPLEMENTED
 - **What's Done**:
   - Phase 1: Manual STUN protocol (RFC 5389) discovers public IP/port
   - Phase 2: ConnectionCandidate exchange via gossip
   - Phase 3: Automatic connection attempts (local addr → public addr priority)
   - CandidateCache with TTL-based expiration (5 min default)
-  - 97 icn-net tests + 4 integration tests passing
+  - **Enhancement**: Parallel STUN queries with majority vote consensus
+  - **Enhancement**: Configurable STUN servers via NetworkConfig (privacy + performance)
+  - 97 icn-net tests + 4 integration tests passing (460 total)
 - **What's Deferred**: Phase 4 (TURN relay) awaiting pilot need
 - **Why Now**: Implemented as part of development exploration; validates architecture for when pilots need it
-- **Deployment**: Can be enabled via config; disabled by default until pilot requests it
+- **Deployment**: Enabled by default with Google STUN; configurable via `icn.toml`
 
 **Cross-Network Standards** (Deferred):
 - **Status**: QUIC/TLS works over internet, only discovery is LAN-only (mDNS)
