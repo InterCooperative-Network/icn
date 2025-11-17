@@ -10,7 +10,7 @@ use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -1042,11 +1042,37 @@ impl Supervisor {
                                                                 .as_secs(),
                                                         });
 
-                                                        if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
-                                                            if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                                                warn!("Failed to store audit trail for {}: {}", prop_id.0, e);
-                                                            } else {
-                                                                info!("📋 Audit trail recorded for proposal {}", prop_id.0);
+                                                        // CRITICAL: Store audit trail - failure here creates inconsistent state
+                                                        // (ledger updated but no governance record)
+                                                        match serde_json::to_vec(&audit_record) {
+                                                            Ok(audit_json) => {
+                                                                match store.put(audit_key.as_bytes(), &audit_json) {
+                                                                    Ok(_) => {
+                                                                        info!("📋 Audit trail recorded for proposal {}", prop_id.0);
+                                                                    }
+                                                                    Err(e) => {
+                                                                        // CRITICAL ERROR: Ledger updated but audit trail failed
+                                                                        // Manual reconciliation required!
+                                                                        error!(
+                                                                            "🚨 CRITICAL: Ledger updated but audit trail write failed for proposal {}",
+                                                                            prop_id.0
+                                                                        );
+                                                                        error!("   Ledger entry hash: {}", hex::encode(&entry_hash.0));
+                                                                        error!("   Amount: {} {}", amount, currency);
+                                                                        error!("   Recipient: {}", recipient);
+                                                                        error!("   Error: {}", e);
+                                                                        error!("   ACTION REQUIRED: Manual reconciliation needed");
+                                                                        // TODO: Write to dead-letter queue for automated reconciliation
+                                                                    }
+                                                                }
+                                                            }
+                                                            Err(e) => {
+                                                                error!(
+                                                                    "🚨 CRITICAL: Failed to serialize audit record for proposal {}: {}",
+                                                                    prop_id.0, e
+                                                                );
+                                                                error!("   Ledger entry hash: {}", hex::encode(&entry_hash.0));
+                                                                error!("   ACTION REQUIRED: Manual reconciliation needed");
                                                             }
                                                         }
                                                     }
@@ -1228,6 +1254,11 @@ impl Supervisor {
                 let _ = self.shutdown_tx.send(());
             }
         }
+
+        // Grace period for in-flight tasks (governance execution, etc.) to complete
+        // TODO: Replace with proper task tracking (JoinSet) for guaranteed completion
+        info!("Waiting 2s for in-flight tasks to complete...");
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Graceful shutdown of actors
         info!("Supervisor shutting down actors");
