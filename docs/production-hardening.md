@@ -397,6 +397,74 @@ fn create_transport_config() -> quinn::TransportConfig {
 
 ---
 
+### 8. Ledger Recovery Transfer Bug (BUG #30)
+
+**Severity**: Critical
+**File**: [`icn-ledger/src/ledger.rs:469-484`](../icn/crates/icn-ledger/src/ledger.rs#L469-L484)
+
+**Vulnerability**: The `transfer_balances_for_recovery()` function had inverted debit/credit operations, causing balance transfers during social recovery to **double the old DID's balance** instead of transferring it to the new DID. This would have allowed users to create unlimited credit by repeatedly initiating fake recoveries.
+
+**Before (BROKEN)**:
+```rust
+let entry = if *balance > 0 {
+    // WRONG: This increases old_did's balance instead of reducing it
+    JournalEntryBuilder::new(new_did.clone())
+        .debit(old_did.clone(), currency.clone(), *balance)  // Increases old_did balance
+        .credit(new_did.clone(), currency.clone(), *balance) // Decreases new_did balance
+        .build()?
+} else {
+    // Negative balance (debt) transfer also broken
+    JournalEntryBuilder::new(new_did.clone())
+        .credit(old_did.clone(), currency.clone(), balance.abs())
+        .debit(new_did.clone(), currency.clone(), balance.abs())
+        .build()?
+};
+```
+
+**After (FIXED)**:
+```rust
+let entry = if *balance > 0 {
+    // Correct: Transfer positive balance from old_did to new_did
+    JournalEntryBuilder::new(new_did.clone())
+        .credit(old_did.clone(), currency.clone(), *balance)  // Reduce old_did's balance
+        .debit(new_did.clone(), currency.clone(), *balance)   // Increase new_did's balance
+        .build()?
+} else {
+    // Correct: Transfer debt from old_did to new_did
+    JournalEntryBuilder::new(new_did.clone())
+        .debit(old_did.clone(), currency.clone(), balance.abs())  // Remove debt from old_did
+        .credit(new_did.clone(), currency.clone(), balance.abs()) // Add debt to new_did
+        .build()?
+};
+```
+
+**Impact**:
+- **Production-blocking severity**: Would have allowed unlimited credit creation via fake recovery
+- **Attack vector**: User creates recovery event → finalizes it → old DID balance doubles instead of transfers
+- **Repeat exploit**: Could be repeated indefinitely to create arbitrary amounts of credit
+- **Economic impact**: Complete breakdown of mutual credit system integrity
+- **Discovery**: Found during social recovery integration test development (2025-11-17)
+- **Status**: Fixed before feature deployment - no production data affected
+
+**Mutual Credit Semantics Reminder**:
+In double-entry mutual credit accounting:
+- **Debit** increases an asset account (receiving credit from someone)
+- **Credit** increases a liability account (giving credit to someone)
+- Positive balance = net creditor (others owe you)
+- Negative balance = net debtor (you owe others)
+
+**Test Coverage**: Integration test `test_full_recovery_lifecycle()` now validates correct balance transfers:
+```rust
+// Old DID starts with 100 hours credit
+assert_eq!(old_balance, Some(100));
+
+// After recovery finalization
+assert_eq!(alice.ledger.read().await.balance(&alice_did, "hours"), Some(0));      // Old DID: 100 → 0
+assert_eq!(alice.ledger.read().await.balance(&alice2_did, "hours"), Some(100));   // New DID: 0 → 100
+```
+
+---
+
 ## Configuration
 
 ### Default Security Settings
@@ -608,6 +676,12 @@ Expected results: 64 tests passed (27 + 18 + 16 + 0)
 ---
 
 ## Changelog
+
+- **2025-11-17**: Critical ledger recovery bug fix (BUG #30)
+  - Fixed inverted debit/credit in `transfer_balances_for_recovery()`
+  - Production-blocking: Would have enabled unlimited credit creation
+  - Discovered during social recovery integration test development
+  - Fixed before feature deployment - no production impact
 
 - **2025-01-XX**: Initial production hardening (Phase 7)
   - Fixed 3 critical security issues
