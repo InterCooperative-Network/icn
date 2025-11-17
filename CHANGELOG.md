@@ -76,6 +76,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Validation:** Only alphanumeric, hyphens, underscores allowed - prevents `../` and other traversal patterns
   - **Defense-in-Depth:** Validation now enforced BEFORE any file operations occur
 
+- **BUG #26 (MEDIUM):** Information leakage in internal error responses
+  - **Problem:** `error_response()` returned raw `self.to_string()` for all errors, exposing implementation details
+  - **Leaked Information:**
+    - "Lock poisoned: ..." reveals concurrency implementation (RwLock usage)
+    - "JWT encoding failed: ..." reveals crypto implementation details
+    - File paths from `IoError` (could reveal directory structure)
+    - Full error chains from `SubstrateError` (internal component details)
+  - **Impact:** Helps attackers understand system internals, aids reconnaissance for further attacks
+  - **Fix:** Sanitize internal errors to generic "Internal server error" while preserving logging
+  - **Implementation:** User errors (BadRequest, NotFound) still show details, internal errors sanitized
+  - **Observability:** Full error details logged via `tracing::error!()` for debugging
+  - **Location:** `error.rs:50-81`
+  - **Security Principle:** Defense in depth - never expose implementation details to untrusted clients
+
 **Earlier TOCTOU Race Condition Fixes:**
 
 - **BUG #7 (CRITICAL):** Timing attack in authentication prevented
