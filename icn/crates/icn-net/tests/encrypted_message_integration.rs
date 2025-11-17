@@ -324,6 +324,7 @@ impl TestNode {
             None, // No trust-gated config
             None, // No fallback config
             None, // No topology config
+            None, // No STUN servers for tests
         )
         .await?;
 
