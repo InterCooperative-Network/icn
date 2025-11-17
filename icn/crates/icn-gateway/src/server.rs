@@ -61,43 +61,53 @@ impl GatewayServer {
         // Create rate limiter with default config
         let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
 
-        // Spawn background cleanup task
+        // Create shutdown channel
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
+
+        // Spawn background cleanup task with graceful shutdown
         {
             let auth_manager_clone = auth_manager.clone();
             let rate_limiter_clone = rate_limiter.clone();
             let event_broadcaster_clone = event_broadcaster.clone();
             let coop_manager_clone = coop_manager.clone();
+            let mut shutdown_signal = shutdown_tx.subscribe();
 
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(300)); // 5 minutes
                 loop {
-                    interval.tick().await;
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Clean up expired authentication challenges
+                            if let Ok(removed) = auth_manager_clone.cleanup_expired_challenges() {
+                                if removed > 0 {
+                                    info!("Cleaned up {} expired authentication challenges", removed);
+                                }
+                            }
 
-                    // Clean up expired authentication challenges
-                    if let Ok(removed) = auth_manager_clone.cleanup_expired_challenges() {
-                        if removed > 0 {
-                            info!("Cleaned up {} expired authentication challenges", removed);
+                            // Clean up inactive rate limiter buckets (1 hour inactivity)
+                            let removed = rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(3600));
+                            if removed > 0 {
+                                info!("Cleaned up {} inactive rate limiter buckets", removed);
+                            }
+
+                            // Clean up dead WebSocket channels for all cooperatives
+                            // Get all coop IDs from coop manager
+                            if let Ok(coops) = coop_manager_clone.list_all_coop_ids() {
+                                for coop_id in coops {
+                                    event_broadcaster_clone.cleanup(&coop_id).await;
+                                }
+                            }
                         }
-                    }
-
-                    // Clean up inactive rate limiter buckets (1 hour inactivity)
-                    let removed = rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(3600));
-                    if removed > 0 {
-                        info!("Cleaned up {} inactive rate limiter buckets", removed);
-                    }
-
-                    // Clean up dead WebSocket channels for all cooperatives
-                    // Get all coop IDs from coop manager
-                    if let Ok(coops) = coop_manager_clone.list_all_coop_ids() {
-                        for coop_id in coops {
-                            event_broadcaster_clone.cleanup(&coop_id).await;
+                        _ = shutdown_signal.recv() => {
+                            info!("Cleanup task received shutdown signal");
+                            break;
                         }
                     }
                 }
             });
         }
 
-        HttpServer::new(move || {
+        let server = HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
 
@@ -149,9 +159,19 @@ impl GatewayServer {
                 )
         })
         .bind(self.bind_addr)?
-        .run()
-        .await?;
+        .run();
 
+        // Wait for server to complete and then signal cleanup task to shutdown
+        let result = server.await;
+
+        // Signal cleanup task to shutdown
+        info!("Server shutting down, signaling cleanup task");
+        let _ = shutdown_tx.send(());
+
+        // Give cleanup task a moment to finish
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        result?;
         Ok(())
     }
 }
