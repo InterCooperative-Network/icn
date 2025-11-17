@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - NAT Traversal Metrics (2025-11-17)
+
+**Comprehensive Prometheus metrics for NAT traversal observability:**
+
+- **STUN Discovery Metrics** (`icn-obs/src/metrics.rs:89-105`)
+  - `icn_stun_queries_total{server, result}` - Track outcomes per server (success/timeout/error)
+  - `icn_stun_discovery_duration_seconds` - Histogram of discovery latency
+  - `icn_stun_consensus_votes_total{endpoint, votes, total_servers}` - Majority vote distribution
+  - `icn_stun_server_failures_total{server, reason}` - Identify unreliable servers
+
+- **Candidate Exchange Metrics** (`icn-obs/src/metrics.rs:107-127`)
+  - `icn_candidates_received_total` - Candidates received via gossip
+  - `icn_candidates_cached_total` - Current cache size (gauge for capacity planning)
+  - `icn_candidates_expired_total` - Expired candidates removed (cache churn rate)
+  - `icn_candidates_stale_rejected_total` - Stale candidates rejected on arrival
+  - `icn_candidates_published_total` - Candidates published to gossip
+
+- **Connection Attempt Metrics** (`icn-obs/src/metrics.rs:129-149`)
+  - `icn_nat_connection_attempts_total{method}` - Attempts by method (local/public/relay)
+  - `icn_nat_connection_success_total{method}` - Success rate per method
+  - `icn_nat_connection_duration_seconds{method}` - Latency distribution per method
+  - `icn_nat_hole_punch_attempts_total` - Total hole punch attempts
+  - `icn_nat_hole_punch_success_total` - Hole punch success rate
+
+- **Helper Functions** (`icn-obs/src/metrics.rs:1115-1193`)
+  - `nat_traversal::stun_query_inc(server, result)` - Record STUN query outcome
+  - `nat_traversal::stun_discovery_duration_record(secs)` - Record discovery time
+  - `nat_traversal::stun_consensus_vote_inc(endpoint, votes, total)` - Record vote
+  - `nat_traversal::candidates_cached_set(count)` - Update cache gauge
+  - `nat_traversal::connection_attempt_inc(method)` - Track attempt
+  - `nat_traversal::connection_success_inc(method)` - Track success
+  - `nat_traversal::connection_duration_record(method, secs)` - Record latency
+  - Plus 6 additional helpers for comprehensive tracking
+
+**Benefits:**
+- **Pilot Validation**: Measure NAT traversal effectiveness in real deployments
+- **Performance Tuning**: Identify slow STUN servers, optimize timeouts
+- **Failure Analysis**: Understand which NAT types succeed/fail
+- **Capacity Planning**: Monitor candidate cache growth
+- **Method Optimization**: Compare local vs public connection success rates
+
+**Use Cases:**
+```promql
+# STUN discovery success rate
+rate(icn_stun_queries_total{result="success"}[5m]) /
+rate(icn_stun_queries_total[5m])
+
+# Public vs local connection success rate
+rate(icn_nat_connection_success_total{method="public"}[5m]) /
+rate(icn_nat_connection_attempts_total{method="public"}[5m])
+
+# 95th percentile connection latency by method
+histogram_quantile(0.95,
+  rate(icn_nat_connection_duration_seconds_bucket[5m]))
+```
+
+**Tests:** All 460 tests passing
+
+---
+
 ### Added - Configurable STUN Servers (2025-11-17)
 
 **Operators can now customize STUN servers via configuration:**
