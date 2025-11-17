@@ -46,6 +46,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fix:** Call `validate_coop_id()` before token generation
   - **Metric:** Track `auth_failures_inc("invalid_coop_id")`
 
+- **BUG #23 (CRITICAL):** Timing attack in auth verification prevented
+  - **Problem:** Short-circuit `||` operator broke constant-time guarantee in `verify_challenge()`
+  - **Impact:** If signature invalid, expiration check was skipped, creating timing side-channel
+  - **Attack:** Attackers could measure response times to determine if signature was valid before checking expiration
+  - **Fix:** Use bitwise `|` instead of `||` to force evaluation of both conditions
+  - **Location:** `auth.rs:150` - `if !signature_valid | is_expired {`
+  - **Documentation:** Lines 81-84 and CHANGELOG BUG #7 explicitly claim constant-time behavior, which was violated
+  - **Verification:** Both signature validation AND expiration check now always execute
+
+- **BUG #24 (CRITICAL):** WebSocket connection counter race condition
+  - **Problem:** When global limit reached, `started()` called `ctx.stop()` without incrementing counter
+  - **Impact:** `stopped()` always decremented, even when `started()` never incremented → counter underflow
+  - **Consequence:** Counter became out of sync, allowing connection limit bypass after multiple rejections
+  - **Fix:** Added `connection_tracked: bool` field to `WsSession` struct
+  - **Implementation:** Only increment sets `connection_tracked = true`, `stopped()` only decrements if true
+  - **Location:** `websocket.rs:42-254`
+  - **Verification:** Rejected connections no longer affect counter
+
 **Earlier TOCTOU Race Condition Fixes:**
 
 - **BUG #7 (CRITICAL):** Timing attack in authentication prevented
