@@ -48,8 +48,34 @@ impl ResponseError for GatewayError {
     }
 
     fn error_response(&self) -> HttpResponse {
+        // Sanitize error messages to prevent information leakage
+        // Internal errors should not expose implementation details to clients
+        let error_message = match self {
+            // User-facing errors - safe to expose
+            GatewayError::AuthenticationFailed(msg) => msg.clone(),
+            GatewayError::AuthorizationFailed(msg) => msg.clone(),
+            GatewayError::NotFound(msg) => msg.clone(),
+            GatewayError::BadRequest(msg) => msg.clone(),
+            GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {}", msg),
+
+            // Internal errors - sanitize to prevent information leakage
+            // Log the full error for debugging but return generic message to client
+            GatewayError::InternalError(details) => {
+                tracing::error!("Internal error: {}", details);
+                "Internal server error".to_string()
+            }
+            GatewayError::SubstrateError(err) => {
+                tracing::error!("Substrate error: {:?}", err);
+                "Internal server error".to_string()
+            }
+            GatewayError::IoError(err) => {
+                tracing::error!("I/O error: {:?}", err);
+                "Internal server error".to_string()
+            }
+        };
+
         HttpResponse::build(self.status_code()).json(serde_json::json!({
-            "error": self.to_string(),
+            "error": error_message,
         }))
     }
 }
