@@ -122,15 +122,18 @@ impl AuthManager {
                 // This ensures constant-time behavior (attackers can't distinguish parsing failures)
                 use ed25519_dalek::{SigningKey, Signer};
 
-                // Create dummy key and signature
+                // Create dummy key and sign a message
                 let dummy_key = SigningKey::from_bytes(&[0u8; 32]);
-                let dummy_message = [0u8; 32];
-                let dummy_signature = dummy_key.sign(&dummy_message);
+                let signed_message = [0u8; 32];
+                let dummy_signature = dummy_key.sign(&signed_message);
 
-                // Perform verification that will always fail
+                // Perform verification that will ALWAYS FAIL
+                // We verify the signature against a DIFFERENT message
                 // This takes the same time as a real verification
                 let dummy_verifying_key = dummy_key.verifying_key();
-                let _ = dummy_verifying_key.verify(&[0u8; 32], &dummy_signature);
+                let different_message = [1u8; 32]; // Different from signed_message
+                let _ = dummy_verifying_key.verify(&different_message, &dummy_signature);
+                // This will always fail: signature for message A won't verify against message B
 
                 false // Parsing failed, so signature is invalid
             }
