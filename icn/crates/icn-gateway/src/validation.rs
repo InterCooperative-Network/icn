@@ -28,6 +28,10 @@ pub const MAX_CREDIT_POLICY_LEN: usize = 64;
 /// Maximum number of members per cooperative
 pub const MAX_MEMBERS_PER_COOP: usize = 10_000;
 
+/// Maximum number of cooperatives per gateway instance
+/// This prevents unbounded memory growth from cooperative creation DoS
+pub const MAX_COOPERATIVES: usize = 1_000;
+
 /// Maximum number of scopes in a token request
 pub const MAX_SCOPES: usize = 20;
 

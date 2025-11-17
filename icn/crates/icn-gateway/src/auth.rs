@@ -104,23 +104,37 @@ impl AuthManager {
                 .ok_or_else(auth_error)?
         };
 
-        // Parse DID public key
-        let verifying_key = did.to_verifying_key()
-            .map_err(|_| auth_error())?;
+        // Parse all inputs WITHOUT early returns
+        // Store results to perform verification even if parsing fails
+        let verifying_key_result = did.to_verifying_key();
+        let nonce_bytes_result = hex::decode(&challenge.nonce);
+        let signature_obj_result = Signature::from_slice(signature);
 
-        // Decode nonce
-        let nonce_bytes = hex::decode(&challenge.nonce)
-            .map_err(|e| GatewayError::InternalError(
-                format!("Invalid nonce encoding: {e}")
-            ))?;
+        // ALWAYS perform signature verification (expensive crypto operation)
+        // Even if parsing failed, we perform a dummy verification to maintain constant timing
+        let signature_valid = match (verifying_key_result, nonce_bytes_result, signature_obj_result) {
+            (Ok(verifying_key), Ok(nonce_bytes), Ok(signature_obj)) => {
+                // All parsing succeeded - perform real verification
+                verifying_key.verify(&nonce_bytes, &signature_obj).is_ok()
+            }
+            _ => {
+                // Parsing failed - perform dummy verification with hardcoded values
+                // This ensures constant-time behavior (attackers can't distinguish parsing failures)
+                use ed25519_dalek::{SigningKey, Signer};
 
-        // Parse signature
-        let signature_obj = Signature::from_slice(signature)
-            .map_err(|_| auth_error())?;
+                // Create dummy key and signature
+                let dummy_key = SigningKey::from_bytes(&[0u8; 32]);
+                let dummy_message = [0u8; 32];
+                let dummy_signature = dummy_key.sign(&dummy_message);
 
-        // ALWAYS verify signature first (expensive crypto operation)
-        // This ensures constant-time behavior regardless of expiration status
-        let signature_valid = verifying_key.verify(&nonce_bytes, &signature_obj).is_ok();
+                // Perform verification that will always fail
+                // This takes the same time as a real verification
+                let dummy_verifying_key = dummy_key.verifying_key();
+                let _ = dummy_verifying_key.verify(&[0u8; 32], &dummy_signature);
+
+                false // Parsing failed, so signature is invalid
+            }
+        };
 
         // Check expiration AFTER signature verification
         // This prevents timing attacks by ensuring we always do the expensive crypto
