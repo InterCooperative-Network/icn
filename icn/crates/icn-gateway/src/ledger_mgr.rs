@@ -156,12 +156,29 @@ impl LedgerManager {
         Ok(account_balances.balances)
     }
 
-    /// Get transaction history for a cooperative
-    pub fn get_history(&self, coop_id: &CoopId, filter_did: Option<&Did>) -> Result<Vec<icn_ledger::JournalEntry>> {
+    /// Get transaction history for a cooperative with pagination
+    ///
+    /// Security: This method enforces pagination to prevent OOM attacks.
+    /// - Loads ALL entries into memory (limitation of current ledger API)
+    /// - Applies filtering and pagination AFTER loading
+    /// - Returns up to `limit` entries starting from `offset`
+    ///
+    /// TODO: Update icn-ledger to support cursor-based pagination for efficiency
+    pub fn get_history(
+        &self,
+        coop_id: &CoopId,
+        filter_did: Option<&Did>,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<icn_ledger::JournalEntry>> {
         let ledger_arc = self.get_ledger(coop_id)?;
         let ledger = ledger_arc.read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
+        // SECURITY: We still load all entries here because the underlying ledger
+        // API doesn't support pagination. This is a known limitation.
+        // The pagination happens AFTER loading to at least limit what's returned.
+        // A full fix would require updating icn-ledger to support cursor-based queries.
         let mut entries = ledger.get_all_entries()
             .map_err(GatewayError::SubstrateError)?;
 
@@ -172,7 +189,14 @@ impl LedgerManager {
             });
         }
 
-        Ok(entries)
+        // Apply pagination
+        let total = entries.len();
+        if offset >= total {
+            return Ok(Vec::new());
+        }
+
+        let end = (offset + limit).min(total);
+        Ok(entries[offset..end].to_vec())
     }
 }
 
@@ -237,16 +261,21 @@ mod tests {
             "hours".to_string(),
         ).unwrap();
 
-        let history = mgr.get_history(&"test-coop".to_string(), None).unwrap();
+        // Get all history with pagination
+        let history = mgr.get_history(&"test-coop".to_string(), None, 0, 100).unwrap();
         assert_eq!(history.len(), 1);
 
         // Filter by Alice
-        let alice_history = mgr.get_history(&"test-coop".to_string(), Some(alice.did())).unwrap();
+        let alice_history = mgr.get_history(&"test-coop".to_string(), Some(alice.did()), 0, 100).unwrap();
         assert_eq!(alice_history.len(), 1);
 
         // Filter by random DID (should be empty)
         let other = IdentityBundle::generate().unwrap();
-        let other_history = mgr.get_history(&"test-coop".to_string(), Some(other.did())).unwrap();
+        let other_history = mgr.get_history(&"test-coop".to_string(), Some(other.did()), 0, 100).unwrap();
         assert_eq!(other_history.len(), 0);
+
+        // Test pagination
+        let empty_page = mgr.get_history(&"test-coop".to_string(), None, 10, 100).unwrap();
+        assert_eq!(empty_page.len(), 0); // Offset beyond available entries
     }
 }

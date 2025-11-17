@@ -83,7 +83,7 @@ pub async fn create_payment(
     })))
 }
 
-/// GET /ledger/:coop_id/history?did=... - Get transaction history
+/// GET /ledger/:coop_id/history?did=...&offset=0&limit=100 - Get transaction history
 #[get("/{coop_id}/history")]
 pub async fn get_history(
     req: HttpRequest,
@@ -101,7 +101,19 @@ pub async fn get_history(
         None
     };
 
-    let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref())?;
+    // Parse pagination parameters
+    let offset: usize = query.get("offset")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+
+    let limit: usize = query.get("limit")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(validation::DEFAULT_HISTORY_LIMIT);
+
+    // Validate limit (prevent OOM attacks from requesting billions of entries)
+    let limit = validation::validate_history_limit(limit)?;
+
+    let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, limit)?;
 
     // Track history query
     gateway::history_queries_inc();
@@ -225,7 +237,7 @@ mod tests {
                 )
         ).await;
 
-        // Get history with authorization
+        // Get history with authorization (uses default pagination)
         let claims = TokenClaims {
             sub: alice.did().to_string(),
             iat: 1000000000,
@@ -248,10 +260,30 @@ mod tests {
         let req = test::TestRequest::get()
             .uri(&uri)
             .to_request();
-        req.extensions_mut().insert(claims);
+        req.extensions_mut().insert(claims.clone());
 
         let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
         assert_eq!(resp.len(), 1);
+
+        // Test pagination parameters
+        let uri = "/ledger/test-coop/history?offset=0&limit=10";
+        let req = test::TestRequest::get()
+            .uri(uri)
+            .to_request();
+        req.extensions_mut().insert(claims.clone());
+
+        let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.len(), 1);
+
+        // Test offset beyond available entries
+        let uri = "/ledger/test-coop/history?offset=100&limit=10";
+        let req = test::TestRequest::get()
+            .uri(uri)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.len(), 0);
     }
 
     #[actix_web::test]

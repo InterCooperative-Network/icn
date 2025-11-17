@@ -43,6 +43,13 @@ pub const MAX_SCOPES: usize = 20;
 /// Set to 1 trillion to allow large legitimate transactions while preventing abuse
 pub const MAX_PAYMENT_AMOUNT: i64 = 1_000_000_000_000;
 
+/// Maximum number of history entries to return per request
+/// This prevents OOM from loading millions of transactions into memory
+pub const MAX_HISTORY_LIMIT: usize = 1_000;
+
+/// Default number of history entries to return if not specified
+pub const DEFAULT_HISTORY_LIMIT: usize = 100;
+
 /// Validate cooperative ID
 pub fn validate_coop_id(id: &str) -> Result<()> {
     if id.is_empty() {
@@ -186,6 +193,21 @@ pub fn validate_coop_count(current_count: usize) -> Result<()> {
     Ok(())
 }
 
+/// Validate history limit parameter
+pub fn validate_history_limit(limit: usize) -> Result<usize> {
+    if limit == 0 {
+        return Err(GatewayError::BadRequest("Limit must be greater than 0".to_string()));
+    }
+
+    if limit > MAX_HISTORY_LIMIT {
+        return Err(GatewayError::BadRequest(
+            format!("Limit exceeds maximum of {}", MAX_HISTORY_LIMIT)
+        ));
+    }
+
+    Ok(limit)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +299,14 @@ mod tests {
         assert!(validate_coop_count(999).is_ok());
         assert!(validate_coop_count(MAX_COOPERATIVES).is_err()); // At limit
         assert!(validate_coop_count(MAX_COOPERATIVES + 1).is_err()); // Over limit
+    }
+
+    #[test]
+    fn test_validate_history_limit() {
+        assert!(validate_history_limit(1).is_ok());
+        assert!(validate_history_limit(100).is_ok());
+        assert!(validate_history_limit(MAX_HISTORY_LIMIT).is_ok());
+        assert!(validate_history_limit(0).is_err()); // Zero
+        assert!(validate_history_limit(MAX_HISTORY_LIMIT + 1).is_err()); // Too large
     }
 }
