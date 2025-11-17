@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - NAT Traversal Phase 2: Connection Candidate Exchange (2025-11-17)
+
+**ConnectionCandidate Infrastructure** (Part 1):
+
+- **New message type** for advertising connection information (186 lines)
+  - **Location:** `icn-net/src/candidate.rs`
+  - **Fields:** DID, local_addr, public_addr (STUN), relay_addr (future TURN), timestamp, version
+  - **Helpers:** `is_fresh(max_age)`, `age_secs()` for freshness validation
+  - **Default freshness:** 5 minutes max age
+  - **Protocol version:** v1 for future compatibility
+  - **Test Coverage:** 4 comprehensive tests (creation, freshness, serialization, all addresses)
+
+- **SessionManager Integration**
+  - **New method:** `connection_candidate(did) -> ConnectionCandidate`
+  - Generates candidate from endpoint's local_addr + discovered public_addr (STUN Phase 1)
+  - relay_addr reserved for Phase 4 (TURN implementation)
+
+- **NetworkHandle API**
+  - Added `session_manager` and `own_did` fields to NetworkHandle
+  - **New method:** `connection_candidate() -> ConnectionCandidate`
+  - Exposes session manager's candidate via async API
+  - Updated all 4 test NetworkHandle constructions
+
+**Supervisor Gossip Integration** (Part 2):
+
+- **Topic Integration** (`icn-core/src/supervisor.rs`)
+  - Added `NETWORK_CANDIDATES_TOPIC` constant ("network:candidates")
+  - Automatic subscription on gossip actor startup
+  - All nodes with identity subscribe to receive peer candidates
+
+- **Candidate Announcement**
+  - After bootstrap peers are dialed, announce connection candidate
+  - Retrieves candidate from NetworkHandle API
+  - Serializes to JSON and publishes to gossip topic
+  - Logs local, public (STUN), and relay addresses
+  - Graceful failure: warns but doesn't fail startup
+
+- **Candidate Reception**
+  - New notification handler for NETWORK_CANDIDATES_TOPIC
+  - Deserializes incoming ConnectionCandidate messages
+  - Validates freshness (5 min max age)
+  - Logs received candidates with full address information
+  - Phase 2: Candidates logged for visibility
+  - TODO Phase 3: Store and use for hole punching
+
+**Integration Flow:**
+1. Network actor starts → STUN discovery (Phase 1)
+2. Subscribe to network:candidates topic
+3. Dial bootstrap peers (for WAN connectivity)
+4. Generate and publish own connection candidate
+5. Receive peer candidates via gossip subscription
+6. Log candidates (Phase 3 will attempt connections)
+
+**Progress Tracking:**
+
+- ✅ **Phase 1 Complete:** STUN Discovery (commit 2f917c1)
+- ✅ **Phase 2 Complete:** Connection Candidate Exchange (commits 9258046, 06e2396)
+- ⏳ **Phase 3 Next:** Hole Punching (simultaneous connection attempts)
+- See [`docs/nat-traversal-design.md`](docs/nat-traversal-design.md) for full architecture
+
+**References:**
+- Design: `docs/nat-traversal-design.md` lines 86-112 (Connection Candidate spec + Gossip integration)
+- MVC Track: Week 3-4, Days 3-4 (Connection Candidate Exchange)
+
 ### Added - NAT Traversal Phase 1: STUN Discovery (2025-11-17)
 
 **STUN Client Implementation:**
