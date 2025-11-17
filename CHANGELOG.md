@@ -54,15 +54,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 5. **Receive peer candidates → store in cache (Phase 3)**
 6. **Attempt connection if not already connected (Phase 3)**
 
+**Integration Tests** (`icn-net/tests/nat_traversal_integration.rs`, 200 lines):
+
+- **test_candidate_cache_flow**: Complete candidate exchange between two nodes
+  - Creates candidates with STUN-discovered addresses
+  - Simulates gossip-based candidate exchange
+  - Verifies bidirectional candidate caching
+  - Validates freshness checks (5-minute TTL)
+
+- **test_stale_candidate_rejection**: TTL-based expiration
+  - Verifies stale candidates are not returned
+  - Tests automatic cleanup removes expired entries
+
+- **test_candidate_update_priority**: Timestamp-based ordering
+  - Rejects older candidates (timestamp comparison)
+  - Accepts newer candidates (updates cache)
+  - Maintains single entry per DID
+
+- **test_multiple_peer_candidates**: Scalability
+  - Stores 10 peer candidates simultaneously
+  - Verifies all can be retrieved correctly
+  - Tests cache capacity under load
+
 **Progress Tracking:**
 
 - ✅ **Phase 1 Complete:** STUN Discovery (commit 2f917c1)
 - ✅ **Phase 2 Complete:** Connection Candidate Exchange (commits 9258046, 06e2396)
-- ✅ **Phase 3 Part 1 Complete:** Candidate Cache & Connection Attempts (commit acd1793)
-- ⏳ **Phase 3 Part 2 Next:** Multi-node integration test
+- ✅ **Phase 3 Complete:** Candidate Cache, Connection Attempts & Integration Tests (commits acd1793, 09a33cb)
 - ⏳ **Phase 4 Future:** TURN relay for symmetric NAT
 
-**Test Results:** All 419 workspace tests passing (93 icn-net tests)
+**Test Results:** All 423 workspace tests passing (97 icn-net tests, +4 integration)
 
 **References:**
 - Design: `docs/nat-traversal-design.md` lines 114-155 (Hole Punching architecture)
