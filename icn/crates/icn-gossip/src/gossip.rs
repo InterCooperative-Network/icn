@@ -1541,7 +1541,7 @@ mod tests {
         // Publish some entries
         let hash1 = gossip.publish("global:identity", b"Entry 1".to_vec()).unwrap();
         let hash2 = gossip.publish("global:identity", b"Entry 2".to_vec()).unwrap();
-        let hash3 = gossip.publish("global:identity", b"Entry 3".to_vec()).unwrap();
+        let _hash3 = gossip.publish("global:identity", b"Entry 3".to_vec()).unwrap();
 
         // Track messages sent via callback
         let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));

@@ -292,7 +292,7 @@ mod tests {
 
         {
             let mut tg = trust_graph.write().await;
-            tg.add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.5));
+            let _ = tg.add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.5));
         }
 
         let policy = policy_source.policy_for(&bob).await;

@@ -217,7 +217,7 @@ mod tests {
 
         let hash1 = [1u8; 32];
         let hash2 = [2u8; 32];
-        let hash3 = [3u8; 32];
+        let _hash3 = [3u8; 32];
 
         filter.insert(&hash1);
         filter.insert(&hash2);

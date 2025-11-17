@@ -405,7 +405,7 @@ mod tests {
         // Create gossip actors
         let trust_lookup = Arc::new(|_: &Did| Some(TrustClass::Partner));
         let alice_gossip = icn_gossip::GossipActor::spawn(alice.did().clone(), trust_lookup.clone());
-        let bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), trust_lookup);
+        let _bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), trust_lookup);
 
         // Alice trusts Bob
         let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.75);

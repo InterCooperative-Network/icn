@@ -192,8 +192,8 @@ pub struct ContractExecutionResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Contract, Rule, Stmt, Expr};
-    use crate::types::{ContractInstallation, Value};
+    use crate::ast::Contract;
+    use crate::types::ContractInstallation;
     use icn_identity::KeyPair;
     use std::time::SystemTime;
 
@@ -443,7 +443,7 @@ mod tests {
         let (_kp, mut deployment) = create_valid_deployment();
 
         // Add 101 signatures (MAX_PARTICIPANTS + 1)
-        for i in 0..=MAX_PARTICIPANTS {
+        for _ in 0..=MAX_PARTICIPANTS {
             let fake_kp = KeyPair::generate().unwrap();
             deployment.installation.signatures.push((fake_kp.did().clone(), vec![0u8; 64]));
         }

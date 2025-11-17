@@ -214,13 +214,13 @@ impl TallySnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{GovernanceConfig, ProposalPayload, VoteChoice};
+    use crate::{GovernanceConfig, VoteChoice};
     use icn_identity::KeyPair;
 
     #[test]
     fn test_message_serialization() {
         let kp = KeyPair::generate().unwrap();
-        let did = kp.did().clone();
+        let _did = kp.did().clone();
         let config = GovernanceConfig::cooperative_default();
         let domain = GovernanceDomain::new("Test Coop".to_string(), config);
 

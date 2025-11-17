@@ -279,7 +279,7 @@ mod tests {
     fn test_wrong_recipient_fails() {
         // Generate keypairs
         let (alice_secret, alice_public) = generate_x25519_keypair();
-        let (bob_secret, bob_public) = generate_x25519_keypair();
+        let (_bob_secret, bob_public) = generate_x25519_keypair();
         let (charlie_secret, _charlie_public) = generate_x25519_keypair();
 
         // Create DIDs

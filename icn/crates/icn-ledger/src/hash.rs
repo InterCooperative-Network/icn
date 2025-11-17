@@ -62,9 +62,8 @@ impl JournalEntry {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::types::{AccountDelta, JournalEntry};
-    use icn_identity::{Did, KeyPair};
+    use icn_identity::KeyPair;
 
     #[test]
     fn test_deterministic_hashing() {
