@@ -52,6 +52,12 @@ pub async fn verify(
         e
     })?;
 
+    // Validate coop_id format
+    validation::validate_coop_id(&req.coop_id).map_err(|e| {
+        gateway::auth_failures_inc("invalid_coop_id");
+        e
+    })?;
+
     let signature = hex::decode(&req.signature)
         .map_err(|e| {
             gateway::auth_failures_inc("invalid_signature_encoding");
@@ -59,6 +65,15 @@ pub async fn verify(
                 format!("Invalid signature encoding: {e}")
             )
         })?;
+
+    // Validate signature length BEFORE expensive verification
+    // Ed25519 signatures are exactly 64 bytes
+    if signature.len() != 64 {
+        gateway::auth_failures_inc("invalid_signature_length");
+        return Err(crate::error::GatewayError::BadRequest(
+            format!("Invalid signature length: expected 64 bytes, got {}", signature.len())
+        ));
+    }
 
     let token = auth.verify_challenge(
         &did,
@@ -175,5 +190,65 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 401); // Unauthorized
+    }
+
+    #[actix_web::test]
+    async fn test_verify_endpoint_invalid_signature_length() {
+        let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        let bundle = IdentityBundle::generate().unwrap();
+
+        let _nonce = auth.create_challenge(bundle.did()).unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(auth))
+                .service(verify)
+        ).await;
+
+        // Test with wrong signature length (32 bytes instead of 64)
+        let req_body = VerifyRequest {
+            did: bundle.did().to_string(),
+            signature: hex::encode([0u8; 32]),  // Wrong length!
+            coop_id: "test-coop".to_string(),
+            scopes: vec![],
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/auth/verify")
+            .set_json(&req_body)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
+    }
+
+    #[actix_web::test]
+    async fn test_verify_endpoint_invalid_coop_id() {
+        let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        let bundle = IdentityBundle::generate().unwrap();
+
+        let _nonce = auth.create_challenge(bundle.did()).unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(auth))
+                .service(verify)
+        ).await;
+
+        // Test with invalid coop_id (contains invalid characters)
+        let req_body = VerifyRequest {
+            did: bundle.did().to_string(),
+            signature: hex::encode([0u8; 64]),
+            coop_id: "invalid@coop#id!".to_string(),  // Invalid characters
+            scopes: vec![],
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/auth/verify")
+            .set_json(&req_body)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
     }
 }
