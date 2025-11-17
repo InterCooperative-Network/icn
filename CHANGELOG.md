@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Code Review Bug Fixes (2025-11-17)
+
+**Critical memory leak** in CandidateCache:
+- Added periodic cleanup task (every 5 minutes) to remove stale connection candidates
+- Without this, candidates accumulated indefinitely causing slow memory growth on long-running nodes
+- Task updates `icn_candidates_cached_total` Prometheus metric
+- Location: [icn-core/src/supervisor.rs:888-911](icn/crates/icn-core/src/supervisor.rs#L888-L911)
+
+**Code clarity improvement** in STUN consensus:
+- Replaced `.unwrap()` with `.expect()` with descriptive message
+- Explains safety invariant: "vote_counts is non-empty because results was checked above"
+- Location: [icn-net/src/stun.rs:134](icn/crates/icn-net/src/stun.rs#L134)
+
+**Comprehensive bug report** documenting findings:
+- 2 bugs found and fixed
+- 5 systems verified as correct (shutdown, bounds checking, channels)
+- 1 known limitation documented (TLS trust integration)
+- See: [docs/bug-report-2025-11-17.md](docs/bug-report-2025-11-17.md)
+
 ### Added - NAT Traversal Metrics (2025-11-17)
 
 **Comprehensive Prometheus metrics for NAT traversal observability:**
