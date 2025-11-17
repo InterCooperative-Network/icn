@@ -100,7 +100,13 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let start = Instant::now();
         let method = req.method().to_string();
-        let path = req.path().to_string();
+
+        // SECURITY: Use route pattern instead of raw path to prevent cardinality explosion
+        // Raw path contains user-controlled values (coop_id, did) which could create millions of unique labels
+        // Pattern normalizes: /ledger/test-coop/balance/did:icn:abc → /ledger/{coop_id}/balance/{did}
+        // This prevents Prometheus OOM from unbounded metric cardinality
+        let path = req.match_pattern()
+            .unwrap_or_else(|| req.path().to_string());
 
         let fut = self.service.call(req);
 
@@ -111,7 +117,7 @@ where
             let duration = start.elapsed().as_secs_f64();
             let status = res.status().as_u16();
 
-            // Record metrics
+            // Record metrics with normalized path
             gateway::requests_total_inc(&path, &method);
             gateway::request_duration_record(&path, status, duration);
 

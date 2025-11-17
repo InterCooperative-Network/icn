@@ -139,6 +139,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Remaining Risk:** Extreme sustained load >10,000 events/sec could still cause backlog
   - **Monitoring:** Warning logs when MAX_EVENTS_PER_POLL hit indicate need for bounded channels
 
+- **BUG #29 (HIGH):** Prometheus metrics cardinality explosion via user-controlled paths
+  - **Problem:** Metrics middleware used raw request path as Prometheus label
+  - **Location:** `middleware.rs:100-116` - `MetricsMiddleware::call()`
+  - **Attack Vector:**
+    - Raw paths include user-controlled segments: `/ledger/coop1/balance/did:icn:abc123`
+    - Attacker creates millions of unique coops and DIDs via API calls
+    - Each unique path creates new Prometheus time series
+  - **Cardinality Impact:**
+    - 1 million unique paths → 1 million time series → ~100 MB memory in Prometheus
+    - 10 million paths → ~1 GB memory in Prometheus
+    - **Result**: Prometheus OOM crash, monitoring system completely offline
+  - **Operational Consequence:**
+    - Blind deployment (no metrics, no alerts, no dashboards)
+    - Undetected outages and performance degradation
+    - SLA violations, potential data loss incidents go unnoticed
+    - Cannot diagnose production issues without metrics
+  - **Root Cause:**
+    - Using `req.path()` returns `/ledger/test-coop/balance/did:icn:abc123` (raw path)
+    - Variable segments (coop_id, did) embedded in metric labels
+    - No normalization → unbounded cardinality as users create new coops/DIDs
+  - **Fix:**
+    - Use `req.match_pattern()` to get route pattern instead of raw path
+    - Normalizes: `/ledger/test-coop/balance/did:icn:abc` → `/ledger/{coop_id}/balance/{did}`
+    - Bounded cardinality: Only 14 unique path labels (one per route endpoint)
+  - **Verification:** Cardinality now bounded regardless of traffic volume or user behavior
+
 **Earlier TOCTOU Race Condition Fixes:**
 
 - **BUG #7 (CRITICAL):** Timing attack in authentication prevented
