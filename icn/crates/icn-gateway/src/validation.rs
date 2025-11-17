@@ -68,7 +68,7 @@ pub fn validate_coop_id(id: &str) -> Result<()> {
 
     if id.len() > MAX_COOP_ID_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Cooperative ID exceeds maximum length of {} characters", MAX_COOP_ID_LEN)
+            format!("Cooperative ID exceeds maximum length of {MAX_COOP_ID_LEN} characters")
         ));
     }
 
@@ -90,7 +90,7 @@ pub fn validate_coop_name(name: &str) -> Result<()> {
 
     if name.len() > MAX_COOP_NAME_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Cooperative name exceeds maximum length of {} characters", MAX_COOP_NAME_LEN)
+            format!("Cooperative name exceeds maximum length of {MAX_COOP_NAME_LEN} characters")
         ));
     }
 
@@ -105,7 +105,7 @@ pub fn validate_currency(currency: &str) -> Result<()> {
 
     if currency.len() > MAX_CURRENCY_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Currency identifier exceeds maximum length of {} characters", MAX_CURRENCY_LEN)
+            format!("Currency identifier exceeds maximum length of {MAX_CURRENCY_LEN} characters")
         ));
     }
 
@@ -117,7 +117,7 @@ pub fn validate_memo(memo: &Option<String>) -> Result<()> {
     if let Some(memo_text) = memo {
         if memo_text.len() > MAX_MEMO_LEN {
             return Err(GatewayError::BadRequest(
-                format!("Memo exceeds maximum length of {} characters", MAX_MEMO_LEN)
+                format!("Memo exceeds maximum length of {MAX_MEMO_LEN} characters")
             ));
         }
     }
@@ -133,7 +133,7 @@ pub fn validate_governance_model(model: &str) -> Result<()> {
 
     if model.len() > MAX_GOVERNANCE_MODEL_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Governance model exceeds maximum length of {} characters", MAX_GOVERNANCE_MODEL_LEN)
+            format!("Governance model exceeds maximum length of {MAX_GOVERNANCE_MODEL_LEN} characters")
         ));
     }
 
@@ -148,7 +148,7 @@ pub fn validate_credit_policy(policy: &str) -> Result<()> {
 
     if policy.len() > MAX_CREDIT_POLICY_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Credit policy exceeds maximum length of {} characters", MAX_CREDIT_POLICY_LEN)
+            format!("Credit policy exceeds maximum length of {MAX_CREDIT_POLICY_LEN} characters")
         ));
     }
 
@@ -159,7 +159,7 @@ pub fn validate_credit_policy(policy: &str) -> Result<()> {
 pub fn validate_member_count(current_count: usize) -> Result<()> {
     if current_count >= MAX_MEMBERS_PER_COOP {
         return Err(GatewayError::BadRequest(
-            format!("Cooperative has reached maximum member limit of {}", MAX_MEMBERS_PER_COOP)
+            format!("Cooperative has reached maximum member limit of {MAX_MEMBERS_PER_COOP}")
         ));
     }
 
@@ -170,7 +170,7 @@ pub fn validate_member_count(current_count: usize) -> Result<()> {
 pub fn validate_scopes(scopes: &[String]) -> Result<()> {
     if scopes.len() > MAX_SCOPES {
         return Err(GatewayError::BadRequest(
-            format!("Number of scopes exceeds maximum of {}", MAX_SCOPES)
+            format!("Number of scopes exceeds maximum of {MAX_SCOPES}")
         ));
     }
 
@@ -185,7 +185,7 @@ pub fn validate_payment_amount(amount: i64) -> Result<()> {
 
     if amount > MAX_PAYMENT_AMOUNT {
         return Err(GatewayError::BadRequest(
-            format!("Amount exceeds maximum of {}", MAX_PAYMENT_AMOUNT)
+            format!("Amount exceeds maximum of {MAX_PAYMENT_AMOUNT}")
         ));
     }
 
@@ -196,7 +196,7 @@ pub fn validate_payment_amount(amount: i64) -> Result<()> {
 pub fn validate_coop_count(current_count: usize) -> Result<()> {
     if current_count >= MAX_COOPERATIVES {
         return Err(GatewayError::BadRequest(
-            format!("Gateway has reached maximum cooperative limit of {}", MAX_COOPERATIVES)
+            format!("Gateway has reached maximum cooperative limit of {MAX_COOPERATIVES}")
         ));
     }
 
@@ -211,7 +211,7 @@ pub fn validate_history_limit(limit: usize) -> Result<usize> {
 
     if limit > MAX_HISTORY_LIMIT {
         return Err(GatewayError::BadRequest(
-            format!("Limit exceeds maximum of {}", MAX_HISTORY_LIMIT)
+            format!("Limit exceeds maximum of {MAX_HISTORY_LIMIT}")
         ));
     }
 

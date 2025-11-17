@@ -58,7 +58,7 @@ impl ContractDeploymentMessage {
 
         let mut hasher = Sha256::new();
         hasher.update(code_hash.as_bytes());
-        hasher.update(&installed_at.to_le_bytes());
+        hasher.update(installed_at.to_le_bytes());
         hasher.finalize().to_vec()
     }
 
@@ -101,9 +101,7 @@ impl ContractDeploymentMessage {
 
         if participant_set != signature_set {
             bail!(
-                "Participant signatures incomplete: need {:?}, got {:?}",
-                participant_set,
-                signature_set
+                "Participant signatures incomplete: need {participant_set:?}, got {signature_set:?}"
             );
         }
 
@@ -118,7 +116,7 @@ impl ContractDeploymentMessage {
                 .map_err(|_| anyhow::anyhow!("Invalid deployer signature length: expected 64 bytes"))?
         );
         deployer_key.verify(&signing_bytes, &deployer_sig)
-            .map_err(|e| anyhow::anyhow!("Deployer signature verification failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Deployer signature verification failed: {e}"))?;
 
         // Verify deployer signature matches installation.signatures (M2: Security fix)
         let deployer_sig_in_installation = self.installation.signatures
@@ -134,7 +132,7 @@ impl ContractDeploymentMessage {
         // Verify each participant signature
         for (participant_did, sig_bytes) in &self.installation.signatures {
             let participant_key = participant_did.to_verifying_key()
-                .context(format!("Failed to extract verifying key for {}", participant_did))?;
+                .context(format!("Failed to extract verifying key for {participant_did}"))?;
 
             if sig_bytes.len() != 64 {
                 bail!("Invalid signature length for {}: expected 64 bytes, got {}",
@@ -143,13 +141,12 @@ impl ContractDeploymentMessage {
 
             let signature = Signature::from_bytes(
                 sig_bytes.as_slice().try_into()
-                    .map_err(|_| anyhow::anyhow!("Failed to parse signature for {}", participant_did))?
+                    .map_err(|_| anyhow::anyhow!("Failed to parse signature for {participant_did}"))?
             );
 
             participant_key.verify(&signing_bytes, &signature)
                 .map_err(|e| anyhow::anyhow!(
-                    "Participant signature verification failed for {}: {}",
-                    participant_did, e
+                    "Participant signature verification failed for {participant_did}: {e}"
                 ))?;
         }
 

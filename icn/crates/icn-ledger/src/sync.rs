@@ -19,7 +19,7 @@ pub enum LedgerSyncMessage {
 
 /// Get the topic name for a currency's ledger sync
 pub fn ledger_topic(currency: &str) -> String {
-    format!("ledger:{}", currency)
+    format!("ledger:{currency}")
 }
 
 /// Serialize a sync message for gossip transmission

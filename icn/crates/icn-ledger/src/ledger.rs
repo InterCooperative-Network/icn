@@ -624,7 +624,7 @@ impl Ledger {
         // All currencies must sum to zero (double-entry)
         for (currency, sum) in currency_sums {
             if sum != 0 {
-                anyhow::bail!("Currency {} does not balance (sum = {})", currency, sum);
+                anyhow::bail!("Currency {currency} does not balance (sum = {sum})");
             }
         }
 

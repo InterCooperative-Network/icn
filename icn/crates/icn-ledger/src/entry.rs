@@ -108,10 +108,7 @@ fn validate_double_entry(accounts: &[AccountDelta]) -> Result<()> {
     for (currency, (debits, credits)) in currency_totals.iter() {
         if debits != credits {
             bail!(
-                "Double-entry invariant violated for currency '{}': debits={}, credits={}",
-                currency,
-                debits,
-                credits
+                "Double-entry invariant violated for currency '{currency}': debits={debits}, credits={credits}"
             );
         }
     }

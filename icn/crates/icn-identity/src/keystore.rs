@@ -151,9 +151,7 @@ impl AgeKeyStore {
 
     /// Get this device's ID in the DID document (fails if locked or v2.1 keystore)
     pub fn get_device_id(&self) -> Result<&str> {
-        self.device_id
-            .as_ref()
-            .map(|s| s.as_str())
+        self.device_id.as_deref()
             .ok_or_else(|| anyhow::anyhow!("Device ID not available"))
     }
 
@@ -266,7 +264,7 @@ impl AgeKeyStore {
 
         // Check if keystore already exists
         if path.exists() {
-            anyhow::bail!("Keystore already exists at {:?}", path);
+            anyhow::bail!("Keystore already exists at {path:?}");
         }
 
         // Create parent directory
@@ -321,7 +319,7 @@ impl AgeKeyStore {
         let path = path.into();
 
         if !path.exists() {
-            anyhow::bail!("Keystore not found at {:?}", path);
+            anyhow::bail!("Keystore not found at {path:?}");
         }
 
         Ok(Self {
@@ -355,8 +353,7 @@ impl AgeKeyStore {
             .context("Failed to encrypt key material")?;
 
         writer
-            .finish()
-            .and_then(|_| Ok(()))
+            .finish().map(|_| ())
             .context("Failed to finalize encryption")?;
 
         // Write to file
@@ -416,8 +413,7 @@ impl AgeKeyStore {
             .context("Failed to encrypt key material")?;
 
         writer
-            .finish()
-            .and_then(|_| Ok(()))
+            .finish().map(|_| ())
             .context("Failed to finalize encryption")?;
 
         // Write to file

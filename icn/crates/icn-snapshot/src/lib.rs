@@ -315,19 +315,19 @@ pub fn cleanup_old_snapshots(data_dir: impl AsRef<Path>, keep_count: usize) -> R
     // Delete all snapshots beyond the keep_count
     for (filename, _, _) in snapshots.iter().skip(keep_count) {
         let snapshot_path = data_dir.join(filename);
-        let checksum_path = data_dir.join(format!("{}.sha256", filename));
+        let checksum_path = data_dir.join(format!("{filename}.sha256"));
 
         // Delete snapshot file
         if snapshot_path.exists() {
             std::fs::remove_file(&snapshot_path)
-                .context(format!("Failed to delete snapshot: {}", filename))?;
+                .context(format!("Failed to delete snapshot: {filename}"))?;
             deleted_count += 1;
         }
 
         // Delete associated checksum file
         if checksum_path.exists() {
             std::fs::remove_file(&checksum_path)
-                .context(format!("Failed to delete checksum: {}.sha256", filename))?;
+                .context(format!("Failed to delete checksum: {filename}.sha256"))?;
         }
     }
 
@@ -340,9 +340,9 @@ pub fn cleanup_old_snapshots(data_dir: impl AsRef<Path>, keep_count: usize) -> R
 pub fn save_timestamped_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<Path>) -> Result<()> {
     let data_dir = data_dir.as_ref();
     let timestamp = snapshot.created_at;
-    let timestamped_filename = format!("state.snapshot.{}", timestamp);
+    let timestamped_filename = format!("state.snapshot.{timestamp}");
     let timestamped_path = data_dir.join(&timestamped_filename);
-    let timestamped_checksum_path = data_dir.join(format!("{}.sha256", timestamped_filename));
+    let timestamped_checksum_path = data_dir.join(format!("{timestamped_filename}.sha256"));
 
     // Serialize to JSON
     let json = serde_json::to_vec_pretty(snapshot)

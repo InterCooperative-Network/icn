@@ -118,6 +118,12 @@ impl Default for AttestationLimits {
     }
 }
 
+impl Default for AttestationRateLimiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AttestationRateLimiter {
     /// Create a new rate limiter with default limits
     pub fn new() -> Self {

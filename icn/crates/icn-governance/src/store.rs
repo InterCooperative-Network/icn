@@ -108,7 +108,7 @@ impl GovernanceStore for InMemoryGovernanceStore {
 
     fn store_vote(&self, vote: &Vote) -> Result<()> {
         let mut votes = self.votes.write().unwrap();
-        let proposal_votes = votes.entry(vote.proposal_id.0.clone()).or_insert_with(Vec::new);
+        let proposal_votes = votes.entry(vote.proposal_id.0.clone()).or_default();
 
         // Replace existing vote from same voter (allow vote changes)
         proposal_votes.retain(|v| v.voter != vote.voter);

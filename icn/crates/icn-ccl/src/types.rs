@@ -197,7 +197,7 @@ impl std::hash::Hash for Value {
             Value::Did(did) => {
                 3u8.hash(state);
                 // Hash the DID's string representation
-                format!("{:?}", did).hash(state);
+                format!("{did:?}").hash(state);
             }
             Value::List(list) => {
                 4u8.hash(state);
@@ -208,7 +208,7 @@ impl std::hash::Hash for Value {
             Value::Set(set) => {
                 5u8.hash(state);
                 let mut items: Vec<_> = set.iter().collect();
-                items.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+                items.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
                 for item in items {
                     item.hash(state);
                 }
@@ -368,7 +368,7 @@ impl Proposal {
         category: String,
         created_at: u64,
     ) -> Self {
-        let id = format!("prop_{}", created_at);
+        let id = format!("prop_{created_at}");
         Proposal {
             id,
             author,

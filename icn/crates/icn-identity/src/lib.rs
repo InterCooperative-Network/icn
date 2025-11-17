@@ -31,7 +31,7 @@ impl Did {
     /// Create a DID from an ed25519 public key
     pub fn from_public_key(public_key: &VerifyingKey) -> Self {
         let encoded = multibase::encode(multibase::Base::Base58Btc, public_key.as_bytes());
-        Did(format!("did:icn:{}", encoded))
+        Did(format!("did:icn:{encoded}"))
     }
 
     /// Parse and validate a DID string
@@ -45,7 +45,7 @@ impl Did {
     pub fn from_str(s: &str) -> Result<Self> {
         // Validate prefix
         if !s.starts_with("did:icn:") {
-            anyhow::bail!("Invalid DID format: must start with 'did:icn:' (got: {})", s);
+            anyhow::bail!("Invalid DID format: must start with 'did:icn:' (got: {s})");
         }
 
         // Extract multibase-encoded part
@@ -57,7 +57,7 @@ impl Did {
 
         // Decode multibase
         let (_base, decoded_bytes) = multibase::decode(encoded_part)
-            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {e}"))?;
 
         // Validate decoded size (Ed25519 public key is 32 bytes)
         if decoded_bytes.len() != 32 {
@@ -73,7 +73,7 @@ impl Did {
                 .try_into()
                 .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?,
         )
-        .map_err(|e| anyhow::anyhow!("Invalid Ed25519 public key in DID: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Invalid Ed25519 public key in DID: {e}"))?;
 
         Ok(Did(s.to_string()))
     }
@@ -93,7 +93,7 @@ impl Did {
 
         // Decode multibase
         let (_base, decoded_bytes) = multibase::decode(encoded_part)
-            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {e}"))?;
 
         // Convert to VerifyingKey
         let key_bytes: [u8; 32] = decoded_bytes
@@ -102,7 +102,7 @@ impl Did {
             .map_err(|_| anyhow::anyhow!("Invalid key length"))?;
 
         VerifyingKey::from_bytes(&key_bytes)
-            .map_err(|e| anyhow::anyhow!("Invalid Ed25519 public key: {}", e))
+            .map_err(|e| anyhow::anyhow!("Invalid Ed25519 public key: {e}"))
     }
 }
 

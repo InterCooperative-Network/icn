@@ -17,7 +17,7 @@ impl GovernanceProfileId {
 
     /// Create a contract-based profile ID from a DID
     pub fn contract(did: &str) -> Self {
-        Self(format!("contract:{}", did))
+        Self(format!("contract:{did}"))
     }
 
     /// Check if this is a contract-based profile

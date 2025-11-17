@@ -73,7 +73,7 @@ impl Interpreter {
             trace!("Checking require condition {}", i);
             let value = self.eval_expr(require)?;
             if !value.is_truthy() {
-                bail!("Precondition failed: require #{}", i);
+                bail!("Precondition failed: require #{i}");
             }
         }
 
@@ -278,7 +278,7 @@ impl Interpreter {
                     // Special variable: caller
                     Ok(Value::Did(self.context.caller.clone()))
                 } else {
-                    bail!("Undefined variable: {}", name)
+                    bail!("Undefined variable: {name}")
                 }
             }
 
@@ -288,7 +288,7 @@ impl Interpreter {
                     Value::Map(ref map) => map
                         .get(field)
                         .cloned()
-                        .ok_or_else(|| anyhow::anyhow!("Field not found: {}", field)),
+                        .ok_or_else(|| anyhow::anyhow!("Field not found: {field}")),
                     _ => bail!("Cannot access field on non-map value"),
                 }
             }
@@ -366,7 +366,7 @@ impl Interpreter {
             (Mod, Int(a), Int(b)) => Ok(Int(a % b)),
 
             // String concatenation
-            (Add, String(a), String(b)) => Ok(String(format!("{}{}", a, b))),
+            (Add, String(a), String(b)) => Ok(String(format!("{a}{b}"))),
 
             // Comparisons
             (Eq, a, b) => Ok(Bool(a == b)),
@@ -380,7 +380,7 @@ impl Interpreter {
             (And, a, b) => Ok(Bool(a.is_truthy() && b.is_truthy())),
             (Or, a, b) => Ok(Bool(a.is_truthy() || b.is_truthy())),
 
-            _ => bail!("Invalid binary operation: {:?} {:?} {:?}", left, op, right),
+            _ => bail!("Invalid binary operation: {left:?} {op:?} {right:?}"),
         }
     }
 
@@ -418,7 +418,7 @@ impl Interpreter {
                 }
             }
 
-            _ => bail!("Unknown function: {}", name),
+            _ => bail!("Unknown function: {name}"),
         }
     }
 

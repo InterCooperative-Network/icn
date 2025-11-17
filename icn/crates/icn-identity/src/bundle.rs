@@ -315,7 +315,7 @@ pub fn verify_binding_info(
     };
 
     // 2. Verify it matches claimed hash
-    if &actual_hash[..] != &binding_info.tls_cert_hash[..] {
+    if actual_hash[..] != binding_info.tls_cert_hash[..] {
         anyhow::bail!("TLS certificate hash mismatch");
     }
 

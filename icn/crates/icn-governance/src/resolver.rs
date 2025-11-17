@@ -63,6 +63,12 @@ pub struct TrustMembershipResolver {
     _trust_graph: (),
 }
 
+impl Default for TrustMembershipResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrustMembershipResolver {
     pub fn new(/* trust_graph: Arc<RwLock<TrustGraph>> */) -> Self {
         Self {

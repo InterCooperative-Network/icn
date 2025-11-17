@@ -56,7 +56,7 @@ impl ResponseError for GatewayError {
             GatewayError::AuthorizationFailed(msg) => msg.clone(),
             GatewayError::NotFound(msg) => msg.clone(),
             GatewayError::BadRequest(msg) => msg.clone(),
-            GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {}", msg),
+            GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {msg}"),
 
             // Internal errors - sanitize to prevent information leakage
             // Log the full error for debugging but return generic message to client

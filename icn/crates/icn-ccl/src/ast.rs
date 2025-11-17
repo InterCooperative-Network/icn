@@ -306,7 +306,7 @@ impl Contract {
         let mut participant_set = HashSet::new();
         for participant in &self.participants {
             if !participant_set.insert(participant) {
-                bail!("Duplicate participant: {}", participant);
+                bail!("Duplicate participant: {participant}");
             }
         }
 
@@ -441,7 +441,7 @@ impl Contract {
         use anyhow::bail;
 
         if current_depth >= MAX_EXPR_DEPTH {
-            bail!("Expression nesting too deep: {} (max {})", current_depth, MAX_EXPR_DEPTH);
+            bail!("Expression nesting too deep: {current_depth} (max {MAX_EXPR_DEPTH})");
         }
 
         match expr {

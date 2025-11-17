@@ -167,7 +167,7 @@ impl TrustAttestation {
         let payload = self.signing_payload();
         verifying_key
             .verify(&payload, &signature)
-            .map_err(|e| anyhow::anyhow!("Signature verification failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {e}"))?;
 
         Ok(())
     }
@@ -287,7 +287,7 @@ impl TrustAttestation {
         let did_str = did.as_str();
 
         if !did_str.starts_with("did:icn:") {
-            anyhow::bail!("Invalid DID format: {}", did_str);
+            anyhow::bail!("Invalid DID format: {did_str}");
         }
 
         let encoded = &did_str[8..]; // Skip "did:icn:"

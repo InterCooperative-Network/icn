@@ -78,8 +78,7 @@ pub fn validate_credit_limit(
             if let Some(limit) = credit_limits.get(&(account_id.clone(), currency.clone())) {
                 if balance < limit {
                     return Err(format!(
-                        "Account {} would exceed credit limit for {}: balance={}, limit={}",
-                        account_id, currency, balance, limit
+                        "Account {account_id} would exceed credit limit for {currency}: balance={balance}, limit={limit}"
                     ));
                 }
             }

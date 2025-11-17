@@ -142,7 +142,7 @@ impl RecoveryEvent {
         let mut hasher = Sha256::new();
         hasher.update(old_did.as_str().as_bytes());
         hasher.update(new_did.as_str().as_bytes());
-        hasher.update(&initiated_at.to_le_bytes());
+        hasher.update(initiated_at.to_le_bytes());
 
         let hash = hasher.finalize();
         hex::encode(&hash[0..16]) // Use first 16 bytes for compact ID
@@ -268,7 +268,7 @@ impl RecoveryEvent {
             }
             RecoveryStatus::Delayed { expires_at } => {
                 let remaining = expires_at.saturating_sub(current_timestamp());
-                format!("Delay period: {} seconds remaining", remaining)
+                format!("Delay period: {remaining} seconds remaining")
             }
             RecoveryStatus::ReadyToFinalize => {
                 "Ready to finalize".to_string()
@@ -277,7 +277,7 @@ impl RecoveryEvent {
                 format!("Finalized at {}", self.finalized_at.unwrap_or(0))
             }
             RecoveryStatus::Cancelled { reason, .. } => {
-                format!("Cancelled: {}", reason)
+                format!("Cancelled: {reason}")
             }
         }
     }
@@ -337,7 +337,7 @@ impl RecoveryAttestation {
         use ed25519_dalek::Verifier;
         trustee_public_key
             .verify(&message, &signature)
-            .map_err(|e| anyhow::anyhow!("Signature verification failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {e}"))?;
 
         Ok(())
     }
@@ -482,16 +482,16 @@ impl RecoveryMessage {
     pub fn summary(&self) -> String {
         match self {
             RecoveryMessage::Initiated { old_did, new_did, threshold, .. } => {
-                format!("Recovery initiated: {} → {} ({})", old_did, new_did, threshold)
+                format!("Recovery initiated: {old_did} → {new_did} ({threshold})")
             }
             RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
                 format!("Attestation from {} for recovery {}", attestation.trustee, recovery_id)
             }
             RecoveryMessage::Finalized { old_did, new_did, .. } => {
-                format!("Recovery finalized: {} → {}", old_did, new_did)
+                format!("Recovery finalized: {old_did} → {new_did}")
             }
             RecoveryMessage::Cancelled { id, reason, .. } => {
-                format!("Recovery {} cancelled: {}", id, reason)
+                format!("Recovery {id} cancelled: {reason}")
             }
         }
     }

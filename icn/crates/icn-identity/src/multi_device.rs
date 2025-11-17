@@ -328,7 +328,7 @@ impl DidDocument {
     ) -> Result<()> {
         // Check device ID doesn't already exist
         if self.get_verification_method(&device_id).is_some() {
-            bail!("Device ID '{}' already exists", device_id);
+            bail!("Device ID '{device_id}' already exists");
         }
 
         let now = current_timestamp();
@@ -377,11 +377,11 @@ impl DidDocument {
     ) -> Result<()> {
         // Check device ID doesn't already exist (for either key)
         if self.get_verification_method(&device_id).is_some() {
-            bail!("Device ID '{}' already exists", device_id);
+            bail!("Device ID '{device_id}' already exists");
         }
-        let enc_id = format!("{}-enc", device_id);
+        let enc_id = format!("{device_id}-enc");
         if self.get_verification_method(&enc_id).is_some() {
-            bail!("Encryption key ID '{}' already exists", enc_id);
+            bail!("Encryption key ID '{enc_id}' already exists");
         }
 
         let now = current_timestamp();
@@ -403,7 +403,7 @@ impl DidDocument {
         // Add X25519 encryption key
         self.verification_method.push(VerificationMethod {
             id: enc_id,
-            label: format!("{} (encryption)", label),
+            label: format!("{label} (encryption)"),
             key_type: KeyType::X25519,
             public_key: x25519_public_key,
             capabilities: vec![Capability::Encrypt],
@@ -432,7 +432,7 @@ impl DidDocument {
             .verification_method
             .iter_mut()
             .find(|vm| vm.id == device_id)
-            .ok_or_else(|| anyhow::anyhow!("Device '{}' not found", device_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Device '{device_id}' not found"))?;
 
         // Mark as revoked
         vm.revoked_at = Some(now);
@@ -461,11 +461,11 @@ impl DidDocument {
             .verification_method
             .iter_mut()
             .find(|vm| vm.id == device_id)
-            .ok_or_else(|| anyhow::anyhow!("Device '{}' not found", device_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Device '{device_id}' not found"))?;
 
         // Verify old key matches
         if vm.public_key != old_key {
-            bail!("Old key does not match current key for device '{}'", device_id);
+            bail!("Old key does not match current key for device '{device_id}'");
         }
 
         // Update to new key
@@ -590,7 +590,7 @@ impl RotationEvent {
         use ed25519_dalek::Verifier;
         verifying_key
             .verify(&message, &signature)
-            .map_err(|e| anyhow::anyhow!("Signature verification failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {e}"))?;
 
         Ok(())
     }
@@ -602,7 +602,7 @@ impl RotationEvent {
         event_copy.proof = vec![]; // Clear proof for signing
 
         bincode::serialize(&event_copy)
-            .map_err(|e| anyhow::anyhow!("Failed to serialize event: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to serialize event: {e}"))
     }
 }
 

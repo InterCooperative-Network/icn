@@ -257,7 +257,7 @@ impl Supervisor {
                             let mut acked_topics = Vec::new();
 
                             for topic in &topics {
-                                match gossip.subscribe(&topic, sender_did.clone()) {
+                                match gossip.subscribe(topic, sender_did.clone()) {
                                     Ok(_) => {
                                         info!("Subscribed {} to topic: {}", sender_did, topic);
                                         acked_topics.push(topic.clone());
@@ -294,7 +294,7 @@ impl Supervisor {
                         tokio::spawn(async move {
                             let mut gossip = gossip_handle.write().await;
                             for topic in &topics {
-                                match gossip.unsubscribe(&topic, &sender_did) {
+                                match gossip.unsubscribe(topic, &sender_did) {
                                     Ok(_) => {
                                         info!("Unsubscribed {} from topic: {}", sender_did, topic);
                                     }
@@ -603,8 +603,8 @@ impl Supervisor {
                                                 let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), *threshold, *delay_period);
 
                                                 // Store recovery event
-                                                let key = format!("recovery:{}", id);
-                                                let value = serde_json::to_vec(&recovery).map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                let key = format!("recovery:{id}");
+                                                let value = serde_json::to_vec(&recovery).map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
                                                 recovery_store.put(key.as_bytes(), &value)?;
 
                                                 info!("Stored new recovery: {} ({} → {})", id, old_did, new_did);
@@ -612,18 +612,18 @@ impl Supervisor {
                                             }
                                             RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
                                             // Load existing recovery
-                                            let key = format!("recovery:{}", recovery_id);
+                                            let key = format!("recovery:{recovery_id}");
                                             match recovery_store.get(key.as_bytes())? {
                                                 Some(data) => {
                                                     let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
-                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
 
                                                     // Add attestation
                                                     match recovery.add_attestation(attestation.clone()) {
                                                         Ok(threshold_reached) => {
                                                             // Save updated recovery
                                                             let value = serde_json::to_vec(&recovery)
-                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
                                                             recovery_store.put(key.as_bytes(), &value)?;
 
                                                             if threshold_reached {
@@ -647,17 +647,17 @@ impl Supervisor {
                                         }
                                         RecoveryMessage::Finalized { id, old_did, new_did, .. } => {
                                             // Load recovery and mark as finalized
-                                            let key = format!("recovery:{}", id);
+                                            let key = format!("recovery:{id}");
                                             match recovery_store.get(key.as_bytes())? {
                                                 Some(data) => {
                                                     let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
-                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
 
                                                     // Finalize the recovery
                                                     match recovery.finalize() {
                                                         Ok(_) => {
                                                             let value = serde_json::to_vec(&recovery)
-                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
                                                             recovery_store.put(key.as_bytes(), &value)?;
 
                                                             info!("✅ Recovery finalized: {} → {}", old_did, new_did);
@@ -677,16 +677,16 @@ impl Supervisor {
                                         }
                                         RecoveryMessage::Cancelled { id, cancelled_by, reason, .. } => {
                                             // Load recovery and mark as cancelled
-                                            let key = format!("recovery:{}", id);
+                                            let key = format!("recovery:{id}");
                                             match recovery_store.get(key.as_bytes())? {
                                                 Some(data) => {
                                                     let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
-                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
 
                                                     match recovery.cancel(cancelled_by.clone(), reason.clone()) {
                                                         Ok(_) => {
                                                             let value = serde_json::to_vec(&recovery)
-                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
                                                             recovery_store.put(key.as_bytes(), &value)?;
 
                                                             info!("⚠️  Recovery {} cancelled by {}: {}", id, cancelled_by, reason);
@@ -948,7 +948,7 @@ impl Supervisor {
 
             // Spawn RPC server with network, ledger, contract, gossip, and governance handles
             let rpc_port = self.config.network.rpc_port;
-            let rpc_addr = format!("127.0.0.1:{}", rpc_port).parse()?;
+            let rpc_addr = format!("127.0.0.1:{rpc_port}").parse()?;
             let mut rpc_server = RpcServer::new(rpc_addr);
             rpc_server.set_network_handle(network_handle.clone());
             rpc_server.set_ledger_handle(ledger_handle.clone());

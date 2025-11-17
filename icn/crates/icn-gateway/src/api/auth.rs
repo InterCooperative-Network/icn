@@ -47,15 +47,13 @@ pub async fn verify(
         })?;
 
     // Validate scopes
-    validation::validate_scopes(&req.scopes).map_err(|e| {
+    validation::validate_scopes(&req.scopes).inspect_err(|e| {
         gateway::auth_failures_inc("invalid_scopes");
-        e
     })?;
 
     // Validate coop_id format
-    validation::validate_coop_id(&req.coop_id).map_err(|e| {
+    validation::validate_coop_id(&req.coop_id).inspect_err(|e| {
         gateway::auth_failures_inc("invalid_coop_id");
-        e
     })?;
 
     let signature = hex::decode(&req.signature)
@@ -80,9 +78,8 @@ pub async fn verify(
         &signature,
         &req.coop_id,
         req.scopes.clone(),
-    ).map_err(|e| {
+    ).inspect_err(|e| {
         gateway::auth_failures_inc("verification_failed");
-        e
     })?;
 
     // Track successful authentication

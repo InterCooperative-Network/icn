@@ -17,20 +17,17 @@ const COMPRESSION_THRESHOLD: usize = 1024; // 1 KB
 /// Determines how far gossip messages should propagate based on
 /// geographic/organizational proximity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Scope {
     /// Local cluster only (same region + cluster)
     LocalCluster,
     /// Regional scope (same region, may span clusters)
     Regional,
     /// Global scope (all neighbors, cross-region)
+    #[default]
     Global,
 }
 
-impl Default for Scope {
-    fn default() -> Self {
-        Scope::Global
-    }
-}
 
 /// Gossip entry metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]

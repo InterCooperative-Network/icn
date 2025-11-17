@@ -251,13 +251,10 @@ impl ContractActor {
                         "Caller {} authorized with trust score {:.2} >= {:.2}",
                         caller, trust_score, min_trust
                     );
-                    return Ok(());
+                    Ok(())
                 } else {
                     bail!(
-                        "Caller {} has insufficient trust: {:.2} < {:.2}",
-                        caller,
-                        trust_score,
-                        min_trust
+                        "Caller {caller} has insufficient trust: {trust_score:.2} < {min_trust:.2}"
                     );
                 }
             } else {
@@ -265,7 +262,7 @@ impl ContractActor {
                 bail!("Trust graph unavailable; only participants can execute");
             }
         } else {
-            bail!("Contract is participant-only; caller {} is not a participant", caller);
+            bail!("Contract is participant-only; caller {caller} is not a participant");
         }
     }
 
@@ -277,7 +274,7 @@ impl ContractActor {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let hash_bytes = hasher.finalize();
         ContentHash::from_bytes(hash_bytes.into())

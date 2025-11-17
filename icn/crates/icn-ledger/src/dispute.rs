@@ -59,7 +59,7 @@ impl DisputeManager {
     ) -> Result<Dispute> {
         // Check if dispute already exists
         if self.active_disputes.contains_key(&entry_hash) {
-            anyhow::bail!("Dispute already exists for entry {}", entry_hash);
+            anyhow::bail!("Dispute already exists for entry {entry_hash}");
         }
 
         let dispute = Dispute {

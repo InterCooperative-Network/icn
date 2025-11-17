@@ -222,7 +222,7 @@ impl GossipActor {
         // Check ACL
         let trust_class = (self.trust_lookup)(&self.own_did);
         if !topic_obj.can_publish(&self.own_did, trust_class) {
-            bail!("Not authorized to publish to topic: {}", topic);
+            bail!("Not authorized to publish to topic: {topic}");
         }
 
         // Increment vector clock
@@ -249,7 +249,7 @@ impl GossipActor {
         // Compress large entries before storing/sending
         if let Err(e) = entry.compress() {
             debug!(
-                entry_hash = %hex::encode(&hash),
+                entry_hash = %hex::encode(hash),
                 topic = %topic,
                 error = %e,
                 "Failed to compress entry, continuing without compression"
@@ -265,7 +265,7 @@ impl GossipActor {
         self.update_gauge_metrics();
 
         debug!(
-            entry_hash = %hex::encode(&hash),
+            entry_hash = %hex::encode(hash),
             topic = %topic,
             author_did = %self.own_did,
             "Published entry to topic"
@@ -280,7 +280,7 @@ impl GossipActor {
         let hash = entry.hash;
 
         // Get or create topic entries
-        let topic_entries = self.entries.entry(topic.clone()).or_insert_with(HashMap::new);
+        let topic_entries = self.entries.entry(topic.clone()).or_default();
 
         // Check if already have this entry
         if topic_entries.contains_key(&hash) {
@@ -374,9 +374,7 @@ impl GossipActor {
                     icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
 
                     bail!(
-                        "Insufficient trust: score {:.3} < required {:.3}",
-                        trust_score,
-                        threshold
+                        "Insufficient trust: score {trust_score:.3} < required {threshold:.3}"
                     );
                 }
 
@@ -395,14 +393,14 @@ impl GossipActor {
         // Priority 2: Check AccessControl-based ACL (coarse-grained)
         let trust_class = (self.trust_lookup)(&subscriber);
         if !topic_obj.can_subscribe(&subscriber, trust_class) {
-            bail!("Not authorized to subscribe to topic: {}", topic);
+            bail!("Not authorized to subscribe to topic: {topic}");
         }
 
         // Add subscriber
         let subscribers = self
             .subscriptions
             .entry(topic.to_string())
-            .or_insert_with(Vec::new);
+            .or_default();
 
         if !subscribers.contains(&subscriber) {
             // Check subscriber limit to prevent unbounded growth
@@ -458,8 +456,7 @@ impl GossipActor {
     /// Get all subscribers for a topic
     pub fn get_subscribers(&self, topic: &str) -> Vec<Did> {
         self.subscriptions
-            .get(topic)
-            .map(|subs| subs.clone())
+            .get(topic).cloned()
             .unwrap_or_default()
     }
 
@@ -538,7 +535,7 @@ impl GossipActor {
 
         if let Some(entries) = self.entries.get(topic) {
             // Check each entry we have
-            for (_hash, entry) in entries {
+            for entry in entries.values() {
                 // If remote clock is ahead of this entry's clock, we might be missing entries
                 if remote_vector.happened_after(&entry.clock) {
                     // This entry is causally before remote state
@@ -561,7 +558,7 @@ impl GossipActor {
                 debug!(
                     peer_did = %sender,
                     topic = %topic,
-                    entry_hash = %hex::encode(&hash),
+                    entry_hash = %hex::encode(hash),
                     author_did = %author,
                     message_type = "Announce",
                     "Received gossip Announce"
@@ -572,7 +569,7 @@ impl GossipActor {
                 if let Some(entries) = self.entries.get(&topic) {
                     if entries.contains_key(&hash) {
                         debug!(
-                            entry_hash = %hex::encode(&hash),
+                            entry_hash = %hex::encode(hash),
                             topic = %topic,
                             "Already have entry, skipping"
                         );
@@ -582,7 +579,7 @@ impl GossipActor {
 
                 // Request full entry if we don't have it
                 debug!(
-                    entry_hash = %hex::encode(&hash),
+                    entry_hash = %hex::encode(hash),
                     from_did = %author,
                     topic = %topic,
                     message_type = "Request",
@@ -599,16 +596,16 @@ impl GossipActor {
                 icn_obs::metrics::gossip::requests_received_inc();
                 debug!(
                     peer_did = %sender,
-                    entry_hash = %hex::encode(&hash),
+                    entry_hash = %hex::encode(hash),
                     message_type = "Request",
                     "Received gossip Request"
                 );
 
                 // Find entry across all topics
-                for (_topic_name, entries) in &self.entries {
+                for entries in self.entries.values() {
                     if let Some(entry) = entries.get(&hash) {
                         debug!(
-                            entry_hash = %hex::encode(&hash),
+                            entry_hash = %hex::encode(hash),
                             topic = %entry.topic,
                             to_did = %sender,
                             message_type = "Response",
@@ -625,7 +622,7 @@ impl GossipActor {
                 }
 
                 debug!(
-                    entry_hash = %hex::encode(&hash),
+                    entry_hash = %hex::encode(hash),
                     peer_did = %sender,
                     "Entry not found for Request"
                 );
@@ -637,7 +634,7 @@ impl GossipActor {
                 debug!(
                     peer_did = %sender,
                     topic = %entry.topic,
-                    entry_hash = %hex::encode(&entry.hash),
+                    entry_hash = %hex::encode(entry.hash),
                     entry_size = entry.data.len(),
                     message_type = "Response",
                     "Received gossip Response"
@@ -720,7 +717,7 @@ impl GossipActor {
                 for hash in hashes {
                     // Find entry across all topics
                     let mut found = false;
-                    for (_topic_name, entries) in &self.entries {
+                    for entries in self.entries.values() {
                         if let Some(entry) = entries.get(&hash) {
                             debug!("Sending requested entry: hash={:?}, topic={}", hash, entry.topic);
                             self.send_message(None, GossipMessage::Response {
@@ -1153,7 +1150,7 @@ impl GossipActor {
             .map(|(name, topic)| {
                 let acl_str = match &topic.acl {
                     AccessControl::Public => "Public".to_string(),
-                    AccessControl::TrustClass(tc) => format!("TrustClass:{:?}", tc),
+                    AccessControl::TrustClass(tc) => format!("TrustClass:{tc:?}"),
                     AccessControl::Participants(dids) => {
                         // Serialize all participant DIDs to preserve access control
                         let did_strs: Vec<String> = dids.iter().map(|d| d.to_string()).collect();
@@ -1227,7 +1224,7 @@ impl GossipActor {
                     let dids: Result<Vec<Did>> = dids_part
                         .split(',')
                         .map(|did_str| Did::from_str(did_str.trim())
-                            .context(format!("Failed to parse participant DID: {}", did_str)))
+                            .context(format!("Failed to parse participant DID: {did_str}")))
                         .collect();
 
                     match dids {
@@ -1277,7 +1274,7 @@ impl GossipActor {
                     .context("Failed to parse DID from subscription")?;
 
                 // Ensure subscription list exists for this topic (create if missing)
-                let sub_list = self.subscriptions.entry(topic.clone()).or_insert_with(Vec::new);
+                let sub_list = self.subscriptions.entry(topic.clone()).or_default();
 
                 // Add subscription without access control check (we trust persisted state)
                 if !sub_list.contains(&did) {

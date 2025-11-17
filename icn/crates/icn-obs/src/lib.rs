@@ -31,7 +31,7 @@ pub fn init_metrics() -> Result<()> {
 ///
 /// Returns a handle that can be used to stop the server
 pub async fn start_metrics_server(port: u16) -> Result<()> {
-    let addr: SocketAddr = format!("0.0.0.0:{}", port)
+    let addr: SocketAddr = format!("0.0.0.0:{port}")
         .parse()
         .context("Failed to parse metrics address")?;
 
