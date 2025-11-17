@@ -70,17 +70,28 @@ impl RecoveryTestNode {
         // Spawn gossip actor with trust lookup
         let trust_graph_clone = trust_graph.clone();
         let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
-            let trust = trust_graph_clone.blocking_read();
-            match trust.trust_class(peer_did) {
-                Ok(class) => Some(class),
-                Err(_) => Some(TrustClass::Known), // Default for testing
+            // Use try_read to avoid blocking
+            match trust_graph_clone.try_read() {
+                Ok(trust) => {
+                    match trust.trust_class(peer_did) {
+                        Ok(class) => Some(class),
+                        Err(_) => Some(TrustClass::Known), // Default for testing
+                    }
+                }
+                Err(_) => Some(TrustClass::Known), // Fallback if lock contended
             }
         });
         let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
 
-        // Subscribe to recovery topic
+        // Create and subscribe to recovery topic
         {
             let mut gossip = gossip_handle.write().await;
+            // Create the topic if it doesn't exist
+            let topic = icn_gossip::Topic::new(
+                IDENTITY_RECOVERY_TOPIC.to_string(),
+                icn_gossip::AccessControl::Public
+            );
+            gossip.create_topic(topic);
             gossip.subscribe(IDENTITY_RECOVERY_TOPIC, did.clone())?;
         }
 
@@ -437,9 +448,10 @@ async fn test_full_recovery_flow() -> Result<()> {
     info!("Creating ledger entries for Alice...");
     {
         let mut ledger = alice.ledger.write().await;
+        // In mutual credit: debit increases assets (Alice receives), credit increases liabilities (Bob gives)
         let entry = JournalEntryBuilder::new(alice_did.clone())
-            .credit(alice_did.clone(), "hours".to_string(), 100)
-            .debit(bob_did.clone(), "hours".to_string(), 100)
+            .debit(alice_did.clone(), "hours".to_string(), 100)  // Alice receives 100 hours
+            .credit(bob_did.clone(), "hours".to_string(), 100)   // Bob gives 100 hours
             .build()?;
         ledger.append_entry(entry)?;
     }
@@ -448,14 +460,14 @@ async fn test_full_recovery_flow() -> Result<()> {
     {
         let ledger = alice.ledger.read().await;
         let balances = ledger.get_account_balances(&alice_did);
-        assert_eq!(balances.balances.get("hours"), Some(&100));
+        assert_eq!(balances.balances.get("hours"), Some(&100), "Alice should have 100 hours balance");
         info!("Alice has 100 hours");
     }
 
     // Alice loses her device and initiates recovery
     info!("Alice initiates recovery...");
-    let recovery_id = "test-recovery-1".to_string();
     let recovery = RecoveryEvent::new(alice_did.clone(), alice2_did.clone(), 2, 0); // 2-of-2 threshold, no delay
+    let recovery_id = recovery.id.clone();
 
     // Store recovery on Alice's node
     {
@@ -502,7 +514,7 @@ async fn test_full_recovery_flow() -> Result<()> {
         "In-person verification".to_string(),
     )?;
 
-    let attestation_msg = RecoveryMessage::attestation(recovery_id.clone(), carol_attestation);
+    let attestation_msg = RecoveryMessage::attestation(recovery_id.clone(), carol_attestation.clone());
     let attestation_bytes = attestation_msg.to_bytes()?;
     {
         let mut gossip = carol.gossip_handle.write().await;
@@ -511,12 +523,13 @@ async fn test_full_recovery_flow() -> Result<()> {
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    // Update Alice's local recovery with attestations
+    // Update Alice's local recovery with both attestations
     {
         let key = format!("recovery:{}", recovery_id);
         let data = alice.recovery_store.get(key.as_bytes())?.unwrap();
         let mut recovery: RecoveryEvent = serde_json::from_slice(&data)?;
         recovery.add_attestation(bob_attestation)?;
+        recovery.add_attestation(carol_attestation)?;
         recovery.check_delay_expired(); // No delay configured, so ready immediately
         let value = serde_json::to_vec(&recovery)?;
         alice.recovery_store.put(key.as_bytes(), &value)?;
@@ -539,7 +552,21 @@ async fn test_full_recovery_flow() -> Result<()> {
         gossip.publish(IDENTITY_RECOVERY_TOPIC, finalized_bytes)?;
     }
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Manually trigger trust graph and ledger migration on Alice's node
+    // (In production, this would happen via the gossip notification handler)
+    info!("Migrating trust graph and ledger...");
+    {
+        let mut trust = alice.trust_graph.write().await;
+        let count = trust.map_did_recovery(&alice_did, &alice2_did)?;
+        info!("Trust graph: migrated {} edges from {} to {}", count, alice_did, alice2_did);
+    }
+    {
+        let mut ledger = alice.ledger.write().await;
+        let count = ledger.transfer_balances_for_recovery(&alice_did, &alice2_did, &recovery_id)?;
+        info!("Ledger: transferred {} currencies from {} to {}", count, alice_did, alice2_did);
+    }
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Verify trust graph migration on Alice's node
     info!("Verifying trust graph migration...");

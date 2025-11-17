@@ -467,19 +467,19 @@ impl Ledger {
             use crate::entry::JournalEntryBuilder;
 
             let entry = if *balance > 0 {
-                // old_did has positive balance (has given credit to others)
-                // Transfer it to new_did
+                // old_did has positive balance (+100 means they have credit)
+                // Transfer it to new_did: reduce old_did's balance, increase new_did's balance
                 JournalEntryBuilder::new(new_did.clone())
-                    .debit(old_did.clone(), currency.clone(), *balance)
-                    .credit(new_did.clone(), currency.clone(), *balance)
+                    .credit(old_did.clone(), currency.clone(), *balance)  // Reduce old_did's balance
+                    .debit(new_did.clone(), currency.clone(), *balance)   // Increase new_did's balance
                     .build()?
             } else {
-                // old_did has negative balance (has received credit from others)
-                // Transfer the debt to new_did
+                // old_did has negative balance (-100 means they owe credit)
+                // Transfer the debt to new_did: reduce old_did's debt, increase new_did's debt
                 let debt_amount = balance.abs();
                 JournalEntryBuilder::new(new_did.clone())
-                    .credit(old_did.clone(), currency.clone(), debt_amount)
-                    .debit(new_did.clone(), currency.clone(), debt_amount)
+                    .debit(old_did.clone(), currency.clone(), debt_amount)  // Reduce old_did's debt
+                    .credit(new_did.clone(), currency.clone(), debt_amount) // Increase new_did's debt
                     .build()?
             };
 
