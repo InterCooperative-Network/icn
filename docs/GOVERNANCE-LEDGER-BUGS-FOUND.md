@@ -399,10 +399,11 @@ match ledger_guard.append_entry(entry) {
 
 ---
 
-## 🟢 LOW: Audit Trail Timestamp Inaccuracy
+## ✅ LOW: Audit Trail Timestamp Inaccuracy (FIXED)
 
 **Severity**: LOW
 **Impact**: Audit timestamps don't match governance decision time
+**Status**: ✅ FIXED (2025-11-17)
 
 ### Description
 
@@ -417,15 +418,33 @@ The audit trail captures `executed_at` timestamp AFTER the ledger write, not at 
 
 Should use `decided_at` from the event instead.
 
-### Recommended Fix
+### ✅ Fix Applied (2025-11-17)
 
-```rust
-"decided_at": decided_at,  // From ProposalAccepted event
-"executed_at": std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH)
-    .unwrap()
-    .as_secs(),
+**Implementation**: Added `decided_at` field to audit trail in `supervisor.rs:991,1002,1060`
+
+**Changes**:
+1. Capture `decided_at` from ProposalAccepted event
+2. Store both `decided_at` (governance decision) and `executed_at` (ledger completion)
+3. Tests updated to verify both timestamps present
+
+**Audit Trail Format (After)**:
+```json
+{
+  "proposal_id": "...",
+  "ledger_entry_hash": "...",
+  "amount": 5000,
+  "currency": "credits",
+  "recipient": "did:icn:...",
+  "decided_at": 1763423118,  // When governance decision was made
+  "executed_at": 1763423118  // When ledger transaction completed
+}
 ```
+
+**Benefits**:
+- Complete timeline: proposal → decision → execution
+- Transparency: Shows when community made the decision vs when executed
+- Debugging: Can identify execution delays
+- Compliance: Separate timestamps for governance vs financial events
 
 ---
 
@@ -437,8 +456,8 @@ Should use `decided_at` from the event instead.
 | ✅ MEDIUM | Partial failure - inconsistent state | **FIXED** |
 | ✅ MEDIUM | Shutdown race condition | **FIXED** |
 | ✅ LOW | Missing metrics | **FIXED** |
+| ✅ LOW | Audit timestamp inaccuracy | **FIXED** |
 | 🟢 LOW | No unsubscribe mechanism | **OPTIONAL** |
-| 🟢 LOW | Audit timestamp inaccuracy | **OPTIONAL** |
 
 ## Next Steps
 
@@ -446,7 +465,7 @@ Should use `decided_at` from the event instead.
 2. ~~**Add comprehensive error handling for partial failures**~~ ✅ COMPLETE
 3. ~~**Implement graceful shutdown for in-flight tasks**~~ ✅ COMPLETE
 4. ~~**Add Prometheus metrics**~~ ✅ COMPLETE
-5. Add audit trail decision timestamp (OPTIONAL - future work)
+5. ~~**Add audit trail decision timestamp**~~ ✅ COMPLETE
 6. Implement proper task tracking with JoinSet (OPTIONAL - replaces grace period)
 7. Implement dead-letter queue for failed audit trails (OPTIONAL - automated reconciliation)
 8. Add EventBus unsubscribe mechanism (OPTIONAL - prevents memory leak)
