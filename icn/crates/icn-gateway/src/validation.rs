@@ -31,6 +31,10 @@ pub const MAX_MEMBERS_PER_COOP: usize = 10_000;
 /// Maximum number of scopes in a token request
 pub const MAX_SCOPES: usize = 20;
 
+/// Maximum payment amount (prevent overflow and unrealistic values)
+/// Set to 1 trillion to allow large legitimate transactions while preventing abuse
+pub const MAX_PAYMENT_AMOUNT: i64 = 1_000_000_000_000;
+
 /// Validate cooperative ID
 pub fn validate_coop_id(id: &str) -> Result<()> {
     if id.is_empty() {
@@ -148,6 +152,21 @@ pub fn validate_scopes(scopes: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Validate payment amount
+pub fn validate_payment_amount(amount: i64) -> Result<()> {
+    if amount <= 0 {
+        return Err(GatewayError::BadRequest("Amount must be positive".to_string()));
+    }
+
+    if amount > MAX_PAYMENT_AMOUNT {
+        return Err(GatewayError::BadRequest(
+            format!("Amount exceeds maximum of {}", MAX_PAYMENT_AMOUNT)
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,5 +238,16 @@ mod tests {
         assert!(validate_credit_policy("permissive").is_ok());
         assert!(validate_credit_policy("").is_err()); // Empty
         assert!(validate_credit_policy(&"a".repeat(65)).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_payment_amount() {
+        assert!(validate_payment_amount(1).is_ok());
+        assert!(validate_payment_amount(1000).is_ok());
+        assert!(validate_payment_amount(MAX_PAYMENT_AMOUNT).is_ok());
+        assert!(validate_payment_amount(0).is_err()); // Zero
+        assert!(validate_payment_amount(-1).is_err()); // Negative
+        assert!(validate_payment_amount(MAX_PAYMENT_AMOUNT + 1).is_err()); // Too large
+        assert!(validate_payment_amount(i64::MAX).is_err()); // Way too large
     }
 }

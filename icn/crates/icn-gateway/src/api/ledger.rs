@@ -57,13 +57,8 @@ pub async fn create_payment(
     let to = req.to.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid to DID: {e}")))?;
 
-    if req.amount <= 0 {
-        return Err(crate::error::GatewayError::BadRequest(
-            "Amount must be positive".to_string(),
-        ));
-    }
-
     // Validate input fields
+    validation::validate_payment_amount(req.amount)?;
     validation::validate_currency(&req.currency)?;
     validation::validate_memo(&req.memo)?;
 
