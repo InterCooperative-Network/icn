@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Governance Execution Metrics (2025-01-17)
+
+**Prometheus metrics for governance→ledger observability:**
+- `icn_governance_proposals_executed_total{payload_type}` - Success counter by proposal type
+- `icn_governance_execution_failures_total{reason}` - Failure counter by reason (ledger_build, ledger_append)
+- `icn_governance_execution_duration_seconds{payload_type}` - Execution time histogram for SLA tracking
+- `icn_governance_audit_failures_total` - Audit trail write failures (critical for partial failure detection)
+- `icn_governance_idempotent_skips_total` - Duplicate events prevented (security monitoring)
+- Location: [icn-obs/src/metrics.rs:301-321](icn/crates/icn-obs/src/metrics.rs#L301-L321) + [supervisor.rs:1007-1107](icn/crates/icn-core/src/supervisor.rs#L1007-L1107)
+
 ### Fixed - Governance→Ledger Production Hardening (2025-01-17)
 
 **Critical: Idempotency bug preventing duplicate proposal execution:**
