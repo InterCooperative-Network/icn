@@ -86,6 +86,68 @@ pub fn init_descriptions() {
         "Total number of successful version negotiations"
     );
 
+    // NAT Traversal metrics (STUN)
+    describe_counter!(
+        "icn_stun_queries_total",
+        "Total number of STUN queries by server and result"
+    );
+    describe_histogram!(
+        "icn_stun_discovery_duration_seconds",
+        "Duration of STUN discovery operations in seconds"
+    );
+    describe_counter!(
+        "icn_stun_consensus_votes_total",
+        "Distribution of majority vote outcomes by endpoint"
+    );
+    describe_counter!(
+        "icn_stun_server_failures_total",
+        "Total number of STUN server query failures by server"
+    );
+
+    // NAT Traversal metrics (Candidates)
+    describe_counter!(
+        "icn_candidates_received_total",
+        "Total number of connection candidates received via gossip"
+    );
+    describe_gauge!(
+        "icn_candidates_cached_total",
+        "Current number of candidates in cache"
+    );
+    describe_counter!(
+        "icn_candidates_expired_total",
+        "Total number of expired candidates removed from cache"
+    );
+    describe_counter!(
+        "icn_candidates_stale_rejected_total",
+        "Total number of stale candidates rejected on arrival"
+    );
+    describe_counter!(
+        "icn_candidates_published_total",
+        "Total number of connection candidates published to gossip"
+    );
+
+    // NAT Traversal metrics (Connection Attempts)
+    describe_counter!(
+        "icn_nat_connection_attempts_total",
+        "Total number of NAT traversal connection attempts by method"
+    );
+    describe_counter!(
+        "icn_nat_connection_success_total",
+        "Total number of successful NAT traversal connections by method"
+    );
+    describe_histogram!(
+        "icn_nat_connection_duration_seconds",
+        "Duration of NAT traversal connection attempts in seconds by method"
+    );
+    describe_counter!(
+        "icn_nat_hole_punch_attempts_total",
+        "Total number of NAT hole punching attempts"
+    );
+    describe_counter!(
+        "icn_nat_hole_punch_success_total",
+        "Total number of successful NAT hole punches"
+    );
+
     // Topology metrics
     describe_gauge!(
         "icn_topology_neighbors_by_set",
@@ -1047,5 +1109,85 @@ pub mod gateway {
 
     pub fn history_queries_inc() {
         counter!("icn_gateway_history_queries_total").increment(1);
+    }
+}
+
+/// NAT traversal metrics
+pub mod nat_traversal {
+    use metrics::{counter, gauge, histogram};
+
+    // STUN metrics
+    pub fn stun_query_inc(server: &str, result: &str) {
+        counter!("icn_stun_queries_total",
+                 "server" => server.to_string(),
+                 "result" => result.to_string())
+            .increment(1);
+    }
+
+    pub fn stun_discovery_duration_record(duration_secs: f64) {
+        histogram!("icn_stun_discovery_duration_seconds").record(duration_secs);
+    }
+
+    pub fn stun_consensus_vote_inc(endpoint: &str, votes: usize, total_servers: usize) {
+        counter!("icn_stun_consensus_votes_total",
+                 "endpoint" => endpoint.to_string(),
+                 "votes" => votes.to_string(),
+                 "total_servers" => total_servers.to_string())
+            .increment(1);
+    }
+
+    pub fn stun_server_failure_inc(server: &str, reason: &str) {
+        counter!("icn_stun_server_failures_total",
+                 "server" => server.to_string(),
+                 "reason" => reason.to_string())
+            .increment(1);
+    }
+
+    // Candidate metrics
+    pub fn candidates_received_inc() {
+        counter!("icn_candidates_received_total").increment(1);
+    }
+
+    pub fn candidates_cached_set(count: usize) {
+        gauge!("icn_candidates_cached_total").set(count as f64);
+    }
+
+    pub fn candidates_expired_inc() {
+        counter!("icn_candidates_expired_total").increment(1);
+    }
+
+    pub fn candidates_stale_rejected_inc() {
+        counter!("icn_candidates_stale_rejected_total").increment(1);
+    }
+
+    pub fn candidates_published_inc() {
+        counter!("icn_candidates_published_total").increment(1);
+    }
+
+    // Connection attempt metrics
+    pub fn connection_attempt_inc(method: &str) {
+        counter!("icn_nat_connection_attempts_total",
+                 "method" => method.to_string())
+            .increment(1);
+    }
+
+    pub fn connection_success_inc(method: &str) {
+        counter!("icn_nat_connection_success_total",
+                 "method" => method.to_string())
+            .increment(1);
+    }
+
+    pub fn connection_duration_record(method: &str, duration_secs: f64) {
+        histogram!("icn_nat_connection_duration_seconds",
+                   "method" => method.to_string())
+            .record(duration_secs);
+    }
+
+    pub fn hole_punch_attempt_inc() {
+        counter!("icn_nat_hole_punch_attempts_total").increment(1);
+    }
+
+    pub fn hole_punch_success_inc() {
+        counter!("icn_nat_hole_punch_success_total").increment(1);
     }
 }
