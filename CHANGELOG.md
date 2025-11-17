@@ -64,6 +64,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Location:** `websocket.rs:42-254`
   - **Verification:** Rejected connections no longer affect counter
 
+- **BUG #25 (CRITICAL):** Path traversal vulnerability in ledger file paths
+  - **Problem:** `coop_id` from URL path used directly in file path construction without validation
+  - **Location:** `ledger_mgr.rs:75` - `data_dir.join("ledgers").join(coop_id)`
+  - **Attack Vector:** Send request to `/ledger/../../etc/passwd/balance/did:icn:attacker`
+  - **Exploit:** `coop_id = "../../etc/passwd"` creates path `data_dir/ledgers/../../etc/passwd`
+  - **Impact:** Read/write arbitrary files accessible to the process (RCE potential if combined with write operations)
+  - **Root Cause:** `validate_coop_id()` only called at cooperative CREATION, not when accessing ledgers
+  - **Consequence:** Non-existent coops trigger ledger creation with attacker-controlled paths
+  - **Fix:** Added `validate_coop_id()` call at start of `get_ledger()` method
+  - **Validation:** Only alphanumeric, hyphens, underscores allowed - prevents `../` and other traversal patterns
+  - **Defense-in-Depth:** Validation now enforced BEFORE any file operations occur
+
 **Earlier TOCTOU Race Condition Fixes:**
 
 - **BUG #7 (CRITICAL):** Timing attack in authentication prevented
