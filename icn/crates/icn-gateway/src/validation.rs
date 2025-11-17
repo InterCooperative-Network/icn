@@ -171,6 +171,17 @@ pub fn validate_payment_amount(amount: i64) -> Result<()> {
     Ok(())
 }
 
+/// Validate cooperative count doesn't exceed global limit
+pub fn validate_coop_count(current_count: usize) -> Result<()> {
+    if current_count >= MAX_COOPERATIVES {
+        return Err(GatewayError::BadRequest(
+            format!("Gateway has reached maximum cooperative limit of {}", MAX_COOPERATIVES)
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,5 +264,14 @@ mod tests {
         assert!(validate_payment_amount(-1).is_err()); // Negative
         assert!(validate_payment_amount(MAX_PAYMENT_AMOUNT + 1).is_err()); // Too large
         assert!(validate_payment_amount(i64::MAX).is_err()); // Way too large
+    }
+
+    #[test]
+    fn test_validate_coop_count() {
+        assert!(validate_coop_count(0).is_ok());
+        assert!(validate_coop_count(500).is_ok());
+        assert!(validate_coop_count(999).is_ok());
+        assert!(validate_coop_count(MAX_COOPERATIVES).is_err()); // At limit
+        assert!(validate_coop_count(MAX_COOPERATIVES + 1).is_err()); // Over limit
     }
 }

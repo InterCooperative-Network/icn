@@ -252,6 +252,14 @@ impl CoopManager {
         Ok(coops.keys().cloned().collect())
     }
 
+    /// Get total number of cooperatives
+    pub fn count(&self) -> Result<usize> {
+        let coops = self.coops.read()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        Ok(coops.len())
+    }
+
     /// Atomically add a member to a cooperative
     /// This prevents race conditions by holding the write lock during the entire operation
     pub fn add_member_atomic(
