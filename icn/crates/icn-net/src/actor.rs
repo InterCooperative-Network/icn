@@ -450,7 +450,13 @@ impl NetworkActor {
         let mut session_manager = SessionManager::new();
         let tls_trust_threshold = trust_gated_config.as_ref().map(|cfg| cfg.min_trust_threshold);
         session_manager
-            .start(identity_bundle.keypair(), listen_addr, trust_graph.clone(), tls_trust_threshold)
+            .start(
+                identity_bundle.keypair(),
+                listen_addr,
+                trust_graph.clone(),
+                tls_trust_threshold,
+                None, // STUN servers (NAT traversal) - TODO: Add config parameter
+            )
             .await
             .context("Failed to start session manager")?;
 

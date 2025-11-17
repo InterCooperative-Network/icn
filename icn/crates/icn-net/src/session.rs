@@ -51,6 +51,9 @@ pub struct SessionManager {
     /// Active connections by peer DID
     connections: Arc<RwLock<HashMap<String, quinn::Connection>>>,
 
+    /// Discovered public endpoint (if NAT traversal enabled)
+    public_endpoint: Arc<RwLock<Option<SocketAddr>>>,
+
     /// Shutdown channel receiver
     _shutdown_rx: mpsc::Receiver<()>,
 }
@@ -63,6 +66,7 @@ impl SessionManager {
         SessionManager {
             endpoint: Arc::new(RwLock::new(None)),
             connections: Arc::new(RwLock::new(HashMap::new())),
+            public_endpoint: Arc::new(RwLock::new(None)),
             _shutdown_rx: shutdown_rx,
         }
     }
@@ -74,12 +78,16 @@ impl SessionManager {
     ///
     /// If trust_graph is provided, enables trust-gated TLS verification where
     /// connections from peers below min_trust_threshold are rejected.
+    ///
+    /// If stun_servers is provided, performs NAT traversal discovery to determine
+    /// the node's public endpoint (IP and port visible from the internet).
     pub async fn start(
         &mut self,
         keypair: &KeyPair,
         listen_addr: SocketAddr,
         trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
         min_trust_threshold: Option<f64>,
+        stun_servers: Option<Vec<SocketAddr>>,
     ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
 
@@ -120,6 +128,28 @@ impl SessionManager {
         endpoint.set_default_client_config(client_config);
 
         info!("QUIC endpoint listening on {}", endpoint.local_addr()?);
+
+        // Perform STUN discovery if enabled (NAT traversal)
+        if let Some(servers) = stun_servers {
+            info!("NAT traversal enabled - discovering public endpoint via STUN");
+            let stun_client = crate::stun::StunClient::new(servers);
+
+            // Get the UDP socket from the QUIC endpoint for STUN queries
+            // Note: We use the same socket to ensure the discovered port matches the QUIC port
+            let local_addr = endpoint.local_addr()?;
+            let socket = tokio::net::UdpSocket::bind(local_addr).await?;
+
+            match stun_client.discover_public_endpoint(&socket).await {
+                Ok(public_addr) => {
+                    info!("✅ Discovered public endpoint: {} (local: {})", public_addr, local_addr);
+                    *self.public_endpoint.write().await = Some(public_addr);
+                }
+                Err(e) => {
+                    // Log warning but don't fail startup - node can still function on local network
+                    tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
+                }
+            }
+        }
 
         // Store endpoint
         *self.endpoint.write().await = Some(endpoint);
@@ -191,6 +221,13 @@ impl SessionManager {
             .collect()
     }
 
+    /// Get the discovered public endpoint (if NAT traversal was enabled)
+    ///
+    /// Returns None if NAT traversal is disabled or STUN discovery failed.
+    pub async fn public_endpoint(&self) -> Option<SocketAddr> {
+        *self.public_endpoint.read().await
+    }
+
     /// Stop the session manager
     pub async fn stop(&mut self) -> Result<()> {
         info!("Session manager stopping");
@@ -232,7 +269,10 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let addr = "127.0.0.1:0".parse().unwrap();
 
-        manager.start(&keypair, addr, None, None).await.unwrap();
+        manager
+            .start(&keypair, addr, None, None, None)
+            .await
+            .unwrap();
 
         // Endpoint should be initialized
         assert!(manager.endpoint.read().await.is_some());
@@ -251,7 +291,7 @@ mod tests {
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         server_manager
-            .start(&server_keypair, server_addr, None, None)
+            .start(&server_keypair, server_addr, None, None, None)
             .await
             .unwrap();
 
@@ -270,7 +310,7 @@ mod tests {
         let client_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         client_manager
-            .start(&client_keypair, client_addr, None, None)
+            .start(&client_keypair, client_addr, None, None, None)
             .await
             .unwrap();
 
@@ -305,6 +345,7 @@ impl SessionManager {
         SessionManager {
             endpoint: self.endpoint.clone(),
             connections: self.connections.clone(),
+            public_endpoint: self.public_endpoint.clone(),
             _shutdown_rx: mpsc::channel(1).1,
         }
     }

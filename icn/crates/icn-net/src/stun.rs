@@ -39,12 +39,33 @@ impl StunClient {
     }
 
     /// Create a STUN client with Google's public STUN servers
-    pub fn with_google_stun() -> Result<Self> {
-        let servers = vec![
-            "stun.l.google.com:19302".parse()?,
-            "stun1.l.google.com:19302".parse()?,
-        ];
+    pub async fn with_google_stun() -> Result<Self> {
+        // Resolve DNS hostnames to IP addresses
+        let servers = Self::resolve_stun_servers(&[
+            "stun.l.google.com:19302",
+            "stun1.l.google.com:19302",
+        ])
+        .await?;
         Ok(Self::new(servers))
+    }
+
+    /// Resolve DNS hostnames to socket addresses
+    async fn resolve_stun_servers(hostnames: &[&str]) -> Result<Vec<SocketAddr>> {
+        let mut servers = Vec::new();
+        for hostname in hostnames {
+            // Use tokio's DNS resolver to lookup the hostname
+            let addrs: Vec<SocketAddr> = tokio::net::lookup_host(hostname)
+                .await
+                .context(format!("Failed to resolve STUN server: {}", hostname))?
+                .collect();
+
+            if let Some(addr) = addrs.first() {
+                servers.push(*addr);
+            } else {
+                anyhow::bail!("No addresses found for STUN server: {}", hostname);
+            }
+        }
+        Ok(servers)
     }
 
     /// Set custom timeout for STUN requests
@@ -322,9 +343,11 @@ fn parse_xor_mapped_address(data: &[u8], transaction_id: &[u8; 12]) -> Result<So
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_stun_client_creation() {
-        let client = StunClient::with_google_stun().expect("Failed to create STUN client");
+    #[tokio::test]
+    async fn test_stun_client_creation() {
+        let client = StunClient::with_google_stun()
+            .await
+            .expect("Failed to create STUN client");
         assert_eq!(client.servers.len(), 2);
         assert_eq!(client.timeout, STUN_TIMEOUT);
         assert_eq!(client.max_retries, MAX_RETRIES);
@@ -349,7 +372,9 @@ mod tests {
             return;
         }
 
-        let client = StunClient::with_google_stun().expect("Failed to create client");
+        let client = StunClient::with_google_stun()
+            .await
+            .expect("Failed to create client");
 
         // Bind to any available port
         let socket = UdpSocket::bind("0.0.0.0:0")

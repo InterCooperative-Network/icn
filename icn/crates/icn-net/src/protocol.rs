@@ -410,8 +410,8 @@ mod tests {
 
     #[test]
     fn test_max_message_size() {
-        let alice = KeyPair::generate().unwrap().did().clone();
-        let data = vec![0u8; MAX_MESSAGE_SIZE + 1];
+        let _alice = KeyPair::generate().unwrap().did().clone();
+        let _data = vec![0u8; MAX_MESSAGE_SIZE + 1];
 
         // This should fail during serialization
         // (We can't easily test this without a huge message, so just check the constant)
