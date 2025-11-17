@@ -105,6 +105,7 @@ impl TestNode {
             None, // No trust-gated config for tests
             None, // No fallback config for tests
             None, // No topology config
+            None, // No STUN servers
         )
         .await?;
 

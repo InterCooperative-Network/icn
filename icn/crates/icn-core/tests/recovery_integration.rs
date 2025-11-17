@@ -320,6 +320,7 @@ impl RecoveryTestNode {
             None, // No trust-gated config
             None, // No fallback config
             None, // No topology config
+            None, // No STUN servers
         )
         .await?;
 

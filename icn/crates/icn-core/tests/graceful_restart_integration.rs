@@ -75,6 +75,7 @@ impl TestNode {
             None, // No trust-gated config for tests
             None, // No fallback config for tests
             None, // No topology config
+            None, // No STUN servers
         )
         .await?;
 
@@ -253,6 +254,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
         None,
         None,
         None,
+        None,
     )
     .await?;
 
@@ -414,7 +416,7 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         listen_addr_restart,
         shutdown_tx_restart.clone(),
         Some(incoming_handler),
-        None, None, None, None,
+        None, None, None, None, None,
     )
     .await?;
 

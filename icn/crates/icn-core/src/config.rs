@@ -42,10 +42,24 @@ pub struct NetworkConfig {
 
     /// Bootstrap rendezvous endpoints
     pub bootstrap_peers: Vec<String>,
+
+    /// STUN servers for NAT traversal (format: "IP:PORT")
+    /// Multiple servers enable majority vote consensus for public endpoint discovery
+    #[serde(default = "default_stun_servers")]
+    pub stun_servers: Vec<String>,
 }
 
 fn default_rpc_port() -> u16 {
     5601
+}
+
+fn default_stun_servers() -> Vec<String> {
+    // Use Google's public STUN servers by default
+    // Multiple servers enable majority vote for robust NAT discovery
+    vec![
+        "stun.l.google.com:19302".to_string(),
+        "stun1.l.google.com:19302".to_string(),
+    ]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,6 +236,7 @@ impl Default for Config {
                 listen_addr: "0.0.0.0:7777".to_string(),
                 rpc_port: 5601,
                 bootstrap_peers: vec![],
+                stun_servers: default_stun_servers(),
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

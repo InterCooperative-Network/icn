@@ -384,6 +384,34 @@ impl Supervisor {
             // Use identity bundle loaded from keystore (preserves TLS cert across restarts)
             info!("Using identity bundle with DID-TLS binding: {}", identity_bundle.did());
 
+            // Parse STUN servers from config
+            let stun_servers = if !self.config.network.stun_servers.is_empty() {
+                let mut parsed_servers = Vec::new();
+                for server_str in &self.config.network.stun_servers {
+                    // Try DNS resolution for hostname-based servers
+                    match tokio::net::lookup_host(server_str).await {
+                        Ok(mut addrs) => {
+                            if let Some(addr) = addrs.next() {
+                                parsed_servers.push(addr);
+                                info!("Resolved STUN server {} to {}", server_str, addr);
+                            } else {
+                                warn!("No addresses found for STUN server: {}", server_str);
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to resolve STUN server {}: {}", server_str, e);
+                        }
+                    }
+                }
+                if !parsed_servers.is_empty() {
+                    Some(parsed_servers)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             let network_handle = icn_net::NetworkActor::spawn(
                 identity_bundle.clone(),
                 listen_addr,
@@ -393,6 +421,7 @@ impl Supervisor {
                 trust_gated_config,
                 fallback_config,
                 Some(self.config.topology.clone()),
+                stun_servers,
             )
             .await?;
 

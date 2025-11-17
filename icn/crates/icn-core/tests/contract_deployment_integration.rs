@@ -114,6 +114,7 @@ impl TestNode {
             None,
             None,
             None, // No topology config for tests
+            None, // No STUN servers
         )
         .await?;
 

@@ -447,6 +447,7 @@ impl NetworkActor {
         trust_gated_config: Option<crate::rate_limit::TrustGatedRateLimitConfig>,
         fallback_config: Option<RateLimitConfig>,
         topology_config: Option<TopologyConfig>,
+        stun_servers: Option<Vec<SocketAddr>>,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
 
@@ -468,7 +469,7 @@ impl NetworkActor {
                 listen_addr,
                 trust_graph.clone(),
                 tls_trust_threshold,
-                None, // STUN servers (NAT traversal) - TODO: Add config parameter
+                stun_servers,
             )
             .await
             .context("Failed to start session manager")?;
@@ -1435,7 +1436,7 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
-        let handle = NetworkActor::spawn(identity_bundle, addr, shutdown_tx.clone(), None, None, None, None, None)
+        let handle = NetworkActor::spawn(identity_bundle, addr, shutdown_tx.clone(), None, None, None, None, None, None)
             .await
             .unwrap();
 

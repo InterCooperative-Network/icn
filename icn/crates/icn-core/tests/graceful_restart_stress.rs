@@ -75,6 +75,7 @@ impl TestNode {
             None, // No trust-gated config for tests
             None, // No fallback config for tests
             None, // No topology config
+            None, // No STUN servers
         )
         .await?;
 
@@ -184,7 +185,7 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            None, None, None, None,
+            None, None, None, None, None,
         )
         .await?;
 
