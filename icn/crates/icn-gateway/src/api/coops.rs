@@ -181,11 +181,8 @@ pub async fn add_member(
 
     let role = parse_role(&req.role)?;
 
-    // Check member count (read-only check, might race but validation happens in add_member too)
-    let current_coop = coop_mgr.get_coop(&id)?;
-    validation::validate_member_count(current_coop.members.len())?;
-
-    // Use atomic operation to prevent race conditions
+    // Note: Member count limit is checked atomically inside add_member()
+    // to prevent TOCTOU race condition
     let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp())?;
 
     // Track member addition

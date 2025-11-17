@@ -102,6 +102,10 @@ impl Coop {
 
     /// Add a member
     pub fn add_member(&mut self, did: Did, role: MemberRole, timestamp: u64) -> Result<()> {
+        // Check member limit BEFORE checking if member exists
+        // This prevents TOCTOU race in concurrent add_member calls
+        crate::validation::validate_member_count(self.members.len())?;
+
         if self.is_member(&did) {
             return Err(GatewayError::BadRequest("Member already exists".to_string()));
         }
