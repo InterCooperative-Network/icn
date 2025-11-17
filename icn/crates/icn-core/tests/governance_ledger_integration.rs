@@ -77,7 +77,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
 
         event_bus.subscribe(Arc::new(move |event| {
             match event {
-                SystemEvent::ProposalAccepted { proposal_id, payload, .. } => {
+                SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
                     match payload {
                         ProposalPayload::Budget { amount, recipient, currency, purpose: _ } => {
                             info!("📊 Executing budget proposal {}: {} {} to {}",
@@ -87,6 +87,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
                             let prop_id = proposal_id.clone();
                             let from_did = own_did.clone();
                             let store = audit_store.clone();
+                            let decision_time = decided_at;
 
                             tokio::spawn(async move {
                                 use icn_ledger::entry::JournalEntryBuilder;
@@ -114,10 +115,11 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
                                                     "amount": amount,
                                                     "currency": currency,
                                                     "recipient": recipient.to_string(),
+                                                    "decided_at": decision_time,  // When governance decision was made
                                                     "executed_at": std::time::SystemTime::now()
                                                         .duration_since(std::time::UNIX_EPOCH)
                                                         .unwrap()
-                                                        .as_secs(),
+                                                        .as_secs(),  // When ledger transaction completed
                                                 });
 
                                                 if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
@@ -256,6 +258,8 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
     assert_eq!(audit_record["amount"], 5000);
     assert_eq!(audit_record["currency"], "credits");
     assert_eq!(audit_record["recipient"], recipient_did.to_string());
+    assert_eq!(audit_record["decided_at"], now, "Audit trail should record governance decision timestamp");
+    assert!(audit_record["executed_at"].is_u64(), "Audit trail should include ledger execution timestamp");
 
     info!("✅ Audit trail verified");
 

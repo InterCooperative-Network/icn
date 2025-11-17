@@ -988,7 +988,7 @@ impl Supervisor {
 
                 event_bus.subscribe(Arc::new(move |event| {
                     match event {
-                        SystemEvent::ProposalAccepted { proposal_id, payload, .. } => {
+                        SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
                             match payload {
                                 ProposalPayload::Budget { amount, recipient, currency, purpose: _ } => {
                                     info!("📊 Executing budget proposal {}: {} {} to {}",
@@ -999,6 +999,7 @@ impl Supervisor {
                                     let prop_id = proposal_id.clone();
                                     let from_did = own_did.clone();
                                     let store = audit_store.clone();
+                                    let decision_time = decided_at;
 
                                     tokio::spawn(async move {
                                         use icn_ledger::entry::JournalEntryBuilder;
@@ -1056,10 +1057,11 @@ impl Supervisor {
                                                             "amount": amount,
                                                             "currency": currency,
                                                             "recipient": recipient.to_string(),
+                                                            "decided_at": decision_time,  // When governance decision was made
                                                             "executed_at": std::time::SystemTime::now()
                                                                 .duration_since(std::time::UNIX_EPOCH)
                                                                 .unwrap()
-                                                                .as_secs(),
+                                                                .as_secs(),  // When ledger transaction completed
                                                         });
 
                                                         // CRITICAL: Store audit trail - failure here creates inconsistent state
