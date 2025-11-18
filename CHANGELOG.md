@@ -277,10 +277,34 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Test: test_cross_cooperative_ledger_privacy() verifies Alice (coop-food token) cannot read coop-tech balances or history
   - **Severity**: HIGH | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all financial data
   - Location: [icn-gateway/src/api/ledger.rs:26,109](icn/crates/icn-gateway/src/api/ledger.rs#L26)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 2 CRITICAL authorization bypasses (ledger + cooperative) + HIGH privacy leak (ledger reads)
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
-- 13 comprehensive tests added (62 → 80 total tests, includes 2 CRITICAL auth bypasses + 1 HIGH privacy leak)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-64,109,408-459](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:98,180,222,260,530-600](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
+- **Bug 22: Cross-cooperative info leak in get_coop** - Cooperative metadata disclosure
+  - get_coop() endpoint missing cooperative isolation check
+  - Attack: Alice (coop-food member) reads metadata from ANY cooperative
+  - Root cause: get_coop() checked `require_scope("coop:read")` but NOT `claims.coop_id == path_id`
+  - **Security Impact**: HIGH - Member list disclosure, settings leak, governance model exposure
+  - Privacy violation enables targeted attacks, social engineering, policy intelligence gathering
+  - Violates cooperative autonomy and member privacy
+  - Fix: Added `require_coop_access(req, &id)` check to get_coop()
+  - Test: Enhanced test_cross_cooperative_authorization_fails() to verify get_coop protection
+  - **Severity**: HIGH | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all metadata
+  - Location: [icn-gateway/src/api/coops.rs:82](icn/crates/icn-gateway/src/api/coops.rs#L82)
+- **Bug 23: Self-payments not prevented** - Spam/bloat vulnerability
+  - Users could create payments to themselves (from == to), enabling spam attacks
+  - Attack: Alice creates thousands of self-payments (debit -10, credit +10 = net zero)
+  - Root cause: No validation preventing `from == to` in create_payment()
+  - **Security Impact**: MEDIUM - Ledger bloat, metric pollution, resource waste, DoS potential
+  - Self-transactions serve no economic purpose in mutual credit system
+  - Violates cooperative exchange principle (requires two parties)
+  - Enables: Storage bloat, transaction count inflation, resource exhaustion, rate limit bypass
+  - Fix: Added validation check rejecting `from == to`
+  - Returns error: "Self-payments not allowed (sender and recipient cannot be the same)"
+  - Test: test_self_payment_rejected() verifies Alice cannot pay herself
+  - **Severity**: MEDIUM | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users
+  - Location: [icn-gateway/src/api/ledger.rs:73-78](icn/crates/icn-gateway/src/api/ledger.rs#L73-L78)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 2 CRITICAL authorization bypasses (ledger + cooperative) + 2 HIGH privacy leaks (ledger reads + coop info) + MEDIUM spam vulnerability (self-payments)
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
+- 15 comprehensive tests added (62 → 81 total tests, includes 2 CRITICAL auth bypasses + 2 HIGH privacy leaks + 1 MEDIUM spam prevention)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,468-507](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
