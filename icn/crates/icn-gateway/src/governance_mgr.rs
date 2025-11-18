@@ -125,6 +125,14 @@ impl GovernanceManager {
         let domains = self.domains.read().unwrap();
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
+            // Validate proposal is in Open state
+            if !proposal.state.is_open() {
+                anyhow::bail!(
+                    "Proposal is not open for voting (current state: {:?})",
+                    proposal.state
+                );
+            }
+
             // Get domain to access governance params
             let domain = domains.get(&proposal.domain_id)
                 .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
@@ -217,8 +225,28 @@ impl GovernanceManager {
             anyhow::bail!("Voter {} is not a member of domain {}", voter, proposal.domain_id.0);
         }
 
-        // Check for duplicate vote
+        // Drop locks before acquiring votes write lock to avoid holding multiple locks
+        drop(domains);
+        drop(proposals);
+
+        // Acquire votes write lock
         let mut votes = self.votes.write().unwrap();
+
+        // CRITICAL: Re-check proposal state after acquiring votes lock to prevent TOCTOU
+        // Another thread could have closed the proposal between our initial check and now
+        let proposals_recheck = self.proposals.read().unwrap();
+        let proposal_recheck = proposals_recheck.get(&proposal_id)
+            .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+        if !proposal_recheck.state.is_open() {
+            anyhow::bail!(
+                "Proposal was closed during vote submission (current state: {:?})",
+                proposal_recheck.state
+            );
+        }
+        drop(proposals_recheck);
+
+        // Check for duplicate vote
         let proposal_votes = votes.entry(proposal_id.clone()).or_insert_with(Vec::new);
 
         if proposal_votes.iter().any(|v| v.voter == voter) {

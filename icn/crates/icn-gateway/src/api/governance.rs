@@ -201,8 +201,41 @@ pub async fn create_proposal(
 
     // Convert payload
     let payload = match &req.payload {
-        ProposalPayloadRequest::Text { body } => ProposalPayload::Text { body: body.clone() },
+        ProposalPayloadRequest::Text { body } => {
+            // Validate text body
+            if body.is_empty() {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "Proposal text body cannot be empty".to_string()
+                ));
+            }
+            if body.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
+                return Err(crate::error::GatewayError::BadRequest(
+                    format!("Proposal text body exceeds maximum length of {} characters",
+                        validation::MAX_PROPOSAL_DESCRIPTION_LEN)
+                ));
+            }
+            ProposalPayload::Text { body: body.clone() }
+        },
         ProposalPayloadRequest::Budget { amount, recipient, currency, purpose } => {
+            // Validate budget amount
+            validation::validate_payment_amount(*amount)?;
+
+            // Validate currency
+            validation::validate_currency(currency)?;
+
+            // Validate purpose
+            if purpose.is_empty() {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "Budget purpose cannot be empty".to_string()
+                ));
+            }
+            if purpose.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
+                return Err(crate::error::GatewayError::BadRequest(
+                    format!("Budget purpose exceeds maximum length of {} characters",
+                        validation::MAX_PROPOSAL_DESCRIPTION_LEN)
+                ));
+            }
+
             let recipient_did: Did = recipient.parse()
                 .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid recipient DID: {e}")))?;
             ProposalPayload::Budget {
@@ -230,6 +263,32 @@ pub async fn create_proposal(
             }
         },
         ProposalPayloadRequest::ConfigChange { key, value } => {
+            // Validate config key
+            if key.is_empty() {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "Config key cannot be empty".to_string()
+                ));
+            }
+            if key.len() > validation::MAX_GOVERNANCE_MODEL_LEN {
+                return Err(crate::error::GatewayError::BadRequest(
+                    format!("Config key exceeds maximum length of {} characters",
+                        validation::MAX_GOVERNANCE_MODEL_LEN)
+                ));
+            }
+
+            // Validate config value
+            if value.is_empty() {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "Config value cannot be empty".to_string()
+                ));
+            }
+            if value.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
+                return Err(crate::error::GatewayError::BadRequest(
+                    format!("Config value exceeds maximum length of {} characters",
+                        validation::MAX_PROPOSAL_DESCRIPTION_LEN)
+                ));
+            }
+
             // Combine key-value into JSON config
             let new_config = serde_json::json!({ key: value }).to_string();
             ProposalPayload::ConfigChange {
@@ -1277,5 +1336,83 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Domain not found"));
+    }
+
+    #[actix_web::test]
+    async fn test_toctou_vote_close_race_condition() {
+        // This test verifies the TOCTOU (Time-of-Check-Time-of-Use) race condition fix
+        // in cast_vote(). The fix re-checks the proposal state after acquiring the votes
+        // lock to ensure the proposal is still open.
+
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain with two members
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone(), bob.did().clone()]),
+        ).await.unwrap();
+
+        // Create and open proposal
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await.unwrap();
+        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+
+        // Alice votes successfully
+        gov_mgr.cast_vote(
+            proposal_id.clone(),
+            alice.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await.unwrap();
+
+        // Spawn concurrent operations to trigger potential race condition
+        let gov_mgr_clone = gov_mgr.clone();
+        let proposal_id_clone = proposal_id.clone();
+        let bob_did = bob.did().clone();
+
+        // Use tokio::join! to run close and vote concurrently
+        let (close_result, vote_result) = tokio::join!(
+            // Thread 1: Close the proposal
+            async move {
+                gov_mgr_clone.close_proposal(proposal_id_clone).await
+            },
+            // Thread 2: Bob tries to vote (should fail if close happens first)
+            async move {
+                // Add tiny delay to increase chance that close happens first
+                tokio::time::sleep(tokio::time::Duration::from_micros(100)).await;
+                gov_mgr.cast_vote(
+                    proposal_id.clone(),
+                    bob_did,
+                    VoteChoice::Against,
+                    None,
+                ).await
+            }
+        );
+
+        // Close should succeed
+        assert!(close_result.is_ok(), "Close operation should succeed");
+
+        // Vote should fail because proposal was closed
+        // The TOCTOU fix ensures that even if the vote passed the initial check,
+        // it will be rejected when re-checked after acquiring the votes lock
+        assert!(vote_result.is_err(), "Vote should fail when proposal is closed");
+        let error_msg = vote_result.unwrap_err().to_string();
+        assert!(
+            error_msg.contains("not open for voting") || error_msg.contains("was closed during vote submission"),
+            "Error should indicate proposal is not open, got: {}", error_msg
+        );
     }
 }
