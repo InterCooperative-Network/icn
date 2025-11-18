@@ -105,8 +105,8 @@ pub fn validate_domain_id(id: &str) -> Result<()> {
 
 /// Validate governance domain name
 pub fn validate_domain_name(name: &str) -> Result<()> {
-    if name.is_empty() {
-        return Err(GatewayError::BadRequest("Domain name cannot be empty".to_string()));
+    if name.is_empty() || name.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Domain name cannot be empty or whitespace-only".to_string()));
     }
 
     if name.len() > MAX_DOMAIN_NAME_LEN {
@@ -294,8 +294,8 @@ pub fn validate_history_offset(offset: usize) -> Result<usize> {
 
 /// Validate proposal title
 pub fn validate_proposal_title(title: &str) -> Result<()> {
-    if title.is_empty() {
-        return Err(GatewayError::BadRequest("Proposal title cannot be empty".to_string()));
+    if title.is_empty() || title.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Proposal title cannot be empty or whitespace-only".to_string()));
     }
 
     if title.len() > MAX_PROPOSAL_TITLE_LEN {
@@ -309,8 +309,8 @@ pub fn validate_proposal_title(title: &str) -> Result<()> {
 
 /// Validate proposal description
 pub fn validate_proposal_description(description: &str) -> Result<()> {
-    if description.is_empty() {
-        return Err(GatewayError::BadRequest("Proposal description cannot be empty".to_string()));
+    if description.is_empty() || description.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Proposal description cannot be empty or whitespace-only".to_string()));
     }
 
     if description.len() > MAX_PROPOSAL_DESCRIPTION_LEN {
@@ -325,6 +325,14 @@ pub fn validate_proposal_description(description: &str) -> Result<()> {
 /// Validate vote comment
 pub fn validate_vote_comment(comment: &Option<String>) -> Result<()> {
     if let Some(comment_text) = comment {
+        // Allow empty comments (user may choose to not provide one)
+        // But reject whitespace-only comments as they provide no value
+        if !comment_text.is_empty() && comment_text.trim().is_empty() {
+            return Err(GatewayError::BadRequest(
+                "Vote comment cannot be whitespace-only".to_string()
+            ));
+        }
+
         if comment_text.len() > MAX_VOTE_COMMENT_LEN {
             return Err(GatewayError::BadRequest(
                 format!("Vote comment exceeds maximum length of {MAX_VOTE_COMMENT_LEN} characters")
@@ -504,6 +512,8 @@ mod tests {
         assert!(validate_proposal_title("x").is_ok());
         assert!(validate_proposal_title(&"a".repeat(MAX_PROPOSAL_TITLE_LEN)).is_ok());
         assert!(validate_proposal_title("").is_err()); // Empty
+        assert!(validate_proposal_title("   ").is_err()); // Whitespace-only
+        assert!(validate_proposal_title("\t\n  ").is_err()); // Whitespace-only (tabs/newlines)
         assert!(validate_proposal_title(&"a".repeat(MAX_PROPOSAL_TITLE_LEN + 1)).is_err()); // Too long
     }
 
@@ -512,6 +522,7 @@ mod tests {
         assert!(validate_proposal_description("Test description").is_ok());
         assert!(validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN)).is_ok());
         assert!(validate_proposal_description("").is_err()); // Empty
+        assert!(validate_proposal_description("   ").is_err()); // Whitespace-only
         assert!(validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN + 1)).is_err()); // Too long
     }
 
@@ -520,7 +531,20 @@ mod tests {
         assert!(validate_vote_comment(&None).is_ok());
         assert!(validate_vote_comment(&Some("Great proposal!".to_string())).is_ok());
         assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN))).is_ok());
+        assert!(validate_vote_comment(&Some("".to_string())).is_ok()); // Empty is allowed
+        assert!(validate_vote_comment(&Some("   ".to_string())).is_err()); // Whitespace-only rejected
         assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN + 1))).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_domain_name() {
+        assert!(validate_domain_name("Food Coop").is_ok());
+        assert!(validate_domain_name("x").is_ok());
+        assert!(validate_domain_name(&"a".repeat(MAX_DOMAIN_NAME_LEN)).is_ok());
+        assert!(validate_domain_name("").is_err()); // Empty
+        assert!(validate_domain_name("   ").is_err()); // Whitespace-only
+        assert!(validate_domain_name("\t\n  ").is_err()); // Whitespace-only (tabs/newlines)
+        assert!(validate_domain_name(&"a".repeat(MAX_DOMAIN_NAME_LEN + 1)).is_err()); // Too long
     }
 
     #[test]
