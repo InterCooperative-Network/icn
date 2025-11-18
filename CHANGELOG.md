@@ -235,10 +235,23 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Returns error: "Duplicate member DID not allowed: <did>"
   - Test: test_validate_domain_members() verifies duplicate rejection
   - **Impact**: Medium - Prevents governance deadlock or unintended proposal rejections
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs)
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
-- 10 comprehensive tests added (62 → 77 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
+- **Bug 19: CRITICAL - Unauthorized payments from other accounts** - Authorization bypass vulnerability
+  - Users with `ledger:write` scope could create payments from ANY account, not just their own
+  - Attack: Alice (authenticated) creates payment from Bob's account to steal funds
+  - Root cause: create_payment() checked `require_scope("ledger:write")` but NOT `claims.sub == req.from`
+  - Classic authorization bypass - scope check without identity verification
+  - Example: `{"from": "did:icn:bob", "to": "did:icn:charlie", "amount": 100}` sent by Alice
+  - **Security Impact**: CRITICAL - Arbitrary fund theft, account balance manipulation, entire ledger system compromised
+  - Fix: Added authentication check after scope verification
+  - Verify `claims.sub == req.from` before allowing payment creation
+  - Returns error: "Cannot create payments from other accounts (authenticated as {}, attempted to send from {})"
+  - Test: test_create_payment_from_other_account_fails() verifies Alice cannot create payment from Bob's account
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users, all currencies
+  - Location: [icn-gateway/src/api/ledger.rs:54-64](icn/crates/icn-gateway/src/api/ledger.rs#L54-L64)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + CRITICAL ledger authorization bypass
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), validation functions, and payload conversions**
+- 11 comprehensive tests added (62 → 78 total tests, includes 1 CRITICAL auth test)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:54-64,363-404](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
