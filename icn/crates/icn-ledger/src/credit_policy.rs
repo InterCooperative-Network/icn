@@ -85,8 +85,7 @@ impl CreditPolicy {
         let trust_score = trust_graph
             .compute_trust_score(member)
             .unwrap_or(0.0)
-            .min(1.0)
-            .max(0.0);
+            .clamp(0.0, 1.0);
 
         // Get cleared volume (sum of all cleared credits)
         let cleared_volume = ledger.total_cleared_by(member, &self.currency)?;
@@ -275,6 +274,7 @@ impl CreditPolicyManager {
     }
 
     /// Check if a transaction would violate credit limit
+    #[allow(clippy::too_many_arguments)] // Required for comprehensive limit checking
     pub fn check_transaction(
         &self,
         member: &Did,

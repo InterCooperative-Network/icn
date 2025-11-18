@@ -481,6 +481,7 @@ impl DidDocument {
 
 impl RotationEvent {
     /// Create a new AddDevice event
+    #[allow(clippy::too_many_arguments)] // Required for multi-device protocol
     pub fn add_device(
         did: Did,
         device_id: String,

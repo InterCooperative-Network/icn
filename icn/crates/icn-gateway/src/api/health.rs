@@ -32,7 +32,7 @@ pub async fn health_detailed(
         },
         Err(e) => ComponentHealth {
             status: "error".to_string(),
-            details: Some(format!("Failed to list cooperatives: {}", e)),
+            details: Some(format!("Failed to list cooperatives: {e}")),
         },
     };
     checks.insert("cooperative_manager".to_string(), coop_health);

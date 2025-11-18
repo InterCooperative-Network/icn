@@ -42,6 +42,9 @@ impl Did {
     /// - Decoded bytes are exactly 32 bytes (Ed25519 public key size)
     ///
     /// Returns an error for malformed DIDs instead of panicking.
+    ///
+    /// Note: This is the implementation used by the `FromStr` trait.
+    #[allow(clippy::should_implement_trait)] // FromStr trait is implemented below
     pub fn from_str(s: &str) -> Result<Self> {
         // Validate prefix
         if !s.starts_with("did:icn:") {
