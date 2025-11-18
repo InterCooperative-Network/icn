@@ -1,8 +1,10 @@
 //! Gateway server
 
+use actix_files as fs;
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::info;
@@ -190,6 +192,13 @@ impl GatewayServer {
                                 .wrap(auth)
                         )
                 )
+                // Static files and root route
+                .service(web::redirect("/", "/static/index.html"))
+                .service(
+                    fs::Files::new("/static", get_static_dir())
+                        .prefer_utf8(true)
+                        .use_last_modified(true)
+                )
         })
         // Production-ready HTTP timeout configuration
         .keep_alive(Duration::from_secs(75))          // HTTP keep-alive timeout (75s is standard)
@@ -211,4 +220,34 @@ impl GatewayServer {
         result?;
         Ok(())
     }
+}
+
+/// Get the static files directory
+///
+/// In development, uses the source tree static directory.
+/// In production, looks for static files relative to the binary.
+fn get_static_dir() -> PathBuf {
+    // Try environment variable first (for custom installations)
+    if let Ok(static_dir) = std::env::var("ICN_STATIC_DIR") {
+        return PathBuf::from(static_dir);
+    }
+
+    // Development: use source tree
+    let dev_static = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("static");
+    if dev_static.exists() {
+        return dev_static;
+    }
+
+    // Production: relative to binary
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            let prod_static = parent.join("static");
+            if prod_static.exists() {
+                return prod_static;
+            }
+        }
+    }
+
+    // Fallback to current directory
+    PathBuf::from("static")
 }

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICN Gateway Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-icon">⚡</span>
+                    ICN Gateway
+                </h1>
+                <div class="header-actions">
+                    <span id="connection-status" class="status-indicator offline">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Disconnected</span>
+                    </span>
+                    <div class="user-info" id="user-info" style="display: none;">
+                        <span class="user-did" id="user-did"></span>
+                        <button class="btn btn-sm btn-secondary" id="logout-btn">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-tabs">
+                <li class="nav-tab active" data-page="dashboard">
+                    <span class="tab-icon">📊</span>
+                    Dashboard
+                </li>
+                <li class="nav-tab" data-page="cooperatives">
+                    <span class="tab-icon">🏘️</span>
+                    Cooperatives
+                </li>
+                <li class="nav-tab" data-page="governance">
+                    <span class="tab-icon">🗳️</span>
+                    Governance
+                </li>
+                <li class="nav-tab" data-page="ledger">
+                    <span class="tab-icon">💰</span>
+                    Ledger
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Login Page -->
+            <div id="page-login" class="page active">
+                <div class="login-container">
+                    <div class="login-card">
+                        <h2>Sign In</h2>
+                        <p class="text-muted">Connect using your DID</p>
+                        <form id="login-form">
+                            <div class="form-group">
+                                <label for="did-input">Decentralized Identifier (DID)</label>
+                                <input
+                                    type="text"
+                                    id="did-input"
+                                    class="form-control"
+                                    placeholder="did:icn:z6Mkk..."
+                                    required
+                                >
+                            </div>
+                            <div class="form-group">
+                                <label for="coop-id-input">Cooperative ID</label>
+                                <input
+                                    type="text"
+                                    id="coop-id-input"
+                                    class="form-control"
+                                    placeholder="my-coop"
+                                    required
+                                >
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                Sign In
+                            </button>
+                        </form>
+                        <div id="login-error" class="alert alert-error" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Page -->
+            <div id="page-dashboard" class="page">
+                <h2 class="page-title">Dashboard</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🏘️</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-coops">0</div>
+                            <div class="stat-label">Cooperatives</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-members">0</div>
+                            <div class="stat-label">Total Members</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🗳️</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-proposals">0</div>
+                            <div class="stat-label">Active Proposals</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-transactions">0</div>
+                            <div class="stat-label">Transactions</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Recent Activity</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="activity-feed" class="activity-feed">
+                                <div class="empty-state">No recent activity</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>System Health</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="health-status" class="health-status">
+                                <div class="loading">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cooperatives Page -->
+            <div id="page-cooperatives" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Cooperatives</h2>
+                    <button class="btn btn-primary" id="create-coop-btn">
+                        <span>+</span> Create Cooperative
+                    </button>
+                </div>
+
+                <div id="coop-list" class="card-grid">
+                    <div class="loading">Loading cooperatives...</div>
+                </div>
+
+                <!-- Create Coop Modal -->
+                <div id="create-coop-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Create Cooperative</h3>
+                            <button class="modal-close">&times;</button>
+                        </div>
+                        <form id="create-coop-form">
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="new-coop-id">Cooperative ID</label>
+                                    <input type="text" id="new-coop-id" class="form-control" required>
+                                    <small class="form-text">Unique identifier (e.g., "food-coop", "tech-collective")</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-coop-name">Name</label>
+                                    <input type="text" id="new-coop-name" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Create</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Governance Page -->
+            <div id="page-governance" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Governance</h2>
+                    <button class="btn btn-primary" id="create-proposal-btn">
+                        <span>+</span> New Proposal
+                    </button>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="domains">Domains</button>
+                    <button class="tab-btn" data-tab="proposals">Proposals</button>
+                </div>
+
+                <div id="tab-domains" class="tab-content active">
+                    <div id="domain-list" class="card-grid">
+                        <div class="loading">Loading domains...</div>
+                    </div>
+                </div>
+
+                <div id="tab-proposals" class="tab-content">
+                    <div id="proposal-list" class="list-view">
+                        <div class="loading">Loading proposals...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ledger Page -->
+            <div id="page-ledger" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Ledger</h2>
+                    <button class="btn btn-primary" id="create-payment-btn">
+                        <span>+</span> New Payment
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Your Balance</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="balance-display" class="balance-display">
+                            <div class="loading">Loading balance...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Transaction History</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="transaction-list" class="transaction-list">
+                            <div class="loading">Loading transactions...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Payment Modal -->
+                <div id="create-payment-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Create Payment</h3>
+                            <button class="modal-close">&times;</button>
+                        </div>
+                        <form id="create-payment-form">
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="payment-to">To (DID)</label>
+                                    <input type="text" id="payment-to" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="payment-amount">Amount</label>
+                                    <input type="number" id="payment-amount" class="form-control" required min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="payment-currency">Currency</label>
+                                    <input type="text" id="payment-currency" class="form-control" value="hours" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="payment-description">Description</label>
+                                    <textarea id="payment-description" class="form-control" rows="3"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Send Payment</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
