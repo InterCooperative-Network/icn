@@ -248,10 +248,25 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Test: test_create_payment_from_other_account_fails() verifies Alice cannot create payment from Bob's account
   - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users, all currencies
   - Location: [icn-gateway/src/api/ledger.rs:54-64](icn/crates/icn-gateway/src/api/ledger.rs#L54-L64)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + CRITICAL ledger authorization bypass
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), validation functions, and payload conversions**
-- 11 comprehensive tests added (62 → 78 total tests, includes 1 CRITICAL auth test)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:54-64,363-404](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
+- **Bug 20: CRITICAL - Cross-cooperative authorization bypass** - Cooperative isolation breach
+  - Admins of one cooperative could manage ANY cooperative's settings, members, and roles
+  - Attack: Alice (admin of coop-food) modifies coop-tech using her coop-food token
+  - Root cause: Admin endpoints checked `require_scope("coop:admin")` but NOT `claims.coop_id == path_coop_id`
+  - JWT tokens include coop_id to scope access to specific cooperative
+  - Without verification, cooperative isolation completely broken
+  - **Affected endpoints**: update_settings, add_member, remove_member, update_member_role (4 endpoints)
+  - **Security Impact**: CRITICAL - Unauthorized cooperative management, member manipulation, governance override, hostile takeovers
+  - Fix: Added `require_coop_access(req, coop_id)` helper function in middleware.rs
+  - Verifies `claims.coop_id == coop_id` before allowing access to coop admin operations
+  - Applied to all 4 coop admin endpoints
+  - Returns error: "Access denied: token is for cooperative '{}', but requested access to '{}'"
+  - Test: test_cross_cooperative_authorization_fails() verifies Alice (coop-food admin) cannot modify coop-tech
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all admin operations
+  - Location: [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs#L64-L78), [icn-gateway/src/api/coops.rs:98,180,222,260](icn/crates/icn-gateway/src/api/coops.rs)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 2 CRITICAL authorization bypasses (ledger + cooperative)
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
+- 12 comprehensive tests added (62 → 79 total tests, includes 2 CRITICAL auth bypass tests)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:54-64,363-404](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:98,180,222,260,530-600](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
