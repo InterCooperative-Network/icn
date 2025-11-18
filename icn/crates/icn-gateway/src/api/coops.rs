@@ -17,7 +17,7 @@ fn timestamp() -> Result<u64> {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .map_err(|e| crate::error::GatewayError::InternalError(
-            format!("System clock error (clock may be set before 1970): {}", e)
+            format!("System clock error (clock may be set before 1970): {e}")
         ))
 }
 

@@ -59,7 +59,7 @@ pub async fn create_domain(
     }
     if req.voting_period_days > MAX_VOTING_PERIOD_DAYS {
         return Err(crate::error::GatewayError::BadRequest(
-            format!("Voting period exceeds maximum of {} days (1 year)", MAX_VOTING_PERIOD_DAYS)
+            format!("Voting period exceeds maximum of {MAX_VOTING_PERIOD_DAYS} days (1 year)")
         ));
     }
 
@@ -531,7 +531,7 @@ pub async fn open_proposal(
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| crate::error::GatewayError::InternalError(
-                format!("System clock error: {}", e)
+                format!("System clock error: {e}")
             ))?
             .as_secs();
         now + voting_period_seconds

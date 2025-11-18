@@ -206,7 +206,7 @@ impl AuthManager {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .map_err(|e| GatewayError::InternalError(
-                format!("System clock error (clock may be set before 1970): {}", e)
+                format!("System clock error (clock may be set before 1970): {e}")
             ))
     }
 

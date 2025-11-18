@@ -360,7 +360,7 @@ pub fn validate_domain_members(members: &[String]) -> Result<()> {
     for member in members {
         if !seen.insert(member) {
             return Err(GatewayError::BadRequest(
-                format!("Duplicate member DID not allowed: {}", member)
+                format!("Duplicate member DID not allowed: {member}")
             ));
         }
     }
