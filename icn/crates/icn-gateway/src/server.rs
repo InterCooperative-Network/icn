@@ -11,6 +11,7 @@ use crate::api;
 use crate::auth::AuthManager;
 use crate::coop::CoopManager;
 use crate::events::EventBroadcaster;
+use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
 use crate::rate_limit::{RateLimitConfig, RateLimiter};
 use crate::error::Result;
@@ -48,6 +49,7 @@ impl GatewayServer {
         // Create shared managers
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
+        let governance_manager = Arc::new(GovernanceManager::new());
 
         // Create ledger manager with persistent storage if data_dir is set
         let ledger_manager = if let Some(data_dir) = self.data_dir {
@@ -115,6 +117,7 @@ impl GatewayServer {
                 // Shared state
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
+                .app_data(web::Data::new(governance_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
@@ -152,6 +155,24 @@ impl GatewayServer {
                                 .service(api::ledger::get_balance)
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
+                                // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                                .wrap(auth.clone())
+                        )
+                        // Protected governance endpoints (auth + rate limiting)
+                        // NOTE: Requires GovernanceHandle from daemon supervisor
+                        //       See governance integration in icnd for wiring
+                        .service(
+                            web::scope("/gov")
+                                .service(api::governance::create_domain)
+                                .service(api::governance::list_domains)
+                                .service(api::governance::get_domain)
+                                .service(api::governance::create_proposal)
+                                .service(api::governance::list_proposals)
+                                .service(api::governance::get_proposal)
+                                .service(api::governance::open_proposal)
+                                .service(api::governance::close_proposal)
+                                .service(api::governance::cast_vote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
                                 .wrap(auth)

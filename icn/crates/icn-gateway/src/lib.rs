@@ -15,6 +15,7 @@ pub mod auth;
 pub mod coop;
 pub mod error;
 pub mod events;
+pub mod governance_mgr;
 pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;

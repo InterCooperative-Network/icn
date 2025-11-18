@@ -106,3 +106,71 @@ pub struct AccountDeltaResponse {
     pub debit: Option<i64>,
     pub credit: Option<i64>,
 }
+
+// === Governance Operations ===
+
+/// Create a new governance domain
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateDomainRequest {
+    pub id: String,                 // Domain ID (e.g., "coop:food-coop")
+    pub name: String,               // Human-readable name
+    pub profile: String,            // Governance profile (e.g., "cooperative_default")
+    pub quorum_percent: u8,         // Quorum percentage (0-100)
+    pub approval_percent: u8,       // Approval percentage (0-100)
+    pub voting_period_days: u64,    // Default voting period in days
+    pub members: Vec<String>,       // List of member DIDs
+}
+
+/// Create a new proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProposalRequest {
+    pub domain_id: String,          // Domain this proposal belongs to
+    pub title: String,              // Short title
+    pub description: String,        // Full description/rationale
+    pub payload: ProposalPayloadRequest,
+}
+
+/// Proposal payload types (matches icn_governance::ProposalPayload)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProposalPayloadRequest {
+    Text {
+        body: String,
+    },
+    Budget {
+        amount: i64,
+        recipient: String,  // DID
+        currency: String,
+        purpose: String,
+    },
+    Membership {
+        action: String,     // "add" or "remove"
+        did: String,
+    },
+    ConfigChange {
+        key: String,
+        value: String,
+    },
+}
+
+/// Open a proposal for voting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenProposalRequest {
+    pub voting_period_seconds: Option<u64>, // Optional override of domain default
+}
+
+/// Cast a vote on a proposal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CastVoteRequest {
+    pub choice: String,  // "for", "against", or "abstain"
+    pub comment: Option<String>,
+}
+
+/// Vote choice response (simpler for API consumers)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VoteChoiceResponse {
+    For,
+    Against,
+    Abstain,
+}

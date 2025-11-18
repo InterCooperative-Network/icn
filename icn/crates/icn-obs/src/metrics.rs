@@ -565,6 +565,26 @@ pub fn init_descriptions() {
         "icn_gateway_history_queries_total",
         "Total number of transaction history queries"
     );
+    describe_counter!(
+        "icn_gateway_governance_domains_created_total",
+        "Total number of governance domains created"
+    );
+    describe_counter!(
+        "icn_gateway_governance_proposals_created_total",
+        "Total number of governance proposals created"
+    );
+    describe_counter!(
+        "icn_gateway_governance_proposals_opened_total",
+        "Total number of governance proposals opened for voting"
+    );
+    describe_counter!(
+        "icn_gateway_governance_proposals_closed_total",
+        "Total number of governance proposals closed"
+    );
+    describe_counter!(
+        "icn_gateway_governance_votes_cast_total",
+        "Total number of governance votes cast"
+    );
 }
 
 /// Network metrics
@@ -1156,6 +1176,26 @@ pub mod gateway {
 
     pub fn history_queries_inc() {
         counter!("icn_gateway_history_queries_total").increment(1);
+    }
+
+    pub fn governance_domains_created_inc() {
+        counter!("icn_gateway_governance_domains_created_total").increment(1);
+    }
+
+    pub fn governance_proposals_created_inc() {
+        counter!("icn_gateway_governance_proposals_created_total").increment(1);
+    }
+
+    pub fn governance_proposals_opened_inc() {
+        counter!("icn_gateway_governance_proposals_opened_total").increment(1);
+    }
+
+    pub fn governance_proposals_closed_inc() {
+        counter!("icn_gateway_governance_proposals_closed_total").increment(1);
+    }
+
+    pub fn governance_votes_cast_inc() {
+        counter!("icn_gateway_governance_votes_cast_total").increment(1);
     }
 }
 

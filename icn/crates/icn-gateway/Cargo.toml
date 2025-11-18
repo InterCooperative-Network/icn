@@ -32,6 +32,9 @@ thiserror = "1"
 # JWT tokens
 jsonwebtoken = "9"
 
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
 # Cryptography
 hex = "0.4"
 rand = "0.8"
@@ -43,6 +46,7 @@ icn-ledger = { path = "../icn-ledger" }
 icn-store = { path = "../icn-store" }
 icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
+icn-governance = { path = "../icn-governance" }
 
 # Metrics
 metrics = "0.22"

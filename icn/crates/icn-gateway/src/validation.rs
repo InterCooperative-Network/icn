@@ -60,6 +60,49 @@ pub const MAX_WEBSOCKET_MESSAGE_SIZE: usize = 65_536;
 /// theoretical max is 1 million, but we limit to 10,000 total connections
 pub const MAX_TOTAL_WEBSOCKET_CONNECTIONS: u64 = 10_000;
 
+/// Maximum length for governance domain ID
+pub const MAX_DOMAIN_ID_LEN: usize = 128;
+
+/// Maximum length for governance domain name
+pub const MAX_DOMAIN_NAME_LEN: usize = 256;
+
+/// Validate governance domain ID
+pub fn validate_domain_id(id: &str) -> Result<()> {
+    if id.is_empty() {
+        return Err(GatewayError::BadRequest("Domain ID cannot be empty".to_string()));
+    }
+
+    if id.len() > MAX_DOMAIN_ID_LEN {
+        return Err(GatewayError::BadRequest(
+            format!("Domain ID exceeds maximum length of {MAX_DOMAIN_ID_LEN} characters")
+        ));
+    }
+
+    // Validate characters (alphanumeric, hyphens, underscores, colons for namespacing)
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':') {
+        return Err(GatewayError::BadRequest(
+            "Domain ID must contain only alphanumeric characters, hyphens, underscores, and colons".to_string()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate governance domain name
+pub fn validate_domain_name(name: &str) -> Result<()> {
+    if name.is_empty() {
+        return Err(GatewayError::BadRequest("Domain name cannot be empty".to_string()));
+    }
+
+    if name.len() > MAX_DOMAIN_NAME_LEN {
+        return Err(GatewayError::BadRequest(
+            format!("Domain name exceeds maximum length of {MAX_DOMAIN_NAME_LEN} characters")
+        ));
+    }
+
+    Ok(())
+}
+
 /// Validate cooperative ID
 pub fn validate_coop_id(id: &str) -> Result<()> {
     if id.is_empty() {
