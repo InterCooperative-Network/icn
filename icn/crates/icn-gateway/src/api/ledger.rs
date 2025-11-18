@@ -70,6 +70,13 @@ pub async fn create_payment(
     let to = req.to.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid to DID: {e}")))?;
 
+    // Prevent self-payments (spam/bloat prevention)
+    if from == to {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Self-payments not allowed (sender and recipient cannot be the same)".to_string()
+        ));
+    }
+
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
     validation::validate_currency(&req.currency)?;
@@ -456,5 +463,46 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_self_payment_rejected() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .service(
+                    web::scope("/ledger")
+                        .service(create_payment)
+                )
+        ).await;
+
+        // Alice tries to pay herself (should fail)
+        let req_body = CreatePaymentRequest {
+            from: alice.did().to_string(),
+            to: alice.did().to_string(), // Same as from!
+            amount: 10,
+            currency: "hours".to_string(),
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
     }
 }
