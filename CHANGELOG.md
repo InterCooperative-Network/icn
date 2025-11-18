@@ -139,10 +139,35 @@ curl -H "Authorization: Bearer $TOKEN" \
 - **Bug 4: Domain existence not checked** - Could create proposals for non-existent domains
   - Fix: Validate domain exists before creating proposal
   - Test: `test_create_proposal_for_nonexistent_domain_fails`
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals)
-- **All bugs fixed in cast_vote() and create_proposal() methods**
-- 5 comprehensive tests added (62 → 67 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:71-223](icn/crates/icn-gateway/src/governance_mgr.rs#L71-L223)
+- **Bug 5: TOCTOU race condition in cast_vote()** - Proposal state checked before releasing locks, vote recorded after
+  - Allowed votes on proposals closed concurrently by another thread
+  - Fix: Re-check proposal.state.is_open() after acquiring votes write lock for atomicity
+  - Explicit lock dropping (`drop(proposals)`, `drop(domains)`) before vote lock acquisition
+  - Reject with "was closed during vote submission" if state changed between checks
+  - Test: `test_toctou_vote_close_race_condition` uses concurrent tokio::join! to verify fix
+  - **Security impact**: Prevents vote counting after proposal closure (time-of-check vs time-of-use bug)
+- **Bug 6: State validation missing in close_proposal()** - Could close non-open proposals multiple times
+  - Fix: Validate proposal.state.is_open() before closing
+  - Prevents state machine violations (closing Draft or already-Closed proposals)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions)
+- **All bugs fixed in cast_vote(), create_proposal(), and close_proposal() methods**
+- 6 comprehensive tests added (62 → 73 total tests)
+- Location: [icn-gateway/src/governance_mgr.rs:71-244](icn/crates/icn-gateway/src/governance_mgr.rs#L71-L244)
+
+**Proposal payload validation (DoS protection) (2025-11-17):**
+- Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
+- **Text proposals**: Body must be non-empty, max 10,000 characters
+- **Budget proposals**:
+  - Amount validation via `validate_payment_amount()` (prevents negative/zero amounts)
+  - Currency validation via `validate_currency()` (max 10 chars)
+  - Purpose must be non-empty, max 10,000 characters
+  - Recipient DID format validation
+- **ConfigChange proposals**:
+  - Key must be non-empty, max 64 characters
+  - Value must be non-empty, max 10,000 characters
+- **Impact**: Prevents DoS attacks via unbounded proposal payloads, ensures data integrity
+- All validation uses existing constants from `validation.rs` (`MAX_PROPOSAL_DESCRIPTION_LEN`, `MAX_GOVERNANCE_MODEL_LEN`)
+- Location: [icn-gateway/src/api/governance.rs:203-297](icn/crates/icn-gateway/src/api/governance.rs#L203-L297)
 
 ### Fixed - Governance→Ledger Production Hardening (2025-01-17 & 2025-11-17)
 
