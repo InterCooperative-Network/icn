@@ -183,7 +183,15 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Fix: Add `|| field.trim().is_empty()` check to all payload text fields
   - Same consistency issue as Bug #11, but in payload conversion logic
   - **Impact**: Data quality, UX confusion, storage waste
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution)
+- **Bug 13: Missing profile validation in create_domain** - Unvalidated governance model field
+  - The `profile` field in CreateDomainRequest was completely unvalidated
+  - Didn't check for empty strings, whitespace-only strings, or length limits
+  - Attack: Create domains with invalid governance models ("", "   ", 10KB string)
+  - Could lead to undefined behavior when evaluating proposals with invalid profiles
+  - Fix: Add `validation::validate_governance_model(&req.profile)?;` call in create_domain
+  - Enhanced validate_governance_model() to check for whitespace-only strings (consistency with Bug #11/12)
+  - **Impact**: Security - prevents invalid governance configuration and potential evaluation errors
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
 - 10 comprehensive tests added (62 → 77 total tests)
 - Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330](icn/crates/icn-gateway/src/validation.rs)
