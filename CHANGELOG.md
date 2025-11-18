@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Components: GovernanceManager (in-memory storage), 5 governance DTOs, domain validation, 5 Prometheus metrics
 - Location: [icn-gateway/src/api/governance.rs](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/governance_mgr.rs](icn/crates/icn-gateway/src/governance_mgr.rs)
 
+**Real-time WebSocket events for governance:**
+- 5 new event types: GovernanceDomainCreated, GovernanceProposalCreated, GovernanceProposalOpened, GovernanceProposalClosed, GovernanceVoteCast
+- Events broadcast after successful operations (domain/proposal/vote mutations)
+- Events keyed by domain_id for subscription filtering
+- WebSocket clients receive push notifications for subscribed domains (no polling required)
+- Includes rich context: creator/proposer/voter DIDs, timestamps, outcomes, payload types
+- Enables reactive UIs and real-time monitoring tools
+
 ### Added - Governance Execution Metrics (2025-01-17)
 
 **Prometheus metrics for governance→ledger observability:**
@@ -28,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `icn_governance_audit_failures_total` - Audit trail write failures (critical for partial failure detection)
 - `icn_governance_idempotent_skips_total` - Duplicate events prevented (security monitoring)
 - Location: [icn-obs/src/metrics.rs:301-321](icn/crates/icn-obs/src/metrics.rs#L301-L321) + [supervisor.rs:1007-1107](icn/crates/icn-core/src/supervisor.rs#L1007-L1107)
+
+### Fixed - Governance Manager Error Handling (2025-11-17)
+
+**Silent failures in GovernanceManager methods:**
+- `open_proposal()` now returns error when proposal not found (previously returned Ok(()) silently)
+- `close_proposal()` now returns error when proposal not found (previously returned Ok(()) silently)
+- **Impact**: API callers receive proper error responses (404 Not Found) instead of misleading success (200 OK)
+- Improves debugging and prevents confusion when operations fail to find target proposals
+- Location: [icn-gateway/src/governance_mgr.rs:99-140](icn/crates/icn-gateway/src/governance_mgr.rs#L99-L140)
 
 ### Fixed - Governance→Ledger Production Hardening (2025-01-17 & 2025-11-17)
 
