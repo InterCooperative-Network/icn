@@ -191,6 +191,14 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Fix: Add `validation::validate_governance_model(&req.profile)?;` call in create_domain
   - Enhanced validate_governance_model() to check for whitespace-only strings (consistency with Bug #11/12)
   - **Impact**: Security - prevents invalid governance configuration and potential evaluation errors
+- **Bug 14: Three more fields missing whitespace validation** - Final whitespace validation gaps
+  - Cooperative name, currency, and credit policy only checked `is_empty()`, not `trim().is_empty()`
+  - Allowed whitespace-only strings: "   " as coop name, currency identifier, or credit policy
+  - Attack: Create cooperatives/payments with invisible/meaningless identifiers
+  - Same consistency issue as Bugs #11, #12, #13 - completes validation uniformity
+  - Fix: Add `|| field.trim().is_empty()` to validate_coop_name(), validate_currency(), validate_credit_policy()
+  - Enhanced tests with whitespace test cases for all three functions
+  - **Impact**: Data quality - completes whitespace validation consistency across all text fields
 - **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
 - 10 comprehensive tests added (62 → 77 total tests)
