@@ -48,6 +48,21 @@ pub async fn create_domain(
     validation::validate_domain_name(&req.name)?;
     validation::validate_domain_members(&req.members)?;
 
+    // Validate voting period BEFORE multiplication to prevent overflow
+    // Max safe value: MAX_VOTING_PERIOD_SECONDS / 86400 = 365 days
+    const MAX_VOTING_PERIOD_DAYS: u64 = validation::MAX_VOTING_PERIOD_SECONDS / 86400;
+    if req.voting_period_days == 0 {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Voting period must be greater than 0 days".to_string()
+        ));
+    }
+    if req.voting_period_days > MAX_VOTING_PERIOD_DAYS {
+        return Err(crate::error::GatewayError::BadRequest(
+            format!("Voting period exceeds maximum of {} days (1 year)", MAX_VOTING_PERIOD_DAYS)
+        ));
+    }
+
+    // Safe to multiply now - voting_period_days <= 365
     let voting_period_seconds = req.voting_period_days * 86400; // days -> seconds
     validation::validate_governance_params(
         req.quorum_percent,
@@ -1496,5 +1511,86 @@ mod tests {
         let proposal = gov_mgr.get_proposal(&proposal_id).await.unwrap().unwrap();
         assert_eq!(proposal.title, "Original Proposal");
         assert_eq!(proposal.description, "Original description");
+    }
+
+    #[actix_web::test]
+    async fn test_voting_period_overflow_prevention() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_domain)
+                )
+        ).await;
+
+        // Try to create domain with voting period that would overflow
+        // MAX_VOTING_PERIOD_SECONDS / 86400 = 365 days
+        let req_body = CreateDomainRequest {
+            id: "coop:overflow".to_string(),
+            name: "Overflow Test".to_string(),
+            profile: "cooperative".to_string(),
+            quorum_percent: 50,
+            approval_percent: 66,
+            voting_period_days: 366, // 1 day over the limit
+            members: vec![alice.did().to_string()],
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/domains")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
+
+        // Try with zero days
+        let req_body_zero = CreateDomainRequest {
+            id: "coop:zero".to_string(),
+            name: "Zero Period Test".to_string(),
+            profile: "cooperative".to_string(),
+            quorum_percent: 50,
+            approval_percent: 66,
+            voting_period_days: 0,
+            members: vec![alice.did().to_string()],
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/domains")
+            .set_json(&req_body_zero)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
+
+        // Valid voting period (365 days exactly) should work
+        let req_body_valid = CreateDomainRequest {
+            id: "coop:valid".to_string(),
+            name: "Valid Period Test".to_string(),
+            profile: "cooperative".to_string(),
+            quorum_percent: 50,
+            approval_percent: 66,
+            voting_period_days: 365, // Exactly 1 year
+            members: vec![alice.did().to_string()],
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/domains")
+            .set_json(&req_body_valid)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201); // Created
     }
 }
