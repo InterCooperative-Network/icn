@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Governance REST API (2025-11-17)
+
+**Gateway API endpoints for governance operations:**
+- 10 REST endpoints under `/v1/gov` scope with JWT auth + rate limiting
+- Domain management: `POST/GET /v1/gov/domains`, `GET /v1/gov/domains/{id}`
+- Proposal lifecycle: `POST/GET /v1/gov/proposals`, `GET /v1/gov/proposals/{id}`, `POST /v1/gov/proposals/{id}/open`, `POST /v1/gov/proposals/{id}/close`
+- Voting: `POST /v1/gov/proposals/{id}/vote`
+- Features: Query filtering (by domain_id, state), proposal payload types (Text, Budget, Membership, ConfigChange), vote comments
+- Security: Scope-based authorization (gov:read, gov:write), per-DID rate limiting, input validation
+- Components: GovernanceManager (in-memory storage), 5 governance DTOs, domain validation, 5 Prometheus metrics
+- Location: [icn-gateway/src/api/governance.rs](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/governance_mgr.rs](icn/crates/icn-gateway/src/governance_mgr.rs)
+
 ### Added - Governance Execution Metrics (2025-01-17)
 
 **Prometheus metrics for governance→ledger observability:**
