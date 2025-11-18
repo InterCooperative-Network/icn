@@ -79,6 +79,7 @@ pub async fn get_coop(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&req, "coop:read")?;
+    require_coop_access(&req, &id)?; // CRITICAL: Prevent cross-coop privacy leaks
 
     let coop = coop_mgr.get_coop(&id)?;
     Ok(HttpResponse::Ok().json(coop))
@@ -554,10 +555,28 @@ mod tests {
                 .app_data(web::Data::new(broadcaster.clone()))
                 .service(
                     web::scope("/coops")
+                        .service(get_coop)
                         .service(update_settings)
                         .service(add_member)
                 )
         ).await;
+
+        // Alice tries to read coop-tech info using her coop-food token (should fail)
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "coop-food".to_string(),
+            scopes: vec!["coop:read".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::get()
+            .uri("/coops/coop-tech")
+            .to_request();
+        req.extensions_mut().insert(claims.clone());
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
 
         // Alice tries to modify coop-tech using her coop-food token (should fail)
         let req_body = UpdateSettingsRequest {
