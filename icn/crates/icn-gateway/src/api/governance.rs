@@ -46,6 +46,7 @@ pub async fn create_domain(
     // Validate inputs
     validation::validate_domain_id(&req.id)?;
     validation::validate_domain_name(&req.name)?;
+    validation::validate_governance_model(&req.profile)?;
     validation::validate_domain_members(&req.members)?;
 
     // Validate voting period BEFORE multiplication to prevent overflow

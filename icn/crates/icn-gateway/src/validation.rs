@@ -185,8 +185,8 @@ pub fn validate_memo(memo: &Option<String>) -> Result<()> {
 
 /// Validate governance model string
 pub fn validate_governance_model(model: &str) -> Result<()> {
-    if model.is_empty() {
-        return Err(GatewayError::BadRequest("Governance model cannot be empty".to_string()));
+    if model.is_empty() || model.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Governance model cannot be empty or whitespace-only".to_string()));
     }
 
     if model.len() > MAX_GOVERNANCE_MODEL_LEN {
@@ -455,8 +455,10 @@ mod tests {
     fn test_validate_governance_model() {
         assert!(validate_governance_model("consensus").is_ok());
         assert!(validate_governance_model("majority").is_ok());
+        assert!(validate_governance_model(&"a".repeat(MAX_GOVERNANCE_MODEL_LEN)).is_ok());
         assert!(validate_governance_model("").is_err()); // Empty
-        assert!(validate_governance_model(&"a".repeat(65)).is_err()); // Too long
+        assert!(validate_governance_model("   ").is_err()); // Whitespace-only
+        assert!(validate_governance_model(&"a".repeat(MAX_GOVERNANCE_MODEL_LEN + 1)).is_err()); // Too long
     }
 
     #[test]
