@@ -33,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full proposal workflow validated: Draft → Open → Voting → Closed (Accepted/Rejected)
 - Location: [icn-gateway/src/api/governance.rs:444-907](icn/crates/icn-gateway/src/api/governance.rs#L444-L907)
 
+**Example scripts and documentation:**
+- Automated full-workflow demo script (9-step bash script with curl + jq, ~300 lines)
+- Complete API documentation with request/response examples for all 10 endpoints
+- Quick-start guide with copy-paste curl commands for rapid experimentation
+- Real-world scenario: Food coop voting on supplier approval (3 members, 2 FOR, 1 AGAINST → ACCEPTED)
+- WebSocket subscription examples and event handling patterns
+- Location: [examples/governance-api/](examples/governance-api/)
+
 ### Added - Governance Execution Metrics (2025-01-17)
 
 **Prometheus metrics for governance→ledger observability:**
