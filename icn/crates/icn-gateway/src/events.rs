@@ -41,6 +41,39 @@ pub enum GatewayEvent {
     SettingsUpdated {
         coop_id: String,
     },
+    /// A governance domain was created
+    GovernanceDomainCreated {
+        domain_id: String,
+        name: String,
+        creator: String,
+    },
+    /// A governance proposal was created
+    GovernanceProposalCreated {
+        proposal_id: String,
+        domain_id: String,
+        proposer: String,
+        title: String,
+        payload_type: String, // "text", "budget", "membership", "config_change"
+    },
+    /// A governance proposal was opened for voting
+    GovernanceProposalOpened {
+        proposal_id: String,
+        domain_id: String,
+        closes_at: u64, // Unix timestamp
+    },
+    /// A governance proposal was closed
+    GovernanceProposalClosed {
+        proposal_id: String,
+        domain_id: String,
+        outcome: String, // "accepted", "rejected", "no_quorum"
+    },
+    /// A vote was cast on a proposal
+    GovernanceVoteCast {
+        proposal_id: String,
+        domain_id: String,
+        voter: String,
+        choice: String, // "for", "against", "abstain"
+    },
 }
 
 /// Event broadcaster manages subscribers and sends events

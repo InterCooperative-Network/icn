@@ -6,6 +6,7 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_scope};
 use crate::models::{
@@ -29,6 +30,7 @@ use icn_obs::metrics::gateway;
 pub async fn create_domain(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<CreateDomainRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
@@ -38,7 +40,7 @@ pub async fn create_domain(
     let claims = get_claims(&http_req)
         .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let _creator_did: Did = claims.sub.parse()
+    let creator_did: Did = claims.sub.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     // Validate inputs
@@ -73,6 +75,16 @@ pub async fn create_domain(
 
     // Track domain creation
     gateway::governance_domains_created_inc();
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster.broadcast(
+        &domain_id.0,
+        GatewayEvent::GovernanceDomainCreated {
+            domain_id: domain_id.0.clone(),
+            name: req.name.clone(),
+            creator: creator_did.to_string(),
+        },
+    ).await;
 
     // Return created domain
     let domain = gov_mgr.get_domain(&domain_id).await?
@@ -120,6 +132,7 @@ pub async fn get_domain(
 pub async fn create_proposal(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<CreateProposalRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
@@ -187,7 +200,7 @@ pub async fn create_proposal(
     gov_mgr.create_proposal(
         proposal_id.clone(),
         domain_id,
-        proposer_did,
+        proposer_did.clone(),
         req.title.clone(),
         req.description.clone(),
         payload,
@@ -195,6 +208,26 @@ pub async fn create_proposal(
 
     // Track proposal creation
     gateway::governance_proposals_created_inc();
+
+    // Determine payload type for event
+    let payload_type = match &req.payload {
+        ProposalPayloadRequest::Text { .. } => "text",
+        ProposalPayloadRequest::Budget { .. } => "budget",
+        ProposalPayloadRequest::Membership { .. } => "membership",
+        ProposalPayloadRequest::ConfigChange { .. } => "config_change",
+    };
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster.broadcast(
+        &req.domain_id,
+        GatewayEvent::GovernanceProposalCreated {
+            proposal_id: proposal_id.0.clone(),
+            domain_id: req.domain_id.clone(),
+            proposer: proposer_did.to_string(),
+            title: req.title.clone(),
+            payload_type: payload_type.to_string(),
+        },
+    ).await;
 
     // Return created proposal
     let proposal = gov_mgr.get_proposal(&proposal_id).await?
@@ -261,6 +294,7 @@ pub async fn get_proposal(
 pub async fn open_proposal(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<OpenProposalRequest>,
 ) -> Result<HttpResponse> {
@@ -286,6 +320,27 @@ pub async fn open_proposal(
     let proposal = gov_mgr.get_proposal(&proposal_id).await?
         .ok_or_else(|| crate::error::GatewayError::InternalError("Proposal opening succeeded but proposal not found".to_string()))?;
 
+    // Calculate closes_at timestamp from proposal state
+    let closes_at = if let icn_governance::ProposalState::Open { opened_at: _, closes_at } = proposal.state {
+        closes_at
+    } else {
+        // Fallback to current time + voting period if state doesn't match
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() + voting_period_seconds
+    };
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster.broadcast(
+        &proposal.domain_id.0,
+        GatewayEvent::GovernanceProposalOpened {
+            proposal_id: proposal_id.0.clone(),
+            domain_id: proposal.domain_id.0.clone(),
+            closes_at,
+        },
+    ).await;
+
     Ok(HttpResponse::Ok().json(proposal))
 }
 
@@ -294,6 +349,7 @@ pub async fn open_proposal(
 pub async fn close_proposal(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
@@ -309,6 +365,24 @@ pub async fn close_proposal(
     let proposal = gov_mgr.get_proposal(&proposal_id).await?
         .ok_or_else(|| crate::error::GatewayError::InternalError("Proposal closing succeeded but proposal not found".to_string()))?;
 
+    // Determine outcome from proposal state
+    let outcome = match &proposal.state {
+        icn_governance::ProposalState::Accepted { .. } => "accepted",
+        icn_governance::ProposalState::Rejected { .. } => "rejected",
+        icn_governance::ProposalState::NoQuorum { .. } => "no_quorum",
+        _ => "unknown", // Shouldn't happen after close, but handle gracefully
+    };
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster.broadcast(
+        &proposal.domain_id.0,
+        GatewayEvent::GovernanceProposalClosed {
+            proposal_id: proposal_id.0.clone(),
+            domain_id: proposal.domain_id.0.clone(),
+            outcome: outcome.to_string(),
+        },
+    ).await;
+
     Ok(HttpResponse::Ok().json(proposal))
 }
 
@@ -321,6 +395,7 @@ pub async fn close_proposal(
 pub async fn cast_vote(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<CastVoteRequest>,
 ) -> Result<HttpResponse> {
@@ -343,7 +418,7 @@ pub async fn cast_vote(
     };
 
     let proposal_id = ProposalId(id.into_inner());
-    gov_mgr.cast_vote(proposal_id.clone(), voter_did, choice, req.comment.clone()).await?;
+    gov_mgr.cast_vote(proposal_id.clone(), voter_did.clone(), choice, req.comment.clone()).await?;
 
     // Track vote
     gateway::governance_votes_cast_inc();
@@ -351,6 +426,17 @@ pub async fn cast_vote(
     // Return updated proposal
     let proposal = gov_mgr.get_proposal(&proposal_id).await?
         .ok_or_else(|| crate::error::GatewayError::InternalError("Vote cast succeeded but proposal not found".to_string()))?;
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster.broadcast(
+        &proposal.domain_id.0,
+        GatewayEvent::GovernanceVoteCast {
+            proposal_id: proposal_id.0.clone(),
+            domain_id: proposal.domain_id.0.clone(),
+            voter: voter_did.to_string(),
+            choice: req.choice.clone(),
+        },
+    ).await;
 
     Ok(HttpResponse::Ok().json(proposal))
 }

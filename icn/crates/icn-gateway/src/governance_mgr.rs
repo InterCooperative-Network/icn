@@ -102,9 +102,10 @@ impl GovernanceManager {
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
             proposal.open(voting_period_seconds)?;
+            Ok(())
+        } else {
+            anyhow::bail!("Proposal not found: {}", proposal_id.0)
         }
-
-        Ok(())
     }
 
     /// Close a proposal and finalize voting
@@ -132,9 +133,10 @@ impl GovernanceManager {
             };
 
             proposal.close(final_state)?;
+            Ok(())
+        } else {
+            anyhow::bail!("Proposal not found: {}", proposal_id.0)
         }
-
-        Ok(())
     }
 
     /// Cast a vote on a proposal
