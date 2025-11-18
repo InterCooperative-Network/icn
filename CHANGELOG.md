@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Includes rich context: creator/proposer/voter DIDs, timestamps, outcomes, payload types
 - Enables reactive UIs and real-time monitoring tools
 
+**Comprehensive test coverage:**
+- 9 integration tests covering all governance endpoints (61 total icn-gateway tests)
+- Tests: Domain CRUD, proposal lifecycle (create→open→vote→close), authorization (gov:read/write scopes), query filtering, error handling
+- Full proposal workflow validated: Draft → Open → Voting → Closed (Accepted/Rejected)
+- Location: [icn-gateway/src/api/governance.rs:444-907](icn/crates/icn-gateway/src/api/governance.rs#L444-L907)
+
 ### Added - Governance Execution Metrics (2025-01-17)
 
 **Prometheus metrics for governance→ledger observability:**
@@ -37,7 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `icn_governance_idempotent_skips_total` - Duplicate events prevented (security monitoring)
 - Location: [icn-obs/src/metrics.rs:301-321](icn/crates/icn-obs/src/metrics.rs#L301-L321) + [supervisor.rs:1007-1107](icn/crates/icn-core/src/supervisor.rs#L1007-L1107)
 
-### Fixed - Governance Manager Error Handling (2025-11-17)
+### Fixed - Governance Manager Bugs (2025-11-17)
+
+**CRITICAL: Proposal ID mismatch preventing retrieval:**
+- `Proposal::new()` generates random ID internally, ignoring ID parameter passed to `create_proposal()`
+- Bug: Proposal stored at key `prop-abc123` but had internal ID `prop-xyz789` (HashMap key ≠ object.id)
+- Fix: Override generated ID with provided ID after creation (`proposal.id = proposal_id.clone()`)
+- **Impact**: Proposals can now be retrieved after creation (was 100% broken)
+- Discovery: Found during integration test development (test_proposal_lifecycle failed to open created proposal)
+- Location: [icn-gateway/src/governance_mgr.rs:79-81](icn/crates/icn-gateway/src/governance_mgr.rs#L79-L81)
 
 **Silent failures in GovernanceManager methods:**
 - `open_proposal()` now returns error when proposal not found (previously returned Ok(()) silently)
