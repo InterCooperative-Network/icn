@@ -83,12 +83,12 @@ pub async fn verify(
         })?;
 
     // Validate scopes
-    validation::validate_scopes(&req.scopes).inspect_err(|e| {
+    validation::validate_scopes(&req.scopes).inspect_err(|_e| {
         gateway::auth_failures_inc("invalid_scopes");
     })?;
 
     // Validate coop_id format
-    validation::validate_coop_id(&req.coop_id).inspect_err(|e| {
+    validation::validate_coop_id(&req.coop_id).inspect_err(|_e| {
         gateway::auth_failures_inc("invalid_coop_id");
     })?;
 
@@ -114,7 +114,7 @@ pub async fn verify(
         &signature,
         &req.coop_id,
         req.scopes.clone(),
-    ).inspect_err(|e| {
+    ).inspect_err(|_e| {
         gateway::auth_failures_inc("verification_failed");
     })?;
 
