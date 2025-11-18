@@ -403,7 +403,7 @@ icnctl gov vote show --proposal-id <id>
 - [x] Per-DID rate limiting (token bucket algorithm)
 - [x] Scope-based authorization enforcement
 - [x] Authenticated DID extraction for ownership
-- [x] All 62 tests pass (10 governance + 52 other)
+- [x] All 67 tests pass (15 governance + 52 other)
 
 **Gateway Features**:
 - **Authentication**: DID-based challenge-response → JWT tokens with configurable TTL

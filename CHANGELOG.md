@@ -28,10 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enables reactive UIs and real-time monitoring tools
 
 **Comprehensive test coverage:**
-- 10 integration tests covering all governance endpoints (62 total icn-gateway tests)
-- Tests: Domain CRUD, proposal lifecycle (create→open→vote→close), authorization (gov:read/write scopes), query filtering, error handling, NoQuorum scenario
+- 15 integration tests covering all governance endpoints + validation (67 total icn-gateway tests)
+- Tests: Domain CRUD, proposal lifecycle (create→open→vote→close), authorization (gov:read/write scopes), query filtering, error handling, NoQuorum scenario, duplicate vote prevention, state validation, membership enforcement, domain existence
 - Full proposal workflow validated: Draft → Open → Voting → Closed (Accepted/Rejected/NoQuorum)
-- Location: [icn-gateway/src/api/governance.rs:444-991](icn/crates/icn-gateway/src/api/governance.rs#L444-L991)
+- Validation tests ensure governance integrity (no double-voting, no unauthorized access, no orphaned proposals)
+- Location: [icn-gateway/src/api/governance.rs:444-1174](icn/crates/icn-gateway/src/api/governance.rs#L444-L1174)
 
 **Example scripts and documentation:**
 - Automated full-workflow demo script (9-step bash script with curl + jq, ~300 lines)
@@ -85,6 +86,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Impact**: API callers receive proper error responses (404 Not Found) instead of misleading success (200 OK)
 - Improves debugging and prevents confusion when operations fail to find target proposals
 - Location: [icn-gateway/src/governance_mgr.rs:99-140](icn/crates/icn-gateway/src/governance_mgr.rs#L99-L140)
+
+**CRITICAL: Governance validation bypasses (2025-11-17):**
+- **Bug 1: Duplicate votes allowed** - Same DID could vote multiple times on proposal (votes appended without checking)
+  - Fix: Check for existing vote before accepting new vote
+  - Test: `test_duplicate_vote_prevention` verifies duplicate rejected
+- **Bug 2: State validation missing** - Could vote on Draft or Closed proposals
+  - Fix: Validate proposal.state.is_open() before accepting vote
+  - Tests: `test_vote_on_draft_proposal_fails`, `test_vote_on_closed_proposal_fails`
+- **Bug 3: Membership not enforced** - Anyone could vote regardless of domain membership
+  - Fix: Check voter against domain.config.membership.source
+  - Test: `test_non_member_vote_fails` verifies non-member rejected
+- **Bug 4: Domain existence not checked** - Could create proposals for non-existent domains
+  - Fix: Validate domain exists before creating proposal
+  - Test: `test_create_proposal_for_nonexistent_domain_fails`
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals)
+- **All bugs fixed in cast_vote() and create_proposal() methods**
+- 5 comprehensive tests added (62 → 67 total tests)
+- Location: [icn-gateway/src/governance_mgr.rs:71-223](icn/crates/icn-gateway/src/governance_mgr.rs#L71-L223)
 
 ### Fixed - Governance→Ledger Production Hardening (2025-01-17 & 2025-11-17)
 

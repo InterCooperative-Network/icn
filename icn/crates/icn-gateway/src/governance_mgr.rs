@@ -77,6 +77,13 @@ impl GovernanceManager {
         description: String,
         payload: ProposalPayload,
     ) -> Result<()> {
+        // Validate domain exists
+        let domains = self.domains.read().unwrap();
+        if !domains.contains_key(&domain_id) {
+            anyhow::bail!("Domain not found: {}", domain_id.0);
+        }
+        drop(domains); // Release read lock before acquiring write lock
+
         let mut proposal = Proposal::new(domain_id, proposer, title, description, payload);
         // Override the generated ID with the one provided
         proposal.id = proposal_id.clone();
@@ -174,17 +181,50 @@ impl GovernanceManager {
         choice: VoteChoice,
         comment: Option<String>,
     ) -> Result<()> {
-        // Create vote record using Vote::new()
-        let mut vote = Vote::new(proposal_id.clone(), voter.clone(), choice);
+        // Validate proposal exists and is open for voting
+        let proposals = self.proposals.read().unwrap();
+        let proposal = proposals.get(&proposal_id)
+            .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
 
-        // Add comment if provided
+        if !proposal.state.is_open() {
+            anyhow::bail!(
+                "Proposal is not open for voting (current state: {:?})",
+                proposal.state
+            );
+        }
+
+        // Validate voter is a member of the domain
+        let domains = self.domains.read().unwrap();
+        let domain = domains.get(&proposal.domain_id)
+            .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
+
+        let is_member = match &domain.config.membership.source {
+            MembershipSource::StaticList(members) => members.contains(&voter),
+            MembershipSource::TrustThreshold(_) => {
+                // For trust-based membership, we'd need trust graph integration
+                // For now, allow all (will be enforced by daemon integration)
+                true
+            }
+        };
+
+        if !is_member {
+            anyhow::bail!("Voter {} is not a member of domain {}", voter, proposal.domain_id.0);
+        }
+
+        // Check for duplicate vote
+        let mut votes = self.votes.write().unwrap();
+        let proposal_votes = votes.entry(proposal_id.clone()).or_insert_with(Vec::new);
+
+        if proposal_votes.iter().any(|v| v.voter == voter) {
+            anyhow::bail!("Voter {} has already voted on proposal {}", voter, proposal_id.0);
+        }
+
+        // Create and store vote record
+        let mut vote = Vote::new(proposal_id, voter, choice);
         if let Some(c) = comment {
             vote = vote.with_comment(c);
         }
-
-        // Store vote
-        let mut votes = self.votes.write().unwrap();
-        votes.entry(proposal_id).or_insert_with(Vec::new).push(vote);
+        proposal_votes.push(vote);
 
         Ok(())
     }

@@ -988,4 +988,187 @@ mod tests {
             }
         }
     }
+
+    #[actix_web::test]
+    async fn test_duplicate_vote_prevention() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain with Alice as member
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        // Create and open proposal
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await.unwrap();
+        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+
+        // First vote succeeds
+        gov_mgr.cast_vote(
+            proposal_id.clone(),
+            alice.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await.unwrap();
+
+        // Second vote from same DID should fail
+        let result = gov_mgr.cast_vote(
+            proposal_id.clone(),
+            alice.did().clone(),
+            VoteChoice::Against,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("already voted"));
+    }
+
+    #[actix_web::test]
+    async fn test_vote_on_draft_proposal_fails() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain and proposal (but don't open it)
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await.unwrap();
+
+        // Try to vote on Draft proposal
+        let result = gov_mgr.cast_vote(
+            proposal_id,
+            alice.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not open for voting"));
+    }
+
+    #[actix_web::test]
+    async fn test_vote_on_closed_proposal_fails() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain, proposal, open, and close it
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await.unwrap();
+        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        gov_mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        // Try to vote on closed proposal
+        let result = gov_mgr.cast_vote(
+            proposal_id,
+            alice.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not open for voting"));
+    }
+
+    #[actix_web::test]
+    async fn test_non_member_vote_fails() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain with only Alice as member
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        // Create and open proposal
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await.unwrap();
+        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+
+        // Try to vote as Bob (non-member)
+        let result = gov_mgr.cast_vote(
+            proposal_id,
+            bob.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not a member"));
+    }
+
+    #[actix_web::test]
+    async fn test_create_proposal_for_nonexistent_domain_fails() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("nonexistent".to_string());
+
+        // Try to create proposal for non-existent domain
+        let result = gov_mgr.create_proposal(
+            ProposalId("prop-123".to_string()),
+            domain_id,
+            alice.did().clone(),
+            "Test".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Domain not found"));
+    }
 }
