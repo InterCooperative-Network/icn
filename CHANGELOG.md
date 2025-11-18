@@ -149,10 +149,25 @@ curl -H "Authorization: Bearer $TOKEN" \
 - **Bug 6: State validation missing in close_proposal()** - Could close non-open proposals multiple times
   - Fix: Validate proposal.state.is_open() before closing
   - Prevents state machine violations (closing Draft or already-Closed proposals)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions)
-- **All bugs fixed in cast_vote(), create_proposal(), and close_proposal() methods**
-- 6 comprehensive tests added (62 → 73 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:71-244](icn/crates/icn-gateway/src/governance_mgr.rs#L71-L244)
+- **Bug 7: Duplicate domain_id allowed** - HashMap.insert() silently overwrites existing domains
+  - Attacker could overwrite legitimate domain with malicious params/membership
+  - Fix: Check contains_key() before insert, return error if duplicate
+  - Test: `test_duplicate_domain_id_prevention` verifies original domain preserved
+  - **Security impact**: Domain configuration tampering, member list manipulation
+- **Bug 8: Duplicate proposal_id allowed** - HashMap.insert() silently overwrites existing proposals
+  - Attacker could overwrite existing proposal with malicious content
+  - Fix: Check contains_key() before insert, return error if duplicate
+  - Test: `test_duplicate_proposal_id_prevention` verifies original proposal preserved
+  - **Security impact**: Proposal content manipulation, vote outcome tampering
+- **Bug 9: Integer overflow in voting_period_days** - Multiplication before validation
+  - `voting_period_days * 86400` could overflow u64 and wrap around, bypassing max validation
+  - Fix: Validate voting_period_days <= 365 BEFORE multiplication
+  - Test: `test_voting_period_overflow_prevention` verifies 0/366/365 day edge cases
+  - **Security impact**: Could create domains with invalid voting periods
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks)
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), and create_domain() methods**
+- 9 comprehensive tests added (62 → 76 total tests)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63](icn/crates/icn-gateway/src/api/governance.rs#L51-L63)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
