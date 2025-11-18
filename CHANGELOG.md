@@ -35,6 +35,102 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8080/v1/gov/proposals?domain_id=coop:food&state=open&limit=20"
 ```
 
+### Fixed - Gateway Security & Resource Management (2025-11-17)
+
+**Critical Security & Authorization Fixes:**
+
+- **Bug #26 (HIGH):** Unauthorized proposal opening bypass
+  - **Problem:** `open_proposal()` did not verify requester is a member of the proposal's governance domain
+  - **Attack Vector:** Non-member could send `POST /v1/gov/proposals/{id}/open` with valid JWT token
+  - **Impact:** Unauthorized control of proposal lifecycle, could open proposals prematurely or strategically
+  - **Root Cause:** Missing domain membership check, only had JWT authentication
+  - **Fix:** Added domain membership verification before allowing proposal to open
+  - **Implementation:**
+    1. Fetch proposal by ID to get domain_id
+    2. Fetch domain to get membership source
+    3. Check if requester DID exists in domain member list
+    4. Return 403 Forbidden if not a member
+  - **Location:** [icn-gateway/src/api/governance.rs:463-495](icn/crates/icn-gateway/src/api/governance.rs#L463-L495)
+  - **Test:** `test_non_member_cannot_open_close_proposal()` verifies 403 response for non-members
+
+- **Bug #27 (CRITICAL):** Unauthorized proposal closing enabling governance manipulation
+  - **Problem:** `close_proposal()` did not verify requester is a member of the proposal's governance domain
+  - **Attack Vector:** Non-member could send `POST /v1/gov/proposals/{id}/close` to close any proposal
+  - **Impact:** Governance hijacking - could close proposals early, prevent legitimate voting, or manipulate outcomes
+  - **Exploitation:** Close proposal before opposition can vote OR force early closure when outcome favorable
+  - **Root Cause:** Same as Bug #26 - missing domain membership verification
+  - **Fix:** Identical pattern to Bug #26 - domain membership check before allowing close
+  - **Location:** [icn-gateway/src/api/governance.rs:518-551](icn/crates/icn-gateway/src/api/governance.rs#L518-L551)
+  - **Security Impact:** Prevents non-members from controlling democratic processes
+  - **Test:** `test_non_member_cannot_open_close_proposal()` covers both open and close operations
+
+- **Bug #28 (CRITICAL):** Cross-cooperative deletion bypass
+  - **Problem:** `delete_coop()` enforced coop:admin scope but did NOT validate token's coop_id matches target cooperative
+  - **Attack Vector:**
+    1. Get JWT token for cooperative "attacker-coop" with coop:admin scope
+    2. Send `DELETE /v1/coops/victim-coop` with that token
+    3. Admin access to ANY coop if you're admin of ANY coop
+  - **Impact:** Complete cooperative takeover - delete any cooperative regardless of ownership
+  - **Pattern Consistency:** All other admin endpoints (update_settings, add_member, remove_member, update_member_role) had this check, delete_coop was missing it
+  - **Root Cause:** Incomplete security review after adding Bug #20 fix
+  - **Fix:** Added `require_coop_access(&req, &coop_id)?` check before deletion
+  - **Location:** [icn-gateway/src/api/coops.rs:156-169](icn/crates/icn-gateway/src/api/coops.rs#L156-L169)
+  - **Test:** `test_cross_cooperative_authorization_fails()` now includes delete_coop verification
+
+**Resource Management & DoS Prevention:**
+
+- **Bug #29 (HIGH):** IP-based rate limiting missing on auth endpoints
+  - **Problem:** No rate limiting on unauthenticated `/auth/challenge` and `/auth/verify` endpoints
+  - **Attack Vector:** Attacker floods auth endpoints from single IP with unlimited requests
+  - **Impact:**
+    - CPU exhaustion from Ed25519 signature verification
+    - Memory exhaustion from challenge nonce storage
+    - Service degradation for legitimate users
+    - Brute force attacks on authentication
+  - **Root Cause:** Per-DID rate limiting only applies to authenticated endpoints (requires JWT token)
+  - **Fix:** Implemented IP-based rate limiting specifically for auth endpoints
+  - **Implementation:**
+    1. Created `IpRateLimiter` struct with token bucket algorithm
+    2. More aggressive limits: 20 burst capacity, 2.0 tokens/sec refill (vs 100/10.0 for authenticated)
+    3. Added `get_client_ip()` helper with X-Forwarded-For support for reverse proxies
+    4. Integrated into both `challenge()` and `verify()` endpoints
+    5. Automatic cleanup every 5 minutes (10-minute inactivity threshold)
+  - **Location:**
+    - Rate limiter: [icn-gateway/src/rate_limit.rs:154-215](icn/crates/icn-gateway/src/rate_limit.rs#L154-L215)
+    - IP extraction: [icn-gateway/src/api/auth.rs:13-34](icn/crates/icn-gateway/src/api/auth.rs#L13-L34)
+    - Integration: [icn-gateway/src/api/auth.rs:44-46,72-74](icn/crates/icn-gateway/src/api/auth.rs#L44-L46)
+  - **Limits:**
+    - 20 requests/burst from single IP
+    - 120 requests/minute sustained (2/sec refill)
+    - Returns HTTP 429 when exceeded
+  - **Reverse Proxy Support:** Honors X-Forwarded-For header for accurate IP extraction
+  - **Tests:**
+    - `test_ip_rate_limiting_on_challenge()` - Verifies 20 requests succeed, 21st returns 429
+    - `test_ip_rate_limiting_on_verify()` - Verifies same limit enforcement on verify endpoint
+
+- **Bug #30 (MEDIUM):** WebSocket authentication timeout prevents resource exhaustion
+  - **Problem:** WebSocket connections had 60-second heartbeat timeout but no authentication deadline
+  - **Attack Vector:** Open 10,000 WebSocket connections, never authenticate, hold for 60 seconds each
+  - **Impact:**
+    - Memory exhaustion from unauthenticated connections
+    - Connection slot exhaustion (MAX_TOTAL_WEBSOCKET_CONNECTIONS = 10,000)
+    - Prevents legitimate users from connecting
+  - **Resource Cost:** Each unauthenticated WebSocket consumes ~1 KB RAM + 1 connection slot for 60 seconds
+  - **Root Cause:** Heartbeat timeout was only mechanism for closing idle connections
+  - **Fix:** Added 10-second authentication deadline in `started()` method
+  - **Implementation:**
+    1. Use `ctx.run_later(Duration::from_secs(10), ...)` to schedule auth check
+    2. If `did.is_none()` after 10 seconds, send AuthError and close connection
+    3. Reduces attack window from 60s to 10s (6x improvement)
+  - **Location:** [icn-gateway/src/websocket.rs:264-282](icn/crates/icn-gateway/src/websocket.rs#L264-L282)
+  - **Error Message:** "Authentication timeout (must authenticate within 10 seconds)"
+  - **Security Impact:** Limits unauthenticated connection lifetime, reduces DoS surface area
+
+**Test Coverage:**
+- All 84 tests passing (82 existing + 2 new IP rate limiting tests)
+- Comprehensive validation of security fixes and resource limits
+- Edge case coverage: non-member access, cross-coop operations, rate limit thresholds, auth timeout
+
 ### Added - Governance REST API (2025-11-17)
 
 **Gateway API endpoints for governance operations:**

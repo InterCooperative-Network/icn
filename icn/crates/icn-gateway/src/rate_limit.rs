@@ -151,6 +151,69 @@ impl RateLimiter {
     }
 }
 
+/// IP-based rate limiter for unauthenticated endpoints (auth endpoints)
+/// Uses more aggressive limits to prevent DoS attacks
+pub struct IpRateLimiter {
+    buckets: Arc<RwLock<HashMap<String, TokenBucket>>>,
+    config: RateLimitConfig,
+}
+
+impl IpRateLimiter {
+    /// Create a new IP-based rate limiter with aggressive limits
+    pub fn new_for_auth() -> Self {
+        // More aggressive limits for unauthenticated endpoints
+        let config = RateLimitConfig {
+            capacity: 20.0,        // Allow burst of 20 requests
+            refill_rate: 2.0,      // Refill 2 tokens/second (120/minute)
+            cost_per_request: 1.0,
+        };
+
+        Self {
+            buckets: Arc::new(RwLock::new(HashMap::new())),
+            config,
+        }
+    }
+
+    /// Check if request should be allowed for an IP address
+    pub fn check_rate_limit(&self, ip: &str) -> Result<(), GatewayError> {
+        let mut buckets = self.buckets.write()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let bucket = buckets
+            .entry(ip.to_string())
+            .or_insert_with(|| TokenBucket::new(self.config.capacity, self.config.refill_rate));
+
+        if bucket.try_consume(self.config.cost_per_request) {
+            Ok(())
+        } else {
+            let available = bucket.available();
+            warn!(
+                "IP rate limit exceeded for: {} (available: {:.2}, needed: {:.2})",
+                ip, available, self.config.cost_per_request
+            );
+            Err(GatewayError::RateLimitExceeded(format!("IP: {}", ip)))
+        }
+    }
+
+    /// Clean up old buckets to prevent unbounded memory growth
+    pub fn cleanup_inactive_buckets(&self, inactive_duration: Duration) -> usize {
+        let mut buckets = match self.buckets.write() {
+            Ok(b) => b,
+            Err(_) => return 0,
+        };
+
+        let now = Instant::now();
+        let initial_count = buckets.len();
+
+        buckets.retain(|_, bucket| {
+            let elapsed = now.duration_since(bucket.last_refill);
+            elapsed < inactive_duration
+        });
+
+        initial_count - buckets.len()
+    }
+}
+
 /// Rate limiting middleware for authenticated requests
 pub async fn rate_limit_middleware(
     req: ServiceRequest,

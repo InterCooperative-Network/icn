@@ -13,7 +13,7 @@ use crate::coop::CoopManager;
 use crate::events::EventBroadcaster;
 use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
-use crate::rate_limit::{RateLimitConfig, RateLimiter};
+use crate::rate_limit::{RateLimitConfig, RateLimiter, IpRateLimiter};
 use crate::error::Result;
 
 /// Gateway server configuration
@@ -63,6 +63,9 @@ impl GatewayServer {
         // Create rate limiter with default config
         let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
 
+        // Create IP-based rate limiter for auth endpoints (more aggressive limits)
+        let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
@@ -70,6 +73,7 @@ impl GatewayServer {
         {
             let auth_manager_clone = auth_manager.clone();
             let rate_limiter_clone = rate_limiter.clone();
+            let ip_rate_limiter_clone = ip_rate_limiter.clone();
             let event_broadcaster_clone = event_broadcaster.clone();
             let coop_manager_clone = coop_manager.clone();
             let mut shutdown_signal = shutdown_tx.subscribe();
@@ -90,6 +94,12 @@ impl GatewayServer {
                             let removed = rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(3600));
                             if removed > 0 {
                                 info!("Cleaned up {} inactive rate limiter buckets", removed);
+                            }
+
+                            // Clean up inactive IP rate limiter buckets (10 minute inactivity for auth endpoints)
+                            let removed = ip_rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(600));
+                            if removed > 0 {
+                                info!("Cleaned up {} inactive IP rate limiter buckets", removed);
                             }
 
                             // Clean up dead WebSocket channels for all cooperatives
@@ -121,6 +131,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
+                .app_data(web::Data::new(ip_rate_limiter.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first, so metrics wraps everything)
