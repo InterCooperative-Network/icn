@@ -51,6 +51,7 @@ pub async fn create_payment(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "ledger:write")?;
+    require_coop_access(&http_req, &coop_id)?; // CRITICAL: Prevent cross-coop payment creation
 
     // CRITICAL: Verify authenticated DID matches payment sender
     // Prevents users from creating payments from other accounts
@@ -432,10 +433,37 @@ mod tests {
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .service(
                     web::scope("/ledger")
+                        .service(create_payment)
                         .service(get_balance)
                         .service(get_history)
                 )
         ).await;
+
+        // Alice tries to create payment in coop-tech using coop-food token (should fail)
+        let payment_req = CreatePaymentRequest {
+            from: alice.did().to_string(),
+            to: bob.did().to_string(),
+            amount: 10,
+            currency: "hours".to_string(),
+            memo: None,
+        };
+
+        let claims_write = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "coop-food".to_string(), // Token for coop-food
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/coop-tech/payment") // Trying to access coop-tech!
+            .set_json(&payment_req)
+            .to_request();
+        req.extensions_mut().insert(claims_write);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
 
         // Alice tries to read balance in coop-tech using coop-food token (should fail)
         let claims = TokenClaims {
