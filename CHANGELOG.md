@@ -301,10 +301,25 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Test: test_self_payment_rejected() verifies Alice cannot pay herself
   - **Severity**: MEDIUM | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users
   - Location: [icn-gateway/src/api/ledger.rs:73-78](icn/crates/icn-gateway/src/api/ledger.rs#L73-L78)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 2 CRITICAL authorization bypasses (ledger + cooperative) + 2 HIGH privacy leaks (ledger reads + coop info) + MEDIUM spam vulnerability (self-payments)
+- **Bug 24: CRITICAL - Cross-cooperative payment creation bypass** - MISSED in Bug #19 fix
+  - create_payment() missing cooperative isolation check (found by user during code review!)
+  - Attack: Alice (coop-food member) creates payments in ANY cooperative
+  - Root cause: Bug #19 added `claims.sub == req.from` check but MISSED `require_coop_access(&http_req, &coop_id)`
+  - Inconsistent with get_balance() and get_history() which both had the coop_id check
+  - **Security Impact**: CRITICAL - Cross-cooperative payment injection, ledger manipulation
+  - Users can create payments in coops they don't have access to
+  - Violates financial isolation between cooperatives
+  - Enables ledger manipulation across trust boundaries
+  - Fix: Added `require_coop_access(&http_req, &coop_id)?;` after scope check (line 54)
+  - Now consistent with all other ledger endpoints
+  - Test: Enhanced test_cross_cooperative_ledger_privacy() to verify cross-coop payment creation blocked
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users with ledger:write
+  - Credit: Discovered by user during code review at @ledger.rs (45-65)
+  - Location: [icn-gateway/src/api/ledger.rs:54](icn/crates/icn-gateway/src/api/ledger.rs#L54)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 3 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin) + 2 HIGH privacy leaks (ledger reads + coop info) + MEDIUM spam vulnerability (self-payments)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
-- 15 comprehensive tests added (62 → 81 total tests, includes 2 CRITICAL auth bypasses + 2 HIGH privacy leaks + 1 MEDIUM spam prevention)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,468-507](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
+- 15 comprehensive tests added (62 → 81 total tests, includes 3 CRITICAL auth bypasses + 2 HIGH privacy leaks + 1 MEDIUM spam prevention)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,442-497](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks

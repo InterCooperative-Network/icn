@@ -460,7 +460,39 @@ pub async fn open_proposal(
     // Check authorization
     require_scope(&http_req, "gov:write")?;
 
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    let requester_did: Did = claims.sub.parse()
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
     let proposal_id = ProposalId(id.into_inner());
+
+    // CRITICAL: Verify requester is a member of the proposal's domain
+    // Fetch proposal to get domain_id
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?
+        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+
+    // Fetch domain to check membership
+    let domain = gov_mgr.get_domain(&proposal.domain_id).await?
+        .ok_or_else(|| crate::error::GatewayError::InternalError(format!("Domain not found: {}", proposal.domain_id.0)))?;
+
+    // Check if requester is a domain member
+    let is_member = match &domain.config.membership.source {
+        icn_governance::MembershipSource::StaticList(members) => members.contains(&requester_did),
+        icn_governance::MembershipSource::TrustThreshold(_) => {
+            // For trust-based membership, we'd need trust graph integration
+            // For now, allow (will be enforced by daemon integration)
+            true
+        }
+    };
+
+    if !is_member {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            format!("Only domain members can open proposals (you are not a member of domain '{}')", proposal.domain_id.0)
+        ));
+    }
 
     // Use custom voting period or get from domain config
     let voting_period_seconds = if let Some(period) = req.voting_period_seconds {
@@ -529,7 +561,40 @@ pub async fn close_proposal(
     // Check authorization
     require_scope(&http_req, "gov:write")?;
 
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    let requester_did: Did = claims.sub.parse()
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
     let proposal_id = ProposalId(id.into_inner());
+
+    // CRITICAL: Verify requester is a member of the proposal's domain
+    // Fetch proposal to get domain_id
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?
+        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+
+    // Fetch domain to check membership
+    let domain = gov_mgr.get_domain(&proposal.domain_id).await?
+        .ok_or_else(|| crate::error::GatewayError::InternalError(format!("Domain not found: {}", proposal.domain_id.0)))?;
+
+    // Check if requester is a domain member
+    let is_member = match &domain.config.membership.source {
+        icn_governance::MembershipSource::StaticList(members) => members.contains(&requester_did),
+        icn_governance::MembershipSource::TrustThreshold(_) => {
+            // For trust-based membership, we'd need trust graph integration
+            // For now, allow (will be enforced by daemon integration)
+            true
+        }
+    };
+
+    if !is_member {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            format!("Only domain members can close proposals (you are not a member of domain '{}')", proposal.domain_id.0)
+        ));
+    }
+
     gov_mgr.close_proposal(proposal_id.clone()).await?;
 
     // Track proposal closing
@@ -1086,7 +1151,7 @@ mod tests {
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 500); // Internal error (from anyhow::bail)
+        assert_eq!(resp.status(), 404); // Not Found (proper error code for nonexistent proposal)
     }
 
     #[actix_web::test]
@@ -1596,5 +1661,90 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 201); // Created
+    }
+
+    #[actix_web::test]
+    async fn test_non_member_cannot_open_close_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap(); // Not a member
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain with only Alice as member
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        // Alice creates proposal (allowed - she's a member)
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Test Proposal".to_string(),
+            "Test".to_string(),
+            ProposalPayload::Text { body: "Test".to_string() },
+        ).await.unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(open_proposal)
+                        .service(close_proposal)
+                )
+        ).await;
+
+        // Bob (non-member) tries to open proposal
+        let req_body = OpenProposalRequest {
+            voting_period_seconds: Some(86400),
+        };
+        let claims = create_test_claims(&bob.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri(&format!("/gov/proposals/{}/open", proposal_id.0))
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 403); // Forbidden - not a member
+
+        // Alice (member) opens proposal successfully
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri(&format!("/gov/proposals/{}/open", proposal_id.0))
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200); // Success
+
+        // Bob (non-member) tries to close proposal
+        let claims = create_test_claims(&bob.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri(&format!("/gov/proposals/{}/close", proposal_id.0))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 403); // Forbidden - not a member
+
+        // Alice (member) can close proposal successfully
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri(&format!("/gov/proposals/{}/close", proposal_id.0))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200); // Success
     }
 }
