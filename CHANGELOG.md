@@ -164,10 +164,15 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Fix: Validate voting_period_days <= 365 BEFORE multiplication
   - Test: `test_voting_period_overflow_prevention` verifies 0/366/365 day edge cases
   - **Security impact**: Could create domains with invalid voting periods
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks)
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), and create_domain() methods**
+- **Bug 10: Potential panic from unwrap() in open_proposal** - Unsafe time calculation
+  - `SystemTime::now().duration_since(UNIX_EPOCH).unwrap()` could panic if system clock set before 1970
+  - Panic would crash entire gateway server instead of returning 500 error
+  - Fix: Replace `.unwrap()` with `.map_err()` that returns GatewayError::InternalError
+  - **Impact**: Server availability - crash vs graceful error response
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes)
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), and open_proposal() methods**
 - 9 comprehensive tests added (62 → 76 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63](icn/crates/icn-gateway/src/api/governance.rs#L51-L63)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,498-504](icn/crates/icn-gateway/src/api/governance.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
