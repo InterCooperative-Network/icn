@@ -316,9 +316,37 @@ curl -H "Authorization: Bearer $TOKEN" \
   - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users with ledger:write
   - Credit: Discovered by user during code review at @ledger.rs (45-65)
   - Location: [icn-gateway/src/api/ledger.rs:54](icn/crates/icn-gateway/src/api/ledger.rs#L54)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 3 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin) + 2 HIGH privacy leaks (ledger reads + coop info) + MEDIUM spam vulnerability (self-payments)
+- **Bug 26: Unauthorized proposal opening** - Domain membership bypass
+  - Anyone with `gov:write` scope could open ANY proposal, regardless of domain membership
+  - Attack: Alice (non-member) opens Bob's proposal in domain she doesn't belong to
+  - Root cause: open_proposal() checked `require_scope("gov:write")` but NOT domain membership
+  - **Security Impact**: HIGH - Governance disruption, unauthorized proposal lifecycle manipulation
+  - Allows non-members to advance proposals without authority, violating domain autonomy
+  - Enables external actors to interfere with cooperative decision-making processes
+  - Fix: Added domain membership check (fetch proposal → get domain → verify is_member)
+  - Verifies requester is a member of the proposal's domain before allowing open
+  - Returns error: "Only domain members can open proposals (you are not a member of domain '{}')"
+  - Test: test_non_member_cannot_open_close_proposal() verifies Bob (non-member) gets 403 Forbidden
+  - **Severity**: HIGH | **Exploitability**: Trivial | **Attack surface**: All governance domains, all proposals
+  - Location: [icn-gateway/src/api/governance.rs:463-495](icn/crates/icn-gateway/src/api/governance.rs#L463-L495)
+- **Bug 27: CRITICAL - Unauthorized proposal closing** - Governance manipulation
+  - Anyone with `gov:write` scope could close ANY proposal, manipulating outcomes
+  - Attack: Alice (non-member or adversary) closes proposals early or at strategic times
+  - Root cause: close_proposal() checked `require_scope("gov:write")` but NOT domain membership
+  - **Security Impact**: CRITICAL - Governance outcome manipulation, democratic process subversion
+  - Allows attackers to: (1) Close proposals early to prevent voting, (2) Close at strategic times to influence results, (3) Deny quorum by closing before participation threshold met
+  - Fundamentally undermines cooperative democratic governance integrity
+  - Enables hostile takeovers, policy manipulation, and silencing of dissent
+  - Fix: Added domain membership check (fetch proposal → get domain → verify is_member)
+  - Verifies requester is a member of the proposal's domain before allowing close
+  - Returns error: "Only domain members can close proposals (you are not a member of domain '{}')"
+  - Test: test_non_member_cannot_open_close_proposal() verifies Bob (non-member) cannot close Alice's proposal
+  - Improved error code: 404 for nonexistent proposals (was 500 internal error)
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All governance domains, all proposals
+  - Location: [icn-gateway/src/api/governance.rs:564-596](icn/crates/icn-gateway/src/api/governance.rs#L564-L596)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 4 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin + proposal closing) + 3 HIGH vulnerabilities (ledger privacy leaks + coop info leak + unauthorized proposal opening) + MEDIUM spam vulnerability (self-payments)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
-- 15 comprehensive tests added (62 → 81 total tests, includes 3 CRITICAL auth bypasses + 2 HIGH privacy leaks + 1 MEDIUM spam prevention)
+- 16 comprehensive tests added (62 → 82 total tests, includes 4 CRITICAL auth bypasses + 3 HIGH vulnerabilities + 1 MEDIUM spam prevention)
 - Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,442-497](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
