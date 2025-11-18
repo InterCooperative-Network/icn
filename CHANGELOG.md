@@ -169,10 +169,17 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Panic would crash entire gateway server instead of returning 500 error
   - Fix: Replace `.unwrap()` with `.map_err()` that returns GatewayError::InternalError
   - **Impact**: Server availability - crash vs graceful error response
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes)
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), and open_proposal() methods**
-- 9 comprehensive tests added (62 → 76 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,498-504](icn/crates/icn-gateway/src/api/governance.rs)
+- **Bug 11: Whitespace-only strings bypass validation** - Input validation gap
+  - Domain names, proposal titles/descriptions, vote comments only checked `is_empty()`
+  - Didn't check `trim().is_empty()`, allowing "   " or "\t\n" strings
+  - Attack: Create domains/proposals with invisible/meaningless names
+  - Fix: Add `|| name.trim().is_empty()` check to all text field validators
+  - Test: `test_validate_domain_name` and enhanced tests for title/description/comment
+  - **Impact**: Data quality, UX confusion, storage waste
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution)
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), and validation functions**
+- 10 comprehensive tests added (62 → 77 total tests)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
