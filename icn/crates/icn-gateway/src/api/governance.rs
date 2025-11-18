@@ -46,6 +46,14 @@ pub async fn create_domain(
     // Validate inputs
     validation::validate_domain_id(&req.id)?;
     validation::validate_domain_name(&req.name)?;
+    validation::validate_domain_members(&req.members)?;
+
+    let voting_period_seconds = req.voting_period_days * 86400; // days -> seconds
+    validation::validate_governance_params(
+        req.quorum_percent,
+        req.approval_percent,
+        voting_period_seconds,
+    )?;
 
     // Convert member DIDs
     let members: Result<Vec<Did>> = req.members.iter()
@@ -60,7 +68,7 @@ pub async fn create_domain(
     let params = GovernanceParams::new(
         req.quorum_percent,
         req.approval_percent,
-        req.voting_period_days * 86400, // days -> seconds
+        voting_period_seconds,
     );
 
     // Create domain via governance manager
@@ -147,12 +155,8 @@ pub async fn create_proposal(
 
     // Validate inputs
     validation::validate_domain_id(&req.domain_id)?;
-    if req.title.is_empty() || req.title.len() > 200 {
-        return Err(crate::error::GatewayError::BadRequest("Title must be 1-200 characters".to_string()));
-    }
-    if req.description.len() > 5000 {
-        return Err(crate::error::GatewayError::BadRequest("Description must be ≤5000 characters".to_string()));
-    }
+    validation::validate_proposal_title(&req.title)?;
+    validation::validate_proposal_description(&req.description)?;
 
     // Convert payload
     let payload = match &req.payload {
@@ -408,6 +412,9 @@ pub async fn cast_vote(
 
     let voter_did: Did = claims.sub.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
+    // Validate comment length
+    validation::validate_vote_comment(&req.comment)?;
 
     // Parse vote choice
     let choice = match req.choice.to_lowercase().as_str() {

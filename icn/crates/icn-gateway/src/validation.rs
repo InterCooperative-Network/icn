@@ -66,6 +66,21 @@ pub const MAX_DOMAIN_ID_LEN: usize = 128;
 /// Maximum length for governance domain name
 pub const MAX_DOMAIN_NAME_LEN: usize = 256;
 
+/// Maximum length for proposal title
+pub const MAX_PROPOSAL_TITLE_LEN: usize = 256;
+
+/// Maximum length for proposal description
+pub const MAX_PROPOSAL_DESCRIPTION_LEN: usize = 10_000;
+
+/// Maximum length for vote comment
+pub const MAX_VOTE_COMMENT_LEN: usize = 2_000;
+
+/// Maximum number of members in governance domain
+pub const MAX_DOMAIN_MEMBERS: usize = 10_000;
+
+/// Maximum voting period (1 year in seconds = 365 * 24 * 3600)
+pub const MAX_VOTING_PERIOD_SECONDS: u64 = 31_536_000;
+
 /// Validate governance domain ID
 pub fn validate_domain_id(id: &str) -> Result<()> {
     if id.is_empty() {
@@ -277,6 +292,100 @@ pub fn validate_history_offset(offset: usize) -> Result<usize> {
     Ok(offset)
 }
 
+/// Validate proposal title
+pub fn validate_proposal_title(title: &str) -> Result<()> {
+    if title.is_empty() {
+        return Err(GatewayError::BadRequest("Proposal title cannot be empty".to_string()));
+    }
+
+    if title.len() > MAX_PROPOSAL_TITLE_LEN {
+        return Err(GatewayError::BadRequest(
+            format!("Proposal title exceeds maximum length of {MAX_PROPOSAL_TITLE_LEN} characters")
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate proposal description
+pub fn validate_proposal_description(description: &str) -> Result<()> {
+    if description.is_empty() {
+        return Err(GatewayError::BadRequest("Proposal description cannot be empty".to_string()));
+    }
+
+    if description.len() > MAX_PROPOSAL_DESCRIPTION_LEN {
+        return Err(GatewayError::BadRequest(
+            format!("Proposal description exceeds maximum length of {MAX_PROPOSAL_DESCRIPTION_LEN} characters")
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate vote comment
+pub fn validate_vote_comment(comment: &Option<String>) -> Result<()> {
+    if let Some(comment_text) = comment {
+        if comment_text.len() > MAX_VOTE_COMMENT_LEN {
+            return Err(GatewayError::BadRequest(
+                format!("Vote comment exceeds maximum length of {MAX_VOTE_COMMENT_LEN} characters")
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate domain members list
+pub fn validate_domain_members(members: &[String]) -> Result<()> {
+    if members.is_empty() {
+        return Err(GatewayError::BadRequest("Domain must have at least one member".to_string()));
+    }
+
+    if members.len() > MAX_DOMAIN_MEMBERS {
+        return Err(GatewayError::BadRequest(
+            format!("Number of members exceeds maximum of {MAX_DOMAIN_MEMBERS}")
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate governance parameters
+pub fn validate_governance_params(
+    quorum_percent: u8,
+    approval_percent: u8,
+    voting_period_seconds: u64,
+) -> Result<()> {
+    // Quorum percentage must be 0-100
+    if quorum_percent > 100 {
+        return Err(GatewayError::BadRequest(
+            "Quorum percentage must be between 0 and 100".to_string()
+        ));
+    }
+
+    // Approval percentage must be 0-100
+    if approval_percent > 100 {
+        return Err(GatewayError::BadRequest(
+            "Approval percentage must be between 0 and 100".to_string()
+        ));
+    }
+
+    // Voting period must be reasonable (not zero, not more than 1 year)
+    if voting_period_seconds == 0 {
+        return Err(GatewayError::BadRequest(
+            "Voting period must be greater than 0".to_string()
+        ));
+    }
+
+    if voting_period_seconds > MAX_VOTING_PERIOD_SECONDS {
+        return Err(GatewayError::BadRequest(
+            format!("Voting period exceeds maximum of {MAX_VOTING_PERIOD_SECONDS} seconds (1 year)")
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,5 +496,59 @@ mod tests {
         assert!(validate_history_offset(usize::MAX / 2).is_ok()); // At limit
         assert!(validate_history_offset(usize::MAX / 2 + 1).is_err()); // Over limit
         assert!(validate_history_offset(usize::MAX).is_err()); // Way over limit
+    }
+
+    #[test]
+    fn test_validate_proposal_title() {
+        assert!(validate_proposal_title("Test Proposal").is_ok());
+        assert!(validate_proposal_title("x").is_ok());
+        assert!(validate_proposal_title(&"a".repeat(MAX_PROPOSAL_TITLE_LEN)).is_ok());
+        assert!(validate_proposal_title("").is_err()); // Empty
+        assert!(validate_proposal_title(&"a".repeat(MAX_PROPOSAL_TITLE_LEN + 1)).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_proposal_description() {
+        assert!(validate_proposal_description("Test description").is_ok());
+        assert!(validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN)).is_ok());
+        assert!(validate_proposal_description("").is_err()); // Empty
+        assert!(validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN + 1)).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_vote_comment() {
+        assert!(validate_vote_comment(&None).is_ok());
+        assert!(validate_vote_comment(&Some("Great proposal!".to_string())).is_ok());
+        assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN))).is_ok());
+        assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN + 1))).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_domain_members() {
+        assert!(validate_domain_members(&vec!["did:icn:alice".to_string()]).is_ok());
+        assert!(validate_domain_members(&vec!["did:icn:alice".to_string(), "did:icn:bob".to_string()]).is_ok());
+        assert!(validate_domain_members(&vec![]).is_err()); // Empty
+        let too_many: Vec<String> = (0..MAX_DOMAIN_MEMBERS + 1).map(|i| format!("did:icn:{}", i)).collect();
+        assert!(validate_domain_members(&too_many).is_err()); // Too many
+    }
+
+    #[test]
+    fn test_validate_governance_params() {
+        // Valid params
+        assert!(validate_governance_params(50, 66, 86400).is_ok());
+        assert!(validate_governance_params(0, 0, 1).is_ok());
+        assert!(validate_governance_params(100, 100, MAX_VOTING_PERIOD_SECONDS).is_ok());
+
+        // Invalid quorum
+        assert!(validate_governance_params(101, 66, 86400).is_err());
+
+        // Invalid approval
+        assert!(validate_governance_params(50, 101, 86400).is_err());
+
+        // Invalid voting period (zero)
+        assert!(validate_governance_params(50, 66, 0).is_err());
+
+        // Invalid voting period (too long)
+        assert!(validate_governance_params(50, 66, MAX_VOTING_PERIOD_SECONDS + 1).is_err());
     }
 }
