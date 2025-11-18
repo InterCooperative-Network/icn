@@ -106,12 +106,53 @@ pub async fn create_domain(
 pub async fn list_domains(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
 
-    let domains = gov_mgr.list_domains().await?;
-    Ok(HttpResponse::Ok().json(domains))
+    let mut domains = gov_mgr.list_domains().await?;
+
+    // Apply pagination
+    let limit = if let Some(limit_str) = query.get("limit") {
+        let limit: usize = limit_str.parse()
+            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string()))?;
+        validation::validate_history_limit(limit)?
+    } else {
+        validation::DEFAULT_HISTORY_LIMIT
+    };
+
+    let offset = if let Some(offset_str) = query.get("offset") {
+        let offset: usize = offset_str.parse()
+            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string()))?;
+        validation::validate_history_offset(offset)?
+    } else {
+        0
+    };
+
+    // Sort by name for consistent pagination
+    domains.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Apply pagination slice
+    let total = domains.len();
+    let paginated: Vec<_> = domains
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .collect();
+
+    // Return with pagination metadata
+    let response = serde_json::json!({
+        "data": paginated,
+        "pagination": {
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "returned": paginated.len(),
+        }
+    });
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// GET /gov/domains/{id} - Get a specific governance domain
@@ -273,7 +314,46 @@ pub async fn list_proposals(
         }
     }
 
-    Ok(HttpResponse::Ok().json(proposals))
+    // Apply pagination
+    let limit = if let Some(limit_str) = query.get("limit") {
+        let limit: usize = limit_str.parse()
+            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string()))?;
+        validation::validate_history_limit(limit)?
+    } else {
+        validation::DEFAULT_HISTORY_LIMIT
+    };
+
+    let offset = if let Some(offset_str) = query.get("offset") {
+        let offset: usize = offset_str.parse()
+            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string()))?;
+        validation::validate_history_offset(offset)?
+    } else {
+        0
+    };
+
+    // Sort by creation time (newest first) for consistent pagination
+    proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply pagination slice
+    let total = proposals.len();
+    let paginated: Vec<_> = proposals
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .collect();
+
+    // Return with pagination metadata
+    let response = serde_json::json!({
+        "data": paginated,
+        "pagination": {
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "returned": paginated.len(),
+        }
+    });
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// GET /gov/proposals/{id} - Get a specific proposal
@@ -573,8 +653,10 @@ mod tests {
             .to_request();
         req.extensions_mut().insert(claims);
 
-        let resp: Vec<GovernanceDomain> = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.len(), 2);
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let domains: Vec<GovernanceDomain> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(domains.len(), 2);
+        assert_eq!(resp["pagination"]["total"], 2);
     }
 
     #[actix_web::test]
@@ -781,8 +863,10 @@ mod tests {
             .to_request();
         req.extensions_mut().insert(claims);
 
-        let all_proposals: Vec<Proposal> = test::call_and_read_body_json(&app, req).await;
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let all_proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
         assert_eq!(all_proposals.len(), 3);
+        assert_eq!(resp["pagination"]["total"], 3);
 
         // Filter by domain
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
@@ -791,8 +875,10 @@ mod tests {
             .to_request();
         req.extensions_mut().insert(claims);
 
-        let food_proposals: Vec<Proposal> = test::call_and_read_body_json(&app, req).await;
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let food_proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
         assert_eq!(food_proposals.len(), 2);
+        assert_eq!(resp["pagination"]["total"], 2);
 
         // Filter by state
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
@@ -801,8 +887,10 @@ mod tests {
             .to_request();
         req.extensions_mut().insert(claims);
 
-        let draft_proposals: Vec<Proposal> = test::call_and_read_body_json(&app, req).await;
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let draft_proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
         assert_eq!(draft_proposals.len(), 3);
+        assert_eq!(resp["pagination"]["total"], 3);
     }
 
     #[actix_web::test]

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Pagination for List Endpoints (2025-11-17)
+
+**Governance list endpoints now support pagination:**
+- `GET /v1/gov/domains` - Paginated domain listing with metadata
+- `GET /v1/gov/proposals` - Paginated proposal listing with metadata
+- **Query parameters**: `limit` (default 100, max 1000), `offset` (default 0)
+- **Response structure**: `{ "data": [...], "pagination": { "total", "offset", "limit", "returned" } }`
+- **Sorting**: Domains sorted by name (alphabetical), proposals sorted by creation time (newest first)
+- **DoS prevention**: Prevents memory exhaustion from loading thousands of entries at once
+- **Backward compatibility**: Existing filters (domain_id, state) work with pagination
+- **Validation**: Uses existing `validate_history_limit()` and `validate_history_offset()` functions
+- Location: [icn-gateway/src/api/governance.rs:106-156,245-316](icn/crates/icn-gateway/src/api/governance.rs)
+
+**Example usage:**
+```bash
+# Get first 50 domains
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/gov/domains?limit=50"
+
+# Get next 50 domains
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/gov/domains?limit=50&offset=50"
+
+# Filter AND paginate
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/gov/proposals?domain_id=coop:food&state=open&limit=20"
+```
+
 ### Added - Governance REST API (2025-11-17)
 
 **Gateway API endpoints for governance operations:**
