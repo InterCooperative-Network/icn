@@ -344,7 +344,23 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Improved error code: 404 for nonexistent proposals (was 500 internal error)
   - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All governance domains, all proposals
   - Location: [icn-gateway/src/api/governance.rs:564-596](icn/crates/icn-gateway/src/api/governance.rs#L564-L596)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 4 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin + proposal closing) + 3 HIGH vulnerabilities (ledger privacy leaks + coop info leak + unauthorized proposal opening) + MEDIUM spam vulnerability (self-payments)
+- **Bug 28: CRITICAL - Cooperative deletion bypass** - Cross-cooperative destruction
+  - Admins of one cooperative could DELETE ANY cooperative, not just their own
+  - Attack: Alice (admin of coop-food) deletes coop-tech using coop-food admin token
+  - Root cause: delete_coop() checked `require_scope("coop:admin")` but NOT `require_coop_access(req, coop_id)`
+  - Same pattern as Bug #20 (cross-coop admin bypass for settings/members)
+  - **Security Impact**: CRITICAL - Complete destruction of cooperatives across isolation boundaries
+  - Allows hostile deletion attacks that permanently destroy cooperative data
+  - Violates cooperative autonomy and data sovereignty
+  - No recovery mechanism for deleted cooperatives (permanent data loss)
+  - Fix: Added `require_coop_access(&req, &coop_id)?;` before deletion operation
+  - Returns error: "Access denied: token is for cooperative '{}', but requested access to '{}'"
+  - Now consistent with all other admin endpoints (update_settings, add_member, remove_member, update_member_role)
+  - Test: Enhanced test_cross_cooperative_authorization_fails() to verify delete protection
+  - Verifies Alice (coop-food admin) cannot delete coop-tech and that coop-tech still exists after failed attempt
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all admins
+  - Location: [icn-gateway/src/api/coops.rs:156](icn/crates/icn-gateway/src/api/coops.rs#L156)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 5 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin + cooperative deletion + proposal closing) + 3 HIGH vulnerabilities (ledger privacy leaks + coop info leak + unauthorized proposal opening) + MEDIUM spam vulnerability (self-payments)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
 - 16 comprehensive tests added (62 → 82 total tests, includes 4 CRITICAL auth bypasses + 3 HIGH vulnerabilities + 1 MEDIUM spam prevention)
 - Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,442-497](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
