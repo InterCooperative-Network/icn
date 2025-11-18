@@ -17,7 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `icn_governance_idempotent_skips_total` - Duplicate events prevented (security monitoring)
 - Location: [icn-obs/src/metrics.rs:301-321](icn/crates/icn-obs/src/metrics.rs#L301-L321) + [supervisor.rs:1007-1107](icn/crates/icn-core/src/supervisor.rs#L1007-L1107)
 
-### Fixed - Governance→Ledger Production Hardening (2025-01-17)
+### Fixed - Governance→Ledger Production Hardening (2025-01-17 & 2025-11-17)
+
+**CRITICAL: Governance event subscription immediately dropped in daemon (2025-11-17):**
+- Governance event handler was unsubscribed immediately after registration
+- Bug: `let _ = event_bus.subscribe(...).await;` triggered immediate Drop via SubscriptionHandle::drop()
+- Fix: Store handle in `_governance_event_subscription` variable for daemon lifetime
+- **Impact**: Governance→ledger integration was **completely non-functional** in daemon (zero events processed)
+- Tests passed because they used correct pattern (`let _handle =`), masking the bug
+- Subscription now lives for full `run()` function scope (daemon lifetime)
+- Credit: User discovered during code review
+- Location: [icn-core/src/supervisor.rs:982,1156-1157](icn/crates/icn-core/src/supervisor.rs#L982)
 
 **Critical: Idempotency bug preventing duplicate proposal execution:**
 - Added audit trail check before ledger execution to prevent double-counting
