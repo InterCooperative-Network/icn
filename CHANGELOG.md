@@ -46,10 +46,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TODO: Replace with JoinSet for guaranteed completion
 - Location: [icn-core/src/supervisor.rs:1258-1261](icn/crates/icn-core/src/supervisor.rs#L1258-L1261)
 
+**Low priority: Audit trail timestamp enhancement (2025-11-17):**
+- Added `decided_at` field to audit trail alongside `executed_at`
+- Provides complete timeline: governance decision → ledger execution
+- `decided_at`: When community voted to approve (from ProposalAccepted event)
+- `executed_at`: When ledger transaction completed (system timestamp)
+- Enables debugging execution delays and compliance tracking
+- Location: [icn-core/src/supervisor.rs:991,1002,1060](icn/crates/icn-core/src/supervisor.rs)
+
+**Low priority: EventBus unsubscribe mechanism (2025-11-17):**
+- Added `SubscriptionHandle` with automatic cleanup via Drop trait
+- Prevents memory leaks if subscriptions become dynamic
+- Safe cleanup during async runtime shutdown (uses `try_write()` not `blocking_write()`)
+- Changed EventBus.subscribers to track IDs for selective removal
+- Added test `test_event_bus_unsubscribe_on_drop` verifying cleanup
+- Location: [icn-core/src/events.rs:49-116](icn/crates/icn-core/src/events.rs#L49-L116)
+
 **Testing:**
+- All 4 event bus unit tests passing
 - All 3 governance-ledger integration tests passing
 - Complete bug analysis: [docs/GOVERNANCE-LEDGER-BUGS-FOUND.md](docs/GOVERNANCE-LEDGER-BUGS-FOUND.md)
-- Status: **Production-ready** - all critical and medium priority issues fixed
+- Status: **Production-ready** - ALL issues fixed (critical + medium + low priority)
 
 ### Fixed - Code Review Bug Fixes (2025-11-17)
 

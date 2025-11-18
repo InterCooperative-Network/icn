@@ -978,7 +978,8 @@ impl Supervisor {
             info!("✓ Governance actor spawned at {}", gov_store_path.display());
 
             // Subscribe to governance events for ledger execution
-            {
+            // CRITICAL: Must store handle to keep subscription alive for daemon lifetime
+            let _governance_event_subscription = {
                 use crate::events::SystemEvent;
                 use icn_governance::ProposalPayload;
 
@@ -986,8 +987,7 @@ impl Supervisor {
                 let own_did = did.clone();
                 let audit_store = gov_store.clone();
 
-                // Subscribe to governance events - handle intentionally ignored (permanent subscription)
-                let _ = event_bus.subscribe(Arc::new(move |event| {
+                event_bus.subscribe(Arc::new(move |event| {
                     match event {
                         SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
                             match payload {
@@ -1153,8 +1153,8 @@ impl Supervisor {
 
                         _ => {}
                     }
-                })).await;
-            }
+                })).await
+            };
 
             info!("✓ Governance event handlers registered");
 
