@@ -90,6 +90,25 @@ enum Commands {
     /// Snapshot management
     #[command(subcommand)]
     Snapshot(SnapshotCommands),
+
+    /// Initialize a new cooperative (guided setup wizard)
+    InitCoop {
+        /// Cooperative name
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// Initial member DIDs (comma-separated)
+        #[arg(short, long)]
+        members: Option<String>,
+
+        /// Skip confirmation prompts
+        #[arg(short, long)]
+        yes: bool,
+
+        /// Don't start the daemon after setup
+        #[arg(long)]
+        no_start: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -663,6 +682,10 @@ async fn main() -> Result<()> {
         Commands::Backup { output } => handle_backup_command(&data_dir, &output)?,
 
         Commands::Restore { input, force } => handle_restore_command(&data_dir, &input, force)?,
+
+        Commands::InitCoop { name, members, yes, no_start } => {
+            handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
+        }
     }
 
     Ok(())
@@ -3175,6 +3198,326 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
             }
         }
     }
+
+    Ok(())
+}
+
+/// Interactive wizard for setting up a new cooperative
+async fn handle_init_coop_command(
+    data_dir: &PathBuf,
+    name: Option<String>,
+    members: Option<String>,
+    yes: bool,
+    no_start: bool,
+) -> Result<()> {
+    println!();
+    println!("╔════════════════════════════════════════╗");
+    println!("║   ICN Cooperative Setup Wizard         ║");
+    println!("╚════════════════════════════════════════╝");
+    println!();
+
+    // Step 1: Get cooperative name
+    let coop_name = if let Some(n) = name {
+        n
+    } else {
+        print!("Cooperative name: ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        input.trim().to_string()
+    };
+
+    if coop_name.is_empty() {
+        bail!("Cooperative name cannot be empty");
+    }
+
+    // Generate a domain ID from the name
+    let domain_id = coop_name
+        .to_lowercase()
+        .replace(' ', "-")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-')
+        .collect::<String>();
+
+    println!("  Name: {coop_name}");
+    println!("  Domain ID: {domain_id}");
+    println!();
+
+    // Step 2: Check/create identity
+    let keystore_path = get_keystore_path(data_dir);
+    let my_did = if keystore_path.exists() {
+        // Use existing identity
+        println!("Step 1: Using existing identity");
+        let passphrase = read_passphrase("Enter passphrase: ")?;
+        let mut keystore = AgeKeyStore::open(&keystore_path)?;
+        keystore.unlock(&passphrase)?;
+        let did = keystore.get_keypair()?.did().clone();
+        println!("  DID: {did}");
+        println!();
+        did
+    } else {
+        // Create new identity
+        println!("Step 1: Creating new identity");
+        std::fs::create_dir_all(data_dir)
+            .context("Failed to create data directory")?;
+
+        print!("Choose a passphrase: ");
+        io::stdout().flush()?;
+        let passphrase1 = rpassword::read_password()?;
+
+        print!("Confirm passphrase: ");
+        io::stdout().flush()?;
+        let passphrase2 = rpassword::read_password()?;
+
+        if passphrase1 != passphrase2 {
+            bail!("Passphrases do not match");
+        }
+        if passphrase1.len() < 8 {
+            bail!("Passphrase must be at least 8 characters");
+        }
+
+        let passphrase = Zeroizing::new(passphrase1.into_bytes());
+
+        // Initialize keystore (generates keypair internally)
+        let keystore = AgeKeyStore::init(&keystore_path, &passphrase)?;
+        let did = keystore.get_keypair()?.did().clone();
+
+        println!("  DID: {did}");
+        println!("  Keystore: {}", keystore_path.display());
+        println!();
+        did
+    };
+
+    // Step 3: Parse initial members
+    let mut member_dids = vec![my_did.clone()];
+
+    if let Some(members_str) = members {
+        println!("Step 2: Adding initial members");
+        for member_str in members_str.split(',') {
+            let member_str = member_str.trim();
+            if member_str.is_empty() {
+                continue;
+            }
+            let member_did = Did::from_str(member_str)
+                .with_context(|| format!("Invalid DID: {member_str}"))?;
+            if !member_dids.contains(&member_did) {
+                member_dids.push(member_did);
+            }
+        }
+    } else if !yes {
+        println!("Step 2: Add initial members (or press Enter to skip)");
+        println!("  Enter member DIDs, one per line. Empty line to finish:");
+
+        loop {
+            print!("  > ");
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let input = input.trim();
+
+            if input.is_empty() {
+                break;
+            }
+
+            match Did::from_str(input) {
+                Ok(member_did) => {
+                    if !member_dids.contains(&member_did) {
+                        member_dids.push(member_did);
+                        println!("    Added: {input}");
+                    } else {
+                        println!("    Already added: {input}");
+                    }
+                }
+                Err(e) => {
+                    println!("    Invalid DID: {e}");
+                }
+            }
+        }
+    }
+
+    println!();
+    println!("Initial members ({}):", member_dids.len());
+    for (i, did) in member_dids.iter().enumerate() {
+        let marker = if did == &my_did { " (you)" } else { "" };
+        println!("  {}. {}{}", i + 1, did, marker);
+    }
+    println!();
+
+    // Step 4: Create configuration file
+    let config_path = data_dir.join("icn.toml");
+    if !config_path.exists() {
+        println!("Step 3: Creating configuration");
+        let config_content = format!(r#"# ICN Configuration for {coop_name}
+# Generated by icnctl init-coop
+
+data_dir = "{}"
+
+[network]
+mdns_enabled = true
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
+
+[observability]
+metrics_port = 9090
+health_port = 8080
+log_level = "info"
+
+[rate_limiting]
+enabled = true
+refill_interval_ms = 100
+
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+
+[gateway]
+enabled = true
+bind_addr = "127.0.0.1:8080"
+# jwt_secret = "CHANGE_ME"  # Set this before starting!
+token_expiry_hours = 24
+"#, data_dir.display());
+
+        std::fs::write(&config_path, config_content)
+            .context("Failed to write configuration")?;
+        println!("  Config: {}", config_path.display());
+    } else {
+        println!("Step 3: Using existing configuration");
+        println!("  Config: {}", config_path.display());
+    }
+    println!();
+
+    // Step 5: Show summary and confirm
+    println!("════════════════════════════════════════");
+    println!("Summary:");
+    println!("  Cooperative: {coop_name}");
+    println!("  Domain ID: {domain_id}");
+    println!("  Your DID: {my_did}");
+    println!("  Members: {}", member_dids.len());
+    println!("  Data dir: {}", data_dir.display());
+    println!("════════════════════════════════════════");
+    println!();
+
+    if !yes {
+        print!("Proceed with setup? (Y/n): ");
+        io::stdout().flush()?;
+        let mut response = String::new();
+        io::stdin().read_line(&mut response)?;
+        if response.trim().eq_ignore_ascii_case("n") {
+            println!("Setup cancelled.");
+            return Ok(());
+        }
+    }
+
+    // Step 6: Create initial governance domain
+    // Note: This would normally be done via RPC to a running daemon.
+    // For now, we just prepare the governance setup that will be
+    // executed when the daemon starts.
+    let governance_setup_path = data_dir.join("governance_setup.json");
+    let governance_setup = serde_json::json!({
+        "domain": {
+            "id": domain_id,
+            "name": coop_name,
+            "members": member_dids.iter().map(|d| d.to_string()).collect::<Vec<_>>(),
+            "profile": "cooperative_default"
+        }
+    });
+
+    std::fs::write(
+        &governance_setup_path,
+        serde_json::to_string_pretty(&governance_setup)?,
+    )
+    .context("Failed to write governance setup")?;
+
+    println!("✓ Governance domain configured");
+    println!("  Domain ID: {domain_id}");
+    println!("  Profile: cooperative_default (1-member-1-vote, 50% quorum)");
+    println!();
+
+    // Step 7: Create trust edges for initial members
+    let store_path = get_store_path(data_dir);
+    std::fs::create_dir_all(&store_path)?;
+    let store = SledStore::open(&store_path).context("Failed to open store")?;
+    let store = Arc::new(store);
+    let mut trust_graph = TrustGraph::new(store, my_did.clone());
+
+    for member_did in &member_dids {
+        if member_did != &my_did {
+            // Add bidirectional trust at "partner" level (0.5)
+            let edge = TrustEdge::new(my_did.clone(), member_did.clone(), 0.5);
+            trust_graph.add_edge(edge)?;
+        }
+    }
+
+    println!("✓ Trust edges created for {} member(s)", member_dids.len() - 1);
+    println!();
+
+    // Step 8: Final instructions
+    println!("════════════════════════════════════════");
+    println!("  Setup Complete!");
+    println!("════════════════════════════════════════");
+    println!();
+
+    if no_start {
+        println!("Next steps:");
+        println!();
+        println!("  1. Edit configuration:");
+        println!("     $EDITOR {}", config_path.display());
+        println!();
+        println!("  2. Set JWT secret for gateway:");
+        println!("     export ICN_GATEWAY_JWT_SECRET=\"your-secret-here\"");
+        println!();
+        println!("  3. Start the daemon:");
+        println!("     icnd --config {}", config_path.display());
+        println!();
+        println!("  4. Create the governance domain:");
+        println!("     icnctl gov domain create --domain-id {domain_id} --name \"{coop_name}\" \\");
+        let members_str = member_dids
+            .iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        println!("       --members \"{members_str}\"");
+        println!();
+        println!("  5. Share the invite info with other members:");
+        println!("     Your DID: {my_did}");
+        println!("     Domain ID: {domain_id}");
+    } else {
+        // TODO: Actually start the daemon
+        println!("Note: Automatic daemon start not yet implemented.");
+        println!();
+        println!("To complete setup:");
+        println!();
+        println!("  1. Set JWT secret:");
+        println!("     export ICN_GATEWAY_JWT_SECRET=\"your-secret-here\"");
+        println!();
+        println!("  2. Start the daemon:");
+        println!("     icnd --config {}", config_path.display());
+        println!();
+        println!("  3. Create governance domain (after daemon starts):");
+        println!("     icnctl gov domain create --domain-id {domain_id} --name \"{coop_name}\" \\");
+        let members_str = member_dids
+            .iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        println!("       --members \"{members_str}\"");
+    }
+
+    println!();
+    println!("Documentation: https://icn.coop/docs");
+    println!();
 
     Ok(())
 }

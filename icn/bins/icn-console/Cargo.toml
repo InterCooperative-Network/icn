@@ -1,0 +1,44 @@
+[package]
+name = "icn-console"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive TUI console for ICN cooperative management"
+
+[[bin]]
+name = "icn-console"
+path = "src/main.rs"
+
+[dependencies]
+# ICN crates
+icn-identity = { path = "../../crates/icn-identity" }
+icn-trust = { path = "../../crates/icn-trust" }
+icn-store = { path = "../../crates/icn-store" }
+
+# TUI
+ratatui = "0.28"
+crossterm = "0.28"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for gateway API
+reqwest = { version = "0.11", features = ["json"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Time
+chrono = "0.4"
+
+# Password input
+rpassword = "7"
+
+# Secure memory
+zeroize = { version = "1", features = ["derive"] }
