@@ -12,11 +12,13 @@ use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, Upda
 use crate::validation;
 use icn_obs::metrics::gateway;
 
-fn timestamp() -> u64 {
+fn timestamp() -> Result<u64> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("System clock is set before Unix epoch (1970-01-01). This indicates a system misconfiguration.")
-        .as_secs()
+        .map(|d| d.as_secs())
+        .map_err(|e| crate::error::GatewayError::InternalError(
+            format!("System clock error (clock may be set before 1970): {}", e)
+        ))
 }
 
 fn parse_role(role_str: &str) -> Result<MemberRole> {
@@ -58,7 +60,7 @@ pub async fn create_coop(
         req.id.clone(),
         req.name.clone(),
         owner,
-        timestamp(),
+        timestamp()?,
     )?;
 
     // Track cooperative creation
@@ -183,7 +185,7 @@ pub async fn add_member(
 
     // Note: Member count limit is checked atomically inside add_member()
     // to prevent TOCTOU race condition
-    let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp())?;
+    let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp()?)?;
 
     // Track member addition
     gateway::members_added_inc();
@@ -351,7 +353,7 @@ mod tests {
             "test-coop".to_string(),
             "Test".to_string(),
             owner.did().clone(),
-            timestamp(),
+            timestamp().unwrap(),
         ).unwrap();
 
         let app = test::init_service(
@@ -411,7 +413,7 @@ mod tests {
             "test-coop".to_string(),
             "Test".to_string(),
             owner.did().clone(),
-            timestamp(),
+            timestamp().unwrap(),
         ).unwrap();
 
         let app = test::init_service(
