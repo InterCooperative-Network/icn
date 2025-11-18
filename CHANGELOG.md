@@ -176,10 +176,17 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Fix: Add `|| name.trim().is_empty()` check to all text field validators
   - Test: `test_validate_domain_name` and enhanced tests for title/description/comment
   - **Impact**: Data quality, UX confusion, storage waste
+- **Bug 12: Proposal payload fields missing whitespace validation** - Payload validation gap
+  - Text body, Budget purpose, ConfigChange key/value only checked `is_empty()`
+  - Didn't check `trim().is_empty()`, allowing whitespace-only payload content
+  - Attack: Create proposals with invisible/meaningless payload data
+  - Fix: Add `|| field.trim().is_empty()` check to all payload text fields
+  - Same consistency issue as Bug #11, but in payload conversion logic
+  - **Impact**: Data quality, UX confusion, storage waste
 - **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution)
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), and validation functions**
+- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
 - 10 comprehensive tests added (62 → 77 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330](icn/crates/icn-gateway/src/validation.rs)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
