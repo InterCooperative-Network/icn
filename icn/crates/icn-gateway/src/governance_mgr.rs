@@ -145,7 +145,13 @@ impl GovernanceManager {
 
             // Calculate quorum: percentage of eligible voters who participated
             let quorum_percentage = if total_members > 0 {
-                ((tally.total_votes() * 100) / total_members) as u8
+                // Use checked_mul to prevent overflow, then clamp to u8 range
+                let total_votes = tally.total_votes();
+                let percentage = total_votes
+                    .checked_mul(100)
+                    .and_then(|v| v.checked_div(total_members))
+                    .unwrap_or(0); // Overflow = 0% (conservative)
+                percentage.min(100) as u8 // Clamp to 100% max
             } else {
                 0
             };

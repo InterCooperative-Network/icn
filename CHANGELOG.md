@@ -87,6 +87,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improves debugging and prevents confusion when operations fail to find target proposals
 - Location: [icn-gateway/src/governance_mgr.rs:99-140](icn/crates/icn-gateway/src/governance_mgr.rs#L99-L140)
 
+**Arithmetic safety & overflow protection (2025-11-17):**
+- **Bug 1: Integer overflow in quorum calculation** - `total_votes * 100` could overflow usize
+  - Fix: Use `checked_mul()` and `checked_div()` with conservative fallback (0% on overflow)
+  - Impact: Prevents panic/wrong results when many members vote
+  - Location: [icn-gateway/src/governance_mgr.rs:147-157](icn/crates/icn-gateway/src/governance_mgr.rs#L147-L157)
+- **Bug 2: Missing validation for voting period** - open_proposal didn't validate custom voting periods
+  - Could pass 0 (instant expiration) or extreme values (years)
+  - Fix: Validate against MAX_VOTING_PERIOD_SECONDS (1 year max, >0 required)
+  - Impact: Prevents resource lock-up from extreme voting periods
+  - Location: [icn-gateway/src/api/governance.rs:311-328](icn/crates/icn-gateway/src/api/governance.rs#L311-L328)
+
 **CRITICAL: Governance validation bypasses (2025-11-17):**
 - **Bug 1: Duplicate votes allowed** - Same DID could vote multiple times on proposal (votes appended without checking)
   - Fix: Check for existing vote before accepting new vote

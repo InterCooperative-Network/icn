@@ -309,6 +309,18 @@ pub async fn open_proposal(
 
     // Use custom voting period or get from domain config
     let voting_period_seconds = if let Some(period) = req.voting_period_seconds {
+        // Validate custom voting period
+        if period == 0 {
+            return Err(crate::error::GatewayError::BadRequest(
+                "Voting period must be greater than 0".to_string()
+            ));
+        }
+        if period > validation::MAX_VOTING_PERIOD_SECONDS {
+            return Err(crate::error::GatewayError::BadRequest(
+                format!("Voting period exceeds maximum of {} seconds (1 year)",
+                    validation::MAX_VOTING_PERIOD_SECONDS)
+            ));
+        }
         period
     } else {
         // Get default from domain (would need to fetch proposal and domain)
