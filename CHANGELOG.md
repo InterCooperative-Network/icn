@@ -223,10 +223,22 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Affected: create_domain, get_domain, list_domains, create_proposal, get_proposal, list_proposals, open_proposal, close_proposal (3 locks), cast_vote (4 locks)
   - Fix: Replace all `.unwrap()` with `.map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?`
   - **Impact**: Reliability - prevents cascading failures, ensures graceful error handling
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades)
+- **Bug 18: Duplicate members inflate quorum denominator** - Quorum calculation bug
+  - Domains could be created with duplicate member DIDs (e.g., ["did:icn:alice", "did:icn:bob", "did:icn:alice"])
+  - validate_domain_members() only checked count limits, not uniqueness
+  - Quorum calculation uses members.len() = 3 instead of 2 unique members
+  - Only 2 unique members can vote (alice votes once due to duplicate vote protection in cast_vote)
+  - Quorum: 2 votes / 3 members = 66% (WRONG - should be 100%)
+  - Attack: Duplicates DEFLATE quorum percentage, causing legitimate proposals to fail quorum requirements
+  - Especially problematic in small domains (e.g., 2 unique, 3 total = 33% error margin)
+  - Fix: Added HashSet-based duplicate detection in validate_domain_members()
+  - Returns error: "Duplicate member DID not allowed: <did>"
+  - Test: test_validate_domain_members() verifies duplicate rejection
+  - **Impact**: Medium - Prevents governance deadlock or unintended proposal rejections
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
 - 10 comprehensive tests added (62 → 77 total tests)
-- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330](icn/crates/icn-gateway/src/validation.rs)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
 - Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
