@@ -260,6 +260,22 @@ impl Actor for WsSession {
 
         // Start heartbeat
         self.heartbeat(ctx);
+
+        // SECURITY: Enforce authentication deadline (Bug #30 fix)
+        // Close connection if not authenticated within 10 seconds
+        ctx.run_later(Duration::from_secs(10), |act, ctx| {
+            if act.did.is_none() {
+                tracing::warn!(
+                    "WebSocket authentication timeout for coop '{}' (no auth within 10s)",
+                    act.coop_id
+                );
+                let msg = ServerMessage::AuthError {
+                    message: "Authentication timeout (must authenticate within 10 seconds)".to_string(),
+                };
+                act.send_message(msg, ctx);
+                ctx.stop();
+            }
+        });
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
