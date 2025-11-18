@@ -152,6 +152,9 @@ pub async fn delete_coop(
 
     let coop_id = id.into_inner();
 
+    // CRITICAL: Verify token is for this cooperative (prevent cross-coop deletion)
+    require_coop_access(&req, &coop_id)?;
+
     coop_mgr.delete_coop(&coop_id)?;
 
     // Track cooperative deletion
@@ -558,6 +561,7 @@ mod tests {
                         .service(get_coop)
                         .service(update_settings)
                         .service(add_member)
+                        .service(delete_coop)
                 )
         ).await;
 
@@ -612,9 +616,22 @@ mod tests {
             .uri("/coops/coop-tech/members")
             .set_json(&add_req)
             .to_request();
+        req.extensions_mut().insert(claims.clone());
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+
+        // Alice tries to DELETE coop-tech using her coop-food token (should fail - Bug #28)
+        let req = test::TestRequest::delete()
+            .uri("/coops/coop-tech")
+            .to_request();
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+
+        // Verify coop-tech still exists (wasn't deleted)
+        let coop_tech = coop_mgr.get_coop(&"coop-tech".to_string()).unwrap();
+        assert_eq!(coop_tech.name, "Tech Coop");
     }
 }
