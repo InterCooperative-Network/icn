@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::ledger_mgr::LedgerManager;
-use crate::middleware::{get_claims, require_scope};
+use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::models::{
     AccountDeltaResponse, BalanceResponse, CreatePaymentRequest, TransactionHistoryEntry,
 };
@@ -23,6 +23,7 @@ pub async fn get_balance(
     require_scope(&req, "ledger:read")?;
 
     let (coop_id, did_str) = path.into_inner();
+    require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop privacy leaks
 
     let did = did_str.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
@@ -105,6 +106,7 @@ pub async fn get_history(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&req, "ledger:read")?;
+    require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop privacy leaks
 
     let filter_did = if let Some(did_str) = query.get("did") {
         Some(did_str.parse()
@@ -396,6 +398,59 @@ mod tests {
         let req = test::TestRequest::post()
             .uri("/ledger/test-coop/payment")
             .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_cross_cooperative_ledger_privacy() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Create payment in coop-food
+        let _ = ledger_mgr.create_payment(
+            &"coop-food".to_string(),
+            alice.did(),
+            bob.did(),
+            50,
+            "hours".to_string(),
+        ).unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .service(
+                    web::scope("/ledger")
+                        .service(get_balance)
+                        .service(get_history)
+                )
+        ).await;
+
+        // Alice tries to read balance in coop-tech using coop-food token (should fail)
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "coop-food".to_string(), // Token for coop-food
+            scopes: vec!["ledger:read".to_string()],
+            exp: 9999999999,
+        };
+
+        let uri = format!("/ledger/coop-tech/balance/{}", bob.did()); // Accessing coop-tech
+        let req = test::TestRequest::get()
+            .uri(&uri)
+            .to_request();
+        req.extensions_mut().insert(claims.clone());
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+
+        // Also test history cross-coop access (should fail)
+        let req = test::TestRequest::get()
+            .uri("/ledger/coop-tech/history") // Accessing coop-tech
             .to_request();
         req.extensions_mut().insert(claims);
 
