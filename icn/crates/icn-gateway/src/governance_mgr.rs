@@ -8,7 +8,8 @@
 use anyhow::Result;
 use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceParams, GovernanceProfileId,
-    MembershipConfig, Proposal, ProposalId, ProposalPayload, ProposalState, Vote, VoteChoice,
+    MembershipConfig, MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState,
+    Vote, VoteChoice, VoteTally,
 };
 use icn_identity::Did;
 use std::collections::HashMap;
@@ -114,23 +115,47 @@ impl GovernanceManager {
     pub async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
         let mut proposals = self.proposals.write().unwrap();
         let votes = self.votes.read().unwrap();
+        let domains = self.domains.read().unwrap();
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
-            // Calculate vote tally
-            let proposal_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
-            let for_votes = proposal_votes.iter().filter(|v| matches!(v.choice, VoteChoice::For)).count();
-            let against_votes = proposal_votes.iter().filter(|v| matches!(v.choice, VoteChoice::Against)).count();
-            let _abstain_votes = proposal_votes.iter().filter(|v| matches!(v.choice, VoteChoice::Abstain)).count();
+            // Get domain to access governance params
+            let domain = domains.get(&proposal.domain_id)
+                .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
 
-            // Simple majority logic (for now)
-            // TODO: Use actual governance profile evaluation
+            // Calculate vote tally using proper vote tally system
+            let proposal_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
+            let tally = VoteTally::from(proposal_votes);
+
+            // Get total eligible voters from domain membership
+            let total_members = match &domain.config.membership.source {
+                MembershipSource::StaticList(members) => members.len(),
+                MembershipSource::TrustThreshold(_) => {
+                    // For trust-based membership, we don't know the exact count
+                    // Use total votes as a proxy (conservative approach)
+                    tally.total_votes().max(1) // Ensure at least 1 to avoid division by zero
+                }
+            };
+
+            // Calculate quorum: percentage of eligible voters who participated
+            let quorum_percentage = if total_members > 0 {
+                ((tally.total_votes() * 100) / total_members) as u8
+            } else {
+                0
+            };
+
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs();
 
-            let final_state = if for_votes > against_votes {
+            // Evaluate outcome based on governance params
+            let final_state = if quorum_percentage < domain.config.params.quorum_percentage {
+                // Quorum not met
+                ProposalState::NoQuorum { closed_at: now }
+            } else if tally.approval_percentage() >= domain.config.params.approval_threshold_percentage {
+                // Quorum met and approval threshold reached
                 ProposalState::Accepted { closed_at: now }
             } else {
+                // Quorum met but approval threshold not reached
                 ProposalState::Rejected { closed_at: now }
             };
 

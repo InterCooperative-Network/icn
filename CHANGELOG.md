@@ -28,10 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enables reactive UIs and real-time monitoring tools
 
 **Comprehensive test coverage:**
-- 9 integration tests covering all governance endpoints (61 total icn-gateway tests)
-- Tests: Domain CRUD, proposal lifecycle (create→open→vote→close), authorization (gov:read/write scopes), query filtering, error handling
-- Full proposal workflow validated: Draft → Open → Voting → Closed (Accepted/Rejected)
-- Location: [icn-gateway/src/api/governance.rs:444-907](icn/crates/icn-gateway/src/api/governance.rs#L444-L907)
+- 10 integration tests covering all governance endpoints (62 total icn-gateway tests)
+- Tests: Domain CRUD, proposal lifecycle (create→open→vote→close), authorization (gov:read/write scopes), query filtering, error handling, NoQuorum scenario
+- Full proposal workflow validated: Draft → Open → Voting → Closed (Accepted/Rejected/NoQuorum)
+- Location: [icn-gateway/src/api/governance.rs:444-991](icn/crates/icn-gateway/src/api/governance.rs#L444-L991)
 
 **Example scripts and documentation:**
 - Automated full-workflow demo script (9-step bash script with curl + jq, ~300 lines)
@@ -50,6 +50,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `icn_governance_audit_failures_total` - Audit trail write failures (critical for partial failure detection)
 - `icn_governance_idempotent_skips_total` - Duplicate events prevented (security monitoring)
 - Location: [icn-obs/src/metrics.rs:301-321](icn/crates/icn-obs/src/metrics.rs#L301-L321) + [supervisor.rs:1007-1107](icn/crates/icn-core/src/supervisor.rs#L1007-L1107)
+
+### Enhanced - Proper Governance Evaluation (2025-11-17)
+
+**Governance profile evaluation with quorum + approval thresholds:**
+- `close_proposal()` now uses proper governance profile evaluation instead of simple majority
+- Uses `VoteTally` for accurate vote counting (for/against/abstain with proper percentages)
+- Retrieves domain's `GovernanceParams` to access quorum and approval thresholds
+- Three-way outcome evaluation:
+  - **NoQuorum**: Participation below required quorum percentage (quorum check runs first)
+  - **Accepted**: Quorum met AND approval threshold reached
+  - **Rejected**: Quorum met BUT approval threshold not reached
+- Handles both membership types:
+  - **StaticList**: Total members = explicit member count
+  - **TrustThreshold**: Total members = actual vote count (conservative approach)
+- Prevents division by zero with `.max(1)` fallback for edge cases
+- **Impact**: Governance decisions now respect configured governance profiles (cooperative_default, custom profiles)
+- Test: `test_proposal_no_quorum_outcome` verifies 80% quorum with 60% participation correctly results in NoQuorum
+- Location: [icn-gateway/src/governance_mgr.rs:114-167](icn/crates/icn-gateway/src/governance_mgr.rs#L114-L167)
 
 ### Fixed - Governance Manager Bugs (2025-11-17)
 

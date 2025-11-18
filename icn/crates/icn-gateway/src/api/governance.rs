@@ -448,7 +448,7 @@ mod tests {
     use crate::auth::TokenClaims;
     use crate::events::EventBroadcaster;
     use icn_identity::IdentityBundle;
-    use icn_governance::{GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, Proposal};
+    use icn_governance::{GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, Proposal, ProposalState};
 
     fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
         TokenClaims {
@@ -902,5 +902,90 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 500); // Internal error (from anyhow::bail)
+    }
+
+    #[actix_web::test]
+    async fn test_proposal_no_quorum_outcome() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+        let carol = IdentityBundle::generate().unwrap();
+        let dave = IdentityBundle::generate().unwrap();
+        let eve = IdentityBundle::generate().unwrap();
+
+        let domain_id = GovernanceDomainId("coop:test".to_string());
+
+        // Create domain with 5 members and 80% quorum requirement
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams {
+                quorum_percentage: 80, // Need 4 out of 5 members to vote
+                approval_threshold_percentage: 66,
+                voting_period_seconds: 86400,
+            },
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![
+                    alice.did().clone(),
+                    bob.did().clone(),
+                    carol.did().clone(),
+                    dave.did().clone(),
+                    eve.did().clone(),
+                ]),
+            },
+        ).await.unwrap();
+
+        // Create proposal
+        let proposal_id = ProposalId("prop-123".to_string());
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            alice.did().clone(),
+            "Test Proposal".to_string(),
+            "A proposal to test quorum".to_string(),
+            ProposalPayload::Text {
+                body: "Should fail due to insufficient quorum".to_string(),
+            },
+        ).await.unwrap();
+
+        // Open the proposal
+        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+
+        // Only 3 out of 5 members vote (60% participation, below 80% quorum)
+        gov_mgr.cast_vote(
+            proposal_id.clone(),
+            alice.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await.unwrap();
+
+        gov_mgr.cast_vote(
+            proposal_id.clone(),
+            bob.did().clone(),
+            VoteChoice::For,
+            None,
+        ).await.unwrap();
+
+        gov_mgr.cast_vote(
+            proposal_id.clone(),
+            carol.did().clone(),
+            VoteChoice::Against,
+            None,
+        ).await.unwrap();
+
+        // Close the proposal
+        gov_mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        // Verify outcome is NoQuorum despite approval being met (2/3 = 66%)
+        let proposal = gov_mgr.get_proposal(&proposal_id).await.unwrap().unwrap();
+        match proposal.state {
+            ProposalState::NoQuorum { .. } => {
+                // Success - quorum not met
+            }
+            other => {
+                panic!("Expected NoQuorum state, got {:?}", other);
+            }
+        }
     }
 }

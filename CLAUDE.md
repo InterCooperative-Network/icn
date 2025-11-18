@@ -403,7 +403,7 @@ icnctl gov vote show --proposal-id <id>
 - [x] Per-DID rate limiting (token bucket algorithm)
 - [x] Scope-based authorization enforcement
 - [x] Authenticated DID extraction for ownership
-- [x] All 61 tests pass (9 governance + 52 other)
+- [x] All 62 tests pass (10 governance + 52 other)
 
 **Gateway Features**:
 - **Authentication**: DID-based challenge-response → JWT tokens with configurable TTL
@@ -427,7 +427,7 @@ icnctl gov vote show --proposal-id <id>
 - **rate_limit.rs**: Token bucket rate limiter with per-DID tracking and automatic cleanup
 - **coop.rs**: Cooperative state management (in-memory for Phase 14)
 - **ledger_mgr.rs**: Ledger operations wrapper
-- **governance_mgr.rs**: Governance operations wrapper (in-memory storage, domains/proposals/votes)
+- **governance_mgr.rs**: Governance operations wrapper (in-memory storage, domains/proposals/votes, proper evaluation with quorum + approval thresholds)
 - **events.rs**: Event broadcasting with tokio mpsc channels (cooperative + governance events)
 - **websocket.rs**: WebSocket session management with JWT auth
 - **api/**: REST endpoint handlers (auth, coops, ledger, governance, websocket, health) with scope enforcement
