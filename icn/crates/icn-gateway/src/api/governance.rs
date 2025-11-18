@@ -440,3 +440,467 @@ pub async fn cast_vote(
 
     Ok(HttpResponse::Ok().json(proposal))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test, App, HttpMessage};
+    use crate::auth::TokenClaims;
+    use crate::events::EventBroadcaster;
+    use icn_identity::IdentityBundle;
+    use icn_governance::{GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, Proposal};
+
+    fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
+        TokenClaims {
+            sub: did.to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+            exp: 9999999999,
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_create_and_get_domain() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_domain)
+                        .service(get_domain)
+                )
+        ).await;
+
+        // Create domain
+        let req_body = CreateDomainRequest {
+            id: "coop:food".to_string(),
+            name: "Food Cooperative".to_string(),
+            profile: "cooperative".to_string(),
+            quorum_percent: 50,
+            approval_percent: 66,
+            voting_period_days: 7,
+            members: vec![alice.did().to_string()],
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/domains")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Get domain
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/domains/coop:food")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: GovernanceDomain = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.name, "Food Cooperative");
+    }
+
+    #[actix_web::test]
+    async fn test_list_domains() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_domain)
+                        .service(list_domains)
+                )
+        ).await;
+
+        // Create two domains
+        for (id, name) in [("coop:food", "Food Coop"), ("coop:tech", "Tech Coop")] {
+            let req_body = CreateDomainRequest {
+                id: id.to_string(),
+                name: name.to_string(),
+                profile: "cooperative".to_string(),
+                quorum_percent: 50,
+                approval_percent: 66,
+                voting_period_days: 7,
+                members: vec![alice.did().to_string()],
+            };
+
+            let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+            let req = test::TestRequest::post()
+                .uri("/gov/domains")
+                .set_json(&req_body)
+                .to_request();
+            req.extensions_mut().insert(claims);
+            test::call_service(&app, req).await;
+        }
+
+        // List all domains
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/domains")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Vec<GovernanceDomain> = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.len(), 2);
+    }
+
+    #[actix_web::test]
+    async fn test_create_proposal_text() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        // Create domain first
+        gov_mgr.create_domain(
+            GovernanceDomainId("coop:food".to_string()),
+            "Food Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 7 * 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_proposal)
+                )
+        ).await;
+
+        // Create text proposal
+        let req_body = CreateProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Approve new supplier".to_string(),
+            description: "We should partner with Local Farms Inc.".to_string(),
+            payload: ProposalPayloadRequest::Text {
+                body: "Detailed proposal text...".to_string(),
+            },
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Approve new supplier");
+        assert!(matches!(resp.state, icn_governance::ProposalState::Draft));
+    }
+
+    #[actix_web::test]
+    async fn test_proposal_lifecycle() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Create domain
+        gov_mgr.create_domain(
+            GovernanceDomainId("coop:food".to_string()),
+            "Food Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 7 * 86400),
+            MembershipConfig::static_list(vec![alice.did().clone(), bob.did().clone()]),
+        ).await.unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_proposal)
+                        .service(open_proposal)
+                        .service(cast_vote)
+                        .service(close_proposal)
+                        .service(get_proposal)
+                )
+        ).await;
+
+        // 1. Create proposal
+        let req_body = CreateProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Test Proposal".to_string(),
+            description: "Testing lifecycle".to_string(),
+            payload: ProposalPayloadRequest::Text {
+                body: "Test".to_string(),
+            },
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let proposal: Proposal = test::call_and_read_body_json(&app, req).await;
+        let proposal_id = proposal.id.0.clone();
+
+        // 2. Open proposal
+        let req_body = OpenProposalRequest {
+            voting_period_seconds: Some(86400),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri(&format!("/gov/proposals/{}/open", proposal_id))
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // 3. Cast votes
+        for (voter, choice) in [(alice.did(), "for"), (bob.did(), "against")] {
+            let req_body = CastVoteRequest {
+                choice: choice.to_string(),
+                comment: None,
+            };
+
+            let claims = create_test_claims(&voter.to_string(), vec!["gov:write"]);
+            let req = test::TestRequest::post()
+                .uri(&format!("/gov/proposals/{}/vote", proposal_id))
+                .set_json(&req_body)
+                .to_request();
+            req.extensions_mut().insert(claims);
+
+            let resp = test::call_service(&app, req).await;
+            assert!(resp.status().is_success());
+        }
+
+        // 4. Close proposal
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri(&format!("/gov/proposals/{}/close", proposal_id))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // 5. Verify final state (should be rejected: 1 for, 1 against, simple majority fails)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri(&format!("/gov/proposals/{}", proposal_id))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let final_proposal: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert!(matches!(final_proposal.state, icn_governance::ProposalState::Rejected { .. }));
+    }
+
+    #[actix_web::test]
+    async fn test_list_proposals_filtering() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        // Create two domains
+        for domain_id in ["coop:food", "coop:tech"] {
+            gov_mgr.create_domain(
+                GovernanceDomainId(domain_id.to_string()),
+                format!("{} Coop", domain_id),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            ).await.unwrap();
+        }
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_proposal)
+                        .service(list_proposals)
+                )
+        ).await;
+
+        // Create proposals in different domains
+        for (domain_id, title) in [("coop:food", "Proposal 1"), ("coop:food", "Proposal 2"), ("coop:tech", "Proposal 3")] {
+            let req_body = CreateProposalRequest {
+                domain_id: domain_id.to_string(),
+                title: title.to_string(),
+                description: "Test".to_string(),
+                payload: ProposalPayloadRequest::Text { body: "Test".to_string() },
+            };
+
+            let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+            let req = test::TestRequest::post()
+                .uri("/gov/proposals")
+                .set_json(&req_body)
+                .to_request();
+            req.extensions_mut().insert(claims);
+            test::call_service(&app, req).await;
+        }
+
+        // List all proposals
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/proposals")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let all_proposals: Vec<Proposal> = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(all_proposals.len(), 3);
+
+        // Filter by domain
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/proposals?domain_id=coop:food")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let food_proposals: Vec<Proposal> = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(food_proposals.len(), 2);
+
+        // Filter by state
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/proposals?state=draft")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let draft_proposals: Vec<Proposal> = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(draft_proposals.len(), 3);
+    }
+
+    #[actix_web::test]
+    async fn test_authorization_gov_read_scope() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(list_domains)
+                )
+        ).await;
+
+        // Try without gov:read scope (should fail)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["ledger:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/domains")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 403); // Forbidden
+    }
+
+    #[actix_web::test]
+    async fn test_authorization_gov_write_scope() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(create_domain)
+                )
+        ).await;
+
+        let req_body = CreateDomainRequest {
+            id: "coop:food".to_string(),
+            name: "Food Coop".to_string(),
+            profile: "cooperative".to_string(),
+            quorum_percent: 50,
+            approval_percent: 66,
+            voting_period_days: 7,
+            members: vec![alice.did().to_string()],
+        };
+
+        // Try without gov:write scope (should fail)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/domains")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 403); // Forbidden
+    }
+
+    #[actix_web::test]
+    async fn test_get_nonexistent_domain() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(get_domain)
+                )
+        ).await;
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/domains/nonexistent")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 404); // Not Found
+    }
+
+    #[actix_web::test]
+    async fn test_open_nonexistent_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(
+                    web::scope("/gov")
+                        .service(open_proposal)
+                )
+        ).await;
+
+        let req_body = OpenProposalRequest {
+            voting_period_seconds: Some(86400),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/nonexistent/open")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 500); // Internal error (from anyhow::bail)
+    }
+}

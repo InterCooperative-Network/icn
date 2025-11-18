@@ -76,7 +76,9 @@ impl GovernanceManager {
         description: String,
         payload: ProposalPayload,
     ) -> Result<()> {
-        let proposal = Proposal::new(domain_id, proposer, title, description, payload);
+        let mut proposal = Proposal::new(domain_id, proposer, title, description, payload);
+        // Override the generated ID with the one provided
+        proposal.id = proposal_id.clone();
 
         let mut proposals = self.proposals.write().unwrap();
         proposals.insert(proposal_id, proposal);
