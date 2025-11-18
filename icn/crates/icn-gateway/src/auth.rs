@@ -67,7 +67,7 @@ impl AuthManager {
         let challenge = Challenge {
             nonce: nonce.clone(),
             did: did.clone(),
-            created_at: Self::current_timestamp(),
+            created_at: Self::current_timestamp()?,
         };
 
         let mut challenges = self.challenges.write()
@@ -143,7 +143,7 @@ impl AuthManager {
 
         // Check expiration AFTER signature verification
         // This prevents timing attacks by ensuring we always do the expensive crypto
-        let now = Self::current_timestamp();
+        let now = Self::current_timestamp()?;
         let is_expired = now - challenge.created_at >= self.challenge_ttl.as_secs();
 
         // Only succeed if signature is valid AND not expired
@@ -159,7 +159,7 @@ impl AuthManager {
 
     /// Issue a JWT capability token
     fn issue_token(&self, did: &Did, coop_id: &str, scopes: Vec<String>) -> Result<String> {
-        let now = Self::current_timestamp();
+        let now = Self::current_timestamp()?;
         let claims = TokenClaims {
             sub: did.to_string(),
             iat: now,
@@ -201,11 +201,13 @@ impl AuthManager {
     }
 
     /// Get current Unix timestamp
-    fn current_timestamp() -> u64 {
+    fn current_timestamp() -> Result<u64> {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("System clock is set before Unix epoch (1970-01-01). This indicates a system misconfiguration.")
-            .as_secs()
+            .map(|d| d.as_secs())
+            .map_err(|e| GatewayError::InternalError(
+                format!("System clock error (clock may be set before 1970): {}", e)
+            ))
     }
 
     /// Clean up expired challenges (periodic task)
@@ -213,7 +215,7 @@ impl AuthManager {
         let mut challenges = self.challenges.write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-        let now = Self::current_timestamp();
+        let now = Self::current_timestamp()?;
         let ttl = self.challenge_ttl.as_secs();
         let initial_count = challenges.len();
 
