@@ -355,6 +355,16 @@ pub fn validate_domain_members(members: &[String]) -> Result<()> {
         ));
     }
 
+    // Check for duplicates (prevents quorum calculation bugs)
+    let mut seen = std::collections::HashSet::new();
+    for member in members {
+        if !seen.insert(member) {
+            return Err(GatewayError::BadRequest(
+                format!("Duplicate member DID not allowed: {}", member)
+            ));
+        }
+    }
+
     Ok(())
 }
 
@@ -559,6 +569,13 @@ mod tests {
         assert!(validate_domain_members(&vec![]).is_err()); // Empty
         let too_many: Vec<String> = (0..MAX_DOMAIN_MEMBERS + 1).map(|i| format!("did:icn:{}", i)).collect();
         assert!(validate_domain_members(&too_many).is_err()); // Too many
+
+        // Duplicate detection
+        assert!(validate_domain_members(&vec![
+            "did:icn:alice".to_string(),
+            "did:icn:bob".to_string(),
+            "did:icn:alice".to_string() // Duplicate!
+        ]).is_err());
     }
 
     #[test]
