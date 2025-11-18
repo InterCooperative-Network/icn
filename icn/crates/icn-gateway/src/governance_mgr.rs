@@ -50,6 +50,12 @@ impl GovernanceManager {
         let domain = GovernanceDomain::new(name, config);
 
         let mut domains = self.domains.write().unwrap();
+
+        // Check for duplicate domain ID
+        if domains.contains_key(&domain_id) {
+            anyhow::bail!("Domain already exists: {}", domain_id.0);
+        }
+
         domains.insert(domain_id, domain);
 
         Ok(())
@@ -89,6 +95,12 @@ impl GovernanceManager {
         proposal.id = proposal_id.clone();
 
         let mut proposals = self.proposals.write().unwrap();
+
+        // Check for duplicate proposal ID
+        if proposals.contains_key(&proposal_id) {
+            anyhow::bail!("Proposal already exists: {}", proposal_id.0);
+        }
+
         proposals.insert(proposal_id, proposal);
 
         Ok(())

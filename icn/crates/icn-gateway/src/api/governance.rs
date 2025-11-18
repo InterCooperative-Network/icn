@@ -1415,4 +1415,86 @@ mod tests {
             "Error should indicate proposal is not open, got: {}", error_msg
         );
     }
+
+    #[actix_web::test]
+    async fn test_duplicate_domain_id_prevention() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:food".to_string());
+
+        // Create first domain
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Food Coop v1".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        // Try to create domain with same ID but different name
+        let result = gov_mgr.create_domain(
+            domain_id.clone(),
+            "Food Coop v2 (OVERWRITE)".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(60, 75, 172800),
+            MembershipConfig::static_list(vec![]),
+        ).await;
+
+        // Should fail - duplicate domain ID not allowed
+        assert!(result.is_err(), "Duplicate domain ID should be rejected");
+        assert!(result.unwrap_err().to_string().contains("already exists"));
+
+        // Verify original domain still exists with original name
+        let domain = gov_mgr.get_domain(&domain_id).await.unwrap().unwrap();
+        assert_eq!(domain.name, "Food Coop v1");
+        // Verify params weren't overwritten
+        assert_eq!(domain.config.params.quorum_percentage, 50);
+    }
+
+    #[actix_web::test]
+    async fn test_duplicate_proposal_id_prevention() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let domain_id = GovernanceDomainId("coop:food".to_string());
+
+        // Create domain first
+        gov_mgr.create_domain(
+            domain_id.clone(),
+            "Food Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 66, 86400),
+            MembershipConfig::static_list(vec![alice.did().clone()]),
+        ).await.unwrap();
+
+        let proposal_id = ProposalId("prop-123".to_string());
+
+        // Create first proposal
+        gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            alice.did().clone(),
+            "Original Proposal".to_string(),
+            "Original description".to_string(),
+            ProposalPayload::Text { body: "Original body".to_string() },
+        ).await.unwrap();
+
+        // Try to create proposal with same ID but different content
+        let result = gov_mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            alice.did().clone(),
+            "Malicious Overwrite".to_string(),
+            "Attempting to overwrite existing proposal".to_string(),
+            ProposalPayload::Text { body: "Malicious content".to_string() },
+        ).await;
+
+        // Should fail - duplicate proposal ID not allowed
+        assert!(result.is_err(), "Duplicate proposal ID should be rejected");
+        assert!(result.unwrap_err().to_string().contains("already exists"));
+
+        // Verify original proposal still exists with original content
+        let proposal = gov_mgr.get_proposal(&proposal_id).await.unwrap().unwrap();
+        assert_eq!(proposal.title, "Original Proposal");
+        assert_eq!(proposal.description, "Original description");
+    }
 }
