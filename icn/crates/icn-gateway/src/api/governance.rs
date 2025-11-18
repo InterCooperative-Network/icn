@@ -218,9 +218,9 @@ pub async fn create_proposal(
     let payload = match &req.payload {
         ProposalPayloadRequest::Text { body } => {
             // Validate text body
-            if body.is_empty() {
+            if body.is_empty() || body.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Proposal text body cannot be empty".to_string()
+                    "Proposal text body cannot be empty or whitespace-only".to_string()
                 ));
             }
             if body.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
@@ -239,9 +239,9 @@ pub async fn create_proposal(
             validation::validate_currency(currency)?;
 
             // Validate purpose
-            if purpose.is_empty() {
+            if purpose.is_empty() || purpose.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Budget purpose cannot be empty".to_string()
+                    "Budget purpose cannot be empty or whitespace-only".to_string()
                 ));
             }
             if purpose.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
@@ -279,9 +279,9 @@ pub async fn create_proposal(
         },
         ProposalPayloadRequest::ConfigChange { key, value } => {
             // Validate config key
-            if key.is_empty() {
+            if key.is_empty() || key.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Config key cannot be empty".to_string()
+                    "Config key cannot be empty or whitespace-only".to_string()
                 ));
             }
             if key.len() > validation::MAX_GOVERNANCE_MODEL_LEN {
@@ -292,9 +292,9 @@ pub async fn create_proposal(
             }
 
             // Validate config value
-            if value.is_empty() {
+            if value.is_empty() || value.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Config value cannot be empty".to_string()
+                    "Config value cannot be empty or whitespace-only".to_string()
                 ));
             }
             if value.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
