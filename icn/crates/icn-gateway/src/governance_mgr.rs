@@ -49,7 +49,8 @@ impl GovernanceManager {
 
         let domain = GovernanceDomain::new(name, config);
 
-        let mut domains = self.domains.write().unwrap();
+        let mut domains = self.domains.write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         // Check for duplicate domain ID
         if domains.contains_key(&domain_id) {
@@ -63,13 +64,15 @@ impl GovernanceManager {
 
     /// Get a governance domain
     pub async fn get_domain(&self, domain_id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap();
+        let domains = self.domains.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(domains.get(domain_id).cloned())
     }
 
     /// List all governance domains
     pub async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap();
+        let domains = self.domains.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(domains.values().cloned().collect())
     }
 
@@ -84,7 +87,8 @@ impl GovernanceManager {
         payload: ProposalPayload,
     ) -> Result<()> {
         // Validate domain exists
-        let domains = self.domains.read().unwrap();
+        let domains = self.domains.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         if !domains.contains_key(&domain_id) {
             anyhow::bail!("Domain not found: {}", domain_id.0);
         }
@@ -94,7 +98,8 @@ impl GovernanceManager {
         // Override the generated ID with the one provided
         proposal.id = proposal_id.clone();
 
-        let mut proposals = self.proposals.write().unwrap();
+        let mut proposals = self.proposals.write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         // Check for duplicate proposal ID
         if proposals.contains_key(&proposal_id) {
@@ -108,19 +113,22 @@ impl GovernanceManager {
 
     /// Get a specific proposal
     pub async fn get_proposal(&self, proposal_id: &ProposalId) -> Result<Option<Proposal>> {
-        let proposals = self.proposals.read().unwrap();
+        let proposals = self.proposals.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(proposals.get(proposal_id).cloned())
     }
 
     /// List all proposals
     pub async fn list_proposals(&self) -> Result<Vec<Proposal>> {
-        let proposals = self.proposals.read().unwrap();
+        let proposals = self.proposals.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(proposals.values().cloned().collect())
     }
 
     /// Open a proposal for voting
     pub async fn open_proposal(&self, proposal_id: ProposalId, voting_period_seconds: u64) -> Result<()> {
-        let mut proposals = self.proposals.write().unwrap();
+        let mut proposals = self.proposals.write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
             proposal.open(voting_period_seconds)?;
@@ -132,9 +140,12 @@ impl GovernanceManager {
 
     /// Close a proposal and finalize voting
     pub async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
-        let mut proposals = self.proposals.write().unwrap();
-        let votes = self.votes.read().unwrap();
-        let domains = self.domains.read().unwrap();
+        let mut proposals = self.proposals.write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let votes = self.votes.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let domains = self.domains.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
             // Validate proposal is in Open state
@@ -208,7 +219,8 @@ impl GovernanceManager {
         comment: Option<String>,
     ) -> Result<()> {
         // Validate proposal exists and is open for voting
-        let proposals = self.proposals.read().unwrap();
+        let proposals = self.proposals.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         let proposal = proposals.get(&proposal_id)
             .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
 
@@ -220,7 +232,8 @@ impl GovernanceManager {
         }
 
         // Validate voter is a member of the domain
-        let domains = self.domains.read().unwrap();
+        let domains = self.domains.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         let domain = domains.get(&proposal.domain_id)
             .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
 
@@ -242,11 +255,13 @@ impl GovernanceManager {
         drop(proposals);
 
         // Acquire votes write lock
-        let mut votes = self.votes.write().unwrap();
+        let mut votes = self.votes.write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         // CRITICAL: Re-check proposal state after acquiring votes lock to prevent TOCTOU
         // Another thread could have closed the proposal between our initial check and now
-        let proposals_recheck = self.proposals.read().unwrap();
+        let proposals_recheck = self.proposals.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         let proposal_recheck = proposals_recheck.get(&proposal_id)
             .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
 
