@@ -215,7 +215,15 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Fix: Change current_timestamp() signature to Result<u64>, use .map_err() instead of .expect()
   - Updated all 4 call sites (create_challenge, verify_challenge, issue_token, cleanup_expired_challenges)
   - **Impact**: Auth system availability - prevents crashes in authentication flows
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models)
+- **Bug 17: RwLock panic vulnerabilities in governance_mgr.rs** - Lock poisoning cascading failures
+  - All 11 RwLock operations used `.unwrap()` instead of `.map_err()` for error handling
+  - Inconsistent with coop.rs, ledger_mgr.rs, auth.rs which properly handle poisoned locks
+  - If thread panics while holding lock, subsequent operations would panic instead of returning errors
+  - Attack: Single panic in governance operation causes cascading failures across all governance
+  - Affected: create_domain, get_domain, list_domains, create_proposal, get_proposal, list_proposals, open_proposal, close_proposal (3 locks), cast_vote (4 locks)
+  - Fix: Replace all `.unwrap()` with `.map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?`
+  - **Impact**: Reliability - prevents cascading failures, ensures graceful error handling
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
 - 10 comprehensive tests added (62 → 77 total tests)
 - Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/validation.rs:108,297,312,330](icn/crates/icn-gateway/src/validation.rs)
