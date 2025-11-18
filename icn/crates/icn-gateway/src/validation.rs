@@ -142,8 +142,8 @@ pub fn validate_coop_id(id: &str) -> Result<()> {
 
 /// Validate cooperative name
 pub fn validate_coop_name(name: &str) -> Result<()> {
-    if name.is_empty() {
-        return Err(GatewayError::BadRequest("Cooperative name cannot be empty".to_string()));
+    if name.is_empty() || name.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Cooperative name cannot be empty or whitespace-only".to_string()));
     }
 
     if name.len() > MAX_COOP_NAME_LEN {
@@ -157,8 +157,8 @@ pub fn validate_coop_name(name: &str) -> Result<()> {
 
 /// Validate currency identifier
 pub fn validate_currency(currency: &str) -> Result<()> {
-    if currency.is_empty() {
-        return Err(GatewayError::BadRequest("Currency cannot be empty".to_string()));
+    if currency.is_empty() || currency.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Currency cannot be empty or whitespace-only".to_string()));
     }
 
     if currency.len() > MAX_CURRENCY_LEN {
@@ -200,8 +200,8 @@ pub fn validate_governance_model(model: &str) -> Result<()> {
 
 /// Validate credit policy string
 pub fn validate_credit_policy(policy: &str) -> Result<()> {
-    if policy.is_empty() {
-        return Err(GatewayError::BadRequest("Credit policy cannot be empty".to_string()));
+    if policy.is_empty() || policy.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Credit policy cannot be empty or whitespace-only".to_string()));
     }
 
     if policy.len() > MAX_CREDIT_POLICY_LEN {
@@ -416,6 +416,7 @@ mod tests {
     fn test_validate_coop_name() {
         assert!(validate_coop_name("Test Cooperative").is_ok());
         assert!(validate_coop_name("").is_err()); // Empty
+        assert!(validate_coop_name("   ").is_err()); // Whitespace-only
         assert!(validate_coop_name(&"a".repeat(257)).is_err()); // Too long
     }
 
@@ -424,6 +425,7 @@ mod tests {
         assert!(validate_currency("hours").is_ok());
         assert!(validate_currency("USD").is_ok());
         assert!(validate_currency("").is_err()); // Empty
+        assert!(validate_currency("   ").is_err()); // Whitespace-only
         assert!(validate_currency(&"a".repeat(33)).is_err()); // Too long
     }
 
@@ -466,6 +468,7 @@ mod tests {
         assert!(validate_credit_policy("conservative").is_ok());
         assert!(validate_credit_policy("permissive").is_ok());
         assert!(validate_credit_policy("").is_err()); // Empty
+        assert!(validate_credit_policy("   ").is_err()); // Whitespace-only
         assert!(validate_credit_policy(&"a".repeat(65)).is_err()); // Too long
     }
 
