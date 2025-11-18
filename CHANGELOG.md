@@ -199,6 +199,14 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Fix: Add `|| field.trim().is_empty()` to validate_coop_name(), validate_currency(), validate_credit_policy()
   - Enhanced tests with whitespace test cases for all three functions
   - **Impact**: Data quality - completes whitespace validation consistency across all text fields
+- **Bug 15: Panic from expect() in timestamp() function** - Server crash vulnerability (cooperative API)
+  - The `timestamp()` utility in api/coops.rs used `.expect()` instead of returning Result
+  - Identical issue to Bug #10 (unwrap in governance), but in different location
+  - Panic would crash entire gateway server if system clock set before 1970
+  - Attack: System misconfiguration crashes server instead of returning 500 error
+  - Fix: Change timestamp() signature to Result<u64>, use .map_err() instead of .expect()
+  - Updated all call sites (3 production + 2 test) to propagate Result with ?
+  - **Impact**: Server availability - prevents crash, enables graceful error responses
 - **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models)
 - **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), validation functions, and payload conversions**
 - 10 comprehensive tests added (62 → 77 total tests)
