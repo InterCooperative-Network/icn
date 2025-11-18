@@ -71,21 +71,18 @@ impl TestNode {
             let sender_did = net_msg.from.clone();
             let gossip_clone = gossip_handle_clone.clone();
 
-            match net_msg.payload {
-                MessagePayload::Gossip(gossip_msg) => {
-                    // Log the gossip message type for debugging
-                    info!("Incoming gossip message: {} from {}",
-                          gossip_msg.variant_name(), sender_did);
+            if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
+                // Log the gossip message type for debugging
+                info!("Incoming gossip message: {} from {}",
+                      gossip_msg.variant_name(), sender_did);
 
-                    // Spawn async task to avoid blocking in callback
-                    tokio::spawn(async move {
-                        let mut gossip = gossip_clone.write().await;
-                        if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
-                            warn!("Failed to handle gossip message: {}", e);
-                        }
-                    });
-                }
-                _ => {}
+                // Spawn async task to avoid blocking in callback
+                tokio::spawn(async move {
+                    let mut gossip = gossip_clone.write().await;
+                    if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                });
             }
         });
 
@@ -173,7 +170,7 @@ impl TestNode {
         }
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -625,8 +622,8 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
         || async {
             let p2 = node2_proposals_open.read().await;
             let p3 = node3_proposals_open.read().await;
-            p2.get(&proposal_id_open).map_or(false, |p| p.state.is_open())
-                && p3.get(&proposal_id_open).map_or(false, |p| p.state.is_open())
+            p2.get(&proposal_id_open).is_some_and(|p| p.state.is_open())
+                && p3.get(&proposal_id_open).is_some_and(|p| p.state.is_open())
         },
         "Proposal opened on all nodes",
         20,
@@ -680,9 +677,9 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
             let p3 = node3_proposals_outcome.read().await;
 
             // Expected: 2 For, 1 Against = 66% approval = Accepted (>50% threshold)
-            p1.get(&proposal_id_outcome).map_or(false, |p| matches!(p.state, ProposalState::Accepted { .. }))
-                && p2.get(&proposal_id_outcome).map_or(false, |p| matches!(p.state, ProposalState::Accepted { .. }))
-                && p3.get(&proposal_id_outcome).map_or(false, |p| matches!(p.state, ProposalState::Accepted { .. }))
+            p1.get(&proposal_id_outcome).is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
+                && p2.get(&proposal_id_outcome).is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
+                && p3.get(&proposal_id_outcome).is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
         },
         "All nodes converged on proposal outcome: Accepted",
         20,

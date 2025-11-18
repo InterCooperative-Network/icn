@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use icn_net::{FanoutConfig, NeighborLimitsConfig, TopologyConfig};
-use icn_gossip::{GossipActor, GossipMessage, Scope};
+use icn_gossip::{GossipActor, Scope};
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle, NetworkMessage};
 use icn_trust::TrustGraph;
@@ -97,7 +97,7 @@ impl TestNode {
         };
 
         // Spawn network actor with topology config
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,

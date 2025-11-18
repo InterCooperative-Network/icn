@@ -196,7 +196,7 @@ fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
         return Ok(Zeroizing::new(passphrase.into_bytes()));
     }
 
-    print!("{}", prompt);
+    print!("{prompt}");
     io::stdout().flush()?;
     // Wrap the String immediately in Zeroizing to prevent it from lingering in memory
     let passphrase_str = Zeroizing::new(

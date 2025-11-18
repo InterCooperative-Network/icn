@@ -58,43 +58,40 @@ impl TestNode {
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             let sender_did = net_msg.from.clone();
 
-            match net_msg.payload {
-                MessagePayload::Gossip(gossip_msg) => {
-                    // Track pull protocol messages
-                    let msg_type = match &gossip_msg {
-                        GossipMessage::Digest { .. } => "Digest",
-                        GossipMessage::PullRequest { .. } => "PullRequest",
-                        GossipMessage::PullResponse { .. } => "PullResponse",
-                        _ => "Other",
-                    };
+            if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
+                // Track pull protocol messages
+                let msg_type = match &gossip_msg {
+                    GossipMessage::Digest { .. } => "Digest",
+                    GossipMessage::PullRequest { .. } => "PullRequest",
+                    GossipMessage::PullResponse { .. } => "PullResponse",
+                    _ => "Other",
+                };
 
-                    if msg_type != "Other" {
-                        let pull_msgs = pull_messages_clone.clone();
-                        let sender = sender_did.clone();
-                        let msg_type_str = msg_type.to_string();
-                        tokio::spawn(async move {
-                            let mut msgs = pull_msgs.lock().await;
-                            info!("📨 Received {}: from {}", msg_type_str, sender);
-                            msgs.push((msg_type_str, sender));
-                        });
-                    }
-
-                    // Handle message asynchronously
-                    let gossip_handle = gossip_handle_clone.clone();
+                if msg_type != "Other" {
+                    let pull_msgs = pull_messages_clone.clone();
                     let sender = sender_did.clone();
+                    let msg_type_str = msg_type.to_string();
                     tokio::spawn(async move {
-                        let mut gossip = gossip_handle.write().await;
-                        if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                            warn!("Failed to handle gossip message: {}", e);
-                        }
+                        let mut msgs = pull_msgs.lock().await;
+                        info!("📨 Received {}: from {}", msg_type_str, sender);
+                        msgs.push((msg_type_str, sender));
                     });
                 }
-                _ => {}
+
+                // Handle message asynchronously
+                let gossip_handle = gossip_handle_clone.clone();
+                let sender = sender_did.clone();
+                tokio::spawn(async move {
+                    let mut gossip = gossip_handle.write().await;
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                });
             }
         });
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -211,7 +208,7 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     // Node 1 publishes 3 entries
     let mut hashes = Vec::new();
     for i in 0..3 {
-        let data = format!("Pull test entry {}", i).into_bytes();
+        let data = format!("Pull test entry {i}").into_bytes();
         let hash = {
             let mut gossip1 = node1.gossip_handle.write().await;
             gossip1.publish(topic, data)?
@@ -344,7 +341,7 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
 
     // Node 1 publishes 100 small entries
     for i in 0..100 {
-        let data = format!("Entry {}", i).into_bytes();
+        let data = format!("Entry {i}").into_bytes();
         let mut gossip1 = node1.gossip_handle.write().await;
         gossip1.publish(topic, data)?;
     }

@@ -265,7 +265,28 @@ impl TrustAttestation {
     pub fn from_trust_edge(edge: &TrustEdge) -> Self {
         let ttl_seconds = edge
             .expires_at
-            .map(|exp| exp.saturating_sub(edge.created_at))
+            .map(|exp| {
+                // Validate expiration time is in the future
+                // Warn on extreme clock skew (>30 days in the past)
+                if exp < edge.created_at {
+                    tracing::warn!(
+                        "Trust edge expires_at ({}) is before created_at ({}), treating as expired",
+                        exp, edge.created_at
+                    );
+                    0 // Already expired
+                } else {
+                    let ttl = exp.saturating_sub(edge.created_at);
+                    // Warn on suspiciously long TTL (>10 years)
+                    const MAX_REASONABLE_TTL: u64 = 10 * 365 * 24 * 60 * 60;
+                    if ttl > MAX_REASONABLE_TTL {
+                        tracing::warn!(
+                            "Trust edge has suspiciously long TTL: {} seconds ({} years)",
+                            ttl, ttl / (365 * 24 * 60 * 60)
+                        );
+                    }
+                    ttl
+                }
+            })
             .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
 
         Self {

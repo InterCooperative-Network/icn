@@ -318,7 +318,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         ContentHash::from_bytes(hasher.finalize().into())
     }
@@ -444,7 +444,7 @@ mod tests {
 
         let result = actor.execute_rule(request).await;
         if let Err(ref e) = result {
-            eprintln!("Execution failed: {:?}", e);
+            eprintln!("Execution failed: {e:?}");
         }
         assert!(result.is_ok(), "Execution failed: {:?}", result.err());
 

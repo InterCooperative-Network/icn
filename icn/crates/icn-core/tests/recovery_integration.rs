@@ -164,7 +164,7 @@ impl RecoveryTestNode {
                                             *threshold,
                                             *delay_period,
                                         );
-                                        let key = format!("recovery:{}", id);
+                                        let key = format!("recovery:{id}");
                                         let value = serde_json::to_vec(&recovery)?;
                                         recovery_store.put(key.as_bytes(), &value)?;
                                         info!("Stored new recovery: {} ({} → {})", id, old_did, new_did);
@@ -175,7 +175,7 @@ impl RecoveryTestNode {
                                         attestation,
                                         ..
                                     } => {
-                                        let key = format!("recovery:{}", recovery_id);
+                                        let key = format!("recovery:{recovery_id}");
                                         match recovery_store.get(key.as_bytes())? {
                                             Some(data) => {
                                                 let mut recovery: RecoveryEvent =
@@ -213,7 +213,7 @@ impl RecoveryTestNode {
                                         new_did,
                                         ..
                                     } => {
-                                        let key = format!("recovery:{}", id);
+                                        let key = format!("recovery:{id}");
                                         match recovery_store.get(key.as_bytes())? {
                                             Some(data) => {
                                                 let mut recovery: RecoveryEvent =
@@ -309,7 +309,7 @@ impl RecoveryTestNode {
         }
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -472,7 +472,7 @@ async fn test_full_recovery_flow() -> Result<()> {
 
     // Store recovery on Alice's node
     {
-        let key = format!("recovery:{}", recovery_id);
+        let key = format!("recovery:{recovery_id}");
         let value = serde_json::to_vec(&recovery)?;
         alice.recovery_store.put(key.as_bytes(), &value)?;
     }
@@ -526,7 +526,7 @@ async fn test_full_recovery_flow() -> Result<()> {
 
     // Update Alice's local recovery with both attestations
     {
-        let key = format!("recovery:{}", recovery_id);
+        let key = format!("recovery:{recovery_id}");
         let data = alice.recovery_store.get(key.as_bytes())?.unwrap();
         let mut recovery: RecoveryEvent = serde_json::from_slice(&data)?;
         recovery.add_attestation(bob_attestation)?;
@@ -539,7 +539,7 @@ async fn test_full_recovery_flow() -> Result<()> {
     // Finalize recovery
     info!("Finalizing recovery...");
     {
-        let key = format!("recovery:{}", recovery_id);
+        let key = format!("recovery:{recovery_id}");
         let data = alice.recovery_store.get(key.as_bytes())?.unwrap();
         let mut recovery: RecoveryEvent = serde_json::from_slice(&data)?;
         recovery.finalize()?;

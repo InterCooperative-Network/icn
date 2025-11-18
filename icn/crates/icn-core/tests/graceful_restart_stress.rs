@@ -12,7 +12,6 @@ use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle};
 use icn_snapshot::{load_snapshot, save_snapshot, StateSnapshot};
 use icn_trust::TrustClass;
-use rustls;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -64,7 +63,7 @@ impl TestNode {
         });
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -178,7 +177,7 @@ impl TestNode {
         });
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -245,7 +244,7 @@ async fn test_high_message_volume_restart() -> Result<()> {
     // Publish messages
     for i in 0..message_count {
         let mut gossip = node.gossip_handle.write().await;
-        let msg = format!("message {}", i);
+        let msg = format!("message {i}");
         gossip.publish(topic_name, msg.as_bytes().to_vec())?;
 
         if (i + 1) % 100 == 0 {
@@ -300,13 +299,11 @@ async fn test_high_message_volume_restart() -> Result<()> {
     // Performance assertions
     assert!(
         save_elapsed < Duration::from_secs(5),
-        "Snapshot save should complete in < 5s (took {:?})",
-        save_elapsed
+        "Snapshot save should complete in < 5s (took {save_elapsed:?})"
     );
     assert!(
         restore_elapsed < Duration::from_secs(5),
-        "Snapshot restore should complete in < 5s (took {:?})",
-        restore_elapsed
+        "Snapshot restore should complete in < 5s (took {restore_elapsed:?})"
     );
 
     info!("\n✅ High message volume stress test passed!");
@@ -346,7 +343,7 @@ async fn test_many_peers_restart() -> Result<()> {
     // Create peer nodes and connect them to central node
     let mut peer_nodes = Vec::new();
     for i in 0..peer_count {
-        let peer_dir = temp_dir.path().join(format!("peer{}", i));
+        let peer_dir = temp_dir.path().join(format!("peer{i}"));
         std::fs::create_dir_all(&peer_dir)?;
 
         let peer_port = base_port + 1 + i as u16;
@@ -446,7 +443,7 @@ async fn test_many_peers_restart() -> Result<()> {
             .await
             .is_some();
         if !key_present {
-            panic!("Peer {} key not restored", i);
+            panic!("Peer {i} key not restored");
         }
     }
     info!("✅ Verified sample of restored keys");
@@ -454,15 +451,11 @@ async fn test_many_peers_restart() -> Result<()> {
     // Performance assertions
     assert!(
         save_elapsed < Duration::from_secs(10),
-        "Save with {} peers should complete in < 10s (took {:?})",
-        peer_count,
-        save_elapsed
+        "Save with {peer_count} peers should complete in < 10s (took {save_elapsed:?})"
     );
     assert!(
         restore_elapsed < Duration::from_secs(10),
-        "Restore with {} peers should complete in < 10s (took {:?})",
-        peer_count,
-        restore_elapsed
+        "Restore with {peer_count} peers should complete in < 10s (took {restore_elapsed:?})"
     );
 
     info!("\n✅ Many peers stress test passed!");
@@ -499,7 +492,7 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
 
     // Create topics and subscribe
     for i in 0..topic_count {
-        let topic_name = format!("test:topic{}", i);
+        let topic_name = format!("test:topic{i}");
         let mut gossip = node.gossip_handle.write().await;
         let topic = Topic::new(topic_name.clone(), AccessControl::Public);
         gossip.create_topic(topic);
@@ -511,10 +504,10 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
     // Publish messages to each topic
     info!("Publishing {} messages to each topic...", messages_per_topic);
     for i in 0..topic_count {
-        let topic_name = format!("test:topic{}", i);
+        let topic_name = format!("test:topic{i}");
         for j in 0..messages_per_topic {
             let mut gossip = node.gossip_handle.write().await;
-            let msg = format!("topic{} msg{}", i, j);
+            let msg = format!("topic{i} msg{j}");
             gossip.publish(&topic_name, msg.as_bytes().to_vec())?;
         }
     }
@@ -577,9 +570,7 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
     // Performance assertion
     assert!(
         restore_elapsed < Duration::from_secs(5),
-        "Restore with {} topics should complete in < 5s (took {:?})",
-        topic_count,
-        restore_elapsed
+        "Restore with {topic_count} topics should complete in < 5s (took {restore_elapsed:?})"
     );
 
     info!("\n✅ Multi-topic stress test passed!");

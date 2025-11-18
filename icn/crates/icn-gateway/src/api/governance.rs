@@ -906,7 +906,7 @@ mod tests {
 
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
         let req = test::TestRequest::post()
-            .uri(&format!("/gov/proposals/{}/open", proposal_id))
+            .uri(&format!("/gov/proposals/{proposal_id}/open"))
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -923,7 +923,7 @@ mod tests {
 
             let claims = create_test_claims(&voter.to_string(), vec!["gov:write"]);
             let req = test::TestRequest::post()
-                .uri(&format!("/gov/proposals/{}/vote", proposal_id))
+                .uri(&format!("/gov/proposals/{proposal_id}/vote"))
                 .set_json(&req_body)
                 .to_request();
             req.extensions_mut().insert(claims);
@@ -935,7 +935,7 @@ mod tests {
         // 4. Close proposal
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
         let req = test::TestRequest::post()
-            .uri(&format!("/gov/proposals/{}/close", proposal_id))
+            .uri(&format!("/gov/proposals/{proposal_id}/close"))
             .to_request();
         req.extensions_mut().insert(claims);
 
@@ -945,7 +945,7 @@ mod tests {
         // 5. Verify final state (should be rejected: 1 for, 1 against, simple majority fails)
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
         let req = test::TestRequest::get()
-            .uri(&format!("/gov/proposals/{}", proposal_id))
+            .uri(&format!("/gov/proposals/{proposal_id}"))
             .to_request();
         req.extensions_mut().insert(claims);
 
@@ -963,7 +963,7 @@ mod tests {
         for domain_id in ["coop:food", "coop:tech"] {
             gov_mgr.create_domain(
                 GovernanceDomainId(domain_id.to_string()),
-                format!("{} Coop", domain_id),
+                format!("{domain_id} Coop"),
                 "cooperative".to_string(),
                 GovernanceParams::new(50, 66, 7 * 86400),
                 MembershipConfig::static_list(vec![alice.did().clone()]),
@@ -1234,7 +1234,7 @@ mod tests {
                 // Success - quorum not met
             }
             other => {
-                panic!("Expected NoQuorum state, got {:?}", other);
+                panic!("Expected NoQuorum state, got {other:?}");
             }
         }
     }
@@ -1496,7 +1496,7 @@ mod tests {
         let error_msg = vote_result.unwrap_err().to_string();
         assert!(
             error_msg.contains("not open for voting") || error_msg.contains("was closed during vote submission"),
-            "Error should indicate proposal is not open, got: {}", error_msg
+            "Error should indicate proposal is not open, got: {error_msg}"
         );
     }
 

@@ -61,7 +61,7 @@ pub use types::{
 #[cfg(test)]
 mod example_contract_tests {
     use super::*;
-    use serde_json;
+    
 
     #[test]
     fn test_timebank_contract_deserializes() {

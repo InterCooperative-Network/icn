@@ -208,7 +208,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 
@@ -271,7 +271,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 
@@ -345,7 +345,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 
@@ -397,7 +397,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 
@@ -460,7 +460,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 

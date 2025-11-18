@@ -50,7 +50,7 @@ impl TestNode {
             let _ = msg_tx.send(net_msg);
         });
 
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
             listen_addr,
@@ -227,8 +227,7 @@ async fn test_multiple_connections_with_binding_verification() -> Result<()> {
     // At least one ping should get through (relaxed assertion for timing issues)
     assert!(
         hub_msg_count >= 1,
-        "Hub should have received at least 1 ping message (got {})",
-        hub_msg_count
+        "Hub should have received at least 1 ping message (got {hub_msg_count})"
     );
 
     // Hub sends pings back to peers that connected
@@ -254,8 +253,7 @@ async fn test_multiple_connections_with_binding_verification() -> Result<()> {
 
     assert!(
         total_peer_msgs >= 1,
-        "At least one peer should have received a message (total: {})",
-        total_peer_msgs
+        "At least one peer should have received a message (total: {total_peer_msgs})"
     );
 
     info!("✓ Multiple connections with DID-TLS binding verification succeeded");
@@ -374,8 +372,7 @@ async fn test_connection_resilience() -> Result<()> {
 
     assert!(
         msg_count >= 5,
-        "Node B should have received all 5 pings (got {})",
-        msg_count
+        "Node B should have received all 5 pings (got {msg_count})"
     );
 
     info!("✓ Connection resilience test passed");

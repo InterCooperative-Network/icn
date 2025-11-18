@@ -277,7 +277,7 @@ mod tests {
         println!("False positive rate: {:.2}%", rate * 100.0);
 
         // Allow some variance, but should be less than 5%
-        assert!(rate < 0.05, "False positive rate too high: {}", rate);
+        assert!(rate < 0.05, "False positive rate too high: {rate}");
     }
 
     #[test]
@@ -336,7 +336,7 @@ mod tests {
         for i in 0..50 {
             let mut hash = [0u8; 32];
             hash[0] = i;
-            assert!(filter.contains(&hash), "Should contain hash {}", i);
+            assert!(filter.contains(&hash), "Should contain hash {i}");
         }
 
         // Test false positive rate on non-inserted items

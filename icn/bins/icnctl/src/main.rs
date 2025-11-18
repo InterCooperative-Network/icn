@@ -604,7 +604,7 @@ fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
         return Ok(passphrase.into_bytes());
     }
 
-    print!("{}", prompt);
+    print!("{prompt}");
     io::stdout().flush()?;
     let passphrase = rpassword::read_password()?;
     Ok(passphrase.into_bytes())
@@ -751,10 +751,10 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
             let rotation = keystore.rotate(new_keypair)?;
 
             println!("\n✓ Key rotation successful!");
-            println!("  Old DID: {}", old_did);
-            println!("  New DID: {}", new_did);
+            println!("  Old DID: {old_did}");
+            println!("  New DID: {new_did}");
             if let Some(r) = reason {
-                println!("  Reason: {}", r);
+                println!("  Reason: {r}");
             } else {
                 println!("  Reason: {:?}", rotation.reason);
             }
@@ -803,7 +803,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
                 .with_context(|| format!("Failed to export keystore to {}", output.display()))?;
 
             println!("✓ Identity exported successfully!");
-            println!("  DID:  {}", did);
+            println!("  DID:  {did}");
             println!("  From: {}", keystore_path.display());
             println!("  To:   {}", output.display());
             println!("\nIMPORTANT:");
@@ -861,7 +861,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
             println!("\n✓ Identity imported successfully!");
             println!("  From: {}", input.display());
             println!("  To:   {}", keystore_path.display());
-            println!("  DID:  {}", imported_did);
+            println!("  DID:  {imported_did}");
         }
     }
 
@@ -936,7 +936,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
             println!("\n⚠️  IMPORTANT:");
             println!("  • Choose trustees you trust and who know you well");
             println!("  • Trustees must verify your identity out-of-band (phone, video, in-person)");
-            println!("  • If you lose all devices, contact {} trustees to initiate recovery", threshold);
+            println!("  • If you lose all devices, contact {threshold} trustees to initiate recovery");
         }
 
         RecoveryCommands::Config => {
@@ -965,7 +965,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
 
                 match &recovery_config.method {
                     RecoveryMethod::Social { m, n } => {
-                        println!("Method: Social recovery ({}-of-{})", m, n);
+                        println!("Method: Social recovery ({m}-of-{n})");
                     }
                     RecoveryMethod::BackupSeed => {
                         println!("Method: Backup seed");
@@ -998,8 +998,8 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
             let new_did = keystore.get_keypair()?.did().clone();
 
             println!("Initiating recovery:");
-            println!("  Old DID: {}", old_did);
-            println!("  New DID: {}", new_did);
+            println!("  Old DID: {old_did}");
+            println!("  New DID: {new_did}");
             println!();
 
             // TODO: Get recovery config from old DID (would need gossip integration)
@@ -1038,16 +1038,16 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
             println!("  Recovery ID: {}", recovery.id);
             println!("  Status: {}", recovery.progress_summary());
             println!("\nNext steps:");
-            println!("  1. Contact your {} trustees out-of-band (phone, video, in-person)", threshold);
+            println!("  1. Contact your {threshold} trustees out-of-band (phone, video, in-person)");
             println!("  2. Ask them to run: icnctl recovery attest {}", recovery.id);
-            println!("  3. After {} attestations, wait {} seconds delay period", threshold, delay);
+            println!("  3. After {threshold} attestations, wait {delay} seconds delay period");
             println!("  4. Finalize recovery: icnctl recovery finalize {}", recovery.id);
         }
 
         RecoveryCommands::Attest { recovery_id, verification } => {
             // Load recovery event from store
             let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_key = format!("recovery:{recovery_id}");
             let recovery_data = store.get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
@@ -1073,7 +1073,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
 
             // Create attestation
             let attestation = RecoveryAttestation::new(
-                &keypair,
+                keypair,
                 recovery.old_did.clone(),
                 recovery.new_did.clone(),
                 verification.clone(),
@@ -1092,7 +1092,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
 
             println!("✓ Attestation signed and added!");
             println!("  Trustee: {}", keypair.did());
-            println!("  Verification: {}", verification);
+            println!("  Verification: {verification}");
             println!("  Status: {}", recovery.progress_summary());
 
             if threshold_reached {
@@ -1136,7 +1136,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
         RecoveryCommands::Status { recovery_id } => {
             // Load recovery event
             let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_key = format!("recovery:{recovery_id}");
             let recovery_data = store.get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
@@ -1169,7 +1169,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
         RecoveryCommands::Finalize { recovery_id } => {
             // Load recovery event
             let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_key = format!("recovery:{recovery_id}");
             let recovery_data = store.get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
@@ -1205,7 +1205,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
         RecoveryCommands::Cancel { recovery_id, reason } => {
             // Load recovery event
             let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{}", recovery_id);
+            let recovery_key = format!("recovery:{recovery_id}");
             let recovery_data = store.get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
@@ -1225,8 +1225,8 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
             println!("  Recovery ID: {}", recovery.id);
             println!("  Old DID: {}", recovery.old_did);
             println!("  New DID: {}", recovery.new_did);
-            println!("  Cancelled by: {}", canceller_did);
-            println!("  Reason: {}", reason);
+            println!("  Cancelled by: {canceller_did}");
+            println!("  Reason: {reason}");
             println!();
 
             // Cancel recovery
@@ -1242,7 +1242,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
 
             println!("✓ Recovery cancelled!");
             println!("\n⚠️  This recovery attempt has been marked as fraudulent.");
-            println!("   Reason: {}", reason);
+            println!("   Reason: {reason}");
         }
     }
 
@@ -1292,8 +1292,8 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
             graph.add_edge(edge)?;
 
             println!("✓ Added trust edge");
-            println!("  Target: {}", target_did);
-            println!("  Score: {:.2}", score);
+            println!("  Target: {target_did}");
+            println!("  Score: {score:.2}");
         }
 
         TrustCommands::List => {
@@ -1302,7 +1302,7 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
             if edges.is_empty() {
                 println!("No trust edges found.");
             } else {
-                println!("Trust edges from {}:\n", own_did);
+                println!("Trust edges from {own_did}:\n");
                 for edge in edges {
                     println!("  → {}", edge.target);
                     println!("    Score: {:.2}", edge.score);
@@ -1324,9 +1324,9 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
             let score = graph.compute_trust_score(&target_did)?;
             let class = graph.trust_class(&target_did)?;
 
-            println!("Trust score for {}:", target_did);
-            println!("  Score: {:.4}", score);
-            println!("  Class: {:?}", class);
+            println!("Trust score for {target_did}:");
+            println!("  Score: {score:.4}");
+            println!("  Class: {class:?}");
 
             // Show direct edge if exists
             if let Some(edge) = graph.get_edge(&own_did, &target_did)? {
@@ -1345,7 +1345,7 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
 
             graph.remove_edge(&own_did, &target_did)?;
 
-            println!("✓ Removed trust edge to {}", target_did);
+            println!("✓ Removed trust edge to {target_did}");
         }
     }
 
@@ -1370,7 +1370,7 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 println!("\nTip: Ensure other ICN nodes are running on the network.");
             } else {
                 println!("Discovered Peers:\n");
-                println!("{:<50} {:<22} {}", "DID", "Address", "Version");
+                println!("{:<50} {:<22} Version", "DID", "Address");
                 println!("{}", "-".repeat(80));
                 for peer in peers {
                     println!("{:<50} {:<22} {}", peer.did, peer.addr, peer.version);
@@ -1381,15 +1381,15 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
         NetworkCommands::Dial { did, addr } => {
             let addr_str = addr.unwrap_or_else(|| "auto-discover".to_string());
             println!("Dialing peer...");
-            println!("  Target DID: {}", did);
-            println!("  Address: {}\n", addr_str);
+            println!("  Target DID: {did}");
+            println!("  Address: {addr_str}\n");
 
             client
                 .dial(did.clone(), addr_str)
                 .await
                 .context("Failed to dial peer. Is icnd running?")?;
 
-            println!("✓ Successfully established connection to {}", did);
+            println!("✓ Successfully established connection to {did}");
         }
 
         NetworkCommands::Stats => {
@@ -1442,10 +1442,10 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                         println!("    • {}", delta.account_id);
                         println!("      Currency: {}", delta.currency);
                         if let Some(debit) = delta.debit {
-                            println!("      Debit:    {}", debit);
+                            println!("      Debit:    {debit}");
                         }
                         if let Some(credit) = delta.credit {
-                            println!("      Credit:   {}", credit);
+                            println!("      Credit:   {credit}");
                         }
                     }
                 }
@@ -1465,14 +1465,14 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                 .context("Failed to get balance from daemon. Is icnd running?")?;
 
             if balances.is_empty() {
-                println!("No balances found for account: {}", account_id);
+                println!("No balances found for account: {account_id}");
             } else if balances.len() == 1 && currency.is_some() {
                 let balance = &balances[0];
-                println!("Balance for {}:\n", account_id);
+                println!("Balance for {account_id}:\n");
                 println!("  Currency: {}", balance.currency);
                 println!("  Amount:   {}", balance.amount);
             } else {
-                println!("Balances for {}:\n", account_id);
+                println!("Balances for {account_id}:\n");
                 for balance in balances {
                     println!("  {:<10} {}", balance.currency, balance.amount);
                 }
@@ -1498,10 +1498,10 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                     for delta in entry.accounts {
                         print!("  • {} ({}): ", delta.account_id, delta.currency);
                         if let Some(debit) = delta.debit {
-                            print!("debit {} ", debit);
+                            print!("debit {debit} ");
                         }
                         if let Some(credit) = delta.credit {
-                            print!("credit {} ", credit);
+                            print!("credit {credit} ");
                         }
                         println!();
                     }
@@ -1544,7 +1544,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                     println!("Author:      {}", item["author"].as_str().unwrap_or("N/A"));
                     println!("Observed at: {}", item["observed_at"].as_u64().unwrap_or(0));
                     if let Some(metadata) = item["metadata"].as_str() {
-                        println!("Metadata:    {}", metadata);
+                        println!("Metadata:    {metadata}");
                     }
                     println!();
                 }
@@ -1557,7 +1557,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 .await
                 .context("Failed to get quarantine entry from daemon. Is icnd running?")?;
 
-            println!("Quarantined Entry: {}\n", entry_id);
+            println!("Quarantined Entry: {entry_id}\n");
 
             if let Some(entry) = result.get("entry") {
                 println!("Entry Details:");
@@ -1575,7 +1575,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 println!("  Author:      {}", info["author"].as_str().unwrap_or("N/A"));
                 println!("  Observed:    {}", info["observed_at"].as_u64().unwrap_or(0));
                 if let Some(metadata) = info["metadata"].as_str() {
-                    println!("  Metadata:    {}", metadata);
+                    println!("  Metadata:    {metadata}");
                 }
             }
         }
@@ -1588,7 +1588,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 .await
                 .context("Failed to release entry from daemon. Is icnd running?")?;
 
-            println!("✓ Released entry: {}", entry_id);
+            println!("✓ Released entry: {entry_id}");
             println!("✓ Successfully reappended to ledger");
         }
 
@@ -1599,7 +1599,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 .context("Failed to drop entry from daemon. Is icnd running?")?;
 
             if result.get("dropped").and_then(|v| v.as_bool()).unwrap_or(false) {
-                println!("✓ Permanently dropped entry: {}", entry_id);
+                println!("✓ Permanently dropped entry: {entry_id}");
             } else {
                 println!("✗ Failed to drop entry (not found in quarantine)");
             }
@@ -1612,7 +1612,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 .context("Failed to purge expired entries from daemon. Is icnd running?")?;
 
             let purged = result.get("purged").and_then(|v| v.as_u64()).unwrap_or(0);
-            println!("✓ Purged {} expired entries", purged);
+            println!("✓ Purged {purged} expired entries");
         }
     }
 
@@ -1660,7 +1660,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             let keypair = keystore.get_keypair()?;
             let deployer_did = keypair.did().clone();
 
-            println!("Signing deployment as {}", deployer_did);
+            println!("Signing deployment as {deployer_did}");
 
             // Compute code hash (must match ContractActor::compute_code_hash)
             let code_hash = {
@@ -1668,7 +1668,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
                 let mut hasher = Sha256::new();
                 hasher.update(contract.name.as_bytes());
                 for participant in &contract.participants {
-                    hasher.update(format!("{:?}", participant).as_bytes());
+                    hasher.update(format!("{participant:?}").as_bytes());
                 }
                 icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
             };
@@ -1717,9 +1717,9 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             {
                 code_hash => {
                     println!("✓ Contract deployed successfully!");
-                    println!("  Code Hash: {}", code_hash);
+                    println!("  Code Hash: {code_hash}");
                     println!("\nYou can now call contract rules using:");
-                    println!("  icnctl contract call {} <rule_name> <caller_did> --args '{{}}'", code_hash);
+                    println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'");
                 }
             }
         }
@@ -1738,10 +1738,10 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
                 serde_json::json!({})
             };
 
-            println!("Calling contract {}...", code_hash);
-            println!("  Rule: {}", rule_name);
-            println!("  Caller: {}", caller);
-            println!("  Args: {}\n", args_value);
+            println!("Calling contract {code_hash}...");
+            println!("  Rule: {rule_name}");
+            println!("  Caller: {caller}");
+            println!("  Args: {args_value}\n");
 
             match client
                 .call_contract(code_hash.clone(), rule_name.clone(), caller.clone(), args_value)
@@ -1787,7 +1787,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
                             println!("  Name: {}", contract.name);
                             println!("  Participants: {}", contract.participants.join(", "));
                             if let Some(currency) = contract.currency {
-                                println!("  Currency: {}", currency);
+                                println!("  Currency: {currency}");
                             }
                             println!("  Rules: {}", contract.rules.join(", "));
                             println!();
@@ -1796,7 +1796,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
                 }
                 Err(e) => {
                     println!("Note: Contract listing not yet fully implemented.");
-                    println!("Error: {}", e);
+                    println!("Error: {e}");
                     println!("\nYou can still deploy and call contracts by code hash.");
                 }
             }
@@ -1844,7 +1844,7 @@ fn handle_contract_prepare(contract_file: &PathBuf, output: &PathBuf, data_dir: 
 
     // Check if signer is a participant
     if !contract.participants.contains(&signer_did) {
-        bail!("You ({}) are not a participant in this contract", signer_did);
+        bail!("You ({signer_did}) are not a participant in this contract");
     }
 
     println!("Signing as {} ({} of {} participants)",
@@ -1858,7 +1858,7 @@ fn handle_contract_prepare(contract_file: &PathBuf, output: &PathBuf, data_dir: 
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
     };
@@ -1903,7 +1903,7 @@ fn handle_contract_prepare(contract_file: &PathBuf, output: &PathBuf, data_dir: 
     println!();
     println!("Signatures collected: 1/{}", contract.participants.len());
     println!("Signed by:");
-    println!("  ✓ {}", signer_did);
+    println!("  ✓ {signer_did}");
     println!();
     println!("Next steps:");
     if contract.participants.len() > 1 {
@@ -1949,12 +1949,12 @@ fn handle_contract_sign(deployment_file: &PathBuf, output: &PathBuf, data_dir: &
 
     // Check if signer is a participant
     if !deployment_msg.contract.participants.contains(&signer_did) {
-        bail!("You ({}) are not a participant in this contract", signer_did);
+        bail!("You ({signer_did}) are not a participant in this contract");
     }
 
     // Check if already signed
     if deployment_msg.installation.signatures.iter().any(|(did, _)| did == &signer_did) {
-        bail!("You ({}) have already signed this deployment", signer_did);
+        bail!("You ({signer_did}) have already signed this deployment");
     }
 
     // Generate signature
@@ -1976,10 +1976,10 @@ fn handle_contract_sign(deployment_file: &PathBuf, output: &PathBuf, data_dir: &
 
     println!("✓ Signature added: {}", output.display());
     println!();
-    println!("Signatures collected: {}/{}", signatures_count, total_participants);
+    println!("Signatures collected: {signatures_count}/{total_participants}");
     println!("Signed by:");
     for (did, _) in &deployment_msg.installation.signatures {
-        println!("  ✓ {}", did);
+        println!("  ✓ {did}");
     }
 
     if signatures_count < total_participants {
@@ -1987,7 +1987,7 @@ fn handle_contract_sign(deployment_file: &PathBuf, output: &PathBuf, data_dir: &
         println!("Still waiting for signatures from:");
         for participant in &deployment_msg.contract.participants {
             if !deployment_msg.installation.signatures.iter().any(|(did, _)| did == participant) {
-                println!("  ⏳ {}", participant);
+                println!("  ⏳ {participant}");
             }
         }
         println!();
@@ -2026,7 +2026,7 @@ async fn handle_contract_deploy_signed(deployment_file: &PathBuf, client: &mut i
 
     if participant_set != signature_set {
         let missing: Vec<_> = participant_set.difference(&signature_set).collect();
-        bail!("Missing signatures from: {:?}", missing);
+        bail!("Missing signatures from: {missing:?}");
     }
 
     println!("✓ All {} participants have signed", deployment_msg.contract.participants.len());
@@ -2040,9 +2040,9 @@ async fn handle_contract_deploy_signed(deployment_file: &PathBuf, client: &mut i
     {
         code_hash => {
             println!("✓ Contract deployed successfully!");
-            println!("  Code Hash: {}", code_hash);
+            println!("  Code Hash: {code_hash}");
             println!("\nYou can now call contract rules using:");
-            println!("  icnctl contract call {} <rule_name> <caller_did> --args '{{}}'", code_hash);
+            println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'");
         }
     }
 
@@ -2120,7 +2120,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
                     vm.id.clone()
                 };
 
-                device_map.entry(base_id).or_insert_with(Vec::new).push(vm);
+                device_map.entry(base_id).or_default().push(vm);
             }
 
             // Display devices in order
@@ -2142,12 +2142,12 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
                     println!("  Added: {}", vm.added_at);
 
                     if let Some(revoked) = vm.revoked_at {
-                        println!("  Revoked: {}", revoked);
+                        println!("  Revoked: {revoked}");
                     }
 
                     println!("  Capabilities:");
                     for cap in &vm.capabilities {
-                        println!("    - {:?}", cap);
+                        println!("    - {cap:?}");
                     }
 
                     // Show associated encryption key
@@ -2162,7 +2162,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
         }
 
         DeviceCommands::Add { name } => {
-            println!("Creating device-add request for '{}'...\n", name);
+            println!("Creating device-add request for '{name}'...\n");
 
             // Prompt for the target DID (the identity to add this device to)
             print!("Enter the DID to add this device to: ");
@@ -2175,7 +2175,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
                 bail!("Invalid DID format. Expected: did:icn:<base58btc-key>");
             }
 
-            println!("Target DID: {}", target_did);
+            println!("Target DID: {target_did}");
             println!();
 
             // Generate new Ed25519 keypair for this device
@@ -2222,7 +2222,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
             println!("     icnctl device approve {}", request_file.display());
             println!();
             println!("⚠️  IMPORTANT:");
-            println!("  • This device will be added to identity: {}", target_did);
+            println!("  • This device will be added to identity: {target_did}");
             println!("  • Do NOT create a new keystore on this device");
             println!("  • After approval, this device will share the same DID");
         }
@@ -2289,7 +2289,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
 
             let new_device_id = format!("device-{}", max_device_num + 1);
 
-            println!("Adding device as: {}", new_device_id);
+            println!("Adding device as: {new_device_id}");
 
             // Decode public keys
             let ed25519_bytes = hex::decode(&request.ed25519_public_key)
@@ -2347,7 +2347,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
             )?;
 
             println!("✓ Device approved and added to DID document");
-            println!("  Device ID: {}", new_device_id);
+            println!("  Device ID: {new_device_id}");
             println!("  Label: {}", request.label);
             println!();
             println!("DID document updated:");
@@ -2362,9 +2362,9 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
                 bail!("No identity found. Run 'icnctl id init' to create one.");
             }
 
-            println!("Revoking device: {}", device_id);
+            println!("Revoking device: {device_id}");
             if let Some(r) = &reason {
-                println!("Reason: {}", r);
+                println!("Reason: {r}");
             }
             println!();
 
@@ -2383,7 +2383,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
 
             // Check device exists
             if did_doc.get_verification_method(&device_id).is_none() {
-                bail!("Device '{}' not found in DID document", device_id);
+                bail!("Device '{device_id}' not found in DID document");
             }
 
             // Determine revocation reason
@@ -2422,9 +2422,9 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> 
             )?;
 
             println!("✓ Device revoked");
-            println!("  Device: {}", device_id);
+            println!("  Device: {device_id}");
             if let Some(r) = reason {
-                println!("  Reason: {}", r);
+                println!("  Reason: {r}");
             }
             println!();
             println!("DID document updated:");
@@ -2502,7 +2502,7 @@ fn handle_backup_command(data_dir: &PathBuf, output: &PathBuf) -> Result<()> {
     println!("✓ Backup created successfully");
     println!("  Output: {}", output.display());
     println!("  ICN version: {}", metadata.icn_version);
-    println!("  Checksum: {}", checksum);
+    println!("  Checksum: {checksum}");
     println!();
     println!("IMPORTANT: Store this backup securely. It contains your identity keystore.");
 
@@ -2550,8 +2550,8 @@ fn handle_restore_command(data_dir: &PathBuf, input: &PathBuf, force: bool) -> R
         println!("Backing up existing data directory...");
         let backup_dir = format!("{}.backup-{}", data_dir.display(), metadata.created_at);
         std::fs::rename(data_dir, &backup_dir)
-            .with_context(|| format!("Failed to backup existing data directory"))?;
-        println!("  Existing data moved to: {}", backup_dir);
+            .with_context(|| "Failed to backup existing data directory".to_string())?;
+        println!("  Existing data moved to: {backup_dir}");
     }
 
     // Create data directory if it doesn't exist
@@ -2588,7 +2588,7 @@ fn handle_restore_command(data_dir: &PathBuf, input: &PathBuf, force: bool) -> R
 
     println!("✓ Backup restored successfully");
     println!("  Restored to: {}", data_dir.display());
-    println!("  Checksum verified: {}", restored_checksum);
+    println!("  Checksum verified: {restored_checksum}");
     println!();
     println!("You can now use 'icnctl id show' to verify your restored identity.");
 
@@ -2686,7 +2686,7 @@ struct JsonRpcError {
 }
 
 fn rpc_call(endpoint: &str, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
-    let url = format!("http://{}/rpc", endpoint);
+    let url = format!("http://{endpoint}/rpc");
     let request = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: 1,
@@ -2755,13 +2755,13 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 rpc_call(endpoint, "governance.domain.create", params)?;
 
                 println!("✓ Governance domain created:");
-                println!("  ID: {}", domain_id);
-                println!("  Name: {}", name);
+                println!("  ID: {domain_id}");
+                println!("  Name: {name}");
                 println!("  Members: {}", member_list.len());
-                println!("  Profile: {}", profile);
-                println!("  Quorum: {}%", quorum);
-                println!("  Approval: {}%", approval);
-                println!("  Voting period: {} seconds", voting_period);
+                println!("  Profile: {profile}");
+                println!("  Quorum: {quorum}%");
+                println!("  Approval: {approval}%");
+                println!("  Voting period: {voting_period} seconds");
             }
 
             DomainCommands::Show { domain_id } => {
@@ -2792,7 +2792,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 for domain in domains {
                     let id = domain["id"].as_str().unwrap_or("unknown");
                     let name = domain["name"].as_str().unwrap_or("unnamed");
-                    println!("  - {} ({})", id, name);
+                    println!("  - {id} ({name})");
                 }
             }
         },
@@ -2871,7 +2871,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 let proposal_id = result["proposal_id"].as_str().context("Missing proposal_id in response")?;
 
                 println!("✓ Proposal created:");
-                println!("  ID: {}", proposal_id);
+                println!("  ID: {proposal_id}");
                 println!("  State: Draft");
             }
 
@@ -2901,12 +2901,12 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 rpc_call(endpoint, "governance.proposal.open", open_params)?;
 
                 println!("✓ Proposal opened for voting:");
-                println!("  ID: {}", proposal_id);
-                println!("  Duration: {} seconds", voting_period);
+                println!("  ID: {proposal_id}");
+                println!("  Duration: {voting_period} seconds");
             }
 
             ProposalCommands::List { domain_id, state } => {
-                println!("Proposals in domain '{}':", domain_id);
+                println!("Proposals in domain '{domain_id}':");
 
                 let result = rpc_call(endpoint, "governance.proposal.list", serde_json::json!({}))?;
                 let proposals: Vec<serde_json::Value> = serde_json::from_value(result)
@@ -2930,7 +2930,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                     let id = proposal["id"].as_str().unwrap_or("unknown");
                     let title = proposal["title"].as_str().unwrap_or("untitled");
 
-                    println!("  [{}] {} - {}", state_upper, id, title);
+                    println!("  [{state_upper}] {id} - {title}");
                 }
             }
 
@@ -2947,13 +2947,13 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 println!("  Domain: {}", proposal["domain_id"].as_str().unwrap_or("unknown"));
 
                 if let Some(opened_at) = proposal["opened_at"].as_u64() {
-                    println!("  Opened at: {} (Unix timestamp)", opened_at);
+                    println!("  Opened at: {opened_at} (Unix timestamp)");
                 }
                 if let Some(closes_at) = proposal["closes_at"].as_u64() {
-                    println!("  Closes at: {} (Unix timestamp)", closes_at);
+                    println!("  Closes at: {closes_at} (Unix timestamp)");
                 }
                 if let Some(closed_at) = proposal["closed_at"].as_u64() {
-                    println!("  Closed at: {} (Unix timestamp)", closed_at);
+                    println!("  Closed at: {closed_at} (Unix timestamp)");
                 }
             }
 
@@ -2962,7 +2962,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 rpc_call(endpoint, "governance.proposal.close", params)?;
 
                 println!("✓ Proposal closed:");
-                println!("  ID: {}", proposal_id);
+                println!("  ID: {proposal_id}");
                 println!("  The daemon has evaluated votes and determined the outcome.");
             }
 
@@ -2993,12 +2993,12 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
                 rpc_call(endpoint, "governance.vote.cast", params)?;
 
                 println!("✓ Vote recorded:");
-                println!("  Proposal: {}", proposal_id);
-                println!("  Choice: {}", choice_lower);
+                println!("  Proposal: {proposal_id}");
+                println!("  Choice: {choice_lower}");
             }
 
             VoteCommands::Show { proposal_id } => {
-                bail!("Vote show command not yet supported via RPC. Use 'proposal show {}' to see the proposal.", proposal_id);
+                bail!("Vote show command not yet supported via RPC. Use 'proposal show {proposal_id}' to see the proposal.");
             }
         },
     }
@@ -3039,15 +3039,15 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
                     let network_peers = snapshot.network_state.as_ref()
                         .map_or(0, |n| n.peer_x25519_keys.len());
 
-                    println!("  Gossip peers: {}", gossip_peers);
-                    println!("  Network peers: {}", network_peers);
+                    println!("  Gossip peers: {gossip_peers}");
+                    println!("  Network peers: {network_peers}");
                     println!("  SHA256 checksum: generated");
                 }
                 Ok(None) => {
                     println!("⚠ No snapshot exists yet. Start the daemon to generate initial state.");
                 }
                 Err(e) => {
-                    bail!("Failed to load snapshot: {}", e);
+                    bail!("Failed to load snapshot: {e}");
                 }
             }
         }
@@ -3067,11 +3067,11 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
                         for (filename, timestamp, size) in snapshots {
                             // Format timestamp as human-readable date
                             let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
-                            let formatted_date = format!("{:?}", datetime);
+                            let formatted_date = format!("{datetime:?}");
 
                             // Format size in KB/MB
                             let formatted_size = if size < 1024 {
-                                format!("{} B", size)
+                                format!("{size} B")
                             } else if size < 1024 * 1024 {
                                 format!("{:.1} KB", size as f64 / 1024.0)
                             } else {
@@ -3089,14 +3089,14 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
                     }
                 }
                 Err(e) => {
-                    bail!("Failed to list snapshots: {}", e);
+                    bail!("Failed to list snapshots: {e}");
                 }
             }
         }
 
         SnapshotCommands::Verify { snapshot } => {
             let snapshot_name = snapshot.unwrap_or_else(|| "state.snapshot".to_string());
-            println!("Verifying snapshot: {}", snapshot_name);
+            println!("Verifying snapshot: {snapshot_name}");
 
             // If a specific snapshot was given, we need to temporarily copy it
             if snapshot_name != "state.snapshot" {
@@ -3123,23 +3123,23 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
                         let network_peers = snapshot.network_state.as_ref()
                             .map_or(0, |n| n.peer_x25519_keys.len());
 
-                        println!("  Gossip peers: {}", gossip_peers);
-                        println!("  Gossip topics: {}", gossip_topics);
-                        println!("  Network peers: {}", network_peers);
+                        println!("  Gossip peers: {gossip_peers}");
+                        println!("  Gossip topics: {gossip_topics}");
+                        println!("  Network peers: {network_peers}");
                     }
                 }
                 Err(e) => {
                     println!("✗ Snapshot verification failed!");
-                    bail!("{}", e);
+                    bail!("{e}");
                 }
             }
         }
 
         SnapshotCommands::Delete { snapshot } => {
-            println!("Deleting snapshot: {}", snapshot);
+            println!("Deleting snapshot: {snapshot}");
 
             let snapshot_path = store_dir.join(&snapshot);
-            let checksum_path = store_dir.join(format!("{}.sha256", snapshot));
+            let checksum_path = store_dir.join(format!("{snapshot}.sha256"));
 
             if !snapshot_path.exists() {
                 bail!("Snapshot not found: {}", snapshot_path.display());
@@ -3159,18 +3159,18 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
         }
 
         SnapshotCommands::Cleanup { keep } => {
-            println!("Cleaning up old snapshots (keeping {} most recent)...", keep);
+            println!("Cleaning up old snapshots (keeping {keep} most recent)...");
 
             match icn_snapshot::cleanup_old_snapshots(&store_dir, keep) {
                 Ok(deleted) => {
                     if deleted > 0 {
-                        println!("✓ Deleted {} old snapshot(s)", deleted);
+                        println!("✓ Deleted {deleted} old snapshot(s)");
                     } else {
                         println!("No snapshots to delete (under retention limit)");
                     }
                 }
                 Err(e) => {
-                    bail!("Failed to cleanup snapshots: {}", e);
+                    bail!("Failed to cleanup snapshots: {e}");
                 }
             }
         }

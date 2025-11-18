@@ -89,7 +89,7 @@ impl TestNode {
         let contract_actor_handle = Arc::new(RwLock::new(contract_actor));
 
         // Spawn network actor
-        let listen_addr: std::net::SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: std::net::SocketAddr = format!("127.0.0.1:{port}").parse()?;
 
         let gossip_for_incoming = gossip_handle.clone();
         let incoming_handler: icn_net::IncomingMessageHandler = Arc::new(move |net_msg| {
@@ -143,17 +143,17 @@ impl TestNode {
                     };
 
                     let result = if let Some(target_did) = recipient {
-                        eprintln!("Sending {} from {} to {}", msg_type, from_did, target_did);
+                        eprintln!("Sending {msg_type} from {from_did} to {target_did}");
                         let net_msg = icn_net::NetworkMessage::gossip(from_did.clone(), Some(target_did.clone()), gossip_msg);
                         net_handle.send_message(target_did, net_msg).await
                     } else {
                         // Skip broadcast in tests - we don't have peer tracking
-                        eprintln!("Skipping broadcast {} from {}", msg_type, from_did);
+                        eprintln!("Skipping broadcast {msg_type} from {from_did}");
                         return;
                     };
                     match result {
-                        Ok(_) => eprintln!("✓ {} sent successfully", msg_type),
-                        Err(e) => eprintln!("✗ Failed to send {}: {}", msg_type, e),
+                        Ok(_) => eprintln!("✓ {msg_type} sent successfully"),
+                        Err(e) => eprintln!("✗ Failed to send {msg_type}: {e}"),
                     }
                 });
             });
@@ -172,7 +172,7 @@ impl TestNode {
                     let entry_data = match entry.get_data() {
                         Ok(data) => data,
                         Err(e) => {
-                            eprintln!("Failed to get entry data: {}", e);
+                            eprintln!("Failed to get entry data: {e}");
                             return;
                         }
                     };
@@ -182,11 +182,11 @@ impl TestNode {
                             Ok(deployment_msg) => {
                                 let actor = contract_actor.write().await;
                                 if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
-                                    eprintln!("Failed to handle contract deployment: {}", e);
+                                    eprintln!("Failed to handle contract deployment: {e}");
                                 }
                             }
                             Err(e) => {
-                                eprintln!("Failed to deserialize contract deployment: {}", e);
+                                eprintln!("Failed to deserialize contract deployment: {e}");
                             }
                         }
                     });
@@ -237,7 +237,7 @@ impl TestNode {
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
-            hasher.update(format!("{:?}", participant).as_bytes());
+            hasher.update(format!("{participant:?}").as_bytes());
         }
         let code_hash = ContentHash::from_bytes(hasher.finalize().into());
 
@@ -296,7 +296,7 @@ impl TestNode {
 
         // Send Announce message to each connected peer
         for peer_did in announce_to {
-            eprintln!("Sending Announce for contract {} to {}", hash.iter().take(8).map(|b| format!("{:02x}", b)).collect::<String>(), peer_did);
+            eprintln!("Sending Announce for contract {} to {}", hash.iter().take(8).map(|b| format!("{b:02x}")).collect::<String>(), peer_did);
             let announce_msg = icn_gossip::GossipMessage::Announce {
                 hash,
                 author: self.did.clone(),
@@ -309,10 +309,10 @@ impl TestNode {
                 announce_msg
             );
             match self.network_handle.send_message(peer_did.clone(), net_msg).await {
-                Ok(_) => eprintln!("✓ Announce sent successfully to {}", peer_did),
+                Ok(_) => eprintln!("✓ Announce sent successfully to {peer_did}"),
                 Err(e) => {
-                    eprintln!("✗ Failed to send Announce to {}: {}", peer_did, e);
-                    return Err(e.into());
+                    eprintln!("✗ Failed to send Announce to {peer_did}: {e}");
+                    return Err(e);
                 }
             }
         }
@@ -395,7 +395,7 @@ async fn test_two_node_contract_deployment() {
         .await
         .expect("Failed to deploy contract");
 
-    println!("Contract deployed from node A: {}", code_hash);
+    println!("Contract deployed from node A: {code_hash}");
 
     // Wait for gossip propagation
     sleep(Duration::from_millis(800)).await;
@@ -1006,16 +1006,16 @@ async fn test_large_contract_near_limits() {
     // Add 50 state variables (half the limit)
     println!("Creating large contract with 50 state variables and 25 rules...");
     for i in 0..50 {
-        contract = contract.add_state_var(format!("var_{}", i), Value::Int(i as i64));
+        contract = contract.add_state_var(format!("var_{i}"), Value::Int(i as i64));
     }
 
     // Add 25 rules (half the limit)
     for i in 0..25 {
         contract = contract.add_rule(
-            Rule::new(format!("rule_{}", i))
-                .add_param(format!("param_{}", i))
+            Rule::new(format!("rule_{i}"))
+                .add_param(format!("param_{i}"))
                 .add_stmt(Stmt::Return {
-                    value: Expr::Var(format!("param_{}", i)),
+                    value: Expr::Var(format!("param_{i}")),
                 }),
         );
     }

@@ -31,6 +31,11 @@ pub type EntryNotificationCallback = Arc<dyn Fn(String, GossipEntry, Did) + Send
 /// Returns a list of peer DIDs to send messages to
 pub type PeerSamplingCallback = Arc<dyn Fn(crate::types::Scope, usize) -> Vec<Did> + Send + Sync>;
 
+/// Trust lookup function for resource limits
+/// Parameters: (did) -> Option<TrustClass>
+/// Returns the trust class for a DID to determine resource limits
+pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
+
 /// Maximum subscribers per topic to prevent unbounded memory growth
 const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 
@@ -62,7 +67,7 @@ pub struct GossipActor {
     subscriptions: HashMap<String, Vec<Did>>,
 
     /// Trust lookup function (returns trust class for resource limits)
-    trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+    trust_lookup: TrustLookup,
 
     /// Trust graph for fine-grained trust score computation (optional)
     /// When provided, enables trust-gated subscription authorization
@@ -85,7 +90,7 @@ impl GossipActor {
     /// Create a new gossip actor
     pub fn new(
         own_did: Did,
-        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+        trust_lookup: TrustLookup,
     ) -> Self {
         Self::new_with_trust_graph(own_did, trust_lookup, None)
     }
@@ -93,7 +98,7 @@ impl GossipActor {
     /// Create a new gossip actor with optional trust graph for fine-grained trust control
     pub fn new_with_trust_graph(
         own_did: Did,
-        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+        trust_lookup: TrustLookup,
         trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
     ) -> Self {
         let mut gossip = GossipActor {
@@ -1295,7 +1300,7 @@ impl GossipActor {
     /// Spawn a gossip actor and return a handle
     pub fn spawn(
         own_did: Did,
-        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+        trust_lookup: TrustLookup,
     ) -> GossipHandle {
         Self::spawn_with_trust_graph(own_did, trust_lookup, None)
     }
@@ -1303,7 +1308,7 @@ impl GossipActor {
     /// Spawn a gossip actor with optional trust graph and return a handle
     pub fn spawn_with_trust_graph(
         own_did: Did,
-        trust_lookup: Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>,
+        trust_lookup: TrustLookup,
         trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
     ) -> GossipHandle {
         let actor = GossipActor::new_with_trust_graph(own_did, trust_lookup, trust_graph);
@@ -1727,7 +1732,7 @@ mod tests {
         for i in 0..100 {
             let did = KeyPair::generate().unwrap().did().clone();
             let result = gossip.subscribe("test:limited", did);
-            assert!(result.is_ok(), "Subscribe {} should succeed", i);
+            assert!(result.is_ok(), "Subscribe {i} should succeed");
         }
 
         // Verify count
@@ -1750,9 +1755,9 @@ mod tests {
 
         // Publish more entries than the limit
         for i in 0..10 {
-            let data = format!("entry_{}", i).into_bytes();
+            let data = format!("entry_{i}").into_bytes();
             let result = gossip.publish("test:entries", data);
-            assert!(result.is_ok(), "Publish {} failed: {:?}", i, result);
+            assert!(result.is_ok(), "Publish {i} failed: {result:?}");
 
             // Sleep briefly to ensure distinct timestamps for proper ordering
             std::thread::sleep(std::time::Duration::from_millis(2));
@@ -1952,7 +1957,7 @@ mod tests {
 
         // Send 5 entries via Response messages
         for i in 0..5 {
-            let data = format!("Entry {}", i).into_bytes();
+            let data = format!("Entry {i}").into_bytes();
             let mut hasher = Sha256::new();
             hasher.update(&data);
             let result_bytes = hasher.finalize();

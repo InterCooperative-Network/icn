@@ -456,10 +456,10 @@ mod tests {
 
     #[test]
     fn test_validate_scopes() {
-        assert!(validate_scopes(&vec!["ledger:read".to_string()]).is_ok());
-        let many_scopes: Vec<String> = (0..20).map(|i| format!("scope:{}", i)).collect();
+        assert!(validate_scopes(&["ledger:read".to_string()]).is_ok());
+        let many_scopes: Vec<String> = (0..20).map(|i| format!("scope:{i}")).collect();
         assert!(validate_scopes(&many_scopes).is_ok());
-        let too_many_scopes: Vec<String> = (0..21).map(|i| format!("scope:{}", i)).collect();
+        let too_many_scopes: Vec<String> = (0..21).map(|i| format!("scope:{i}")).collect();
         assert!(validate_scopes(&too_many_scopes).is_err());
     }
 
@@ -564,10 +564,10 @@ mod tests {
 
     #[test]
     fn test_validate_domain_members() {
-        assert!(validate_domain_members(&vec!["did:icn:alice".to_string()]).is_ok());
-        assert!(validate_domain_members(&vec!["did:icn:alice".to_string(), "did:icn:bob".to_string()]).is_ok());
-        assert!(validate_domain_members(&vec![]).is_err()); // Empty
-        let too_many: Vec<String> = (0..MAX_DOMAIN_MEMBERS + 1).map(|i| format!("did:icn:{}", i)).collect();
+        assert!(validate_domain_members(&["did:icn:alice".to_string()]).is_ok());
+        assert!(validate_domain_members(&["did:icn:alice".to_string(), "did:icn:bob".to_string()]).is_ok());
+        assert!(validate_domain_members(&[]).is_err()); // Empty
+        let too_many: Vec<String> = (0..MAX_DOMAIN_MEMBERS + 1).map(|i| format!("did:icn:{i}")).collect();
         assert!(validate_domain_members(&too_many).is_err()); // Too many
 
         // Duplicate detection

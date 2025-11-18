@@ -225,6 +225,52 @@ impl AuthManager {
 
         Ok(initial_count - challenges.len())
     }
+
+    /// Spawn a background task that periodically cleans up expired challenges
+    /// Returns a JoinHandle that can be awaited for graceful shutdown
+    pub fn spawn_cleanup_task(&self) -> tokio::task::JoinHandle<()> {
+        let challenges = self.challenges.clone();
+        let challenge_ttl = self.challenge_ttl;
+
+        tokio::spawn(async move {
+            // Run cleanup every 5 minutes
+            let mut interval = tokio::time::interval(Duration::from_secs(300));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            loop {
+                interval.tick().await;
+
+                // Perform cleanup
+                let mut challenges_guard = match challenges.write() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        tracing::warn!("Failed to acquire challenges lock for cleanup: {}", e);
+                        continue;
+                    }
+                };
+
+                let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+                    Ok(duration) => duration.as_secs(),
+                    Err(e) => {
+                        tracing::warn!("Failed to get current timestamp for cleanup: {}", e);
+                        continue;
+                    }
+                };
+
+                let ttl = challenge_ttl.as_secs();
+                let initial_count = challenges_guard.len();
+
+                challenges_guard.retain(|_, challenge| {
+                    now - challenge.created_at < ttl
+                });
+
+                let removed = initial_count - challenges_guard.len();
+                if removed > 0 {
+                    tracing::debug!("Cleaned up {} expired challenges", removed);
+                }
+            }
+        })
+    }
 }
 
 #[cfg(test)]

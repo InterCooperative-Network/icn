@@ -24,9 +24,9 @@ async fn main() -> anyhow::Result<()> {
 
     println!("=== TimeBank Contract Example ===\n");
     println!("Participants:");
-    println!("  Alice:   {}", alice);
-    println!("  Bob:     {}", bob);
-    println!("  Charlie: {}\n", charlie);
+    println!("  Alice:   {alice}");
+    println!("  Bob:     {bob}");
+    println!("  Charlie: {charlie}\n");
 
     // Build TimeBank contract
     let contract = Contract::new("TimeBank".to_string())
@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
     let code_hash = ContentHash::from_bytes([42u8; 32]);
     runtime.install_contract(code_hash.clone(), contract)?;
 
-    println!("Contract installed: {}\n", code_hash);
+    println!("Contract installed: {code_hash}\n");
 
     // Scenario: Alice provides 3 hours of web design to Bob
     println!("Scenario 1: Alice provides 3 hours of web design to Bob");

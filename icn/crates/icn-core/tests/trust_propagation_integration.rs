@@ -119,7 +119,7 @@ impl TestNode {
         });
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -385,9 +385,8 @@ async fn test_three_node_transitive_trust() -> Result<()> {
 
         // Should be approximately 0.144 (0.8 * 0.6 * 0.3)
         assert!(
-            transitive_score >= 0.14 && transitive_score <= 0.15,
-            "Transitive trust score should be ~0.144, got {}",
-            transitive_score
+            (0.14..=0.15).contains(&transitive_score),
+            "Transitive trust score should be ~0.144, got {transitive_score}"
         );
     }
 

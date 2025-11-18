@@ -7,6 +7,16 @@ use serde::{Deserialize, Serialize};
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checks: Option<std::collections::HashMap<String, ComponentHealth>>,
+}
+
+/// Health status of an individual component
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentHealth {
+    pub status: String,  // "ok", "degraded", "error"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
 }
 
 // === Authentication ===

@@ -258,7 +258,7 @@ mod tests {
         // Create a multibase-encoded string with wrong size (16 bytes instead of 32)
         let short_bytes = vec![0u8; 16];
         let encoded = multibase::encode(multibase::Base::Base58Btc, &short_bytes);
-        let did_str = format!("did:icn:{}", encoded);
+        let did_str = format!("did:icn:{encoded}");
 
         let result = Did::from_str(&did_str);
         assert!(result.is_err());
@@ -270,7 +270,7 @@ mod tests {
         // All zeros is not a valid Ed25519 public key
         let invalid_key = vec![0u8; 32];
         let encoded = multibase::encode(multibase::Base::Base58Btc, &invalid_key);
-        let did_str = format!("did:icn:{}", encoded);
+        let did_str = format!("did:icn:{encoded}");
 
         let result = Did::from_str(&did_str);
         // Note: All-zeros might actually be accepted by ed25519_dalek

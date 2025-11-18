@@ -128,6 +128,6 @@ mod tests {
     #[test]
     fn test_domain_id_display() {
         let id = GovernanceDomainId::new("test-domain");
-        assert_eq!(format!("{}", id), "test-domain");
+        assert_eq!(format!("{id}"), "test-domain");
     }
 }

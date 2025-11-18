@@ -198,14 +198,18 @@ impl CoopManager {
         // This prevents TOCTOU race where multiple threads check limit concurrently
         crate::validation::validate_coop_count(coops.len())?;
 
-        if coops.contains_key(&id) {
-            return Err(GatewayError::BadRequest("Coop ID already exists".to_string()));
+        // Use entry API for atomic check-and-insert (prevents any potential race)
+        use std::collections::hash_map::Entry;
+        match coops.entry(id.clone()) {
+            Entry::Vacant(e) => {
+                let coop = Coop::new(id, name, owner, timestamp);
+                e.insert(coop);
+                Ok(())
+            }
+            Entry::Occupied(_) => {
+                Err(GatewayError::BadRequest("Coop ID already exists".to_string()))
+            }
         }
-
-        let coop = Coop::new(id.clone(), name, owner, timestamp);
-        coops.insert(id, coop);
-
-        Ok(())
     }
 
     /// Get a cooperative

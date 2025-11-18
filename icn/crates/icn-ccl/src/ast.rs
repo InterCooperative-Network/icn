@@ -741,7 +741,7 @@ mod tests {
 
         // Add MAX_STATE_VARS + 1 state variables
         for i in 0..=MAX_STATE_VARS {
-            contract = contract.add_state_var(format!("var{}", i), Value::Int(0));
+            contract = contract.add_state_var(format!("var{i}"), Value::Int(0));
         }
 
         let result = contract.validate();
@@ -757,7 +757,7 @@ mod tests {
 
         // Add MAX_RULES + 1 rules
         for i in 0..=MAX_RULES {
-            let rule = Rule::new(format!("rule{}", i));
+            let rule = Rule::new(format!("rule{i}"));
             contract = contract.add_rule(rule);
         }
 

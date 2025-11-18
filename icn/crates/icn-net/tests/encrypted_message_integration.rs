@@ -9,7 +9,7 @@
 //! This demonstrates Phase 10 encryption working with Phase 9 authentication.
 
 use anyhow::Result;
-use icn_identity::{IdentityBundle, KeyPair};
+use icn_identity::IdentityBundle;
 use icn_net::{EncryptedEnvelope, IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage, PayloadType, SignedEnvelope};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -220,7 +220,7 @@ fn test_multiple_encrypted_messages_different_nonces() {
     // Send multiple messages with increasing sequence numbers
     for seq in 1..=5 {
         let message = SecretMessage {
-            content: format!("Message #{}", seq),
+            content: format!("Message #{seq}"),
             timestamp: 1234567890 + seq,
         };
 
@@ -314,7 +314,7 @@ impl TestNode {
             let _ = msg_tx.send(net_msg);
         });
 
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let network_handle = NetworkActor::spawn(
             identity_bundle.clone(),
             listen_addr,

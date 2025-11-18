@@ -5,10 +5,9 @@
 
 use anyhow::Result;
 use icn_identity::{IdentityBundle, KeyPair};
-use icn_net::{NetworkActor, NetworkMessage};
+use icn_net::NetworkActor;
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::Duration;

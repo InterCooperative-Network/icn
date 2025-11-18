@@ -10,6 +10,7 @@ use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
+use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
@@ -79,6 +80,9 @@ impl Supervisor {
         }
 
         let mut shutdown_rx = self.shutdown_tx.subscribe();
+
+        // Track spawned background tasks for graceful shutdown
+        let mut background_tasks: JoinSet<()> = JoinSet::new();
 
         // Spawn actors (requires identity bundle from unlocked keystore)
         let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) = &self.identity_bundle {
@@ -1085,7 +1089,7 @@ impl Supervisor {
                                                                             "🚨 CRITICAL: Ledger updated but audit trail write failed for proposal {}",
                                                                             prop_id.0
                                                                         );
-                                                                        error!("   Ledger entry hash: {}", hex::encode(&entry_hash.0));
+                                                                        error!("   Ledger entry hash: {}", hex::encode(entry_hash.0));
                                                                         error!("   Amount: {} {}", amount, currency);
                                                                         error!("   Recipient: {}", recipient);
                                                                         error!("   Error: {}", e);
@@ -1102,7 +1106,7 @@ impl Supervisor {
                                                                     "🚨 CRITICAL: Failed to serialize audit record for proposal {}: {}",
                                                                     prop_id.0, e
                                                                 );
-                                                                error!("   Ledger entry hash: {}", hex::encode(&entry_hash.0));
+                                                                error!("   Ledger entry hash: {}", hex::encode(entry_hash.0));
                                                                 error!("   ACTION REQUIRED: Manual reconciliation needed");
 
                                                                 // Metrics: audit trail failure
@@ -1168,7 +1172,7 @@ impl Supervisor {
             rpc_server.set_gossip_handle(gossip_handle.clone());
             rpc_server.set_governance_handle(governance_handle);
 
-            tokio::spawn(async move {
+            background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {
                     warn!("RPC server error: {}", e);
                 }
@@ -1230,7 +1234,7 @@ impl Supervisor {
             let start_time = std::time::Instant::now();
             let network_handle_metrics = network_handle.clone();
             let mut metrics_shutdown = self.shutdown_tx.subscribe();
-            tokio::spawn(async move {
+            background_tasks.spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
                 loop {
                     tokio::select! {
@@ -1262,7 +1266,7 @@ impl Supervisor {
             // Still spawn metrics update task for system metrics
             let start_time = std::time::Instant::now();
             let mut metrics_shutdown = self.shutdown_tx.subscribe();
-            tokio::spawn(async move {
+            background_tasks.spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
                 loop {
                     tokio::select! {
@@ -1295,90 +1299,124 @@ impl Supervisor {
             }
         }
 
-        // Grace period for in-flight tasks (governance execution, etc.) to complete
-        // TODO: Replace with proper task tracking (JoinSet) for guaranteed completion
-        info!("Waiting 2s for in-flight tasks to complete...");
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        // Wait for background tasks to complete gracefully (with timeout)
+        info!("Waiting for background tasks to complete...");
+        let shutdown_timeout = tokio::time::Duration::from_secs(5);
+        match tokio::time::timeout(shutdown_timeout, async {
+            while background_tasks.join_next().await.is_some() {
+                // Task completed successfully
+            }
+        }).await {
+            Ok(_) => info!("All background tasks completed successfully"),
+            Err(_) => warn!("Shutdown timeout reached, {} tasks may still be running", background_tasks.len()),
+        }
+
+        // Abort any remaining tasks that didn't finish
+        background_tasks.shutdown().await;
 
         // Graceful shutdown of actors
         info!("Supervisor shutting down actors");
 
         // Save state snapshot before actors are dropped
+        // Errors during state export should not prevent graceful shutdown
         if gossip_handle.is_some() || network_handle.is_some() {
             info!("Saving state snapshot before shutdown");
-            let mut snapshot = icn_snapshot::StateSnapshot::new();
+            let snapshot_result = async {
+                let mut snapshot = icn_snapshot::StateSnapshot::new();
 
-            // Export gossip state
-            if let Some(ref gossip_handle) = gossip_handle {
-                let gossip = gossip_handle.read().await;
-                snapshot.gossip_state = Some(gossip.export_state());
-                info!("Exported gossip state: {} vector clock entries, {} subscriptions",
-                      snapshot.gossip_state.as_ref().unwrap().vector_clock.len(),
-                      snapshot.gossip_state.as_ref().unwrap().subscriptions.len());
-            }
-
-            // Export network state
-            if let Some(ref network_handle) = network_handle {
-                // Need to use blocking context for async export_state
-                let state = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        network_handle.export_state().await
-                    })
-                });
-                snapshot.network_state = Some(state);
-                info!("Exported network state: {} peer X25519 keys",
-                      snapshot.network_state.as_ref().unwrap().peer_x25519_keys.len());
-            }
-
-            // Record snapshot metrics before saving
-            if let Some(ref gossip_state) = snapshot.gossip_state {
-                icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());
-                icn_obs::metrics::snapshot::gossip_subscriptions_set(gossip_state.subscriptions.len());
-                icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
-            }
-            if let Some(ref network_state) = snapshot.network_state {
-                icn_obs::metrics::snapshot::network_x25519_keys_set(network_state.peer_x25519_keys.len());
-            }
-
-            // Save snapshot to disk
-            let data_dir = self.config.store_path();
-            let save_start = std::time::Instant::now();
-            let save_result = icn_snapshot::save_snapshot(&snapshot, &data_dir);
-            let save_duration = save_start.elapsed();
-
-            match save_result {
-                Ok(()) => {
-                    icn_obs::metrics::snapshot::save_total_inc();
-                    icn_obs::metrics::snapshot::save_duration_record(save_duration.as_secs_f64());
-
-                    // Record snapshot file size
-                    let snapshot_path = data_dir.join("state.snapshot");
-                    if let Ok(metadata) = std::fs::metadata(&snapshot_path) {
-                        icn_obs::metrics::snapshot::size_bytes_set(metadata.len());
-                    }
-
-                    info!("✅ State snapshot saved to {}/state.snapshot in {:.3}s",
-                          data_dir.display(), save_duration.as_secs_f64());
-
-                    // Save timestamped backup for archival
-                    if let Err(e) = icn_snapshot::save_timestamped_snapshot(&snapshot, &data_dir) {
-                        warn!("Failed to save timestamped snapshot backup: {}", e);
-                    }
-
-                    // Cleanup old snapshots (keep last 3)
-                    match icn_snapshot::cleanup_old_snapshots(&data_dir, 3) {
-                        Ok(deleted) if deleted > 0 => {
-                            info!("Cleaned up {} old snapshot(s)", deleted);
+                // Export gossip state
+                if let Some(ref gossip_handle) = gossip_handle {
+                    match gossip_handle.read().await.export_state() {
+                        gossip_state => {
+                            info!("Exported gossip state: {} vector clock entries, {} subscriptions",
+                                  gossip_state.vector_clock.len(),
+                                  gossip_state.subscriptions.len());
+                            snapshot.gossip_state = Some(gossip_state);
                         }
-                        Ok(_) => {},
+                    }
+                }
+
+                // Export network state
+                if let Some(ref network_handle) = network_handle {
+                    // Need to use blocking context for async export_state
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async {
+                                network_handle.export_state().await
+                            })
+                        })
+                    })) {
+                        Ok(state) => {
+                            info!("Exported network state: {} peer X25519 keys",
+                                  state.peer_x25519_keys.len());
+                            snapshot.network_state = Some(state);
+                        }
                         Err(e) => {
-                            warn!("Failed to cleanup old snapshots: {}", e);
+                            warn!("Failed to export network state (panic): {:?}", e);
+                        }
+                    }
+                }
+
+                Ok::<_, anyhow::Error>(snapshot)
+            }.await;
+
+            match snapshot_result {
+                Ok(snapshot) => {
+                    // Record snapshot metrics before saving
+                    if let Some(ref gossip_state) = snapshot.gossip_state {
+                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());
+                        icn_obs::metrics::snapshot::gossip_subscriptions_set(gossip_state.subscriptions.len());
+                        icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
+                    }
+                    if let Some(ref network_state) = snapshot.network_state {
+                        icn_obs::metrics::snapshot::network_x25519_keys_set(network_state.peer_x25519_keys.len());
+                    }
+
+                    // Save snapshot to disk
+                    let data_dir = self.config.store_path();
+                    let save_start = std::time::Instant::now();
+                    let save_result = icn_snapshot::save_snapshot(&snapshot, &data_dir);
+                    let save_duration = save_start.elapsed();
+
+                    match save_result {
+                        Ok(()) => {
+                            icn_obs::metrics::snapshot::save_total_inc();
+                            icn_obs::metrics::snapshot::save_duration_record(save_duration.as_secs_f64());
+
+                            // Record snapshot file size
+                            let snapshot_path = data_dir.join("state.snapshot");
+                            if let Ok(metadata) = std::fs::metadata(&snapshot_path) {
+                                icn_obs::metrics::snapshot::size_bytes_set(metadata.len());
+                            }
+
+                            info!("✅ State snapshot saved to {}/state.snapshot in {:.3}s",
+                                  data_dir.display(), save_duration.as_secs_f64());
+
+                            // Save timestamped backup for archival
+                            if let Err(e) = icn_snapshot::save_timestamped_snapshot(&snapshot, &data_dir) {
+                                warn!("Failed to save timestamped snapshot backup: {}", e);
+                            }
+
+                            // Cleanup old snapshots (keep last 3)
+                            match icn_snapshot::cleanup_old_snapshots(&data_dir, 3) {
+                                Ok(deleted) if deleted > 0 => {
+                                    info!("Cleaned up {} old snapshot(s)", deleted);
+                                }
+                                Ok(_) => {},
+                                Err(e) => {
+                                    warn!("Failed to cleanup old snapshots: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            icn_obs::metrics::snapshot::save_errors_inc();
+                            warn!("Failed to save state snapshot: {}", e);
                         }
                     }
                 }
                 Err(e) => {
-                    icn_obs::metrics::snapshot::save_errors_inc();
-                    warn!("Failed to save state snapshot: {}", e);
+                    warn!("Failed to export actor state during shutdown: {}", e);
+                    // Continue with shutdown even if state export failed
                 }
             }
         }

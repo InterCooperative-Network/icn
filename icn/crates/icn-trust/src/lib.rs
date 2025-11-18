@@ -399,7 +399,7 @@ mod tests {
 
         // Compute trust
         let score = graph.compute_trust_score(&bob).unwrap();
-        assert!(score >= 0.42 && score <= 0.43); // 0.6 * 0.7 (direct only)
+        assert!((0.42..=0.43).contains(&score)); // 0.6 * 0.7 (direct only)
 
         let class = graph.trust_class(&bob).unwrap();
         assert_eq!(class, TrustClass::Partner);
@@ -429,7 +429,7 @@ mod tests {
 
         // Expected: 0 * 0.7 (no direct) + (0.8 * 0.6) * 0.3 (transitive)
         // = 0 + 0.144 = 0.144
-        assert!(score >= 0.14 && score <= 0.15);
+        assert!((0.14..=0.15).contains(&score));
 
         let class = graph.trust_class(&carol).unwrap();
         assert_eq!(class, TrustClass::Known);

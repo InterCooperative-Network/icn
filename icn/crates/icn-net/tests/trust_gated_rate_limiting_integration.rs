@@ -49,7 +49,7 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
     println!("   Expected: 10 msg/sec, burst capacity 2");
 
     let allowed_count = test_peer_rate_limit(&rate_limiter, &bob, 10).await;
-    println!("   Result: {} messages allowed out of 10", allowed_count);
+    println!("   Result: {allowed_count} messages allowed out of 10");
     assert_eq!(allowed_count, 2, "Isolated peer should allow burst of 2");
 
     // Test 2: Carol (Partner) - 100 msg/sec, burst 20
@@ -57,7 +57,7 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
     println!("   Expected: 100 msg/sec, burst capacity 20");
 
     let allowed_count = test_peer_rate_limit(&rate_limiter, &carol, 30).await;
-    println!("   Result: {} messages allowed out of 30", allowed_count);
+    println!("   Result: {allowed_count} messages allowed out of 30");
     assert_eq!(allowed_count, 20, "Partner peer should allow burst of 20");
 
     // Test 3: Dave (Federated) - 200 msg/sec, burst 50
@@ -65,7 +65,7 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
     println!("   Expected: 200 msg/sec, burst capacity 50");
 
     let allowed_count = test_peer_rate_limit(&rate_limiter, &dave, 60).await;
-    println!("   Result: {} messages allowed out of 60", allowed_count);
+    println!("   Result: {allowed_count} messages allowed out of 60");
     assert_eq!(allowed_count, 50, "Federated peer should allow burst of 50");
 
     // Test 4: Dynamic trust adjustment
@@ -79,7 +79,7 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
 
     // Bob should now have Federated limits (burst 50)
     let allowed_count = test_peer_rate_limit(&rate_limiter, &bob, 60).await;
-    println!("   Result: {} messages allowed out of 60", allowed_count);
+    println!("   Result: {allowed_count} messages allowed out of 60");
     assert_eq!(allowed_count, 50, "Upgraded peer should get Federated limits");
 
     println!("\n=== All tests passed! ===\n");
@@ -182,13 +182,13 @@ async fn test_cache_performance() -> Result<()> {
     let start = std::time::Instant::now();
     let _score1 = graph.compute_trust_score(&bob)?;
     let duration1 = start.elapsed();
-    println!("First lookup (cache miss): {:?}", duration1);
+    println!("First lookup (cache miss): {duration1:?}");
 
     // Second lookup - cache hit
     let start = std::time::Instant::now();
     let _score2 = graph.compute_trust_score(&bob)?;
     let duration2 = start.elapsed();
-    println!("Second lookup (cache hit): {:?}", duration2);
+    println!("Second lookup (cache hit): {duration2:?}");
 
     // Cache hit should be significantly faster
     assert!(duration2 < duration1, "Cache hit should be faster than cache miss");

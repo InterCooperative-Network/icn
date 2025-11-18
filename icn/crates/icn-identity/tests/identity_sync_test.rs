@@ -20,7 +20,7 @@ fn test_identity_sync_add_device_workflow() {
     let alice_did = alice_ks.get_keypair().unwrap().did().clone();
     let alice_doc_v1 = alice_ks.get_did_document().unwrap().clone();
 
-    println!("Alice's DID: {}", alice_did);
+    println!("Alice's DID: {alice_did}");
     println!("Alice's initial DID Document version: {}", alice_doc_v1.version);
 
     // === Bob's Setup ===
@@ -29,7 +29,7 @@ fn test_identity_sync_add_device_workflow() {
     let bob_keystore_path = bob_dir.path().join("bob.age");
     let bob_passphrase = b"bob-password";
 
-    let mut bob_ks = AgeKeyStore::init(&bob_keystore_path, bob_passphrase).unwrap();
+    let bob_ks = AgeKeyStore::init(&bob_keystore_path, bob_passphrase).unwrap();
     let bob_did = bob_ks.get_keypair().unwrap().did().clone();
 
     // Bob maintains a cache of DID Documents for identity verification

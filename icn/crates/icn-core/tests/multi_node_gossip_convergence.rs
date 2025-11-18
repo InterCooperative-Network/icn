@@ -144,7 +144,7 @@ impl TestNode {
         });
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -387,7 +387,7 @@ async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()>
     // Node 1 publishes 5 entries
     let mut hashes = Vec::new();
     for i in 0..5 {
-        let data = format!("Entry {}", i).into_bytes();
+        let data = format!("Entry {i}").into_bytes();
         let hash = {
             let mut gossip1 = node1.gossip_handle.write().await;
             gossip1.publish(topic, data)?

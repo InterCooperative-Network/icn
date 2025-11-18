@@ -615,9 +615,9 @@ mod tests {
         save_timestamped_snapshot(&snapshot, &temp).unwrap();
 
         // Verify timestamped snapshot was created
-        let expected_filename = format!("state.snapshot.{}", timestamp);
+        let expected_filename = format!("state.snapshot.{timestamp}");
         let expected_path = temp.join(&expected_filename);
-        let expected_checksum_path = temp.join(format!("{}.sha256", expected_filename));
+        let expected_checksum_path = temp.join(format!("{expected_filename}.sha256"));
 
         assert!(expected_path.exists(), "Timestamped snapshot should exist");
         assert!(expected_checksum_path.exists(), "Timestamped checksum should exist");
@@ -883,13 +883,13 @@ mod tests {
 
             // Create large vector clock
             for i in 0..large_clock_size {
-                gossip.vector_clock.insert(format!("did:icn:peer{}", i), i as u64);
+                gossip.vector_clock.insert(format!("did:icn:peer{i}"), i as u64);
             }
 
             // Create large subscriptions
             for i in 0..large_sub_size {
-                let subs: Vec<String> = (0..10).map(|j| format!("sub{}", j)).collect();
-                gossip.subscriptions.insert(format!("topic{}", i), subs);
+                let subs: Vec<String> = (0..10).map(|j| format!("sub{j}")).collect();
+                gossip.subscriptions.insert(format!("topic{i}"), subs);
             }
 
             let mut snapshot = StateSnapshot::new();

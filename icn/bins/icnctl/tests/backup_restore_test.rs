@@ -277,7 +277,7 @@ fn test_backup_includes_state_snapshot() -> Result<()> {
 
     let tar_contents = String::from_utf8_lossy(&tar_list.stdout);
     assert!(tar_contents.contains("state.snapshot"),
-            "Backup missing state.snapshot file. Contents:\n{}", tar_contents);
+            "Backup missing state.snapshot file. Contents:\n{tar_contents}");
 
     // Restore to different directory
     let restore_dir = temp_dir.path().join("restore");

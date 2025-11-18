@@ -369,7 +369,7 @@ mod tests {
         //         = 4,000
         assert!(limit > policy.initial_limit);
         assert!(limit < full_limit);
-        assert!(limit >= 3_000 && limit <= 4_000); // Approximate due to rounding
+        assert!((3_000..=4_000).contains(&limit)); // Approximate due to rounding
 
         // Test 3: Full ramp period complete
         let cleared = 10_000;

@@ -452,7 +452,7 @@ mod tests {
         // Should allow burst of 5
         for i in 0..5 {
             let result = limiter.check(alice.did(), bob.did()).await;
-            assert!(result.is_ok(), "Burst attestation {} should be allowed", i);
+            assert!(result.is_ok(), "Burst attestation {i} should be allowed");
         }
 
         // 6th should be rate limited
@@ -501,7 +501,7 @@ mod tests {
         // Alice can attest to Bob 3 times
         for i in 0..3 {
             let result = limiter.check(alice.did(), bob.did()).await;
-            assert!(result.is_ok(), "Attestation {} should be allowed", i);
+            assert!(result.is_ok(), "Attestation {i} should be allowed");
         }
 
         // 4th attestation to Bob should be blocked (targeting limit)

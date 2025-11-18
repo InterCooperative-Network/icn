@@ -76,75 +76,69 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
         let audit_store = gov_store.clone();
 
         event_bus.subscribe(Arc::new(move |event| {
-            match event {
-                SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
-                    match payload {
-                        ProposalPayload::Budget { amount, recipient, currency, purpose: _ } => {
-                            info!("📊 Executing budget proposal {}: {} {} to {}",
-                                  proposal_id.0, amount, currency, recipient);
+            if let SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } = event {
+                if let ProposalPayload::Budget { amount, recipient, currency, purpose: _ } = payload {
+                    info!("📊 Executing budget proposal {}: {} {} to {}",
+                          proposal_id.0, amount, currency, recipient);
 
-                            let ledger = ledger_clone.clone();
-                            let prop_id = proposal_id.clone();
-                            let from_did = own_did.clone();
-                            let store = audit_store.clone();
-                            let decision_time = decided_at;
+                    let ledger = ledger_clone.clone();
+                    let prop_id = proposal_id.clone();
+                    let from_did = own_did.clone();
+                    let store = audit_store.clone();
+                    let decision_time = decided_at;
 
-                            tokio::spawn(async move {
-                                use icn_ledger::entry::JournalEntryBuilder;
+                    tokio::spawn(async move {
+                        use icn_ledger::entry::JournalEntryBuilder;
 
-                                let mut ledger_guard = ledger.write().await;
+                        let mut ledger_guard = ledger.write().await;
 
-                                // Create double-entry: credit cooperative (decrease balance), debit recipient (increase balance)
-                                let entry_result = JournalEntryBuilder::new(from_did.clone())
-                                    .credit(from_did.clone(), currency.clone(), amount)
-                                    .debit(recipient.clone(), currency.clone(), amount)
-                                    .build();
+                        // Create double-entry: credit cooperative (decrease balance), debit recipient (increase balance)
+                        let entry_result = JournalEntryBuilder::new(from_did.clone())
+                            .credit(from_did.clone(), currency.clone(), amount)
+                            .debit(recipient.clone(), currency.clone(), amount)
+                            .build();
 
-                                match entry_result {
-                                    Ok(entry) => {
-                                        match ledger_guard.append_entry(entry) {
-                                            Ok(entry_hash) => {
-                                                info!("✅ Budget proposal {} executed: {} {} transferred to {}",
-                                                      prop_id.0, amount, currency, recipient);
+                        match entry_result {
+                            Ok(entry) => {
+                                match ledger_guard.append_entry(entry) {
+                                    Ok(entry_hash) => {
+                                        info!("✅ Budget proposal {} executed: {} {} transferred to {}",
+                                              prop_id.0, amount, currency, recipient);
 
-                                                // Store audit trail
-                                                let audit_key = format!("gov:audit:{}", prop_id.0);
-                                                let audit_record = serde_json::json!({
-                                                    "proposal_id": prop_id.0,
-                                                    "ledger_entry_hash": hex::encode(entry_hash.0),
-                                                    "amount": amount,
-                                                    "currency": currency,
-                                                    "recipient": recipient.to_string(),
-                                                    "decided_at": decision_time,  // When governance decision was made
-                                                    "executed_at": std::time::SystemTime::now()
-                                                        .duration_since(std::time::UNIX_EPOCH)
-                                                        .unwrap()
-                                                        .as_secs(),  // When ledger transaction completed
-                                                });
+                                        // Store audit trail
+                                        let audit_key = format!("gov:audit:{}", prop_id.0);
+                                        let audit_record = serde_json::json!({
+                                            "proposal_id": prop_id.0,
+                                            "ledger_entry_hash": hex::encode(entry_hash.0),
+                                            "amount": amount,
+                                            "currency": currency,
+                                            "recipient": recipient.to_string(),
+                                            "decided_at": decision_time,  // When governance decision was made
+                                            "executed_at": std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_secs(),  // When ledger transaction completed
+                                        });
 
-                                                if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
-                                                    if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                                        tracing::warn!("Failed to store audit trail for {}: {}", prop_id.0, e);
-                                                    } else {
-                                                        info!("📋 Audit trail recorded for proposal {}", prop_id.0);
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                tracing::warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
+                                        if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                                            if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                                                tracing::warn!("Failed to store audit trail for {}: {}", prop_id.0, e);
+                                            } else {
+                                                info!("📋 Audit trail recorded for proposal {}", prop_id.0);
                                             }
                                         }
                                     }
                                     Err(e) => {
-                                        tracing::warn!("❌ Failed to build ledger entry for proposal {}: {}", prop_id.0, e);
+                                        tracing::warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
                                     }
                                 }
-                            });
+                            }
+                            Err(e) => {
+                                tracing::warn!("❌ Failed to build ledger entry for proposal {}: {}", prop_id.0, e);
+                            }
                         }
-                        _ => {}
-                    }
+                    });
                 }
-                _ => {}
             }
         })).await
     };

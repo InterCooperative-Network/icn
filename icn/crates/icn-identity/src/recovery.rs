@@ -791,7 +791,7 @@ mod tests {
                 &trustee,
                 old_did.clone(),
                 new_did.clone(),
-                format!("method {}", i),
+                format!("method {i}"),
             )
             .unwrap();
             recovery.add_attestation(att).unwrap();

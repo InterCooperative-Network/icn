@@ -9,7 +9,6 @@ use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle};
 use icn_snapshot::{load_snapshot, save_snapshot, StateSnapshot};
 use icn_trust::TrustClass;
-use rustls;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -64,7 +63,7 @@ impl TestNode {
         });
 
         // Spawn network actor
-        let listen_addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone())?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
@@ -191,7 +190,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     let num_messages = 3;
     for i in 0..num_messages {
         let mut gossip = node1.gossip_handle.write().await;
-        let msg = format!("message {}", i);
+        let msg = format!("message {i}");
         let entry_id = gossip.publish(topic_name, msg.as_bytes().to_vec())?;
         info!("✅ Published entry {}: {:?}", i, entry_id);
     }
