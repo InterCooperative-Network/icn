@@ -390,11 +390,12 @@ icnctl gov vote show --proposal-id <id>
 
 ---
 
-**Phase 14 - Gateway API (Complete ✓)** (2025-01-15, Production Hardening: 2025-11-16):
+**Phase 14 - Gateway API (Complete ✓)** (2025-01-15, Production Hardening: 2025-11-16, Governance API: 2025-11-17):
 - [x] REST API server with actix-web framework
 - [x] JWT-based authentication with challenge-response flow
 - [x] Cooperative namespace management (CRUD operations)
 - [x] Ledger API (balances, payments, transaction history)
+- [x] Governance API (domains, proposals, voting) with WebSocket events (2025-11-17)
 - [x] WebSocket real-time event streaming
 - [x] Event broadcasting system with pub/sub
 - [x] JWT middleware protecting all endpoints
@@ -402,21 +403,22 @@ icnctl gov vote show --proposal-id <id>
 - [x] Per-DID rate limiting (token bucket algorithm)
 - [x] Scope-based authorization enforcement
 - [x] Authenticated DID extraction for ownership
-- [x] All 38 tests pass
+- [x] All 61 tests pass (9 governance + 52 other)
 
 **Gateway Features**:
 - **Authentication**: DID-based challenge-response → JWT tokens with configurable TTL
-- **Authorization**: Scope-based access control (ledger:read, ledger:write, coop:read, coop:write, coop:admin)
+- **Authorization**: Scope-based access control (ledger:read, ledger:write, coop:read, coop:write, coop:admin, gov:read, gov:write)
 - **Rate Limiting**: Per-DID token bucket (100 burst, 10/sec refill) prevents abuse
 - **Cooperative Management**: Create/read/update/delete coops, member management, role assignments
 - **Ledger Operations**: Query balances, create payments, view transaction history
-- **Real-time Events**: WebSocket subscriptions to cooperative events (member added/removed, role updated, settings changed)
+- **Governance Operations**: Create domains/proposals, open voting, cast votes, close proposals with outcome calculation
+- **Real-time Events**: WebSocket subscriptions to cooperative/governance events (domains, proposals, votes, member changes, settings)
 - **API Versioning**: All endpoints under /v1 scope for backward compatibility
 - **Security**: Three-layer security (auth → rate limiting → authorization)
 
 **API Endpoints**:
 - **Public**: `/health`, `/auth/challenge`, `/auth/verify`, `/ws/{coop_id}`
-- **Protected**: `/coops/*` (cooperative management), `/ledger/*` (ledger operations)
+- **Protected**: `/coops/*` (cooperative management), `/ledger/*` (ledger operations), `/gov/*` (governance operations)
 
 **Architecture** (`icn-gateway/`):
 - **server.rs**: Actix-web HTTP server with /v1 public/protected scopes and middleware composition
@@ -425,10 +427,12 @@ icnctl gov vote show --proposal-id <id>
 - **rate_limit.rs**: Token bucket rate limiter with per-DID tracking and automatic cleanup
 - **coop.rs**: Cooperative state management (in-memory for Phase 14)
 - **ledger_mgr.rs**: Ledger operations wrapper
-- **events.rs**: Event broadcasting with tokio mpsc channels
+- **governance_mgr.rs**: Governance operations wrapper (in-memory storage, domains/proposals/votes)
+- **events.rs**: Event broadcasting with tokio mpsc channels (cooperative + governance events)
 - **websocket.rs**: WebSocket session management with JWT auth
-- **api/**: REST endpoint handlers (auth, coops, ledger, websocket, health) with scope enforcement
+- **api/**: REST endpoint handlers (auth, coops, ledger, governance, websocket, health) with scope enforcement
 - **models.rs**: Request/response DTOs
+- **validation.rs**: Input validation (domain IDs, names, etc.)
 - **error.rs**: GatewayError types with HTTP status mapping (401, 403, 429, etc.)
 
 **WebSocket Protocol**:
@@ -657,7 +661,7 @@ wscat -c ws://localhost:8080/ws/my-coop
 - **Middleware**: JWT auth, rate limiting, logging, compression
 - **Authorization**: Scope-based access control (ledger:read/write, coop:read/write/admin)
 
-**Event Types**: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated
+**Event Types**: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated, GovernanceDomainCreated, GovernanceProposalCreated, GovernanceProposalOpened, GovernanceProposalClosed, GovernanceVoteCast
 
 **This is NOT a runtime**: Apps run externally and call this API. See [docs/platform-layer-design.md](docs/platform-layer-design.md).
 
