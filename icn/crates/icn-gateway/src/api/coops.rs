@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::coop::{CoopManager, MemberRole};
 use crate::error::Result;
 use crate::events::{EventBroadcaster, GatewayEvent};
-use crate::middleware::require_scope;
+use crate::middleware::{require_coop_access, require_scope};
 use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest};
 use crate::validation;
 use icn_obs::metrics::gateway;
@@ -95,6 +95,7 @@ pub async fn update_settings(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "coop:admin")?;
+    require_coop_access(&http_req, &id)?; // CRITICAL: Prevent cross-coop attacks
 
     // Validate settings fields upfront
     if let Some(gov) = &req.governance_model {
@@ -176,6 +177,7 @@ pub async fn add_member(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "coop:admin")?;
+    require_coop_access(&http_req, &id)?; // CRITICAL: Prevent cross-coop attacks
 
     // Parse and validate inputs first
     let did: icn_identity::Did = req.did.parse()
@@ -217,6 +219,7 @@ pub async fn remove_member(
     require_scope(&req, "coop:admin")?;
 
     let (coop_id, did_str) = path.into_inner();
+    require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop attacks
 
     let did = did_str.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
@@ -254,6 +257,7 @@ pub async fn update_member_role(
     require_scope(&http_req, "coop:admin")?;
 
     let (coop_id, did_str) = path.into_inner();
+    require_coop_access(&http_req, &coop_id)?; // CRITICAL: Prevent cross-coop attacks
 
     let did = did_str.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
@@ -520,5 +524,78 @@ mod tests {
             .find(|m| m.did == *alice.did())
             .expect("Alice should be a member");
         assert_eq!(alice_member.role, MemberRole::Owner, "Alice should be the owner");
+    }
+
+    #[actix_web::test]
+    async fn test_cross_cooperative_authorization_fails() {
+        let coop_mgr = Arc::new(CoopManager::new());
+        let broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Create two cooperatives
+        coop_mgr.create_coop(
+            "coop-food".to_string(),
+            "Food Coop".to_string(),
+            alice.did().clone(),
+            timestamp().unwrap(),
+        ).unwrap();
+
+        coop_mgr.create_coop(
+            "coop-tech".to_string(),
+            "Tech Coop".to_string(),
+            bob.did().clone(),
+            timestamp().unwrap(),
+        ).unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_mgr.clone()))
+                .app_data(web::Data::new(broadcaster.clone()))
+                .service(
+                    web::scope("/coops")
+                        .service(update_settings)
+                        .service(add_member)
+                )
+        ).await;
+
+        // Alice tries to modify coop-tech using her coop-food token (should fail)
+        let req_body = UpdateSettingsRequest {
+            governance_model: Some("malicious".to_string()),
+            credit_policy: None,
+            currency: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "coop-food".to_string(), // Alice's token is for coop-food
+            scopes: vec!["coop:admin".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::put()
+            .uri("/coops/coop-tech/settings") // But trying to modify coop-tech!
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims.clone());
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+
+        // Also test add_member cross-coop attack
+        let add_req = AddMemberRequest {
+            did: alice.did().to_string(),
+            role: "admin".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/coops/coop-tech/members")
+            .set_json(&add_req)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
     }
 }

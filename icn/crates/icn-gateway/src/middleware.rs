@@ -61,6 +61,22 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
     Ok(())
 }
 
+/// Check if authenticated user has access to the requested cooperative
+/// CRITICAL: Prevents cross-cooperative authorization bypass
+pub fn require_coop_access(req: &HttpRequest, coop_id: &str) -> Result<(), GatewayError> {
+    let claims = get_claims(req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    if claims.coop_id != coop_id {
+        return Err(GatewayError::AuthorizationFailed(
+            format!("Access denied: token is for cooperative '{}', but requested access to '{}'",
+                claims.coop_id, coop_id)
+        ));
+    }
+
+    Ok(())
+}
+
 /// Middleware for tracking request metrics (count and duration)
 pub struct MetricsMiddleware;
 
