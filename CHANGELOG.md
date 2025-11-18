@@ -360,9 +360,35 @@ curl -H "Authorization: Bearer $TOKEN" \
   - Verifies Alice (coop-food admin) cannot delete coop-tech and that coop-tech still exists after failed attempt
   - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all admins
   - Location: [icn-gateway/src/api/coops.rs:156](icn/crates/icn-gateway/src/api/coops.rs#L156)
-- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 5 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin + cooperative deletion + proposal closing) + 3 HIGH vulnerabilities (ledger privacy leaks + coop info leak + unauthorized proposal opening) + MEDIUM spam vulnerability (self-payments)
-- **All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), validation functions, and payload conversions**
-- 16 comprehensive tests added (62 → 82 total tests, includes 4 CRITICAL auth bypasses + 3 HIGH vulnerabilities + 1 MEDIUM spam prevention)
+- **Bug 29 (HIGH): Missing rate limiting on auth endpoints** - DoS vulnerability (IDENTIFIED, NOT YET FIXED)
+  - Authentication endpoints /auth/challenge and /auth/verify have NO rate limiting
+  - Attack: Unlimited challenge creation causes storage exhaustion, brute force verification attempts
+  - Root cause: rate_limit_middleware skips unauthenticated requests (returns early if no TokenClaims)
+  - **Security Impact**: HIGH - DoS via resource exhaustion and brute force attacks
+  - Challenge endpoint: Attackers can create unlimited challenges → HashMap growth → memory exhaustion
+  - Verify endpoint: Attackers can brute force signature verification without throttling
+  - Public endpoints bypass per-DID rate limiter by design (no JWT token = no claims = no rate limit)
+  - **Recommendation**: Implement IP-based rate limiting for public endpoints
+  - Alternative: Add separate auth-specific rate limiter with aggressive limits (e.g., 10 req/min per IP)
+  - **Status**: IDENTIFIED in systematic bug hunting, requires IP extraction infrastructure
+  - Location: [icn-gateway/src/server.rs:135-136](icn/crates/icn-gateway/src/server.rs#L135-L136), [icn-gateway/src/rate_limit.rs:175-181](icn/crates/icn-gateway/src/rate_limit.rs#L175-L181)
+- **Bug 30 (MEDIUM): WebSocket authentication timeout missing** - Resource exhaustion (IDENTIFIED, NOT YET FIXED)
+  - WebSocket connections have NO timeout for sending Auth message after connection establishment
+  - Attack: Attackers open 10,000 WebSocket connections and never authenticate
+  - Root cause: started() begins heartbeat immediately, but no separate auth deadline
+  - **Security Impact**: MEDIUM - Temporary resource exhaustion (connections held for 60 seconds)
+  - Attackers can consume MAX_TOTAL_WEBSOCKET_CONNECTIONS (10,000) slots without authenticating
+  - Heartbeat timeout eventually disconnects after 60 seconds, limiting severity (not indefinite)
+  - During 60-second window, legitimate users may be unable to connect
+  - **Mitigation**: Heartbeat mechanism provides eventual cleanup (reduces from CRITICAL to MEDIUM)
+  - **Recommendation**: Add 10-second auth timeout: close connection if no Auth message received
+  - Reduce attack window from 60s to 10s (6x improvement)
+  - **Status**: IDENTIFIED in systematic bug hunting, straightforward fix
+  - Location: [icn-gateway/src/websocket.rs:234-262](icn/crates/icn-gateway/src/websocket.rs#L234-L262)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 5 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin + cooperative deletion + proposal closing) + 4 HIGH vulnerabilities (ledger privacy leaks + coop info leak + unauthorized proposal opening + auth endpoint DoS) + 2 MEDIUM vulnerabilities (self-payments + WebSocket auth timeout)
+- **Bugs FIXED (Bugs #1-28)**: All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), delete_coop(), validation functions, and payload conversions
+- **Bugs IDENTIFIED but not yet fixed (Bugs #29-30)**: Auth endpoint rate limiting, WebSocket auth timeout
+- 16 comprehensive tests added (62 → 82 total tests, includes 5 CRITICAL auth bypasses + 3 HIGH vulnerabilities + 1 MEDIUM spam prevention)
 - Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,442-497](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
 
 **Proposal payload validation (DoS protection) (2025-11-17):**
