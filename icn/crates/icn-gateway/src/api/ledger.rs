@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::ledger_mgr::LedgerManager;
-use crate::middleware::require_scope;
+use crate::middleware::{get_claims, require_scope};
 use crate::models::{
     AccountDeltaResponse, BalanceResponse, CreatePaymentRequest, TransactionHistoryEntry,
 };
@@ -50,6 +50,18 @@ pub async fn create_payment(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "ledger:write")?;
+
+    // CRITICAL: Verify authenticated DID matches payment sender
+    // Prevents users from creating payments from other accounts
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    if claims.sub != req.from {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            format!("Cannot create payments from other accounts (authenticated as {}, attempted to send from {})",
+                claims.sub, req.from)
+        ));
+    }
 
     let from = req.from.parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid from DID: {e}")))?;
@@ -341,6 +353,49 @@ mod tests {
 
         let req = test::TestRequest::get()
             .uri(&uri)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_create_payment_from_other_account_fails() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+        let charlie = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .service(
+                    web::scope("/ledger")
+                        .service(create_payment)
+                )
+        ).await;
+
+        // Alice tries to create payment from Bob's account (should fail)
+        let req_body = CreatePaymentRequest {
+            from: bob.did().to_string(),  // Bob's account
+            to: charlie.did().to_string(),
+            amount: 10,
+            currency: "hours".to_string(),
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(), // Alice authenticated
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment")
+            .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
 
