@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /build
 
-# Copy workspace
-COPY icn/ .
+# Copy workspace (context is already ../icn)
+COPY . .
 
 # Build release binaries
 RUN cargo build --release --bin icnd --bin icnctl
