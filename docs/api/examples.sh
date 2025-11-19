@@ -103,10 +103,11 @@ echo ""
 
 # Create Proposal
 echo -e "${GREEN}10. Create Proposal${NC}"
-PROPOSAL=$(curl -s -X POST $BASE_URL/v1/gov/domains/example-domain/proposals \
+PROPOSAL=$(curl -s -X POST $BASE_URL/v1/gov/proposals \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
+        "domain_id": "example-domain",
         "title": "Test Proposal",
         "description": "A proposal to test the governance system",
         "kind": "text"
@@ -131,7 +132,7 @@ echo ""
 
 # Get Vote Tally
 echo -e "${GREEN}13. Get Vote Tally${NC}"
-curl -s $BASE_URL/v1/gov/proposals/$PROPOSAL_ID/vote \
+curl -s $BASE_URL/v1/gov/proposals/$PROPOSAL_ID/votes \
     -H "Authorization: Bearer $TOKEN" | jq
 echo ""
 
