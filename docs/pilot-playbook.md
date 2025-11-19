@@ -13,6 +13,66 @@ This playbook covers the complete lifecycle of an ICN pilot deployment:
 6. Day-2 operations
 7. Success metrics
 
+---
+
+## Quick Start (Docker)
+
+For the fastest path to a working pilot, use Docker:
+
+### 1. Clone and Configure
+
+```bash
+git clone https://github.com/anthropics/icn.git
+cd icn/deploy
+
+# Configure environment
+cp .env.example .env
+# Edit .env and set a strong JWT_SECRET
+```
+
+### 2. Start Services
+
+```bash
+docker-compose build
+docker-compose up -d
+```
+
+### 3. Initialize Cooperative
+
+```bash
+# Create identity
+docker-compose exec icnd icnctl id init
+
+# Show your DID (share with members)
+docker-compose exec icnd icnctl id show
+```
+
+### 4. Access
+
+| Service | URL |
+|---------|-----|
+| Web UI | http://localhost:3000 |
+| API | http://localhost:8080 |
+| Grafana | http://localhost:3001 (admin/admin) |
+
+### 5. Get a Token
+
+Members need JWT tokens to use the web UI. For testing:
+
+```bash
+# Get your DID
+docker-compose exec icnd icnctl id show
+
+# Use icnctl to generate a token (implementation depends on your setup)
+# Or implement the challenge-response flow in your application
+```
+
+**That's it!** Open http://localhost:3000 to use the web interface.
+
+For detailed deployment options, continue to Phase 1.
+
+---
+
 ## Phase 1: Pre-Deployment Preparation
 
 ### 1.1 Community Assessment
