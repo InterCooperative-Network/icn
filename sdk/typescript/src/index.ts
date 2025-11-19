@@ -127,7 +127,7 @@ export class ICNClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
+        const errorBody = await response.json().catch(() => ({})) as { error?: string; code?: string; details?: unknown };
         throw new ICNError(
           errorBody.error || response.statusText,
           response.status,
@@ -140,7 +140,7 @@ export class ICNClient {
         return undefined as T;
       }
 
-      return await response.json();
+      return await response.json() as T;
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof ICNError) {
