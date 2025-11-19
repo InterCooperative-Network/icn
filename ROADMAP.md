@@ -1,6 +1,6 @@
 # ICN Roadmap
 
-**Status**: Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅, NAT Traversal (Phases 1-3) ✅ - All 423 Tests Passing
+**Status**: Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅, NAT Traversal (Phases 1-3) ✅, Pilot Tooling ✅ - All 423 Tests Passing
 **Next**: Track C1 (Pilot Selection) → MVC Track (13 weeks focused work)
 
 ## Executive Summary
@@ -516,6 +516,47 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 ---
 
 ## Track C: Pilot Community & Bootstrap
+
+### Pilot Tooling ✅ COMPLETE
+**Status**: Complete (2025-01-17)
+**Purpose**: Everything needed to deploy to a pilot community
+
+**Completed Components**:
+1. **icn-console** - Interactive TUI for cooperative management
+   - Dashboard, Members, Ledger, Governance, Trust tabs
+   - Real-time stats and navigation
+   - Gateway API integration
+2. **install.sh** - One-line installer
+   - Linux (systemd) and macOS (launchd) support
+   - x86_64 and aarch64 architectures
+   - Automatic service installation
+3. **icnctl init-coop** - Interactive setup wizard
+   - Identity creation
+   - Trust graph initialization
+   - Governance domain setup
+4. **Pilot Playbook** - Step-by-step deployment guide
+   - Pre-deployment checklist
+   - Infrastructure setup
+   - Member onboarding
+   - Day-2 operations
+   - Success metrics
+5. **Grafana Dashboard** - Monitoring
+   - Network, gossip, ledger panels
+   - Security and rate limiting
+   - Snapshot and version negotiation metrics
+6. **Pilot Proposal Template** - Community outreach
+   - Customizable proposal for approaching communities
+   - Success criteria and timeline
+   - FAQ and technical summary
+
+**Deliverables**:
+- [icn-console](icn/bins/icn-console/) - TUI binary
+- [scripts/install.sh](scripts/install.sh) - Installer
+- [docs/pilot-playbook.md](docs/pilot-playbook.md) - Deployment guide
+- [monitoring/](monitoring/) - Grafana dashboard and setup
+- [docs/pilots/pilot-proposal-template.md](docs/pilots/pilot-proposal-template.md) - Outreach template
+
+---
 
 ### C1: Community Selection (2-4 weeks, can start immediately)
 **Status**: Not Started
