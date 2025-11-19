@@ -11,6 +11,8 @@ const state = {
     members: [],
     transactions: [],
     proposals: [],
+    ws: null,
+    wsConnected: false,
 };
 
 // DOM Elements
@@ -181,6 +183,9 @@ async function login() {
         await loadAllData();
         updateConnectionStatus(true);
 
+        // Connect WebSocket for real-time updates
+        connectWebSocket();
+
     } catch (error) {
         showError(elements.loginError, `Connection failed: ${error.message}`);
         updateConnectionStatus(false);
@@ -191,6 +196,9 @@ async function login() {
 }
 
 function logout() {
+    // Disconnect WebSocket
+    disconnectWebSocket();
+
     localStorage.removeItem('icn-token');
     state.token = '';
     elements.mainScreen.classList.add('hidden');
@@ -374,6 +382,149 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// WebSocket Connection
+function connectWebSocket() {
+    if (state.ws) {
+        state.ws.close();
+    }
+
+    // Convert HTTP URL to WebSocket URL
+    const wsUrl = state.gatewayUrl
+        .replace('http://', 'ws://')
+        .replace('https://', 'wss://');
+
+    const ws = new WebSocket(`${wsUrl}/v1/ws/${state.coopId}`);
+    state.ws = ws;
+
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+        // Authenticate with token
+        ws.send(JSON.stringify({
+            type: 'Auth',
+            token: state.token
+        }));
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const message = JSON.parse(event.data);
+            handleWebSocketMessage(message);
+        } catch (e) {
+            console.error('Failed to parse WebSocket message:', e);
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        state.wsConnected = false;
+        updateConnectionStatus(false);
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket closed');
+        state.wsConnected = false;
+        state.ws = null;
+
+        // Attempt to reconnect after 5 seconds
+        if (state.token) {
+            setTimeout(() => {
+                if (state.token) {
+                    connectWebSocket();
+                }
+            }, 5000);
+        }
+    };
+}
+
+function handleWebSocketMessage(message) {
+    switch (message.type) {
+        case 'AuthOk':
+            console.log('WebSocket authenticated:', message.did);
+            state.wsConnected = true;
+            updateConnectionStatus(true);
+            break;
+
+        case 'Error':
+            console.error('WebSocket error:', message.message);
+            break;
+
+        case 'Event':
+            handleWebSocketEvent(message);
+            break;
+
+        default:
+            console.log('Unknown WebSocket message:', message);
+    }
+}
+
+function handleWebSocketEvent(message) {
+    // Handle different event types
+    if (message.PaymentCreated) {
+        console.log('Payment created:', message.PaymentCreated);
+        // Reload transactions and balance
+        loadTransactions();
+        loadBalance();
+        showNotification('New payment recorded');
+    }
+
+    if (message.MemberAdded) {
+        console.log('Member added:', message.MemberAdded);
+        // Reload members
+        loadMembers();
+        showNotification('New member joined');
+    }
+
+    if (message.MemberRemoved) {
+        console.log('Member removed:', message.MemberRemoved);
+        loadMembers();
+    }
+
+    if (message.GovernanceVoteCast) {
+        console.log('Vote cast:', message.GovernanceVoteCast);
+        // Reload proposals to show updated vote counts
+        loadProposals();
+        showNotification('New vote cast');
+    }
+
+    if (message.GovernanceProposalCreated) {
+        console.log('Proposal created:', message.GovernanceProposalCreated);
+        loadProposals();
+        showNotification('New proposal created');
+    }
+
+    if (message.GovernanceProposalOpened) {
+        console.log('Proposal opened:', message.GovernanceProposalOpened);
+        loadProposals();
+        showNotification('Proposal opened for voting');
+    }
+
+    if (message.GovernanceProposalClosed) {
+        console.log('Proposal closed:', message.GovernanceProposalClosed);
+        loadProposals();
+        showNotification('Proposal closed');
+    }
+}
+
+function showNotification(message) {
+    // Update status bar briefly
+    const originalStatus = elements.lastUpdate.textContent;
+    elements.lastUpdate.textContent = message;
+    elements.lastUpdate.style.color = '#16a34a';
+
+    setTimeout(() => {
+        elements.lastUpdate.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        elements.lastUpdate.style.color = '';
+    }, 3000);
+}
+
+function disconnectWebSocket() {
+    if (state.ws) {
+        state.ws.close();
+        state.ws = null;
+    }
+    state.wsConnected = false;
 }
 
 // Rendering
