@@ -334,7 +334,7 @@ impl App {
                 self.status = format!("Connected to {} | {} peers", self.gateway_url, health.network_peers);
             }
             Err(e) => {
-                self.error = Some(format!("Failed to connect: {}", e));
+                self.error = Some(format!("Failed to connect: {e}"));
                 self.status = "Disconnected".to_string();
                 return;
             }
@@ -372,7 +372,7 @@ impl App {
     }
 
     fn auth_header(&self) -> Option<String> {
-        self.token.as_ref().map(|t| format!("Bearer {}", t))
+        self.token.as_ref().map(|t| format!("Bearer {t}"))
     }
 
     async fn fetch_members(&self) -> Result<Vec<Member>> {
@@ -513,15 +513,6 @@ impl App {
     }
 }
 
-impl Default for ApiVoteTally {
-    fn default() -> Self {
-        Self {
-            for_votes: 0,
-            against_votes: 0,
-            abstain_votes: 0,
-        }
-    }
-}
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -572,6 +563,7 @@ struct ApiProposal {
 }
 
 #[derive(Debug, Deserialize)]
+#[derive(Default)]
 struct ApiVoteTally {
     #[serde(default)]
     for_votes: u32,
@@ -647,11 +639,8 @@ fn run_app(
                             KeyCode::Char('5') => app.current_tab = 4,
                             KeyCode::Enter => {
                                 // Action on selected item
-                                match app.current_tab() {
-                                    Tab::Governance => {
-                                        // Could open voting dialog
-                                    }
-                                    _ => {}
+                                if app.current_tab() == Tab::Governance {
+                                    // Could open voting dialog
                                 }
                             }
                             _ => {}

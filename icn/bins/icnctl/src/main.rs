@@ -3266,7 +3266,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()
             let client = reqwest::Client::new();
 
             // Step 1: Get challenge
-            let challenge_url = format!("{}/v1/auth/challenge", gateway);
+            let challenge_url = format!("{gateway}/v1/auth/challenge");
             let challenge_req = serde_json::json!({
                 "did": did
             });
@@ -3281,7 +3281,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()
             if !challenge_resp.status().is_success() {
                 let status = challenge_resp.status();
                 let body = challenge_resp.text().await.unwrap_or_default();
-                bail!("Failed to get challenge: {} - {}", status, body);
+                bail!("Failed to get challenge: {status} - {body}");
             }
 
             let challenge_data: serde_json::Value = challenge_resp
@@ -3298,7 +3298,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()
             let signature_hex = hex::encode(signature.to_bytes());
 
             // Step 3: Verify signature and get token
-            let verify_url = format!("{}/v1/auth/verify", gateway);
+            let verify_url = format!("{gateway}/v1/auth/verify");
             let verify_req = serde_json::json!({
                 "did": did,
                 "signature": signature_hex,
@@ -3316,7 +3316,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()
             if !verify_resp.status().is_success() {
                 let status = verify_resp.status();
                 let body = verify_resp.text().await.unwrap_or_default();
-                bail!("Failed to verify: {} - {}", status, body);
+                bail!("Failed to verify: {status} - {body}");
             }
 
             let token_data: serde_json::Value = verify_resp
