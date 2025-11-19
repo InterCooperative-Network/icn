@@ -11,7 +11,26 @@ Docker Compose configuration for deploying a complete ICN pilot stack.
 
 ## Quick Start
 
-### 1. Configure
+### Automated Setup
+
+The easiest way to get started is with the quickstart script:
+
+```bash
+cd deploy
+./quickstart.sh "My Timebank"
+```
+
+This will:
+- Configure environment with a random JWT secret
+- Build and start all Docker containers
+- Initialize your identity
+- Display access URLs and next steps
+
+### Manual Setup
+
+If you prefer manual configuration:
+
+#### 1. Configure
 
 ```bash
 cd deploy
@@ -37,7 +56,7 @@ docker-compose up -d
 docker-compose ps
 ```
 
-### 3. Initialize Identity
+#### 3. Initialize Identity
 
 ```bash
 # Create identity for the daemon
@@ -47,7 +66,25 @@ docker-compose exec icnd icnctl id init
 docker-compose exec icnd icnctl id show
 ```
 
-### 4. Access Services
+#### 4. Get Authentication Token
+
+```bash
+# Get a JWT token for the web UI
+docker-compose exec icnd icnctl auth token --coop my-coop
+
+# Copy the token and use it in the web UI
+```
+
+#### 5. Seed Demo Data (Optional)
+
+```bash
+# From the sdk/typescript directory
+cd ../sdk/typescript
+npm install
+npm run seed -- --gateway http://localhost:8080 --token <your-token>
+```
+
+### 6. Access Services
 
 | Service | URL | Description |
 |---------|-----|-------------|
