@@ -1,0 +1,1079 @@
+openapi: 3.0.3
+info:
+  title: ICN Gateway API
+  description: |
+    REST API for the Intercooperative Network (ICN).
+
+    ## Authentication
+
+    ICN uses DID-based authentication with JWT tokens:
+    1. Request a challenge for your DID via `POST /v1/auth/challenge`
+    2. Sign the challenge with your Ed25519 private key
+    3. Submit the signature via `POST /v1/auth/verify` to get a JWT token
+    4. Include the token in the `Authorization: Bearer <token>` header
+
+    ## Rate Limiting
+
+    API requests are rate-limited per DID using a token bucket algorithm:
+    - Burst capacity: 100 requests
+    - Refill rate: 10 tokens/second
+
+    When rate limited, the API returns HTTP 429.
+
+    ## Scopes
+
+    Tokens are issued with specific scopes. Request only the scopes you need:
+    - `ledger:read` - Read balances and transaction history
+    - `ledger:write` - Create payments
+    - `coop:read` - Read cooperative information
+    - `coop:write` - Modify cooperative settings
+    - `coop:admin` - Manage cooperative members
+    - `gov:read` - Read governance domains and proposals
+    - `gov:write` - Create proposals and cast votes
+
+  version: 0.1.0
+  license:
+    name: MIT OR Apache-2.0
+    url: https://github.com/anthropics/icn/blob/main/LICENSE
+  contact:
+    name: ICN Project
+    url: https://github.com/anthropics/icn
+
+servers:
+  - url: http://localhost:8080/v1
+    description: Local development
+
+tags:
+  - name: auth
+    description: Authentication operations
+  - name: health
+    description: Health check
+  - name: coops
+    description: Cooperative management
+  - name: ledger
+    description: Mutual credit ledger
+  - name: governance
+    description: Governance domains, proposals, and voting
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Gateway is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /auth/challenge:
+    post:
+      tags: [auth]
+      summary: Request authentication challenge
+      operationId: getChallenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChallengeRequest'
+      responses:
+        '200':
+          description: Challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeResponse'
+
+  /auth/verify:
+    post:
+      tags: [auth]
+      summary: Verify signature and get JWT token
+      operationId: verifyChallenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '401':
+          description: Invalid signature or expired challenge
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /coops:
+    post:
+      tags: [coops]
+      summary: Create a new cooperative
+      operationId: createCoop
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCoopRequest'
+      responses:
+        '201':
+          description: Cooperative created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Cooperative ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /coops/{coopId}:
+    get:
+      tags: [coops]
+      summary: Get cooperative by ID
+      operationId: getCoop
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      responses:
+        '200':
+          description: Cooperative found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+        '404':
+          description: Cooperative not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags: [coops]
+      summary: Update cooperative
+      operationId: updateCoop
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCoopRequest'
+      responses:
+        '200':
+          description: Cooperative updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+        '403':
+          description: Not authorized to update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Cooperative not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags: [coops]
+      summary: Delete cooperative
+      operationId: deleteCoop
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      responses:
+        '204':
+          description: Cooperative deleted
+        '403':
+          description: Not authorized to delete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Cooperative not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /coops/{coopId}/members:
+    get:
+      tags: [coops]
+      summary: List cooperative members
+      operationId: listMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      responses:
+        '200':
+          description: Member list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+
+    post:
+      tags: [coops]
+      summary: Add member to cooperative
+      operationId: addMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberRequest'
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '403':
+          description: Not authorized (requires coop:admin scope)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Member already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /coops/{coopId}/members/{did}:
+    put:
+      tags: [coops]
+      summary: Update member role
+      operationId: updateMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+        - $ref: '#/components/parameters/did'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
+      responses:
+        '200':
+          description: Member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '403':
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags: [coops]
+      summary: Remove member from cooperative
+      operationId: removeMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+        - $ref: '#/components/parameters/did'
+      responses:
+        '204':
+          description: Member removed
+        '403':
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ledger/{coopId}/balance/{did}:
+    get:
+      tags: [ledger]
+      summary: Get member balance
+      operationId: getBalance
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+        - $ref: '#/components/parameters/did'
+      responses:
+        '200':
+          description: Balance retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ledger/{coopId}/payment:
+    post:
+      tags: [ledger]
+      summary: Create a payment
+      operationId: createPayment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Invalid payment (insufficient credit, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not authorized (requires ledger:write scope)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ledger/{coopId}/history:
+    get:
+      tags: [ledger]
+      summary: Get transaction history
+      operationId: getHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Number of transactions to skip
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: Maximum transactions to return
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionHistory'
+
+  /gov/domains:
+    get:
+      tags: [governance]
+      summary: List governance domains
+      operationId: listDomains
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Domain list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GovernanceDomain'
+
+    post:
+      tags: [governance]
+      summary: Create governance domain
+      operationId: createDomain
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDomainRequest'
+      responses:
+        '201':
+          description: Domain created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GovernanceDomain'
+
+  /gov/domains/{domainId}:
+    get:
+      tags: [governance]
+      summary: Get governance domain
+      operationId: getDomain
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/domainId'
+      responses:
+        '200':
+          description: Domain found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GovernanceDomain'
+        '404':
+          description: Domain not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gov/proposals:
+    get:
+      tags: [governance]
+      summary: List proposals
+      operationId: listProposals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: domain_id
+          in: query
+          schema:
+            type: string
+          description: Filter by domain
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [draft, open, closed]
+          description: Filter by state
+      responses:
+        '200':
+          description: Proposal list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Proposal'
+
+    post:
+      tags: [governance]
+      summary: Create proposal
+      operationId: createProposal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProposalRequest'
+      responses:
+        '201':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+
+  /gov/proposals/{proposalId}:
+    get:
+      tags: [governance]
+      summary: Get proposal
+      operationId: getProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/proposalId'
+      responses:
+        '200':
+          description: Proposal found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '404':
+          description: Proposal not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gov/proposals/{proposalId}/open:
+    post:
+      tags: [governance]
+      summary: Open proposal for voting
+      operationId: openProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/proposalId'
+      responses:
+        '200':
+          description: Proposal opened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '400':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gov/proposals/{proposalId}/close:
+    post:
+      tags: [governance]
+      summary: Close proposal and calculate outcome
+      operationId: closeProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/proposalId'
+      responses:
+        '200':
+          description: Proposal closed with outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalOutcome'
+        '400':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gov/proposals/{proposalId}/vote:
+    post:
+      tags: [governance]
+      summary: Cast vote on proposal
+      operationId: castVote
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/proposalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CastVoteRequest'
+      responses:
+        '204':
+          description: Vote cast
+        '400':
+          description: Voting not open or already voted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gov/proposals/{proposalId}/votes:
+    get:
+      tags: [governance]
+      summary: Get vote tally
+      operationId: getVotes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/proposalId'
+      responses:
+        '200':
+          description: Vote tally
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteTally'
+        '404':
+          description: Proposal not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ws/{coopId}:
+    get:
+      tags: [websocket]
+      summary: WebSocket connection for real-time events
+      description: |
+        Upgrade to WebSocket for real-time event streaming.
+
+        After connecting, send an Auth message with your JWT token:
+        ```json
+        {"type": "Auth", "token": "your-jwt-token"}
+        ```
+
+        On success, you'll receive:
+        ```json
+        {"type": "AuthOk", "did": "did:icn:..."}
+        ```
+
+        Then you'll receive Event messages for cooperative activity.
+      parameters:
+        - $ref: '#/components/parameters/coopId'
+      responses:
+        '101':
+          description: WebSocket upgrade
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    coopId:
+      name: coopId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Cooperative ID
+
+    did:
+      name: did
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Decentralized identifier (URL-encoded)
+
+    domainId:
+      name: domainId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Governance domain ID
+
+    proposalId:
+      name: proposalId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Proposal ID
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        network_peers:
+          type: integer
+          example: 3
+        gossip_entries:
+          type: integer
+          example: 42
+        ledger_entries:
+          type: integer
+          example: 100
+      required: [status]
+
+    ChallengeRequest:
+      type: object
+      properties:
+        did:
+          type: string
+          example: did:icn:abc123
+      required: [did]
+
+    ChallengeResponse:
+      type: object
+      properties:
+        challenge:
+          type: string
+          description: Random challenge to sign
+        expires_at:
+          type: integer
+          format: int64
+          description: Unix timestamp when challenge expires
+      required: [challenge, expires_at]
+
+    VerifyRequest:
+      type: object
+      properties:
+        did:
+          type: string
+        signature:
+          type: string
+          description: Hex-encoded Ed25519 signature
+        coop_id:
+          type: string
+          description: Cooperative to authenticate for
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Requested scopes
+      required: [did, signature]
+
+    VerifyResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token
+        expires_at:
+          type: integer
+          format: int64
+          description: Unix timestamp when token expires
+      required: [token, expires_at]
+
+    Cooperative:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        owner:
+          type: string
+          description: Owner DID
+        created_at:
+          type: integer
+          format: int64
+        settings:
+          type: object
+          additionalProperties: true
+      required: [id, name, owner, created_at]
+
+    CreateCoopRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          minLength: 3
+          maxLength: 64
+        name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        settings:
+          type: object
+          additionalProperties: true
+      required: [id, name]
+
+    UpdateCoopRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        settings:
+          type: object
+          additionalProperties: true
+
+    Member:
+      type: object
+      properties:
+        did:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joined_at:
+          type: integer
+          format: int64
+      required: [did, role, joined_at]
+
+    AddMemberRequest:
+      type: object
+      properties:
+        did:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+      required: [did, role]
+
+    UpdateMemberRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+      required: [role]
+
+    Balance:
+      type: object
+      properties:
+        did:
+          type: string
+        balance:
+          type: number
+          format: double
+        currency:
+          type: string
+      required: [did, balance, currency]
+
+    PaymentRequest:
+      type: object
+      properties:
+        from:
+          type: string
+          description: Sender DID
+        to:
+          type: string
+          description: Recipient DID
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+        currency:
+          type: string
+        memo:
+          type: string
+          maxLength: 500
+      required: [from, to, amount, currency]
+
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        memo:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+      required: [id, from, to, amount, currency, timestamp]
+
+    TransactionHistory:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentResponse'
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+      required: [transactions, total, offset, limit]
+
+    GovernanceDomain:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: integer
+          format: int64
+      required: [id, name, members, created_at]
+
+    CreateDomainRequest:
+      type: object
+      properties:
+        domain_id:
+          type: string
+        name:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+      required: [domain_id, name, members]
+
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: string
+        domain_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        kind:
+          type: string
+          enum: [text, budget, membership, config_change]
+        state:
+          type: string
+          enum: [draft, open, closed]
+        created_by:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        opened_at:
+          type: integer
+          format: int64
+        closed_at:
+          type: integer
+          format: int64
+      required: [id, domain_id, title, kind, state, created_by, created_at]
+
+    CreateProposalRequest:
+      type: object
+      properties:
+        domain_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        kind:
+          type: string
+          enum: [text, budget, membership, config_change]
+      required: [domain_id, title, kind]
+
+    CastVoteRequest:
+      type: object
+      properties:
+        choice:
+          type: string
+          enum: [for, against, abstain]
+      required: [choice]
+
+    Vote:
+      type: object
+      properties:
+        voter:
+          type: string
+        choice:
+          type: string
+          enum: [for, against, abstain]
+        timestamp:
+          type: integer
+          format: int64
+      required: [voter, choice, timestamp]
+
+    VoteTally:
+      type: object
+      properties:
+        proposal_id:
+          type: string
+        votes_for:
+          type: integer
+        votes_against:
+          type: integer
+        votes_abstain:
+          type: integer
+        total_votes:
+          type: integer
+        votes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vote'
+      required: [proposal_id, votes_for, votes_against, votes_abstain, total_votes, votes]
+
+    ProposalOutcome:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        votes_for:
+          type: integer
+        votes_against:
+          type: integer
+        votes_abstain:
+          type: integer
+        quorum_met:
+          type: boolean
+        approval_met:
+          type: boolean
+      required: [accepted, votes_for, votes_against, votes_abstain, quorum_met, approval_met]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+      required: [error]
