@@ -1,0 +1,48 @@
+[Unit]
+Description=ICN Daemon - Intercooperative Network Node
+Documentation=https://github.com/InterCooperative-Network/icn
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=icn
+Group=icn
+
+# Working directory
+WorkingDirectory=/var/lib/icn
+
+# Environment
+EnvironmentFile=-/etc/icn/icnd.env
+
+# Command - passphrase must be provided via environment or file
+ExecStart=/usr/local/bin/icnd \
+    --data-dir /var/lib/icn \
+    --gateway-enable \
+    --gateway-bind 127.0.0.1:8080
+
+# Restart policy
+Restart=always
+RestartSec=10
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/icn /var/log/icn
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=icnd
+
+[Install]
+WantedBy=multi-user.target

@@ -1,8 +1,103 @@
-# ICN Docker Deployment
+# ICN Deployment
+
+Tools and configuration for deploying ICN (Intercooperative Network) pilots.
+
+## Deployment Options
+
+- **Native/Bare-metal**: Direct installation with systemd (recommended for production)
+- **Docker Compose**: Containerized stack with monitoring
+
+---
+
+## Native Installation
+
+For production deployments on Linux servers.
+
+### Quick Install
+
+```bash
+# Clone the repository
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn
+
+# Run the installer (requires root)
+sudo deploy/install.sh
+```
+
+### Manual Installation
+
+1. **Build from source**:
+   ```bash
+   cd icn
+   cargo build --release
+   ```
+
+2. **Copy binaries**:
+   ```bash
+   sudo cp target/release/icnd /usr/local/bin/
+   sudo cp target/release/icnctl /usr/local/bin/
+   ```
+
+3. **Create user and directories**:
+   ```bash
+   sudo useradd --system --home-dir /var/lib/icn icn
+   sudo mkdir -p /var/lib/icn /etc/icn
+   sudo chown icn:icn /var/lib/icn
+   ```
+
+4. **Configure environment**:
+   ```bash
+   sudo cp deploy/icnd.env.example /etc/icn/icnd.env
+   sudo chmod 600 /etc/icn/icnd.env
+   # Edit and set JWT_SECRET
+   sudo nano /etc/icn/icnd.env
+   ```
+
+5. **Install systemd service**:
+   ```bash
+   sudo cp deploy/icnd.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   ```
+
+6. **Initialize identity**:
+   ```bash
+   sudo -u icn icnctl --data-dir /var/lib/icn id init
+   ```
+
+7. **Start service**:
+   ```bash
+   sudo systemctl enable icnd
+   sudo systemctl start icnd
+   ```
+
+### Health Monitoring
+
+```bash
+# Check service status
+icn-health-check
+
+# JSON output for monitoring systems
+icn-health-check --json
+```
+
+### Files Installed
+
+| Path | Description |
+|------|-------------|
+| `/usr/local/bin/icnd` | ICN daemon |
+| `/usr/local/bin/icnctl` | CLI tool |
+| `/usr/local/bin/icn-health-check` | Health check script |
+| `/etc/icn/icnd.env` | Environment configuration |
+| `/var/lib/icn/` | Data directory |
+| `/usr/share/icn/static/` | Web UI files |
+
+---
+
+## Docker Deployment
 
 Docker Compose configuration for deploying a complete ICN pilot stack.
 
-## Components
+### Components
 
 - **icnd**: ICN daemon with gateway API enabled
 - **prometheus**: Metrics collection
@@ -270,9 +365,14 @@ Common issues:
 
 ```
 deploy/
-├── docker-compose.yml      # Main compose file
+├── install.sh              # Native installation script
+├── quickstart.sh           # Docker quickstart script
+├── health-check.sh         # Health monitoring script
+├── icnd.service            # systemd service file
+├── icnd.env.example        # Environment template
+├── docker-compose.yml      # Docker compose file
 ├── Dockerfile.icnd         # ICN daemon image
-├── .env.example            # Environment template
+├── .env.example            # Docker environment template
 ├── README.md               # This file
 └── config/
     ├── icn.toml            # ICN configuration
