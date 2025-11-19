@@ -209,6 +209,26 @@ After authentication, you'll receive events as they occur:
 | `GovernanceProposalClosed` | Proposal closed with outcome |
 | `GovernanceVoteCast` | Vote cast on proposal |
 
+## Running Examples
+
+Run the example script to test all API endpoints:
+
+```bash
+# Run health check only (no token needed)
+./docs/api/examples.sh
+
+# Run all examples with authentication
+export TOKEN=$(icnctl auth token --coop my-coop)
+./docs/api/examples.sh
+```
+
+The script demonstrates:
+- Health checks
+- Cooperative management
+- Member management
+- Ledger operations (balance, payments)
+- Governance (domains, proposals, voting)
+
 ## Viewing the OpenAPI Spec
 
 You can view the interactive API documentation using:
