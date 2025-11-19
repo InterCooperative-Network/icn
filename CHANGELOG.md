@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Auth token header support
    - Real-time data fetching for all views
 
+7. **API Documentation** (`docs/api/`)
+   - OpenAPI 3.1.0 specification with all 26 endpoints
+   - Covers authentication, cooperatives, ledger, governance, WebSocket
+   - Request/response schemas with examples
+   - API reference README with quick start guide
+   - Swagger UI / Redoc viewing instructions
+
 **Test Results:**
 - Gateway Tests: ✅ 84 passed
 - Governance Integration: ✅ passed
