@@ -67,6 +67,7 @@ paths:
       summary: Health check
       description: Returns the current health status of the Gateway API.
       operationId: getHealth
+      security: []  # Public endpoint
       responses:
         '200':
           description: Service is healthy
@@ -77,6 +78,12 @@ paths:
               example:
                 status: healthy
                 version: "1.0.0"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /v1/auth/challenge:
     post:
@@ -87,6 +94,7 @@ paths:
         The challenge must be signed with the DID's private key and
         submitted to `/v1/auth/verify` within 5 minutes.
       operationId: requestChallenge
+      security: []  # Public endpoint
       requestBody:
         required: true
         content:
@@ -117,6 +125,7 @@ paths:
         The signature must be created using the Ed25519 private key
         corresponding to the DID's public key.
       operationId: verifyChallenge
+      security: []  # Public endpoint
       requestBody:
         required: true
         content:
@@ -722,19 +731,22 @@ paths:
       summary: WebSocket event stream
       description: |
         Connect for real-time event streaming.
-        
+
         After connecting, send: `{"type": "Auth", "token": "..."}`
-        
+
         Events include: PaymentCreated, MemberAdded, MemberRemoved,
         RoleUpdated, SettingsUpdated, GovernanceDomainCreated,
         GovernanceProposalCreated, GovernanceProposalOpened,
         GovernanceProposalClosed, GovernanceVoteCast
       operationId: websocketConnect
+      security: []  # Auth handled via WebSocket message
       parameters:
         - $ref: '#/components/parameters/CoopId'
       responses:
         '101':
           description: Switching to WebSocket protocol
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
 components:
   securitySchemes:
