@@ -1097,7 +1097,7 @@ components:
 
     CreateProposalRequest:
       type: object
-      required: [domain_id, title, kind]
+      required: [domain_id, title, description, payload]
       properties:
         domain_id:
           type: string
@@ -1106,9 +1106,74 @@ components:
           type: string
         description:
           type: string
-        kind:
+        payload:
+          $ref: '#/components/schemas/ProposalPayload'
+
+    ProposalPayload:
+      oneOf:
+        - $ref: '#/components/schemas/TextPayload'
+        - $ref: '#/components/schemas/BudgetPayload'
+        - $ref: '#/components/schemas/MembershipPayload'
+        - $ref: '#/components/schemas/ConfigChangePayload'
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/TextPayload'
+          budget: '#/components/schemas/BudgetPayload'
+          membership: '#/components/schemas/MembershipPayload'
+          config_change: '#/components/schemas/ConfigChangePayload'
+
+    TextPayload:
+      type: object
+      required: [type, body]
+      properties:
+        type:
           type: string
-          enum: [text, budget, membership, config_change]
+          enum: [text]
+        body:
+          type: string
+
+    BudgetPayload:
+      type: object
+      required: [type, amount, recipient, currency, purpose]
+      properties:
+        type:
+          type: string
+          enum: [budget]
+        amount:
+          type: integer
+        recipient:
+          type: string
+          description: DID of the recipient
+        currency:
+          type: string
+        purpose:
+          type: string
+
+    MembershipPayload:
+      type: object
+      required: [type, action, did]
+      properties:
+        type:
+          type: string
+          enum: [membership]
+        action:
+          type: string
+          enum: [add, remove]
+        did:
+          type: string
+
+    ConfigChangePayload:
+      type: object
+      required: [type, key, value]
+      properties:
+        type:
+          type: string
+          enum: [config_change]
+        key:
+          type: string
+        value:
+          type: string
 
     CastVoteRequest:
       type: object

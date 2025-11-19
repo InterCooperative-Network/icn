@@ -110,7 +110,10 @@ PROPOSAL=$(curl -s -X POST $BASE_URL/v1/gov/proposals \
         "domain_id": "example-domain",
         "title": "Test Proposal",
         "description": "A proposal to test the governance system",
-        "kind": "text"
+        "payload": {
+            "type": "text",
+            "body": "This is the full text body of the proposal."
+        }
     }')
 echo "$PROPOSAL" | jq
 PROPOSAL_ID=$(echo "$PROPOSAL" | jq -r '.id')

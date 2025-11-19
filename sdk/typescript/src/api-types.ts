@@ -492,9 +492,48 @@ export interface components {
             /** @description The governance domain this proposal belongs to */
             domain_id: string;
             title: string;
-            description?: string;
+            description: string;
+            payload: components["schemas"]["ProposalPayload"];
+        };
+        ProposalPayload: components["schemas"]["TextPayload"] | components["schemas"]["BudgetPayload"] | components["schemas"]["MembershipPayload"] | components["schemas"]["ConfigChangePayload"];
+        TextPayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+            body: string;
+        };
+        BudgetPayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "budget";
+            amount: number;
+            /** @description DID of the recipient */
+            recipient: string;
+            currency: string;
+            purpose: string;
+        };
+        MembershipPayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "membership";
             /** @enum {string} */
-            kind: "text" | "budget" | "membership" | "config_change";
+            action: "add" | "remove";
+            did: string;
+        };
+        ConfigChangePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "config_change";
+            key: string;
+            value: string;
         };
         CastVoteRequest: {
             /** @enum {string} */
