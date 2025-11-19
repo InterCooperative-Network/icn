@@ -20,9 +20,6 @@ rpc_port = 5601
 # Prometheus metrics
 metrics_port = 9090
 
-# Health check endpoint
-health_port = 8080
-
 # Log level
 log_level = "info"
 
