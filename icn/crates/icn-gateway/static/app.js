@@ -328,11 +328,13 @@ async function renderProposalList(proposals, container, showVoteButtons) {
 
         let actionsHtml = '';
         if (showVoteButtons) {
+            // Use data attributes to prevent XSS from proposal.id
+            const escapedId = escapeHtml(proposal.id);
             actionsHtml = `
                 <div class="proposal-actions">
-                    <button class="btn-vote for" onclick="castVote('${proposal.id}', 'for')">For</button>
-                    <button class="btn-vote against" onclick="castVote('${proposal.id}', 'against')">Against</button>
-                    <button class="btn-vote abstain" onclick="castVote('${proposal.id}', 'abstain')">Abstain</button>
+                    <button class="btn-vote for" data-proposal-id="${escapedId}" data-vote="for">For</button>
+                    <button class="btn-vote against" data-proposal-id="${escapedId}" data-vote="against">Against</button>
+                    <button class="btn-vote abstain" data-proposal-id="${escapedId}" data-vote="abstain">Abstain</button>
                 </div>
             `;
         } else if (proposal.outcome) {
@@ -680,6 +682,17 @@ elements.navBtns.forEach(btn => {
 // Enter key on login form
 elements.token.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') login();
+});
+
+// Event delegation for vote buttons (prevents XSS from inline onclick)
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('btn-vote')) {
+        const proposalId = e.target.dataset.proposalId;
+        const vote = e.target.dataset.vote;
+        if (proposalId && vote) {
+            castVote(proposalId, vote);
+        }
+    }
 });
 
 // Auto-refresh every 30 seconds

@@ -87,6 +87,7 @@ if [ ! -f "$CONFIG_DIR/icnd.env" ]; then
     echo "Creating environment configuration..."
     cp "$SCRIPT_DIR/icnd.env.example" "$CONFIG_DIR/icnd.env"
     chmod 600 "$CONFIG_DIR/icnd.env"
+    chown "$ICN_USER:$ICN_USER" "$CONFIG_DIR/icnd.env"
 
     # Generate JWT secret
     JWT_SECRET=$(openssl rand -hex 32)

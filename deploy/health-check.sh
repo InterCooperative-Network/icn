@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 GATEWAY_URL="${ICN_GATEWAY_URL:-http://localhost:8080}"
-METRICS_URL="${ICN_METRICS_URL:-http://localhost:9100}"
+METRICS_URL="${ICN_METRICS_URL:-http://localhost:9090}"
 TIMEOUT="${ICN_HEALTH_TIMEOUT:-5}"
 
 # Colors for output
