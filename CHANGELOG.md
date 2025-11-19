@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Pilot Deployment Tooling (2025-11-18)
+
+**Complete pilot deployment package for cooperative communities:**
+
+1. **Pilot Coordinator Guide** (`docs/pilot-coordinator-guide.md`)
+   - Comprehensive tutorial for cooperative coordinators
+   - Quick start and manual setup instructions
+   - Member onboarding workflow
+   - Web UI usage guide (all 5 tabs)
+   - Governance management via CLI
+   - Day-to-day operations checklist
+   - Troubleshooting common issues
+   - Security best practices with HTTPS setup
+
+2. **Native Installation Support** (`deploy/`)
+   - `install.sh`: Automated installer script
+     - Creates icn user and directories
+     - Installs binaries to /usr/local/bin
+     - Sets up systemd service automatically
+     - Generates JWT secret
+   - `icnd.service`: Systemd service file with security hardening
+   - `health-check.sh`: Monitoring script with JSON output
+   - `icnd.env.example`: Environment configuration template
+   - Updated README with both deployment options
+
+3. **Gateway Static File Serving**
+   - Web UI bundled in `icn-gateway/static/`
+   - Gateway serves UI at `/static/` with root redirect
+   - Self-contained deployment without separate web server
+
+4. **Web UI Enhancements**
+   - Governance tab for voting on proposals
+   - WebSocket real-time updates (payments, votes, members)
+   - Race condition fix in WebSocket reconnection
+   - Vote tally display with For/Against/Abstain counts
+
+5. **Gateway API Additions**
+   - `GET /gov/proposals/{id}/votes` endpoint for vote tallies
+   - GovernanceManager.get_vote_tally() method
+
+6. **icn-console TUI**
+   - Connected to real Gateway API (was mock data)
+   - Auth token header support
+   - Real-time data fetching for all views
+
+**Test Results:**
+- Gateway Tests: ✅ 84 passed
+- Governance Integration: ✅ passed
+- Build: ✅ release binaries built
+
 ### Fixed - Code Quality & Production Hardening (2025-11-18)
 
 **Critical & High Priority Fixes:**
