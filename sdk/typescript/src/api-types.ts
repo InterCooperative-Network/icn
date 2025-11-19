@@ -230,7 +230,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/gov/domains/{domain_id}/proposals": {
+    "/v1/gov/proposals": {
         parameters: {
             query?: never;
             header?: never;
@@ -306,11 +306,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get vote tally */
-        get: operations["getVoteTally"];
+        get?: never;
         put?: never;
         /** Cast vote */
         post: operations["castVote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/gov/proposals/{proposal_id}/votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get vote tally */
+        get: operations["getVoteTally"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -473,6 +489,8 @@ export interface components {
             created_at?: string;
         };
         CreateProposalRequest: {
+            /** @description The governance domain this proposal belongs to */
+            domain_id: string;
             title: string;
             description?: string;
             /** @enum {string} */
@@ -1098,27 +1116,36 @@ export interface operations {
     listProposals: {
         parameters: {
             query?: {
+                /** @description Filter by domain ID */
+                domain_id?: string;
                 state?: "draft" | "open" | "closed";
+                limit?: number;
+                offset?: number;
             };
             header?: never;
-            path: {
-                domain_id: components["parameters"]["DomainId"];
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description List of proposals */
+            /** @description List of proposals with pagination */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Proposal"][];
+                    "application/json": {
+                        data?: components["schemas"]["Proposal"][];
+                        pagination?: {
+                            total?: number;
+                            offset?: number;
+                            limit?: number;
+                            returned?: number;
+                        };
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
         };
     };
@@ -1126,9 +1153,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                domain_id: components["parameters"]["DomainId"];
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
@@ -1147,7 +1172,13 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Domain not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             429: components["responses"]["RateLimited"];
         };
     };
@@ -1240,31 +1271,6 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
-    getVoteTally: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                proposal_id: components["parameters"]["ProposalId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Vote tally */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoteTally"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
     castVote: {
         parameters: {
             query?: never;
@@ -1295,6 +1301,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getVoteTally: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: components["parameters"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Vote tally */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoteTally"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
