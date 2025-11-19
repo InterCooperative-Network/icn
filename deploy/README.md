@@ -347,7 +347,7 @@ Common issues:
 
 1. Check icnd is healthy: `docker-compose ps`
 2. Check gateway is enabled in config
-3. Test health endpoint: `curl http://localhost:8080/health`
+3. Test health endpoint: `curl http://localhost:8080/v1/health`
 
 ### Grafana shows no data
 
@@ -357,7 +357,7 @@ Common issues:
 
 ### Web UI can't connect
 
-1. Verify API is accessible: `curl http://localhost:8080/health`
+1. Verify API is accessible: `curl http://localhost:8080/v1/health`
 2. Check browser console for CORS errors
 3. Ensure nginx is proxying correctly
 
