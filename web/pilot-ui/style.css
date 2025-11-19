@@ -382,6 +382,155 @@ main {
     color: white;
 }
 
+/* Proposal List */
+.proposal-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.proposal-item {
+    padding: 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.proposal-item:last-child {
+    margin-bottom: 0;
+}
+
+.proposal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.proposal-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.proposal-state {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background: var(--gray-100);
+}
+
+.proposal-state.open {
+    background: var(--success);
+    color: white;
+}
+
+.proposal-state.closed {
+    background: var(--gray-500);
+    color: white;
+}
+
+.proposal-description {
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.proposal-votes {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.vote-count {
+    font-size: 0.875rem;
+}
+
+.vote-count.for {
+    color: var(--success);
+}
+
+.vote-count.against {
+    color: var(--danger);
+}
+
+.vote-count.abstain {
+    color: var(--gray-500);
+}
+
+.proposal-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-vote {
+    padding: 0.5rem 1rem;
+    border: 1px solid;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.btn-vote.for {
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.btn-vote.for:hover {
+    background: var(--success);
+    color: white;
+}
+
+.btn-vote.against {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.btn-vote.against:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-vote.abstain {
+    border-color: var(--gray-500);
+    color: var(--gray-500);
+}
+
+.btn-vote.abstain:hover {
+    background: var(--gray-500);
+    color: white;
+}
+
+.btn-vote:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.proposal-outcome {
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.proposal-outcome.accepted {
+    background: #dcfce7;
+    color: var(--success);
+}
+
+.proposal-outcome.rejected {
+    background: #fee2e2;
+    color: var(--danger);
+}
+
+.empty-state {
+    color: var(--gray-500);
+    text-align: center;
+    padding: 2rem;
+    font-style: italic;
+}
+
 /* Messages */
 .error-message {
     color: var(--danger);

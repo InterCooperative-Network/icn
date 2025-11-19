@@ -10,6 +10,7 @@ const state = {
     token: '',
     members: [],
     transactions: [],
+    proposals: [],
 };
 
 // DOM Elements
@@ -53,6 +54,10 @@ const elements = {
 
     // Members
     memberList: document.getElementById('member-list'),
+
+    // Governance
+    proposalList: document.getElementById('proposal-list'),
+    closedProposals: document.getElementById('closed-proposals'),
 
     // Footer
     connectionStatus: document.getElementById('connection-status'),
@@ -198,6 +203,7 @@ async function loadAllData() {
         loadBalance(),
         loadMembers(),
         loadTransactions(),
+        loadProposals(),
     ]);
 
     elements.lastUpdate.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
@@ -269,6 +275,105 @@ async function loadTransactions() {
         console.error('Failed to load transactions:', error);
         elements.monthlyHours.textContent = '--';
     }
+}
+
+async function loadProposals() {
+    try {
+        // Try to load proposals from governance API
+        const proposals = await apiRequest('GET', '/gov/proposals');
+        state.proposals = proposals;
+
+        // Split into open and closed
+        const openProposals = proposals.filter(p => p.state === 'Open');
+        const closedProposals = proposals.filter(p => p.state === 'Closed');
+
+        // Render lists
+        await renderProposalList(openProposals, elements.proposalList, true);
+        await renderProposalList(closedProposals, elements.closedProposals, false);
+
+    } catch (error) {
+        console.error('Failed to load proposals:', error);
+        if (elements.proposalList) {
+            elements.proposalList.innerHTML = '<p class="empty-state">No proposals available</p>';
+        }
+    }
+}
+
+async function renderProposalList(proposals, container, showVoteButtons) {
+    if (!container) return;
+
+    if (proposals.length === 0) {
+        container.innerHTML = `<p class="empty-state">${showVoteButtons ? 'No active proposals' : 'No closed proposals yet'}</p>`;
+        return;
+    }
+
+    const html = await Promise.all(proposals.map(async (proposal) => {
+        // Get vote tally
+        let votes = { for_votes: 0, against_votes: 0, abstain_votes: 0 };
+        try {
+            votes = await apiRequest('GET', `/gov/proposals/${proposal.id}/votes`);
+        } catch (e) {
+            // Votes might not be available
+        }
+
+        const stateClass = proposal.state.toLowerCase();
+
+        let actionsHtml = '';
+        if (showVoteButtons) {
+            actionsHtml = `
+                <div class="proposal-actions">
+                    <button class="btn-vote for" onclick="castVote('${proposal.id}', 'for')">For</button>
+                    <button class="btn-vote against" onclick="castVote('${proposal.id}', 'against')">Against</button>
+                    <button class="btn-vote abstain" onclick="castVote('${proposal.id}', 'abstain')">Abstain</button>
+                </div>
+            `;
+        } else if (proposal.outcome) {
+            const outcomeClass = proposal.outcome === 'Accepted' ? 'accepted' : 'rejected';
+            actionsHtml = `<div class="proposal-outcome ${outcomeClass}">${proposal.outcome}</div>`;
+        }
+
+        return `
+            <div class="proposal-item">
+                <div class="proposal-header">
+                    <div class="proposal-title">${escapeHtml(proposal.title)}</div>
+                    <div class="proposal-state ${stateClass}">${proposal.state}</div>
+                </div>
+                ${proposal.description ? `<div class="proposal-description">${escapeHtml(proposal.description)}</div>` : ''}
+                <div class="proposal-votes">
+                    <span class="vote-count for">For: ${votes.for_votes || 0}</span>
+                    <span class="vote-count against">Against: ${votes.against_votes || 0}</span>
+                    <span class="vote-count abstain">Abstain: ${votes.abstain_votes || 0}</span>
+                </div>
+                ${actionsHtml}
+            </div>
+        `;
+    }));
+
+    container.innerHTML = html.join('');
+}
+
+async function castVote(proposalId, choice) {
+    try {
+        await apiRequest('POST', `/gov/proposals/${proposalId}/vote`, {
+            choice: choice,
+        });
+
+        // Reload proposals to show updated votes
+        await loadProposals();
+
+        // Show a brief success message (optional)
+        console.log(`Vote cast: ${choice} on proposal ${proposalId}`);
+
+    } catch (error) {
+        alert(`Failed to cast vote: ${error.message}`);
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Rendering
