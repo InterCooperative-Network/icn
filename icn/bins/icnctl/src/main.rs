@@ -109,6 +109,28 @@ enum Commands {
         #[arg(long)]
         no_start: bool,
     },
+
+    /// Gateway authentication (get JWT tokens)
+    #[command(subcommand)]
+    Auth(AuthCommands),
+}
+
+#[derive(Subcommand, Debug)]
+enum AuthCommands {
+    /// Get a JWT token for the Gateway API
+    Token {
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Cooperative ID
+        #[arg(short, long)]
+        coop_id: String,
+
+        /// Scopes to request (comma-separated)
+        #[arg(short, long, default_value = "ledger:read,ledger:write,coop:read,gov:read,gov:write")]
+        scopes: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -685,6 +707,10 @@ async fn main() -> Result<()> {
 
         Commands::InitCoop { name, members, yes, no_start } => {
             handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
+        }
+
+        Commands::Auth(auth_cmd) => {
+            handle_auth_command(auth_cmd, &data_dir).await?
         }
     }
 
@@ -3196,6 +3222,128 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
                     bail!("Failed to cleanup snapshots: {e}");
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle authentication commands
+async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()> {
+    match cmd {
+        AuthCommands::Token { gateway, coop_id, scopes } => {
+            // Get keystore path and unlock
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No keystore found. Run 'icnctl id init' first.");
+            }
+
+            // Prompt for passphrase
+            let passphrase = rpassword::prompt_password("Keystore passphrase: ")
+                .context("Failed to read passphrase")?;
+
+            // Unlock keystore
+            let mut keystore = icn_identity::keystore::AgeKeyStore::open(&keystore_path)
+                .context("Failed to open keystore")?;
+            keystore.unlock(passphrase.as_bytes())
+                .context("Failed to unlock keystore")?;
+
+            let bundle = keystore.get_identity_bundle()
+                .context("Keystore is locked")?;
+            let did = bundle.did().to_string();
+            let keypair = bundle.keypair();
+
+            // Parse scopes
+            let scope_list: Vec<String> = scopes.split(',').map(|s| s.trim().to_string()).collect();
+
+            println!("Getting token for DID: {did}");
+            println!("Gateway: {gateway}");
+            println!("Cooperative: {coop_id}");
+            println!("Scopes: {}", scope_list.join(", "));
+            println!();
+
+            // Create HTTP client
+            let client = reqwest::Client::new();
+
+            // Step 1: Get challenge
+            let challenge_url = format!("{}/v1/auth/challenge", gateway);
+            let challenge_req = serde_json::json!({
+                "did": did
+            });
+
+            let challenge_resp = client
+                .post(&challenge_url)
+                .json(&challenge_req)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !challenge_resp.status().is_success() {
+                let status = challenge_resp.status();
+                let body = challenge_resp.text().await.unwrap_or_default();
+                bail!("Failed to get challenge: {} - {}", status, body);
+            }
+
+            let challenge_data: serde_json::Value = challenge_resp
+                .json()
+                .await
+                .context("Failed to parse challenge response")?;
+
+            let challenge = challenge_data["challenge"]
+                .as_str()
+                .context("Missing challenge in response")?;
+
+            // Step 2: Sign the challenge
+            let signature = keypair.sign(challenge.as_bytes());
+            let signature_hex = hex::encode(signature.to_bytes());
+
+            // Step 3: Verify signature and get token
+            let verify_url = format!("{}/v1/auth/verify", gateway);
+            let verify_req = serde_json::json!({
+                "did": did,
+                "signature": signature_hex,
+                "coop_id": coop_id,
+                "scopes": scope_list
+            });
+
+            let verify_resp = client
+                .post(&verify_url)
+                .json(&verify_req)
+                .send()
+                .await
+                .context("Failed to verify signature")?;
+
+            if !verify_resp.status().is_success() {
+                let status = verify_resp.status();
+                let body = verify_resp.text().await.unwrap_or_default();
+                bail!("Failed to verify: {} - {}", status, body);
+            }
+
+            let token_data: serde_json::Value = verify_resp
+                .json()
+                .await
+                .context("Failed to parse token response")?;
+
+            let token = token_data["token"]
+                .as_str()
+                .context("Missing token in response")?;
+
+            let expires_at = token_data["expires_at"]
+                .as_i64()
+                .unwrap_or(0);
+
+            let expiry_time = chrono::DateTime::from_timestamp(expires_at, 0)
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            println!("✓ Token obtained successfully!");
+            println!();
+            println!("Token (copy this to use with web UI):");
+            println!("────────────────────────────────────────");
+            println!("{token}");
+            println!("────────────────────────────────────────");
+            println!();
+            println!("Expires: {expiry_time}");
         }
     }
 
