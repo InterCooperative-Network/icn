@@ -254,7 +254,25 @@ npm run dev
 
 # Run tests
 npm test
+
+# Regenerate types from OpenAPI spec
+npm run generate-types
 ```
+
+### Type Generation
+
+The SDK includes auto-generated types from the OpenAPI specification (`docs/api/openapi.yaml`).
+
+- **`src/api-types.ts`** - Generated types matching the API spec exactly
+- **`src/types.ts`** - Hand-written types for the client SDK
+
+To regenerate types after API changes:
+
+```bash
+npm run generate-types
+```
+
+This uses [openapi-typescript](https://github.com/openapi-ts/openapi-typescript) to ensure type safety with the API.
 
 ## License
 
