@@ -184,6 +184,7 @@ impl GatewayServer {
                                 .service(api::governance::create_proposal)
                                 .service(api::governance::list_proposals)
                                 .service(api::governance::get_proposal)
+                                .service(api::governance::get_votes)
                                 .service(api::governance::open_proposal)
                                 .service(api::governance::close_proposal)
                                 .service(api::governance::cast_vote)

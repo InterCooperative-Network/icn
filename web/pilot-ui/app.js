@@ -386,8 +386,12 @@ function escapeHtml(text) {
 
 // WebSocket Connection
 function connectWebSocket() {
+    // Close old connection without triggering its onclose handler side effects
     if (state.ws) {
-        state.ws.close();
+        const oldWs = state.ws;
+        state.ws = null; // Clear reference first
+        oldWs.onclose = null; // Remove handler to prevent race condition
+        oldWs.close();
     }
 
     // Convert HTTP URL to WebSocket URL
@@ -425,12 +429,15 @@ function connectWebSocket() {
     ws.onclose = () => {
         console.log('WebSocket closed');
         state.wsConnected = false;
-        state.ws = null;
+        // Only clear if this is still the active connection
+        if (state.ws === ws) {
+            state.ws = null;
+        }
 
         // Attempt to reconnect after 5 seconds
-        if (state.token) {
+        if (state.token && state.ws === null) {
             setTimeout(() => {
-                if (state.token) {
+                if (state.token && state.ws === null) {
                     connectWebSocket();
                 }
             }, 5000);

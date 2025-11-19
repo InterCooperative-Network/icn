@@ -448,6 +448,42 @@ pub async fn get_proposal(
     Ok(HttpResponse::Ok().json(proposal))
 }
 
+/// GET /gov/proposals/{id}/votes - Get vote tally for a proposal
+#[get("/proposals/{id}/votes")]
+pub async fn get_votes(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:read")?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    // Verify proposal exists
+    let _ = gov_mgr.get_proposal(&proposal_id).await?
+        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+
+    let tally = gov_mgr.get_vote_tally(&proposal_id).await?;
+
+    #[derive(serde::Serialize)]
+    struct VoteTallyResponse {
+        for_votes: usize,
+        against_votes: usize,
+        abstain_votes: usize,
+        total_votes: usize,
+    }
+
+    let response = VoteTallyResponse {
+        for_votes: tally.for_votes,
+        against_votes: tally.against_votes,
+        abstain_votes: tally.abstain_votes,
+        total_votes: tally.total_votes(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 /// POST /gov/proposals/{id}/open - Open a proposal for voting
 #[post("/proposals/{id}/open")]
 pub async fn open_proposal(

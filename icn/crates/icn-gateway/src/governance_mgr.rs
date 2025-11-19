@@ -210,6 +210,14 @@ impl GovernanceManager {
         }
     }
 
+    /// Get vote tally for a proposal
+    pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
+        let votes = self.votes.read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let proposal_votes = votes.get(proposal_id).cloned().unwrap_or_default();
+        Ok(VoteTally::from(proposal_votes))
+    }
+
     /// Cast a vote on a proposal
     pub async fn cast_vote(
         &self,
