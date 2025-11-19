@@ -365,103 +365,166 @@ impl App {
     }
 
     async fn fetch_health(&self) -> Result<HealthResponse> {
-        let url = format!("{}/health", self.gateway_url);
+        let url = format!("{}/v1/health", self.gateway_url);
         let resp = self.client.get(&url).send().await?;
         let health: HealthResponse = resp.json().await?;
         Ok(health)
     }
 
+    fn auth_header(&self) -> Option<String> {
+        self.token.as_ref().map(|t| format!("Bearer {}", t))
+    }
+
     async fn fetch_members(&self) -> Result<Vec<Member>> {
-        // This would call the gateway API
-        // For now, return mock data
-        Ok(vec![
-            Member {
-                did: "did:icn:alice123...".to_string(),
-                role: "Owner".to_string(),
-                balance: 150.0,
-                joined_at: Some(1705000000),
-            },
-            Member {
-                did: "did:icn:bob456...".to_string(),
-                role: "Admin".to_string(),
-                balance: 75.5,
-                joined_at: Some(1705100000),
-            },
-            Member {
-                did: "did:icn:carol789...".to_string(),
-                role: "Member".to_string(),
-                balance: -25.0,
-                joined_at: Some(1705200000),
-            },
-        ])
+        let url = format!("{}/v1/coops/{}/members", self.gateway_url, self.coop_id);
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+
+        let resp = req.send().await?;
+        if !resp.status().is_success() {
+            return Ok(Vec::new());
+        }
+
+        let api_members: Vec<ApiMember> = resp.json().await?;
+
+        // Fetch balance for each member
+        let mut members = Vec::new();
+        for api_member in api_members {
+            let balance = self.fetch_balance(&api_member.did).await.unwrap_or(0.0);
+            members.push(Member {
+                did: api_member.did,
+                role: api_member.role,
+                balance,
+                joined_at: None,
+            });
+        }
+
+        Ok(members)
+    }
+
+    async fn fetch_balance(&self, did: &str) -> Result<f64> {
+        let url = format!(
+            "{}/v1/ledger/{}/balance/{}",
+            self.gateway_url,
+            self.coop_id,
+            urlencoding::encode(did)
+        );
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+
+        let resp = req.send().await?;
+        if !resp.status().is_success() {
+            return Ok(0.0);
+        }
+
+        let balance: ApiBalance = resp.json().await?;
+        Ok(balance.balance)
     }
 
     async fn fetch_transactions(&self) -> Result<Vec<Transaction>> {
-        // Mock data
-        Ok(vec![
-            Transaction {
-                id: "tx001".to_string(),
-                from: "did:icn:alice...".to_string(),
-                to: "did:icn:bob...".to_string(),
-                amount: 10.0,
-                currency: "hours".to_string(),
-                memo: Some("Web design work".to_string()),
-                timestamp: 1705300000,
-            },
-            Transaction {
-                id: "tx002".to_string(),
-                from: "did:icn:bob...".to_string(),
-                to: "did:icn:carol...".to_string(),
-                amount: 5.0,
-                currency: "hours".to_string(),
-                memo: Some("Consulting".to_string()),
-                timestamp: 1705290000,
-            },
-        ])
+        let url = format!(
+            "{}/v1/ledger/{}/history?limit=50",
+            self.gateway_url, self.coop_id
+        );
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+
+        let resp = req.send().await?;
+        if !resp.status().is_success() {
+            return Ok(Vec::new());
+        }
+
+        let history: ApiHistory = resp.json().await?;
+        let transactions = history
+            .transactions
+            .into_iter()
+            .map(|tx| Transaction {
+                id: tx.id,
+                from: tx.from,
+                to: tx.to,
+                amount: tx.amount,
+                currency: tx.currency,
+                memo: tx.memo,
+                timestamp: tx.timestamp,
+            })
+            .collect();
+
+        Ok(transactions)
     }
 
     async fn fetch_proposals(&self) -> Result<Vec<Proposal>> {
-        // Mock data
-        Ok(vec![
-            Proposal {
-                id: "prop-001".to_string(),
-                title: "Approve new member application".to_string(),
-                state: "open".to_string(),
-                votes_for: 2,
-                votes_against: 0,
-                votes_abstain: 1,
-                closes_at: Some(1705400000),
-            },
-            Proposal {
-                id: "prop-002".to_string(),
-                title: "Update credit limit policy".to_string(),
-                state: "closed".to_string(),
-                votes_for: 3,
-                votes_against: 1,
-                votes_abstain: 0,
+        let url = format!("{}/v1/gov/proposals", self.gateway_url);
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+
+        let resp = req.send().await?;
+        if !resp.status().is_success() {
+            return Ok(Vec::new());
+        }
+
+        let api_proposals: Vec<ApiProposal> = resp.json().await?;
+
+        // Fetch vote tally for each proposal
+        let mut proposals = Vec::new();
+        for api_prop in api_proposals {
+            let tally = self.fetch_votes(&api_prop.id).await.unwrap_or_default();
+            proposals.push(Proposal {
+                id: api_prop.id,
+                title: api_prop.title,
+                state: api_prop.state,
+                votes_for: tally.for_votes,
+                votes_against: tally.against_votes,
+                votes_abstain: tally.abstain_votes,
                 closes_at: None,
-            },
-        ])
+            });
+        }
+
+        Ok(proposals)
+    }
+
+    async fn fetch_votes(&self, proposal_id: &str) -> Result<ApiVoteTally> {
+        let url = format!("{}/v1/gov/proposals/{}/votes", self.gateway_url, proposal_id);
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+
+        let resp = req.send().await?;
+        if !resp.status().is_success() {
+            return Ok(ApiVoteTally::default());
+        }
+
+        let tally: ApiVoteTally = resp.json().await?;
+        Ok(tally)
     }
 
     async fn fetch_trust(&self) -> Result<Vec<TrustRelation>> {
-        // Mock data
-        Ok(vec![
-            TrustRelation {
-                target: "did:icn:bob...".to_string(),
-                score: 0.8,
-                labels: vec!["founding member".to_string()],
-            },
-            TrustRelation {
-                target: "did:icn:carol...".to_string(),
-                score: 0.5,
-                labels: vec!["new member".to_string()],
-            },
-        ])
+        // Trust API endpoint not yet implemented in gateway
+        // Return empty for now
+        Ok(Vec::new())
+    }
+}
+
+impl Default for ApiVoteTally {
+    fn default() -> Self {
+        Self {
+            for_votes: 0,
+            against_votes: 0,
+            abstain_votes: 0,
+        }
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct HealthResponse {
     status: String,
     #[serde(default)]
@@ -470,6 +533,52 @@ struct HealthResponse {
     gossip_entries: usize,
     #[serde(default)]
     ledger_entries: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiMember {
+    did: String,
+    role: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiBalance {
+    balance: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiTransaction {
+    id: String,
+    from: String,
+    to: String,
+    amount: f64,
+    currency: String,
+    memo: Option<String>,
+    timestamp: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiHistory {
+    transactions: Vec<ApiTransaction>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiProposal {
+    id: String,
+    title: String,
+    state: String,
+    #[serde(default)]
+    description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiVoteTally {
+    #[serde(default)]
+    for_votes: u32,
+    #[serde(default)]
+    against_votes: u32,
+    #[serde(default)]
+    abstain_votes: u32,
 }
 
 fn main() -> Result<()> {
