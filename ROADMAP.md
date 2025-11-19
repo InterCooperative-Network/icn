@@ -457,24 +457,27 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 
 ---
 
-### B2: Legal & Regulatory Radar (ongoing, lightweight)
-**Status**: Not Started
+### B2: Legal & Regulatory Radar ✅ FOUNDATION COMPLETE
+**Status**: Foundation Complete (2025-01-17)
 **Priority**: Medium (document early, don't block on it)
 
 **Goal**: Not "solve all legal problems" but "know what questions communities will face."
 
-**Deliverables**:
-- [ ] `docs/legal-considerations.md`:
-  - Are mutual credits "money" under US/EU/UK law? (spoiler: probably not, but varies)
-  - What records do cooperatives need for tax reporting?
-  - How to export ledger history for accountants (CSV format)
-  - Data protection stance (GDPR, CCPA)
-  - Liability model if ICN loses economic history
-- [ ] Privacy/data minimization guidelines:
-  - ICN nodes are self-hosted by communities
-  - How to handle delete/portability requests
-  - Don't log more PII than necessary
-- [ ] Treat this as a living document, updated as real communities raise concerns
+**Completed Deliverables**:
+- [x] `docs/legal-considerations.md` (comprehensive guide):
+  - Money transmission regulations by jurisdiction (US, EU, UK)
+  - Tax reporting requirements (IRS barter exchange rules)
+  - Data protection (GDPR, CCPA) with privacy policy template
+  - Liability considerations and mitigation strategies
+  - Corporate structure options for cooperatives
+  - Compliance checklist (before launch and ongoing)
+  - Resource links for legal, tax, privacy, and cooperative development
+- [x] Privacy/data minimization guidelines included in legal-considerations.md
+- [x] Export formats documented (CSV for accountants)
+
+**Ongoing**:
+- [ ] Update as real communities raise specific concerns
+- [ ] Add jurisdiction-specific appendices as needed
 
 **Non-Goals**:
 - We are NOT building a compliance framework
@@ -548,6 +551,21 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
    - Customizable proposal for approaching communities
    - Success criteria and timeline
    - FAQ and technical summary
+7. **Pilot Web UI** - Simple browser interface
+   - Dashboard with balance and stats
+   - Log hours form
+   - Transaction history
+   - Member list
+   - No build step (vanilla HTML/CSS/JS)
+8. **TypeScript SDK** - @icn/client npm package
+   - Full Gateway API coverage
+   - Type definitions
+   - WebSocket events
+   - Usage examples
+9. **OpenAPI Specification** - API documentation
+   - All endpoints documented
+   - Request/response schemas
+   - Can generate clients
 
 **Deliverables**:
 - [icn-console](icn/bins/icn-console/) - TUI binary
@@ -555,6 +573,9 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 - [docs/pilot-playbook.md](docs/pilot-playbook.md) - Deployment guide
 - [monitoring/](monitoring/) - Grafana dashboard and setup
 - [docs/pilots/pilot-proposal-template.md](docs/pilots/pilot-proposal-template.md) - Outreach template
+- [web/pilot-ui/](web/pilot-ui/) - Simple web interface
+- [sdk/typescript/](sdk/typescript/) - TypeScript SDK
+- [docs/api/openapi.yaml](docs/api/openapi.yaml) - API specification
 
 ---
 
