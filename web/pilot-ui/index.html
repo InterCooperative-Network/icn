@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICN Timebank</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen">
+            <div class="card login-card">
+                <h1>ICN Timebank</h1>
+                <p class="subtitle">Community Time Exchange</p>
+
+                <div class="form-group">
+                    <label for="gateway-url">Gateway URL</label>
+                    <input type="text" id="gateway-url" value="http://localhost:8080" />
+                </div>
+
+                <div class="form-group">
+                    <label for="coop-id">Cooperative ID</label>
+                    <input type="text" id="coop-id" placeholder="e.g., timebank-coop" />
+                </div>
+
+                <div class="form-group">
+                    <label for="did">Your DID</label>
+                    <input type="text" id="did" placeholder="did:icn:..." />
+                </div>
+
+                <div class="form-group">
+                    <label for="token">JWT Token</label>
+                    <input type="password" id="token" placeholder="Paste your token here" />
+                    <small>Get a token using <code>icnctl auth</code></small>
+                </div>
+
+                <button id="login-btn" class="btn btn-primary">Connect</button>
+
+                <div id="login-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-screen" class="screen hidden">
+            <!-- Header -->
+            <header>
+                <div class="header-left">
+                    <h1>ICN Timebank</h1>
+                    <span id="coop-name" class="coop-badge"></span>
+                </div>
+                <div class="header-right">
+                    <span id="user-did" class="user-info"></span>
+                    <button id="logout-btn" class="btn btn-small">Logout</button>
+                </div>
+            </header>
+
+            <!-- Navigation -->
+            <nav>
+                <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+                <button class="nav-btn" data-tab="log-hours">Log Hours</button>
+                <button class="nav-btn" data-tab="history">History</button>
+                <button class="nav-btn" data-tab="members">Members</button>
+            </nav>
+
+            <!-- Dashboard Tab -->
+            <main id="dashboard" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="my-balance">--</div>
+                        <div class="stat-label">My Balance</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-members">--</div>
+                        <div class="stat-label">Members</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="monthly-hours">--</div>
+                        <div class="stat-label">Hours This Month</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Activity</h2>
+                    <div id="recent-activity" class="activity-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Log Hours Tab -->
+            <main id="log-hours" class="tab-content">
+                <div class="card">
+                    <h2>Log Service Hours</h2>
+
+                    <form id="log-hours-form">
+                        <div class="form-group">
+                            <label for="recipient">Service Provided To</label>
+                            <select id="recipient" required>
+                                <option value="">Select member...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="hours">Hours</label>
+                            <input type="number" id="hours" min="0.25" step="0.25" required placeholder="e.g., 2.5" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="memo">Description</label>
+                            <textarea id="memo" rows="3" placeholder="What service did you provide?"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Log Hours</button>
+                    </form>
+
+                    <div id="log-result" class="result-message"></div>
+                </div>
+            </main>
+
+            <!-- History Tab -->
+            <main id="history" class="tab-content">
+                <div class="card">
+                    <h2>Transaction History</h2>
+                    <div id="transaction-list" class="transaction-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Members Tab -->
+            <main id="members" class="tab-content">
+                <div class="card">
+                    <h2>Community Members</h2>
+                    <div id="member-list" class="member-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Status Bar -->
+            <footer>
+                <span id="connection-status" class="status-indicator">
+                    <span class="status-dot"></span>
+                    Connected
+                </span>
+                <span id="last-update"></span>
+            </footer>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
