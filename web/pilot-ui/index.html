@@ -8,6 +8,9 @@
 </head>
 <body>
     <div id="app">
+        <!-- Toast Notifications -->
+        <div id="toast-container"></div>
+
         <!-- Login Screen -->
         <div id="login-screen" class="screen">
             <div class="card login-card">
@@ -27,17 +30,64 @@
                 <div class="form-group">
                     <label for="did">Your DID</label>
                     <input type="text" id="did" placeholder="did:icn:..." />
+                    <small>Don't know your DID? Run <code>icnctl id show</code></small>
                 </div>
 
                 <div class="form-group">
-                    <label for="token">JWT Token</label>
+                    <label for="token">Authentication Token</label>
                     <input type="password" id="token" placeholder="Paste your token here" />
-                    <small>Get a token using <code>icnctl auth</code></small>
+                    <button type="button" id="show-auth-help" class="btn-link">How do I get a token?</button>
                 </div>
 
                 <button id="login-btn" class="btn btn-primary">Connect</button>
 
                 <div id="login-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Auth Help Modal -->
+        <div id="auth-help-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Getting Your Authentication Token</h2>
+                    <button id="close-auth-help" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="help-intro">To sign in securely, you'll need to get an authentication token using the command-line tool.</p>
+
+                    <div class="help-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Open your terminal</h3>
+                            <p>Open a command line terminal on the same computer where ICN is running.</p>
+                        </div>
+                    </div>
+
+                    <div class="help-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Get your authentication token</h3>
+                            <p>Run this command (replace the values with your own):</p>
+                            <div class="code-block">
+                                <code id="auth-command">icnctl auth login --gateway <span id="help-gateway">http://localhost:8080</span> --coop <span id="help-coop">your-coop-id</span></code>
+                                <button id="copy-command" class="btn-copy" title="Copy command">Copy</button>
+                            </div>
+                            <small>This command will display your token. Token is valid for 24 hours.</small>
+                        </div>
+                    </div>
+
+                    <div class="help-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Copy and paste the token</h3>
+                            <p>Copy the token from the terminal and paste it into the "Authentication Token" field above.</p>
+                        </div>
+                    </div>
+
+                    <div class="help-note">
+                        <strong>Note:</strong> Your token is like a password - keep it secure and don't share it. It expires after 24 hours for security.
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -50,6 +100,7 @@
                     <span id="coop-name" class="coop-badge"></span>
                 </div>
                 <div class="header-right">
+                    <span id="token-expires" class="token-info"></span>
                     <span id="user-did" class="user-info"></span>
                     <button id="logout-btn" class="btn btn-small">Logout</button>
                 </div>
@@ -78,6 +129,27 @@
                     <div class="stat-card">
                         <div class="stat-value" id="monthly-hours">--</div>
                         <div class="stat-label">Hours This Month</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Balance Over Time</h2>
+                    <canvas id="balance-chart" width="800" height="300"></canvas>
+                </div>
+
+                <div class="dashboard-row">
+                    <div class="card">
+                        <h2>Pending Proposals</h2>
+                        <div id="dashboard-proposals" class="proposal-summary">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Top Contributors</h2>
+                        <div id="top-contributors" class="contributors-list">
+                            <p class="loading">Loading...</p>
+                        </div>
                     </div>
                 </div>
 
@@ -122,7 +194,25 @@
             <!-- History Tab -->
             <main id="history" class="tab-content">
                 <div class="card">
-                    <h2>Transaction History</h2>
+                    <div class="card-header">
+                        <h2>Transaction History</h2>
+                        <div class="history-filters">
+                            <select id="history-filter">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month" selected>This Month</option>
+                                <option value="year">This Year</option>
+                            </select>
+                            <select id="transaction-sort">
+                                <option value="date-desc">Newest First</option>
+                                <option value="date-asc">Oldest First</option>
+                                <option value="amount-desc">Highest Amount</option>
+                                <option value="amount-asc">Lowest Amount</option>
+                            </select>
+                            <button id="export-csv" class="btn btn-small">Export CSV</button>
+                        </div>
+                    </div>
                     <div id="transaction-list" class="transaction-list">
                         <p class="loading">Loading...</p>
                     </div>
@@ -132,7 +222,12 @@
             <!-- Members Tab -->
             <main id="members" class="tab-content">
                 <div class="card">
-                    <h2>Community Members</h2>
+                    <div class="card-header">
+                        <h2>Community Members</h2>
+                        <div class="member-search">
+                            <input type="text" id="member-search" placeholder="Search members..." />
+                        </div>
+                    </div>
                     <div id="member-list" class="member-list">
                         <p class="loading">Loading...</p>
                     </div>
