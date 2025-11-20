@@ -3,13 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ICN Timebank - Community time exchange and mutual credit system for cooperatives">
+    <meta name="theme-color" content="#2563eb">
     <title>ICN Timebank</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <div id="app">
-        <!-- Toast Notifications -->
-        <div id="toast-container"></div>
+        <!-- Toast Notifications (ARIA live region) -->
+        <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+
+        <!-- Screen Reader Announcements -->
+        <div id="sr-announcements" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
         <!-- Login Screen -->
         <div id="login-screen" class="screen">
@@ -17,40 +26,76 @@
                 <h1>ICN Timebank</h1>
                 <p class="subtitle">Community Time Exchange</p>
 
-                <div class="form-group">
-                    <label for="gateway-url">Gateway URL</label>
-                    <input type="text" id="gateway-url" value="http://localhost:8080" />
-                </div>
+                <form id="login-form" aria-label="Sign in to your cooperative">
+                    <div class="form-group">
+                        <label for="gateway-url">Gateway URL</label>
+                        <input
+                            type="url"
+                            id="gateway-url"
+                            value="http://localhost:8080"
+                            aria-required="true"
+                            aria-describedby="gateway-url-hint"
+                        />
+                        <small id="gateway-url-hint" class="sr-only">The URL of your ICN gateway server</small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="coop-id">Cooperative ID</label>
-                    <input type="text" id="coop-id" placeholder="e.g., timebank-coop" />
-                </div>
+                    <div class="form-group">
+                        <label for="coop-id">Cooperative ID</label>
+                        <input
+                            type="text"
+                            id="coop-id"
+                            placeholder="e.g., timebank-coop"
+                            aria-required="true"
+                            aria-describedby="coop-id-hint"
+                        />
+                        <small id="coop-id-hint">The unique identifier for your cooperative</small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="did">Your DID</label>
-                    <input type="text" id="did" placeholder="did:icn:..." />
-                    <small>Don't know your DID? Run <code>icnctl id show</code></small>
-                </div>
+                    <div class="form-group">
+                        <label for="did">Your DID</label>
+                        <input
+                            type="text"
+                            id="did"
+                            placeholder="did:icn:..."
+                            aria-required="true"
+                            aria-describedby="did-hint"
+                        />
+                        <small id="did-hint">Don't know your DID? Run <code>icnctl id show</code></small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="token">Authentication Token</label>
-                    <input type="password" id="token" placeholder="Paste your token here" />
-                    <button type="button" id="show-auth-help" class="btn-link">How do I get a token?</button>
-                </div>
+                    <div class="form-group">
+                        <label for="token">Authentication Token</label>
+                        <input
+                            type="password"
+                            id="token"
+                            placeholder="Paste your token here"
+                            aria-required="true"
+                            aria-describedby="token-hint"
+                        />
+                        <button type="button" id="show-auth-help" class="btn-link" aria-label="Open help dialog for getting authentication token">How do I get a token?</button>
+                        <small id="token-hint" class="sr-only">Your 24-hour authentication token from icnctl</small>
+                    </div>
 
-                <button id="login-btn" class="btn btn-primary">Connect</button>
+                    <button id="login-btn" type="submit" class="btn btn-primary">Connect</button>
 
-                <div id="login-error" class="error-message"></div>
+                    <div id="login-error" class="error-message" role="alert" aria-live="assertive"></div>
+                </form>
             </div>
         </div>
 
         <!-- Auth Help Modal -->
-        <div id="auth-help-modal" class="modal hidden">
+        <div
+            id="auth-help-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="modal-title"
+            aria-modal="true"
+            aria-hidden="true"
+        >
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Getting Your Authentication Token</h2>
-                    <button id="close-auth-help" class="modal-close">&times;</button>
+                    <h2 id="modal-title">Getting Your Authentication Token</h2>
+                    <button id="close-auth-help" class="modal-close" aria-label="Close help dialog">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p class="help-intro">To sign in securely, you'll need to get an authentication token using the command-line tool.</p>
@@ -94,47 +139,70 @@
         <!-- Main App -->
         <div id="main-screen" class="screen hidden">
             <!-- Header -->
-            <header>
+            <header role="banner">
                 <div class="header-left">
                     <h1>ICN Timebank</h1>
-                    <span id="coop-name" class="coop-badge"></span>
+                    <span id="coop-name" class="coop-badge" aria-label="Current cooperative"></span>
                 </div>
                 <div class="header-right">
-                    <span id="token-expires" class="token-info"></span>
-                    <span id="user-did" class="user-info"></span>
-                    <button id="logout-btn" class="btn btn-small">Logout</button>
+                    <!-- Theme Toggle -->
+                    <button
+                        id="theme-toggle"
+                        class="btn-icon"
+                        aria-label="Toggle dark mode"
+                        title="Toggle dark mode"
+                    >
+                        <span class="theme-icon">🌙</span>
+                    </button>
+                    <span id="token-expires" class="token-info" aria-label="Token expiration time"></span>
+                    <span id="user-did" class="user-info" aria-label="Your DID"></span>
+                    <button id="logout-btn" class="btn btn-small" aria-label="Sign out">Logout</button>
                 </div>
             </header>
 
             <!-- Navigation -->
-            <nav>
-                <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
-                <button class="nav-btn" data-tab="log-hours">Log Hours</button>
-                <button class="nav-btn" data-tab="history">History</button>
-                <button class="nav-btn" data-tab="members">Members</button>
-                <button class="nav-btn" data-tab="governance">Governance</button>
+            <nav role="navigation" aria-label="Main navigation">
+                <button class="nav-btn active" data-tab="dashboard" aria-current="page">
+                    <span aria-label="Dashboard">Dashboard</span>
+                </button>
+                <button class="nav-btn" data-tab="log-hours">
+                    <span aria-label="Log service hours">Log Hours</span>
+                </button>
+                <button class="nav-btn" data-tab="history">
+                    <span aria-label="Transaction history">History</span>
+                </button>
+                <button class="nav-btn" data-tab="members">
+                    <span aria-label="Member directory">Members</span>
+                </button>
+                <button class="nav-btn" data-tab="governance">
+                    <span aria-label="Governance and proposals">Governance</span>
+                </button>
             </nav>
 
             <!-- Dashboard Tab -->
-            <main id="dashboard" class="tab-content active">
-                <div class="stats-grid">
+            <main id="main-content" class="tab-container">
+                <div id="dashboard" class="tab-content active" role="tabpanel" aria-labelledby="tab-dashboard">
+                <div class="stats-grid" role="region" aria-label="Account statistics">
                     <div class="stat-card">
-                        <div class="stat-value" id="my-balance">--</div>
+                        <div class="stat-value" id="my-balance" aria-label="Current balance">--</div>
                         <div class="stat-label">My Balance</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="total-members">--</div>
+                        <div class="stat-value" id="total-members" aria-label="Total cooperative members">--</div>
                         <div class="stat-label">Members</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="monthly-hours">--</div>
+                        <div class="stat-value" id="monthly-hours" aria-label="Hours logged this month">--</div>
                         <div class="stat-label">Hours This Month</div>
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" role="region" aria-label="Balance history chart">
                     <h2>Balance Over Time</h2>
-                    <canvas id="balance-chart" width="800" height="300"></canvas>
+                    <canvas id="balance-chart" width="800" height="300" role="img" aria-label="Line chart showing balance over the last 30 days"></canvas>
+                    <div id="chart-description" class="sr-only">
+                        A line chart showing your timebank balance over the last 30 days
+                    </div>
                 </div>
 
                 <div class="dashboard-row">
