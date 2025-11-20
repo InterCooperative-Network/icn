@@ -1366,4 +1366,321 @@ document.addEventListener('DOMContentLoaded', () => {
             login();
         }
     }
+
+    // Initialize theme (dark mode)
+    initializeTheme();
+
+    // Initialize accessibility features
+    initializeAccessibility();
+});
+
+// ============================================================================
+// Dark Mode / Theme Toggle
+// ============================================================================
+
+function initializeTheme() {
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = themeToggle.querySelector('.theme-icon');
+
+    // Check for saved theme preference or default to light mode
+    const savedTheme = localStorage.getItem('icn-theme') || 'light';
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = savedTheme === 'auto' ? (prefersDark ? 'dark' : 'light') : savedTheme;
+
+    // Apply theme
+    applyTheme(theme);
+
+    // Theme toggle click
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        applyTheme(newTheme);
+        localStorage.setItem('icn-theme', newTheme);
+
+        // Announce to screen readers
+        announceToScreenReader(`Switched to ${newTheme} mode`);
+    });
+
+    // Listen for OS theme changes
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (localStorage.getItem('icn-theme') === 'auto') {
+                applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const themeIcon = document.querySelector('.theme-icon');
+    if (themeIcon) {
+        themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    // Update meta theme-color for mobile browsers
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', theme === 'dark' ? '#1f2937' : '#2563eb');
+    }
+}
+
+// ============================================================================
+// Accessibility Enhancements
+// ============================================================================
+
+function initializeAccessibility() {
+    // Screen reader announcement helper
+    window.announceToScreenReader = function(message, priority = 'polite') {
+        const announcer = document.getElementById('sr-announcements');
+        if (announcer) {
+            announcer.setAttribute('aria-live', priority);
+            announcer.textContent = message;
+
+            // Clear after announcement
+            setTimeout(() => {
+                announcer.textContent = '';
+            }, 1000);
+        }
+    };
+
+    // Modal focus trap
+    setupModalFocusTrap();
+
+    // Enhanced keyboard navigation for tabs
+    setupTabKeyboardNav();
+
+    // Form submission via Enter key
+    setupFormSubmission();
+
+    // Announce page changes
+    announcePageChanges();
+}
+
+// Modal Focus Trap
+function setupModalFocusTrap() {
+    const modal = elements.authHelpModal;
+    const openBtn = elements.showAuthHelp;
+    const closeBtn = elements.closeAuthHelp;
+
+    openBtn.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        closeBtn.focus(); // Focus close button for easy escape
+
+        // Announce modal opened
+        announceToScreenReader('Authentication help dialog opened');
+
+        // Trap focus
+        trapFocus(modal);
+    });
+
+    closeBtn.addEventListener('click', () => {
+        closeModal();
+    });
+
+    // Close on Escape key
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        openBtn.focus(); // Return focus to trigger
+        announceToScreenReader('Dialog closed');
+    }
+}
+
+// Trap focus within modal
+function trapFocus(element) {
+    const focusableElements = element.querySelectorAll(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements[focusableElements.length - 1];
+
+    element.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            if (e.shiftKey) {
+                // Shift + Tab
+                if (document.activeElement === firstFocusable) {
+                    lastFocusable.focus();
+                    e.preventDefault();
+                }
+            } else {
+                // Tab
+                if (document.activeElement === lastFocusable) {
+                    firstFocusable.focus();
+                    e.preventDefault();
+                }
+            }
+        }
+    });
+}
+
+// Tab Navigation with Arrow Keys
+function setupTabKeyboardNav() {
+    const tabButtons = Array.from(elements.navBtns);
+
+    tabButtons.forEach((button, index) => {
+        button.addEventListener('keydown', (e) => {
+            let newIndex;
+
+            switch (e.key) {
+                case 'ArrowLeft':
+                case 'ArrowUp':
+                    e.preventDefault();
+                    newIndex = index === 0 ? tabButtons.length - 1 : index - 1;
+                    tabButtons[newIndex].click();
+                    tabButtons[newIndex].focus();
+                    break;
+
+                case 'ArrowRight':
+                case 'ArrowDown':
+                    e.preventDefault();
+                    newIndex = index === tabButtons.length - 1 ? 0 : index + 1;
+                    tabButtons[newIndex].click();
+                    tabButtons[newIndex].focus();
+                    break;
+
+                case 'Home':
+                    e.preventDefault();
+                    tabButtons[0].click();
+                    tabButtons[0].focus();
+                    break;
+
+                case 'End':
+                    e.preventDefault();
+                    tabButtons[tabButtons.length - 1].click();
+                    tabButtons[tabButtons.length - 1].focus();
+                    break;
+            }
+        });
+    });
+}
+
+// Form Submission via Enter
+function setupFormSubmission() {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            login();
+        });
+    }
+}
+
+// Announce Tab Changes to Screen Readers
+function announcePageChanges() {
+    elements.navBtns.forEach(btn => {
+        const originalClickHandler = btn.onclick;
+        btn.addEventListener('click', () => {
+            const tabName = btn.textContent.trim();
+            announceToScreenReader(`Navigated to ${tabName} tab`);
+
+            // Update aria-current
+            elements.navBtns.forEach(b => b.removeAttribute('aria-current'));
+            btn.setAttribute('aria-current', 'page');
+        });
+    });
+}
+
+// ============================================================================
+// Progressive Web App (PWA) - Service Worker Registration
+// ============================================================================
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+                console.log('[PWA] Service Worker registered successfully:', registration.scope);
+
+                // Check for updates periodically
+                setInterval(() => {
+                    registration.update();
+                }, 60000); // Check every minute
+
+                // Handle updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New service worker available, prompt user to reload
+                            showUpdateNotification();
+                        }
+                    });
+                });
+            })
+            .catch((error) => {
+                console.error('[PWA] Service Worker registration failed:', error);
+            });
+
+        // Listen for controller change (new service worker activated)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('[PWA] New service worker activated');
+        });
+    });
+}
+
+// Show update notification when new version available
+function showUpdateNotification() {
+    const updateMessage = 'A new version of ICN Timebank is available!';
+
+    // Use toast notification
+    const toast = document.createElement('div');
+    toast.className = 'toast info update-toast';
+    toast.innerHTML = `
+        <span class="toast-icon">🔄</span>
+        <span class="toast-message">${updateMessage}</span>
+        <button class="btn btn-small" onclick="window.location.reload()">Update Now</button>
+    `;
+
+    const container = document.getElementById('toast-container');
+    container.appendChild(toast);
+
+    // Don't auto-dismiss update notifications
+}
+
+// Install prompt for PWA
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+
+    // Stash the event so it can be triggered later
+    deferredPrompt = e;
+
+    // Show custom install button/prompt
+    showInstallPromotion();
+});
+
+function showInstallPromotion() {
+    // Show a custom install promotion (could be a toast or banner)
+    const installMessage = 'Install ICN Timebank for quick access and offline support!';
+
+    showToast(installMessage, 'info', 10000);
+
+    // Note: A proper implementation would show an install button
+    // that calls deferredPrompt.prompt()
+}
+
+// Track install
+window.addEventListener('appinstalled', () => {
+    console.log('[PWA] App installed successfully');
+    deferredPrompt = null;
+
+    showToast('ICN Timebank installed! You can now use it offline.', 'success', 5000);
 });
