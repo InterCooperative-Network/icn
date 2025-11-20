@@ -29,6 +29,36 @@ cd icn && cargo build --release
 - [Examples](examples/) - Tutorials and demos
 - [Documentation](docs/) - Architecture, deployment, APIs
 
+---
+
+## 🌱 For Cooperative Communities
+
+**Want to use ICN for your timebank or mutual credit system?**
+
+Check out the **[Pilot Web UI](web/pilot-ui/)** - a production-ready web interface with:
+
+- 📊 Dashboard with balance tracking and activity charts
+- 🕐 Easy time/credit logging interface
+- 👥 Member directory with search
+- 🗳️ Built-in governance and voting
+- 📱 Full mobile support
+- 📋 CSV export for treasurer reports
+
+**Quick Deploy** (Complete stack with Docker):
+```bash
+cd deploy
+./quickstart.sh "Your Cooperative Name"
+# Visit http://localhost:3000
+```
+
+**Resources**:
+- [5-Minute Getting Started](web/pilot-ui/GETTING-STARTED.md) - Test locally
+- [Production Deployment](web/pilot-ui/PRODUCTION-DEPLOY.md) - Deploy with TLS/HTTPS
+- [Complete Summary](web/pilot-ui/SUMMARY.md) - All features documented
+- [User Guides](web/pilot-ui/) - Quick start, treasurer, admin, FAQ
+
+---
+
 ## What is ICN?
 
 ICN is not a blockchain. It's not a federation server. It's a **substrate daemon** that provides:
