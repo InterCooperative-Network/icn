@@ -27,7 +27,10 @@ mod executor;
 mod task;
 mod types;
 
-pub use actor::{ComputeActor, ComputeHandle, PaymentCallback, PaymentRequest, SendCallback, TrustCallback};
+pub use actor::{
+    ComputeActor, ComputeEvent, ComputeHandle, EventCallback, PaymentCallback, PaymentRequest,
+    SendCallback, TrustCallback,
+};
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
 pub use task::{TaskManager, TaskStatus};

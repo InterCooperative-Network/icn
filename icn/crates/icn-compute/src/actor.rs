@@ -63,6 +63,27 @@ pub struct PaymentRequest {
 /// Callback for settling payments via ledger
 pub type PaymentCallback = Arc<dyn Fn(PaymentRequest) + Send + Sync>;
 
+/// Compute event for external notification
+#[derive(Debug, Clone)]
+pub enum ComputeEvent {
+    /// A task was claimed by an executor
+    TaskClaimed {
+        task_hash: String,
+        executor: String,
+    },
+    /// A task completed execution
+    TaskCompleted {
+        task_hash: String,
+        executor: String,
+        outcome: String,
+        fuel_used: u64,
+        duration_ms: u64,
+    },
+}
+
+/// Callback for broadcasting compute events (e.g., to WebSocket clients)
+pub type EventCallback = Arc<dyn Fn(ComputeEvent) + Send + Sync>;
+
 /// Handle for interacting with the ComputeActor
 #[derive(Clone)]
 pub struct ComputeHandle {
@@ -158,6 +179,8 @@ pub struct ComputeActor {
     trust_callback: TrustCallback,
     /// Callback to settle payments
     payment_callback: Option<PaymentCallback>,
+    /// Callback to broadcast compute events
+    event_callback: Option<EventCallback>,
     /// Signing key for results (placeholder)
     #[allow(dead_code)]
     signing_key: Vec<u8>,
@@ -179,6 +202,7 @@ impl ComputeActor {
             send_callback: None,
             trust_callback,
             payment_callback: None,
+            event_callback: None,
             signing_key: vec![],
             executor_registry: Arc::new(Mutex::new(HashMap::new())),
             pending_consensus: Arc::new(Mutex::new(HashMap::new())),
@@ -209,6 +233,11 @@ impl ComputeActor {
     /// Set the callback for settling payments
     pub fn set_payment_callback(&mut self, cb: PaymentCallback) {
         self.payment_callback = Some(cb);
+    }
+
+    /// Set the callback for broadcasting compute events
+    pub fn set_event_callback(&mut self, cb: EventCallback) {
+        self.event_callback = Some(cb);
     }
 
     /// Set the signing key for result signatures
@@ -566,6 +595,14 @@ impl ComputeActor {
             });
         }
 
+        // Broadcast event for external listeners (e.g., WebSocket clients)
+        if let Some(ref cb) = self.event_callback {
+            cb(ComputeEvent::TaskClaimed {
+                task_hash: task_hash_str.clone(),
+                executor: self.own_did.clone(),
+            });
+        }
+
         // Execute
         let start = std::time::Instant::now();
         let result = self
@@ -668,7 +705,24 @@ impl ComputeActor {
 
         // Broadcast result
         if let Some(ref cb) = self.send_callback {
-            cb(ComputeMessage::TaskResult(result));
+            cb(ComputeMessage::TaskResult(result.clone()));
+        }
+
+        // Broadcast event for external listeners (e.g., WebSocket clients)
+        if let Some(ref cb) = self.event_callback {
+            let outcome_str = match &result.outcome {
+                crate::types::ExecutionOutcome::Success(_) => "success",
+                crate::types::ExecutionOutcome::Failed(_) => "failed",
+                crate::types::ExecutionOutcome::OutOfFuel => "out_of_fuel",
+                crate::types::ExecutionOutcome::Timeout => "timeout",
+            };
+            cb(ComputeEvent::TaskCompleted {
+                task_hash: task_hash_str.clone(),
+                executor: self.own_did.clone(),
+                outcome: outcome_str.to_string(),
+                fuel_used: result.fuel_used,
+                duration_ms: result.duration_ms,
+            });
         }
 
         Ok(())
@@ -816,6 +870,11 @@ impl ComputeActor {
 
             // Complete the task
             let executor_did = accepted_result.executor.clone();
+            let task_hash = accepted_result.task_hash;
+            let outcome = accepted_result.outcome.clone();
+            let fuel_used = accepted_result.fuel_used;
+            let duration_ms = accepted_result.duration_ms;
+
             let mut mgr = self.task_manager.lock().await;
             if mgr.get(&accepted_result.task_hash).is_some() {
                 mgr.complete(accepted_result)?;
@@ -829,6 +888,24 @@ impl ComputeActor {
                     info.tasks_executing -= 1;
                     icn_obs::metrics::compute::executor_load_set(&executor_did, info.tasks_executing as f64);
                 }
+            }
+            drop(registry);
+
+            // Broadcast event for external listeners (e.g., WebSocket clients)
+            if let Some(ref cb) = self.event_callback {
+                let outcome_str = match &outcome {
+                    crate::types::ExecutionOutcome::Success(_) => "success",
+                    crate::types::ExecutionOutcome::Failed(_) => "failed",
+                    crate::types::ExecutionOutcome::OutOfFuel => "out_of_fuel",
+                    crate::types::ExecutionOutcome::Timeout => "timeout",
+                };
+                cb(ComputeEvent::TaskCompleted {
+                    task_hash: hex::encode(task_hash),
+                    executor: executor_did.clone(),
+                    outcome: outcome_str.to_string(),
+                    fuel_used,
+                    duration_ms,
+                });
             }
         }
 

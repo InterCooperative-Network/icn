@@ -690,7 +690,16 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] Gateway-level validation with proper error messages
 - [x] Structured logging with tracing (DEBUG/INFO/WARN levels)
 - [x] Task cancellation with submitter authorization and gossip propagation
-- [x] 40 compute tests + 92 gateway tests + 25 RPC tests passing (11 validation + 6 gateway validation + 4 signature + 2 consensus + 6 cancellation)
+- [x] 41 compute tests + 92 gateway tests + 25 RPC tests passing (11 validation + 6 gateway validation + 4 signature + 2 consensus + 6 cancellation + 1 priority)
+
+**Production Enhancements** (2025-11-21):
+- [x] **Cancellation Metrics**: `tasks_cancelled_inc()` tracked at actor/gateway/network levels
+- [x] **Executor Load Tracking**: Per-executor gauge `icn_compute_executor_load{executor}` updated at 6 lifecycle points
+- [x] **Automatic Timeout Enforcement**: Background task scans every 10s, auto-fails expired tasks, broadcasts timeout results
+- [x] **Load-Based Capacity Control**: Configurable `max_concurrent_tasks` (default: 10), capacity checks before claiming, `tasks_rejected_capacity_total` metric
+- [x] **Task Priority Levels**: TaskPriority enum (Low=0, Normal=1, High=2, Critical=3) with PartialOrd for natural comparison
+- [x] **Priority-Based Claiming**: `TaskManager::pending_by_priority()` sorts by priority desc → created_at asc, executor claims highest-priority task
+- [x] **User-Facing Priority API**: Priority support in Gateway REST API, RPC, CLI (`--priority`), and TypeScript SDK
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
@@ -699,18 +708,24 @@ wscat -c ws://localhost:8080/ws/my-coop
 - **Payment Settlement**: (fuel_used * payment_rate) / 1000 credits
 - **Task Cancellation**: Submitter-only authorization, only pending/claimed tasks cancellable
 - **Cryptographic Security**: Ed25519-signed results with DID-based verification
-- **Executor Registry**: Tracks available executors with capabilities, trust scores, and last_seen timestamps
+- **Executor Registry**: Tracks available executors with capabilities, trust scores, last_seen timestamps, and current load
 - **Consensus Framework**: Multi-executor result verification (currently single-executor mode, extensible to multi-executor)
 - **Input Validation**: Comprehensive checks (task ID length, DID format, fuel min/max, code size limits, payment rate caps)
-- **Structured Logging**: Tracing spans with structured fields (task_id, task_hash, executor, fuel_used, duration_ms, outcome)
+- **Structured Logging**: Tracing spans with structured fields (task_id, task_hash, executor, fuel_used, duration_ms, outcome, priority)
+- **Task Prioritization**: Four priority levels with preferential execution (Critical > High > Normal > Low)
+- **Automatic Timeouts**: Background checker auto-fails tasks past deadline, prevents stuck tasks
+- **Capacity Management**: Per-executor concurrency limits prevent overload
 
 **CLI Commands**:
 ```bash
 # Submit a CCL contract for distributed execution
 icnctl compute submit --contract contract.json --fuel 10000
 
-# With payment rate (credits per 1000 fuel)
-icnctl compute submit --contract contract.json --payment-rate 100
+# With priority (low, normal, high, critical)
+icnctl compute submit --contract contract.json --priority high
+
+# With payment rate (credits per 1000 fuel) and priority
+icnctl compute submit --contract contract.json --payment-rate 100 --priority critical
 
 # Check task status
 icnctl compute status <task_hash>

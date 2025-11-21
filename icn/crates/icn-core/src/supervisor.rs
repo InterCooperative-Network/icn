@@ -1313,6 +1313,22 @@ impl Supervisor {
             });
             compute_actor.set_payment_callback(compute_payment_callback);
 
+            // Set up event callback for task status changes
+            let compute_event_callback: icn_compute::EventCallback = Arc::new(move |event| {
+                match event {
+                    icn_compute::ComputeEvent::TaskClaimed { task_hash, executor } => {
+                        info!("🔧 Task claimed: {} by {}", task_hash, executor);
+                        icn_obs::metrics::compute::tasks_claimed_inc();
+                    }
+                    icn_compute::ComputeEvent::TaskCompleted { task_hash, executor, outcome, fuel_used, duration_ms } => {
+                        info!("✅ Task completed: {} by {} - outcome: {}, fuel: {}, duration: {}ms",
+                              task_hash, executor, outcome, fuel_used, duration_ms);
+                        icn_obs::metrics::compute::tasks_completed_inc(&outcome);
+                    }
+                }
+            });
+            compute_actor.set_event_callback(compute_event_callback);
+
             // Set signing key for result signatures
             let signing_key_bytes = identity_bundle.keypair().to_signing_key_bytes();
             compute_actor.set_signing_key(signing_key_bytes.to_vec());
