@@ -722,7 +722,18 @@ icnctl compute cancel <task_hash> --reason "No longer needed"
 **RPC Methods**:
 - `compute.submit` - Submit task, returns task_hash
 - `compute.status` - Get task status (pending/claimed/completed/failed/cancelled)
-- `compute.cancel` - Cancel a task (submitter-only authorization)
+- `compute.cancel` - Cancel a task with optional reason (submitter-only authorization)
+
+**Gateway REST API**:
+- `POST /v1/compute/submit` - Submit task (requires compute:write scope)
+- `GET /v1/compute/status/{task_hash}` - Get task status (requires compute:read scope)
+- `POST /v1/compute/cancel/{task_hash}` - Cancel task with optional reason (requires compute:write scope)
+
+**TypeScript SDK**:
+- `client.submitTask(req)` - Submit compute task
+- `client.getTaskStatus(taskHash)` - Get task status
+- `client.cancelTask(taskHash, req?)` - Cancel task
+- `client.waitForTask(taskHash)` - Poll until completed/failed/cancelled
 
 **Task Flow**:
 ```
