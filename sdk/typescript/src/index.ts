@@ -53,6 +53,8 @@ import {
   SubmitTaskRequest,
   SubmitTaskResponse,
   ComputeTaskStatus,
+  CancelTaskRequest,
+  CancelTaskResponse,
 } from './types';
 
 export * from './types';
@@ -456,12 +458,32 @@ export class ICNClient {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const status = await this.getTaskStatus(taskHash);
-      if (status.status === 'completed' || status.status === 'failed') {
+      if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
         return status;
       }
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new ICNError('Task polling timeout', 408);
+  }
+
+  /**
+   * Cancel a compute task
+   *
+   * @example
+   * ```typescript
+   * await client.cancelTask(taskHash, {
+   *   reason: 'No longer needed'
+   * });
+   * ```
+   */
+  async cancelTask(
+    taskHash: string,
+    req?: CancelTaskRequest
+  ): Promise<CancelTaskResponse> {
+    return this.post<CancelTaskResponse>(
+      `/compute/cancel/${taskHash}`,
+      req || {}
+    );
   }
 
   // ===========================================================================

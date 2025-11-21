@@ -101,6 +101,12 @@ pub enum GatewayEvent {
         fuel_used: u64,
         duration_ms: u64,
     },
+    /// A compute task was cancelled
+    ComputeTaskCancelled {
+        task_hash: String,
+        submitter: String,
+        reason: String,
+    },
 }
 
 /// Event with sequence number for backfill support

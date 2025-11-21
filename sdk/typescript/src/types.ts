@@ -224,8 +224,8 @@ export interface SubmitTaskResponse {
   task_hash: string;
 }
 
-export type ComputeTaskState = 'pending' | 'claimed' | 'completed' | 'failed';
-export type ComputeOutcome = 'success' | 'failed' | 'out_of_fuel' | 'timeout';
+export type ComputeTaskState = 'pending' | 'claimed' | 'completed' | 'failed' | 'cancelled';
+export type ComputeOutcome = 'success' | 'failed' | 'out_of_fuel' | 'timeout' | 'cancelled';
 
 export interface ComputeResult {
   outcome: ComputeOutcome;
@@ -240,6 +240,17 @@ export interface ComputeTaskStatus {
   status: ComputeTaskState;
   executor?: string;
   result?: ComputeResult;
+}
+
+export interface CancelTaskRequest {
+  /** Cancellation reason (optional) */
+  reason?: string;
+}
+
+export interface CancelTaskResponse {
+  task_hash: string;
+  status: string;
+  reason: string;
 }
 
 // ============================================================================
@@ -293,7 +304,8 @@ export type CoopEventType =
   | 'GovernanceVoteCast'
   | 'ComputeTaskSubmitted'
   | 'ComputeTaskClaimed'
-  | 'ComputeTaskCompleted';
+  | 'ComputeTaskCompleted'
+  | 'ComputeTaskCancelled';
 
 /** GatewayEvent payload with its type tag */
 export interface GatewayEventPayload {

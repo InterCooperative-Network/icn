@@ -180,6 +180,7 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "governance.vote.cast" => handle_governance_vote_cast(req.id, &req.params, state).await,
         "compute.submit" => handle_compute_submit(req.id, &req.params, state).await,
         "compute.status" => handle_compute_status(req.id, &req.params, state).await,
+        "compute.cancel" => handle_compute_cancel(req.id, &req.params, state).await,
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -1731,6 +1732,65 @@ async fn handle_compute_status(
         }
         Ok(None) => RpcResponse::error(id, -32000, "Task not found".to_string()),
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to get status: {}", e)),
+    }
+}
+
+/// Handle compute.cancel RPC call - cancel a task
+async fn handle_compute_cancel(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let compute_handle = match &state.compute_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Compute not available".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct CancelParams {
+        task_hash: String,
+        #[serde(default)]
+        reason: Option<String>,
+    }
+
+    let params: CancelParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse hash
+    let hash_bytes = match hex::decode(&params.task_hash) {
+        Ok(b) if b.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&b);
+            arr
+        }
+        _ => {
+            return RpcResponse::error(id, -32602, "Invalid task_hash (expected 32 hex bytes)".to_string());
+        }
+    };
+
+    let reason = params.reason.unwrap_or_else(|| "Cancelled by submitter".to_string());
+    let caller_did = "rpc:unknown"; // TODO: Get from auth context
+
+    match compute_handle.cancel_task(&hash_bytes, caller_did, reason).await {
+        Ok(_) => {
+            #[derive(serde::Serialize)]
+            struct CancelResponse {
+                task_hash: String,
+                status: String,
+            }
+            let response = CancelResponse {
+                task_hash: params.task_hash,
+                status: "cancelled".to_string(),
+            };
+            RpcResponse::success(id, serde_json::to_value(response).unwrap())
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cancel task: {}", e)),
     }
 }
 

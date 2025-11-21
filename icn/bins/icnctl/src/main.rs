@@ -171,6 +171,16 @@ enum ComputeCommands {
         /// Task hash (hex)
         task_hash: String,
     },
+
+    /// Cancel a task
+    Cancel {
+        /// Task hash (hex)
+        task_hash: String,
+
+        /// Cancellation reason
+        #[arg(short, long, default_value = "Cancelled by user")]
+        reason: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -3795,6 +3805,20 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                     println!("  Error:       {}", error);
                 }
             }
+        }
+
+        ComputeCommands::Cancel { task_hash, reason } => {
+            let params = serde_json::json!({
+                "task_hash": task_hash,
+                "reason": reason,
+            });
+            let result = rpc_call(endpoint, "compute.cancel", params)?;
+
+            let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+            println!("Task cancelled successfully!");
+            println!("Task hash: {}", task_hash);
+            println!("Status:    {}", status);
+            println!("Reason:    {}", reason);
         }
     }
 

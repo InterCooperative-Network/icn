@@ -140,11 +140,81 @@ pub async fn get_status(
     }
 }
 
+/// Request to cancel a compute task
+#[derive(Debug, serde::Deserialize)]
+pub struct CancelTaskRequest {
+    /// Cancellation reason (optional)
+    #[serde(default = "default_cancel_reason")]
+    pub reason: String,
+}
+
+fn default_cancel_reason() -> String {
+    "Cancelled by user".to_string()
+}
+
+/// POST /compute/cancel/{task_hash} - Cancel a task
+#[post("/cancel/{task_hash}")]
+pub async fn cancel_task(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
+    path: web::Path<String>,
+    req: web::Json<CancelTaskRequest>,
+) -> Result<HttpResponse> {
+    // Require compute:write scope
+    require_scope(&http_req, "compute:write")?;
+
+    // Get submitter DID from JWT
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let requester_did = claims.sub.clone();
+
+    let task_hash_hex = path.into_inner();
+
+    // Parse task hash
+    let hash_bytes = hex::decode(&task_hash_hex)
+        .map_err(|_| crate::error::GatewayError::BadRequest("Invalid task hash".to_string()))?;
+
+    if hash_bytes.len() != 32 {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Task hash must be 32 bytes".to_string()
+        ));
+    }
+
+    let mut task_hash = [0u8; 32];
+    task_hash.copy_from_slice(&hash_bytes);
+
+    // Cancel task
+    compute_mgr.cancel_task(task_hash, requester_did.clone(), req.reason.clone()).await
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    // Broadcast event
+    broadcaster.broadcast("compute", GatewayEvent::ComputeTaskCancelled {
+        task_hash: task_hash_hex.clone(),
+        submitter: requester_did,
+        reason: req.reason.clone(),
+    }).await;
+
+    #[derive(serde::Serialize)]
+    struct CancelResponse {
+        task_hash: String,
+        status: String,
+        reason: String,
+    }
+
+    Ok(HttpResponse::Ok().json(CancelResponse {
+        task_hash: task_hash_hex,
+        status: "cancelled".to_string(),
+        reason: req.reason.clone(),
+    }))
+}
+
 /// Configure compute routes
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/compute")
             .service(submit_task)
+            .service(cancel_task)
             .service(get_status)
     );
 }
