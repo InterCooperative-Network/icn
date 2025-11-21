@@ -30,6 +30,7 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `icn-obs` - Prometheus metrics, tracing, logging
 - `icn-gateway` - REST + WebSocket API for cooperative applications (Phase 14)
 - `icn-governance` - Governance primitives for community decision-making (Phase 13)
+- `icn-compute` - Distributed compute layer with trust-gated task execution (Phase 15)
 - `icn-testkit` - Test utilities for multi-node scenarios
 
 **Binaries** (in `icn/bins/`):
@@ -664,6 +665,40 @@ wscat -c ws://localhost:8080/ws/my-coop
 **Event Types**: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated, GovernanceDomainCreated, GovernanceProposalCreated, GovernanceProposalOpened, GovernanceProposalClosed, GovernanceVoteCast
 
 **This is NOT a runtime**: Apps run externally and call this API. See [docs/platform-layer-design.md](docs/platform-layer-design.md).
+
+---
+
+**Phase 15 - Distributed Compute Layer (Complete ✓)** (2025-11-21):
+- [x] `icn-compute` crate with trust-gated task execution
+- [x] ComputeTask/ComputeResult types for task lifecycle
+- [x] TaskManager for tracking states (Pending/Claimed/Completed)
+- [x] LocalExecutor with real CCL interpreter integration
+- [x] ComputeActor with gossip-based task distribution
+- [x] Payment settlement via ledger (auto-pay on success)
+- [x] Supervisor integration with trust/gossip/ledger callbacks
+- [x] 17 tests passing
+
+**Compute Features**:
+- **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
+- **Gossip Topics**: `compute:submit`, `compute:claim`, `compute:result`
+- **CCL Execution**: Real contract parsing and interpreter execution
+- **Payment Settlement**: (fuel_used * payment_rate) / 1000 credits
+
+**Task Flow**:
+```
+Submitter → compute:submit → Executor claims → Executes CCL
+                                                    ↓
+                         compute:result ← Signed result
+                                                    ↓
+                                         Payment → Ledger
+```
+
+**Architecture** (`icn-compute/`):
+- **types.rs**: ComputeTask, ComputeResult, ComputeMessage, TaskCode (CCL/WASM)
+- **task.rs**: TaskManager with lifecycle tracking
+- **executor.rs**: Executor trait, LocalExecutor (CCL), future WasmExecutor
+- **actor.rs**: ComputeActor with gossip/trust/payment callbacks
+- **error.rs**: ComputeError types
 
 ---
 
