@@ -684,7 +684,9 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] Ed25519 signature signing and verification for all compute results
 - [x] Automatic signing in production (configured via supervisor)
 - [x] Prometheus metrics for signature verification
-- [x] 21 compute tests + 87 gateway tests passing (4 new signature security tests)
+- [x] Executor registry tracking (capabilities, trust, last_seen)
+- [x] Consensus framework for multi-executor verification (single-executor mode)
+- [x] 23 compute tests + 87 gateway tests passing (6 new tests: 4 signature + 2 consensus)
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
@@ -692,6 +694,8 @@ wscat -c ws://localhost:8080/ws/my-coop
 - **CCL Execution**: Real contract parsing and interpreter execution
 - **Payment Settlement**: (fuel_used * payment_rate) / 1000 credits
 - **Cryptographic Security**: Ed25519-signed results with DID-based verification
+- **Executor Registry**: Tracks available executors with capabilities, trust scores, and last_seen timestamps
+- **Consensus Framework**: Multi-executor result verification (currently single-executor mode, extensible to multi-executor)
 
 **CLI Commands**:
 ```bash
@@ -727,7 +731,7 @@ Submitter → compute:submit → Executor claims → Executes CCL
 
 **Prometheus Metrics** (`icn_compute_*`):
 - `tasks_submitted_total`, `tasks_claimed_total`, `tasks_completed_total`
-- `tasks_pending`, `tasks_executing` (gauges)
+- `tasks_pending`, `tasks_executing`, `executors_available` (gauges)
 - `task_duration_seconds`, `fuel_used` (histograms)
 - `fuel_total`, `payments_settled_total`, `payment_amount_total`
 - `tasks_rejected_trust_total`, `tasks_timeout_total`, `tasks_out_of_fuel_total`

@@ -651,6 +651,10 @@ pub fn init_descriptions() {
         "icn_compute_signatures_invalid_total",
         "Total number of invalid compute result signatures detected"
     );
+    describe_gauge!(
+        "icn_compute_executors_available",
+        "Current number of available executors in the registry"
+    );
 }
 
 /// Network metrics
@@ -1415,5 +1419,9 @@ pub mod compute {
 
     pub fn signatures_invalid_inc(reason: &str) {
         counter!("icn_compute_signatures_invalid_total", "reason" => reason.to_string()).increment(1);
+    }
+
+    pub fn executors_available_set(count: f64) {
+        gauge!("icn_compute_executors_available").set(count);
     }
 }

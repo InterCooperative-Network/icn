@@ -1,13 +1,41 @@
 //! Compute actor for distributed task execution.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
 use crate::error::ComputeError;
 use crate::executor::{Executor, LocalExecutor};
 use crate::task::{TaskManager, TaskStatus};
-use crate::types::{ComputeMessage, ComputeResult, ComputeTask, TaskHash};
+use crate::types::{ComputeMessage, ComputeResult, ComputeTask, ExecutorCapability, TaskHash};
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
+
+/// Information about an available executor
+#[derive(Debug, Clone)]
+struct ExecutorInfo {
+    /// Executor's DID
+    did: String,
+    /// Capabilities this executor offers
+    capabilities: Vec<ExecutorCapability>,
+    /// Current trust score (used for future executor selection)
+    #[allow(dead_code)]
+    trust_score: f64,
+    /// Last announcement timestamp (milliseconds since epoch, used for staleness detection)
+    #[allow(dead_code)]
+    last_seen: u64,
+}
+
+/// Consensus tracking for task results
+#[derive(Debug, Clone)]
+struct ResultConsensus {
+    /// Task hash (used for tracking in HashMap)
+    #[allow(dead_code)]
+    task_hash: TaskHash,
+    /// Results received from different executors
+    results: Vec<ComputeResult>,
+    /// Number of required confirmations (default: 1 for now)
+    required: usize,
+}
 
 /// Callback for sending compute messages via gossip
 pub type SendCallback = Arc<dyn Fn(ComputeMessage) + Send + Sync>;
@@ -103,6 +131,10 @@ pub struct ComputeActor {
     /// Signing key for results (placeholder)
     #[allow(dead_code)]
     signing_key: Vec<u8>,
+    /// Registry of available executors
+    executor_registry: Arc<Mutex<HashMap<String, ExecutorInfo>>>,
+    /// Pending consensus tracking for task results
+    pending_consensus: Arc<Mutex<HashMap<TaskHash, ResultConsensus>>>,
 }
 
 impl ComputeActor {
@@ -116,6 +148,8 @@ impl ComputeActor {
             trust_callback,
             payment_callback: None,
             signing_key: vec![],
+            executor_registry: Arc::new(Mutex::new(HashMap::new())),
+            pending_consensus: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -197,9 +231,8 @@ impl ComputeActor {
             ComputeMessage::TaskResult(result) => {
                 self.on_task_result(result).await
             }
-            ComputeMessage::ExecutorAnnounce { .. } => {
-                // TODO: Track available executors
-                Ok(())
+            ComputeMessage::ExecutorAnnounce { executor, capabilities } => {
+                self.on_executor_announce(executor, capabilities).await
             }
         }
     }
@@ -308,7 +341,47 @@ impl ComputeActor {
         Ok(())
     }
 
-    /// Handle task result
+    /// Handle executor announcement
+    async fn on_executor_announce(
+        &self,
+        did: String,
+        capabilities: Vec<ExecutorCapability>,
+    ) -> Result<(), ComputeError> {
+        let trust_score = (self.trust_callback)(&did);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let info = ExecutorInfo {
+            did: did.clone(),
+            capabilities,
+            trust_score,
+            last_seen: now,
+        };
+
+        let mut registry = self.executor_registry.lock().await;
+        registry.insert(did, info);
+        icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        Ok(())
+    }
+
+    /// Get list of available executors with required capabilities
+    #[allow(dead_code)]
+    pub async fn find_executors(&self, required_caps: &[ExecutorCapability]) -> Vec<String> {
+        let registry = self.executor_registry.lock().await;
+        registry
+            .values()
+            .filter(|info| {
+                // Check if executor has all required capabilities
+                required_caps.iter().all(|cap| info.capabilities.contains(cap))
+            })
+            .map(|info| info.did.clone())
+            .collect()
+    }
+
+    /// Handle task result with consensus checking
     async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
         // Verify signature
         let executor_did: icn_identity::Did = result.executor.parse()
@@ -323,12 +396,41 @@ impl ComputeActor {
         }
         icn_obs::metrics::compute::signatures_verified_inc();
 
-        // TODO: Compare with other results for consensus
+        // Consensus checking: For now, we require just 1 result (single-executor mode)
+        // In the future, this can be extended to require multiple matching results
+        let required_confirmations = 1;
 
-        let mut mgr = self.task_manager.lock().await;
-        if mgr.get(&result.task_hash).is_some() {
-            mgr.complete(result)?;
+        let mut consensus_map = self.pending_consensus.lock().await;
+        let consensus = consensus_map
+            .entry(result.task_hash)
+            .or_insert_with(|| ResultConsensus {
+                task_hash: result.task_hash,
+                results: vec![],
+                required: required_confirmations,
+            });
+
+        // Add this result if not already present (by executor)
+        if !consensus.results.iter().any(|r| r.executor == result.executor) {
+            consensus.results.push(result.clone());
         }
+
+        // Check if we have enough confirmations
+        if consensus.results.len() >= consensus.required {
+            // For now, just accept the first result
+            // Future: compare results and handle disagreements
+            let accepted_result = consensus.results[0].clone();
+
+            // Clean up consensus tracking
+            consensus_map.remove(&result.task_hash);
+            drop(consensus_map);
+
+            // Complete the task
+            let mut mgr = self.task_manager.lock().await;
+            if mgr.get(&accepted_result.task_hash).is_some() {
+                mgr.complete(accepted_result)?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -411,6 +513,77 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
         let hash = task.hash();
         let status = handle.status(hash).await.unwrap();
+        assert!(matches!(status, Some(TaskStatus::Completed { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_executor_tracking() {
+        let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+        let mut actor = ComputeActor::new("did:icn:submitter".into(), trust_cb);
+        actor.set_signing_key(vec![1u8; 32]);
+        let handle = actor.spawn();
+
+        // Announce two executors with different capabilities
+        let msg1 = ComputeMessage::ExecutorAnnounce {
+            executor: "did:icn:executor1".into(),
+            capabilities: vec![ExecutorCapability::Ccl],
+        };
+        let msg2 = ComputeMessage::ExecutorAnnounce {
+            executor: "did:icn:executor2".into(),
+            capabilities: vec![ExecutorCapability::Ccl, ExecutorCapability::Wasm],
+        };
+
+        handle.handle_gossip(msg1).await.unwrap();
+        handle.handle_gossip(msg2).await.unwrap();
+
+        // Give time for processing
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Both executors should be tracked in the registry
+        // (We can't directly access the registry from here, but the announcements succeeded)
+        // This test validates the message handling works without errors
+    }
+
+    #[tokio::test]
+    async fn test_consensus_single_result() {
+        let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+        let mut actor = ComputeActor::new("did:icn:submitter".into(), trust_cb);
+        actor.set_signing_key(vec![1u8; 32]);
+        let handle = actor.spawn();
+
+        // Submit a task
+        let task = make_task("consensus-task", "did:icn:alice");
+        let task_hash = handle.submit(task.clone()).await.unwrap();
+
+        // Generate a valid keypair and result
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did().as_str();
+        let signing_key = keypair.to_signing_key_bytes();
+
+        let mut result = crate::types::ComputeResult {
+            task_hash,
+            task_id: task.id.clone(),
+            executor: executor_did.to_string(),
+            outcome: crate::types::ExecutionOutcome::Success(b"42".to_vec()),
+            fuel_used: 100,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+
+        // Sign the result
+        let ed25519_key = ed25519_dalek::SigningKey::from_bytes(&signing_key);
+        result.sign(&ed25519_key);
+
+        // Submit result via gossip
+        let msg = ComputeMessage::TaskResult(result);
+        handle.handle_gossip(msg).await.unwrap();
+
+        // Give time for processing
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Task should be completed after consensus (1 result required)
+        let status = handle.status(task_hash).await.unwrap();
         assert!(matches!(status, Some(TaskStatus::Completed { .. })));
     }
 }
