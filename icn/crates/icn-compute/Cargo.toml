@@ -1,0 +1,40 @@
+[package]
+name = "icn-compute"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Distributed compute layer for ICN"
+
+[dependencies]
+# ICN crates
+icn-identity = { path = "../icn-identity" }
+icn-trust = { path = "../icn-trust" }
+icn-ccl = { path = "../icn-ccl" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+
+# Crypto
+blake3 = "1.5"
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+
+# Async
+tokio = { version = "1.0", features = ["sync", "time", "rt"] }
+
+# Logging
+tracing = "0.1"
+
+# Error handling
+thiserror = "1.0"
+
+# Utilities
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+
+[features]
+default = []

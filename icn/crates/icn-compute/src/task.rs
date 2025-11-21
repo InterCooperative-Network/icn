@@ -1,0 +1,247 @@
+//! Task management and tracking.
+
+use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::error::ComputeError;
+use crate::types::{ComputeResult, ComputeTask, TaskHash};
+
+/// Status of a task in the system
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskStatus {
+    /// Task submitted, waiting for executor
+    Pending,
+    /// Task claimed by an executor
+    Claimed { executor: String, claimed_at: u64 },
+    /// Task completed
+    Completed { result: Box<ComputeResult> },
+    /// Task failed or timed out
+    Failed { reason: String },
+}
+
+/// Manages task lifecycle
+pub struct TaskManager {
+    /// Tasks by hash
+    tasks: HashMap<TaskHash, ComputeTask>,
+    /// Task status by hash
+    status: HashMap<TaskHash, TaskStatus>,
+    /// Maximum pending tasks
+    max_pending: usize,
+}
+
+impl TaskManager {
+    /// Create a new task manager
+    pub fn new(max_pending: usize) -> Self {
+        Self {
+            tasks: HashMap::new(),
+            status: HashMap::new(),
+            max_pending,
+        }
+    }
+
+    /// Submit a new task
+    pub fn submit(&mut self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
+        if self.pending_count() >= self.max_pending {
+            return Err(ComputeError::Internal("too many pending tasks".into()));
+        }
+
+        let hash = task.hash();
+        self.tasks.insert(hash, task);
+        self.status.insert(hash, TaskStatus::Pending);
+        Ok(hash)
+    }
+
+    /// Get a task by hash
+    pub fn get(&self, hash: &TaskHash) -> Option<&ComputeTask> {
+        self.tasks.get(hash)
+    }
+
+    /// Get task status
+    pub fn status(&self, hash: &TaskHash) -> Option<&TaskStatus> {
+        self.status.get(hash)
+    }
+
+    /// Claim a task for execution
+    pub fn claim(&mut self, hash: &TaskHash, executor: String) -> Result<(), ComputeError> {
+        let status = self
+            .status
+            .get(hash)
+            .ok_or_else(|| ComputeError::TaskNotFound(hex::encode(hash)))?;
+
+        match status {
+            TaskStatus::Pending => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                self.status.insert(
+                    *hash,
+                    TaskStatus::Claimed {
+                        executor,
+                        claimed_at: now,
+                    },
+                );
+                Ok(())
+            }
+            TaskStatus::Claimed { executor: e, .. } => {
+                Err(ComputeError::TaskAlreadyClaimed(e.clone()))
+            }
+            _ => Err(ComputeError::Internal("task not in pending state".into())),
+        }
+    }
+
+    /// Record task completion
+    pub fn complete(&mut self, result: ComputeResult) -> Result<(), ComputeError> {
+        let hash = result.task_hash;
+        if !self.tasks.contains_key(&hash) {
+            return Err(ComputeError::TaskNotFound(hex::encode(hash)));
+        }
+        self.status
+            .insert(hash, TaskStatus::Completed { result: Box::new(result) });
+        Ok(())
+    }
+
+    /// Mark task as failed
+    pub fn fail(&mut self, hash: &TaskHash, reason: String) -> Result<(), ComputeError> {
+        if !self.tasks.contains_key(hash) {
+            return Err(ComputeError::TaskNotFound(hex::encode(hash)));
+        }
+        self.status.insert(*hash, TaskStatus::Failed { reason });
+        Ok(())
+    }
+
+    /// Get pending tasks
+    pub fn pending(&self) -> impl Iterator<Item = (&TaskHash, &ComputeTask)> {
+        self.tasks.iter().filter(|(h, _)| {
+            matches!(self.status.get(*h), Some(TaskStatus::Pending))
+        })
+    }
+
+    /// Count of pending tasks
+    pub fn pending_count(&self) -> usize {
+        self.status
+            .values()
+            .filter(|s| matches!(s, TaskStatus::Pending))
+            .count()
+    }
+
+    /// Remove old completed/failed tasks
+    pub fn cleanup(&mut self, max_age_ms: u64) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let to_remove: Vec<_> = self
+            .tasks
+            .iter()
+            .filter(|(h, t)| {
+                let age = now.saturating_sub(t.created_at);
+                age > max_age_ms
+                    && matches!(
+                        self.status.get(*h),
+                        Some(TaskStatus::Completed { .. }) | Some(TaskStatus::Failed { .. })
+                    )
+            })
+            .map(|(h, _)| *h)
+            .collect();
+
+        for hash in to_remove {
+            self.tasks.remove(&hash);
+            self.status.remove(&hash);
+        }
+    }
+}
+
+impl Default for TaskManager {
+    fn default() -> Self {
+        Self::new(1000)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ExecutionOutcome, ExecutorCapability, FuelLimit, TaskCode};
+
+    fn make_task(id: &str) -> ComputeTask {
+        ComputeTask {
+            id: id.into(),
+            submitter: "did:icn:alice".into(),
+            code: TaskCode::Ccl("return 1".into()),
+            inputs: vec![],
+            fuel_limit: FuelLimit::default(),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            created_at: 1000,
+            deadline: None,
+        }
+    }
+
+    #[test]
+    fn test_submit_and_get() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task.clone()).unwrap();
+
+        assert!(mgr.get(&hash).is_some());
+        assert!(matches!(mgr.status(&hash), Some(TaskStatus::Pending)));
+    }
+
+    #[test]
+    fn test_claim_task() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        mgr.claim(&hash, "did:icn:bob".into()).unwrap();
+
+        match mgr.status(&hash) {
+            Some(TaskStatus::Claimed { executor, .. }) => {
+                assert_eq!(executor, "did:icn:bob");
+            }
+            _ => panic!("expected claimed status"),
+        }
+    }
+
+    #[test]
+    fn test_double_claim_fails() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        mgr.claim(&hash, "did:icn:bob".into()).unwrap();
+        let result = mgr.claim(&hash, "did:icn:charlie".into());
+
+        assert!(matches!(result, Err(ComputeError::TaskAlreadyClaimed(_))));
+    }
+
+    #[test]
+    fn test_complete_task() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        let result = ComputeResult {
+            task_hash: hash,
+            task_id: "task-1".into(),
+            executor: "did:icn:bob".into(),
+            outcome: ExecutionOutcome::Success(vec![42]),
+            fuel_used: 100,
+            duration_ms: 50,
+            completed_at: 2000,
+            signature: vec![],
+        };
+
+        mgr.complete(result).unwrap();
+        assert!(matches!(mgr.status(&hash), Some(TaskStatus::Completed { .. })));
+    }
+
+    #[test]
+    fn test_pending_count() {
+        let mut mgr = TaskManager::new(100);
+        mgr.submit(make_task("task-1")).unwrap();
+        mgr.submit(make_task("task-2")).unwrap();
+
+        assert_eq!(mgr.pending_count(), 2);
+    }
+}

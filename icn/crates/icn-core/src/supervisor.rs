@@ -445,6 +445,10 @@ impl Supervisor {
                 }
             }
 
+            // Create compute handle holder (will be filled after ComputeActor is spawned)
+            let compute_handle_holder: Arc<tokio::sync::RwLock<Option<icn_compute::ComputeHandle>>> =
+                Arc::new(tokio::sync::RwLock::new(None));
+
             // Set send callback on gossip actor to enable request/response
             {
                 let mut gossip = gossip_handle.write().await;
@@ -519,6 +523,8 @@ impl Supervisor {
                 let candidate_cache_for_notifications = candidate_cache.clone();
                 let candidate_cache_for_cleanup = candidate_cache.clone();
                 let network_handle_for_candidates = network_handle.clone();
+
+                let compute_handle_for_notifications = compute_handle_holder.clone();
 
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
                     // Handle trust attestations
@@ -843,6 +849,35 @@ impl Supervisor {
                             }
                         }
                     }
+                    // Handle compute topics
+                    else if topic == icn_compute::TOPIC_SUBMIT
+                        || topic == icn_compute::TOPIC_CLAIM
+                        || topic == icn_compute::TOPIC_RESULT
+                    {
+                        let entry_data = match entry.get_data() {
+                            Ok(data) => data,
+                            Err(e) => {
+                                warn!("Failed to get compute entry data: {}", e);
+                                return;
+                            }
+                        };
+
+                        match bincode::deserialize::<icn_compute::ComputeMessage>(&entry_data) {
+                            Ok(compute_msg) => {
+                                let compute_holder = compute_handle_for_notifications.clone();
+                                tokio::spawn(async move {
+                                    if let Some(handle) = compute_holder.read().await.as_ref() {
+                                        if let Err(e) = handle.handle_gossip(compute_msg).await {
+                                            warn!("Failed to handle compute message: {}", e);
+                                        }
+                                    }
+                                });
+                            }
+                            Err(e) => {
+                                warn!("Failed to deserialize compute message: {}", e);
+                            }
+                        }
+                    }
                 });
 
                 gossip.set_notification_callback(notification_callback);
@@ -1161,6 +1196,84 @@ impl Supervisor {
             };
 
             info!("✓ Governance event handlers registered");
+
+            // Spawn Compute actor for distributed task execution
+            let trust_graph_for_compute = trust_graph_handle.clone();
+            let compute_trust_callback: icn_compute::TrustCallback = Arc::new(move |did_str: &str| {
+                let graph = trust_graph_for_compute.clone();
+                let did_string = did_str.to_string();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let did: icn_identity::Did = match serde_json::from_value(
+                            serde_json::Value::String(did_string.clone())
+                        ) {
+                            Ok(d) => d,
+                            Err(_) => return 0.0,
+                        };
+                        let graph = graph.read().await;
+                        graph.compute_trust_score(&did).unwrap_or(0.0)
+                    })
+                })
+            });
+
+            let mut compute_actor = icn_compute::ComputeActor::new(
+                did.to_string(),
+                compute_trust_callback,
+            );
+
+            // Set up compute send callback to route through gossip
+            let gossip_handle_for_compute = gossip_handle.clone();
+            let compute_send_callback: icn_compute::SendCallback = Arc::new(move |compute_msg| {
+                let gossip = gossip_handle_for_compute.clone();
+                tokio::spawn(async move {
+                    let (topic, data) = match &compute_msg {
+                        icn_compute::ComputeMessage::TaskSubmitted(_) => {
+                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::TaskClaimed { .. } => {
+                            (icn_compute::TOPIC_CLAIM, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::TaskResult(_) => {
+                            (icn_compute::TOPIC_RESULT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::ExecutorAnnounce { .. } => {
+                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                        }
+                    };
+
+                    match data {
+                        Ok(bytes) => {
+                            let mut gossip = gossip.write().await;
+                            if let Err(e) = gossip.publish(topic, bytes) {
+                                warn!("Failed to publish compute message to {}: {}", topic, e);
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to serialize compute message: {}", e);
+                        }
+                    }
+                });
+            });
+
+            compute_actor.set_send_callback(compute_send_callback);
+            let compute_handle = compute_actor.spawn();
+
+            // Fill compute handle holder for notification callback
+            *compute_handle_holder.write().await = Some(compute_handle);
+
+            info!("✓ Compute actor spawned");
+
+            // Subscribe to compute topics
+            {
+                let mut gossip = gossip_handle.write().await;
+                for topic in &[icn_compute::TOPIC_SUBMIT, icn_compute::TOPIC_CLAIM, icn_compute::TOPIC_RESULT] {
+                    if let Err(e) = gossip.subscribe(topic, did.clone()) {
+                        warn!("Failed to subscribe to compute topic {}: {}", topic, e);
+                    } else {
+                        info!("Subscribed to compute topic: {}", topic);
+                    }
+                }
+            }
 
             // Spawn RPC server with network, ledger, contract, gossip, and governance handles
             let rpc_port = self.config.network.rpc_port;

@@ -17,7 +17,7 @@ members = [
     "bins/icnctl",
     "bins/icn-console",
     "crates/icn-gateway",
-    "crates/icn-governance",
+    "crates/icn-governance", "crates/icn-compute",
 ]
 
 [workspace.package]

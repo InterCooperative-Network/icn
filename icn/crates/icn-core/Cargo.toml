@@ -17,6 +17,7 @@ dirs = "5.0"
 ed25519-dalek.workspace = true
 async-trait = "0.1"
 hex = "0.4"
+bincode = "1.3"
 
 # ICN crates
 icn-identity.workspace = true
@@ -31,6 +32,7 @@ icn-obs.workspace = true
 icn-snapshot.workspace = true
 icn-gateway.workspace = true
 icn-governance.workspace = true
+icn-compute = { path = "../icn-compute" }
 
 [dev-dependencies]
 rustls.workspace = true
