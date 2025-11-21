@@ -295,11 +295,16 @@ export type CoopEventType =
   | 'ComputeTaskClaimed'
   | 'ComputeTaskCompleted';
 
+/** GatewayEvent payload with its type tag */
+export interface GatewayEventPayload {
+  type: CoopEventType;
+  [key: string]: unknown;
+}
+
 export interface WsEventMessage {
   type: 'Event';
   seq: number;
-  event_type: CoopEventType;
-  payload: unknown;
+  event: GatewayEventPayload;
 }
 
 export type WsMessage =

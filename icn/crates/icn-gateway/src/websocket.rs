@@ -35,7 +35,8 @@ enum ServerMessage {
     /// Authentication failed
     AuthError { message: String },
     /// Event notification with sequence number
-    Event(SequencedEvent),
+    /// Note: event is nested to avoid tag conflict with GatewayEvent's type field
+    Event { seq: u64, event: crate::events::GatewayEvent },
     /// Backfill complete with number of events sent
     BackfillComplete { count: usize },
     /// Error message
@@ -180,7 +181,7 @@ impl WsSession {
                 match rx.try_recv() {
                     Ok(sequenced_event) => {
                         // Forward sequenced event to client
-                        let msg = ServerMessage::Event(sequenced_event);
+                        let msg = ServerMessage::Event { seq: sequenced_event.seq, event: sequenced_event.event };
                         if let Ok(json) = serde_json::to_string(&msg) {
                             ctx.text(json);
                             // Track message sent
@@ -242,8 +243,8 @@ impl WsSession {
         .map(|events, act, ctx| {
             let count = events.len();
             // Send all backfill events
-            for event in events {
-                let msg = ServerMessage::Event(event);
+            for sequenced in events {
+                let msg = ServerMessage::Event { seq: sequenced.seq, event: sequenced.event };
                 act.send_message(msg, ctx);
                 gateway::websocket_messages_sent_inc();
             }
