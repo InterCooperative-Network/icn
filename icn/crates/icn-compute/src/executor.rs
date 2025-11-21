@@ -64,7 +64,7 @@ impl LocalExecutor {
         &self,
         task: &ComputeTask,
         executor_did: &str,
-        _signing_key: &[u8], // Will be used for signing results
+        signing_key: &[u8],
     ) -> Result<ComputeResult, ComputeError> {
         // Check deadline
         if let Some(deadline) = task.deadline {
@@ -100,7 +100,12 @@ impl LocalExecutor {
             .unwrap()
             .as_millis() as u64;
 
-        Ok(ComputeResult {
+        // Parse signing key and sign the result
+        let signing_key_bytes: [u8; 32] = signing_key.try_into()
+            .map_err(|_| ComputeError::InvalidSignature("Invalid signing key length".into()))?;
+        let ed25519_key = ed25519_dalek::SigningKey::from_bytes(&signing_key_bytes);
+
+        let mut result = ComputeResult {
             task_hash: task.hash(),
             task_id: task.id.clone(),
             executor: executor_did.to_string(),
@@ -108,8 +113,13 @@ impl LocalExecutor {
             fuel_used,
             duration_ms,
             completed_at: now,
-            signature: vec![], // TODO: Sign with ed25519
-        })
+            signature: vec![],
+        };
+
+        // Sign the result
+        result.sign(&ed25519_key);
+
+        Ok(result)
     }
 }
 
@@ -272,13 +282,18 @@ mod tests {
         }
     }
 
+    fn test_signing_key() -> [u8; 32] {
+        // Deterministic test key
+        [1u8; 32]
+    }
+
     #[test]
     fn test_local_executor_success() {
         let executor = LocalExecutor::new();
         let task = make_task(&simple_contract(), 10_000);
 
         let result = executor
-            .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &[])
+            .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &test_signing_key())
             .unwrap();
 
         match &result.outcome {
@@ -299,7 +314,7 @@ mod tests {
         task.inputs = r#"{"a": {"Int": 5}, "b": {"Int": 3}}"#.as_bytes().to_vec();
 
         let result = executor
-            .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &[])
+            .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &test_signing_key())
             .unwrap();
 
         match &result.outcome {
@@ -315,7 +330,7 @@ mod tests {
         let task = make_task("not valid json", 10_000);
 
         let result = executor
-            .execute_task(&task, "did:icn:bob", &[])
+            .execute_task(&task, "did:icn:bob", &test_signing_key())
             .unwrap();
 
         assert!(matches!(result.outcome, ExecutionOutcome::Failed(_)));
@@ -360,7 +375,7 @@ mod tests {
             payment_currency: None,
         };
 
-        let result = executor.execute_task(&task, "did:icn:bob", &[]);
+        let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());
         assert!(matches!(result, Err(ComputeError::DeadlineExceeded)));
     }
 }

@@ -1,5 +1,6 @@
 //! Core types for the compute layer.
 
+use ed25519_dalek::Signer;
 use serde::{Deserialize, Serialize};
 
 /// Unique task identifier (blake3 hash of task content)
@@ -94,6 +95,67 @@ pub struct ComputeResult {
     pub signature: Vec<u8>,
 }
 
+impl ComputeResult {
+    /// Compute canonical hash for signing (deterministic serialization)
+    pub fn signing_payload(&self) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&self.task_hash);
+        payload.extend_from_slice(self.task_id.as_bytes());
+        payload.extend_from_slice(self.executor.as_bytes());
+
+        // Outcome hash
+        match &self.outcome {
+            ExecutionOutcome::Success(data) => {
+                payload.push(0);
+                payload.extend_from_slice(data);
+            }
+            ExecutionOutcome::Failed(msg) => {
+                payload.push(1);
+                payload.extend_from_slice(msg.as_bytes());
+            }
+            ExecutionOutcome::OutOfFuel => {
+                payload.push(2);
+            }
+            ExecutionOutcome::Timeout => {
+                payload.push(3);
+            }
+        }
+
+        payload.extend_from_slice(&self.fuel_used.to_le_bytes());
+        payload.extend_from_slice(&self.duration_ms.to_le_bytes());
+        payload.extend_from_slice(&self.completed_at.to_le_bytes());
+
+        payload
+    }
+
+    /// Sign the result with Ed25519
+    pub fn sign(&mut self, signing_key: &ed25519_dalek::SigningKey) {
+        let payload = self.signing_payload();
+        let signature = signing_key.sign(&payload);
+        self.signature = signature.to_bytes().to_vec();
+    }
+
+    /// Verify the signature
+    pub fn verify_signature(&self, executor_did: &icn_identity::Did) -> Result<(), crate::error::ComputeError> {
+        use ed25519_dalek::Verifier;
+
+        // Extract public key from DID
+        let verifying_key = executor_did.to_verifying_key()
+            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Cannot extract public key from DID: {}", e)))?;
+
+        let signature = ed25519_dalek::Signature::from_bytes(
+            self.signature.as_slice().try_into()
+                .map_err(|_| crate::error::ComputeError::InvalidSignature("Invalid signature length".into()))?
+        );
+
+        let payload = self.signing_payload();
+        verifying_key.verify(&payload, &signature)
+            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Signature verification failed: {}", e)))?;
+
+        Ok(())
+    }
+}
+
 /// Outcome of task execution
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExecutionOutcome {
@@ -169,5 +231,108 @@ mod tests {
             }
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn test_result_signing_and_verification() {
+        // Generate a keypair for testing
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did();
+
+        // Create a test result
+        let mut result = ComputeResult {
+            task_hash: [1u8; 32],
+            task_id: "test-task".into(),
+            executor: executor_did.to_string(),
+            outcome: ExecutionOutcome::Success(vec![42]),
+            fuel_used: 1000,
+            duration_ms: 100,
+            completed_at: 123456789,
+            signature: vec![],
+        };
+
+        // Sign the result using keypair.sign()
+        let payload = result.signing_payload();
+        let signature = keypair.sign(&payload);
+        result.signature = signature.to_bytes().to_vec();
+
+        // Verify signature is not empty
+        assert!(!result.signature.is_empty());
+        assert_eq!(result.signature.len(), 64); // Ed25519 signatures are 64 bytes
+
+        // Verify the signature
+        assert!(result.verify_signature(executor_did).is_ok());
+    }
+
+    #[test]
+    fn test_result_signature_verification_fails_wrong_did() {
+        // Generate two different keypairs
+        let signer_keypair = icn_identity::KeyPair::generate().unwrap();
+        let wrong_keypair = icn_identity::KeyPair::generate().unwrap();
+
+        // Create and sign result with first keypair
+        let mut result = ComputeResult {
+            task_hash: [1u8; 32],
+            task_id: "test-task".into(),
+            executor: signer_keypair.did().to_string(),
+            outcome: ExecutionOutcome::Success(vec![42]),
+            fuel_used: 1000,
+            duration_ms: 100,
+            completed_at: 123456789,
+            signature: vec![],
+        };
+
+        let payload = result.signing_payload();
+        let signature = signer_keypair.sign(&payload);
+        result.signature = signature.to_bytes().to_vec();
+
+        // Try to verify with different DID - should fail
+        assert!(result.verify_signature(wrong_keypair.did()).is_err());
+    }
+
+    #[test]
+    fn test_result_signature_verification_fails_tampered() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+
+        let mut result = ComputeResult {
+            task_hash: [1u8; 32],
+            task_id: "test-task".into(),
+            executor: keypair.did().to_string(),
+            outcome: ExecutionOutcome::Success(vec![42]),
+            fuel_used: 1000,
+            duration_ms: 100,
+            completed_at: 123456789,
+            signature: vec![],
+        };
+
+        let payload = result.signing_payload();
+        let signature = keypair.sign(&payload);
+        result.signature = signature.to_bytes().to_vec();
+
+        // Tamper with the result after signing
+        result.fuel_used = 9999;
+
+        // Verification should fail
+        assert!(result.verify_signature(keypair.did()).is_err());
+    }
+
+    #[test]
+    fn test_result_signing_payload_deterministic() {
+        let result = ComputeResult {
+            task_hash: [1u8; 32],
+            task_id: "test-task".into(),
+            executor: "did:icn:executor".into(),
+            outcome: ExecutionOutcome::Success(vec![42, 43]),
+            fuel_used: 1000,
+            duration_ms: 100,
+            completed_at: 123456789,
+            signature: vec![],
+        };
+
+        let payload1 = result.signing_payload();
+        let payload2 = result.signing_payload();
+
+        assert_eq!(payload1, payload2);
+        assert!(!payload1.is_empty());
     }
 }

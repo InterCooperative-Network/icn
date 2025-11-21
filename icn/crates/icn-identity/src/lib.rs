@@ -195,6 +195,15 @@ impl KeyPair {
         let signing_key = SigningKey::from_bytes(&self.secret_bytes);
         signing_key.sign(message)
     }
+
+    /// Get the signing key bytes for use in external signing operations
+    ///
+    /// This method exposes the secret key bytes for use in scenarios where
+    /// direct access to the signing key is needed (e.g., for compute task signing).
+    /// Use with caution - these bytes should be handled securely.
+    pub fn to_signing_key_bytes(&self) -> [u8; 32] {
+        *self.secret_bytes
+    }
 }
 
 impl Drop for KeyPair {

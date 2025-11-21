@@ -643,6 +643,14 @@ pub fn init_descriptions() {
         "icn_compute_tasks_out_of_fuel_total",
         "Total number of tasks that ran out of fuel"
     );
+    describe_counter!(
+        "icn_compute_signatures_verified_total",
+        "Total number of compute result signatures verified"
+    );
+    describe_counter!(
+        "icn_compute_signatures_invalid_total",
+        "Total number of invalid compute result signatures detected"
+    );
 }
 
 /// Network metrics
@@ -1399,5 +1407,13 @@ pub mod compute {
 
     pub fn tasks_out_of_fuel_inc() {
         counter!("icn_compute_tasks_out_of_fuel_total").increment(1);
+    }
+
+    pub fn signatures_verified_inc() {
+        counter!("icn_compute_signatures_verified_total").increment(1);
+    }
+
+    pub fn signatures_invalid_inc(reason: &str) {
+        counter!("icn_compute_signatures_invalid_total", "reason" => reason.to_string()).increment(1);
     }
 }

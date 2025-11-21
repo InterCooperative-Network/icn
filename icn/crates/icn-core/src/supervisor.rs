@@ -1310,6 +1310,10 @@ impl Supervisor {
             });
             compute_actor.set_payment_callback(compute_payment_callback);
 
+            // Set signing key for result signatures
+            let signing_key_bytes = identity_bundle.keypair().to_signing_key_bytes();
+            compute_actor.set_signing_key(signing_key_bytes.to_vec());
+
             let compute_handle = compute_actor.spawn();
 
             // Fill compute handle holder for notification callback

@@ -129,6 +129,11 @@ impl ComputeActor {
         self.payment_callback = Some(cb);
     }
 
+    /// Set the signing key for result signatures
+    pub fn set_signing_key(&mut self, key: Vec<u8>) {
+        self.signing_key = key;
+    }
+
     /// Spawn the actor and return a handle
     pub fn spawn(self) -> ComputeHandle {
         let (tx, mut rx) = mpsc::channel::<ComputeCommand>(256);
@@ -305,7 +310,19 @@ impl ComputeActor {
 
     /// Handle task result
     async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
-        // TODO: Verify signature
+        // Verify signature
+        let executor_did: icn_identity::Did = result.executor.parse()
+            .map_err(|e| {
+                icn_obs::metrics::compute::signatures_invalid_inc("invalid_did");
+                ComputeError::InvalidSignature(format!("Invalid executor DID: {}", e))
+            })?;
+
+        if let Err(e) = result.verify_signature(&executor_did) {
+            icn_obs::metrics::compute::signatures_invalid_inc("verification_failed");
+            return Err(e);
+        }
+        icn_obs::metrics::compute::signatures_verified_inc();
+
         // TODO: Compare with other results for consensus
 
         let mut mgr = self.task_manager.lock().await;
@@ -380,7 +397,9 @@ mod tests {
     #[tokio::test]
     async fn test_gossip_message_handling() {
         let trust_cb: TrustCallback = Arc::new(|_| 0.5);
-        let actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+        let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+        // Set a valid signing key for result signatures
+        actor.set_signing_key(vec![1u8; 32]);
         let handle = actor.spawn();
 
         let task = make_task("task-1", "did:icn:alice");

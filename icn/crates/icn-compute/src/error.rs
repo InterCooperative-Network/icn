@@ -42,8 +42,8 @@ pub enum ComputeError {
     MissingCapability(String),
 
     /// Signature verification failed
-    #[error("invalid signature")]
-    InvalidSignature,
+    #[error("invalid signature: {0}")]
+    InvalidSignature(String),
 
     /// Internal error
     #[error("internal error: {0}")]

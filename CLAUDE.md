@@ -681,13 +681,17 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] RPC endpoints (compute.submit, compute.status)
 - [x] CLI commands (icnctl compute submit/status)
 - [x] Gateway REST API (/v1/compute/submit, /v1/compute/status)
-- [x] 17 compute tests + 86 gateway tests passing
+- [x] Ed25519 signature signing and verification for all compute results
+- [x] Automatic signing in production (configured via supervisor)
+- [x] Prometheus metrics for signature verification
+- [x] 21 compute tests + 87 gateway tests passing (4 new signature security tests)
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
 - **Gossip Topics**: `compute:submit`, `compute:claim`, `compute:result`
 - **CCL Execution**: Real contract parsing and interpreter execution
 - **Payment Settlement**: (fuel_used * payment_rate) / 1000 credits
+- **Cryptographic Security**: Ed25519-signed results with DID-based verification
 
 **CLI Commands**:
 ```bash
@@ -727,6 +731,7 @@ Submitter → compute:submit → Executor claims → Executes CCL
 - `task_duration_seconds`, `fuel_used` (histograms)
 - `fuel_total`, `payments_settled_total`, `payment_amount_total`
 - `tasks_rejected_trust_total`, `tasks_timeout_total`, `tasks_out_of_fuel_total`
+- `signatures_verified_total`, `signatures_invalid_total` (by reason: invalid_did, verification_failed)
 
 **WebSocket Events** (subscribe to "compute" channel):
 - `ComputeTaskSubmitted` - Task created with task_id, task_hash, submitter, fuel_limit
