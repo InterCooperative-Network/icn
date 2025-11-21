@@ -1428,4 +1428,8 @@ pub mod compute {
     pub fn executors_available_set(count: f64) {
         gauge!("icn_compute_executors_available").set(count);
     }
+
+    pub fn executor_load_set(executor_did: &str, load: f64) {
+        gauge!("icn_compute_executor_load", "executor" => executor_did.to_string()).set(load);
+    }
 }

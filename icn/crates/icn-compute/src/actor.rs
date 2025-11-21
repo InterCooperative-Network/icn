@@ -23,6 +23,8 @@ struct ExecutorInfo {
     /// Last announcement timestamp (milliseconds since epoch, used for staleness detection)
     #[allow(dead_code)]
     last_seen: u64,
+    /// Number of tasks currently executing
+    tasks_executing: usize,
 }
 
 /// Consensus tracking for task results
@@ -393,6 +395,14 @@ impl ComputeActor {
             .claim(&hash, self.own_did.clone())?;
         icn_obs::metrics::compute::tasks_claimed_inc();
 
+        // Update our own executor load
+        let mut registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get_mut(&self.own_did) {
+            info.tasks_executing += 1;
+            icn_obs::metrics::compute::executor_load_set(&self.own_did, info.tasks_executing as f64);
+        }
+        drop(registry);
+
         tracing::info!(
             task_id = %task.id,
             task_hash = %task_hash_str,
@@ -471,6 +481,16 @@ impl ComputeActor {
         // Record completion
         self.task_manager.lock().await.complete(result.clone())?;
 
+        // Decrement our own executor load
+        let mut registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get_mut(&self.own_did) {
+            if info.tasks_executing > 0 {
+                info.tasks_executing -= 1;
+                icn_obs::metrics::compute::executor_load_set(&self.own_did, info.tasks_executing as f64);
+            }
+        }
+        drop(registry);
+
         // Settle payment if configured and execution succeeded
         if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
             if let (Some(rate), Some(ref payment_cb)) = (task.payment_rate, &self.payment_callback) {
@@ -515,8 +535,17 @@ impl ComputeActor {
         // Just record the claim if we know about the task
         let mut mgr = self.task_manager.lock().await;
         if mgr.get(&task_hash).is_some() {
-            let _ = mgr.claim(&task_hash, executor);
+            let _ = mgr.claim(&task_hash, executor.clone());
         }
+        drop(mgr);
+
+        // Update executor load tracking
+        let mut registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get_mut(&executor) {
+            info.tasks_executing += 1;
+            icn_obs::metrics::compute::executor_load_set(&executor, info.tasks_executing as f64);
+        }
+
         Ok(())
     }
 
@@ -537,11 +566,15 @@ impl ComputeActor {
             capabilities,
             trust_score,
             last_seen: now,
+            tasks_executing: 0,
         };
 
         let mut registry = self.executor_registry.lock().await;
-        registry.insert(did, info);
+        registry.insert(did.clone(), info);
         icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        // Update executor load metric
+        icn_obs::metrics::compute::executor_load_set(&did, 0.0);
 
         Ok(())
     }
@@ -634,9 +667,20 @@ impl ComputeActor {
             drop(consensus_map);
 
             // Complete the task
+            let executor_did = accepted_result.executor.clone();
             let mut mgr = self.task_manager.lock().await;
             if mgr.get(&accepted_result.task_hash).is_some() {
                 mgr.complete(accepted_result)?;
+            }
+            drop(mgr);
+
+            // Decrement executor load
+            let mut registry = self.executor_registry.lock().await;
+            if let Some(info) = registry.get_mut(&executor_did) {
+                if info.tasks_executing > 0 {
+                    info.tasks_executing -= 1;
+                    icn_obs::metrics::compute::executor_load_set(&executor_did, info.tasks_executing as f64);
+                }
             }
         }
 
@@ -661,11 +705,37 @@ impl ComputeActor {
             "Received task cancellation"
         );
 
+        // Get the executor if task was claimed
+        let executor_did = {
+            let mgr = self.task_manager.lock().await;
+            if let Some(status) = mgr.status(&task_hash) {
+                if let TaskStatus::Claimed { executor, .. } = status {
+                    Some(executor.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
         // Cancel the task in our local manager
         let mut mgr = self.task_manager.lock().await;
         mgr.cancel(&task_hash, &submitter, reason)?;
+        drop(mgr);
 
         icn_obs::metrics::compute::tasks_cancelled_inc();
+
+        // Decrement executor load if task was claimed
+        if let Some(executor) = executor_did {
+            let mut registry = self.executor_registry.lock().await;
+            if let Some(info) = registry.get_mut(&executor) {
+                if info.tasks_executing > 0 {
+                    info.tasks_executing -= 1;
+                    icn_obs::metrics::compute::executor_load_set(&executor, info.tasks_executing as f64);
+                }
+            }
+        }
 
         tracing::info!(
             task_hash = %task_hash_str,
