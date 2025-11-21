@@ -1684,3 +1684,641 @@ window.addEventListener('appinstalled', () => {
 
     showToast('ICN Timebank installed! You can now use it offline.', 'success', 5000);
 });
+
+// ============================================================================
+// Phase 8: Advanced Features - Economic Health Dashboard
+// ============================================================================
+
+// Toggle advanced reports visibility
+const toggleAdvancedReports = document.getElementById('toggle-advanced-reports');
+const advancedReports = document.getElementById('advanced-reports');
+
+if (toggleAdvancedReports && advancedReports) {
+    toggleAdvancedReports.addEventListener('click', () => {
+        const isHidden = advancedReports.classList.contains('hidden');
+        advancedReports.classList.toggle('hidden');
+        toggleAdvancedReports.textContent = isHidden ? 'Hide Details' : 'Show Details';
+
+        if (isHidden) {
+            // Load data when showing
+            loadEconomicMetrics();
+            renderVelocityChart();
+            renderParticipationHeatmap();
+        }
+    });
+}
+
+// Calculate and display economic health metrics
+function loadEconomicMetrics() {
+    if (!state.transactions || state.transactions.length === 0) return;
+
+    // Calculate transaction velocity (transactions per member per month)
+    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+    const recentTransactions = state.transactions.filter(tx => tx.timestamp >= thirtyDaysAgo);
+    const activeMemberCount = new Set(
+        recentTransactions.flatMap(tx => [tx.from, tx.to])
+    ).size || 1;
+    const velocity = (recentTransactions.length / activeMemberCount).toFixed(2);
+
+    // Calculate participation rate (% of members with at least 1 transaction in 30 days)
+    const totalMembers = state.members.length || 1;
+    const participation = ((activeMemberCount / totalMembers) * 100).toFixed(1);
+
+    // Calculate Gini coefficient (economic inequality)
+    const balances = state.members.map(m => m.balance || 0).sort((a, b) => a - b);
+    const gini = calculateGini(balances);
+
+    // Calculate hoarding index (% with balance > 2x average)
+    const avgBalance = balances.reduce((sum, b) => sum + b, 0) / balances.length;
+    const hoarders = balances.filter(b => b > avgBalance * 2).length;
+    const hoarding = ((hoarders / totalMembers) * 100).toFixed(1);
+
+    // Update display
+    document.getElementById('metric-velocity').textContent = velocity;
+    document.getElementById('metric-participation').textContent = `${participation}%`;
+    document.getElementById('metric-gini').textContent = gini.toFixed(3);
+    document.getElementById('metric-hoarding').textContent = `${hoarding}%`;
+}
+
+// Calculate Gini coefficient
+function calculateGini(values) {
+    if (values.length === 0) return 0;
+
+    const n = values.length;
+    let numerator = 0;
+
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            numerator += Math.abs(values[i] - values[j]);
+        }
+    }
+
+    const mean = values.reduce((sum, v) => sum + v, 0) / n;
+    const denominator = 2 * n * n * mean;
+
+    return denominator === 0 ? 0 : numerator / denominator;
+}
+
+// Render velocity chart (6-month trend)
+function renderVelocityChart() {
+    const canvas = document.getElementById('velocity-chart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Generate sample data (6 months of velocity)
+    const months = ['6mo', '5mo', '4mo', '3mo', '2mo', '1mo', 'Now'];
+    const velocityData = months.map((month, i) => {
+        // Simulate increasing velocity trend
+        const baseVelocity = 1.5 + (i * 0.3);
+        return baseVelocity + (Math.random() * 0.4 - 0.2);
+    });
+
+    // Chart dimensions
+    const padding = 40;
+    const chartWidth = width - (padding * 2);
+    const chartHeight = height - (padding * 2);
+    const maxVelocity = Math.max(...velocityData) * 1.2;
+
+    // Draw axes
+    ctx.strokeStyle = '#9ca3af';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, height - padding);
+    ctx.lineTo(width - padding, height - padding);
+    ctx.stroke();
+
+    // Draw velocity line
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    velocityData.forEach((velocity, i) => {
+        const x = padding + (chartWidth / (months.length - 1)) * i;
+        const y = (height - padding) - ((velocity / maxVelocity) * chartHeight);
+
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+
+        // Draw data points
+        ctx.fillStyle = '#2563eb';
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.stroke();
+
+    // Draw labels
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+
+    months.forEach((month, i) => {
+        const x = padding + (chartWidth / (months.length - 1)) * i;
+        ctx.fillText(month, x, height - padding + 20);
+    });
+
+    // Y-axis label
+    ctx.textAlign = 'right';
+    ctx.fillText('Velocity', padding - 10, padding - 10);
+
+    // Title
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#1f2937';
+    ctx.fillText('Transaction Velocity Trend (6 months)', width / 2, 20);
+}
+
+// Render participation heatmap (last 12 weeks)
+function renderParticipationHeatmap() {
+    const container = document.getElementById('participation-heatmap');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // Generate 12 weeks of data (7 days each = 84 cells)
+    for (let week = 0; week < 12; week++) {
+        for (let day = 0; day < 7; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'heatmap-cell';
+
+            // Simulate participation level (0-4)
+            const level = Math.floor(Math.random() * 5);
+            cell.setAttribute('data-level', level);
+
+            // Add tooltip
+            const weekDate = new Date();
+            weekDate.setDate(weekDate.getDate() - ((11 - week) * 7 + (6 - day)));
+            const dateStr = weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+            const tooltip = document.createElement('div');
+            tooltip.className = 'heatmap-tooltip';
+            tooltip.textContent = `${dateStr}: ${level * 2} transactions`;
+            cell.appendChild(tooltip);
+
+            container.appendChild(cell);
+        }
+    }
+}
+
+// ============================================================================
+// Phase 8: Member Profile
+// ============================================================================
+
+// Profile data (stored in localStorage)
+let profileData = {
+    bio: '',
+    skills: [],
+    availability: {
+        monday: '9am-5pm',
+        tuesday: '9am-5pm',
+        wednesday: '9am-5pm',
+        thursday: '9am-5pm',
+        friday: '9am-5pm',
+        saturday: 'Not available',
+        sunday: 'Not available'
+    },
+    contact: {
+        email: '',
+        phone: '',
+        location: ''
+    },
+    serviceHistory: {
+        given: [],
+        received: []
+    }
+};
+
+// Load profile when Profile tab is opened
+document.addEventListener('click', (e) => {
+    if (e.target.dataset.tab === 'member-profile') {
+        loadProfile();
+    }
+});
+
+// Load profile from localStorage
+function loadProfile() {
+    const saved = localStorage.getItem('icn-profile');
+    if (saved) {
+        profileData = { ...profileData, ...JSON.parse(saved) };
+    }
+
+    // Update UI
+    document.getElementById('profile-name').textContent = state.did ? 'Member Profile' : 'Your Profile';
+    document.getElementById('profile-did').textContent = truncateDid(state.did || 'did:icn:...');
+
+    // Update initials
+    const initials = state.did ? state.did.slice(8, 10).toUpperCase() : '?';
+    document.getElementById('profile-initials').textContent = initials;
+
+    // Load stats
+    loadProfileStats();
+
+    // Load bio
+    document.getElementById('profile-bio').textContent = profileData.bio || 'No bio added yet. Click Edit Profile to add one.';
+
+    // Load skills
+    renderSkills();
+
+    // Load availability
+    renderAvailability();
+
+    // Load contact
+    renderContact();
+
+    // Load service history
+    renderServiceHistory();
+}
+
+// Load profile statistics
+function loadProfileStats() {
+    const myTransactions = state.transactions.filter(tx =>
+        tx.from === state.did || tx.to === state.did
+    );
+
+    const hoursGiven = myTransactions
+        .filter(tx => tx.from === state.did)
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const hoursReceived = myTransactions
+        .filter(tx => tx.to === state.did)
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const totalHours = hoursGiven + hoursReceived;
+
+    document.getElementById('profile-hours-given').textContent = hoursGiven.toFixed(1);
+    document.getElementById('profile-hours-received').textContent = hoursReceived.toFixed(1);
+    document.getElementById('profile-total-hours').textContent = totalHours.toFixed(1);
+}
+
+// Render skills list
+function renderSkills() {
+    const container = document.getElementById('skills-list');
+    container.innerHTML = '';
+
+    if (profileData.skills.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-tertiary); font-style: italic;">No skills added yet.</p>';
+        return;
+    }
+
+    profileData.skills.forEach(skill => {
+        const tag = document.createElement('span');
+        tag.className = 'skill-tag';
+        tag.textContent = skill;
+        container.appendChild(tag);
+    });
+}
+
+// Render availability
+function renderAvailability() {
+    const container = document.getElementById('availability-display');
+    container.innerHTML = '';
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const grid = document.createElement('div');
+    grid.className = 'availability-grid';
+
+    days.forEach(day => {
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'availability-day';
+
+        const dayKey = day.toLowerCase();
+        const time = profileData.availability[dayKey] || 'Not set';
+
+        dayDiv.innerHTML = `
+            <strong>${day}</strong>
+            <span class="availability-time">${time}</span>
+        `;
+
+        grid.appendChild(dayDiv);
+    });
+
+    container.appendChild(grid);
+}
+
+// Render contact info
+function renderContact() {
+    const email = profileData.contact.email || 'Not provided';
+    const phone = profileData.contact.phone || 'Not provided';
+    const location = profileData.contact.location || 'Not provided';
+
+    document.getElementById('contact-email').textContent = email;
+    document.getElementById('contact-phone').textContent = phone;
+    document.getElementById('contact-location').textContent = location;
+}
+
+// Render service history
+function renderServiceHistory() {
+    const givenContainer = document.getElementById('services-given');
+    const receivedContainer = document.getElementById('services-received');
+
+    givenContainer.innerHTML = '';
+    receivedContainer.innerHTML = '';
+
+    // Get transactions
+    const given = state.transactions.filter(tx => tx.from === state.did).slice(0, 10);
+    const received = state.transactions.filter(tx => tx.to === state.did).slice(0, 10);
+
+    if (given.length === 0) {
+        givenContainer.innerHTML = '<p class="empty-state">No services given yet</p>';
+    } else {
+        given.forEach(tx => {
+            givenContainer.appendChild(createServiceHistoryItem(tx, 'given'));
+        });
+    }
+
+    if (received.length === 0) {
+        receivedContainer.innerHTML = '<p class="empty-state">No services received yet</p>';
+    } else {
+        received.forEach(tx => {
+            receivedContainer.appendChild(createServiceHistoryItem(tx, 'received'));
+        });
+    }
+}
+
+// Create service history item
+function createServiceHistoryItem(tx, type) {
+    const item = document.createElement('div');
+    item.className = 'service-history-item';
+
+    const peer = type === 'given' ? tx.to : tx.from;
+    const description = tx.memo || 'Service exchange';
+
+    item.innerHTML = `
+        <div class="service-history-details">
+            <div class="service-history-description">${description}</div>
+            <div class="service-history-date">${formatDate(tx.timestamp)} • ${truncateDid(peer)}</div>
+        </div>
+        <div class="service-history-hours">${tx.amount}h</div>
+    `;
+
+    return item;
+}
+
+// Service history tabs
+const serviceTabBtns = document.querySelectorAll('.service-tab-btn');
+const serviceTabContents = document.querySelectorAll('.service-history-content');
+
+serviceTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tabId = btn.dataset.tab;
+
+        serviceTabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        serviceTabContents.forEach(content => {
+            content.classList.toggle('hidden', content.id !== tabId);
+        });
+    });
+});
+
+// Edit Profile Modal
+const editProfileBtn = document.getElementById('edit-profile-btn');
+const editProfileModal = document.getElementById('edit-profile-modal');
+const closeEditProfile = document.getElementById('close-edit-profile');
+const saveProfileBtn = document.getElementById('save-profile-btn');
+
+if (editProfileBtn) {
+    editProfileBtn.addEventListener('click', () => {
+        // Populate form
+        document.getElementById('edit-bio').value = profileData.bio;
+        document.getElementById('edit-email').value = profileData.contact.email;
+        document.getElementById('edit-phone').value = profileData.contact.phone;
+        document.getElementById('edit-location').value = profileData.contact.location;
+
+        editProfileModal.classList.remove('hidden');
+    });
+}
+
+if (closeEditProfile) {
+    closeEditProfile.addEventListener('click', () => {
+        editProfileModal.classList.add('hidden');
+    });
+}
+
+if (saveProfileBtn) {
+    saveProfileBtn.addEventListener('click', () => {
+        // Save profile data
+        profileData.bio = document.getElementById('edit-bio').value;
+        profileData.contact.email = document.getElementById('edit-email').value;
+        profileData.contact.phone = document.getElementById('edit-phone').value;
+        profileData.contact.location = document.getElementById('edit-location').value;
+
+        // Save to localStorage
+        localStorage.setItem('icn-profile', JSON.stringify(profileData));
+
+        // Reload profile display
+        loadProfile();
+
+        // Close modal
+        editProfileModal.classList.add('hidden');
+
+        showToast('Profile updated successfully!', 'success');
+    });
+}
+
+// ============================================================================
+// Phase 8: Service Request Board
+// ============================================================================
+
+// Service listings data (stored in localStorage)
+let serviceListings = [];
+
+// Load service board when tab is opened
+document.addEventListener('click', (e) => {
+    if (e.target.dataset.tab === 'service-board') {
+        loadServiceBoard();
+    }
+});
+
+// Load service listings from localStorage
+function loadServiceBoard() {
+    const saved = localStorage.getItem('icn-services');
+    if (saved) {
+        serviceListings = JSON.parse(saved);
+    } else {
+        // Add sample data if empty
+        serviceListings = [
+            {
+                id: '1',
+                type: 'offer',
+                category: 'Education',
+                title: 'Math Tutoring',
+                description: 'Offering math tutoring for high school students. Algebra, geometry, and calculus.',
+                poster: state.did || 'did:icn:sample',
+                date: Math.floor(Date.now() / 1000)
+            },
+            {
+                id: '2',
+                type: 'request',
+                category: 'Home',
+                title: 'Help Moving Furniture',
+                description: 'Need help moving furniture to a new apartment this weekend.',
+                poster: 'did:icn:sample2',
+                date: Math.floor(Date.now() / 1000) - 86400
+            }
+        ];
+    }
+
+    renderServiceListings();
+}
+
+// Render service listings
+function renderServiceListings(filterType = 'all', filterCategory = 'all', searchQuery = '') {
+    const container = document.getElementById('service-listings');
+    container.innerHTML = '';
+
+    let filtered = serviceListings;
+
+    // Apply filters
+    if (filterType !== 'all') {
+        filtered = filtered.filter(s => s.type === filterType);
+    }
+
+    if (filterCategory !== 'all') {
+        filtered = filtered.filter(s => s.category === filterCategory);
+    }
+
+    if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(s =>
+            s.title.toLowerCase().includes(query) ||
+            s.description.toLowerCase().includes(query)
+        );
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="empty-state">No service listings found</p>';
+        return;
+    }
+
+    filtered.forEach(service => {
+        container.appendChild(createServiceListing(service));
+    });
+}
+
+// Create service listing card
+function createServiceListing(service) {
+    const card = document.createElement('div');
+    card.className = 'service-listing';
+
+    card.innerHTML = `
+        <div class="service-listing-header">
+            <span class="service-type-badge ${service.type}">${service.type}</span>
+            <span class="service-category">${service.category}</span>
+        </div>
+        <h3 class="service-listing-title">${service.title}</h3>
+        <p class="service-listing-description">${service.description}</p>
+        <div class="service-listing-meta">
+            <div class="service-listing-poster">
+                Posted by <strong>${truncateDid(service.poster)}</strong>
+            </div>
+            <div class="service-listing-date">${formatDate(service.date)}</div>
+        </div>
+        <div class="service-listing-actions">
+            <button class="btn-respond">Respond</button>
+        </div>
+    `;
+
+    return card;
+}
+
+// Service filters
+const serviceTypeFilter = document.getElementById('service-type-filter');
+const serviceCategoryFilter = document.getElementById('service-category-filter');
+const serviceSearch = document.getElementById('service-search');
+
+if (serviceTypeFilter) {
+    serviceTypeFilter.addEventListener('change', (e) => {
+        const type = e.target.value;
+        const category = serviceCategoryFilter?.value || 'all';
+        const search = serviceSearch?.value || '';
+        renderServiceListings(type, category, search);
+    });
+}
+
+if (serviceCategoryFilter) {
+    serviceCategoryFilter.addEventListener('change', (e) => {
+        const type = serviceTypeFilter?.value || 'all';
+        const category = e.target.value;
+        const search = serviceSearch?.value || '';
+        renderServiceListings(type, category, search);
+    });
+}
+
+if (serviceSearch) {
+    serviceSearch.addEventListener('input', (e) => {
+        const type = serviceTypeFilter?.value || 'all';
+        const category = serviceCategoryFilter?.value || 'all';
+        const search = e.target.value;
+        renderServiceListings(type, category, search);
+    });
+}
+
+// Post Service Modal
+const postServiceBtn = document.getElementById('post-service-btn');
+const postServiceModal = document.getElementById('post-service-modal');
+const closePostService = document.getElementById('close-post-service');
+const submitServiceBtn = document.getElementById('submit-service-btn');
+
+if (postServiceBtn) {
+    postServiceBtn.addEventListener('click', () => {
+        postServiceModal.classList.remove('hidden');
+    });
+}
+
+if (closePostService) {
+    closePostService.addEventListener('click', () => {
+        postServiceModal.classList.add('hidden');
+    });
+}
+
+if (submitServiceBtn) {
+    submitServiceBtn.addEventListener('click', () => {
+        const type = document.querySelector('input[name="service-type"]:checked')?.value;
+        const category = document.getElementById('service-category').value;
+        const title = document.getElementById('service-title').value;
+        const description = document.getElementById('service-description').value;
+
+        if (!type || !category || !title || !description) {
+            showToast('Please fill in all fields', 'error');
+            return;
+        }
+
+        // Create new listing
+        const newListing = {
+            id: Date.now().toString(),
+            type,
+            category,
+            title,
+            description,
+            poster: state.did || 'did:icn:unknown',
+            date: Math.floor(Date.now() / 1000)
+        };
+
+        serviceListings.unshift(newListing);
+
+        // Save to localStorage
+        localStorage.setItem('icn-services', JSON.stringify(serviceListings));
+
+        // Reload board
+        renderServiceListings();
+
+        // Close modal and reset form
+        postServiceModal.classList.add('hidden');
+        document.getElementById('service-title').value = '';
+        document.getElementById('service-description').value = '';
+
+        showToast('Service posted successfully!', 'success');
+    });
+}

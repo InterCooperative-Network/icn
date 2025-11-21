@@ -174,6 +174,12 @@
                 <button class="nav-btn" data-tab="members">
                     <span aria-label="Member directory">Members</span>
                 </button>
+                <button class="nav-btn" data-tab="service-board">
+                    <span aria-label="Service marketplace">Services</span>
+                </button>
+                <button class="nav-btn" data-tab="member-profile">
+                    <span aria-label="Your profile">Profile</span>
+                </button>
                 <button class="nav-btn" data-tab="governance">
                     <span aria-label="Governance and proposals">Governance</span>
                 </button>
@@ -205,6 +211,63 @@
                     </div>
                 </div>
 
+                <!-- Advanced Reports Section -->
+                <div class="card" role="region" aria-label="Advanced economic reports">
+                    <div class="card-header">
+                        <h2>Economic Health Dashboard</h2>
+                        <button id="toggle-advanced-reports" class="btn btn-small" aria-expanded="false">
+                            Show Details
+                        </button>
+                    </div>
+
+                    <div id="advanced-reports" class="advanced-reports hidden">
+                        <!-- Economic Health Metrics -->
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-label">Transaction Velocity</div>
+                                <div class="metric-value" id="metric-velocity">--</div>
+                                <div class="metric-desc">Transactions per member per month</div>
+                                <div class="metric-indicator" id="velocity-indicator"></div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-label">Participation Rate</div>
+                                <div class="metric-value" id="metric-participation">--</div>
+                                <div class="metric-desc">Active members (30 days)</div>
+                                <div class="metric-indicator" id="participation-indicator"></div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-label">Economic Inequality</div>
+                                <div class="metric-value" id="metric-gini">--</div>
+                                <div class="metric-desc">Gini coefficient (lower is better)</div>
+                                <div class="metric-indicator" id="gini-indicator"></div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-label">Hoarding Index</div>
+                                <div class="metric-value" id="metric-hoarding">--</div>
+                                <div class="metric-desc">High balances without transactions</div>
+                                <div class="metric-indicator" id="hoarding-indicator"></div>
+                            </div>
+                        </div>
+
+                        <!-- Velocity Chart (Transactions Over Time) -->
+                        <div class="chart-container">
+                            <h3>Transaction Velocity (Last 90 Days)</h3>
+                            <canvas id="velocity-chart" width="800" height="250" role="img" aria-label="Bar chart showing transaction volume over time"></canvas>
+                        </div>
+
+                        <!-- Participation Heatmap -->
+                        <div class="chart-container">
+                            <h3>Member Participation Heatmap (Last 30 Days)</h3>
+                            <div id="participation-heatmap" class="heatmap">
+                                <p class="loading">Loading participation data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="dashboard-row">
                     <div class="card">
                         <h2>Pending Proposals</h2>
@@ -227,6 +290,237 @@
                         <p class="loading">Loading...</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Member Profile Tab -->
+            <div id="member-profile" class="tab-content" role="tabpanel" aria-labelledby="tab-profile">
+                <div class="card">
+                    <div class="profile-header">
+                        <div class="profile-avatar">
+                            <div class="avatar-placeholder" id="profile-avatar">
+                                <span id="profile-initials">?</span>
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h2 id="profile-name">Member Profile</h2>
+                            <p id="profile-did" class="did-display">did:icn:...</p>
+                            <div class="profile-stats">
+                                <span class="profile-stat">
+                                    <strong id="profile-balance">0</strong> balance
+                                </span>
+                                <span class="profile-stat">
+                                    <strong id="profile-tx-count">0</strong> transactions
+                                </span>
+                                <span class="profile-stat">
+                                    <strong id="profile-member-since">--</strong> member since
+                                </span>
+                            </div>
+                        </div>
+                        <button id="edit-profile-btn" class="btn btn-primary">Edit Profile</button>
+                    </div>
+
+                    <div class="profile-content">
+                        <!-- Bio Section -->
+                        <div class="profile-section">
+                            <h3>About</h3>
+                            <p id="profile-bio" class="profile-bio">No bio added yet.</p>
+                        </div>
+
+                        <!-- Skills Section -->
+                        <div class="profile-section">
+                            <h3>Skills & Services Offered</h3>
+                            <div id="profile-skills" class="skills-list">
+                                <p class="empty-state">No skills added yet.</p>
+                            </div>
+                        </div>
+
+                        <!-- Availability -->
+                        <div class="profile-section">
+                            <h3>Availability</h3>
+                            <div id="profile-availability" class="availability-display">
+                                <p class="empty-state">Availability not set.</p>
+                            </div>
+                        </div>
+
+                        <!-- Contact Preferences -->
+                        <div class="profile-section">
+                            <h3>Contact Preferences</h3>
+                            <div id="profile-contact" class="contact-info">
+                                <p class="empty-state">Contact information not provided.</p>
+                            </div>
+                        </div>
+
+                        <!-- Service History -->
+                        <div class="profile-section">
+                            <h3>Service History</h3>
+                            <div class="service-history-tabs">
+                                <button class="tab-btn active" data-history="given">Services Given</button>
+                                <button class="tab-btn" data-history="received">Services Received</button>
+                            </div>
+                            <div id="profile-service-history" class="service-history">
+                                <p class="loading">Loading service history...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Profile Modal -->
+                <div id="edit-profile-modal" class="modal hidden" role="dialog" aria-labelledby="edit-profile-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="edit-profile-title">Edit Your Profile</h2>
+                            <button id="close-edit-profile" class="modal-close" aria-label="Close edit profile dialog">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="edit-profile-form">
+                                <div class="form-group">
+                                    <label for="edit-bio">Bio</label>
+                                    <textarea id="edit-bio" rows="4" placeholder="Tell others about yourself..."></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="edit-skills">Skills (comma-separated)</label>
+                                    <input type="text" id="edit-skills" placeholder="e.g., Gardening, Cooking, Teaching, Carpentry" />
+                                    <small>Add skills you can offer to the community</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="edit-availability">Availability</label>
+                                    <select id="edit-availability">
+                                        <option value="">Not specified</option>
+                                        <option value="weekdays">Weekdays</option>
+                                        <option value="weekends">Weekends</option>
+                                        <option value="flexible">Flexible</option>
+                                        <option value="by-appointment">By appointment only</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="edit-contact">Contact Information (optional)</label>
+                                    <textarea id="edit-contact" rows="2" placeholder="Email, phone, or preferred contact method"></textarea>
+                                    <small>This will be visible to other cooperative members</small>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-secondary" id="cancel-edit-profile">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Board Tab -->
+            <div id="service-board" class="tab-content" role="tabpanel" aria-labelledby="tab-services">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Service Request Board</h2>
+                        <button id="post-service-btn" class="btn btn-primary">Post Request/Offer</button>
+                    </div>
+
+                    <!-- Service Board Filters -->
+                    <div class="service-filters">
+                        <div class="filter-group">
+                            <label for="service-type-filter">Type</label>
+                            <select id="service-type-filter">
+                                <option value="all">All</option>
+                                <option value="offer">Offers</option>
+                                <option value="request">Requests</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="service-category-filter">Category</label>
+                            <select id="service-category-filter">
+                                <option value="all">All Categories</option>
+                                <option value="gardening">Gardening</option>
+                                <option value="cooking">Cooking</option>
+                                <option value="childcare">Childcare</option>
+                                <option value="teaching">Teaching</option>
+                                <option value="repairs">Repairs</option>
+                                <option value="transportation">Transportation</option>
+                                <option value="tech">Tech Support</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="service-search">Search</label>
+                            <input type="text" id="service-search" placeholder="Search services..." />
+                        </div>
+                    </div>
+
+                    <!-- Service Listings -->
+                    <div id="service-listings" class="service-listings">
+                        <p class="loading">Loading services...</p>
+                    </div>
+                </div>
+
+                <!-- Post Service Modal -->
+                <div id="post-service-modal" class="modal hidden" role="dialog" aria-labelledby="post-service-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="post-service-title">Post Service Request/Offer</h2>
+                            <button id="close-post-service" class="modal-close" aria-label="Close post service dialog">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="post-service-form">
+                                <div class="form-group">
+                                    <label>Type</label>
+                                    <div class="radio-group">
+                                        <label>
+                                            <input type="radio" name="service-type" value="offer" checked />
+                                            I'm offering a service
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="service-type" value="request" />
+                                            I need a service
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-title">Title</label>
+                                    <input type="text" id="service-title" required placeholder="e.g., Garden help needed" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-category">Category</label>
+                                    <select id="service-category" required>
+                                        <option value="">Select category...</option>
+                                        <option value="gardening">Gardening</option>
+                                        <option value="cooking">Cooking</option>
+                                        <option value="childcare">Childcare</option>
+                                        <option value="teaching">Teaching</option>
+                                        <option value="repairs">Repairs</option>
+                                        <option value="transportation">Transportation</option>
+                                        <option value="tech">Tech Support</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-description">Description</label>
+                                    <textarea id="service-description" rows="4" required placeholder="Describe the service in detail..."></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-hours">Estimated Hours</label>
+                                    <input type="number" id="service-hours" min="0.25" step="0.25" placeholder="e.g., 2.5" />
+                                    <small>Optional: Estimated time for this service</small>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-secondary" id="cancel-post-service">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Post</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             </main>
 
             <!-- Log Hours Tab -->
