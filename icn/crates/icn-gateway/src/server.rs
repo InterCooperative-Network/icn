@@ -11,6 +11,7 @@ use tracing::info;
 
 use crate::api;
 use crate::auth::AuthManager;
+use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
 use crate::events::EventBroadcaster;
 use crate::governance_mgr::GovernanceManager;
@@ -52,6 +53,7 @@ impl GatewayServer {
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
         let governance_manager = Arc::new(GovernanceManager::new());
+        let compute_manager = Arc::new(ComputeManager::new());
 
         // Create ledger manager with persistent storage if data_dir is set
         let ledger_manager = if let Some(data_dir) = self.data_dir {
@@ -130,6 +132,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
+                .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
@@ -189,6 +192,14 @@ impl GatewayServer {
                                 .service(api::governance::close_proposal)
                                 .service(api::governance::cast_vote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
+                                .wrap(auth.clone())
+                        )
+                        // Protected compute endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/compute")
+                                .service(api::compute::submit_task)
+                                .service(api::compute::get_status)
                                 .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
                                 .wrap(auth)
                         )

@@ -48,6 +48,7 @@ icn-store = { path = "../icn-store" }
 icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
 icn-governance = { path = "../icn-governance" }
+icn-compute = { path = "../icn-compute" }
 
 # Metrics
 metrics = "0.22"

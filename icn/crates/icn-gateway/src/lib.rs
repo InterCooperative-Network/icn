@@ -12,6 +12,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod compute_mgr;
 pub mod coop;
 pub mod error;
 pub mod events;
