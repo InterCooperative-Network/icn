@@ -249,6 +249,7 @@ mod tests {
             inputs: vec![],
             fuel_limit: FuelLimit::default(),
             required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
             created_at: 1000,
             deadline: None,
             payment_rate: None,

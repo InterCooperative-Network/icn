@@ -30,6 +30,25 @@ pub enum ExecutorCapability {
     Custom(String),
 }
 
+/// Task priority level (higher priority tasks execute first)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum TaskPriority {
+    /// Low priority - background tasks
+    Low = 0,
+    /// Normal priority - default
+    Normal = 1,
+    /// High priority - important tasks
+    High = 2,
+    /// Critical priority - urgent tasks only
+    Critical = 3,
+}
+
+impl Default for TaskPriority {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
 /// A compute task to be executed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComputeTask {
@@ -45,6 +64,9 @@ pub struct ComputeTask {
     pub fuel_limit: FuelLimit,
     /// Required capabilities
     pub required_capabilities: Vec<ExecutorCapability>,
+    /// Priority level
+    #[serde(default)]
+    pub priority: TaskPriority,
     /// Timestamp (Unix millis)
     pub created_at: u64,
     /// Optional deadline (Unix millis)
@@ -314,6 +336,7 @@ mod tests {
             inputs: vec![],
             fuel_limit: FuelLimit::default(),
             required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
             created_at: 1000,
             deadline: None,
             payment_rate: None,
@@ -463,6 +486,7 @@ mod tests {
             inputs: vec![],
             fuel_limit: FuelLimit(10_000),
             required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
             created_at: 1000,
             deadline: None,
             payment_rate: None,

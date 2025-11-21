@@ -275,6 +275,7 @@ mod tests {
             inputs: vec![],
             fuel_limit: FuelLimit(fuel),
             required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
             created_at: 1000,
             deadline: None,
             payment_rate: None,
@@ -352,6 +353,7 @@ mod tests {
             inputs: vec![],
             fuel_limit: FuelLimit::default(),
             required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
             created_at: 1000,
             deadline: None,
             payment_rate: None,
@@ -371,6 +373,7 @@ mod tests {
             inputs: vec![],
             fuel_limit: FuelLimit::default(),
             required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
             created_at: 1000,
             deadline: Some(1), // Already expired
             payment_rate: None,

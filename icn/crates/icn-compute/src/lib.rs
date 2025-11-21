@@ -33,7 +33,7 @@ pub use executor::{ExecutionContext, Executor, LocalExecutor};
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
     ComputeMessage, ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, FuelLimit,
-    TaskCode, TaskHash, TaskId,
+    TaskCode, TaskHash, TaskId, TaskPriority,
 };
 
 /// Gossip topic for task submission
