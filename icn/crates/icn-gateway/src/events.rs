@@ -74,6 +74,26 @@ pub enum GatewayEvent {
         voter: String,
         choice: String, // "for", "against", "abstain"
     },
+    /// A compute task was submitted
+    ComputeTaskSubmitted {
+        task_id: String,
+        task_hash: String,
+        submitter: String,
+        fuel_limit: u64,
+    },
+    /// A compute task was claimed by an executor
+    ComputeTaskClaimed {
+        task_hash: String,
+        executor: String,
+    },
+    /// A compute task completed
+    ComputeTaskCompleted {
+        task_hash: String,
+        executor: String,
+        outcome: String, // "success", "failed", "out_of_fuel", "timeout"
+        fuel_used: u64,
+        duration_ms: u64,
+    },
 }
 
 /// Event broadcaster manages subscribers and sends events

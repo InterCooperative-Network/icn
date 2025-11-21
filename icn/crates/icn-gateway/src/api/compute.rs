@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::compute_mgr::ComputeManager;
 use crate::error::Result;
+use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::middleware::{get_claims, require_scope};
 
 /// Request to submit a compute task
@@ -54,6 +55,7 @@ pub struct SubmitTaskResponse {
 pub async fn submit_task(
     http_req: HttpRequest,
     compute_mgr: web::Data<Arc<ComputeManager>>,
+    broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<SubmitTaskRequest>,
 ) -> Result<HttpResponse> {
     // Require compute:write scope
@@ -79,7 +81,7 @@ pub async fn submit_task(
     // Submit task
     let task_hash = compute_mgr.submit_task(
         task_id.clone(),
-        submitter_did,
+        submitter_did.clone(),
         req.code.clone(),
         inputs,
         req.fuel_limit,
@@ -89,9 +91,19 @@ pub async fn submit_task(
     ).await
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
 
+    let task_hash_hex = hex::encode(task_hash);
+
+    // Broadcast event
+    broadcaster.broadcast("compute", GatewayEvent::ComputeTaskSubmitted {
+        task_id: task_id.clone(),
+        task_hash: task_hash_hex.clone(),
+        submitter: submitter_did,
+        fuel_limit: req.fuel_limit,
+    }).await;
+
     Ok(HttpResponse::Ok().json(SubmitTaskResponse {
         task_id,
-        task_hash: hex::encode(task_hash),
+        task_hash: task_hash_hex,
     }))
 }
 
