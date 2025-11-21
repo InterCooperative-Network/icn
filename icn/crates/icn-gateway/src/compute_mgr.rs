@@ -70,6 +70,9 @@ impl ComputeManager {
             .unwrap()
             .as_millis() as u64;
 
+        // Convert relative deadline to absolute timestamp
+        let absolute_deadline = deadline_ms.map(|ms| now + ms);
+
         let task = ComputeTask {
             id: task_id.clone(),
             submitter: submitter.clone(),
@@ -78,10 +81,14 @@ impl ComputeManager {
             fuel_limit: FuelLimit(fuel_limit),
             required_capabilities: vec![ExecutorCapability::Ccl],
             created_at: now,
-            deadline: deadline_ms,
+            deadline: absolute_deadline,
             payment_rate,
             payment_currency,
         };
+
+        // Validate task before submission
+        task.validate()
+            .map_err(|e| anyhow::anyhow!("Invalid task: {}", e))?;
 
         // If we have a daemon handle, use it
         if let Some(ref handle) = self.compute_handle {
@@ -228,5 +235,95 @@ mod tests {
     fn test_compute_manager_new() {
         let mgr = ComputeManager::new();
         assert!(mgr.compute_handle.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_submit_without_daemon() {
+        let mgr = ComputeManager::new();
+        let result = mgr.submit_task(
+            "task-1".to_string(),
+            "did:icn:alice".to_string(),
+            r#"{"name": "Test"}"#.to_string(),
+            vec![],
+            10_000,
+            None,
+            None,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not connected"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_invalid_fuel() {
+        let mgr = ComputeManager::new();
+        let result = mgr.submit_task(
+            "task-1".to_string(),
+            "did:icn:alice".to_string(),
+            r#"{"name": "Test"}"#.to_string(),
+            vec![],
+            50, // Below minimum (100)
+            None,
+            None,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too low"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_invalid_did() {
+        let mgr = ComputeManager::new();
+        let result = mgr.submit_task(
+            "task-1".to_string(),
+            "not-a-did".to_string(), // Invalid DID format
+            r#"{"name": "Test"}"#.to_string(),
+            vec![],
+            10_000,
+            None,
+            None,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid submitter DID"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_empty_task_id() {
+        let mgr = ComputeManager::new();
+        let result = mgr.submit_task(
+            "".to_string(), // Empty ID
+            "did:icn:alice".to_string(),
+            r#"{"name": "Test"}"#.to_string(),
+            vec![],
+            10_000,
+            None,
+            None,
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_payment_rate_too_high() {
+        let mgr = ComputeManager::new();
+        let result = mgr.submit_task(
+            "task-1".to_string(),
+            "did:icn:alice".to_string(),
+            r#"{"name": "Test"}"#.to_string(),
+            vec![],
+            10_000,
+            None,
+            Some(2_000_000), // Above max (1M)
+            None,
+        ).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Payment rate too high"));
     }
 }

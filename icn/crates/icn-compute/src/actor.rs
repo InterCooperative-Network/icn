@@ -197,12 +197,34 @@ impl ComputeActor {
 
     /// Handle task submission
     async fn handle_submit(&self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
+        tracing::debug!(
+            task_id = %task.id,
+            submitter = %task.submitter,
+            fuel_limit = task.fuel_limit.0,
+            "Validating task submission"
+        );
+
         // Validate task parameters first
-        task.validate()?;
+        if let Err(e) = task.validate() {
+            tracing::warn!(
+                task_id = %task.id,
+                submitter = %task.submitter,
+                error = %e,
+                "Task validation failed"
+            );
+            return Err(e);
+        }
 
         // Check submitter trust
         let trust = (self.trust_callback)(&task.submitter);
         if trust < MIN_TRUST_SUBMIT {
+            tracing::warn!(
+                task_id = %task.id,
+                submitter = %task.submitter,
+                trust_score = trust,
+                required = MIN_TRUST_SUBMIT,
+                "Task rejected: insufficient trust"
+            );
             icn_obs::metrics::compute::tasks_rejected_trust_inc(&task.submitter, trust);
             return Err(ComputeError::InsufficientTrust {
                 required: MIN_TRUST_SUBMIT,
@@ -213,6 +235,14 @@ impl ComputeActor {
         // Add to local task manager
         let hash = self.task_manager.lock().await.submit(task.clone())?;
         icn_obs::metrics::compute::tasks_submitted_inc();
+
+        tracing::info!(
+            task_id = %task.id,
+            task_hash = %hex::encode(hash),
+            submitter = %task.submitter,
+            fuel_limit = task.fuel_limit.0,
+            "Task submitted successfully"
+        );
 
         // Broadcast to network
         if let Some(ref cb) = self.send_callback {
@@ -242,14 +272,33 @@ impl ComputeActor {
 
     /// Handle received task submission
     async fn on_task_submitted(&self, task: ComputeTask) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task.hash());
+
+        tracing::debug!(
+            task_id = %task.id,
+            task_hash = %task_hash_str,
+            submitter = %task.submitter,
+            "Received task submission"
+        );
+
         // Check if we can execute
         let our_trust = (self.trust_callback)(&self.own_did);
         if our_trust < MIN_TRUST_EXECUTE {
+            tracing::debug!(
+                task_id = %task.id,
+                our_trust = our_trust,
+                required = MIN_TRUST_EXECUTE,
+                "Skipping task: insufficient executor trust"
+            );
             return Ok(()); // We're not trusted enough to execute
         }
 
         // Check if we have required capabilities
         if !self.executor.can_execute(&task) {
+            tracing::debug!(
+                task_id = %task.id,
+                "Skipping task: missing required capabilities"
+            );
             return Ok(()); // Can't execute this task
         }
 
@@ -262,6 +311,13 @@ impl ComputeActor {
             .await
             .claim(&hash, self.own_did.clone())?;
         icn_obs::metrics::compute::tasks_claimed_inc();
+
+        tracing::info!(
+            task_id = %task.id,
+            task_hash = %task_hash_str,
+            executor = %self.own_did,
+            "Claimed and executing task"
+        );
 
         // Broadcast claim
         if let Some(ref cb) = self.send_callback {
@@ -283,18 +339,49 @@ impl ComputeActor {
         icn_obs::metrics::compute::fuel_used_record(result.fuel_used);
         icn_obs::metrics::compute::fuel_total_add(result.fuel_used);
 
+        // Log outcome
         match &result.outcome {
-            crate::types::ExecutionOutcome::Success(_) => {
+            crate::types::ExecutionOutcome::Success(output) => {
+                tracing::info!(
+                    task_id = %task.id,
+                    task_hash = %task_hash_str,
+                    fuel_used = result.fuel_used,
+                    duration_ms = result.duration_ms,
+                    output_size = output.len(),
+                    "Task executed successfully"
+                );
                 icn_obs::metrics::compute::tasks_completed_inc("success");
             }
             crate::types::ExecutionOutcome::Failed(reason) => {
+                tracing::warn!(
+                    task_id = %task.id,
+                    task_hash = %task_hash_str,
+                    fuel_used = result.fuel_used,
+                    duration_ms = result.duration_ms,
+                    reason = %reason,
+                    "Task execution failed"
+                );
                 icn_obs::metrics::compute::tasks_failed_inc(reason);
             }
             crate::types::ExecutionOutcome::OutOfFuel => {
+                tracing::warn!(
+                    task_id = %task.id,
+                    task_hash = %task_hash_str,
+                    fuel_used = result.fuel_used,
+                    duration_ms = result.duration_ms,
+                    "Task ran out of fuel"
+                );
                 icn_obs::metrics::compute::tasks_out_of_fuel_inc();
                 icn_obs::metrics::compute::tasks_completed_inc("out_of_fuel");
             }
             crate::types::ExecutionOutcome::Timeout => {
+                tracing::warn!(
+                    task_id = %task.id,
+                    task_hash = %task_hash_str,
+                    fuel_used = result.fuel_used,
+                    duration_ms = result.duration_ms,
+                    "Task execution timed out"
+                );
                 icn_obs::metrics::compute::tasks_timeout_inc();
                 icn_obs::metrics::compute::tasks_completed_inc("timeout");
             }
@@ -309,6 +396,14 @@ impl ComputeActor {
                 let amount = (result.fuel_used * rate) / 1000; // rate is per 1000 fuel
                 if amount > 0 {
                     let currency = task.payment_currency.clone().unwrap_or_else(|| "credits".to_string());
+                    tracing::info!(
+                        task_id = %task.id,
+                        from = %task.submitter,
+                        to = %self.own_did,
+                        amount = amount,
+                        currency = %currency,
+                        "Settling payment for completed task"
+                    );
                     payment_cb(PaymentRequest {
                         from: task.submitter.clone(),
                         to: self.own_did.clone(),
@@ -386,17 +481,47 @@ impl ComputeActor {
 
     /// Handle task result with consensus checking
     async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(result.task_hash);
+
+        tracing::debug!(
+            task_id = %result.task_id,
+            task_hash = %task_hash_str,
+            executor = %result.executor,
+            "Received task result"
+        );
+
         // Verify signature
         let executor_did: icn_identity::Did = result.executor.parse()
             .map_err(|e| {
+                tracing::warn!(
+                    task_id = %result.task_id,
+                    task_hash = %task_hash_str,
+                    executor = %result.executor,
+                    error = %e,
+                    "Invalid executor DID in result"
+                );
                 icn_obs::metrics::compute::signatures_invalid_inc("invalid_did");
                 ComputeError::InvalidSignature(format!("Invalid executor DID: {}", e))
             })?;
 
         if let Err(e) = result.verify_signature(&executor_did) {
+            tracing::warn!(
+                task_id = %result.task_id,
+                task_hash = %task_hash_str,
+                executor = %result.executor,
+                error = %e,
+                "Signature verification failed"
+            );
             icn_obs::metrics::compute::signatures_invalid_inc("verification_failed");
             return Err(e);
         }
+
+        tracing::debug!(
+            task_id = %result.task_id,
+            task_hash = %task_hash_str,
+            executor = %result.executor,
+            "Signature verified successfully"
+        );
         icn_obs::metrics::compute::signatures_verified_inc();
 
         // Consensus checking: For now, we require just 1 result (single-executor mode)
