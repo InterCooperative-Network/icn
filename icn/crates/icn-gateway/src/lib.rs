@@ -12,6 +12,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod compute_events;
 pub mod compute_mgr;
 pub mod coop;
 pub mod error;
@@ -26,6 +27,7 @@ pub mod validation;
 pub mod websocket;
 
 pub use auth::TokenClaims;
+pub use compute_events::{create_forwarding_callback, forward_compute_event};
 pub use error::{GatewayError, Result};
 pub use events::{EventBroadcaster, GatewayEvent, SequencedEvent};
 pub use rate_limit::{RateLimitConfig, RateLimiter};

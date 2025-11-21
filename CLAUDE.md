@@ -775,7 +775,27 @@ Events are broadcast at two points:
 1. Local execution: When this node's executor claims and completes tasks
 2. Remote execution: When accepting verified results from other executors
 
-The supervisor sets up the event callback for logging and metrics. Future gateway integration can forward events to WebSocket clients for real-time task monitoring.
+The supervisor sets up the event callback for logging and metrics.
+
+**WebSocket Integration Pattern**:
+The `icn-gateway/compute_events.rs` module provides utilities for forwarding compute events to WebSocket clients:
+
+```rust
+// Create event broadcaster
+let broadcaster = Arc::new(EventBroadcaster::new());
+
+// Create forwarding callback
+let callback = icn_gateway::create_forwarding_callback(broadcaster.clone());
+
+// Set on compute actor
+compute_actor.set_event_callback(callback);
+
+// WebSocket clients subscribe to "compute" channel and receive:
+// - ComputeTaskClaimed events when tasks are claimed
+// - ComputeTaskCompleted events when execution finishes
+```
+
+This enables real-time task monitoring for web/mobile applications via WebSocket connections.
 
 **Prometheus Metrics** (`icn_compute_*`):
 - `tasks_submitted_total`, `tasks_claimed_total`, `tasks_completed_total`
