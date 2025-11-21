@@ -267,6 +267,8 @@ mod tests {
             required_capabilities: vec![ExecutorCapability::Ccl],
             created_at: 1000,
             deadline: None,
+            payment_rate: None,
+            payment_currency: None,
         }
     }
 
@@ -335,6 +337,8 @@ mod tests {
             required_capabilities: vec![ExecutorCapability::Wasm],
             created_at: 1000,
             deadline: None,
+            payment_rate: None,
+            payment_currency: None,
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -352,6 +356,8 @@ mod tests {
             required_capabilities: vec![ExecutorCapability::Ccl],
             created_at: 1000,
             deadline: Some(1), // Already expired
+            payment_rate: None,
+            payment_currency: None,
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &[]);

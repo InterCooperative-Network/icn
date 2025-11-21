@@ -15,6 +15,24 @@ pub type SendCallback = Arc<dyn Fn(ComputeMessage) + Send + Sync>;
 /// Callback for looking up trust scores
 pub type TrustCallback = Arc<dyn Fn(&str) -> f64 + Send + Sync>;
 
+/// Payment settlement request
+#[derive(Debug, Clone)]
+pub struct PaymentRequest {
+    /// Payer DID (task submitter)
+    pub from: String,
+    /// Payee DID (executor)
+    pub to: String,
+    /// Amount to pay
+    pub amount: u64,
+    /// Currency
+    pub currency: String,
+    /// Task ID for memo
+    pub task_id: String,
+}
+
+/// Callback for settling payments via ledger
+pub type PaymentCallback = Arc<dyn Fn(PaymentRequest) + Send + Sync>;
+
 /// Handle for interacting with the ComputeActor
 #[derive(Clone)]
 pub struct ComputeHandle {
@@ -80,6 +98,8 @@ pub struct ComputeActor {
     send_callback: Option<SendCallback>,
     /// Callback to lookup trust scores
     trust_callback: TrustCallback,
+    /// Callback to settle payments
+    payment_callback: Option<PaymentCallback>,
     /// Signing key for results (placeholder)
     #[allow(dead_code)]
     signing_key: Vec<u8>,
@@ -94,6 +114,7 @@ impl ComputeActor {
             executor: Arc::new(LocalExecutor::new()),
             send_callback: None,
             trust_callback,
+            payment_callback: None,
             signing_key: vec![],
         }
     }
@@ -101,6 +122,11 @@ impl ComputeActor {
     /// Set the callback for sending gossip messages
     pub fn set_send_callback(&mut self, cb: SendCallback) {
         self.send_callback = Some(cb);
+    }
+
+    /// Set the callback for settling payments
+    pub fn set_payment_callback(&mut self, cb: PaymentCallback) {
+        self.payment_callback = Some(cb);
     }
 
     /// Spawn the actor and return a handle
@@ -209,6 +235,23 @@ impl ComputeActor {
         // Record completion
         self.task_manager.lock().await.complete(result.clone())?;
 
+        // Settle payment if configured and execution succeeded
+        if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
+            if let (Some(rate), Some(ref payment_cb)) = (task.payment_rate, &self.payment_callback) {
+                let amount = (result.fuel_used * rate) / 1000; // rate is per 1000 fuel
+                if amount > 0 {
+                    let currency = task.payment_currency.clone().unwrap_or_else(|| "credits".to_string());
+                    payment_cb(PaymentRequest {
+                        from: task.submitter.clone(),
+                        to: self.own_did.clone(),
+                        amount,
+                        currency,
+                        task_id: task.id.clone(),
+                    });
+                }
+            }
+        }
+
         // Broadcast result
         if let Some(ref cb) = self.send_callback {
             cb(ComputeMessage::TaskResult(result));
@@ -275,6 +318,8 @@ mod tests {
             required_capabilities: vec![ExecutorCapability::Ccl],
             created_at: 1000,
             deadline: None,
+            payment_rate: None,
+            payment_currency: None,
         }
     }
 

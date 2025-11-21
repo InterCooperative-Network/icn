@@ -174,6 +174,8 @@ mod tests {
             required_capabilities: vec![ExecutorCapability::Ccl],
             created_at: 1000,
             deadline: None,
+            payment_rate: None,
+            payment_currency: None,
         }
     }
 

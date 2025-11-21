@@ -48,6 +48,10 @@ pub struct ComputeTask {
     pub created_at: u64,
     /// Optional deadline (Unix millis)
     pub deadline: Option<u64>,
+    /// Payment rate per 1000 fuel units (in credits)
+    pub payment_rate: Option<u64>,
+    /// Currency for payment (default: "credits")
+    pub payment_currency: Option<String>,
 }
 
 impl ComputeTask {
@@ -137,6 +141,8 @@ mod tests {
             required_capabilities: vec![ExecutorCapability::Ccl],
             created_at: 1000,
             deadline: None,
+            payment_rate: None,
+            payment_currency: None,
         };
 
         let hash1 = task.hash();
