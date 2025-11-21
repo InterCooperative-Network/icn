@@ -165,6 +165,8 @@ pub struct ComputeActor {
     executor_registry: Arc<Mutex<HashMap<String, ExecutorInfo>>>,
     /// Pending consensus tracking for task results
     pending_consensus: Arc<Mutex<HashMap<TaskHash, ResultConsensus>>>,
+    /// Maximum concurrent tasks this executor will claim
+    max_concurrent_tasks: usize,
 }
 
 impl ComputeActor {
@@ -180,6 +182,22 @@ impl ComputeActor {
             signing_key: vec![],
             executor_registry: Arc::new(Mutex::new(HashMap::new())),
             pending_consensus: Arc::new(Mutex::new(HashMap::new())),
+            max_concurrent_tasks: 10, // Default: 10 concurrent tasks
+        }
+    }
+
+    /// Set maximum concurrent tasks this executor will claim
+    pub fn set_max_concurrent_tasks(&mut self, max: usize) {
+        self.max_concurrent_tasks = max;
+    }
+
+    /// Check if we're at capacity for claiming new tasks
+    async fn at_capacity(&self) -> bool {
+        let registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get(&self.own_did) {
+            info.tasks_executing >= self.max_concurrent_tasks
+        } else {
+            false // If we're not registered, we can claim
         }
     }
 
@@ -469,6 +487,17 @@ impl ComputeActor {
                 "Skipping task: insufficient executor trust"
             );
             return Ok(()); // We're not trusted enough to execute
+        }
+
+        // Check if we're at capacity
+        if self.at_capacity().await {
+            tracing::debug!(
+                task_id = %task.id,
+                max_concurrent = self.max_concurrent_tasks,
+                "Skipping task: executor at capacity"
+            );
+            icn_obs::metrics::compute::tasks_rejected_capacity_inc();
+            return Ok(());
         }
 
         // Check if we have required capabilities

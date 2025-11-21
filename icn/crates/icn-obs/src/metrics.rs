@@ -1432,4 +1432,8 @@ pub mod compute {
     pub fn executor_load_set(executor_did: &str, load: f64) {
         gauge!("icn_compute_executor_load", "executor" => executor_did.to_string()).set(load);
     }
+
+    pub fn tasks_rejected_capacity_inc() {
+        counter!("icn_compute_tasks_rejected_capacity_total").increment(1);
+    }
 }
