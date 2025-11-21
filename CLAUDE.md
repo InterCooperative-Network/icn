@@ -721,6 +721,18 @@ Submitter → compute:submit → Executor claims → Executes CCL
 - **actor.rs**: ComputeActor with gossip/trust/payment callbacks
 - **error.rs**: ComputeError types
 
+**Prometheus Metrics** (`icn_compute_*`):
+- `tasks_submitted_total`, `tasks_claimed_total`, `tasks_completed_total`
+- `tasks_pending`, `tasks_executing` (gauges)
+- `task_duration_seconds`, `fuel_used` (histograms)
+- `fuel_total`, `payments_settled_total`, `payment_amount_total`
+- `tasks_rejected_trust_total`, `tasks_timeout_total`, `tasks_out_of_fuel_total`
+
+**WebSocket Events** (subscribe to "compute" channel):
+- `ComputeTaskSubmitted` - Task created with task_id, task_hash, submitter, fuel_limit
+- `ComputeTaskClaimed` - Executor claimed task
+- `ComputeTaskCompleted` - Task finished with outcome, fuel_used, duration_ms
+
 ---
 
 **What's Next**: See [ROADMAP.md](/ROADMAP.md) for strategic roadmap. Critical path:
