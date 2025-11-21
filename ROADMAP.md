@@ -195,13 +195,19 @@ pub enum EntryStatus {
 **Still Needed** (Deferred until pilot selection):
 4. **TypeScript SDK** - `@icn/client` npm package
 5. **Reference App** - Timebank or other pilot-specific application
-6. **Remaining API Improvements**:
-   - WebSocket reconnection and event backfill
+
+**Recently Completed** (2025-11-21):
+- ✅ WebSocket reconnection and event backfill
+  - SequencedEvent with global sequence numbers
+  - Backfill buffer (100 events per channel)
+  - Client can request missed events via `Backfill` message
+  - AuthOk includes `current_seq` for reconnection tracking
 
 **Success Criteria**: ✅ Gateway Complete
 - ✅ Gateway API operational and integrated into icnd
 - ✅ JWT authentication working (challenge → token → protected endpoints)
 - ✅ WebSocket events streaming to connected clients
+- ✅ WebSocket reconnection with event backfill
 - ✅ Cooperative namespace isolation functional
 - 🔲 TypeScript SDK (deferred)
 - 🔲 Reference application (deferred)
