@@ -50,6 +50,9 @@ import {
   HealthResponse,
   WsMessage,
   SignatureProvider,
+  SubmitTaskRequest,
+  SubmitTaskResponse,
+  ComputeTaskStatus,
 } from './types';
 
 export * from './types';
@@ -400,6 +403,65 @@ export class ICNClient {
    */
   async getVotes(proposalId: string): Promise<VoteTally> {
     return this.get<VoteTally>(`/gov/proposals/${proposalId}/votes`);
+  }
+
+  // ===========================================================================
+  // Compute
+  // ===========================================================================
+
+  /**
+   * Submit a compute task
+   *
+   * @example
+   * ```typescript
+   * const result = await client.submitTask({
+   *   code: JSON.stringify(cclContract),
+   *   fuel_limit: 10000,
+   *   payment_rate: 100, // 100 credits per 1000 fuel
+   * });
+   * console.log('Task submitted:', result.task_hash);
+   * ```
+   */
+  async submitTask(req: SubmitTaskRequest): Promise<SubmitTaskResponse> {
+    return this.post<SubmitTaskResponse>('/compute/submit', req);
+  }
+
+  /**
+   * Get the status of a compute task
+   *
+   * @example
+   * ```typescript
+   * const status = await client.getTaskStatus(taskHash);
+   * if (status.status === 'completed') {
+   *   console.log('Result:', status.result?.output);
+   * }
+   * ```
+   */
+  async getTaskStatus(taskHash: string): Promise<ComputeTaskStatus> {
+    return this.get<ComputeTaskStatus>(`/compute/status/${taskHash}`);
+  }
+
+  /**
+   * Poll for task completion
+   *
+   * @param taskHash - Task hash to poll
+   * @param intervalMs - Polling interval in milliseconds (default 1000)
+   * @param timeoutMs - Maximum time to wait (default 60000)
+   */
+  async waitForTask(
+    taskHash: string,
+    intervalMs = 1000,
+    timeoutMs = 60000
+  ): Promise<ComputeTaskStatus> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const status = await this.getTaskStatus(taskHash);
+      if (status.status === 'completed' || status.status === 'failed') {
+        return status;
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+    throw new ICNError('Task polling timeout', 408);
   }
 
   // ===========================================================================

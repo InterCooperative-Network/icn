@@ -199,6 +199,50 @@ export interface ProposalOutcome {
 }
 
 // ============================================================================
+// Compute
+// ============================================================================
+
+export interface SubmitTaskRequest {
+  /** Optional task ID (auto-generated if not provided) */
+  task_id?: string;
+  /** CCL contract JSON */
+  code: string;
+  /** Input arguments */
+  inputs?: Record<string, unknown>;
+  /** Maximum fuel for execution (default 10000) */
+  fuel_limit?: number;
+  /** Deadline in milliseconds from now */
+  deadline_ms?: number;
+  /** Payment rate per 1000 fuel */
+  payment_rate?: number;
+  /** Payment currency (default credits) */
+  payment_currency?: string;
+}
+
+export interface SubmitTaskResponse {
+  task_id: string;
+  task_hash: string;
+}
+
+export type ComputeTaskState = 'pending' | 'claimed' | 'completed' | 'failed';
+export type ComputeOutcome = 'success' | 'failed' | 'out_of_fuel' | 'timeout';
+
+export interface ComputeResult {
+  outcome: ComputeOutcome;
+  output?: unknown;
+  error?: string;
+  fuel_used: number;
+  duration_ms: number;
+}
+
+export interface ComputeTaskStatus {
+  task_hash: string;
+  status: ComputeTaskState;
+  executor?: string;
+  result?: ComputeResult;
+}
+
+// ============================================================================
 // WebSocket Events
 // ============================================================================
 
@@ -218,6 +262,17 @@ export interface WsAuthMessage {
 export interface WsAuthOkMessage {
   type: 'AuthOk';
   did: string;
+  current_seq: number;
+}
+
+export interface WsBackfillMessage {
+  type: 'Backfill';
+  after_seq: number;
+}
+
+export interface WsBackfillCompleteMessage {
+  type: 'BackfillComplete';
+  count: number;
 }
 
 export interface WsErrorMessage {
@@ -235,10 +290,14 @@ export type CoopEventType =
   | 'GovernanceProposalCreated'
   | 'GovernanceProposalOpened'
   | 'GovernanceProposalClosed'
-  | 'GovernanceVoteCast';
+  | 'GovernanceVoteCast'
+  | 'ComputeTaskSubmitted'
+  | 'ComputeTaskClaimed'
+  | 'ComputeTaskCompleted';
 
 export interface WsEventMessage {
   type: 'Event';
+  seq: number;
   event_type: CoopEventType;
   payload: unknown;
 }
@@ -246,6 +305,8 @@ export interface WsEventMessage {
 export type WsMessage =
   | WsAuthMessage
   | WsAuthOkMessage
+  | WsBackfillMessage
+  | WsBackfillCompleteMessage
   | WsEventMessage
   | WsErrorMessage
   | { type: 'Ping' }
