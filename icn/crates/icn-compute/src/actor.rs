@@ -310,6 +310,8 @@ impl ComputeActor {
         mgr.cancel(task_hash, requester, reason.clone())?;
         drop(mgr);
 
+        icn_obs::metrics::compute::tasks_cancelled_inc();
+
         tracing::info!(
             task_hash = %task_hash_str,
             "Task cancelled locally"
@@ -662,6 +664,8 @@ impl ComputeActor {
         // Cancel the task in our local manager
         let mut mgr = self.task_manager.lock().await;
         mgr.cancel(&task_hash, &submitter, reason)?;
+
+        icn_obs::metrics::compute::tasks_cancelled_inc();
 
         tracing::info!(
             task_hash = %task_hash_str,

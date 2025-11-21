@@ -188,6 +188,8 @@ pub async fn cancel_task(
     compute_mgr.cancel_task(task_hash, requester_did.clone(), req.reason.clone()).await
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
 
+    icn_obs::metrics::compute::tasks_cancelled_inc();
+
     // Broadcast event
     broadcaster.broadcast("compute", GatewayEvent::ComputeTaskCancelled {
         task_hash: task_hash_hex.clone(),

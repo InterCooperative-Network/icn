@@ -1369,6 +1369,10 @@ pub mod compute {
         counter!("icn_compute_tasks_failed_total", "reason" => reason.to_string()).increment(1);
     }
 
+    pub fn tasks_cancelled_inc() {
+        counter!("icn_compute_tasks_cancelled_total").increment(1);
+    }
+
     pub fn tasks_pending_set(count: u64) {
         gauge!("icn_compute_tasks_pending").set(count as f64);
     }
