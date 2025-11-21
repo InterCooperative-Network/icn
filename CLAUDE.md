@@ -676,6 +676,8 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] ComputeActor with gossip-based task distribution
 - [x] Payment settlement via ledger (auto-pay on success)
 - [x] Supervisor integration with trust/gossip/ledger callbacks
+- [x] RPC endpoints (compute.submit, compute.status)
+- [x] CLI commands (icnctl compute submit/status)
 - [x] 17 tests passing
 
 **Compute Features**:
@@ -683,6 +685,22 @@ wscat -c ws://localhost:8080/ws/my-coop
 - **Gossip Topics**: `compute:submit`, `compute:claim`, `compute:result`
 - **CCL Execution**: Real contract parsing and interpreter execution
 - **Payment Settlement**: (fuel_used * payment_rate) / 1000 credits
+
+**CLI Commands**:
+```bash
+# Submit a CCL contract for distributed execution
+icnctl compute submit --contract contract.json --fuel 10000
+
+# With payment rate (credits per 1000 fuel)
+icnctl compute submit --contract contract.json --payment-rate 100
+
+# Check task status
+icnctl compute status <task_hash>
+```
+
+**RPC Methods**:
+- `compute.submit` - Submit task, returns task_hash
+- `compute.status` - Get task status (pending/claimed/completed/failed)
 
 **Task Flow**:
 ```
