@@ -644,10 +644,11 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] Authenticated DID extraction - Cooperative owners use real JWT claims
 - [x] All 38 tests passing (5 rate limiting + 2 authorization + 1 ownership + 30 existing)
 
-**Gateway API (14 endpoints under /v1)**:
+**Gateway API (16 endpoints under /v1)**:
 - **Authentication**: `POST /v1/auth/challenge`, `POST /v1/auth/verify`
 - **Cooperatives**: 7 endpoints under `/v1/coops/*` (create, get, update, delete, member CRUD)
 - **Ledger**: `GET /v1/ledger/:coop/balance/:did`, `POST /v1/ledger/:coop/payment`, `GET /v1/ledger/:coop/history`
+- **Compute**: `POST /v1/compute/submit`, `GET /v1/compute/status/:task_hash`
 - **WebSocket**: `GET /v1/ws/:coop_id` (real-time event streaming)
 - **Health**: `GET /v1/health`
 
@@ -655,12 +656,13 @@ wscat -c ws://localhost:8080/ws/my-coop
 - **AuthManager**: DID-based challenge/verify with JWT capability tokens
 - **CoopManager**: In-memory namespace storage (Owner/Admin/Member roles)
 - **LedgerManager**: Per-coop mutual credit ledgers with SledStore backend
+- **ComputeManager**: Distributed task submission and status tracking
 - **EventBroadcaster**: Pub/sub event distribution with per-coop isolation
 - **RateLimiter**: Token bucket per-DID rate limiting with automatic cleanup
 - **WsSession**: WebSocket actor with heartbeat/ping-pong and automatic cleanup
 - **Error Handling**: HTTP status mapping (401, 403, 429), JSON error responses
 - **Middleware**: JWT auth, rate limiting, logging, compression
-- **Authorization**: Scope-based access control (ledger:read/write, coop:read/write/admin)
+- **Authorization**: Scope-based access control (ledger:read/write, coop:read/write/admin, compute:read/write)
 
 **Event Types**: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated, GovernanceDomainCreated, GovernanceProposalCreated, GovernanceProposalOpened, GovernanceProposalClosed, GovernanceVoteCast
 
@@ -678,7 +680,8 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] Supervisor integration with trust/gossip/ledger callbacks
 - [x] RPC endpoints (compute.submit, compute.status)
 - [x] CLI commands (icnctl compute submit/status)
-- [x] 17 tests passing
+- [x] Gateway REST API (/v1/compute/submit, /v1/compute/status)
+- [x] 17 compute tests + 86 gateway tests passing
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
