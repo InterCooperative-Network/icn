@@ -333,6 +333,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/compute/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a compute task
+         * @description Submit a CCL (Cooperative Contract Language) contract for distributed execution.
+         *
+         *     The task is broadcast to the network where trusted executors can claim and run it.
+         *     Payment is automatically settled based on fuel consumed.
+         */
+        post: operations["submitComputeTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compute/status/{task_hash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get task status
+         * @description Retrieve the current status of a compute task by its hash.
+         *
+         *     Status values: pending, claimed, completed, failed
+         */
+        get: operations["getComputeTaskStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ws/{coop_id}": {
         parameters: {
             query?: never;
@@ -346,10 +391,15 @@ export interface paths {
          *
          *     After connecting, send: `{"type": "Auth", "token": "..."}`
          *
+         *     The server responds with: `{"type": "AuthOk", "did": "...", "current_seq": N}`
+         *
+         *     To request missed events after reconnection: `{"type": "Backfill", "after_seq": N}`
+         *
          *     Events include: PaymentCreated, MemberAdded, MemberRemoved,
          *     RoleUpdated, SettingsUpdated, GovernanceDomainCreated,
          *     GovernanceProposalCreated, GovernanceProposalOpened,
-         *     GovernanceProposalClosed, GovernanceVoteCast
+         *     GovernanceProposalClosed, GovernanceVoteCast,
+         *     ComputeTaskSubmitted, ComputeTaskClaimed, ComputeTaskCompleted
          */
         get: operations["websocketConnect"];
         put?: never;
@@ -556,6 +606,48 @@ export interface components {
             votes_abstain?: number;
             total_votes?: number;
             quorum_reached?: boolean;
+        };
+        SubmitTaskRequest: {
+            /** @description Optional task ID (auto-generated if not provided) */
+            task_id?: string;
+            /** @description CCL contract JSON */
+            code: string;
+            /** @description Input arguments (JSON) */
+            inputs?: Record<string, never>;
+            /**
+             * @description Maximum fuel for execution (default 10000)
+             * @default 10000
+             */
+            fuel_limit: number;
+            /** @description Deadline in milliseconds from now (optional) */
+            deadline_ms?: number;
+            /** @description Payment rate per 1000 fuel (optional) */
+            payment_rate?: number;
+            /** @description Payment currency (default credits) */
+            payment_currency?: string;
+        };
+        SubmitTaskResponse: {
+            task_id?: string;
+            /** @description 64-character hex hash */
+            task_hash?: string;
+        };
+        ComputeTaskStatus: {
+            task_hash?: string;
+            /** @enum {string} */
+            status?: "pending" | "claimed" | "completed" | "failed";
+            /** @description DID of the executor (if claimed) */
+            executor?: string;
+            result?: components["schemas"]["ComputeResult"];
+        };
+        ComputeResult: {
+            /** @enum {string} */
+            outcome?: "success" | "failed" | "out_of_fuel" | "timeout";
+            /** @description Execution output (JSON) */
+            output?: Record<string, never>;
+            /** @description Error message (if failed) */
+            error?: string;
+            fuel_used?: number;
+            duration_ms?: number;
         };
     };
     responses: {
@@ -1364,6 +1456,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoteTally"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    submitComputeTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "code": "{\"name\":\"SimpleReturn\",\"participants\":[\"did:icn:alice\"],\"rules\":[{\"name\":\"run\",\"body\":[{\"Return\":{\"value\":{\"Literal\":{\"Int\":42}}}}]}]}",
+                 *       "fuel_limit": 10000,
+                 *       "payment_rate": 100
+                 *     }
+                 */
+                "application/json": components["schemas"]["SubmitTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Task submitted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitTaskResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getComputeTaskStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task hash (64 hex characters) */
+                task_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputeTaskStatus"];
                 };
             };
             401: components["responses"]["Unauthorized"];

@@ -31,6 +31,8 @@ info:
     - `coop:admin` - Manage members and roles
     - `gov:read` - View governance domains, proposals, votes
     - `gov:write` - Create proposals, cast votes
+    - `compute:read` - View compute task status
+    - `compute:write` - Submit compute tasks
 
   version: 1.0.0
   license:
@@ -57,6 +59,8 @@ tags:
     description: Mutual credit ledger operations
   - name: Governance
     description: Democratic governance for cooperatives
+  - name: Compute
+    description: Distributed compute task submission and monitoring
   - name: WebSocket
     description: Real-time event streaming
 
@@ -750,6 +754,83 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  # ============================================
+  # Compute Endpoints
+  # ============================================
+
+  /v1/compute/submit:
+    post:
+      tags: [Compute]
+      summary: Submit a compute task
+      description: |
+        Submit a CCL (Cooperative Contract Language) contract for distributed execution.
+
+        The task is broadcast to the network where trusted executors can claim and run it.
+        Payment is automatically settled based on fuel consumed.
+      operationId: submitComputeTask
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTaskRequest'
+            example:
+              code: '{"name":"SimpleReturn","participants":["did:icn:alice"],"rules":[{"name":"run","body":[{"Return":{"value":{"Literal":{"Int":42}}}}]}]}'
+              fuel_limit: 10000
+              payment_rate: 100
+      responses:
+        '200':
+          description: Task submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/compute/status/{task_hash}:
+    get:
+      tags: [Compute]
+      summary: Get task status
+      description: |
+        Retrieve the current status of a compute task by its hash.
+
+        Status values: pending, claimed, completed, failed
+      operationId: getComputeTaskStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: task_hash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+          description: Task hash (64 hex characters)
+      responses:
+        '200':
+          description: Task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputeTaskStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ============================================
+  # WebSocket Endpoint
+  # ============================================
+
   /v1/ws/{coop_id}:
     get:
       tags: [WebSocket]
@@ -759,10 +840,15 @@ paths:
 
         After connecting, send: `{"type": "Auth", "token": "..."}`
 
+        The server responds with: `{"type": "AuthOk", "did": "...", "current_seq": N}`
+
+        To request missed events after reconnection: `{"type": "Backfill", "after_seq": N}`
+
         Events include: PaymentCreated, MemberAdded, MemberRemoved,
         RoleUpdated, SettingsUpdated, GovernanceDomainCreated,
         GovernanceProposalCreated, GovernanceProposalOpened,
-        GovernanceProposalClosed, GovernanceVoteCast
+        GovernanceProposalClosed, GovernanceVoteCast,
+        ComputeTaskSubmitted, ComputeTaskClaimed, ComputeTaskCompleted
       operationId: websocketConnect
       security: []  # Auth handled via WebSocket message
       parameters:
@@ -1214,3 +1300,74 @@ components:
           type: integer
         quorum_reached:
           type: boolean
+
+    # ============================================
+    # Compute Schemas
+    # ============================================
+
+    SubmitTaskRequest:
+      type: object
+      required: [code]
+      properties:
+        task_id:
+          type: string
+          description: Optional task ID (auto-generated if not provided)
+        code:
+          type: string
+          description: CCL contract JSON
+        inputs:
+          type: object
+          description: Input arguments (JSON)
+        fuel_limit:
+          type: integer
+          description: Maximum fuel for execution (default 10000)
+          default: 10000
+        deadline_ms:
+          type: integer
+          description: Deadline in milliseconds from now (optional)
+        payment_rate:
+          type: integer
+          description: Payment rate per 1000 fuel (optional)
+        payment_currency:
+          type: string
+          description: Payment currency (default credits)
+
+    SubmitTaskResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        task_hash:
+          type: string
+          description: 64-character hex hash
+
+    ComputeTaskStatus:
+      type: object
+      properties:
+        task_hash:
+          type: string
+        status:
+          type: string
+          enum: [pending, claimed, completed, failed]
+        executor:
+          type: string
+          description: DID of the executor (if claimed)
+        result:
+          $ref: '#/components/schemas/ComputeResult'
+
+    ComputeResult:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum: [success, failed, out_of_fuel, timeout]
+        output:
+          type: object
+          description: Execution output (JSON)
+        error:
+          type: string
+          description: Error message (if failed)
+        fuel_used:
+          type: integer
+        duration_ms:
+          type: integer
