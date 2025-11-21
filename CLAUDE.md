@@ -686,7 +686,10 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] Prometheus metrics for signature verification
 - [x] Executor registry tracking (capabilities, trust, last_seen)
 - [x] Consensus framework for multi-executor verification (single-executor mode)
-- [x] 23 compute tests + 87 gateway tests passing (6 new tests: 4 signature + 2 consensus)
+- [x] Comprehensive input validation (task ID, DID format, fuel limits, code size, payment rate)
+- [x] Gateway-level validation with proper error messages
+- [x] Structured logging with tracing (DEBUG/INFO/WARN levels)
+- [x] 34 compute tests + 92 gateway tests passing (11 validation + 6 gateway validation + 4 signature + 2 consensus)
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
@@ -696,6 +699,8 @@ wscat -c ws://localhost:8080/ws/my-coop
 - **Cryptographic Security**: Ed25519-signed results with DID-based verification
 - **Executor Registry**: Tracks available executors with capabilities, trust scores, and last_seen timestamps
 - **Consensus Framework**: Multi-executor result verification (currently single-executor mode, extensible to multi-executor)
+- **Input Validation**: Comprehensive checks (task ID length, DID format, fuel min/max, code size limits, payment rate caps)
+- **Structured Logging**: Tracing spans with structured fields (task_id, task_hash, executor, fuel_used, duration_ms, outcome)
 
 **CLI Commands**:
 ```bash
