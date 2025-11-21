@@ -582,7 +582,7 @@ impl ComputeActor {
         match &result.outcome {
             crate::types::ExecutionOutcome::Success(output) => {
                 tracing::info!(
-                    task_id = %task.id,
+                    task_id = %claimed_task.id,
                     task_hash = %task_hash_str,
                     fuel_used = result.fuel_used,
                     duration_ms = result.duration_ms,
@@ -593,7 +593,7 @@ impl ComputeActor {
             }
             crate::types::ExecutionOutcome::Failed(reason) => {
                 tracing::warn!(
-                    task_id = %task.id,
+                    task_id = %claimed_task.id,
                     task_hash = %task_hash_str,
                     fuel_used = result.fuel_used,
                     duration_ms = result.duration_ms,
@@ -604,7 +604,7 @@ impl ComputeActor {
             }
             crate::types::ExecutionOutcome::OutOfFuel => {
                 tracing::warn!(
-                    task_id = %task.id,
+                    task_id = %claimed_task.id,
                     task_hash = %task_hash_str,
                     fuel_used = result.fuel_used,
                     duration_ms = result.duration_ms,
@@ -615,7 +615,7 @@ impl ComputeActor {
             }
             crate::types::ExecutionOutcome::Timeout => {
                 tracing::warn!(
-                    task_id = %task.id,
+                    task_id = %claimed_task.id,
                     task_hash = %task_hash_str,
                     fuel_used = result.fuel_used,
                     duration_ms = result.duration_ms,
@@ -641,24 +641,24 @@ impl ComputeActor {
 
         // Settle payment if configured and execution succeeded
         if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
-            if let (Some(rate), Some(ref payment_cb)) = (task.payment_rate, &self.payment_callback) {
+            if let (Some(rate), Some(ref payment_cb)) = (claimed_task.payment_rate, &self.payment_callback) {
                 let amount = (result.fuel_used * rate) / 1000; // rate is per 1000 fuel
                 if amount > 0 {
-                    let currency = task.payment_currency.clone().unwrap_or_else(|| "credits".to_string());
+                    let currency = claimed_task.payment_currency.clone().unwrap_or_else(|| "credits".to_string());
                     tracing::info!(
-                        task_id = %task.id,
-                        from = %task.submitter,
+                        task_id = %claimed_task.id,
+                        from = %claimed_task.submitter,
                         to = %self.own_did,
                         amount = amount,
                         currency = %currency,
                         "Settling payment for completed task"
                     );
                     payment_cb(PaymentRequest {
-                        from: task.submitter.clone(),
+                        from: claimed_task.submitter.clone(),
                         to: self.own_did.clone(),
                         amount,
                         currency,
-                        task_id: task.id.clone(),
+                        task_id: claimed_task.id.clone(),
                     });
                     icn_obs::metrics::compute::payments_settled_inc();
                     icn_obs::metrics::compute::payment_amount_add(amount);
