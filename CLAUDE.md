@@ -689,13 +689,15 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] Comprehensive input validation (task ID, DID format, fuel limits, code size, payment rate)
 - [x] Gateway-level validation with proper error messages
 - [x] Structured logging with tracing (DEBUG/INFO/WARN levels)
-- [x] 34 compute tests + 92 gateway tests passing (11 validation + 6 gateway validation + 4 signature + 2 consensus)
+- [x] Task cancellation with submitter authorization and gossip propagation
+- [x] 40 compute tests + 92 gateway tests + 25 RPC tests passing (11 validation + 6 gateway validation + 4 signature + 2 consensus + 6 cancellation)
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
-- **Gossip Topics**: `compute:submit`, `compute:claim`, `compute:result`
+- **Gossip Topics**: `compute:submit`, `compute:claim`, `compute:result`, `compute:cancel`
 - **CCL Execution**: Real contract parsing and interpreter execution
 - **Payment Settlement**: (fuel_used * payment_rate) / 1000 credits
+- **Task Cancellation**: Submitter-only authorization, only pending/claimed tasks cancellable
 - **Cryptographic Security**: Ed25519-signed results with DID-based verification
 - **Executor Registry**: Tracks available executors with capabilities, trust scores, and last_seen timestamps
 - **Consensus Framework**: Multi-executor result verification (currently single-executor mode, extensible to multi-executor)
@@ -712,11 +714,15 @@ icnctl compute submit --contract contract.json --payment-rate 100
 
 # Check task status
 icnctl compute status <task_hash>
+
+# Cancel a task
+icnctl compute cancel <task_hash> --reason "No longer needed"
 ```
 
 **RPC Methods**:
 - `compute.submit` - Submit task, returns task_hash
-- `compute.status` - Get task status (pending/claimed/completed/failed)
+- `compute.status` - Get task status (pending/claimed/completed/failed/cancelled)
+- `compute.cancel` - Cancel a task (submitter-only authorization)
 
 **Task Flow**:
 ```
@@ -729,9 +735,9 @@ Submitter → compute:submit → Executor claims → Executes CCL
 
 **Architecture** (`icn-compute/`):
 - **types.rs**: ComputeTask, ComputeResult, ComputeMessage, TaskCode (CCL/WASM)
-- **task.rs**: TaskManager with lifecycle tracking
+- **task.rs**: TaskManager with lifecycle tracking (Pending→Claimed→Completed/Failed/Cancelled)
 - **executor.rs**: Executor trait, LocalExecutor (CCL), future WasmExecutor
-- **actor.rs**: ComputeActor with gossip/trust/payment callbacks
+- **actor.rs**: ComputeActor with gossip/trust/payment callbacks + cancellation support
 - **error.rs**: ComputeError types
 
 **Prometheus Metrics** (`icn_compute_*`):
@@ -746,6 +752,7 @@ Submitter → compute:submit → Executor claims → Executes CCL
 - `ComputeTaskSubmitted` - Task created with task_id, task_hash, submitter, fuel_limit
 - `ComputeTaskClaimed` - Executor claimed task
 - `ComputeTaskCompleted` - Task finished with outcome, fuel_used, duration_ms
+- `ComputeTaskCancelled` - Task cancelled by submitter with reason
 
 ---
 
