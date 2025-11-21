@@ -1709,6 +1709,16 @@ async fn handle_compute_status(
                     };
                     ("failed".to_string(), None, Some(result_info))
                 }
+                icn_compute::TaskStatus::Cancelled { reason, .. } => {
+                    let result_info = TaskResultInfo {
+                        outcome: "cancelled".to_string(),
+                        output: None,
+                        error: Some(reason),
+                        fuel_used: 0,
+                        duration_ms: 0,
+                    };
+                    ("cancelled".to_string(), None, Some(result_info))
+                }
             };
 
             let info = TaskStatusInfo {

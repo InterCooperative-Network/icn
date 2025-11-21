@@ -1236,6 +1236,9 @@ impl Supervisor {
                         icn_compute::ComputeMessage::TaskResult(_) => {
                             (icn_compute::TOPIC_RESULT, bincode::serialize(&compute_msg))
                         }
+                        icn_compute::ComputeMessage::TaskCancelled { .. } => {
+                            (icn_compute::TOPIC_CANCEL, bincode::serialize(&compute_msg))
+                        }
                         icn_compute::ComputeMessage::ExecutorAnnounce { .. } => {
                             (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
                         }
@@ -1324,7 +1327,7 @@ impl Supervisor {
             // Subscribe to compute topics
             {
                 let mut gossip = gossip_handle.write().await;
-                for topic in &[icn_compute::TOPIC_SUBMIT, icn_compute::TOPIC_CLAIM, icn_compute::TOPIC_RESULT] {
+                for topic in &[icn_compute::TOPIC_SUBMIT, icn_compute::TOPIC_CLAIM, icn_compute::TOPIC_RESULT, icn_compute::TOPIC_CANCEL] {
                     if let Err(e) = gossip.subscribe(topic, did.clone()) {
                         warn!("Failed to subscribe to compute topic {}: {}", topic, e);
                     } else {

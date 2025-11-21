@@ -92,6 +92,28 @@ impl ComputeHandle {
             .map_err(|_| ComputeError::Internal("no response".into()))
     }
 
+    /// Cancel a task
+    pub async fn cancel_task(
+        &self,
+        hash: &TaskHash,
+        requester: &str,
+        reason: String,
+    ) -> Result<(), ComputeError> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::Cancel {
+                hash: *hash,
+                requester: requester.to_string(),
+                reason,
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ComputeError::Internal("actor closed".into()))?;
+        resp_rx
+            .await
+            .map_err(|_| ComputeError::Internal("no response".into()))?
+    }
+
     /// Handle incoming gossip message
     pub async fn handle_gossip(&self, msg: ComputeMessage) -> Result<(), ComputeError> {
         self.tx
@@ -110,6 +132,12 @@ enum ComputeCommand {
     Status {
         hash: TaskHash,
         resp: tokio::sync::oneshot::Sender<Option<TaskStatus>>,
+    },
+    Cancel {
+        hash: TaskHash,
+        requester: String,
+        reason: String,
+        resp: tokio::sync::oneshot::Sender<Result<(), ComputeError>>,
     },
     GossipMessage(ComputeMessage),
 }
@@ -183,6 +211,10 @@ impl ComputeActor {
                         let status = self.task_manager.lock().await.status(&hash).cloned();
                         let _ = resp.send(status);
                     }
+                    ComputeCommand::Cancel { hash, requester, reason, resp } => {
+                        let result = self.cancel_task(&hash, &requester, reason).await;
+                        let _ = resp.send(result);
+                    }
                     ComputeCommand::GossipMessage(msg) => {
                         if let Err(e) = self.handle_message(msg).await {
                             tracing::warn!("compute message error: {}", e);
@@ -252,6 +284,50 @@ impl ComputeActor {
         Ok(hash)
     }
 
+    /// Cancel a submitted task
+    pub async fn cancel_task(
+        &self,
+        task_hash: &TaskHash,
+        requester: &str,
+        reason: String,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            requester = %requester,
+            reason = %reason,
+            "Cancelling task"
+        );
+
+        // Cancel in local manager (validates authorization)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let mut mgr = self.task_manager.lock().await;
+        mgr.cancel(task_hash, requester, reason.clone())?;
+        drop(mgr);
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            "Task cancelled locally"
+        );
+
+        // Broadcast cancellation to network
+        if let Some(ref cb) = self.send_callback {
+            cb(ComputeMessage::TaskCancelled {
+                task_hash: *task_hash,
+                submitter: requester.to_string(),
+                reason,
+                cancelled_at: now,
+            });
+        }
+
+        Ok(())
+    }
+
     /// Handle incoming compute message
     async fn handle_message(&self, msg: ComputeMessage) -> Result<(), ComputeError> {
         match msg {
@@ -263,6 +339,9 @@ impl ComputeActor {
             }
             ComputeMessage::TaskResult(result) => {
                 self.on_task_result(result).await
+            }
+            ComputeMessage::TaskCancelled { task_hash, submitter, reason, cancelled_at } => {
+                self.on_task_cancelled(task_hash, submitter, reason, cancelled_at).await
             }
             ComputeMessage::ExecutorAnnounce { executor, capabilities } => {
                 self.on_executor_announce(executor, capabilities).await
@@ -558,6 +637,36 @@ impl ComputeActor {
                 mgr.complete(accepted_result)?;
             }
         }
+
+        Ok(())
+    }
+
+    /// Handle task cancellation
+    async fn on_task_cancelled(
+        &self,
+        task_hash: TaskHash,
+        submitter: String,
+        reason: String,
+        cancelled_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            submitter = %submitter,
+            reason = %reason,
+            cancelled_at = cancelled_at,
+            "Received task cancellation"
+        );
+
+        // Cancel the task in our local manager
+        let mut mgr = self.task_manager.lock().await;
+        mgr.cancel(&task_hash, &submitter, reason)?;
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            "Task cancelled successfully"
+        );
 
         Ok(())
     }

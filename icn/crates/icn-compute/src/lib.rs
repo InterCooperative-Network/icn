@@ -45,6 +45,9 @@ pub const TOPIC_CLAIM: &str = "compute:claim";
 /// Gossip topic for results
 pub const TOPIC_RESULT: &str = "compute:result";
 
+/// Gossip topic for cancellations
+pub const TOPIC_CANCEL: &str = "compute:cancel";
+
 /// Minimum trust score to submit tasks (0.0 - 1.0)
 pub const MIN_TRUST_SUBMIT: f64 = 0.1;
 

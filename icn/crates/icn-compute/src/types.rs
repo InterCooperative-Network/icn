@@ -287,6 +287,13 @@ pub enum ComputeMessage {
     },
     /// Task result published
     TaskResult(ComputeResult),
+    /// Task cancelled by submitter
+    TaskCancelled {
+        task_hash: TaskHash,
+        submitter: String,
+        reason: String,
+        cancelled_at: u64,
+    },
     /// Executor announces capabilities
     ExecutorAnnounce {
         executor: String,

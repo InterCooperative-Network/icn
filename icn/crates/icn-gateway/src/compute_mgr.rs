@@ -173,6 +173,18 @@ impl ComputeManager {
                                 duration_ms: 0,
                             }),
                         },
+                        TaskStatus::Cancelled { reason, .. } => ComputeTaskStatus {
+                            task_hash: hex::encode(task_hash),
+                            status: "cancelled".to_string(),
+                            executor: None,
+                            result: Some(ComputeResult {
+                                outcome: "cancelled".to_string(),
+                                output: None,
+                                error: Some(reason),
+                                fuel_used: 0,
+                                duration_ms: 0,
+                            }),
+                        },
                     };
                     Ok(Some(result))
                 }
@@ -194,6 +206,22 @@ impl ComputeManager {
             } else {
                 Ok(None)
             }
+        }
+    }
+
+    /// Cancel a task
+    pub async fn cancel_task(
+        &self,
+        task_hash: TaskHash,
+        requester: String,
+        reason: String,
+    ) -> Result<()> {
+        if let Some(ref handle) = self.compute_handle {
+            handle.cancel_task(&task_hash, &requester, reason).await
+                .map_err(|e| anyhow::anyhow!("Failed to cancel task: {}", e))?;
+            Ok(())
+        } else {
+            anyhow::bail!("Compute not available - daemon not connected")
         }
     }
 }

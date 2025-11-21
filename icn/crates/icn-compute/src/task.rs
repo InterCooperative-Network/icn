@@ -17,6 +17,8 @@ pub enum TaskStatus {
     Completed { result: Box<ComputeResult> },
     /// Task failed or timed out
     Failed { reason: String },
+    /// Task cancelled by submitter
+    Cancelled { cancelled_at: u64, reason: String },
 }
 
 /// Manages task lifecycle
@@ -110,6 +112,53 @@ impl TaskManager {
         Ok(())
     }
 
+    /// Cancel a task (only if pending or claimed)
+    pub fn cancel(&mut self, hash: &TaskHash, requester: &str, reason: String) -> Result<(), ComputeError> {
+        let task = self
+            .tasks
+            .get(hash)
+            .ok_or_else(|| ComputeError::TaskNotFound(hex::encode(hash)))?;
+
+        // Only the submitter can cancel their own tasks
+        if task.submitter != requester {
+            return Err(ComputeError::Internal(
+                "Only task submitter can cancel the task".into(),
+            ));
+        }
+
+        let status = self
+            .status
+            .get(hash)
+            .ok_or_else(|| ComputeError::TaskNotFound(hex::encode(hash)))?;
+
+        // Can only cancel pending or claimed tasks
+        match status {
+            TaskStatus::Pending | TaskStatus::Claimed { .. } => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                self.status.insert(
+                    *hash,
+                    TaskStatus::Cancelled {
+                        cancelled_at: now,
+                        reason,
+                    },
+                );
+                Ok(())
+            }
+            TaskStatus::Completed { .. } => {
+                Err(ComputeError::Internal("Cannot cancel completed task".into()))
+            }
+            TaskStatus::Failed { .. } => {
+                Err(ComputeError::Internal("Cannot cancel failed task".into()))
+            }
+            TaskStatus::Cancelled { .. } => {
+                Err(ComputeError::Internal("Task already cancelled".into()))
+            }
+        }
+    }
+
     /// Get pending tasks
     pub fn pending(&self) -> impl Iterator<Item = (&TaskHash, &ComputeTask)> {
         self.tasks.iter().filter(|(h, _)| {
@@ -125,7 +174,7 @@ impl TaskManager {
             .count()
     }
 
-    /// Remove old completed/failed tasks
+    /// Remove old completed/failed/cancelled tasks
     pub fn cleanup(&mut self, max_age_ms: u64) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -140,7 +189,9 @@ impl TaskManager {
                 age > max_age_ms
                     && matches!(
                         self.status.get(*h),
-                        Some(TaskStatus::Completed { .. }) | Some(TaskStatus::Failed { .. })
+                        Some(TaskStatus::Completed { .. })
+                            | Some(TaskStatus::Failed { .. })
+                            | Some(TaskStatus::Cancelled { .. })
                     )
             })
             .map(|(h, _)| *h)
@@ -250,5 +301,94 @@ mod tests {
         mgr.submit(make_task("task-2")).unwrap();
 
         assert_eq!(mgr.pending_count(), 2);
+    }
+
+    #[test]
+    fn test_cancel_pending_task() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        mgr.cancel(&hash, "did:icn:alice", "User requested cancellation".into())
+            .unwrap();
+
+        let status = mgr.status(&hash).expect("Task should exist");
+        assert!(
+            matches!(status, TaskStatus::Cancelled { .. }),
+            "Expected Cancelled status, got: {:?}", status
+        );
+    }
+
+    #[test]
+    fn test_cancel_claimed_task() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        mgr.claim(&hash, "did:icn:bob".into()).unwrap();
+        mgr.cancel(&hash, "did:icn:alice", "Changed my mind".into())
+            .unwrap();
+
+        assert!(matches!(mgr.status(&hash), Some(TaskStatus::Cancelled { .. })));
+    }
+
+    #[test]
+    fn test_cancel_wrong_submitter() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        let result = mgr.cancel(&hash, "did:icn:charlie", "Unauthorized".into());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("submitter"));
+    }
+
+    #[test]
+    fn test_cannot_cancel_completed_task() {
+        let mut mgr = TaskManager::new(100);
+        let task = make_task("task-1");
+        let hash = mgr.submit(task).unwrap();
+
+        let result = ComputeResult {
+            task_hash: hash,
+            task_id: "task-1".into(),
+            executor: "did:icn:bob".into(),
+            outcome: ExecutionOutcome::Success(vec![42]),
+            fuel_used: 100,
+            duration_ms: 50,
+            completed_at: 2000,
+            signature: vec![],
+        };
+        mgr.complete(result).unwrap();
+
+        let cancel_result = mgr.cancel(&hash, "did:icn:alice", "Too late".into());
+        assert!(cancel_result.is_err());
+        assert!(cancel_result.unwrap_err().to_string().contains("Cannot cancel completed"));
+    }
+
+    #[test]
+    fn test_cancel_nonexistent_task() {
+        let mut mgr = TaskManager::new(100);
+        let fake_hash = [0u8; 32];
+
+        let result = mgr.cancel(&fake_hash, "did:icn:alice", "No such task".into());
+        assert!(matches!(result, Err(ComputeError::TaskNotFound(_))));
+    }
+
+    #[test]
+    fn test_cleanup_includes_cancelled() {
+        let mut mgr = TaskManager::new(100);
+        let mut task = make_task("task-1");
+        task.created_at = 1000; // Old task
+        let hash = mgr.submit(task).unwrap();
+
+        mgr.cancel(&hash, "did:icn:alice", "Cleanup test".into()).unwrap();
+
+        // Cleanup tasks older than 1000ms
+        mgr.cleanup(1000);
+
+        // Task should be removed
+        assert!(mgr.get(&hash).is_none());
+        assert!(mgr.status(&hash).is_none());
     }
 }
