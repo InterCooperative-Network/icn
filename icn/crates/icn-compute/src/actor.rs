@@ -161,6 +161,7 @@ impl ComputeActor {
         // Check submitter trust
         let trust = (self.trust_callback)(&task.submitter);
         if trust < MIN_TRUST_SUBMIT {
+            icn_obs::metrics::compute::tasks_rejected_trust_inc(&task.submitter, trust);
             return Err(ComputeError::InsufficientTrust {
                 required: MIN_TRUST_SUBMIT,
                 actual: trust,
@@ -169,6 +170,7 @@ impl ComputeActor {
 
         // Add to local task manager
         let hash = self.task_manager.lock().await.submit(task.clone())?;
+        icn_obs::metrics::compute::tasks_submitted_inc();
 
         // Broadcast to network
         if let Some(ref cb) = self.send_callback {
@@ -218,6 +220,7 @@ impl ComputeActor {
             .lock()
             .await
             .claim(&hash, self.own_did.clone())?;
+        icn_obs::metrics::compute::tasks_claimed_inc();
 
         // Broadcast claim
         if let Some(ref cb) = self.send_callback {
@@ -228,9 +231,33 @@ impl ComputeActor {
         }
 
         // Execute
+        let start = std::time::Instant::now();
         let result = self
             .executor
             .execute_task(&task, &self.own_did, &self.signing_key)?;
+        let duration = start.elapsed().as_secs_f64();
+
+        // Record metrics
+        icn_obs::metrics::compute::task_duration_record(duration);
+        icn_obs::metrics::compute::fuel_used_record(result.fuel_used);
+        icn_obs::metrics::compute::fuel_total_add(result.fuel_used);
+
+        match &result.outcome {
+            crate::types::ExecutionOutcome::Success(_) => {
+                icn_obs::metrics::compute::tasks_completed_inc("success");
+            }
+            crate::types::ExecutionOutcome::Failed(reason) => {
+                icn_obs::metrics::compute::tasks_failed_inc(reason);
+            }
+            crate::types::ExecutionOutcome::OutOfFuel => {
+                icn_obs::metrics::compute::tasks_out_of_fuel_inc();
+                icn_obs::metrics::compute::tasks_completed_inc("out_of_fuel");
+            }
+            crate::types::ExecutionOutcome::Timeout => {
+                icn_obs::metrics::compute::tasks_timeout_inc();
+                icn_obs::metrics::compute::tasks_completed_inc("timeout");
+            }
+        }
 
         // Record completion
         self.task_manager.lock().await.complete(result.clone())?;
@@ -248,6 +275,8 @@ impl ComputeActor {
                         currency,
                         task_id: task.id.clone(),
                     });
+                    icn_obs::metrics::compute::payments_settled_inc();
+                    icn_obs::metrics::compute::payment_amount_add(amount);
                 }
             }
         }

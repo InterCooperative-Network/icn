@@ -11,6 +11,7 @@ description = "Distributed compute layer for ICN"
 icn-identity = { path = "../icn-identity" }
 icn-trust = { path = "../icn-trust" }
 icn-ccl = { path = "../icn-ccl" }
+icn-obs = { path = "../icn-obs" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

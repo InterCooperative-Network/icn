@@ -585,6 +585,64 @@ pub fn init_descriptions() {
         "icn_gateway_governance_votes_cast_total",
         "Total number of governance votes cast"
     );
+
+    // Compute metrics
+    describe_counter!(
+        "icn_compute_tasks_submitted_total",
+        "Total number of compute tasks submitted"
+    );
+    describe_counter!(
+        "icn_compute_tasks_claimed_total",
+        "Total number of compute tasks claimed by executors"
+    );
+    describe_counter!(
+        "icn_compute_tasks_completed_total",
+        "Total number of compute tasks completed"
+    );
+    describe_counter!(
+        "icn_compute_tasks_failed_total",
+        "Total number of compute tasks that failed"
+    );
+    describe_gauge!(
+        "icn_compute_tasks_pending",
+        "Current number of pending compute tasks"
+    );
+    describe_gauge!(
+        "icn_compute_tasks_executing",
+        "Current number of tasks being executed"
+    );
+    describe_histogram!(
+        "icn_compute_task_duration_seconds",
+        "Duration of compute task execution in seconds"
+    );
+    describe_histogram!(
+        "icn_compute_fuel_used",
+        "Distribution of fuel consumed by compute tasks"
+    );
+    describe_counter!(
+        "icn_compute_fuel_total",
+        "Total fuel consumed across all tasks"
+    );
+    describe_counter!(
+        "icn_compute_payments_settled_total",
+        "Total number of compute payments settled"
+    );
+    describe_counter!(
+        "icn_compute_payment_amount_total",
+        "Total payment amount for compute tasks"
+    );
+    describe_counter!(
+        "icn_compute_tasks_rejected_trust_total",
+        "Total number of tasks rejected due to insufficient trust"
+    );
+    describe_counter!(
+        "icn_compute_tasks_timeout_total",
+        "Total number of tasks that timed out"
+    );
+    describe_counter!(
+        "icn_compute_tasks_out_of_fuel_total",
+        "Total number of tasks that ran out of fuel"
+    );
 }
 
 /// Network metrics
@@ -1276,5 +1334,70 @@ pub mod nat_traversal {
 
     pub fn hole_punch_success_inc() {
         counter!("icn_nat_hole_punch_success_total").increment(1);
+    }
+}
+
+/// Compute metrics
+pub mod compute {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn tasks_submitted_inc() {
+        counter!("icn_compute_tasks_submitted_total").increment(1);
+    }
+
+    pub fn tasks_claimed_inc() {
+        counter!("icn_compute_tasks_claimed_total").increment(1);
+    }
+
+    pub fn tasks_completed_inc(outcome: &str) {
+        counter!("icn_compute_tasks_completed_total", "outcome" => outcome.to_string()).increment(1);
+    }
+
+    pub fn tasks_failed_inc(reason: &str) {
+        counter!("icn_compute_tasks_failed_total", "reason" => reason.to_string()).increment(1);
+    }
+
+    pub fn tasks_pending_set(count: u64) {
+        gauge!("icn_compute_tasks_pending").set(count as f64);
+    }
+
+    pub fn tasks_executing_set(count: u64) {
+        gauge!("icn_compute_tasks_executing").set(count as f64);
+    }
+
+    pub fn task_duration_record(duration_secs: f64) {
+        histogram!("icn_compute_task_duration_seconds").record(duration_secs);
+    }
+
+    pub fn fuel_used_record(fuel: u64) {
+        histogram!("icn_compute_fuel_used").record(fuel as f64);
+    }
+
+    pub fn fuel_total_add(fuel: u64) {
+        counter!("icn_compute_fuel_total").increment(fuel);
+    }
+
+    pub fn payments_settled_inc() {
+        counter!("icn_compute_payments_settled_total").increment(1);
+    }
+
+    pub fn payment_amount_add(amount: u64) {
+        counter!("icn_compute_payment_amount_total").increment(amount);
+    }
+
+    pub fn tasks_rejected_trust_inc(submitter: &str, trust_score: f64) {
+        counter!(
+            "icn_compute_tasks_rejected_trust_total",
+            "submitter" => submitter.to_string(),
+            "trust_score" => format!("{:.2}", trust_score)
+        ).increment(1);
+    }
+
+    pub fn tasks_timeout_inc() {
+        counter!("icn_compute_tasks_timeout_total").increment(1);
+    }
+
+    pub fn tasks_out_of_fuel_inc() {
+        counter!("icn_compute_tasks_out_of_fuel_total").increment(1);
     }
 }
