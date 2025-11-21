@@ -647,8 +647,9 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>Community Members</h2>
-                        <div class="member-search">
+                        <div class="member-controls">
                             <input type="text" id="member-search" placeholder="Search members..." />
+                            <button id="import-members-btn" class="btn btn-primary">Import CSV</button>
                         </div>
                     </div>
                     <div id="member-list" class="member-list">
@@ -680,6 +681,104 @@
                             <button id="member-last-page" class="btn btn-small" aria-label="Last page" disabled>
                                 ⟩⟩
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Import Members Modal -->
+                <div id="import-members-modal" class="modal hidden" role="dialog" aria-labelledby="import-members-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="import-members-title">Import Members from CSV</h2>
+                            <button id="close-import-members" class="modal-close" aria-label="Close import members dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div id="import-step-1" class="import-step">
+                                <h3>Step 1: Upload CSV File</h3>
+                                <p class="help-text">
+                                    Upload a CSV file with member data. Required columns: <code>did</code>, <code>role</code>, <code>balance</code>
+                                </p>
+
+                                <div class="csv-template">
+                                    <h4>Template Format:</h4>
+                                    <pre><code>did,role,balance
+did:icn:alice123,member,10.5
+did:icn:bob456,admin,-5.0
+did:icn:charlie789,member,0</code></pre>
+                                    <button id="download-template" class="btn btn-small btn-secondary">Download Template</button>
+                                </div>
+
+                                <div class="file-upload-area" id="csv-upload-area">
+                                    <input type="file" id="csv-file-input" accept=".csv" hidden />
+                                    <label for="csv-file-input" class="file-upload-label">
+                                        <span class="upload-icon">📁</span>
+                                        <span class="upload-text">Click to select CSV file or drag and drop</span>
+                                        <span class="upload-hint">CSV files only</span>
+                                    </label>
+                                </div>
+
+                                <div id="file-info" class="file-info hidden">
+                                    <p><strong>Selected file:</strong> <span id="file-name"></span></p>
+                                    <p><strong>File size:</strong> <span id="file-size"></span></p>
+                                </div>
+                            </div>
+
+                            <div id="import-step-2" class="import-step hidden">
+                                <h3>Step 2: Preview & Validate</h3>
+                                <div id="import-stats" class="import-stats">
+                                    <div class="stat">
+                                        <span class="stat-value" id="total-rows">0</span>
+                                        <span class="stat-label">Total Rows</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="valid-rows">0</span>
+                                        <span class="stat-label">Valid</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="invalid-rows">0</span>
+                                        <span class="stat-label">Invalid</span>
+                                    </div>
+                                </div>
+
+                                <div id="validation-errors" class="validation-errors hidden">
+                                    <h4>Validation Errors:</h4>
+                                    <ul id="error-list"></ul>
+                                </div>
+
+                                <div id="import-preview" class="import-preview">
+                                    <h4>Preview (first 10 rows):</h4>
+                                    <div class="table-wrapper">
+                                        <table id="preview-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>DID</th>
+                                                    <th>Role</th>
+                                                    <th>Balance</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="preview-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="import-step-3" class="import-step hidden">
+                                <h3>Step 3: Import Complete</h3>
+                                <div class="import-success">
+                                    <div class="success-icon">✓</div>
+                                    <p><strong id="imported-count">0</strong> members imported successfully!</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="import-back-btn" class="btn btn-secondary hidden">Back</button>
+                            <button id="import-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="import-next-btn" class="btn btn-primary" disabled>Next</button>
+                            <button id="import-confirm-btn" class="btn btn-primary hidden" disabled>Import Members</button>
+                            <button id="import-close-btn" class="btn btn-primary hidden">Close</button>
                         </div>
                     </div>
                 </div>

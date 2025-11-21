@@ -2960,3 +2960,374 @@ document.addEventListener('DOMContentLoaded', () => {
         memberSearch.addEventListener('input', renderMemberList);
     }
 });
+
+// ============================================================================
+// Phase 9: CSV Import for Bulk Member Operations
+// ============================================================================
+
+let csvImportState = {
+    currentStep: 1,
+    file: null,
+    parsedData: [],
+    validRows: [],
+    invalidRows: [],
+};
+
+function initializeCSVImport() {
+    const importBtn = document.getElementById('import-members-btn');
+    const modal = document.getElementById('import-members-modal');
+    const closeBtn = document.getElementById('close-import-members');
+    const cancelBtn = document.getElementById('import-cancel-btn');
+    const backBtn = document.getElementById('import-back-btn');
+    const nextBtn = document.getElementById('import-next-btn');
+    const confirmBtn = document.getElementById('import-confirm-btn');
+    const closeFinalBtn = document.getElementById('import-close-btn');
+    const fileInput = document.getElementById('csv-file-input');
+    const uploadArea = document.getElementById('csv-upload-area');
+    const downloadTemplateBtn = document.getElementById('download-template');
+
+    if (!importBtn || !modal) return;
+
+    // Open modal
+    importBtn.addEventListener('click', () => {
+        resetCSVImport();
+        modal.classList.remove('hidden');
+        showStep(1);
+    });
+
+    // Close modal
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        resetCSVImport();
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    closeFinalBtn.addEventListener('click', closeModal);
+
+    // Download template
+    downloadTemplateBtn.addEventListener('click', () => {
+        const template = 'did,role,balance\ndid:icn:example123,member,0.0\ndid:icn:example456,admin,10.5';
+        const blob = new Blob([template], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'member-import-template.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    // Step navigation
+    backBtn.addEventListener('click', () => {
+        showStep(csvImportState.currentStep - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (csvImportState.currentStep === 1) {
+            // Parse and validate CSV
+            parseCSV();
+        }
+        showStep(csvImportState.currentStep + 1);
+    });
+
+    confirmBtn.addEventListener('click', () => {
+        importMembers();
+        showStep(3);
+    });
+
+    // Close modal on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+}
+
+function resetCSVImport() {
+    csvImportState = {
+        currentStep: 1,
+        file: null,
+        parsedData: [],
+        validRows: [],
+        invalidRows: [],
+    };
+
+    // Reset file input
+    const fileInput = document.getElementById('csv-file-input');
+    if (fileInput) fileInput.value = '';
+
+    // Hide file info
+    const fileInfo = document.getElementById('file-info');
+    if (fileInfo) fileInfo.classList.add('hidden');
+}
+
+function showStep(stepNum) {
+    csvImportState.currentStep = stepNum;
+
+    // Hide all steps
+    for (let i = 1; i <= 3; i++) {
+        const step = document.getElementById(`import-step-${i}`);
+        if (step) step.classList.add('hidden');
+    }
+
+    // Show current step
+    const currentStep = document.getElementById(`import-step-${stepNum}`);
+    if (currentStep) currentStep.classList.remove('hidden');
+
+    // Update buttons
+    const backBtn = document.getElementById('import-back-btn');
+    const cancelBtn = document.getElementById('import-cancel-btn');
+    const nextBtn = document.getElementById('import-next-btn');
+    const confirmBtn = document.getElementById('import-confirm-btn');
+    const closeBtn = document.getElementById('import-close-btn');
+
+    if (backBtn) backBtn.classList.toggle('hidden', stepNum === 1);
+    if (cancelBtn) cancelBtn.classList.toggle('hidden', stepNum === 3);
+    if (nextBtn) nextBtn.classList.toggle('hidden', stepNum !== 1);
+    if (confirmBtn) confirmBtn.classList.toggle('hidden', stepNum !== 2);
+    if (closeBtn) closeBtn.classList.toggle('hidden', stepNum !== 3);
+}
+
+function handleFile(file) {
+    if (!file.name.endsWith('.csv')) {
+        showToast('Please select a CSV file', 'error');
+        return;
+    }
+
+    csvImportState.file = file;
+
+    // Show file info
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+
+    if (fileInfo && fileName && fileSize) {
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        fileInfo.classList.remove('hidden');
+    }
+
+    // Enable next button
+    const nextBtn = document.getElementById('import-next-btn');
+    if (nextBtn) nextBtn.disabled = false;
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function parseCSV() {
+    if (!csvImportState.file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+        if (lines.length < 2) {
+            showToast('CSV file is empty or has no data rows', 'error');
+            return;
+        }
+
+        // Parse header
+        const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const requiredColumns = ['did', 'role', 'balance'];
+
+        // Validate header
+        for (const col of requiredColumns) {
+            if (!header.includes(col)) {
+                showToast(`Missing required column: ${col}`, 'error');
+                return;
+            }
+        }
+
+        // Parse data rows
+        const didIndex = header.indexOf('did');
+        const roleIndex = header.indexOf('role');
+        const balanceIndex = header.indexOf('balance');
+
+        csvImportState.parsedData = [];
+        csvImportState.validRows = [];
+        csvImportState.invalidRows = [];
+
+        const existingDIDs = new Set(state.members.map(m => m.did));
+        const seenDIDs = new Set();
+
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim());
+            const row = {
+                lineNumber: i + 1,
+                did: cols[didIndex] || '',
+                role: cols[roleIndex] || 'member',
+                balance: cols[balanceIndex] || '0',
+            };
+
+            // Validate row
+            const errors = [];
+
+            // Validate DID
+            if (!row.did) {
+                errors.push('DID is required');
+            } else if (!row.did.startsWith('did:icn:')) {
+                errors.push('DID must start with "did:icn:"');
+            } else if (row.did.length < 15) {
+                errors.push('DID is too short');
+            } else if (existingDIDs.has(row.did)) {
+                errors.push('DID already exists');
+                row.status = 'duplicate';
+            } else if (seenDIDs.has(row.did)) {
+                errors.push('Duplicate DID in CSV');
+                row.status = 'duplicate';
+            }
+
+            seenDIDs.add(row.did);
+
+            // Validate role
+            const validRoles = ['member', 'admin', 'owner'];
+            if (!validRoles.includes(row.role.toLowerCase())) {
+                errors.push('Role must be one of: member, admin, owner');
+            }
+
+            // Validate balance
+            const balance = parseFloat(row.balance);
+            if (isNaN(balance)) {
+                errors.push('Balance must be a number');
+            }
+
+            row.errors = errors;
+            row.status = row.status || (errors.length === 0 ? 'valid' : 'invalid');
+            row.balanceNum = balance;
+
+            csvImportState.parsedData.push(row);
+
+            if (row.status === 'valid') {
+                csvImportState.validRows.push(row);
+            } else {
+                csvImportState.invalidRows.push(row);
+            }
+        }
+
+        renderPreview();
+    };
+
+    reader.readAsText(csvImportState.file);
+}
+
+function renderPreview() {
+    // Update stats
+    document.getElementById('total-rows').textContent = csvImportState.parsedData.length;
+    document.getElementById('valid-rows').textContent = csvImportState.validRows.length;
+    document.getElementById('invalid-rows').textContent = csvImportState.invalidRows.length;
+
+    // Show/hide errors section
+    const errorsSection = document.getElementById('validation-errors');
+    const errorList = document.getElementById('error-list');
+
+    if (csvImportState.invalidRows.length > 0) {
+        errorsSection.classList.remove('hidden');
+        errorList.innerHTML = csvImportState.invalidRows
+            .slice(0, 10) // Show first 10 errors
+            .map(row => {
+                return `<li>Line ${row.lineNumber}: ${row.errors.join(', ')}</li>`;
+            })
+            .join('');
+
+        if (csvImportState.invalidRows.length > 10) {
+            errorList.innerHTML += `<li>... and ${csvImportState.invalidRows.length - 10} more errors</li>`;
+        }
+    } else {
+        errorsSection.classList.add('hidden');
+    }
+
+    // Render preview table (first 10 rows)
+    const previewBody = document.getElementById('preview-body');
+    previewBody.innerHTML = csvImportState.parsedData
+        .slice(0, 10)
+        .map(row => {
+            let statusText = row.status;
+            let statusClass = `status-${row.status}`;
+
+            if (row.status === 'invalid') {
+                statusText = '✗ Invalid';
+            } else if (row.status === 'duplicate') {
+                statusText = '⚠ Duplicate';
+            } else {
+                statusText = '✓ Valid';
+            }
+
+            return `
+                <tr>
+                    <td>${truncateDid(row.did)}</td>
+                    <td>${row.role}</td>
+                    <td>${parseFloat(row.balance).toFixed(1)}</td>
+                    <td class="${statusClass}">${statusText}</td>
+                </tr>
+            `;
+        })
+        .join('');
+
+    // Enable/disable import button
+    const confirmBtn = document.getElementById('import-confirm-btn');
+    if (confirmBtn) {
+        confirmBtn.disabled = csvImportState.validRows.length === 0;
+    }
+}
+
+function importMembers() {
+    // Add valid rows to state
+    csvImportState.validRows.forEach(row => {
+        state.members.push({
+            did: row.did,
+            role: row.role,
+            balance: row.balanceNum,
+        });
+    });
+
+    // Update display
+    document.getElementById('imported-count').textContent = csvImportState.validRows.length;
+
+    // Save to localStorage
+    localStorage.setItem('icn-members', JSON.stringify(state.members));
+
+    // Re-render member list
+    renderMemberList();
+
+    // Show notification
+    addNotification({
+        type: 'success',
+        title: 'Import Complete',
+        message: `${csvImportState.validRows.length} members imported successfully`,
+    });
+
+    showToast(`Imported ${csvImportState.validRows.length} members`, 'success');
+}
+
+// Initialize CSV import after DOM loads
+document.addEventListener('DOMContentLoaded', initializeCSVImport);
