@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use crate::auth::AuthManager;
-use crate::events::{EventBroadcaster, GatewayEvent};
+use crate::events::{EventBroadcaster, SequencedEvent};
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
 
@@ -22,18 +22,22 @@ static WS_ACTIVE_CONNECTIONS: AtomicU64 = AtomicU64::new(0);
 enum ClientMessage {
     /// Authenticate with JWT token
     Auth { token: String },
+    /// Request event backfill since a sequence number
+    Backfill { after_seq: u64 },
 }
 
 /// WebSocket server message (from server to client)
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 enum ServerMessage {
-    /// Authentication successful
-    AuthOk { did: String },
+    /// Authentication successful with current sequence number
+    AuthOk { did: String, current_seq: u64 },
     /// Authentication failed
     AuthError { message: String },
-    /// Event notification
-    Event(GatewayEvent),
+    /// Event notification with sequence number
+    Event(SequencedEvent),
+    /// Backfill complete with number of events sent
+    BackfillComplete { count: usize },
     /// Error message
     Error { message: String },
 }
@@ -51,7 +55,7 @@ pub struct WsSession {
     /// Event broadcaster
     event_broadcaster: Arc<EventBroadcaster>,
     /// Event receiver (subscribed after authentication)
-    event_rx: Option<mpsc::UnboundedReceiver<GatewayEvent>>,
+    event_rx: Option<mpsc::UnboundedReceiver<SequencedEvent>>,
     /// Tracks whether this connection was successfully started and incremented the global counter
     /// This prevents counter desync when connection is rejected at limit
     connection_tracked: bool,
@@ -105,6 +109,9 @@ impl WsSession {
                     Ok(did) => {
                         self.did = Some(did.clone());
 
+                        // Get current sequence for reconnection support
+                        let current_seq = self.event_broadcaster.current_sequence();
+
                         // Subscribe to events
                         let event_broadcaster = self.event_broadcaster.clone();
                         let coop_id = self.coop_id.clone();
@@ -113,16 +120,17 @@ impl WsSession {
                             event_broadcaster.subscribe(&coop_id).await
                         }
                         .into_actor(self)
-                        .map(|rx_opt, act, ctx| {
+                        .map(move |rx_opt, act, ctx| {
                             match rx_opt {
                                 Some(rx) => {
                                     act.event_rx = Some(rx);
                                     // Start polling for events
                                     act.poll_events(ctx);
 
-                                    // Send success message
+                                    // Send success message with current sequence
                                     let msg = ServerMessage::AuthOk {
                                         did: act.did.as_ref().unwrap().to_string(),
+                                        current_seq,
                                     };
                                     act.send_message(msg, ctx);
                                 }
@@ -170,9 +178,9 @@ impl WsSession {
 
             loop {
                 match rx.try_recv() {
-                    Ok(event) => {
-                        // Forward event to client
-                        let msg = ServerMessage::Event(event);
+                    Ok(sequenced_event) => {
+                        // Forward sequenced event to client
+                        let msg = ServerMessage::Event(sequenced_event);
                         if let Ok(json) = serde_json::to_string(&msg) {
                             ctx.text(json);
                             // Track message sent
@@ -212,6 +220,39 @@ impl WsSession {
                 act.poll_events(ctx);
             });
         }
+    }
+
+    /// Handle backfill request
+    fn handle_backfill(&self, after_seq: u64, ctx: &mut <Self as Actor>::Context) {
+        if self.did.is_none() {
+            let msg = ServerMessage::Error {
+                message: "Must authenticate before requesting backfill".to_string(),
+            };
+            self.send_message(msg, ctx);
+            return;
+        }
+
+        let event_broadcaster = self.event_broadcaster.clone();
+        let coop_id = self.coop_id.clone();
+
+        let fut = async move {
+            event_broadcaster.get_backfill(&coop_id, after_seq).await
+        }
+        .into_actor(self)
+        .map(|events, act, ctx| {
+            let count = events.len();
+            // Send all backfill events
+            for event in events {
+                let msg = ServerMessage::Event(event);
+                act.send_message(msg, ctx);
+                gateway::websocket_messages_sent_inc();
+            }
+            // Send completion message
+            let msg = ServerMessage::BackfillComplete { count };
+            act.send_message(msg, ctx);
+        });
+
+        ctx.spawn(fut);
     }
 
     /// Send heartbeat ping to client
@@ -321,6 +362,9 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for WsSe
                     Ok(ClientMessage::Auth { token }) => {
                         self.authenticate(&token, ctx);
                     }
+                    Ok(ClientMessage::Backfill { after_seq }) => {
+                        self.handle_backfill(after_seq, ctx);
+                    }
                     Err(e) => {
                         let msg = ServerMessage::Error {
                             message: format!("Invalid message format: {e}"),
@@ -359,9 +403,11 @@ mod tests {
     fn test_server_message_serialization() {
         let msg = ServerMessage::AuthOk {
             did: "did:icn:test".to_string(),
+            current_seq: 42,
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("AuthOk"));
         assert!(json.contains("did:icn:test"));
+        assert!(json.contains("42"));
     }
 }

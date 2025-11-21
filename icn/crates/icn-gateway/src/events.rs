@@ -1,11 +1,18 @@
 //! Event broadcasting for real-time updates
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::coop::CoopId;
+
+/// Maximum number of events to keep for backfill per channel
+const MAX_BACKFILL_EVENTS: usize = 100;
+
+/// Global sequence counter for events
+static EVENT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 /// Event types that can be broadcast to WebSocket clients
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,10 +103,22 @@ pub enum GatewayEvent {
     },
 }
 
+/// Event with sequence number for backfill support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequencedEvent {
+    /// Sequence number for ordering and backfill
+    pub seq: u64,
+    /// The event payload
+    #[serde(flatten)]
+    pub event: GatewayEvent,
+}
+
 /// Event broadcaster manages subscribers and sends events
 pub struct EventBroadcaster {
     /// Subscribers per cooperative (coop_id -> list of subscriber channels)
-    subscribers: Arc<RwLock<HashMap<CoopId, Vec<tokio::sync::mpsc::UnboundedSender<GatewayEvent>>>>>,
+    subscribers: Arc<RwLock<HashMap<CoopId, Vec<tokio::sync::mpsc::UnboundedSender<SequencedEvent>>>>>,
+    /// Recent events for backfill (coop_id -> ring buffer of recent events)
+    backfill_buffer: Arc<RwLock<HashMap<CoopId, VecDeque<SequencedEvent>>>>,
 }
 
 impl EventBroadcaster {
@@ -107,12 +126,13 @@ impl EventBroadcaster {
     pub fn new() -> Self {
         Self {
             subscribers: Arc::new(RwLock::new(HashMap::new())),
+            backfill_buffer: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     /// Subscribe to events for a cooperative
     /// Returns None if the subscriber limit has been reached for this cooperative
-    pub async fn subscribe(&self, coop_id: &str) -> Option<tokio::sync::mpsc::UnboundedReceiver<GatewayEvent>> {
+    pub async fn subscribe(&self, coop_id: &str) -> Option<tokio::sync::mpsc::UnboundedReceiver<SequencedEvent>> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         let mut subscribers = self.subscribers.write().await;
@@ -130,15 +150,49 @@ impl EventBroadcaster {
         Some(rx)
     }
 
+    /// Get events after a given sequence number for backfill
+    pub async fn get_backfill(&self, coop_id: &str, after_seq: u64) -> Vec<SequencedEvent> {
+        let buffer = self.backfill_buffer.read().await;
+        if let Some(events) = buffer.get(coop_id) {
+            events
+                .iter()
+                .filter(|e| e.seq > after_seq)
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the current sequence number (for initial connection)
+    pub fn current_sequence(&self) -> u64 {
+        EVENT_SEQUENCE.load(Ordering::Relaxed)
+    }
+
     /// Broadcast an event to all subscribers of a cooperative
     pub async fn broadcast(&self, coop_id: &str, event: GatewayEvent) {
+        // Assign sequence number
+        let seq = EVENT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let sequenced = SequencedEvent { seq, event };
+
+        // Store in backfill buffer
+        {
+            let mut buffer = self.backfill_buffer.write().await;
+            let events = buffer.entry(coop_id.to_string()).or_insert_with(VecDeque::new);
+            events.push_back(sequenced.clone());
+            // Trim to max size
+            while events.len() > MAX_BACKFILL_EVENTS {
+                events.pop_front();
+            }
+        }
+
         // First try read-only send
         {
             let subscribers = self.subscribers.read().await;
             if let Some(subs) = subscribers.get(coop_id) {
                 let mut any_closed = false;
                 for sub in subs {
-                    if sub.send(event.clone()).is_err() {
+                    if sub.send(sequenced.clone()).is_err() {
                         any_closed = true;
                     }
                 }
@@ -209,13 +263,42 @@ mod tests {
         let received = rx.recv().await;
         assert!(received.is_some());
 
-        match received.unwrap() {
+        let sequenced = received.unwrap();
+        assert!(sequenced.seq > 0);
+        match sequenced.event {
             GatewayEvent::PaymentCreated { coop_id, amount, .. } => {
                 assert_eq!(coop_id, "test-coop");
                 assert_eq!(amount, 10);
             }
             _ => panic!("Wrong event type"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_backfill() {
+        let broadcaster = EventBroadcaster::new();
+
+        // Broadcast 3 events
+        for i in 0..3 {
+            let event = GatewayEvent::PaymentCreated {
+                coop_id: "test-coop".to_string(),
+                hash: format!("hash{}", i),
+                from: "did:icn:alice".to_string(),
+                to: "did:icn:bob".to_string(),
+                amount: i as i64,
+                currency: "hours".to_string(),
+            };
+            broadcaster.broadcast("test-coop", event).await;
+        }
+
+        // Get all events (after seq 0)
+        let backfill = broadcaster.get_backfill("test-coop", 0).await;
+        assert_eq!(backfill.len(), 3);
+
+        // Get events after first
+        let first_seq = backfill[0].seq;
+        let partial = broadcaster.get_backfill("test-coop", first_seq).await;
+        assert_eq!(partial.len(), 2);
     }
 
     #[tokio::test]
