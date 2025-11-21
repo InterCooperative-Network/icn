@@ -211,6 +211,8 @@ export interface SubmitTaskRequest {
   inputs?: Record<string, unknown>;
   /** Maximum fuel for execution (default 10000) */
   fuel_limit?: number;
+  /** Task priority: "low", "normal", "high", or "critical" (default: "normal") */
+  priority?: string;
   /** Deadline in milliseconds from now */
   deadline_ms?: number;
   /** Payment rate per 1000 fuel */

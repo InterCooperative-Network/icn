@@ -1604,6 +1604,15 @@ async fn handle_compute_submit(
         serde_json::to_vec(&request.inputs).unwrap_or_default()
     };
 
+    // Parse priority string (case-insensitive)
+    let priority = match request.priority.to_lowercase().as_str() {
+        "low" => icn_compute::TaskPriority::Low,
+        "normal" => icn_compute::TaskPriority::Normal,
+        "high" => icn_compute::TaskPriority::High,
+        "critical" => icn_compute::TaskPriority::Critical,
+        _ => icn_compute::TaskPriority::Normal, // Default to normal for invalid values
+    };
+
     let task = icn_compute::ComputeTask {
         id: request.task_id,
         submitter: "rpc:unknown".to_string(), // TODO: Get from auth context
@@ -1611,7 +1620,7 @@ async fn handle_compute_submit(
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
         required_capabilities: vec![icn_compute::ExecutorCapability::Ccl],
-        priority: icn_compute::TaskPriority::Normal,
+        priority,
         created_at: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

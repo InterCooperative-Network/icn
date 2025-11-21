@@ -61,6 +61,7 @@ impl ComputeManager {
         code: String,
         inputs: Vec<u8>,
         fuel_limit: u64,
+        priority: &str,
         deadline_ms: Option<u64>,
         payment_rate: Option<u64>,
         payment_currency: Option<String>,
@@ -73,6 +74,15 @@ impl ComputeManager {
         // Convert relative deadline to absolute timestamp
         let absolute_deadline = deadline_ms.map(|ms| now + ms);
 
+        // Parse priority string (case-insensitive)
+        let task_priority = match priority.to_lowercase().as_str() {
+            "low" => TaskPriority::Low,
+            "normal" => TaskPriority::Normal,
+            "high" => TaskPriority::High,
+            "critical" => TaskPriority::Critical,
+            _ => TaskPriority::Normal, // Default to normal for invalid values
+        };
+
         let task = ComputeTask {
             id: task_id.clone(),
             submitter: submitter.clone(),
@@ -80,7 +90,7 @@ impl ComputeManager {
             inputs,
             fuel_limit: FuelLimit(fuel_limit),
             required_capabilities: vec![ExecutorCapability::Ccl],
-            priority: TaskPriority::Normal,
+            priority: task_priority,
             created_at: now,
             deadline: absolute_deadline,
             payment_rate,
@@ -275,6 +285,7 @@ mod tests {
             r#"{"name": "Test"}"#.to_string(),
             vec![],
             10_000,
+            "normal",
             None,
             None,
             None,
@@ -293,6 +304,7 @@ mod tests {
             r#"{"name": "Test"}"#.to_string(),
             vec![],
             50, // Below minimum (100)
+            "normal",
             None,
             None,
             None,
@@ -311,6 +323,7 @@ mod tests {
             r#"{"name": "Test"}"#.to_string(),
             vec![],
             10_000,
+            "normal",
             None,
             None,
             None,
@@ -329,6 +342,7 @@ mod tests {
             r#"{"name": "Test"}"#.to_string(),
             vec![],
             10_000,
+            "normal",
             None,
             None,
             None,
@@ -347,6 +361,7 @@ mod tests {
             r#"{"name": "Test"}"#.to_string(),
             vec![],
             10_000,
+            "normal",
             None,
             Some(2_000_000), // Above max (1M)
             None,

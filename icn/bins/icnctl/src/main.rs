@@ -153,6 +153,10 @@ enum ComputeCommands {
         #[arg(short, long, default_value = "10000")]
         fuel: u64,
 
+        /// Task priority: low, normal, high, or critical (default: normal)
+        #[arg(short = 'P', long, default_value = "normal")]
+        priority: String,
+
         /// Path to inputs JSON file
         #[arg(short = 'i', long)]
         inputs: Option<PathBuf>,
@@ -3730,6 +3734,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             contract,
             id,
             fuel,
+            priority,
             inputs,
             payment_rate,
             payment_currency,
@@ -3754,6 +3759,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                 "code": contract_json,
                 "inputs": inputs_value,
                 "fuel_limit": fuel,
+                "priority": priority,
                 "payment_rate": payment_rate,
                 "payment_currency": payment_currency,
             });

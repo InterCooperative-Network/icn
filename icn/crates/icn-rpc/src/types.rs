@@ -234,12 +234,19 @@ pub struct SubmitTaskRequest {
     pub inputs: serde_json::Value,
     #[serde(default = "default_fuel_limit")]
     pub fuel_limit: u64,
+    /// Task priority: "low", "normal", "high", or "critical" (default: "normal")
+    #[serde(default = "default_priority")]
+    pub priority: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deadline_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_rate: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_currency: Option<String>,
+}
+
+fn default_priority() -> String {
+    "normal".to_string()
 }
 
 fn default_fuel_limit() -> u64 {

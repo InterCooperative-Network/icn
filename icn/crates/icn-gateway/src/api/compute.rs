@@ -24,6 +24,9 @@ pub struct SubmitTaskRequest {
     /// Fuel limit (default: 10000)
     #[serde(default = "default_fuel_limit")]
     pub fuel_limit: u64,
+    /// Task priority (default: Normal)
+    #[serde(default)]
+    pub priority: Option<String>,
     /// Deadline in milliseconds from now (optional)
     #[serde(default)]
     pub deadline_ms: Option<u64>,
@@ -78,6 +81,9 @@ pub async fn submit_task(
         serde_json::to_vec(&req.inputs).unwrap_or_default()
     };
 
+    // Parse priority string (low, normal, high, critical) - case insensitive
+    let priority = req.priority.as_deref().unwrap_or("normal");
+
     // Submit task
     let task_hash = compute_mgr.submit_task(
         task_id.clone(),
@@ -85,6 +91,7 @@ pub async fn submit_task(
         req.code.clone(),
         inputs,
         req.fuel_limit,
+        priority,
         req.deadline_ms,
         req.payment_rate,
         req.payment_currency.clone(),
