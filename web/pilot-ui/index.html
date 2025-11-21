@@ -187,9 +187,46 @@
                         </div>
                     </div>
 
+                    <!-- Language Switcher -->
+                    <div class="language-switcher">
+                        <button
+                            id="language-btn"
+                            class="btn-icon"
+                            aria-label="Change language"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            title="Change language"
+                        >
+                            <span class="language-icon">🌐</span>
+                        </button>
+
+                        <div id="language-menu" class="language-menu hidden" role="menu" aria-label="Language selection">
+                            <button class="language-option" data-lang="en" role="menuitem">
+                                <span class="flag">🇺🇸</span>
+                                <span class="language-name">English</span>
+                            </button>
+                            <button class="language-option" data-lang="es" role="menuitem">
+                                <span class="flag">🇪🇸</span>
+                                <span class="language-name">Español</span>
+                            </button>
+                            <button class="language-option" data-lang="fr" role="menuitem">
+                                <span class="flag">🇫🇷</span>
+                                <span class="language-name">Français</span>
+                            </button>
+                            <button class="language-option" data-lang="de" role="menuitem">
+                                <span class="flag">🇩🇪</span>
+                                <span class="language-name">Deutsch</span>
+                            </button>
+                            <button class="language-option" data-lang="zh" role="menuitem">
+                                <span class="flag">🇨🇳</span>
+                                <span class="language-name">中文</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <span id="token-expires" class="token-info" aria-label="Token expiration time"></span>
                     <span id="user-did" class="user-info" aria-label="Your DID"></span>
-                    <button id="logout-btn" class="btn btn-small" aria-label="Sign out">Logout</button>
+                    <button id="logout-btn" class="btn btn-small" aria-label="Sign out" data-i18n="logout">Logout</button>
                 </div>
             </header>
 

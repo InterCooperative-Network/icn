@@ -3714,3 +3714,146 @@ function importBatchTransactions() {
 
 // Initialize batch import after DOM loads
 document.addEventListener('DOMContentLoaded', initializeBatchImport);
+
+// ============================================================================
+// Phase 10: Internationalization (i18n)
+// ============================================================================
+
+const translations = {
+    en: {
+        'logout': 'Logout',
+        'notifications': 'Notifications',
+        'markAllRead': 'Mark all read',
+        'noNotifications': 'No notifications',
+    },
+    es: {
+        'logout': 'Cerrar Sesión',
+        'notifications': 'Notificaciones',
+        'markAllRead': 'Marcar todo como leído',
+        'noNotifications': 'Sin notificaciones',
+    },
+    fr: {
+        'logout': 'Déconnexion',
+        'notifications': 'Notifications',
+        'markAllRead': 'Tout marquer comme lu',
+        'noNotifications': 'Aucune notification',
+    },
+    de: {
+        'logout': 'Abmelden',
+        'notifications': 'Benachrichtigungen',
+        'markAllRead': 'Alle als gelesen markieren',
+        'noNotifications': 'Keine Benachrichtigungen',
+    },
+    zh: {
+        'logout': '登出',
+        'notifications': '通知',
+        'markAllRead': '全部标记为已读',
+        'noNotifications': '无通知',
+    },
+};
+
+// Current language state
+let currentLanguage = localStorage.getItem('icn-language') || 'en';
+
+// Translation function
+function t(key) {
+    return translations[currentLanguage][key] || translations['en'][key] || key;
+}
+
+// Update all translatable elements
+function updateTranslations() {
+    document.body.classList.add('translating');
+
+    // Update all elements with data-i18n attribute
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        const key = element.getAttribute('data-i18n');
+        const translation = t(key);
+
+        // Update text content or specific attributes
+        if (element.hasAttribute('placeholder')) {
+            element.placeholder = translation;
+        } else if (element.hasAttribute('aria-label')) {
+            element.setAttribute('aria-label', translation);
+        } else if (element.hasAttribute('title')) {
+            element.title = translation;
+        } else {
+            element.textContent = translation;
+        }
+    });
+
+    // Update active language option
+    document.querySelectorAll('.language-option').forEach(option => {
+        const lang = option.getAttribute('data-lang');
+        if (lang === currentLanguage) {
+            option.classList.add('active');
+        } else {
+            option.classList.remove('active');
+        }
+    });
+
+    // Set HTML lang attribute
+    document.documentElement.setAttribute('lang', currentLanguage);
+
+    // Set RTL direction for Arabic, Hebrew, etc.
+    const rtlLanguages = ['ar', 'he', 'fa', 'ur'];
+    if (rtlLanguages.includes(currentLanguage)) {
+        document.documentElement.setAttribute('dir', 'rtl');
+    } else {
+        document.documentElement.setAttribute('dir', 'ltr');
+    }
+
+    setTimeout(() => {
+        document.body.classList.remove('translating');
+    }, 200);
+}
+
+// Initialize language switcher
+function initializeLanguageSwitcher() {
+    const languageBtn = document.getElementById('language-btn');
+    const languageMenu = document.getElementById('language-menu');
+    const languageOptions = document.querySelectorAll('.language-option');
+
+    if (!languageBtn || !languageMenu) return;
+
+    // Toggle language menu
+    languageBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !languageMenu.classList.contains('hidden');
+        if (isOpen) {
+            languageMenu.classList.add('hidden');
+            languageBtn.setAttribute('aria-expanded', 'false');
+        } else {
+            languageMenu.classList.remove('hidden');
+            languageBtn.setAttribute('aria-expanded', 'true');
+        }
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!languageMenu.contains(e.target) && !languageBtn.contains(e.target)) {
+            languageMenu.classList.add('hidden');
+            languageBtn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    // Language selection
+    languageOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const lang = option.getAttribute('data-lang');
+            if (lang !== currentLanguage) {
+                currentLanguage = lang;
+                localStorage.setItem('icn-language', lang);
+                updateTranslations();
+                showToast(`Language changed to ${option.querySelector('.language-name').textContent}`, 'success', 2000);
+            }
+            languageMenu.classList.add('hidden');
+            languageBtn.setAttribute('aria-expanded', 'false');
+        });
+    });
+
+    // Initial translation update
+    updateTranslations();
+}
+
+// Initialize language switcher after DOM loads
+document.addEventListener('DOMContentLoaded', initializeLanguageSwitcher);

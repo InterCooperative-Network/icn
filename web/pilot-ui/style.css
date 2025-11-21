@@ -2936,3 +2936,106 @@ footer {
         width: 100%;
     }
 }
+
+/* ============================================================================
+   Phase 10: Internationalization (i18n)
+   ============================================================================ */
+
+/* Language Switcher */
+.language-switcher {
+    position: relative;
+}
+
+.language-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 180px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.language-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s ease;
+    text-align: left;
+}
+
+.language-option:last-child {
+    border-bottom: none;
+}
+
+.language-option:hover {
+    background: var(--bg-secondary);
+}
+
+.language-option.active {
+    background: rgba(37, 99, 235, 0.1);
+    font-weight: 600;
+}
+
+.language-option .flag {
+    font-size: 1.25rem;
+}
+
+.language-option .language-name {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.language-icon {
+    font-size: 1.25rem;
+}
+
+/* RTL Support */
+html[dir="rtl"] {
+    direction: rtl;
+}
+
+html[dir="rtl"] .header-left {
+    margin-right: 0;
+    margin-left: auto;
+}
+
+html[dir="rtl"] .notification-panel,
+html[dir="rtl"] .language-menu {
+    left: 0;
+    right: auto;
+}
+
+/* Translation loading indicator */
+.translating {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .language-menu {
+        min-width: 160px;
+    }
+
+    .language-option {
+        padding: 0.65rem 0.85rem;
+    }
+
+    .language-option .flag {
+        font-size: 1.1rem;
+    }
+
+    .language-option .language-name {
+        font-size: 0.85rem;
+    }
+}
