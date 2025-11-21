@@ -763,8 +763,19 @@ Submitter → compute:submit → Executor claims → Executes CCL
 - **types.rs**: ComputeTask, ComputeResult, ComputeMessage, TaskCode (CCL/WASM)
 - **task.rs**: TaskManager with lifecycle tracking (Pending→Claimed→Completed/Failed/Cancelled)
 - **executor.rs**: Executor trait, LocalExecutor (CCL), future WasmExecutor
-- **actor.rs**: ComputeActor with gossip/trust/payment callbacks + cancellation support
+- **actor.rs**: ComputeActor with gossip/trust/payment/event callbacks + cancellation support
 - **error.rs**: ComputeError types
+
+**Event Broadcasting**:
+The compute layer broadcasts task status events via the EventCallback:
+- **ComputeEvent::TaskClaimed** - When an executor claims a task
+- **ComputeEvent::TaskCompleted** - When task execution finishes (with outcome, fuel_used, duration_ms)
+
+Events are broadcast at two points:
+1. Local execution: When this node's executor claims and completes tasks
+2. Remote execution: When accepting verified results from other executors
+
+The supervisor sets up the event callback for logging and metrics. Future gateway integration can forward events to WebSocket clients for real-time task monitoring.
 
 **Prometheus Metrics** (`icn_compute_*`):
 - `tasks_submitted_total`, `tasks_claimed_total`, `tasks_completed_total`
