@@ -510,13 +510,35 @@ impl ComputeActor {
         }
 
         // Store task
-        let hash = self.task_manager.lock().await.submit(task.clone())?;
+        let _hash = self.task_manager.lock().await.submit(task.clone())?;
 
-        // Claim it
-        self.task_manager
-            .lock()
-            .await
-            .claim(&hash, self.own_did.clone())?;
+        // Find highest-priority pending task we can execute
+        let mgr = self.task_manager.lock().await;
+        let pending = mgr.pending_by_priority();
+        let highest_priority_task = pending
+            .into_iter()
+            .find(|(_, t)| self.executor.can_execute(t))
+            .map(|(h, _)| h);
+        drop(mgr);
+
+        // Claim highest-priority task if available
+        let (hash, claimed_task) = if let Some(h) = highest_priority_task {
+            self.task_manager
+                .lock()
+                .await
+                .claim(&h, self.own_did.clone())?;
+
+            let mgr = self.task_manager.lock().await;
+            let t = mgr.get(&h)
+                .ok_or_else(|| ComputeError::TaskNotFound(hex::encode(h)))?
+                .clone();
+            drop(mgr);
+            (h, t)
+        } else {
+            tracing::debug!("No suitable pending tasks found after submission");
+            return Ok(());
+        };
+
         icn_obs::metrics::compute::tasks_claimed_inc();
 
         // Update our own executor load
@@ -527,11 +549,13 @@ impl ComputeActor {
         }
         drop(registry);
 
+        let task_hash_str = hex::encode(hash);
         tracing::info!(
-            task_id = %task.id,
+            task_id = %claimed_task.id,
             task_hash = %task_hash_str,
+            priority = ?claimed_task.priority,
             executor = %self.own_did,
-            "Claimed and executing task"
+            "Claimed and executing highest-priority task"
         );
 
         // Broadcast claim
@@ -546,7 +570,7 @@ impl ComputeActor {
         let start = std::time::Instant::now();
         let result = self
             .executor
-            .execute_task(&task, &self.own_did, &self.signing_key)?;
+            .execute_task(&claimed_task, &self.own_did, &self.signing_key)?;
         let duration = start.elapsed().as_secs_f64();
 
         // Record metrics
@@ -1021,5 +1045,59 @@ mod tests {
         // Task should be completed after consensus (1 result required)
         let status = handle.status(task_hash).await.unwrap();
         assert!(matches!(status, Some(TaskStatus::Completed { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_priority_based_claiming() {
+        let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+        let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+        actor.set_signing_key(vec![1u8; 32]);
+
+        // Set max concurrent to 1 so we can control execution order
+        actor.set_max_concurrent_tasks(1);
+        let handle = actor.spawn();
+
+        // Submit tasks with different priorities
+        let mut low_task = make_task("low-priority", "did:icn:alice");
+        low_task.priority = crate::types::TaskPriority::Low;
+
+        let mut normal_task = make_task("normal-priority", "did:icn:alice");
+        normal_task.priority = crate::types::TaskPriority::Normal;
+
+        let mut high_task = make_task("high-priority", "did:icn:alice");
+        high_task.priority = crate::types::TaskPriority::High;
+
+        let mut critical_task = make_task("critical-priority", "did:icn:alice");
+        critical_task.priority = crate::types::TaskPriority::Critical;
+
+        // Submit them via gossip (not direct submit which auto-executes)
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(low_task.clone())).await.unwrap();
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(normal_task.clone())).await.unwrap();
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(high_task.clone())).await.unwrap();
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(critical_task.clone())).await.unwrap();
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // The critical task should have been claimed and completed first
+        // Since we have max_concurrent=1, only highest priority runs at a time
+        let critical_hash = critical_task.hash();
+        let critical_status = handle.status(critical_hash).await.unwrap();
+        assert!(
+            matches!(critical_status, Some(TaskStatus::Completed { .. })),
+            "Critical task should be completed first, got: {:?}", critical_status
+        );
+
+        // High should be next
+        let high_hash = high_task.hash();
+        let high_status = handle.status(high_hash).await.unwrap();
+        assert!(
+            matches!(high_status, Some(TaskStatus::Completed { .. })),
+            "High priority task should be completed second, got: {:?}", high_status
+        );
     }
 }

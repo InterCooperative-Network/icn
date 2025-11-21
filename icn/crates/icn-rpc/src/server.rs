@@ -1611,6 +1611,7 @@ async fn handle_compute_submit(
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
         required_capabilities: vec![icn_compute::ExecutorCapability::Ccl],
+        priority: icn_compute::TaskPriority::Normal,
         created_at: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

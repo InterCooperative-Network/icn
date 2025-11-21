@@ -6,7 +6,7 @@
 //! 2. ComputeHandle (when integrated with daemon)
 
 use anyhow::Result;
-use icn_compute::{ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskStatus};
+use icn_compute::{ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TaskStatus};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -80,6 +80,7 @@ impl ComputeManager {
             inputs,
             fuel_limit: FuelLimit(fuel_limit),
             required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
             created_at: now,
             deadline: absolute_deadline,
             payment_rate,

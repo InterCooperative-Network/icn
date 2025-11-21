@@ -166,6 +166,26 @@ impl TaskManager {
         })
     }
 
+    /// Get pending tasks sorted by priority (highest priority first)
+    pub fn pending_by_priority(&self) -> Vec<(TaskHash, &ComputeTask)> {
+        let mut pending: Vec<_> = self.tasks
+            .iter()
+            .filter(|(h, _)| matches!(self.status.get(*h), Some(TaskStatus::Pending)))
+            .map(|(h, task)| (*h, task))
+            .collect();
+
+        // Sort by priority descending (Critical > High > Normal > Low)
+        // Then by created_at ascending (older tasks first) as tiebreaker
+        pending.sort_by(|(_, a), (_, b)| {
+            match b.priority.cmp(&a.priority) {
+                std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at),
+                other => other,
+            }
+        });
+
+        pending
+    }
+
     /// Count of pending tasks
     pub fn pending_count(&self) -> usize {
         self.status
