@@ -174,6 +174,32 @@ impl TaskManager {
             .count()
     }
 
+    /// Find tasks that have exceeded their deadline
+    pub fn find_timed_out(&self, now: u64) -> Vec<(TaskHash, Option<String>)> {
+        self.tasks
+            .iter()
+            .filter_map(|(hash, task)| {
+                // Check if task has a deadline and it has passed
+                if let Some(deadline) = task.deadline {
+                    if deadline <= now {
+                        // Only return pending or claimed tasks
+                        match self.status.get(hash) {
+                            Some(TaskStatus::Pending) => Some((*hash, None)),
+                            Some(TaskStatus::Claimed { executor, .. }) => {
+                                Some((*hash, Some(executor.clone())))
+                            }
+                            _ => None, // Already completed/failed/cancelled
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Remove old completed/failed/cancelled tasks
     pub fn cleanup(&mut self, max_age_ms: u64) {
         let now = SystemTime::now()

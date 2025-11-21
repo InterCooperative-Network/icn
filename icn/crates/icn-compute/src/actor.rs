@@ -202,6 +202,27 @@ impl ComputeActor {
     pub fn spawn(self) -> ComputeHandle {
         let (tx, mut rx) = mpsc::channel::<ComputeCommand>(256);
 
+        // Clone Arc references for the timeout checker
+        let task_manager_clone = Arc::clone(&self.task_manager);
+        let executor_registry_clone = Arc::clone(&self.executor_registry);
+        let send_callback_clone = self.send_callback.clone();
+
+        // Spawn timeout checker task
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+            loop {
+                interval.tick().await;
+                if let Err(e) = Self::check_timeouts(
+                    &task_manager_clone,
+                    &executor_registry_clone,
+                    &send_callback_clone,
+                ).await {
+                    tracing::warn!("timeout checker error: {}", e);
+                }
+            }
+        });
+
+        // Spawn main command loop
         tokio::spawn(async move {
             while let Some(cmd) = rx.recv().await {
                 match cmd {
@@ -227,6 +248,80 @@ impl ComputeActor {
         });
 
         ComputeHandle { tx }
+    }
+
+    /// Check for timed-out tasks and mark them as failed
+    async fn check_timeouts(
+        task_manager: &Arc<Mutex<TaskManager>>,
+        executor_registry: &Arc<Mutex<HashMap<String, ExecutorInfo>>>,
+        send_callback: &Option<SendCallback>,
+    ) -> Result<(), ComputeError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let mgr = task_manager.lock().await;
+        let timed_out_tasks = mgr.find_timed_out(now);
+        drop(mgr);
+
+        let timeout_count = timed_out_tasks.len();
+        if timeout_count > 0 {
+            tracing::info!(
+                count = timeout_count,
+                "Found timed-out tasks, marking as failed"
+            );
+        }
+
+        // Mark timed-out tasks as failed
+        for (hash, executor_did) in timed_out_tasks {
+            let task_hash_str = hex::encode(hash);
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                "Task exceeded deadline, marking as failed"
+            );
+
+            // Get task info for broadcasting
+            let mut mgr = task_manager.lock().await;
+            let task_id = mgr.get(&hash)
+                .map(|t| t.id.clone())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            // Mark as failed
+            mgr.fail(&hash, "Deadline exceeded".to_string())?;
+            drop(mgr);
+
+            icn_obs::metrics::compute::tasks_timeout_inc();
+            icn_obs::metrics::compute::tasks_completed_inc("timeout");
+
+            // Decrement executor load if task was claimed
+            if let Some(executor) = executor_did {
+                let mut registry = executor_registry.lock().await;
+                if let Some(info) = registry.get_mut(&executor) {
+                    if info.tasks_executing > 0 {
+                        info.tasks_executing -= 1;
+                        icn_obs::metrics::compute::executor_load_set(&executor, info.tasks_executing as f64);
+                    }
+                }
+            }
+
+            // Broadcast failure via gossip
+            if let Some(ref cb) = send_callback {
+                let result = ComputeResult {
+                    task_hash: hash,
+                    task_id,
+                    executor: "system".to_string(),
+                    outcome: crate::types::ExecutionOutcome::Timeout,
+                    fuel_used: 0,
+                    duration_ms: 0,
+                    completed_at: now,
+                    signature: vec![], // System-generated results don't need signatures
+                };
+                cb(ComputeMessage::TaskResult(result));
+            }
+        }
+
+        Ok(())
     }
 
     /// Handle task submission
