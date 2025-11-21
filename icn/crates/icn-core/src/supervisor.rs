@@ -1256,12 +1256,66 @@ impl Supervisor {
             });
 
             compute_actor.set_send_callback(compute_send_callback);
+
+            // Set up payment callback to settle via ledger
+            let ledger_for_compute = ledger_handle.clone();
+            let compute_payment_callback: icn_compute::PaymentCallback = Arc::new(move |req| {
+                let ledger = ledger_for_compute.clone();
+                tokio::spawn(async move {
+                    // Parse DIDs
+                    let from_did: icn_identity::Did = match serde_json::from_value(
+                        serde_json::Value::String(req.from.clone())
+                    ) {
+                        Ok(d) => d,
+                        Err(e) => {
+                            warn!("Failed to parse payer DID: {}", e);
+                            return;
+                        }
+                    };
+                    let to_did: icn_identity::Did = match serde_json::from_value(
+                        serde_json::Value::String(req.to.clone())
+                    ) {
+                        Ok(d) => d,
+                        Err(e) => {
+                            warn!("Failed to parse payee DID: {}", e);
+                            return;
+                        }
+                    };
+
+                    // Create journal entry for transfer: debit from payer, credit to payee
+                    let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
+                        .debit(from_did, req.currency.clone(), req.amount as i64)
+                        .credit(to_did, req.currency.clone(), req.amount as i64)
+                        .build()
+                    {
+                        Ok(e) => e,
+                        Err(e) => {
+                            warn!("Failed to build payment entry: {}", e);
+                            return;
+                        }
+                    };
+
+                    // Append to ledger
+                    let mut ledger = ledger.write().await;
+                    match ledger.append_entry(entry) {
+                        Ok(_) => {
+                            info!("✓ Compute payment settled: {} {} from {} to {} for task {}",
+                                  req.amount, req.currency, req.from, req.to, req.task_id);
+                        }
+                        Err(e) => {
+                            warn!("Failed to settle compute payment: {}", e);
+                        }
+                    }
+                });
+            });
+            compute_actor.set_payment_callback(compute_payment_callback);
+
             let compute_handle = compute_actor.spawn();
 
             // Fill compute handle holder for notification callback
             *compute_handle_holder.write().await = Some(compute_handle);
 
-            info!("✓ Compute actor spawned");
+            info!("✓ Compute actor spawned with payment settlement");
 
             // Subscribe to compute topics
             {
