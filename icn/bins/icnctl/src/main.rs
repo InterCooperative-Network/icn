@@ -113,6 +113,10 @@ enum Commands {
     /// Gateway authentication (get JWT tokens)
     #[command(subcommand)]
     Auth(AuthCommands),
+
+    /// Distributed compute operations
+    #[command(subcommand)]
+    Compute(ComputeCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -130,6 +134,42 @@ enum AuthCommands {
         /// Scopes to request (comma-separated)
         #[arg(short, long, default_value = "ledger:read,ledger:write,coop:read,gov:read,gov:write")]
         scopes: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ComputeCommands {
+    /// Submit a CCL contract for distributed execution
+    Submit {
+        /// Path to CCL contract JSON file
+        #[arg(short, long)]
+        contract: PathBuf,
+
+        /// Task ID (auto-generated if not provided)
+        #[arg(short, long)]
+        id: Option<String>,
+
+        /// Fuel limit (default 10000)
+        #[arg(short, long, default_value = "10000")]
+        fuel: u64,
+
+        /// Path to inputs JSON file
+        #[arg(short = 'i', long)]
+        inputs: Option<PathBuf>,
+
+        /// Payment rate per 1000 fuel (optional)
+        #[arg(short, long)]
+        payment_rate: Option<u64>,
+
+        /// Payment currency (default: credits)
+        #[arg(long)]
+        payment_currency: Option<String>,
+    },
+
+    /// Check task status
+    Status {
+        /// Task hash (hex)
+        task_hash: String,
     },
 }
 
@@ -711,6 +751,10 @@ async fn main() -> Result<()> {
 
         Commands::Auth(auth_cmd) => {
             handle_auth_command(auth_cmd, &data_dir).await?
+        }
+
+        Commands::Compute(compute_cmd) => {
+            handle_compute_command(compute_cmd, &args.endpoint)?
         }
     }
 
@@ -3666,6 +3710,93 @@ token_expiry_hours = 24
     println!();
     println!("Documentation: https://icn.coop/docs");
     println!();
+
+    Ok(())
+}
+
+fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
+    match cmd {
+        ComputeCommands::Submit {
+            contract,
+            id,
+            fuel,
+            inputs,
+            payment_rate,
+            payment_currency,
+        } => {
+            // Read contract JSON
+            let contract_json = std::fs::read_to_string(&contract)
+                .with_context(|| format!("Failed to read contract file: {:?}", contract))?;
+
+            // Read inputs if provided
+            let inputs_value: serde_json::Value = if let Some(inputs_path) = inputs {
+                let inputs_json = std::fs::read_to_string(&inputs_path)
+                    .with_context(|| format!("Failed to read inputs file: {:?}", inputs_path))?;
+                serde_json::from_str(&inputs_json)?
+            } else {
+                serde_json::Value::Null
+            };
+
+            let task_id = id.unwrap_or_else(|| format!("task-{}", uuid::Uuid::new_v4()));
+
+            let params = serde_json::json!({
+                "task_id": task_id,
+                "code": contract_json,
+                "inputs": inputs_value,
+                "fuel_limit": fuel,
+                "payment_rate": payment_rate,
+                "payment_currency": payment_currency,
+            });
+
+            let result = rpc_call(endpoint, "compute.submit", params)?;
+
+            let task_hash = result
+                .get("task_hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            println!("Task submitted successfully!");
+            println!("Task ID:   {}", task_id);
+            println!("Task hash: {}", task_hash);
+            println!();
+            println!("Check status with:");
+            println!("  icnctl compute status {}", task_hash);
+        }
+
+        ComputeCommands::Status { task_hash } => {
+            let params = serde_json::json!({ "task_hash": task_hash });
+            let result = rpc_call(endpoint, "compute.status", params)?;
+
+            let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+            println!("Task:   {}", task_hash);
+            println!("Status: {}", status);
+
+            if let Some(executor) = result.get("executor").and_then(|v| v.as_str()) {
+                println!("Executor: {}", executor);
+            }
+
+            if let Some(task_result) = result.get("result") {
+                let outcome = task_result.get("outcome").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let fuel_used = task_result.get("fuel_used").and_then(|v| v.as_u64()).unwrap_or(0);
+                let duration_ms = task_result.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                println!();
+                println!("Result:");
+                println!("  Outcome:     {}", outcome);
+                println!("  Fuel used:   {}", fuel_used);
+                println!("  Duration:    {}ms", duration_ms);
+
+                if let Some(output) = task_result.get("output") {
+                    if !output.is_null() {
+                        println!("  Output:      {}", serde_json::to_string_pretty(output)?);
+                    }
+                }
+
+                if let Some(error) = task_result.get("error").and_then(|v| v.as_str()) {
+                    println!("  Error:       {}", error);
+                }
+            }
+        }
+    }
 
     Ok(())
 }

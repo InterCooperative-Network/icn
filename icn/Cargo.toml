@@ -96,3 +96,4 @@ icn-snapshot = { path = "crates/icn-snapshot" }
 icn-testkit = { path = "crates/icn-testkit" }
 icn-gateway = { path = "crates/icn-gateway" }
 icn-governance = { path = "crates/icn-governance" }
+icn-compute = { path = "crates/icn-compute" }

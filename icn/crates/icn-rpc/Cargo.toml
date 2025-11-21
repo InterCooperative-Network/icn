@@ -25,3 +25,4 @@ icn-ledger.workspace = true
 icn-ccl.workspace = true
 icn-gossip.workspace = true
 icn-governance.workspace = true
+icn-compute.workspace = true

@@ -1313,7 +1313,7 @@ impl Supervisor {
             let compute_handle = compute_actor.spawn();
 
             // Fill compute handle holder for notification callback
-            *compute_handle_holder.write().await = Some(compute_handle);
+            *compute_handle_holder.write().await = Some(compute_handle.clone());
 
             info!("✓ Compute actor spawned with payment settlement");
 
@@ -1338,6 +1338,7 @@ impl Supervisor {
             rpc_server.set_contract_runtime(contract_runtime_handle.clone());
             rpc_server.set_gossip_handle(gossip_handle.clone());
             rpc_server.set_governance_handle(governance_handle);
+            rpc_server.set_compute_handle(compute_handle);
 
             background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {

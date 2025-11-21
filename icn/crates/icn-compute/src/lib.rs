@@ -32,7 +32,8 @@ pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
-    ComputeMessage, ComputeResult, ComputeTask, ExecutorCapability, FuelLimit, TaskHash, TaskId,
+    ComputeMessage, ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, FuelLimit,
+    TaskCode, TaskHash, TaskId,
 };
 
 /// Gossip topic for task submission

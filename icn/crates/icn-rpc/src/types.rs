@@ -223,6 +223,58 @@ pub struct CloseProposalRequest {
     pub proposal_id: String,
 }
 
+// Compute task types
+
+/// Request to submit a compute task
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitTaskRequest {
+    pub task_id: String,
+    pub code: String, // CCL JSON
+    #[serde(default)]
+    pub inputs: serde_json::Value,
+    #[serde(default = "default_fuel_limit")]
+    pub fuel_limit: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deadline_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_rate: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_currency: Option<String>,
+}
+
+fn default_fuel_limit() -> u64 {
+    10_000
+}
+
+/// Response from submitting a compute task
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitTaskResponse {
+    pub task_hash: String,
+}
+
+/// Compute task status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskStatusInfo {
+    pub task_hash: String,
+    pub status: String, // "pending", "claimed", "completed", "failed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<TaskResultInfo>,
+}
+
+/// Compute task result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskResultInfo {
+    pub outcome: String, // "success", "failed", "out_of_fuel"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub fuel_used: u64,
+    pub duration_ms: u64,
+}
+
 impl RpcResponse {
     pub fn success(id: u64, result: serde_json::Value) -> Self {
         RpcResponse {

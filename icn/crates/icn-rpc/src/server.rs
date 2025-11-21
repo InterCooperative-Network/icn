@@ -18,13 +18,14 @@ use icn_net::NetworkHandle;
 use icn_ledger::Ledger;
 use icn_ccl::ContractRuntime;
 use icn_governance::{GovernanceOps, MembershipAction};
+use icn_compute::ComputeHandle;
 
 use crate::types::{
     CastVoteRequest, CloseProposalRequest, ContractExecutionResponse, CreateDomainRequest,
     CreateProposalRequest, CreateProposalResponse, GovernanceDomainInfo, GovernanceParamsInfo,
     LedgerAccountDelta, LedgerBalance, LedgerEntry, MembershipConfigInfo, NetworkStats,
     NetworkStatus, OpenProposalRequest, PeerInfo, ProposalInfo, ProposalPayloadInfo, RpcRequest,
-    RpcResponse,
+    RpcResponse, SubmitTaskRequest, SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
 };
 use crate::receipt::ReceiptStore;
 
@@ -37,6 +38,7 @@ pub struct RpcServer {
     contract_runtime: Option<Arc<RwLock<ContractRuntime>>>,
     gossip_handle: Option<Arc<RwLock<GossipActor>>>,
     governance_handle: Option<Box<dyn GovernanceOps>>,
+    compute_handle: Option<ComputeHandle>,
     receipt_store: Arc<ReceiptStore>,
     listen_addr: SocketAddr,
 }
@@ -50,6 +52,7 @@ impl RpcServer {
             contract_runtime: None,
             gossip_handle: None,
             governance_handle: None,
+            compute_handle: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             listen_addr,
         }
@@ -78,6 +81,11 @@ impl RpcServer {
     /// Set the governance handle (called after GovernanceActor initializes)
     pub fn set_governance_handle(&mut self, handle: impl GovernanceOps + 'static) {
         self.governance_handle = Some(Box::new(handle));
+    }
+
+    /// Set the compute handle (called after ComputeActor spawns)
+    pub fn set_compute_handle(&mut self, handle: ComputeHandle) {
+        self.compute_handle = Some(handle);
     }
 
     /// Start the RPC server
@@ -170,6 +178,8 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "governance.proposal.open" => handle_governance_proposal_open(req.id, &req.params, state).await,
         "governance.proposal.close" => handle_governance_proposal_close(req.id, &req.params, state).await,
         "governance.vote.cast" => handle_governance_vote_cast(req.id, &req.params, state).await,
+        "compute.submit" => handle_compute_submit(req.id, &req.params, state).await,
+        "compute.status" => handle_compute_status(req.id, &req.params, state).await,
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -1563,6 +1573,154 @@ async fn handle_governance_proposal_close(
             RpcResponse::success(id, result)
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to close proposal: {}", e)),
+    }
+}
+
+/// Handle compute.submit RPC call - submit a task for distributed execution
+async fn handle_compute_submit(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let compute_handle = match &state.compute_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Compute not available".to_string());
+        }
+    };
+
+    let request: SubmitTaskRequest = match serde_json::from_value(params.clone()) {
+        Ok(r) => r,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Build compute task
+    let inputs = if request.inputs.is_null() {
+        vec![]
+    } else {
+        serde_json::to_vec(&request.inputs).unwrap_or_default()
+    };
+
+    let task = icn_compute::ComputeTask {
+        id: request.task_id,
+        submitter: "rpc:unknown".to_string(), // TODO: Get from auth context
+        code: icn_compute::TaskCode::Ccl(request.code),
+        inputs,
+        fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
+        required_capabilities: vec![icn_compute::ExecutorCapability::Ccl],
+        created_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64,
+        deadline: request.deadline_ms,
+        payment_rate: request.payment_rate,
+        payment_currency: request.payment_currency,
+    };
+
+    match compute_handle.submit(task).await {
+        Ok(hash) => {
+            let response = SubmitTaskResponse {
+                task_hash: hex::encode(hash),
+            };
+            RpcResponse::success(id, serde_json::to_value(response).unwrap())
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to submit task: {}", e)),
+    }
+}
+
+/// Handle compute.status RPC call - get task status
+async fn handle_compute_status(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let compute_handle = match &state.compute_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Compute not available".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct StatusParams {
+        task_hash: String,
+    }
+
+    let params: StatusParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+        }
+    };
+
+    // Parse hash
+    let hash_bytes = match hex::decode(&params.task_hash) {
+        Ok(b) if b.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&b);
+            arr
+        }
+        _ => {
+            return RpcResponse::error(id, -32602, "Invalid task_hash (expected 32 hex bytes)".to_string());
+        }
+    };
+
+    match compute_handle.status(hash_bytes).await {
+        Ok(Some(status)) => {
+            let (status_str, executor, result) = match status {
+                icn_compute::TaskStatus::Pending => ("pending".to_string(), None, None),
+                icn_compute::TaskStatus::Claimed { executor, .. } => {
+                    ("claimed".to_string(), Some(executor), None)
+                }
+                icn_compute::TaskStatus::Completed { result } => {
+                    let (outcome, output, error) = match &result.outcome {
+                        icn_compute::ExecutionOutcome::Success(data) => {
+                            let output = serde_json::from_slice(data).ok();
+                            ("success".to_string(), output, None)
+                        }
+                        icn_compute::ExecutionOutcome::Failed(e) => {
+                            ("failed".to_string(), None, Some(e.clone()))
+                        }
+                        icn_compute::ExecutionOutcome::OutOfFuel => {
+                            ("out_of_fuel".to_string(), None, None)
+                        }
+                        icn_compute::ExecutionOutcome::Timeout => {
+                            ("timeout".to_string(), None, None)
+                        }
+                    };
+                    let result_info = TaskResultInfo {
+                        outcome,
+                        output,
+                        error,
+                        fuel_used: result.fuel_used,
+                        duration_ms: result.duration_ms,
+                    };
+                    ("completed".to_string(), Some(result.executor.clone()), Some(result_info))
+                }
+                icn_compute::TaskStatus::Failed { reason } => {
+                    let result_info = TaskResultInfo {
+                        outcome: "failed".to_string(),
+                        output: None,
+                        error: Some(reason),
+                        fuel_used: 0,
+                        duration_ms: 0,
+                    };
+                    ("failed".to_string(), None, Some(result_info))
+                }
+            };
+
+            let info = TaskStatusInfo {
+                task_hash: params.task_hash,
+                status: status_str,
+                executor,
+                result,
+            };
+            RpcResponse::success(id, serde_json::to_value(info).unwrap())
+        }
+        Ok(None) => RpcResponse::error(id, -32000, "Task not found".to_string()),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get status: {}", e)),
     }
 }
 
