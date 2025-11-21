@@ -197,11 +197,16 @@ mod tests {
 
         mgr.claim(&hash, "did:icn:bob".into()).unwrap();
 
-        match mgr.status(&hash) {
-            Some(TaskStatus::Claimed { executor, .. }) => {
-                assert_eq!(executor, "did:icn:bob");
-            }
-            _ => panic!("expected claimed status"),
+        // Verify task is in claimed state
+        let status = mgr.status(&hash).expect("Task should exist");
+        assert!(
+            matches!(&status, TaskStatus::Claimed { .. }),
+            "Expected Claimed status, got: {:?}", status
+        );
+
+        // Verify correct executor
+        if let TaskStatus::Claimed { executor, .. } = status {
+            assert_eq!(executor, "did:icn:bob");
         }
     }
 

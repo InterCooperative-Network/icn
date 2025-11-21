@@ -61,6 +61,112 @@ impl ComputeTask {
         let bytes = bincode::serialize(self).unwrap_or_default();
         *blake3::hash(&bytes).as_bytes()
     }
+
+    /// Validate task parameters
+    pub fn validate(&self) -> Result<(), crate::error::ComputeError> {
+        // Validate task ID
+        if self.id.is_empty() {
+            return Err(crate::error::ComputeError::InvalidCode(
+                "Task ID cannot be empty".into()
+            ));
+        }
+        if self.id.len() > 256 {
+            return Err(crate::error::ComputeError::InvalidCode(
+                format!("Task ID too long: {} bytes (max 256)", self.id.len())
+            ));
+        }
+
+        // Validate submitter DID format
+        if !self.submitter.starts_with("did:icn:") {
+            return Err(crate::error::ComputeError::InvalidCode(
+                format!("Invalid submitter DID format: {}", self.submitter)
+            ));
+        }
+
+        // Validate fuel limit
+        const MIN_FUEL: u64 = 100;
+        const MAX_FUEL: u64 = 10_000_000; // 10M operations max
+        if self.fuel_limit.0 < MIN_FUEL {
+            return Err(crate::error::ComputeError::InvalidCode(
+                format!("Fuel limit too low: {} (min {})", self.fuel_limit.0, MIN_FUEL)
+            ));
+        }
+        if self.fuel_limit.0 > MAX_FUEL {
+            return Err(crate::error::ComputeError::InvalidCode(
+                format!("Fuel limit too high: {} (max {})", self.fuel_limit.0, MAX_FUEL)
+            ));
+        }
+
+        // Validate task code
+        match &self.code {
+            TaskCode::Ccl(source) => {
+                if source.is_empty() {
+                    return Err(crate::error::ComputeError::InvalidCode(
+                        "CCL source cannot be empty".into()
+                    ));
+                }
+                if source.len() > 1_000_000 {
+                    return Err(crate::error::ComputeError::InvalidCode(
+                        format!("CCL source too large: {} bytes (max 1MB)", source.len())
+                    ));
+                }
+            }
+            TaskCode::WasmInline(bytes) => {
+                if bytes.is_empty() {
+                    return Err(crate::error::ComputeError::InvalidCode(
+                        "WASM bytes cannot be empty".into()
+                    ));
+                }
+                if bytes.len() > 5_000_000 {
+                    return Err(crate::error::ComputeError::InvalidCode(
+                        format!("WASM module too large: {} bytes (max 5MB)", bytes.len())
+                    ));
+                }
+            }
+            TaskCode::WasmRef(_) => {
+                // Hash is always valid by type
+            }
+        }
+
+        // Validate input size
+        const MAX_INPUT_SIZE: usize = 1_000_000; // 1MB max
+        if self.inputs.len() > MAX_INPUT_SIZE {
+            return Err(crate::error::ComputeError::InvalidCode(
+                format!("Input too large: {} bytes (max 1MB)", self.inputs.len())
+            ));
+        }
+
+        // Validate deadline is in the future if provided
+        if let Some(deadline) = self.deadline {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+
+            if deadline <= now {
+                return Err(crate::error::ComputeError::DeadlineExceeded);
+            }
+        }
+
+        // Validate payment rate if provided
+        if let Some(rate) = self.payment_rate {
+            const MAX_RATE: u64 = 1_000_000; // 1M credits per 1000 fuel max
+            if rate > MAX_RATE {
+                return Err(crate::error::ComputeError::InvalidCode(
+                    format!("Payment rate too high: {} (max {})", rate, MAX_RATE)
+                ));
+            }
+        }
+
+        // Validate capabilities
+        if self.required_capabilities.is_empty() {
+            return Err(crate::error::ComputeError::InvalidCode(
+                "At least one capability required".into()
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 /// Task code format
@@ -225,11 +331,15 @@ mod tests {
         };
         let bytes = bincode::serialize(&msg).unwrap();
         let decoded: ComputeMessage = bincode::deserialize(&bytes).unwrap();
-        match decoded {
-            ComputeMessage::TaskClaimed { executor, .. } => {
-                assert_eq!(executor, "did:icn:bob");
-            }
-            _ => panic!("wrong variant"),
+
+        // Verify correct variant and executor
+        assert!(
+            matches!(&decoded, ComputeMessage::TaskClaimed { .. }),
+            "Expected TaskClaimed variant, got: {:?}", decoded
+        );
+
+        if let ComputeMessage::TaskClaimed { executor, .. } = decoded {
+            assert_eq!(executor, "did:icn:bob");
         }
     }
 
@@ -334,5 +444,118 @@ mod tests {
 
         assert_eq!(payload1, payload2);
         assert!(!payload1.is_empty());
+    }
+
+    // Validation tests
+
+    fn valid_task() -> ComputeTask {
+        ComputeTask {
+            id: "test-task-1".into(),
+            submitter: "did:icn:alice".into(),
+            code: TaskCode::Ccl(r#"{"name": "Test"}"#.into()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+        }
+    }
+
+    #[test]
+    fn test_validate_valid_task() {
+        let task = valid_task();
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_id() {
+        let mut task = valid_task();
+        task.id = "".into();
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
+    }
+
+    #[test]
+    fn test_validate_id_too_long() {
+        let mut task = valid_task();
+        task.id = "x".repeat(300);
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too long"));
+    }
+
+    #[test]
+    fn test_validate_invalid_did() {
+        let mut task = valid_task();
+        task.submitter = "not-a-did".into();
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid submitter DID"));
+    }
+
+    #[test]
+    fn test_validate_fuel_too_low() {
+        let mut task = valid_task();
+        task.fuel_limit = FuelLimit(50); // Below MIN_FUEL (100)
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too low"));
+    }
+
+    #[test]
+    fn test_validate_fuel_too_high() {
+        let mut task = valid_task();
+        task.fuel_limit = FuelLimit(20_000_000); // Above MAX_FUEL (10M)
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too high"));
+    }
+
+    #[test]
+    fn test_validate_empty_ccl() {
+        let mut task = valid_task();
+        task.code = TaskCode::Ccl("".into());
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
+    }
+
+    #[test]
+    fn test_validate_ccl_too_large() {
+        let mut task = valid_task();
+        task.code = TaskCode::Ccl("x".repeat(2_000_000)); // Above 1MB
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too large"));
+    }
+
+    #[test]
+    fn test_validate_input_too_large() {
+        let mut task = valid_task();
+        task.inputs = vec![0u8; 2_000_000]; // Above 1MB
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Input too large"));
+    }
+
+    #[test]
+    fn test_validate_payment_rate_too_high() {
+        let mut task = valid_task();
+        task.payment_rate = Some(2_000_000); // Above MAX_RATE (1M)
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Payment rate too high"));
+    }
+
+    #[test]
+    fn test_validate_no_capabilities() {
+        let mut task = valid_task();
+        task.required_capabilities = vec![];
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("At least one capability"));
     }
 }

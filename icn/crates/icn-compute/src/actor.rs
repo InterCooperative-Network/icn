@@ -197,6 +197,9 @@ impl ComputeActor {
 
     /// Handle task submission
     async fn handle_submit(&self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
+        // Validate task parameters first
+        task.validate()?;
+
         // Check submitter trust
         let trust = (self.trust_callback)(&task.submitter);
         if trust < MIN_TRUST_SUBMIT {

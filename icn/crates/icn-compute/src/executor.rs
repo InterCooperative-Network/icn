@@ -296,13 +296,15 @@ mod tests {
             .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &test_signing_key())
             .unwrap();
 
-        match &result.outcome {
-            ExecutionOutcome::Success(output) => {
-                // Verify we got valid output
-                assert!(!output.is_empty());
-            }
-            ExecutionOutcome::Failed(e) => panic!("Execution failed: {}", e),
-            other => panic!("Unexpected outcome: {:?}", other),
+        // Verify execution succeeded
+        assert!(
+            matches!(&result.outcome, ExecutionOutcome::Success(_)),
+            "Expected successful execution, got: {:?}", result.outcome
+        );
+
+        // Verify output is non-empty
+        if let ExecutionOutcome::Success(output) = &result.outcome {
+            assert!(!output.is_empty(), "Expected non-empty output");
         }
     }
 
@@ -317,11 +319,11 @@ mod tests {
             .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &test_signing_key())
             .unwrap();
 
-        match &result.outcome {
-            ExecutionOutcome::Success(_) => {}
-            ExecutionOutcome::Failed(e) => panic!("Execution failed: {}", e),
-            other => panic!("Unexpected outcome: {:?}", other),
-        }
+        // Verify execution succeeded with arguments
+        assert!(
+            matches!(&result.outcome, ExecutionOutcome::Success(_)),
+            "Expected successful execution with args, got: {:?}", result.outcome
+        );
     }
 
     #[test]
