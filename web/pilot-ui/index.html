@@ -154,6 +154,39 @@
                     >
                         <span class="theme-icon">🌙</span>
                     </button>
+
+                    <!-- Notification Center -->
+                    <div class="notification-container">
+                        <button
+                            id="notification-bell"
+                            class="btn-icon"
+                            aria-label="Notifications"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            title="Notifications"
+                        >
+                            <span class="bell-icon">🔔</span>
+                            <span id="notification-badge" class="notification-badge hidden" aria-label="Unread notifications">0</span>
+                        </button>
+
+                        <div id="notification-panel" class="notification-panel hidden" role="menu" aria-label="Notifications">
+                            <div class="notification-header">
+                                <h3>Notifications</h3>
+                                <button id="mark-all-read" class="btn-link" title="Mark all as read">
+                                    Mark all read
+                                </button>
+                            </div>
+
+                            <div id="notification-list" class="notification-list">
+                                <!-- Notifications will be inserted here -->
+                            </div>
+
+                            <div id="notification-empty" class="notification-empty">
+                                <p>No notifications</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <span id="token-expires" class="token-info" aria-label="Token expiration time"></span>
                     <span id="user-did" class="user-info" aria-label="Your DID"></span>
                     <button id="logout-btn" class="btn btn-small" aria-label="Sign out">Logout</button>

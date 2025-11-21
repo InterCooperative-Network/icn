@@ -2322,3 +2322,248 @@ if (submitServiceBtn) {
         showToast('Service posted successfully!', 'success');
     });
 }
+
+// ============================================================================
+// Phase 9: Notification Center
+// ============================================================================
+
+// Notification state
+let notifications = [];
+let unreadCount = 0;
+
+// Notification types with icons
+const notificationIcons = {
+    success: '✓',
+    warning: '⚠',
+    error: '✕',
+    info: 'ℹ',
+    payment: '💰',
+    proposal: '📋',
+    member: '👤',
+    service: '🔧',
+};
+
+// Initialize notification center
+function initializeNotificationCenter() {
+    const bellBtn = document.getElementById('notification-bell');
+    const panel = document.getElementById('notification-panel');
+    const markAllRead = document.getElementById('mark-all-read');
+
+    if (!bellBtn || !panel) return;
+
+    // Load saved notifications from localStorage
+    const saved = localStorage.getItem('icn-notifications');
+    if (saved) {
+        notifications = JSON.parse(saved);
+        unreadCount = notifications.filter(n => !n.read).length;
+        updateNotificationBadge();
+        renderNotifications();
+    }
+
+    // Toggle notification panel
+    bellBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !panel.classList.contains('hidden');
+
+        if (isOpen) {
+            panel.classList.add('hidden');
+            bellBtn.setAttribute('aria-expanded', 'false');
+        } else {
+            panel.classList.remove('hidden');
+            bellBtn.setAttribute('aria-expanded', 'true');
+        }
+    });
+
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!panel.contains(e.target) && !bellBtn.contains(e.target)) {
+            panel.classList.add('hidden');
+            bellBtn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    // Mark all as read
+    if (markAllRead) {
+        markAllRead.addEventListener('click', () => {
+            notifications.forEach(n => n.read = true);
+            unreadCount = 0;
+            updateNotificationBadge();
+            renderNotifications();
+            saveNotifications();
+        });
+    }
+
+    // Listen to WebSocket events to create notifications
+    setupNotificationListeners();
+}
+
+// Add a new notification
+function addNotification(notification) {
+    const newNotification = {
+        id: Date.now().toString(),
+        timestamp: Math.floor(Date.now() / 1000),
+        read: false,
+        ...notification,
+    };
+
+    notifications.unshift(newNotification);
+
+    // Keep only last 50 notifications
+    if (notifications.length > 50) {
+        notifications = notifications.slice(0, 50);
+    }
+
+    unreadCount++;
+    updateNotificationBadge();
+    renderNotifications();
+    saveNotifications();
+
+    // Show toast for immediate feedback
+    showToast(notification.message, notification.type || 'info', 3000);
+}
+
+// Update notification badge
+function updateNotificationBadge() {
+    const badge = document.getElementById('notification-badge');
+    if (!badge) return;
+
+    if (unreadCount > 0) {
+        badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+        badge.classList.remove('hidden');
+        badge.setAttribute('aria-label', `${unreadCount} unread notifications`);
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Render notifications list
+function renderNotifications() {
+    const list = document.getElementById('notification-list');
+    const empty = document.getElementById('notification-empty');
+
+    if (!list || !empty) return;
+
+    list.innerHTML = '';
+
+    if (notifications.length === 0) {
+        empty.style.display = 'block';
+        list.style.display = 'none';
+        return;
+    }
+
+    empty.style.display = 'none';
+    list.style.display = 'block';
+
+    notifications.forEach(notification => {
+        const item = createNotificationItem(notification);
+        list.appendChild(item);
+    });
+}
+
+// Create notification item element
+function createNotificationItem(notification) {
+    const item = document.createElement('div');
+    item.className = `notification-item ${notification.type || 'info'}`;
+
+    if (!notification.read) {
+        item.classList.add('unread');
+    }
+
+    const icon = notificationIcons[notification.type] || notificationIcons.info;
+    const timeAgo = formatTimeAgo(notification.timestamp);
+
+    item.innerHTML = `
+        <div class="notification-icon">${icon}</div>
+        <div class="notification-content">
+            <div class="notification-title">${notification.title}</div>
+            <div class="notification-message">${notification.message}</div>
+            <div class="notification-time">${timeAgo}</div>
+        </div>
+    `;
+
+    // Mark as read on click
+    item.addEventListener('click', () => {
+        if (!notification.read) {
+            notification.read = true;
+            unreadCount = Math.max(0, unreadCount - 1);
+            updateNotificationBadge();
+            item.classList.remove('unread');
+            saveNotifications();
+        }
+
+        // Execute action if provided
+        if (notification.action) {
+            notification.action();
+        }
+    });
+
+    return item;
+}
+
+// Format time ago
+function formatTimeAgo(timestamp) {
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - timestamp;
+
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+
+    return formatDate(timestamp);
+}
+
+// Save notifications to localStorage
+function saveNotifications() {
+    localStorage.setItem('icn-notifications', JSON.stringify(notifications));
+}
+
+// Setup listeners for notification triggers
+function setupNotificationListeners() {
+    // Listen to WebSocket events (when connected)
+    if (state.ws && state.wsConnected) {
+        // WebSocket message handler would trigger notifications
+        // This is already set up in the WebSocket code
+    }
+
+    // Simulate some notifications for demo (remove in production)
+    // addDemoNotifications();
+}
+
+// Add demo notifications (for testing)
+function addDemoNotifications() {
+    setTimeout(() => {
+        addNotification({
+            type: 'payment',
+            title: 'Payment Received',
+            message: 'You received 3 hours from did:icn:alice for garden work',
+        });
+    }, 3000);
+
+    setTimeout(() => {
+        addNotification({
+            type: 'proposal',
+            title: 'New Proposal',
+            message: 'Vote needed: Update credit limit to -100 hours',
+            action: () => {
+                switchTab('governance');
+                document.getElementById('notification-panel').classList.add('hidden');
+            },
+        });
+    }, 6000);
+
+    setTimeout(() => {
+        addNotification({
+            type: 'member',
+            title: 'New Member',
+            message: 'did:icn:charlie joined the cooperative',
+        });
+    }, 9000);
+}
+
+// Initialize notification center after DOM loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeNotificationCenter);
+} else {
+    initializeNotificationCenter();
+}
