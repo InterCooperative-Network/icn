@@ -2443,3 +2443,200 @@ footer {
         grid-template-columns: repeat(3, 1fr);
     }
 }
+
+/* ============================================================================
+   Phase 9: Pagination & Virtual Scrolling
+   ============================================================================ */
+
+/* Pagination Controls */
+.pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    border-radius: 0 0 8px 8px;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.pagination-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.pagination-info select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.pagination-info select:hover {
+    border-color: var(--primary);
+}
+
+.pagination-info select:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.pagination-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-buttons .btn {
+    min-width: 36px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+}
+
+.pagination-buttons .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-numbers {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.page-number {
+    min-width: 36px;
+    height: 36px;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.page-number:hover:not(.active) {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+}
+
+.page-number.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: 600;
+}
+
+.page-ellipsis {
+    padding: 0.4rem 0.6rem;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+/* Virtual Scrolling */
+.virtual-scroll-container {
+    position: relative;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.virtual-scroll-spacer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+}
+
+.virtual-scroll-content {
+    position: relative;
+    will-change: transform;
+}
+
+/* Loading indicator for pagination */
+.pagination-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-weight: 500;
+    color: var(--text-muted);
+    z-index: 10;
+}
+
+/* Responsive pagination */
+@media (max-width: 768px) {
+    .pagination-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pagination-info {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .pagination-info select {
+        width: 100%;
+    }
+
+    .pagination-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .page-numbers {
+        display: none; /* Hide page numbers on mobile, keep prev/next */
+    }
+}
+
+/* Smooth transitions for list updates */
+.transaction-list,
+.member-list {
+    position: relative;
+    min-height: 200px;
+}
+
+.transaction-item,
+.member-item {
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.transaction-item.loading,
+.member-item.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Page transition animation */
+@keyframes pageTransition {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-transitioning .transaction-item,
+.page-transitioning .member-item {
+    animation: pageTransition 0.3s ease;
+}

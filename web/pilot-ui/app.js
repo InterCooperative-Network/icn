@@ -2567,3 +2567,396 @@ if (document.readyState === 'loading') {
 } else {
     initializeNotificationCenter();
 }
+
+// ============================================================================
+// Phase 9: Pagination & Virtual Scrolling
+// ============================================================================
+
+/**
+ * Generic Pagination Manager
+ * Handles pagination for any list (transactions, members, etc.)
+ */
+class PaginationManager {
+    constructor(config) {
+        this.containerId = config.containerId;
+        this.paginationId = config.paginationId;
+        this.pageInfoId = config.pageInfoId;
+        this.pageSizeId = config.pageSizeId;
+        this.firstPageId = config.firstPageId;
+        this.prevPageId = config.prevPageId;
+        this.nextPageId = config.nextPageId;
+        this.lastPageId = config.lastPageId;
+        this.pageNumbersId = config.pageNumbersId;
+        this.renderItem = config.renderItem;
+        this.itemName = config.itemName || 'items';
+
+        this.data = [];
+        this.filteredData = [];
+        this.currentPage = 1;
+        this.pageSize = 25;
+        this.totalPages = 1;
+
+        this.initialize();
+    }
+
+    initialize() {
+        const pageSizeSelect = document.getElementById(this.pageSizeId);
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', (e) => {
+                this.pageSize = parseInt(e.target.value);
+                this.currentPage = 1;
+                this.render();
+            });
+        }
+
+        // First page button
+        const firstBtn = document.getElementById(this.firstPageId);
+        if (firstBtn) {
+            firstBtn.addEventListener('click', () => {
+                this.goToPage(1);
+            });
+        }
+
+        // Previous page button
+        const prevBtn = document.getElementById(this.prevPageId);
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                this.goToPage(this.currentPage - 1);
+            });
+        }
+
+        // Next page button
+        const nextBtn = document.getElementById(this.nextPageId);
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                this.goToPage(this.currentPage + 1);
+            });
+        }
+
+        // Last page button
+        const lastBtn = document.getElementById(this.lastPageId);
+        if (lastBtn) {
+            lastBtn.addEventListener('click', () => {
+                this.goToPage(this.totalPages);
+            });
+        }
+    }
+
+    setData(data, filtered = null) {
+        this.data = data;
+        this.filteredData = filtered || data;
+        this.totalPages = Math.ceil(this.filteredData.length / this.pageSize);
+
+        // Reset to page 1 if current page is out of bounds
+        if (this.currentPage > this.totalPages) {
+            this.currentPage = Math.max(1, this.totalPages);
+        }
+
+        this.render();
+    }
+
+    goToPage(pageNum) {
+        if (pageNum < 1 || pageNum > this.totalPages) return;
+        this.currentPage = pageNum;
+        this.render();
+
+        // Scroll to top of container
+        const container = document.getElementById(this.containerId);
+        if (container) {
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    render() {
+        this.renderItems();
+        this.renderPaginationControls();
+    }
+
+    renderItems() {
+        const container = document.getElementById(this.containerId);
+        if (!container) return;
+
+        // Calculate start and end indices
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = Math.min(startIndex + this.pageSize, this.filteredData.length);
+        const pageData = this.filteredData.slice(startIndex, endIndex);
+
+        // Add transition class
+        container.classList.add('page-transitioning');
+
+        // Render items
+        if (pageData.length === 0) {
+            container.innerHTML = `<p class="empty">No ${this.itemName} found</p>`;
+        } else {
+            container.innerHTML = pageData.map(item => this.renderItem(item)).join('');
+        }
+
+        // Remove transition class after animation
+        setTimeout(() => {
+            container.classList.remove('page-transitioning');
+        }, 300);
+    }
+
+    renderPaginationControls() {
+        const paginationContainer = document.getElementById(this.paginationId);
+        if (!paginationContainer) return;
+
+        // Show/hide pagination controls
+        if (this.filteredData.length <= this.pageSize && this.pageSize === 25) {
+            paginationContainer.classList.add('hidden');
+            return;
+        }
+
+        paginationContainer.classList.remove('hidden');
+
+        // Update page info
+        const pageInfo = document.getElementById(this.pageInfoId);
+        if (pageInfo) {
+            const startIndex = (this.currentPage - 1) * this.pageSize + 1;
+            const endIndex = Math.min(this.currentPage * this.pageSize, this.filteredData.length);
+            pageInfo.textContent = `Showing ${startIndex}-${endIndex} of ${this.filteredData.length} ${this.itemName}`;
+        }
+
+        // Update button states
+        const firstBtn = document.getElementById(this.firstPageId);
+        const prevBtn = document.getElementById(this.prevPageId);
+        const nextBtn = document.getElementById(this.nextPageId);
+        const lastBtn = document.getElementById(this.lastPageId);
+
+        if (firstBtn) firstBtn.disabled = this.currentPage === 1;
+        if (prevBtn) prevBtn.disabled = this.currentPage === 1;
+        if (nextBtn) nextBtn.disabled = this.currentPage === this.totalPages;
+        if (lastBtn) lastBtn.disabled = this.currentPage === this.totalPages;
+
+        // Render page numbers
+        this.renderPageNumbers();
+    }
+
+    renderPageNumbers() {
+        const pageNumbersContainer = document.getElementById(this.pageNumbersId);
+        if (!pageNumbersContainer) return;
+
+        const pageNumbers = this.calculatePageNumbers();
+        pageNumbersContainer.innerHTML = pageNumbers.map(page => {
+            if (page === '...') {
+                return '<span class="page-ellipsis">...</span>';
+            }
+
+            const isActive = page === this.currentPage;
+            return `
+                <button
+                    class="page-number ${isActive ? 'active' : ''}"
+                    data-page="${page}"
+                    aria-label="Page ${page}"
+                    aria-current="${isActive ? 'page' : 'false'}"
+                    ${isActive ? 'disabled' : ''}
+                >
+                    ${page}
+                </button>
+            `;
+        }).join('');
+
+        // Add click listeners to page numbers
+        pageNumbersContainer.querySelectorAll('.page-number').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const page = parseInt(e.target.dataset.page);
+                this.goToPage(page);
+            });
+        });
+    }
+
+    calculatePageNumbers() {
+        const pages = [];
+        const maxVisible = 7; // Maximum number of page buttons to show
+
+        if (this.totalPages <= maxVisible) {
+            // Show all pages
+            for (let i = 1; i <= this.totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            // Always show first page
+            pages.push(1);
+
+            // Calculate range around current page
+            let start = Math.max(2, this.currentPage - 1);
+            let end = Math.min(this.totalPages - 1, this.currentPage + 1);
+
+            // Adjust if at boundaries
+            if (this.currentPage <= 3) {
+                end = 4;
+            } else if (this.currentPage >= this.totalPages - 2) {
+                start = this.totalPages - 3;
+            }
+
+            // Add ellipsis before if needed
+            if (start > 2) {
+                pages.push('...');
+            }
+
+            // Add middle pages
+            for (let i = start; i <= end; i++) {
+                pages.push(i);
+            }
+
+            // Add ellipsis after if needed
+            if (end < this.totalPages - 1) {
+                pages.push('...');
+            }
+
+            // Always show last page
+            pages.push(this.totalPages);
+        }
+
+        return pages;
+    }
+}
+
+// Initialize Transaction Pagination
+let transactionPagination = null;
+
+function initializeTransactionPagination() {
+    transactionPagination = new PaginationManager({
+        containerId: 'transaction-list',
+        paginationId: 'transaction-pagination',
+        pageInfoId: 'transaction-page-info',
+        pageSizeId: 'transaction-page-size',
+        firstPageId: 'transaction-first-page',
+        prevPageId: 'transaction-prev-page',
+        nextPageId: 'transaction-next-page',
+        lastPageId: 'transaction-last-page',
+        pageNumbersId: 'transaction-page-numbers',
+        itemName: 'transactions',
+        renderItem: (tx) => {
+            const isIncoming = tx.to === state.userDid;
+            const amount = parseFloat(tx.amount);
+            const amountStr = amount.toFixed(1);
+
+            return `
+                <div class="transaction-item ${isIncoming ? 'incoming' : 'outgoing'}">
+                    <div class="transaction-icon">${isIncoming ? '↓' : '↑'}</div>
+                    <div class="transaction-details">
+                        <div class="transaction-party">
+                            ${isIncoming ? 'From' : 'To'}:
+                            <span class="did">${truncateDid(isIncoming ? tx.from : tx.to)}</span>
+                        </div>
+                        <div class="transaction-memo">${tx.memo || 'No description'}</div>
+                        <div class="transaction-date">${formatDate(tx.timestamp)}</div>
+                    </div>
+                    <div class="transaction-amount ${isIncoming ? 'positive' : 'negative'}">
+                        ${isIncoming ? '+' : '-'}${amountStr} hours
+                    </div>
+                </div>
+            `;
+        }
+    });
+}
+
+// Initialize Member Pagination
+let memberPagination = null;
+
+function initializeMemberPagination() {
+    memberPagination = new PaginationManager({
+        containerId: 'member-list',
+        paginationId: 'member-pagination',
+        pageInfoId: 'member-page-info',
+        pageSizeId: 'member-page-size',
+        firstPageId: 'member-first-page',
+        prevPageId: 'member-prev-page',
+        nextPageId: 'member-next-page',
+        lastPageId: 'member-last-page',
+        pageNumbersId: 'member-page-numbers',
+        itemName: 'members',
+        renderItem: (member) => {
+            const balance = parseFloat(member.balance || 0);
+            const balanceClass = balance >= 0 ? 'positive' : 'negative';
+
+            return `
+                <div class="member-item">
+                    <div class="member-avatar">
+                        <div class="avatar-placeholder">${member.did.slice(-6, -4).toUpperCase()}</div>
+                    </div>
+                    <div class="member-info">
+                        <div class="member-did">${truncateDid(member.did)}</div>
+                        <div class="member-role">${member.role || 'Member'}</div>
+                    </div>
+                    <div class="member-balance ${balanceClass}">
+                        ${balance.toFixed(1)} hours
+                    </div>
+                    <button
+                        class="btn btn-small btn-copy-did"
+                        data-did="${member.did}"
+                        aria-label="Copy DID to clipboard"
+                        title="Copy DID"
+                    >
+                        📋 Copy
+                    </button>
+                </div>
+            `;
+        }
+    });
+}
+
+// Update the existing renderTransactionHistory function to use pagination
+const originalRenderTransactionHistory = renderTransactionHistory;
+renderTransactionHistory = function() {
+    if (!transactionPagination) {
+        initializeTransactionPagination();
+    }
+
+    // Get all transactions
+    const allTransactions = state.transactions || [];
+
+    // Apply existing filters
+    const filterValue = document.getElementById('history-filter')?.value || 'month';
+    const sortValue = document.getElementById('transaction-sort')?.value || 'date-desc';
+
+    // Filter transactions
+    let filteredTransactions = filterTransactionsByDate(allTransactions, filterValue);
+
+    // Sort transactions
+    filteredTransactions = sortTransactions(filteredTransactions, sortValue);
+
+    // Update pagination with filtered data
+    transactionPagination.setData(allTransactions, filteredTransactions);
+};
+
+// Update the existing renderMemberList function to use pagination
+const originalRenderMemberList = renderMemberList;
+renderMemberList = function() {
+    if (!memberPagination) {
+        initializeMemberPagination();
+    }
+
+    // Get all members
+    const allMembers = state.members || [];
+
+    // Apply search filter
+    const searchTerm = document.getElementById('member-search')?.value?.toLowerCase() || '';
+    const filteredMembers = searchTerm
+        ? allMembers.filter(m => m.did.toLowerCase().includes(searchTerm))
+        : allMembers;
+
+    // Update pagination with filtered data
+    memberPagination.setData(allMembers, filteredMembers);
+};
+
+// Re-render when filters/sort/search change
+document.addEventListener('DOMContentLoaded', () => {
+    // Transaction filter/sort listeners
+    const historyFilter = document.getElementById('history-filter');
+    if (historyFilter) {
+        historyFilter.addEventListener('change', renderTransactionHistory);
+    }
+
+    const transactionSort = document.getElementById('transaction-sort');
+    if (transactionSort) {
+        transactionSort.addEventListener('change', renderTransactionHistory);
+    }
+
+    // Member search listener
+    const memberSearch = document.getElementById('member-search');
+    if (memberSearch) {
+        memberSearch.addEventListener('input', renderMemberList);
+    }
+});

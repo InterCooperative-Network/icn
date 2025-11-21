@@ -611,6 +611,34 @@
                     <div id="transaction-list" class="transaction-list">
                         <p class="loading">Loading...</p>
                     </div>
+
+                    <!-- Transaction Pagination -->
+                    <div id="transaction-pagination" class="pagination-controls hidden">
+                        <div class="pagination-info">
+                            <span id="transaction-page-info">Showing 1-10 of 0 transactions</span>
+                            <select id="transaction-page-size" aria-label="Items per page">
+                                <option value="10">10 per page</option>
+                                <option value="25" selected>25 per page</option>
+                                <option value="50">50 per page</option>
+                                <option value="100">100 per page</option>
+                            </select>
+                        </div>
+                        <div class="pagination-buttons">
+                            <button id="transaction-first-page" class="btn btn-small" aria-label="First page" disabled>
+                                ⟨⟨
+                            </button>
+                            <button id="transaction-prev-page" class="btn btn-small" aria-label="Previous page" disabled>
+                                ⟨
+                            </button>
+                            <span id="transaction-page-numbers" class="page-numbers"></span>
+                            <button id="transaction-next-page" class="btn btn-small" aria-label="Next page" disabled>
+                                ⟩
+                            </button>
+                            <button id="transaction-last-page" class="btn btn-small" aria-label="Last page" disabled>
+                                ⟩⟩
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </main>
 
@@ -625,6 +653,34 @@
                     </div>
                     <div id="member-list" class="member-list">
                         <p class="loading">Loading...</p>
+                    </div>
+
+                    <!-- Member Pagination -->
+                    <div id="member-pagination" class="pagination-controls hidden">
+                        <div class="pagination-info">
+                            <span id="member-page-info">Showing 1-10 of 0 members</span>
+                            <select id="member-page-size" aria-label="Items per page">
+                                <option value="10">10 per page</option>
+                                <option value="25" selected>25 per page</option>
+                                <option value="50">50 per page</option>
+                                <option value="100">100 per page</option>
+                            </select>
+                        </div>
+                        <div class="pagination-buttons">
+                            <button id="member-first-page" class="btn btn-small" aria-label="First page" disabled>
+                                ⟨⟨
+                            </button>
+                            <button id="member-prev-page" class="btn btn-small" aria-label="Previous page" disabled>
+                                ⟨
+                            </button>
+                            <span id="member-page-numbers" class="page-numbers"></span>
+                            <button id="member-next-page" class="btn btn-small" aria-label="Next page" disabled>
+                                ⟩
+                            </button>
+                            <button id="member-last-page" class="btn btn-small" aria-label="Last page" disabled>
+                                ⟩⟩
+                            </button>
+                        </div>
                     </div>
                 </div>
             </main>
