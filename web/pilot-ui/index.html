@@ -605,6 +605,7 @@
                                 <option value="amount-desc">Highest Amount</option>
                                 <option value="amount-asc">Lowest Amount</option>
                             </select>
+                            <button id="import-batch-btn" class="btn btn-small btn-primary">Import Batch</button>
                             <button id="export-csv" class="btn btn-small">Export CSV</button>
                         </div>
                     </div>
@@ -779,6 +780,110 @@ did:icn:charlie789,member,0</code></pre>
                             <button id="import-next-btn" class="btn btn-primary" disabled>Next</button>
                             <button id="import-confirm-btn" class="btn btn-primary hidden" disabled>Import Members</button>
                             <button id="import-close-btn" class="btn btn-primary hidden">Close</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Transaction Import Modal -->
+                <div id="import-batch-modal" class="modal hidden" role="dialog" aria-labelledby="import-batch-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="import-batch-title">Import Batch Transactions</h2>
+                            <button id="close-import-batch" class="modal-close" aria-label="Close import batch dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div id="batch-step-1" class="import-step">
+                                <h3>Step 1: Upload CSV File</h3>
+                                <p class="help-text">
+                                    Upload a CSV file with transaction data. Required columns: <code>from</code>, <code>to</code>, <code>amount</code>, <code>memo</code>
+                                </p>
+
+                                <div class="csv-template">
+                                    <h4>Template Format:</h4>
+                                    <pre><code>from,to,amount,memo
+did:icn:alice,did:icn:bob,2.5,Garden work
+did:icn:bob,did:icn:charlie,1.0,Tech support
+did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
+                                    <button id="download-batch-template" class="btn btn-small btn-secondary">Download Template</button>
+                                </div>
+
+                                <div class="file-upload-area" id="batch-upload-area">
+                                    <input type="file" id="batch-file-input" accept=".csv" hidden />
+                                    <label for="batch-file-input" class="file-upload-label">
+                                        <span class="upload-icon">📁</span>
+                                        <span class="upload-text">Click to select CSV file or drag and drop</span>
+                                        <span class="upload-hint">CSV files only</span>
+                                    </label>
+                                </div>
+
+                                <div id="batch-file-info" class="file-info hidden">
+                                    <p><strong>Selected file:</strong> <span id="batch-file-name"></span></p>
+                                    <p><strong>File size:</strong> <span id="batch-file-size"></span></p>
+                                </div>
+                            </div>
+
+                            <div id="batch-step-2" class="import-step hidden">
+                                <h3>Step 2: Preview & Validate</h3>
+                                <div id="batch-stats" class="import-stats">
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-total-rows">0</span>
+                                        <span class="stat-label">Total Rows</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-valid-rows">0</span>
+                                        <span class="stat-label">Valid</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-invalid-rows">0</span>
+                                        <span class="stat-label">Invalid</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-total-amount">0.0</span>
+                                        <span class="stat-label">Total Hours</span>
+                                    </div>
+                                </div>
+
+                                <div id="batch-errors" class="validation-errors hidden">
+                                    <h4>Validation Errors:</h4>
+                                    <ul id="batch-error-list"></ul>
+                                </div>
+
+                                <div id="batch-preview" class="import-preview">
+                                    <h4>Preview (first 10 rows):</h4>
+                                    <div class="table-wrapper">
+                                        <table id="batch-preview-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>From</th>
+                                                    <th>To</th>
+                                                    <th>Amount</th>
+                                                    <th>Memo</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="batch-preview-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="batch-step-3" class="import-step hidden">
+                                <h3>Step 3: Import Complete</h3>
+                                <div class="import-success">
+                                    <div class="success-icon">✓</div>
+                                    <p><strong id="batch-imported-count">0</strong> transactions imported successfully!</p>
+                                    <p><strong id="batch-imported-total">0.0</strong> total hours transferred</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="batch-back-btn" class="btn btn-secondary hidden">Back</button>
+                            <button id="batch-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="batch-next-btn" class="btn btn-primary" disabled>Next</button>
+                            <button id="batch-confirm-btn" class="btn btn-primary hidden" disabled>Import Transactions</button>
+                            <button id="batch-close-btn" class="btn btn-primary hidden">Close</button>
                         </div>
                     </div>
                 </div>

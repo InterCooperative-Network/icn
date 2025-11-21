@@ -3331,3 +3331,386 @@ function importMembers() {
 
 // Initialize CSV import after DOM loads
 document.addEventListener('DOMContentLoaded', initializeCSVImport);
+
+// ============================================================================
+// Phase 9: Batch Transaction Import
+// ============================================================================
+
+let batchImportState = {
+    currentStep: 1,
+    file: null,
+    parsedData: [],
+    validRows: [],
+    invalidRows: [],
+};
+
+function initializeBatchImport() {
+    const importBtn = document.getElementById('import-batch-btn');
+    const modal = document.getElementById('import-batch-modal');
+    const closeBtn = document.getElementById('close-import-batch');
+    const cancelBtn = document.getElementById('batch-cancel-btn');
+    const backBtn = document.getElementById('batch-back-btn');
+    const nextBtn = document.getElementById('batch-next-btn');
+    const confirmBtn = document.getElementById('batch-confirm-btn');
+    const closeFinalBtn = document.getElementById('batch-close-btn');
+    const fileInput = document.getElementById('batch-file-input');
+    const uploadArea = document.getElementById('batch-upload-area');
+    const downloadTemplateBtn = document.getElementById('download-batch-template');
+
+    if (!importBtn || !modal) return;
+
+    // Open modal
+    importBtn.addEventListener('click', () => {
+        resetBatchImport();
+        modal.classList.remove('hidden');
+        showBatchStep(1);
+    });
+
+    // Close modal
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        resetBatchImport();
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    closeFinalBtn.addEventListener('click', closeModal);
+
+    // Download template
+    downloadTemplateBtn.addEventListener('click', () => {
+        const template = 'from,to,amount,memo\ndid:icn:alice,did:icn:bob,2.5,Garden work\ndid:icn:bob,did:icn:charlie,1.0,Tech support';
+        const blob = new Blob([template], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'transaction-batch-template.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleBatchFile(e.target.files[0]);
+        }
+    });
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            handleBatchFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    // Step navigation
+    backBtn.addEventListener('click', () => {
+        showBatchStep(batchImportState.currentStep - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (batchImportState.currentStep === 1) {
+            // Parse and validate CSV
+            parseBatchCSV();
+        }
+        showBatchStep(batchImportState.currentStep + 1);
+    });
+
+    confirmBtn.addEventListener('click', () => {
+        importBatchTransactions();
+        showBatchStep(3);
+    });
+
+    // Close modal on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+}
+
+function resetBatchImport() {
+    batchImportState = {
+        currentStep: 1,
+        file: null,
+        parsedData: [],
+        validRows: [],
+        invalidRows: [],
+    };
+
+    // Reset file input
+    const fileInput = document.getElementById('batch-file-input');
+    if (fileInput) fileInput.value = '';
+
+    // Hide file info
+    const fileInfo = document.getElementById('batch-file-info');
+    if (fileInfo) fileInfo.classList.add('hidden');
+}
+
+function showBatchStep(stepNum) {
+    batchImportState.currentStep = stepNum;
+
+    // Hide all steps
+    for (let i = 1; i <= 3; i++) {
+        const step = document.getElementById(`batch-step-${i}`);
+        if (step) step.classList.add('hidden');
+    }
+
+    // Show current step
+    const currentStep = document.getElementById(`batch-step-${stepNum}`);
+    if (currentStep) currentStep.classList.remove('hidden');
+
+    // Update buttons
+    const backBtn = document.getElementById('batch-back-btn');
+    const cancelBtn = document.getElementById('batch-cancel-btn');
+    const nextBtn = document.getElementById('batch-next-btn');
+    const confirmBtn = document.getElementById('batch-confirm-btn');
+    const closeBtn = document.getElementById('batch-close-btn');
+
+    if (backBtn) backBtn.classList.toggle('hidden', stepNum === 1);
+    if (cancelBtn) cancelBtn.classList.toggle('hidden', stepNum === 3);
+    if (nextBtn) nextBtn.classList.toggle('hidden', stepNum !== 1);
+    if (confirmBtn) confirmBtn.classList.toggle('hidden', stepNum !== 2);
+    if (closeBtn) closeBtn.classList.toggle('hidden', stepNum !== 3);
+}
+
+function handleBatchFile(file) {
+    if (!file.name.endsWith('.csv')) {
+        showToast('Please select a CSV file', 'error');
+        return;
+    }
+
+    batchImportState.file = file;
+
+    // Show file info
+    const fileInfo = document.getElementById('batch-file-info');
+    const fileName = document.getElementById('batch-file-name');
+    const fileSize = document.getElementById('batch-file-size');
+
+    if (fileInfo && fileName && fileSize) {
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        fileInfo.classList.remove('hidden');
+    }
+
+    // Enable next button
+    const nextBtn = document.getElementById('batch-next-btn');
+    if (nextBtn) nextBtn.disabled = false;
+}
+
+function parseBatchCSV() {
+    if (!batchImportState.file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+        if (lines.length < 2) {
+            showToast('CSV file is empty or has no data rows', 'error');
+            return;
+        }
+
+        // Parse header
+        const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const requiredColumns = ['from', 'to', 'amount', 'memo'];
+
+        // Validate header
+        for (const col of requiredColumns) {
+            if (!header.includes(col)) {
+                showToast(`Missing required column: ${col}`, 'error');
+                return;
+            }
+        }
+
+        // Parse data rows
+        const fromIndex = header.indexOf('from');
+        const toIndex = header.indexOf('to');
+        const amountIndex = header.indexOf('amount');
+        const memoIndex = header.indexOf('memo');
+
+        batchImportState.parsedData = [];
+        batchImportState.validRows = [];
+        batchImportState.invalidRows = [];
+
+        const memberDIDs = new Set(state.members.map(m => m.did));
+
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim());
+            const row = {
+                lineNumber: i + 1,
+                from: cols[fromIndex] || '',
+                to: cols[toIndex] || '',
+                amount: cols[amountIndex] || '0',
+                memo: cols[memoIndex] || '',
+            };
+
+            // Validate row
+            const errors = [];
+
+            // Validate from DID
+            if (!row.from) {
+                errors.push('From DID is required');
+            } else if (!row.from.startsWith('did:icn:')) {
+                errors.push('From DID must start with "did:icn:"');
+            } else if (!memberDIDs.has(row.from)) {
+                errors.push('From DID not found in members');
+            }
+
+            // Validate to DID
+            if (!row.to) {
+                errors.push('To DID is required');
+            } else if (!row.to.startsWith('did:icn:')) {
+                errors.push('To DID must start with "did:icn:"');
+            } else if (!memberDIDs.has(row.to)) {
+                errors.push('To DID not found in members');
+            }
+
+            // Check for self-transactions
+            if (row.from && row.to && row.from === row.to) {
+                errors.push('Cannot transfer to yourself');
+            }
+
+            // Validate amount
+            const amount = parseFloat(row.amount);
+            if (isNaN(amount)) {
+                errors.push('Amount must be a number');
+            } else if (amount <= 0) {
+                errors.push('Amount must be positive');
+            } else if (amount > 1000) {
+                errors.push('Amount exceeds limit (max 1000)');
+            }
+
+            row.errors = errors;
+            row.status = errors.length === 0 ? 'valid' : 'invalid';
+            row.amountNum = amount;
+
+            batchImportState.parsedData.push(row);
+
+            if (row.status === 'valid') {
+                batchImportState.validRows.push(row);
+            } else {
+                batchImportState.invalidRows.push(row);
+            }
+        }
+
+        renderBatchPreview();
+    };
+
+    reader.readAsText(batchImportState.file);
+}
+
+function renderBatchPreview() {
+    // Calculate total amount
+    const totalAmount = batchImportState.validRows.reduce((sum, row) => sum + row.amountNum, 0);
+
+    // Update stats
+    document.getElementById('batch-total-rows').textContent = batchImportState.parsedData.length;
+    document.getElementById('batch-valid-rows').textContent = batchImportState.validRows.length;
+    document.getElementById('batch-invalid-rows').textContent = batchImportState.invalidRows.length;
+    document.getElementById('batch-total-amount').textContent = totalAmount.toFixed(1);
+
+    // Show/hide errors section
+    const errorsSection = document.getElementById('batch-errors');
+    const errorList = document.getElementById('batch-error-list');
+
+    if (batchImportState.invalidRows.length > 0) {
+        errorsSection.classList.remove('hidden');
+        errorList.innerHTML = batchImportState.invalidRows
+            .slice(0, 10) // Show first 10 errors
+            .map(row => {
+                return `<li>Line ${row.lineNumber}: ${row.errors.join(', ')}</li>`;
+            })
+            .join('');
+
+        if (batchImportState.invalidRows.length > 10) {
+            errorList.innerHTML += `<li>... and ${batchImportState.invalidRows.length - 10} more errors</li>`;
+        }
+    } else {
+        errorsSection.classList.add('hidden');
+    }
+
+    // Render preview table (first 10 rows)
+    const previewBody = document.getElementById('batch-preview-body');
+    previewBody.innerHTML = batchImportState.parsedData
+        .slice(0, 10)
+        .map(row => {
+            let statusText = row.status;
+            let statusClass = `status-${row.status}`;
+
+            if (row.status === 'invalid') {
+                statusText = '✗ Invalid';
+            } else {
+                statusText = '✓ Valid';
+            }
+
+            return `
+                <tr>
+                    <td>${truncateDid(row.from)}</td>
+                    <td>${truncateDid(row.to)}</td>
+                    <td>${parseFloat(row.amount).toFixed(1)} hrs</td>
+                    <td>${row.memo}</td>
+                    <td class="${statusClass}">${statusText}</td>
+                </tr>
+            `;
+        })
+        .join('');
+
+    // Enable/disable import button
+    const confirmBtn = document.getElementById('batch-confirm-btn');
+    if (confirmBtn) {
+        confirmBtn.disabled = batchImportState.validRows.length === 0;
+    }
+}
+
+function importBatchTransactions() {
+    // Add valid transactions to state
+    const now = Math.floor(Date.now() / 1000);
+    let totalAmount = 0;
+
+    batchImportState.validRows.forEach((row, index) => {
+        state.transactions.push({
+            id: `batch-${Date.now()}-${index}`,
+            from: row.from,
+            to: row.to,
+            amount: row.amountNum,
+            currency: 'hours',
+            memo: row.memo,
+            timestamp: now + index, // Slight offset to maintain order
+        });
+
+        totalAmount += row.amountNum;
+    });
+
+    // Update display
+    document.getElementById('batch-imported-count').textContent = batchImportState.validRows.length;
+    document.getElementById('batch-imported-total').textContent = totalAmount.toFixed(1);
+
+    // Save to localStorage
+    localStorage.setItem('icn-transactions', JSON.stringify(state.transactions));
+
+    // Re-render transaction history
+    renderTransactionHistory();
+
+    // Show notification
+    addNotification({
+        type: 'success',
+        title: 'Batch Import Complete',
+        message: `${batchImportState.validRows.length} transactions imported (${totalAmount.toFixed(1)} hours)`,
+    });
+
+    showToast(`Imported ${batchImportState.validRows.length} transactions`, 'success');
+}
+
+// Initialize batch import after DOM loads
+document.addEventListener('DOMContentLoaded', initializeBatchImport);
