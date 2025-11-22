@@ -1,7 +1,8 @@
 //! icnctl - CLI for managing ICNd
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::generate;
 // Governance types no longer needed - using RPC instead
 use icn_identity::{
     AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType, RecoveryAttestation, RecoveryEvent,
@@ -117,6 +118,13 @@ enum Commands {
     /// Distributed compute operations
     #[command(subcommand)]
     Compute(ComputeCommands),
+
+    /// Generate shell completions
+    Completions {
+        /// Shell type
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -158,7 +166,7 @@ enum ComputeCommands {
         priority: String,
 
         /// Path to inputs JSON file
-        #[arg(short = 'i', long)]
+        #[arg(long)]
         inputs: Option<PathBuf>,
 
         /// Payment rate per 1000 fuel (optional)
@@ -769,6 +777,12 @@ async fn main() -> Result<()> {
 
         Commands::Compute(compute_cmd) => {
             handle_compute_command(compute_cmd, &args.endpoint)?
+        }
+
+        Commands::Completions { shell } => {
+            let mut cmd = Args::command();
+            let bin_name = cmd.get_name().to_string();
+            generate(shell, &mut cmd, bin_name, &mut std::io::stdout());
         }
     }
 
@@ -3741,12 +3755,12 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
         } => {
             // Read contract JSON
             let contract_json = std::fs::read_to_string(&contract)
-                .with_context(|| format!("Failed to read contract file: {:?}", contract))?;
+                .with_context(|| format!("Failed to read contract file: {contract:?}"))?;
 
             // Read inputs if provided
             let inputs_value: serde_json::Value = if let Some(inputs_path) = inputs {
                 let inputs_json = std::fs::read_to_string(&inputs_path)
-                    .with_context(|| format!("Failed to read inputs file: {:?}", inputs_path))?;
+                    .with_context(|| format!("Failed to read inputs file: {inputs_path:?}"))?;
                 serde_json::from_str(&inputs_json)?
             } else {
                 serde_json::Value::Null
@@ -3771,11 +3785,11 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
             println!("Task submitted successfully!");
-            println!("Task ID:   {}", task_id);
-            println!("Task hash: {}", task_hash);
+            println!("Task ID:   {task_id}");
+            println!("Task hash: {task_hash}");
             println!();
             println!("Check status with:");
-            println!("  icnctl compute status {}", task_hash);
+            println!("  icnctl compute status {task_hash}");
         }
 
         ComputeCommands::Status { task_hash } => {
@@ -3783,11 +3797,11 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             let result = rpc_call(endpoint, "compute.status", params)?;
 
             let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
-            println!("Task:   {}", task_hash);
-            println!("Status: {}", status);
+            println!("Task:   {task_hash}");
+            println!("Status: {status}");
 
             if let Some(executor) = result.get("executor").and_then(|v| v.as_str()) {
-                println!("Executor: {}", executor);
+                println!("Executor: {executor}");
             }
 
             if let Some(task_result) = result.get("result") {
@@ -3797,9 +3811,9 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
 
                 println!();
                 println!("Result:");
-                println!("  Outcome:     {}", outcome);
-                println!("  Fuel used:   {}", fuel_used);
-                println!("  Duration:    {}ms", duration_ms);
+                println!("  Outcome:     {outcome}");
+                println!("  Fuel used:   {fuel_used}");
+                println!("  Duration:    {duration_ms}ms");
 
                 if let Some(output) = task_result.get("output") {
                     if !output.is_null() {
@@ -3808,7 +3822,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                 }
 
                 if let Some(error) = task_result.get("error").and_then(|v| v.as_str()) {
-                    println!("  Error:       {}", error);
+                    println!("  Error:       {error}");
                 }
             }
         }
@@ -3822,9 +3836,9 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
 
             let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
             println!("Task cancelled successfully!");
-            println!("Task hash: {}", task_hash);
-            println!("Status:    {}", status);
-            println!("Reason:    {}", reason);
+            println!("Task hash: {task_hash}");
+            println!("Status:    {status}");
+            println!("Reason:    {reason}");
         }
     }
 

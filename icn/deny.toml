@@ -1,0 +1,42 @@
+# cargo-deny configuration for ICN workspace
+# Run with: cargo deny check
+# Install: cargo install cargo-deny
+
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+ignore = [
+    # Add advisory IDs to ignore here
+]
+
+[licenses]
+# We allow permissive and copyleft licenses compatible with cooperative software
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "CC0-1.0",
+    "Unlicense",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+# Deny specific crates
+deny = [
+    # Add crates to ban here
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -1331,7 +1331,7 @@ impl Supervisor {
                     icn_compute::ComputeEvent::TaskCompleted { task_hash, executor, outcome, fuel_used, duration_ms } => {
                         info!("✅ Task completed: {} by {} - outcome: {}, fuel: {}, duration: {}ms",
                               task_hash, executor, outcome, fuel_used, duration_ms);
-                        icn_obs::metrics::compute::tasks_completed_inc(&outcome);
+                        icn_obs::metrics::compute::tasks_completed_inc(outcome);
                     }
                 }
 

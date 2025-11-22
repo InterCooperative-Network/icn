@@ -299,7 +299,7 @@ mod tests {
         let status = mgr.status(&hash).expect("Task should exist");
         assert!(
             matches!(&status, TaskStatus::Claimed { .. }),
-            "Expected Claimed status, got: {:?}", status
+            "Expected Claimed status, got: {status:?}"
         );
 
         // Verify correct executor
@@ -362,7 +362,7 @@ mod tests {
         let status = mgr.status(&hash).expect("Task should exist");
         assert!(
             matches!(status, TaskStatus::Cancelled { .. }),
-            "Expected Cancelled status, got: {:?}", status
+            "Expected Cancelled status, got: {status:?}"
         );
     }
 

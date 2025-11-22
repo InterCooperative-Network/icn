@@ -22,6 +22,7 @@ pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;
 pub mod rate_limit;
+pub mod security;
 pub mod server;
 pub mod validation;
 pub mod websocket;

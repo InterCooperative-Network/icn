@@ -154,6 +154,7 @@ struct App {
 }
 
 #[derive(PartialEq)]
+#[allow(dead_code)] // Input variant reserved for future forms feature
 enum InputMode {
     Normal,
     Input,
@@ -559,6 +560,7 @@ struct ApiProposal {
     title: String,
     state: String,
     #[serde(default)]
+    #[allow(dead_code)] // Reserved for future proposal details view
     description: Option<String>,
 }
 

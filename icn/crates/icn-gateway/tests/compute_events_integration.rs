@@ -99,7 +99,7 @@ async fn test_compute_events_to_websocket() {
             assert_eq!(task_hash, expected_hash, "Task hash should match");
             assert_eq!(executor, "did:icn:executor", "Executor should match");
         }
-        other => panic!("Expected ComputeTaskClaimed, got {:?}", other),
+        other => panic!("Expected ComputeTaskClaimed, got {other:?}"),
     }
 
     // 6. Verify we received TaskCompleted event
@@ -117,7 +117,7 @@ async fn test_compute_events_to_websocket() {
             assert_eq!(executor, "did:icn:executor", "Executor should match");
             assert_eq!(outcome, "success", "Outcome should be success");
         }
-        other => panic!("Expected ComputeTaskCompleted, got {:?}", other),
+        other => panic!("Expected ComputeTaskCompleted, got {other:?}"),
     }
 }
 
@@ -188,13 +188,12 @@ async fn test_multiple_subscribers_receive_events() {
             client.recv()
         )
         .await
-        .expect(&format!("Client {} should receive claim within timeout", client_num))
-        .expect(&format!("Client {} should receive claim event", client_num));
+        .unwrap_or_else(|_| panic!("Client {client_num} should receive claim within timeout"))
+        .unwrap_or_else(|| panic!("Client {client_num} should receive claim event"));
 
         assert!(
             matches!(claimed.event, GatewayEvent::ComputeTaskClaimed { .. }),
-            "Client {} should receive ComputeTaskClaimed",
-            client_num
+            "Client {client_num} should receive ComputeTaskClaimed"
         );
 
         // Completion event
@@ -203,13 +202,12 @@ async fn test_multiple_subscribers_receive_events() {
             client.recv()
         )
         .await
-        .expect(&format!("Client {} should receive completion within timeout", client_num))
-        .expect(&format!("Client {} should receive completion event", client_num));
+        .unwrap_or_else(|_| panic!("Client {client_num} should receive completion within timeout"))
+        .unwrap_or_else(|| panic!("Client {client_num} should receive completion event"));
 
         assert!(
             matches!(completed.event, GatewayEvent::ComputeTaskCompleted { .. }),
-            "Client {} should receive ComputeTaskCompleted",
-            client_num
+            "Client {client_num} should receive ComputeTaskCompleted"
         );
     }
 }

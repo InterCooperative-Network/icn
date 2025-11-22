@@ -99,12 +99,12 @@ impl ComputeManager {
 
         // Validate task before submission
         task.validate()
-            .map_err(|e| anyhow::anyhow!("Invalid task: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid task: {e}"))?;
 
         // If we have a daemon handle, use it
         if let Some(ref handle) = self.compute_handle {
             let hash = handle.submit(task).await
-                .map_err(|e| anyhow::anyhow!("Failed to submit task: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to submit task: {e}"))?;
 
             // Track locally
             let info = TaskInfo {
@@ -200,7 +200,7 @@ impl ComputeManager {
                     Ok(Some(result))
                 }
                 Ok(None) => Ok(None),
-                Err(e) => anyhow::bail!("Failed to get status: {}", e),
+                Err(e) => anyhow::bail!("Failed to get status: {e}"),
             }
         } else {
             // Check local cache
@@ -229,7 +229,7 @@ impl ComputeManager {
     ) -> Result<()> {
         if let Some(ref handle) = self.compute_handle {
             handle.cancel_task(&task_hash, &requester, reason).await
-                .map_err(|e| anyhow::anyhow!("Failed to cancel task: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to cancel task: {e}"))?;
             Ok(())
         } else {
             anyhow::bail!("Compute not available - daemon not connected")

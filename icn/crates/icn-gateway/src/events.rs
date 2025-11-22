@@ -288,7 +288,7 @@ mod tests {
         for i in 0..3 {
             let event = GatewayEvent::PaymentCreated {
                 coop_id: "test-coop".to_string(),
-                hash: format!("hash{}", i),
+                hash: format!("hash{i}"),
                 from: "did:icn:alice".to_string(),
                 to: "did:icn:bob".to_string(),
                 amount: i as i64,

@@ -136,12 +136,12 @@ impl Executor for LocalExecutor {
                 // Parse CCL contract from JSON
                 let contract: icn_ccl::Contract = match serde_json::from_str(source) {
                     Ok(c) => c,
-                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid CCL JSON: {}", e)),
+                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid CCL JSON: {e}")),
                 };
 
                 // Validate contract structure
                 if let Err(e) = contract.validate() {
-                    return ExecutionOutcome::Failed(format!("Contract validation failed: {}", e));
+                    return ExecutionOutcome::Failed(format!("Contract validation failed: {e}"));
                 }
 
                 // Find the default rule to execute (first rule or "main")
@@ -154,7 +154,7 @@ impl Executor for LocalExecutor {
                     serde_json::Value::String(ctx.executor_did.clone())
                 ) {
                     Ok(d) => d,
-                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {}", e)),
+                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {e}")),
                 };
 
                 // Create execution context for CCL

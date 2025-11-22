@@ -817,7 +817,7 @@ impl ComputeActor {
                     "Invalid executor DID in result"
                 );
                 icn_obs::metrics::compute::signatures_invalid_inc("invalid_did");
-                ComputeError::InvalidSignature(format!("Invalid executor DID: {}", e))
+                ComputeError::InvalidSignature(format!("Invalid executor DID: {e}"))
             })?;
 
         if let Err(e) = result.verify_signature(&executor_did) {
@@ -1166,7 +1166,7 @@ mod tests {
         let critical_status = handle.status(critical_hash).await.unwrap();
         assert!(
             matches!(critical_status, Some(TaskStatus::Completed { .. })),
-            "Critical task should be completed first, got: {:?}", critical_status
+            "Critical task should be completed first, got: {critical_status:?}"
         );
 
         // High should be next
@@ -1174,7 +1174,7 @@ mod tests {
         let high_status = handle.status(high_hash).await.unwrap();
         assert!(
             matches!(high_status, Some(TaskStatus::Completed { .. })),
-            "High priority task should be completed second, got: {:?}", high_status
+            "High priority task should be completed second, got: {high_status:?}"
         );
     }
 }

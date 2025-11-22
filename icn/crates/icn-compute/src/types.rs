@@ -175,7 +175,7 @@ impl ComputeTask {
             const MAX_RATE: u64 = 1_000_000; // 1M credits per 1000 fuel max
             if rate > MAX_RATE {
                 return Err(crate::error::ComputeError::InvalidCode(
-                    format!("Payment rate too high: {} (max {})", rate, MAX_RATE)
+                    format!("Payment rate too high: {rate} (max {MAX_RATE})")
                 ));
             }
         }
@@ -269,7 +269,7 @@ impl ComputeResult {
 
         // Extract public key from DID
         let verifying_key = executor_did.to_verifying_key()
-            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Cannot extract public key from DID: {}", e)))?;
+            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Cannot extract public key from DID: {e}")))?;
 
         let signature = ed25519_dalek::Signature::from_bytes(
             self.signature.as_slice().try_into()
@@ -278,7 +278,7 @@ impl ComputeResult {
 
         let payload = self.signing_payload();
         verifying_key.verify(&payload, &signature)
-            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Signature verification failed: {}", e)))?;
+            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Signature verification failed: {e}")))?;
 
         Ok(())
     }
@@ -365,7 +365,7 @@ mod tests {
         // Verify correct variant and executor
         assert!(
             matches!(&decoded, ComputeMessage::TaskClaimed { .. }),
-            "Expected TaskClaimed variant, got: {:?}", decoded
+            "Expected TaskClaimed variant, got: {decoded:?}"
         );
 
         if let ComputeMessage::TaskClaimed { executor, .. } = decoded {
