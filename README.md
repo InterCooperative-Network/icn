@@ -24,10 +24,11 @@ cd icn && cargo build --release
 ```
 
 **Next Steps:**
+- **[Getting Started Guide](docs/GETTING_STARTED.md)** - Complete onboarding (5-minute quickstart, core concepts, troubleshooting)
+- **[FAQ](docs/FAQ.md)** - 30+ common questions answered
 - [Configuration Examples](config/) - Customize your node
 - [Docker Deployment](docker/) - Run with containers
 - [Examples](examples/) - Tutorials and demos
-- [Documentation](docs/) - Architecture, deployment, APIs
 
 ---
 
@@ -83,57 +84,31 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 
 ## Project Status
 
-**Phase 0 - Scaffold: Complete ✓**
-- [x] Workspace structure, core runtime, supervisor
-- [x] Identity/DID generation & verification
-- [x] CLI tooling (icnd + icnctl)
+**Core Substrate: Complete ✓**
+- [x] Phases 0-7: Identity, trust graph, networking, ledger, contracts, gossip, production hardening
+- [x] Phase 8: DID-TLS binding with persistent certificates
+- [x] Phase 9: Message integrity with Ed25519 signatures and replay protection
+- [x] Phase 10: End-to-end encryption with X25519-ChaCha20-Poly1305
+- [x] Phase 11: Multi-device identity with DID Document v2
+- [x] Phase 12: Economic safety rails (dynamic credit limits, dispute resolution)
+- [x] Phase 13: Governance primitives v1 (domains, proposals, voting with gossip coordination)
+- [x] Phase 14: Gateway REST API (JWT auth, WebSocket events, per-DID rate limiting)
+- [x] Phase 15: Distributed compute layer (trust-gated CCL execution with task prioritization)
 
-**Phase 1 - Identity & Trust: Complete ✓**
-- [x] Age-encrypted keystore with passphrase unlock
-- [x] Key rotation protocol with transition records
-- [x] Trust graph storage & transitive trust computation
-- [x] DID import/export
+**Operational Readiness: Complete ✓**
+- [x] Track B1: Operational hardening (backup/restore, monitoring dashboard, graceful restart)
+- [x] Track B3: Economic modeling (agent-based simulation validates dynamic credit limits)
 
-**Phase 2 - Network Transport: Complete ✓**
-- [x] QUIC/TLS sessions with DID-based certificates
-- [x] mDNS local discovery
-- [x] Network actor with session pooling
-- [x] Secure passphrase handling (zeroization)
+**Production Features:**
+- ✅ Three-layer security (transport, message, application)
+- ✅ Prometheus metrics and real-time monitoring dashboard
+- ✅ Encrypted backup/restore with state snapshots
+- ✅ Version negotiation with capability-based feature gating
+- ✅ Graceful restart with vector clock and subscription persistence
+- ✅ Comprehensive documentation (8,500+ lines)
+- ✅ Production-hardened gateway (7 security headers, CORS, request limits)
 
-**Phase 3 - Ledger: Complete ✓**
-- [x] Double-entry mutual credit accounting
-- [x] Merkle-DAG content-addressable structure
-- [x] Multi-currency support with credit limits
-- [x] Balance queries & integrity verification
-
-**Phase 4 - Cooperative Contracts (CCL): Complete ✓**
-- [x] Domain-specific contract language (AST-based)
-- [x] Deterministic interpreter with fuel metering
-- [x] Capability system (ReadLedger, WriteLedger, etc.)
-- [x] Contract runtime with ledger integration
-- [x] TimeBank example contract
-
-**Phase 5 - Gossip & Distributed Sync: Complete ✓**
-- [x] Topic-based gossip protocol with ACLs
-- [x] Vector clocks for causal ordering
-- [x] Bloom filter anti-entropy
-- [x] Ledger-gossip integration
-- [x] Multi-node convergence verification
-
-**Phase 6 - Network Protocol Bridge: Complete ✓**
-- [x] Wire protocol for gossip over QUIC
-- [x] NetworkMessage envelope with DID routing
-- [x] NetworkActor extensions (send/broadcast)
-- [x] Gossip-network bridge in supervisor
-- [x] Background anti-entropy task
-- [x] Two-node integration test structure
-
-**Phase 7 - Polish & Production: In Progress**
-- [x] Metrics exporter (Prometheus) ✓
-- [x] Complete pull protocol (Request/Response) ✓
-- [x] Topic subscriptions & routing ✓
-- [x] Production hardening (3 critical + 4 high priority issues fixed) ✓
-- [x] Comprehensive documentation ✓
+**Next Milestone: Track C1 - Pilot Community Selection & Deployment**
 
 ## Topic Subscriptions
 
@@ -177,6 +152,23 @@ ICN includes comprehensive production hardening against DoS attacks and resource
 
 See [docs/production-hardening.md](docs/production-hardening.md) for complete security documentation.
 
+## Documentation
+
+### For Users
+- **[Getting Started Guide](docs/GETTING_STARTED.md)** - Complete onboarding from installation to first transaction
+- **[FAQ](docs/FAQ.md)** - 30+ common questions covering setup, security, usage, and troubleshooting
+- **[Migration Guides](docs/migration-guides/)** - Keystore version upgrades and safe version migration procedures
+
+### For Developers
+- **[Contributing Guide](CONTRIBUTING.md)** - Developer onboarding, code style, testing philosophy, and PR process
+- **[Architecture](docs/ARCHITECTURE.md)** - System design, component architecture, and implementation details
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards and expectations
+- **[API Documentation](docs/)** - Topic subscriptions, governance primitives, and protocol references
+
+### For Operators
+- **[Deployment Guide](docs/deployment-guide.md)** - Production deployment, monitoring, and operations
+- **[Project Governance](docs/PROJECT_GOVERNANCE.md)** - Decision-making process, roles, and release procedures
+
 ## Building
 
 ```bash
@@ -200,6 +192,21 @@ cargo build --release
 
 # Override data directory
 ./target/release/icnd --data-dir /custom/path --log-level debug
+```
+
+### Shell Completions
+
+Generate shell completions for enhanced CLI experience:
+
+```bash
+# Bash
+./target/release/icnctl completions bash > ~/.local/share/bash-completion/completions/icnctl
+
+# Zsh
+./target/release/icnctl completions zsh > ~/.zsh/completion/_icnctl
+
+# Fish
+./target/release/icnctl completions fish > ~/.config/fish/completions/icnctl.fish
 ```
 
 ### Identity Management
@@ -288,6 +295,37 @@ Access health: `curl http://localhost:8080/health`
 
 - `icnd` - The ICN daemon
 - `icnctl` - CLI management tool
+
+## Community & Contributing
+
+We welcome contributions from the cooperative community! ICN is designed for cooperatives, by cooperatives.
+
+**Getting Started:**
+1. Read the [Contributing Guide](CONTRIBUTING.md) - setup, code style, testing, and PR process
+2. Check our [Code of Conduct](CODE_OF_CONDUCT.md) - community standards
+3. Review [Project Governance](docs/PROJECT_GOVERNANCE.md) - decision-making and roles
+
+**Ways to Contribute:**
+- **Report bugs** - Use GitHub issues with detailed reproduction steps
+- **Improve documentation** - Guides, examples, and clarifications welcome
+- **Submit code** - Bug fixes, features, tests, and optimizations
+- **Join a pilot** - Help test ICN with your cooperative community
+- **Provide feedback** - Share your use case and requirements
+
+**Development Quick Start:**
+```bash
+# Clone and build
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn/icn && cargo build
+
+# Run tests
+cargo test
+
+# Generate shell completions
+./target/debug/icnctl completions bash > icnctl.bash
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development workflow.
 
 ## License
 
