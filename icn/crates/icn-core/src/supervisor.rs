@@ -84,6 +84,9 @@ impl Supervisor {
         // Track spawned background tasks for graceful shutdown
         let mut background_tasks: JoinSet<()> = JoinSet::new();
 
+        // Event broadcaster for WebSocket delivery (shared between compute actor and gateway)
+        let event_broadcaster: Option<Arc<icn_gateway::EventBroadcaster>>;
+
         // Spawn actors (requires identity bundle from unlocked keystore)
         let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) = &self.identity_bundle {
             info!("Identity bundle available - spawning actors");
@@ -1313,9 +1316,14 @@ impl Supervisor {
             });
             compute_actor.set_payment_callback(compute_payment_callback);
 
-            // Set up event callback for task status changes
+            // Create shared event broadcaster for WebSocket delivery
+            let broadcaster = Arc::new(icn_gateway::EventBroadcaster::new());
+
+            // Set up event callback for task status changes (logs + metrics + WebSocket forwarding)
+            let broadcaster_for_callback = broadcaster.clone();
             let compute_event_callback: icn_compute::EventCallback = Arc::new(move |event| {
-                match event {
+                // Log and update metrics
+                match &event {
                     icn_compute::ComputeEvent::TaskClaimed { task_hash, executor } => {
                         info!("🔧 Task claimed: {} by {}", task_hash, executor);
                         icn_obs::metrics::compute::tasks_claimed_inc();
@@ -1326,6 +1334,12 @@ impl Supervisor {
                         icn_obs::metrics::compute::tasks_completed_inc(&outcome);
                     }
                 }
+
+                // Forward to EventBroadcaster for WebSocket delivery
+                let broadcaster = broadcaster_for_callback.clone();
+                tokio::spawn(async move {
+                    icn_gateway::forward_compute_event(&broadcaster, event).await;
+                });
             });
             compute_actor.set_event_callback(compute_event_callback);
 
@@ -1421,6 +1435,9 @@ impl Supervisor {
 
             info!("Metrics update task spawned");
 
+            // Assign broadcaster to outer scope for gateway use
+            event_broadcaster = Some(broadcaster);
+
             (Some(network_handle), Some(gossip_handle), Some(ledger_handle))
         } else {
             warn!("No identity bundle available - actors not spawned");
@@ -1448,6 +1465,9 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
+            // No event broadcaster without identity
+            event_broadcaster = None;
+
             (None, None, None)
         };
 
@@ -1464,12 +1484,31 @@ impl Supervisor {
                 info!("Gateway JWT secret verified, spawning server...");
 
                 let jwt_secret = self.config.gateway.jwt_secret.clone().into_bytes();
+                let data_dir = self.config.data_dir.clone();
+
+                // Get event broadcaster if compute actor was created
+                let broadcaster_for_gateway = if let Some(ref broadcaster) = event_broadcaster {
+                    info!("Using shared EventBroadcaster for real-time WebSocket delivery");
+                    Some(broadcaster.clone())
+                } else {
+                    None
+                };
 
                 // Spawn gateway in a dedicated thread (actix-web has its own runtime)
                 std::thread::spawn(move || {
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(async move {
-                        let gateway_server = icn_gateway::GatewayServer::new(gateway_addr, jwt_secret);
+                        let gateway_server = if let Some(broadcaster) = broadcaster_for_gateway {
+                            icn_gateway::GatewayServer::new_with_broadcaster(
+                                gateway_addr,
+                                jwt_secret,
+                                Some(data_dir),
+                                broadcaster,
+                            )
+                        } else {
+                            icn_gateway::GatewayServer::new(gateway_addr, jwt_secret)
+                        };
+
                         if let Err(e) = gateway_server.run().await {
                             warn!("Gateway server error: {}", e);
                         }

@@ -24,6 +24,7 @@ pub struct GatewayServer {
     bind_addr: SocketAddr,
     jwt_secret: Vec<u8>,
     data_dir: Option<std::path::PathBuf>,
+    event_broadcaster: Option<Arc<EventBroadcaster>>,
 }
 
 impl GatewayServer {
@@ -33,6 +34,7 @@ impl GatewayServer {
             bind_addr,
             jwt_secret,
             data_dir: None,
+            event_broadcaster: None,
         }
     }
 
@@ -42,6 +44,22 @@ impl GatewayServer {
             bind_addr,
             jwt_secret,
             data_dir: Some(data_dir),
+            event_broadcaster: None,
+        }
+    }
+
+    /// Create a new gateway server with shared event broadcaster (for production integration)
+    pub fn new_with_broadcaster(
+        bind_addr: SocketAddr,
+        jwt_secret: Vec<u8>,
+        data_dir: Option<std::path::PathBuf>,
+        event_broadcaster: Arc<EventBroadcaster>,
+    ) -> Self {
+        GatewayServer {
+            bind_addr,
+            jwt_secret,
+            data_dir,
+            event_broadcaster: Some(event_broadcaster),
         }
     }
 
@@ -62,7 +80,11 @@ impl GatewayServer {
             Arc::new(LedgerManager::new())
         };
 
-        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        // Use provided event broadcaster or create a new one
+        let event_broadcaster = self.event_broadcaster.unwrap_or_else(|| {
+            info!("Creating new EventBroadcaster (not shared with compute actor)");
+            Arc::new(EventBroadcaster::new())
+        });
 
         // Create rate limiter with default config
         let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
