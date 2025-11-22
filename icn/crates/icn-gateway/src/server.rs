@@ -17,6 +17,7 @@ use crate::events::EventBroadcaster;
 use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
 use crate::rate_limit::{RateLimitConfig, RateLimiter, IpRateLimiter};
+use crate::security::{SecurityConfig, SecurityHeaders, configure_cors};
 use crate::error::Result;
 
 /// Gateway server configuration
@@ -25,6 +26,7 @@ pub struct GatewayServer {
     jwt_secret: Vec<u8>,
     data_dir: Option<std::path::PathBuf>,
     event_broadcaster: Option<Arc<EventBroadcaster>>,
+    security_config: SecurityConfig,
 }
 
 impl GatewayServer {
@@ -35,6 +37,7 @@ impl GatewayServer {
             jwt_secret,
             data_dir: None,
             event_broadcaster: None,
+            security_config: SecurityConfig::development(), // Permissive for tests
         }
     }
 
@@ -45,6 +48,7 @@ impl GatewayServer {
             jwt_secret,
             data_dir: Some(data_dir),
             event_broadcaster: None,
+            security_config: SecurityConfig::production(), // Strict for production
         }
     }
 
@@ -60,7 +64,14 @@ impl GatewayServer {
             jwt_secret,
             data_dir,
             event_broadcaster: Some(event_broadcaster),
+            security_config: SecurityConfig::production(),
         }
+    }
+
+    /// Set custom security configuration
+    pub fn with_security_config(mut self, config: SecurityConfig) -> Self {
+        self.security_config = config;
+        self
     }
 
     /// Run the gateway server
@@ -145,9 +156,15 @@ impl GatewayServer {
             });
         }
 
+        // Clone security config for the move closure
+        let security_config = self.security_config.clone();
+
         let server = HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
+
+            // Configure CORS based on security config
+            let cors = configure_cors(&security_config);
 
             App::new()
                 // Shared state
@@ -163,6 +180,8 @@ impl GatewayServer {
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first, so metrics wraps everything)
                 .wrap(crate::middleware::MetricsMiddleware)
+                .wrap(SecurityHeaders::new(security_config.clone()))
+                .wrap(cors)
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
                 // API v1 - single scope with public and protected routes
