@@ -316,7 +316,8 @@ We welcome contributions from the cooperative community! ICN is designed for coo
 ```bash
 # Clone and build
 git clone https://github.com/InterCooperative-Network/icn.git
-cd icn/icn && cargo build
+cd icn
+cd icn && cargo build
 
 # Run tests
 cargo test
