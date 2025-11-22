@@ -700,6 +700,8 @@ wscat -c ws://localhost:8080/ws/my-coop
 - [x] **Task Priority Levels**: TaskPriority enum (Low=0, Normal=1, High=2, Critical=3) with PartialOrd for natural comparison
 - [x] **Priority-Based Claiming**: `TaskManager::pending_by_priority()` sorts by priority desc → created_at asc, executor claims highest-priority task
 - [x] **User-Facing Priority API**: Priority support in Gateway REST API, RPC, CLI (`--priority`), and TypeScript SDK
+- [x] **WebSocket Event Broadcasting**: Shared EventBroadcaster between supervisor and gateway enables real-time event delivery to WebSocket clients in production
+- [x] **Event Flow Integration**: Compute actor → EventBroadcaster → Gateway WebSocket connections → Clients receive TaskClaimed/TaskCompleted events in real-time
 
 **Compute Features**:
 - **Trust-Gated Execution**: MIN_TRUST_SUBMIT (0.1), MIN_TRUST_EXECUTE (0.3)
@@ -777,23 +779,38 @@ Events are broadcast at two points:
 
 The supervisor sets up the event callback for logging and metrics.
 
-**WebSocket Integration Pattern**:
-The `icn-gateway/compute_events.rs` module provides utilities for forwarding compute events to WebSocket clients:
+**WebSocket Integration Pattern** (Automatically Configured in Production):
+The supervisor automatically sets up event broadcasting when both compute actor and gateway are enabled:
+
+1. **Supervisor creates shared EventBroadcaster** when compute actor spawns
+2. **Compute event callback** logs + updates metrics + forwards to EventBroadcaster
+3. **Gateway receives EventBroadcaster** via `new_with_broadcaster()` constructor
+4. **WebSocket clients** connect to `/ws/{coop_id}` and receive real-time events
+
+The `icn-gateway/compute_events.rs` module provides the integration utilities:
 
 ```rust
-// Create event broadcaster
+// In supervisor (automatic):
 let broadcaster = Arc::new(EventBroadcaster::new());
+let callback: EventCallback = Arc::new(move |event| {
+    // Log + metrics
+    // ...
 
-// Create forwarding callback
-let callback = icn_gateway::create_forwarding_callback(broadcaster.clone());
-
-// Set on compute actor
+    // Forward to WebSocket clients
+    let b = broadcaster.clone();
+    tokio::spawn(async move {
+        icn_gateway::forward_compute_event(&b, event).await;
+    });
+});
 compute_actor.set_event_callback(callback);
 
-// WebSocket clients subscribe to "compute" channel and receive:
-// - ComputeTaskClaimed events when tasks are claimed
-// - ComputeTaskCompleted events when execution finishes
+// Gateway receives shared broadcaster
+let gateway = GatewayServer::new_with_broadcaster(addr, jwt, data_dir, broadcaster);
 ```
+
+**WebSocket clients** subscribe to "compute" channel and receive:
+- **ComputeTaskClaimed** - When executors claim tasks
+- **ComputeTaskCompleted** - When execution finishes (with outcome, fuel_used, duration_ms)
 
 This enables real-time task monitoring for web/mobile applications via WebSocket connections.
 
