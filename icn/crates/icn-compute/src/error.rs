@@ -45,6 +45,14 @@ pub enum ComputeError {
     #[error("invalid signature: {0}")]
     InvalidSignature(String),
 
+    /// Policy violation (Phase 16E)
+    #[error("policy violation: {0}")]
+    PolicyViolation(String),
+
+    /// Invalid input
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+
     /// Internal error
     #[error("internal error: {0}")]
     Internal(String),

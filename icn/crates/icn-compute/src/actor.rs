@@ -201,6 +201,8 @@ pub struct ComputeActor {
     checkpoint_store: Option<Arc<CheckpointStore>>,
     /// Migration manager for actor migrations (Phase 16D)
     migration_manager: Option<Arc<ActorMigrationManager>>,
+    /// Policy manager for cooperative scheduling policies (Phase 16E)
+    policy_manager: Option<Arc<crate::policy::PolicyManager>>,
 }
 
 impl ComputeActor {
@@ -222,6 +224,7 @@ impl ComputeActor {
             max_concurrent_tasks: 10, // Default: 10 concurrent tasks
             checkpoint_store: None,
             migration_manager: None,
+            policy_manager: None,
         }
     }
 
@@ -233,6 +236,11 @@ impl ComputeActor {
     /// Set migration manager for actor migrations
     pub fn set_migration_manager(&mut self, manager: Arc<ActorMigrationManager>) {
         self.migration_manager = Some(manager);
+    }
+
+    /// Set policy manager for cooperative scheduling policies
+    pub fn set_policy_manager(&mut self, manager: Arc<crate::policy::PolicyManager>) {
+        self.policy_manager = Some(manager);
     }
 
     /// Set maximum concurrent tasks this executor will claim
@@ -452,8 +460,49 @@ impl ComputeActor {
             });
         }
 
-        // Add to local task manager
-        let hash = self.task_manager.lock().await.submit(task.clone())?;
+        // Check policy compliance (Phase 16E)
+        let mut adjusted_task = task.clone();
+        if let Some(ref policy_manager) = self.policy_manager {
+            // Parse submitter DID
+            let submitter_did = icn_identity::Did::from_str(&task.submitter)
+                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {}", e)))?;
+
+            // Extract coop_id from task (for now, use task.id prefix or default)
+            // TODO: Add explicit coop_id field to ComputeTask in future
+            let coop_id = "default"; // Placeholder - will be replaced with proper coop field
+
+            // Check policy
+            match policy_manager.check_submission(&task, &submitter_did, coop_id).await? {
+                crate::policy::PolicyDecision::Reject { reason } => {
+                    tracing::warn!(
+                        task_id = %task.id,
+                        submitter = %task.submitter,
+                        coop_id = %coop_id,
+                        reason = %reason,
+                        "Task rejected by policy"
+                    );
+                    return Err(ComputeError::PolicyViolation(reason));
+                }
+                crate::policy::PolicyDecision::Allow {
+                    adjusted_priority,
+                    placement_constraints,
+                } => {
+                    // Apply policy adjustments
+                    adjusted_task.priority = adjusted_priority;
+                    // Store placement constraints for later use in placement scoring
+                    // TODO: Add placement_constraints field to ComputeTask
+                    tracing::debug!(
+                        task_id = %task.id,
+                        original_priority = ?task.priority,
+                        adjusted_priority = ?adjusted_priority,
+                        "Policy check passed with adjustments"
+                    );
+                }
+            }
+        }
+
+        // Add to local task manager (use adjusted task)
+        let hash = self.task_manager.lock().await.submit(adjusted_task.clone())?;
         icn_obs::metrics::compute::tasks_submitted_inc();
 
         tracing::info!(
