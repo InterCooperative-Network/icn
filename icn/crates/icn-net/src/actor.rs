@@ -1267,6 +1267,62 @@ impl NetworkActor {
                                     info!("Received handshake ack from {}", message.from);
                                     // Nothing to do, just acknowledgement
                                 }
+                                MessagePayload::Ping { sent_at } => {
+                                    info!("Received Ping from {} (sent_at={}ms)", message.from, sent_at);
+
+                                    // Send Pong response with timestamp echo
+                                    let pong_msg = NetworkMessage::pong(
+                                        own_did.clone(),
+                                        message.from.clone(),
+                                        *sent_at,
+                                    );
+
+                                    let connection_clone = connection.clone();
+                                    let from_did = message.from.clone();
+                                    tokio::spawn(async move {
+                                        match connection_clone.open_bi().await {
+                                            Ok((mut new_send, _new_recv)) => {
+                                                if let Err(e) = write_message(&mut new_send, &pong_msg).await {
+                                                    warn!("Failed to send Pong to {}: {}", from_did, e);
+                                                } else if let Err(e) = new_send.finish() {
+                                                    warn!("Failed to finish Pong stream to {}: {}", from_did, e);
+                                                } else {
+                                                    info!("Sent Pong to {}", from_did);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to open stream for Pong to {}: {}", from_did, e);
+                                            }
+                                        }
+                                    });
+                                }
+                                MessagePayload::Pong { ping_sent_at, pong_sent_at } => {
+                                    // Calculate RTT
+                                    let now = std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_millis() as u64;
+                                    let rtt_ms = now.saturating_sub(*ping_sent_at);
+
+                                    info!(
+                                        peer_did = %message.from,
+                                        rtt_ms = rtt_ms,
+                                        ping_sent_at = ping_sent_at,
+                                        pong_sent_at = pong_sent_at,
+                                        "Received Pong - RTT measured"
+                                    );
+
+                                    // Record RTT in neighbor sets if available
+                                    if let Some(ref sets) = neighbor_sets {
+                                        sets.write().await.record_rtt(
+                                            &PeerId(message.from.clone()),
+                                            rtt_ms,
+                                        );
+
+                                        // Update metrics
+                                        icn_obs::metrics::topology::rtt_observe(rtt_ms as f64);
+                                    }
+                                }
                                 MessagePayload::Signed(ref envelope) => {
                                     // Verify SignedEnvelope (signature + replay protection)
                                     match replay_guard.write().await.check(envelope) {

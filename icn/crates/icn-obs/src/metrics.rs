@@ -157,6 +157,14 @@ pub fn init_descriptions() {
         "icn_topology_gossip_fanout",
         "Gossip fanout count by scope (local_cluster, regional, global)"
     );
+    describe_histogram!(
+        "icn_topology_rtt_milliseconds",
+        "Round-trip time measurements for peers in milliseconds"
+    );
+    describe_histogram!(
+        "icn_topology_bandwidth_bytes_per_second",
+        "Bandwidth measurements for peers in bytes per second"
+    );
 
     // Gossip metrics
     describe_gauge!(
@@ -1126,6 +1134,16 @@ pub mod topology {
     pub fn gossip_fanout_record(scope: &str, count: usize) {
         histogram!("icn_topology_gossip_fanout", "scope" => scope.to_string())
             .record(count as f64);
+    }
+
+    /// Record RTT measurement for a peer
+    pub fn rtt_observe(rtt_ms: f64) {
+        histogram!("icn_topology_rtt_milliseconds").record(rtt_ms);
+    }
+
+    /// Record bandwidth measurement for a peer
+    pub fn bandwidth_observe(bandwidth_bps: f64) {
+        histogram!("icn_topology_bandwidth_bytes_per_second").record(bandwidth_bps);
     }
 }
 
