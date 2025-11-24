@@ -451,6 +451,73 @@ impl ActorMigrationManager {
         removed
     }
 
+    /// Detect and fail timed-out migrations.
+    ///
+    /// Checks for migrations stuck in transient states and marks them as failed.
+    /// Returns number of migrations timed out.
+    pub async fn detect_timeouts(&self, timeout_secs: u64) -> Result<usize, ComputeError> {
+        let now = now_millis();
+        let timeout_ms = timeout_secs * 1000;
+        let mut timed_out = Vec::new();
+
+        // Find timed-out migrations
+        {
+            let migrations = self.migrations.read().await;
+            for (actor_id, state) in migrations.iter() {
+                let is_timeout = match state {
+                    MigrationState::Requesting { sent_at, .. } => {
+                        now.saturating_sub(*sent_at) > timeout_ms
+                    }
+                    MigrationState::Checkpointing { .. } => {
+                        // Checkpointing shouldn't take long, use half timeout
+                        false // TODO: Track start time
+                    }
+                    MigrationState::Transferring { .. } => {
+                        // TODO: Track start time for transferring state
+                        false
+                    }
+                    MigrationState::Restoring { .. } => {
+                        // TODO: Track start time for restoring state
+                        false
+                    }
+                    _ => false,
+                };
+
+                if is_timeout {
+                    timed_out.push((*actor_id, state.clone()));
+                }
+            }
+        }
+
+        // Mark timed-out migrations as failed
+        if !timed_out.is_empty() {
+            let mut migrations = self.migrations.write().await;
+            for (actor_id, old_state) in &timed_out {
+                let target = match old_state {
+                    MigrationState::Requesting { target, .. } => target.clone(),
+                    _ => "unknown".to_string(),
+                };
+
+                tracing::warn!(
+                    actor_id = %hex::encode(actor_id),
+                    target = %target,
+                    state = ?old_state,
+                    "Migration timed out"
+                );
+
+                migrations.insert(
+                    *actor_id,
+                    MigrationState::Failed {
+                        reason: "Migration timed out".to_string(),
+                        failed_at: now,
+                    },
+                );
+            }
+        }
+
+        Ok(timed_out.len())
+    }
+
     /// Get migration state for actor.
     pub async fn get_state(&self, actor_id: &ActorId) -> Option<MigrationState> {
         let migrations = self.migrations.read().await;
@@ -706,5 +773,38 @@ mod tests {
         // Verify removed
         let state = manager.get_state(&[5u8; 32]).await;
         assert!(state.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_detect_timeouts() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did().to_string();
+        let (manager, _sent_messages) = make_manager(&executor_did);
+
+        let actor_id = [6u8; 32];
+
+        // Manually insert a migration in Requesting state with old timestamp
+        {
+            let mut migrations = manager.migrations.write().await;
+            migrations.insert(
+                actor_id,
+                MigrationState::Requesting {
+                    target: "did:icn:executor-b".to_string(),
+                    sent_at: now_millis() - 120_000, // 2 minutes ago
+                },
+            );
+        }
+
+        // Detect timeouts with 60-second threshold
+        let timed_out = manager.detect_timeouts(60).await.unwrap();
+        assert_eq!(timed_out, 1);
+
+        // Verify migration marked as failed
+        let state = manager.get_state(&actor_id).await;
+        assert!(matches!(state, Some(MigrationState::Failed { .. })));
+
+        if let Some(MigrationState::Failed { reason, .. }) = state {
+            assert_eq!(reason, "Migration timed out");
+        }
     }
 }

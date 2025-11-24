@@ -294,6 +294,25 @@ impl ComputeActor {
             }
         });
 
+        // Spawn migration manager task (Phase 16D Week 4)
+        if let Some(ref migration_manager) = self.migration_manager {
+            let manager_clone = Arc::clone(migration_manager);
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+
+                    // Detect and fail timed-out migrations (60 second timeout)
+                    if let Err(e) = manager_clone.detect_timeouts(60).await {
+                        tracing::warn!("migration timeout detection error: {}", e);
+                    }
+
+                    // Cleanup old migration records (keep for 5 minutes)
+                    let _removed = manager_clone.cleanup_migrations(300).await;
+                }
+            });
+        }
+
         // Spawn main command loop
         tokio::spawn(async move {
             while let Some(cmd) = rx.recv().await {
@@ -1710,6 +1729,7 @@ mod tests {
             payment_rate: None,
             payment_currency: None,
             resource_profile: None,
+            actor_mode: None,
         }
     }
 

@@ -78,6 +78,10 @@ pub struct ComputeTask {
     /// Resource requirements (Phase 16B - for placement negotiation)
     #[serde(default)]
     pub resource_profile: Option<crate::scheduler::ResourceProfile>,
+    /// Actor mode for stateful execution (Phase 16D Week 4)
+    /// None = ephemeral (default), Some(mode) = stateful actor
+    #[serde(default)]
+    pub actor_mode: Option<crate::actor_model::ActorMode>,
 }
 
 impl ComputeTask {
@@ -417,6 +421,7 @@ mod tests {
             payment_rate: None,
             payment_currency: None,
             resource_profile: None,
+            actor_mode: None,
         };
 
         let hash1 = task.hash();
@@ -568,6 +573,7 @@ mod tests {
             payment_rate: None,
             payment_currency: None,
             resource_profile: None,
+            actor_mode: None,
         }
     }
 
