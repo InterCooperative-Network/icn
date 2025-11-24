@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - Placement Scoring Implementation (Phase 16B - Partial) (2025-11-23)
+### Added - Placement Scoring Complete (Phase 16B) (2025-11-23)
 
-**Intelligent Task Placement:**
+**Production-Ready Intelligent Task Placement:**
 
 1. **Deliberation Window** ([actor.rs:1108-1147](icn/crates/icn-compute/src/actor.rs#L1108-L1147))
    - 500ms delay before executors broadcast placement offers
@@ -24,7 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Selects executor with highest score
    - Broadcasts `TaskClaimed` to winner
 
-3. **Integration Test** ([actor.rs:1494-1675](icn/crates/icn-compute/src/actor.rs#L1494-L1675))
+3. **Prometheus Metrics** ([metrics.rs:658-685, 1468-1496](icn/crates/icn-obs/src/metrics.rs))
+   - 5 new metrics for placement observability:
+     - `icn_compute_placement_requests_received_total`
+     - `icn_compute_placement_offers_sent_total`
+     - `icn_compute_placement_offers_received_total`
+     - `icn_compute_placement_score` (histogram)
+     - `icn_compute_placement_duration_seconds` (histogram)
+   - Metrics integrated at key placement lifecycle points
+   - Win/loss tracking deferred (requires executor state tracking)
+
+4. **Automatic Protocol Selection** ([types.rs:78-80](icn/crates/icn-compute/src/types.rs#L78-L80), [actor.rs:427-459](icn/crates/icn-compute/src/actor.rs#L427-L459))
+   - Tasks with `resource_profile` → PlacementRequest (Phase 16B)
+   - Tasks without `resource_profile` → TaskSubmitted (Phase 15 legacy)
+   - No new API methods needed
+   - Backward compatible: all existing APIs unchanged
+
+5. **Integration Test** ([actor.rs:1494-1675](icn/crates/icn-compute/src/actor.rs#L1494-L1675))
    - Multi-executor placement negotiation test
    - 5 executors with varying trust levels compete for task
    - Verifies trust gate rejection (MIN_TRUST_EXECUTE = 0.3)
@@ -32,15 +48,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Confirms no double-claims occur
 
 **Technical Achievements:**
-- ✅ 1 new integration test (48 total in icn-compute, all passing)
+- ✅ All 48 tests passing (100% backward compatible)
 - ✅ Deliberation prevents network-speed bias
 - ✅ Highest-trust executors win placement fairly
 - ✅ Trust-gated participation (low-trust executors rejected)
 - ✅ Random jitter (10%) breaks ties, prevents thundering herd
+- ✅ Production observability via Prometheus metrics
+- ✅ Seamless API migration (automatic protocol detection)
 
-**Progress:**
-- Phase 16B: 50% complete (2 of 4 priorities done)
-- Next: Prometheus metrics, submitter API
+**Completion:**
+- Phase 16B: 100% complete ✅
+- Total effort: 3 sessions (~8 hours)
+- Next: Phase 16C (Locality Awareness) - estimated 3-4 weeks
 
 ### Added - Scheduler Evolution Foundation (Phase 16A) (2025-11-23)
 

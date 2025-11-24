@@ -424,9 +424,37 @@ impl ComputeActor {
             "Task submitted successfully"
         );
 
-        // Broadcast to network
+        // Broadcast to network - use placement negotiation if resource profile provided
         if let Some(ref cb) = self.send_callback {
-            cb(ComputeMessage::TaskSubmitted(task));
+            if let Some(ref profile) = task.resource_profile {
+                // Phase 16B: Use placement negotiation
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+
+                tracing::debug!(
+                    task_hash = %hex::encode(hash),
+                    "Using placement negotiation (resource profile provided)"
+                );
+
+                cb(ComputeMessage::PlacementRequest {
+                    task_hash: hash,
+                    submitter: task.submitter.clone(),
+                    resource_profile: profile.clone(),
+                    locality_hints: vec![], // Future enhancement
+                    max_cost: task.payment_rate, // Use payment_rate as max cost
+                    requested_at: now,
+                });
+            } else {
+                // Phase 15: Legacy immediate claiming
+                tracing::debug!(
+                    task_hash = %hex::encode(hash),
+                    "Using legacy claiming (no resource profile)"
+                );
+
+                cb(ComputeMessage::TaskSubmitted(task));
+            }
         }
 
         Ok(hash)
@@ -1030,6 +1058,9 @@ impl ComputeActor {
             "Received placement request"
         );
 
+        // Track placement request received
+        icn_obs::metrics::compute::placement_requests_received_inc();
+
         // Check if we can execute
         let our_trust = (self.trust_callback)(&self.own_did);
         if our_trust < MIN_TRUST_EXECUTE {
@@ -1105,6 +1136,9 @@ impl ComputeActor {
             "Computed placement score, starting deliberation"
         );
 
+        // Track placement score
+        icn_obs::metrics::compute::placement_score_observe(offer.score);
+
         // Deliberation window: wait 500ms before broadcasting offer
         // This allows all executors to compute scores simultaneously,
         // reducing race conditions where fastest network wins
@@ -1135,6 +1169,9 @@ impl ComputeActor {
                     score = offer.score,
                     "Broadcasting placement offer after deliberation"
                 );
+
+                // Track offer sent
+                icn_obs::metrics::compute::placement_offers_sent_inc();
 
                 cb(ComputeMessage::PlacementOffer {
                     task_hash,
@@ -1175,6 +1212,13 @@ impl ComputeActor {
         let mut offers_map = self.pending_offers.lock().await;
         let task_offers = offers_map.entry(task_hash).or_insert_with(Vec::new);
 
+        // Track the first offer's timestamp for duration calculation
+        let first_offer_at = if task_offers.is_empty() {
+            Some(offered_at)
+        } else {
+            None
+        };
+
         // Check if we already have an offer from this executor (shouldn't happen)
         if task_offers.iter().any(|o| o.executor == executor) {
             tracing::warn!(
@@ -1197,12 +1241,16 @@ impl ComputeActor {
             "Received placement offer"
         );
 
+        // Track offer received
+        icn_obs::metrics::compute::placement_offers_received_inc();
+
         // If this is the first offer, spawn selection task
         if offer_count == 1 {
             let task_hash_copy = task_hash;
             let pending_offers = self.pending_offers.clone();
             let task_manager = self.task_manager.clone();
             let send_callback = self.send_callback.clone();
+            let start_time = first_offer_at.unwrap(); // Safe because offer_count == 1
 
             tokio::spawn(async move {
                 // Wait for offers to arrive (1000ms: 500ms deliberation + 500ms grace)
@@ -1231,13 +1279,30 @@ impl ComputeActor {
                     })
                     .unwrap();
 
+                // Compute placement duration
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                let duration_ms = now.saturating_sub(start_time);
+                let duration_secs = duration_ms as f64 / 1000.0;
+
                 tracing::info!(
                     task_hash = %hex::encode(task_hash_copy),
                     winner = %winner.executor,
                     score = winner.score,
                     offer_count = offers.len(),
+                    duration_secs = duration_secs,
                     "Selected executor for task"
                 );
+
+                // Track placement duration
+                icn_obs::metrics::compute::placement_duration_observe(duration_secs);
+
+                // TODO: Track placement_wins_total and placement_losses_total
+                // This requires executors to track which tasks they've offered on,
+                // then listen for TaskClaimed messages to determine win/loss.
+                // Implementation deferred to future work (Phase 16B+).
 
                 // Claim task with winner
                 let mut mgr = task_manager.lock().await;
@@ -1318,6 +1383,7 @@ mod tests {
             deadline: None,
             payment_rate: None,
             payment_currency: None,
+            resource_profile: None,
         }
     }
 

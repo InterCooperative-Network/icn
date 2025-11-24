@@ -75,6 +75,9 @@ pub struct ComputeTask {
     pub payment_rate: Option<u64>,
     /// Currency for payment (default: "credits")
     pub payment_currency: Option<String>,
+    /// Resource requirements (Phase 16B - for placement negotiation)
+    #[serde(default)]
+    pub resource_profile: Option<crate::scheduler::ResourceProfile>,
 }
 
 impl ComputeTask {
@@ -364,6 +367,7 @@ mod tests {
             deadline: None,
             payment_rate: None,
             payment_currency: None,
+            resource_profile: None,
         };
 
         let hash1 = task.hash();
@@ -514,6 +518,7 @@ mod tests {
             deadline: None,
             payment_rate: None,
             payment_currency: None,
+            resource_profile: None,
         }
     }
 

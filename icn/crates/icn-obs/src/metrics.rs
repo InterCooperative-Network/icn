@@ -655,6 +655,34 @@ pub fn init_descriptions() {
         "icn_compute_executors_available",
         "Current number of available executors in the registry"
     );
+    describe_counter!(
+        "icn_compute_placement_requests_received_total",
+        "Total number of placement requests received by this executor"
+    );
+    describe_counter!(
+        "icn_compute_placement_offers_sent_total",
+        "Total number of placement offers sent by this executor"
+    );
+    describe_counter!(
+        "icn_compute_placement_offers_received_total",
+        "Total number of placement offers received by submitters"
+    );
+    describe_counter!(
+        "icn_compute_placement_wins_total",
+        "Total number of tasks this executor won via placement negotiation"
+    );
+    describe_counter!(
+        "icn_compute_placement_losses_total",
+        "Total number of tasks this executor lost (had offer but didn't win)"
+    );
+    describe_histogram!(
+        "icn_compute_placement_score",
+        "Distribution of placement scores computed by this executor"
+    );
+    describe_histogram!(
+        "icn_compute_placement_duration_seconds",
+        "Time from PlacementRequest to TaskClaimed in seconds"
+    );
 }
 
 /// Network metrics
@@ -1435,5 +1463,34 @@ pub mod compute {
 
     pub fn tasks_rejected_capacity_inc() {
         counter!("icn_compute_tasks_rejected_capacity_total").increment(1);
+    }
+
+    // Placement negotiation metrics (Phase 16B)
+    pub fn placement_requests_received_inc() {
+        counter!("icn_compute_placement_requests_received_total").increment(1);
+    }
+
+    pub fn placement_offers_sent_inc() {
+        counter!("icn_compute_placement_offers_sent_total").increment(1);
+    }
+
+    pub fn placement_offers_received_inc() {
+        counter!("icn_compute_placement_offers_received_total").increment(1);
+    }
+
+    pub fn placement_wins_inc() {
+        counter!("icn_compute_placement_wins_total").increment(1);
+    }
+
+    pub fn placement_losses_inc() {
+        counter!("icn_compute_placement_losses_total").increment(1);
+    }
+
+    pub fn placement_score_observe(score: f64) {
+        histogram!("icn_compute_placement_score").record(score);
+    }
+
+    pub fn placement_duration_observe(duration_secs: f64) {
+        histogram!("icn_compute_placement_duration_seconds").record(duration_secs);
     }
 }

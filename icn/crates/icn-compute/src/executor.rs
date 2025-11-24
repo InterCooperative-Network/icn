@@ -280,6 +280,7 @@ mod tests {
             deadline: None,
             payment_rate: None,
             payment_currency: None,
+            resource_profile: None,
         }
     }
 
@@ -358,6 +359,7 @@ mod tests {
             deadline: None,
             payment_rate: None,
             payment_currency: None,
+            resource_profile: None,
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -378,6 +380,7 @@ mod tests {
             deadline: Some(1), // Already expired
             payment_rate: None,
             payment_currency: None,
+            resource_profile: None,
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());
