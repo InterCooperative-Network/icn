@@ -191,6 +191,8 @@ pub struct ComputeActor {
     pending_consensus: Arc<Mutex<HashMap<TaskHash, ResultConsensus>>>,
     /// Pending placement offers (Phase 16B)
     pending_offers: Arc<Mutex<HashMap<TaskHash, Vec<crate::scheduler::PlacementOffer>>>>,
+    /// Track when placement requests were sent (for duration metrics)
+    pending_request_timestamps: Arc<Mutex<HashMap<TaskHash, u64>>>,
     /// Maximum concurrent tasks this executor will claim
     max_concurrent_tasks: usize,
 }
@@ -210,6 +212,7 @@ impl ComputeActor {
             executor_registry: Arc::new(Mutex::new(HashMap::new())),
             pending_consensus: Arc::new(Mutex::new(HashMap::new())),
             pending_offers: Arc::new(Mutex::new(HashMap::new())),
+            pending_request_timestamps: Arc::new(Mutex::new(HashMap::new())),
             max_concurrent_tasks: 10, // Default: 10 concurrent tasks
         }
     }
@@ -437,6 +440,9 @@ impl ComputeActor {
                     task_hash = %hex::encode(hash),
                     "Using placement negotiation (resource profile provided)"
                 );
+
+                // Store request timestamp for duration metrics
+                self.pending_request_timestamps.lock().await.insert(hash, now);
 
                 cb(ComputeMessage::PlacementRequest {
                     task_hash: hash,
@@ -1049,7 +1055,7 @@ impl ComputeActor {
         resource_profile: crate::scheduler::ResourceProfile,
         _locality_hints: Vec<crate::scheduler::LocalityHint>,
         _max_cost: Option<u64>,
-        _requested_at: u64,
+        requested_at: u64,
     ) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task_hash);
 
@@ -1212,13 +1218,6 @@ impl ComputeActor {
         let mut offers_map = self.pending_offers.lock().await;
         let task_offers = offers_map.entry(task_hash).or_insert_with(Vec::new);
 
-        // Track the first offer's timestamp for duration calculation
-        let first_offer_at = if task_offers.is_empty() {
-            Some(offered_at)
-        } else {
-            None
-        };
-
         // Check if we already have an offer from this executor (shouldn't happen)
         if task_offers.iter().any(|o| o.executor == executor) {
             tracing::warn!(
@@ -1248,9 +1247,9 @@ impl ComputeActor {
         if offer_count == 1 {
             let task_hash_copy = task_hash;
             let pending_offers = self.pending_offers.clone();
+            let pending_timestamps = self.pending_request_timestamps.clone();
             let task_manager = self.task_manager.clone();
             let send_callback = self.send_callback.clone();
-            let start_time = first_offer_at.unwrap(); // Safe because offer_count == 1
 
             tokio::spawn(async move {
                 // Wait for offers to arrive (1000ms: 500ms deliberation + 500ms grace)
@@ -1279,25 +1278,39 @@ impl ComputeActor {
                     })
                     .unwrap();
 
-                // Compute placement duration
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64;
-                let duration_ms = now.saturating_sub(start_time);
-                let duration_secs = duration_ms as f64 / 1000.0;
+                // Compute placement duration from original request time
+                let mut timestamps = pending_timestamps.lock().await;
+                let requested_at = timestamps.remove(&task_hash_copy);
+                drop(timestamps);
 
-                tracing::info!(
-                    task_hash = %hex::encode(task_hash_copy),
-                    winner = %winner.executor,
-                    score = winner.score,
-                    offer_count = offers.len(),
-                    duration_secs = duration_secs,
-                    "Selected executor for task"
-                );
+                if let Some(requested_at) = requested_at {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    let duration_ms = now.saturating_sub(requested_at);
+                    let duration_secs = duration_ms as f64 / 1000.0;
 
-                // Track placement duration
-                icn_obs::metrics::compute::placement_duration_observe(duration_secs);
+                    tracing::info!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        winner = %winner.executor,
+                        score = winner.score,
+                        offer_count = offers.len(),
+                        duration_secs = duration_secs,
+                        "Selected executor for task"
+                    );
+
+                    // Track placement duration (true end-to-end latency)
+                    icn_obs::metrics::compute::placement_duration_observe(duration_secs);
+                } else {
+                    tracing::info!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        winner = %winner.executor,
+                        score = winner.score,
+                        offer_count = offers.len(),
+                        "Selected executor for task (no duration tracking)"
+                    );
+                }
 
                 // TODO: Track placement_wins_total and placement_losses_total
                 // This requires executors to track which tasks they've offered on,
