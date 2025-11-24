@@ -272,17 +272,20 @@ pub enum MigrationState {
     /// Target accepted, source creating final checkpoint
     Checkpointing {
         target: String,
+        started_at: u64,
     },
 
     /// Transferring checkpoint to target
     Transferring {
         target: String,
         checkpoint_sequence: u64,
+        started_at: u64,
     },
 
     /// Target loading checkpoint and resuming actor
     Restoring {
         target: String,
+        started_at: u64,
     },
 
     /// Migration complete
@@ -308,9 +311,9 @@ impl MigrationState {
     pub fn target_executor(&self) -> Option<&str> {
         match self {
             MigrationState::Requesting { target, .. }
-            | MigrationState::Checkpointing { target }
+            | MigrationState::Checkpointing { target, .. }
             | MigrationState::Transferring { target, .. }
-            | MigrationState::Restoring { target } => Some(target.as_str()),
+            | MigrationState::Restoring { target, .. } => Some(target.as_str()),
             _ => None,
         }
     }
@@ -454,7 +457,8 @@ mod tests {
         }
         .is_active());
         assert!(MigrationState::Checkpointing {
-            target: "did:icn:target".to_string()
+            target: "did:icn:target".to_string(),
+            started_at: 1500,
         }
         .is_active());
         assert!(!MigrationState::Complete {

@@ -244,6 +244,7 @@ impl ActorMigrationManager {
             let mut migrations = self.migrations.write().await;
             migrations.insert(actor_id, MigrationState::Restoring {
                 target: self.own_did.clone(),
+                started_at: now_millis(),
             });
             drop(migrations);
 
@@ -293,6 +294,7 @@ impl ActorMigrationManager {
         let mut migrations = self.migrations.write().await;
         migrations.insert(actor_id, MigrationState::Checkpointing {
             target: to_executor.clone(),
+                started_at: now_millis(),
         });
         drop(migrations);
 
@@ -310,6 +312,7 @@ impl ActorMigrationManager {
             MigrationState::Transferring {
                 target: to_executor.clone(),
                 checkpoint_sequence: final_checkpoint.sequence,
+                started_at: now_millis(),
             },
         );
         drop(migrations);
@@ -468,17 +471,17 @@ impl ActorMigrationManager {
                     MigrationState::Requesting { sent_at, .. } => {
                         now.saturating_sub(*sent_at) > timeout_ms
                     }
-                    MigrationState::Checkpointing { .. } => {
-                        // Checkpointing shouldn't take long, use half timeout
-                        false // TODO: Track start time
+                    MigrationState::Checkpointing { started_at, .. } => {
+                        // Checkpointing should be fast (seconds), use timeout
+                        now.saturating_sub(*started_at) > timeout_ms
                     }
-                    MigrationState::Transferring { .. } => {
-                        // TODO: Track start time for transferring state
-                        false
+                    MigrationState::Transferring { started_at, .. } => {
+                        // Checkpoint transfer can take longer for large states
+                        now.saturating_sub(*started_at) > timeout_ms
                     }
-                    MigrationState::Restoring { .. } => {
-                        // TODO: Track start time for restoring state
-                        false
+                    MigrationState::Restoring { started_at, .. } => {
+                        // Restoring should be fast (seconds), use timeout
+                        now.saturating_sub(*started_at) > timeout_ms
                     }
                     _ => false,
                 };
@@ -776,7 +779,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_detect_timeouts() {
+    async fn test_detect_timeouts_requesting() {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let executor_did = keypair.did().to_string();
         let (manager, _sent_messages) = make_manager(&executor_did);
@@ -805,6 +808,147 @@ mod tests {
 
         if let Some(MigrationState::Failed { reason, .. }) = state {
             assert_eq!(reason, "Migration timed out");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_detect_timeouts_checkpointing() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did().to_string();
+        let (manager, _sent_messages) = make_manager(&executor_did);
+
+        let actor_id = [7u8; 32];
+
+        // Insert migration in Checkpointing state with old timestamp
+        {
+            let mut migrations = manager.migrations.write().await;
+            migrations.insert(
+                actor_id,
+                MigrationState::Checkpointing {
+                    target: "did:icn:executor-b".to_string(),
+                    started_at: now_millis() - 90_000, // 90 seconds ago
+                },
+            );
+        }
+
+        // Detect timeouts (60s threshold)
+        let timed_out = manager.detect_timeouts(60).await.unwrap();
+        assert_eq!(timed_out, 1);
+
+        // Verify failure
+        let state = manager.get_state(&actor_id).await;
+        assert!(matches!(state, Some(MigrationState::Failed { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_detect_timeouts_transferring() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did().to_string();
+        let (manager, _sent_messages) = make_manager(&executor_did);
+
+        let actor_id = [8u8; 32];
+
+        // Insert migration in Transferring state with old timestamp
+        {
+            let mut migrations = manager.migrations.write().await;
+            migrations.insert(
+                actor_id,
+                MigrationState::Transferring {
+                    target: "did:icn:executor-b".to_string(),
+                    checkpoint_sequence: 5,
+                    started_at: now_millis() - 75_000, // 75 seconds ago
+                },
+            );
+        }
+
+        // Detect timeouts (60s threshold)
+        let timed_out = manager.detect_timeouts(60).await.unwrap();
+        assert_eq!(timed_out, 1);
+
+        // Verify failure
+        let state = manager.get_state(&actor_id).await;
+        assert!(matches!(state, Some(MigrationState::Failed { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_detect_timeouts_restoring() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did().to_string();
+        let (manager, _sent_messages) = make_manager(&executor_did);
+
+        let actor_id = [9u8; 32];
+
+        // Insert migration in Restoring state with old timestamp
+        {
+            let mut migrations = manager.migrations.write().await;
+            migrations.insert(
+                actor_id,
+                MigrationState::Restoring {
+                    target: "did:icn:executor-b".to_string(),
+                    started_at: now_millis() - 80_000, // 80 seconds ago
+                },
+            );
+        }
+
+        // Detect timeouts (60s threshold)
+        let timed_out = manager.detect_timeouts(60).await.unwrap();
+        assert_eq!(timed_out, 1);
+
+        // Verify failure
+        let state = manager.get_state(&actor_id).await;
+        assert!(matches!(state, Some(MigrationState::Failed { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_detect_timeouts_multiple_states() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let executor_did = keypair.did().to_string();
+        let (manager, _sent_messages) = make_manager(&executor_did);
+
+        // Insert multiple timed-out migrations in different states
+        {
+            let mut migrations = manager.migrations.write().await;
+            let old_time = now_millis() - 100_000; // 100 seconds ago
+
+            migrations.insert(
+                [10u8; 32],
+                MigrationState::Requesting {
+                    target: "did:icn:a".to_string(),
+                    sent_at: old_time,
+                },
+            );
+            migrations.insert(
+                [11u8; 32],
+                MigrationState::Checkpointing {
+                    target: "did:icn:b".to_string(),
+                    started_at: old_time,
+                },
+            );
+            migrations.insert(
+                [12u8; 32],
+                MigrationState::Transferring {
+                    target: "did:icn:c".to_string(),
+                    checkpoint_sequence: 1,
+                    started_at: old_time,
+                },
+            );
+            migrations.insert(
+                [13u8; 32],
+                MigrationState::Restoring {
+                    target: "did:icn:d".to_string(),
+                    started_at: old_time,
+                },
+            );
+        }
+
+        // Detect timeouts (60s threshold should catch all 4)
+        let timed_out = manager.detect_timeouts(60).await.unwrap();
+        assert_eq!(timed_out, 4);
+
+        // Verify all marked as failed
+        for actor_id in [[10u8; 32], [11u8; 32], [12u8; 32], [13u8; 32]] {
+            let state = manager.get_state(&actor_id).await;
+            assert!(matches!(state, Some(MigrationState::Failed { .. })));
         }
     }
 }
