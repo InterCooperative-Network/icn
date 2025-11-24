@@ -467,9 +467,8 @@ impl ComputeActor {
             let submitter_did = icn_identity::Did::from_str(&task.submitter)
                 .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {}", e)))?;
 
-            // Extract coop_id from task (for now, use task.id prefix or default)
-            // TODO: Add explicit coop_id field to ComputeTask in future
-            let coop_id = "default"; // Placeholder - will be replaced with proper coop field
+            // Extract coop_id from task (default to "default" if not specified)
+            let coop_id = task.coop_id.as_deref().unwrap_or("default");
 
             // Check policy
             match policy_manager.check_submission(&task, &submitter_did, coop_id).await? {
@@ -772,8 +771,8 @@ impl ComputeActor {
         if let Some(ref policy_manager) = self.policy_manager {
             // Parse submitter DID
             if let Ok(submitter_did) = icn_identity::Did::from_str(&claimed_task.submitter) {
-                // TODO: Extract coop_id from task - using "default" placeholder for now
-                let coop_id = "default";
+                // Extract coop_id from task (default to "default" if not specified)
+                let coop_id = claimed_task.coop_id.as_deref().unwrap_or("default");
 
                 // Increment concurrent task counter
                 if let Err(e) = policy_manager
@@ -901,8 +900,8 @@ impl ComputeActor {
         if let Some(ref policy_manager) = self.policy_manager {
             // Parse submitter DID
             if let Ok(submitter_did) = icn_identity::Did::from_str(&claimed_task.submitter) {
-                // TODO: Extract coop_id from task - using "default" placeholder for now
-                let coop_id = "default";
+                // Extract coop_id from task (default to "default" if not specified)
+                let coop_id = claimed_task.coop_id.as_deref().unwrap_or("default");
 
                 // Calculate credits spent (same formula as payment settlement)
                 let credits_spent = if let Some(rate) = claimed_task.payment_rate {
@@ -1832,6 +1831,7 @@ mod tests {
         ComputeTask {
             id: id.into(),
             submitter: submitter.into(),
+            coop_id: None,
             code: TaskCode::Ccl(simple_ccl()),
             inputs: vec![],
             fuel_limit: FuelLimit::default(),

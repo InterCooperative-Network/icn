@@ -265,6 +265,7 @@ mod tests {
         ComputeTask {
             id: id.into(),
             submitter: "did:icn:alice".into(),
+            coop_id: None,
             code: TaskCode::Ccl("return 1".into()),
             inputs: vec![],
             fuel_limit: FuelLimit::default(),

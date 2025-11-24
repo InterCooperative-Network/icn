@@ -611,6 +611,7 @@ mod tests {
         ComputeTask {
             id: "test-task".into(),
             submitter: make_test_did().to_string(),
+            coop_id: None,
             code: TaskCode::Ccl(String::new()),
             inputs: vec![],
             fuel_limit: FuelLimit(10000),

@@ -271,6 +271,7 @@ mod tests {
         ComputeTask {
             id: "test".into(),
             submitter: "did:icn:alice".into(),
+            coop_id: None,
             code: TaskCode::Ccl(code.into()),
             inputs: vec![],
             fuel_limit: FuelLimit(fuel),
@@ -351,6 +352,7 @@ mod tests {
         let wasm_task = ComputeTask {
             id: "wasm-test".into(),
             submitter: "did:icn:alice".into(),
+            coop_id: None,
             code: TaskCode::WasmRef([0u8; 32]),
             inputs: vec![],
             fuel_limit: FuelLimit::default(),
@@ -373,6 +375,7 @@ mod tests {
         let task = ComputeTask {
             id: "expired".into(),
             submitter: "did:icn:alice".into(),
+            coop_id: None,
             code: TaskCode::Ccl(simple_contract()),
             inputs: vec![],
             fuel_limit: FuelLimit::default(),

@@ -56,6 +56,9 @@ pub struct ComputeTask {
     pub id: TaskId,
     /// DID of task submitter
     pub submitter: String,
+    /// Cooperative ID (for policy enforcement and usage tracking)
+    #[serde(default)]
+    pub coop_id: Option<String>,
     /// Task code (CCL source or WASM bytes reference)
     pub code: TaskCode,
     /// Input data (serialized)
@@ -411,6 +414,7 @@ mod tests {
         let task = ComputeTask {
             id: "test-1".into(),
             submitter: "did:icn:alice".into(),
+            coop_id: None,
             code: TaskCode::Ccl("return 42".into()),
             inputs: vec![],
             fuel_limit: FuelLimit::default(),
@@ -563,6 +567,7 @@ mod tests {
         ComputeTask {
             id: "test-task-1".into(),
             submitter: "did:icn:alice".into(),
+            coop_id: None,
             code: TaskCode::Ccl(r#"{"name": "Test"}"#.into()),
             inputs: vec![],
             fuel_limit: FuelLimit(10_000),
