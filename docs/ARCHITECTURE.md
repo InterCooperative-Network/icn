@@ -1636,12 +1636,22 @@ ComputeActor
 
 **Message Flow:**
 ```
-Submitter → compute:submit → Executor claims → Executes CCL
-                                                    ↓
-                         compute:result ← Signed result
-                                                    ↓
-                                         Payment → Ledger
+Submitter → compute:submit → TaskManager (pending)
+                                    ↓
+         Executor observes → compute:claim → TaskManager (claimed)
+                                    ↓
+                            Executes CCL
+                                    ↓
+                    compute:result → Signed result
+                                    ↓
+                          Payment → Ledger
 ```
+
+**Gossip Topics:**
+- `compute:submit` - Task submission announcements
+- `compute:claim` - Executor claim notifications
+- `compute:result` - Execution results with Ed25519 signatures
+- `compute:cancel` - Task cancellation requests (submitter-only)
 
 **Rationale:**
 - **Actor-based:** Natural fit for distributed task execution
@@ -2110,7 +2120,7 @@ The compute layer is not a standalone system—it is the culmination of all ICN 
    - Capability isolation: tasks cannot access ledger/state without explicit grants
 
 6. **Gossip Protocol (Section 6)**
-   - Decentralized task distribution via `compute:submit`, `compute:claim`, `compute:result` topics
+   - Decentralized task distribution via `compute:submit`, `compute:claim`, `compute:result`, `compute:cancel` topics
    - Vector clocks ensure causal ordering of task state transitions
    - Anti-entropy guarantees eventual delivery even under network partitions
 
