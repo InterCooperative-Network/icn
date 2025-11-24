@@ -1614,7 +1614,9 @@ icnctl backup restore backup-20251110.tar.gz
 **Introduced:** Phase 15 (2025-11-21)
 **Evolution:** Phase 16A-E (2025-11-23 to 2025-11-24)
 
-The distributed compute layer enables cooperative task execution across ICN nodes, with trust-gated access, intelligent scheduling, and democratic policy management.
+The distributed compute layer turns the ICN substrate into a cooperative, trust-aware scheduling fabric for secure job execution, resource sharing, and cross-community workflows.
+
+It enables cooperative task execution across ICN nodes, with trust-gated access, intelligent scheduling, and democratic policy management.
 
 ---
 
@@ -2073,6 +2075,75 @@ GET  /v1/quota/:coop_id/:did      # Get member quota
 - ✅ Governance integration prevents policy capture
 - ❌ Policy complexity (mitigated with example policies and documentation)
 - ❌ Per-cooperative overhead (acceptable, policies cached in memory)
+
+---
+
+### 11.8 Integration Summary
+
+**How ICN components enable distributed compute:**
+
+The compute layer is not a standalone system—it is the culmination of all ICN substrate components working together to provide a trust-aware, decentralized execution fabric:
+
+1. **Identity Layer (Section 1)**
+   - Every executor, submitter, and task is tied to a DID
+   - Ed25519 signatures authenticate results and prevent forgery
+   - Multi-device identity enables submitting tasks from mobile/web while executors run on servers
+
+2. **Trust Graph (Section 2)**
+   - Trust scores gate task submission (MIN_TRUST_SUBMIT = 0.1) and execution (MIN_TRUST_EXECUTE = 0.3)
+   - Scheduler prioritizes executors with high trust (30% of placement score)
+   - Prevents Sybil attacks: new nodes cannot execute tasks without trust relationships
+
+3. **Network Transport (Section 3)**
+   - QUIC/TLS provides encrypted, multiplexed task communication
+   - mDNS enables LAN-local executor discovery (fast, low-latency placement)
+   - Network topology awareness (Phase 16C) optimizes placement for same-cluster executors
+
+4. **Ledger (Section 4)**
+   - Automatic payment settlement: `(fuel_used × payment_rate) / 1000` credits
+   - Mutual credit enables cooperatives to compensate executors without fiat currency
+   - Double-entry accounting ensures executors are paid for completed work
+
+5. **Contract Execution (Section 5)**
+   - CCL interpreter executes task code deterministically
+   - Fuel metering prevents runaway execution
+   - Capability isolation: tasks cannot access ledger/state without explicit grants
+
+6. **Gossip Protocol (Section 6)**
+   - Decentralized task distribution via `compute:submit`, `compute:claim`, `compute:result` topics
+   - Vector clocks ensure causal ordering of task state transitions
+   - Anti-entropy guarantees eventual delivery even under network partitions
+
+7. **Data Storage (Section 7)**
+   - Persistent task queues survive node restarts
+   - Sled-based storage for executor registries and task metadata
+   - Graceful restart (Track B1) preserves task state across daemon updates
+
+8. **Security Model (Section 8)**
+   - Ed25519-signed results prevent result forgery
+   - Trust-gated access prevents untrusted nodes from claiming tasks
+   - Rate limiting prevents compute spam attacks
+
+**This integration is what makes ICN's compute model unique:**
+
+Unlike centralized schedulers (Kubernetes) or blockchain VMs (Ethereum), ICN compute is:
+- **Trust-native:** Placement decisions based on social relationships, not just resources
+- **Democratic:** Policies governed by cooperative votes, not operators
+- **Local-first:** Tasks distributed via gossip, not central coordinators
+- **Privacy-preserving:** Executor capabilities advertised without revealing internal infrastructure
+- **Payment-integrated:** Ledger settlement is automatic, not bolted-on
+
+**Example: Healthcare Cooperative Compute Workflow**
+
+1. **Doctor submits diagnostic task** (DID verification, trust check: 0.5 > 0.1 ✓)
+2. **Scheduler finds compliant executors** (GDPR-region filter, HIPAA capability requirement)
+3. **Executor claims task** (trust score 0.7, capacity available, data local)
+4. **CCL executes diagnosis** (fuel-metered, no network access)
+5. **Result returned** (Ed25519-signed by executor)
+6. **Payment settled** (10,000 fuel × 100 rate / 1000 = 1,000 credits)
+7. **Governance** (cooperative votes to adjust GDPR region policy via proposal)
+
+All seven substrate layers contribute to making this workflow secure, decentralized, and compliant.
 
 ---
 
