@@ -560,6 +560,69 @@ impl NetworkActor {
             });
         }
 
+        // Spawn RTT refresh task if topology is enabled
+        if let Some(ref sets) = neighbor_sets {
+            let neighbor_sets_clone = sets.clone();
+            let session_manager_clone = session_manager.clone();
+            let own_did_clone = did.clone();
+            let mut shutdown_rx = shutdown_tx.subscribe();
+
+            tokio::spawn(async move {
+                info!("RTT refresh task starting (60s interval)");
+
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Get peers with stale RTT measurements
+                            let peers = {
+                                let sets = neighbor_sets_clone.read().await;
+                                sets.peers_needing_rtt_refresh()
+                            };
+
+                            if !peers.is_empty() {
+                                info!("Refreshing RTT for {} peers with stale measurements", peers.len());
+
+                                for peer in peers {
+                                    let peer_did = peer.0.clone();
+
+                                    // Send Ping message
+                                    let ping_msg = NetworkMessage::ping(own_did_clone.clone(), peer_did.clone());
+
+                                    // Get connection and send
+                                    let session_mgr = session_manager_clone.read().await;
+                                    let connections = session_mgr.connections().await;
+                                    if let Some((_did_str, conn)) = connections.iter().find(|(did, _)| did == peer_did.as_str()) {
+                                        match conn.open_bi().await {
+                                            Ok((mut send, _recv)) => {
+                                                if let Err(e) = crate::protocol::write_message(&mut send, &ping_msg).await {
+                                                    warn!("Failed to send Ping to {}: {}", peer_did, e);
+                                                } else if let Err(e) = send.finish() {
+                                                    warn!("Failed to finish Ping stream to {}: {}", peer_did, e);
+                                                } else {
+                                                    info!("Sent Ping to {} for RTT refresh", peer_did);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to open stream for Ping to {}: {}", peer_did, e);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ = shutdown_rx.recv() => {
+                            info!("RTT refresh task received shutdown signal");
+                            break;
+                        }
+                    }
+                }
+
+                info!("RTT refresh task stopped");
+            });
+        }
+
         // Create actor
         let actor = NetworkActor {
             discovery,
