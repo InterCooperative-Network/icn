@@ -26,6 +26,7 @@ mod actor_model;
 mod checkpoint_store;
 mod error;
 mod executor;
+mod migration_manager;
 mod migration_policy;
 mod scheduler;
 mod task;
@@ -44,6 +45,7 @@ pub use checkpoint_store::{
 };
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
+pub use migration_manager::{ActorMigrationManager, MigrationSender};
 pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
 };
