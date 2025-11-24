@@ -456,10 +456,11 @@ impl LocalityContext {
     /// Calculate data locality ratio (0.0 - 1.0)
     ///
     /// Returns the fraction of input blobs available locally.
-    /// Returns 1.0 if no blobs required (no data transfer needed).
+    /// Returns 0.0 if blob information is unknown (total_blob_count = 0).
+    /// This prevents rewarding executors when blob locality is unverified.
     pub fn data_locality_ratio(&self) -> f64 {
         if self.total_blob_count == 0 {
-            return 1.0; // No data needed = perfect locality
+            return 0.0; // Unknown blobs = no locality bonus
         }
         self.local_blob_count as f64 / self.total_blob_count as f64
     }
@@ -819,7 +820,8 @@ mod tests {
             .unwrap();
 
         // Should score higher than without RTT info (RTT bonus: 0.9 * 0.15 = 0.135)
-        assert!(offer_with_rtt.score > offer.score + 0.10);
+        // Use 0.05 threshold to account for random jitter variance (0-0.10 per invocation)
+        assert!(offer_with_rtt.score > offer.score + 0.05);
 
         // Test with data locality
         let locality_with_data = LocalityContext {
@@ -835,7 +837,55 @@ mod tests {
             .unwrap();
 
         // Should get full data locality bonus (1.0 * 0.15 = 0.15)
-        assert!(offer_with_data.score > offer.score + 0.10);
+        // Use 0.05 threshold to account for random jitter variance (0-0.10 per invocation)
+        assert!(offer_with_data.score > offer.score + 0.05);
+    }
+
+    #[test]
+    fn test_locality_context_data_locality_ratio() {
+        // Test: Unknown blobs (total_blob_count = 0) should return 0.0, not 1.0
+        let unknown_blobs = LocalityContext {
+            submitter_rtt_ms: None,
+            local_blob_count: 0,
+            total_blob_count: 0,
+            own_region: None,
+            submitter_region: None,
+        };
+        assert_eq!(
+            unknown_blobs.data_locality_ratio(),
+            0.0,
+            "Unknown blob information should not grant locality bonus"
+        );
+
+        // Test: All blobs available locally = 1.0
+        let all_local = LocalityContext {
+            submitter_rtt_ms: None,
+            local_blob_count: 5,
+            total_blob_count: 5,
+            own_region: None,
+            submitter_region: None,
+        };
+        assert_eq!(all_local.data_locality_ratio(), 1.0);
+
+        // Test: Half blobs available locally = 0.5
+        let half_local = LocalityContext {
+            submitter_rtt_ms: None,
+            local_blob_count: 3,
+            total_blob_count: 6,
+            own_region: None,
+            submitter_region: None,
+        };
+        assert_eq!(half_local.data_locality_ratio(), 0.5);
+
+        // Test: No blobs available locally = 0.0
+        let none_local = LocalityContext {
+            submitter_rtt_ms: None,
+            local_blob_count: 0,
+            total_blob_count: 10,
+            own_region: None,
+            submitter_region: None,
+        };
+        assert_eq!(none_local.data_locality_ratio(), 0.0);
     }
 
     #[test]
