@@ -691,6 +691,36 @@ pub fn init_descriptions() {
         "icn_compute_placement_duration_seconds",
         "Time from PlacementRequest to TaskClaimed in seconds"
     );
+
+    // Policy metrics (Phase 16E)
+    describe_counter!(
+        "icn_compute_policy_violations_total",
+        "Total number of policy violations detected"
+    );
+    describe_counter!(
+        "icn_compute_quota_exceeded_total",
+        "Total number of quota exceeded events"
+    );
+    describe_counter!(
+        "icn_compute_priority_adjustments_total",
+        "Total number of task priority adjustments by policy"
+    );
+    describe_gauge!(
+        "icn_compute_member_cpu_hours",
+        "CPU hours used by member in current month"
+    );
+    describe_gauge!(
+        "icn_compute_member_concurrent_tasks",
+        "Current concurrent tasks for member"
+    );
+    describe_gauge!(
+        "icn_compute_member_credits_spent",
+        "Credits spent by member in current month"
+    );
+    describe_counter!(
+        "icn_compute_placement_constraints_enforced_total",
+        "Total number of placement constraint enforcements"
+    );
 }
 
 /// Network metrics
@@ -1510,5 +1540,70 @@ pub mod compute {
 
     pub fn placement_duration_observe(duration_secs: f64) {
         histogram!("icn_compute_placement_duration_seconds").record(duration_secs);
+    }
+
+    // Policy metrics (Phase 16E)
+    pub fn policy_violations_inc(coop_id: &str, reason: &str) {
+        counter!(
+            "icn_compute_policy_violations_total",
+            "coop_id" => coop_id.to_string(),
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn quota_exceeded_inc(coop_id: &str, member: &str, quota_type: &str) {
+        counter!(
+            "icn_compute_quota_exceeded_total",
+            "coop_id" => coop_id.to_string(),
+            "member" => member.to_string(),
+            "quota_type" => quota_type.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn priority_adjustments_inc(coop_id: &str, from_priority: &str, to_priority: &str) {
+        counter!(
+            "icn_compute_priority_adjustments_total",
+            "coop_id" => coop_id.to_string(),
+            "from" => from_priority.to_string(),
+            "to" => to_priority.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn member_cpu_hours_set(coop_id: &str, member: &str, hours: f64) {
+        gauge!(
+            "icn_compute_member_cpu_hours",
+            "coop_id" => coop_id.to_string(),
+            "member" => member.to_string()
+        )
+        .set(hours);
+    }
+
+    pub fn member_concurrent_tasks_set(coop_id: &str, member: &str, count: u32) {
+        gauge!(
+            "icn_compute_member_concurrent_tasks",
+            "coop_id" => coop_id.to_string(),
+            "member" => member.to_string()
+        )
+        .set(count as f64);
+    }
+
+    pub fn member_credits_spent_set(coop_id: &str, member: &str, credits: u64) {
+        gauge!(
+            "icn_compute_member_credits_spent",
+            "coop_id" => coop_id.to_string(),
+            "member" => member.to_string()
+        )
+        .set(credits as f64);
+    }
+
+    pub fn placement_constraints_enforced_inc(constraint_type: &str) {
+        counter!(
+            "icn_compute_placement_constraints_enforced_total",
+            "constraint_type" => constraint_type.to_string()
+        )
+        .increment(1);
     }
 }

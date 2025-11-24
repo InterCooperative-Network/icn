@@ -233,6 +233,27 @@ impl PolicyManager {
 
         // Check quotas
         if let Some(rejection) = self.check_quotas(&quota, &usage, task)? {
+            // Emit metrics
+            icn_obs::metrics::compute::policy_violations_inc(coop_id, &rejection);
+
+            // Determine quota type for detailed metric
+            let quota_type = if rejection.contains("CPU hours") {
+                "cpu_hours"
+            } else if rejection.contains("concurrent") {
+                "concurrent_tasks"
+            } else if rejection.contains("priority") {
+                "priority"
+            } else if rejection.contains("credits") {
+                "credits"
+            } else {
+                "unknown"
+            };
+            icn_obs::metrics::compute::quota_exceeded_inc(
+                coop_id,
+                &submitter.to_string(),
+                quota_type,
+            );
+
             if policy.enforcement_mode == EnforcementMode::Strict {
                 return Ok(PolicyDecision::Reject { reason: rejection });
             } else {
@@ -247,6 +268,9 @@ impl PolicyManager {
 
         // Evaluate scheduling rules
         if let Some(rejection) = self.evaluate_rules(&policy, task)? {
+            // Emit violation metric
+            icn_obs::metrics::compute::policy_violations_inc(coop_id, &rejection);
+
             if policy.enforcement_mode == EnforcementMode::Strict {
                 return Ok(PolicyDecision::Reject { reason: rejection });
             } else {
@@ -260,8 +284,18 @@ impl PolicyManager {
         }
 
         // Calculate adjusted priority and constraints
+        let original_priority = task.priority;
         let adjusted_priority = self.calculate_adjusted_priority(task, submitter, &policy);
         let placement_constraints = self.extract_placement_constraints(&policy, task);
+
+        // Emit priority adjustment metric if changed
+        if adjusted_priority != original_priority {
+            icn_obs::metrics::compute::priority_adjustments_inc(
+                coop_id,
+                &format!("{:?}", original_priority),
+                &format!("{:?}", adjusted_priority),
+            );
+        }
 
         Ok(PolicyDecision::Allow {
             adjusted_priority,
@@ -481,6 +515,18 @@ impl UsageTracker {
         record.credits_spent_this_month += credits_spent;
         record.updated_at = now;
 
+        // Update metrics
+        icn_obs::metrics::compute::member_cpu_hours_set(
+            coop_id,
+            &member.to_string(),
+            record.cpu_hours_this_month,
+        );
+        icn_obs::metrics::compute::member_credits_spent_set(
+            coop_id,
+            &member.to_string(),
+            record.credits_spent_this_month,
+        );
+
         Ok(())
     }
 
@@ -504,6 +550,13 @@ impl UsageTracker {
         record.concurrent_tasks += 1;
         record.updated_at = Self::now_millis();
 
+        // Update metric
+        icn_obs::metrics::compute::member_concurrent_tasks_set(
+            coop_id,
+            &member.to_string(),
+            record.concurrent_tasks,
+        );
+
         Ok(())
     }
 
@@ -515,6 +568,13 @@ impl UsageTracker {
         if let Some(record) = records.get_mut(&key) {
             record.concurrent_tasks = record.concurrent_tasks.saturating_sub(1);
             record.updated_at = Self::now_millis();
+
+            // Update metric
+            icn_obs::metrics::compute::member_concurrent_tasks_set(
+                coop_id,
+                &member.to_string(),
+                record.concurrent_tasks,
+            );
         }
 
         Ok(())

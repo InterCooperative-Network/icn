@@ -1331,6 +1331,7 @@ impl ComputeActor {
                         executor = %self.own_did,
                         "Executor not in whitelist, skipping placement"
                     );
+                    icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
                     drop(mgr);
                     return Ok(());
                 }
@@ -1342,6 +1343,7 @@ impl ComputeActor {
                         executor = %self.own_did,
                         "Executor in blacklist, skipping placement"
                     );
+                    icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
                     drop(mgr);
                     return Ok(());
                 }
@@ -1365,6 +1367,9 @@ impl ComputeActor {
                                     executor = %self.own_did,
                                     missing_capability = %required,
                                     "Missing required capability, skipping placement"
+                                );
+                                icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                    "capability",
                                 );
                                 drop(registry);
                                 drop(mgr);
