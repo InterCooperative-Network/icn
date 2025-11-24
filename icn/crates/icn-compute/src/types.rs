@@ -300,7 +300,7 @@ pub enum ExecutionOutcome {
 /// Messages sent over gossip for compute coordination
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ComputeMessage {
-    /// New task submitted
+    /// New task submitted (Phase 15 - legacy)
     TaskSubmitted(ComputeTask),
     /// Executor claims a task
     TaskClaimed {
@@ -320,6 +320,29 @@ pub enum ComputeMessage {
     ExecutorAnnounce {
         executor: String,
         capabilities: Vec<ExecutorCapability>,
+    },
+    /// Request placement for a task (Phase 16B)
+    PlacementRequest {
+        task_hash: TaskHash,
+        submitter: String,
+        resource_profile: crate::scheduler::ResourceProfile,
+        locality_hints: Vec<crate::scheduler::LocalityHint>,
+        max_cost: Option<u64>,
+        requested_at: u64,
+    },
+    /// Executor offers to execute a task (Phase 16B)
+    PlacementOffer {
+        task_hash: TaskHash,
+        executor: String,
+        score: f64,
+        cost: u64,
+        estimated_start: u64,
+        offered_at: u64,
+    },
+    /// Executor announces capacity (Phase 16A)
+    NodeCapacityAnnounce {
+        executor: String,
+        capacity: crate::scheduler::NodeCapacity,
     },
 }
 

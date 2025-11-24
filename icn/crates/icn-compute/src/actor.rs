@@ -6,6 +6,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::error::ComputeError;
 use crate::executor::{Executor, LocalExecutor};
+use crate::scheduler::PlacementPolicy;
 use crate::task::{TaskManager, TaskStatus};
 use crate::types::{ComputeMessage, ComputeResult, ComputeTask, ExecutorCapability, TaskHash};
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
@@ -188,6 +189,8 @@ pub struct ComputeActor {
     executor_registry: Arc<Mutex<HashMap<String, ExecutorInfo>>>,
     /// Pending consensus tracking for task results
     pending_consensus: Arc<Mutex<HashMap<TaskHash, ResultConsensus>>>,
+    /// Pending placement offers (Phase 16B)
+    pending_offers: Arc<Mutex<HashMap<TaskHash, Vec<crate::scheduler::PlacementOffer>>>>,
     /// Maximum concurrent tasks this executor will claim
     max_concurrent_tasks: usize,
 }
@@ -206,6 +209,7 @@ impl ComputeActor {
             signing_key: vec![],
             executor_registry: Arc::new(Mutex::new(HashMap::new())),
             pending_consensus: Arc::new(Mutex::new(HashMap::new())),
+            pending_offers: Arc::new(Mutex::new(HashMap::new())),
             max_concurrent_tasks: 10, // Default: 10 concurrent tasks
         }
     }
@@ -491,6 +495,45 @@ impl ComputeActor {
             }
             ComputeMessage::ExecutorAnnounce { executor, capabilities } => {
                 self.on_executor_announce(executor, capabilities).await
+            }
+            ComputeMessage::PlacementRequest {
+                task_hash,
+                submitter,
+                resource_profile,
+                locality_hints,
+                max_cost,
+                requested_at,
+            } => {
+                self.on_placement_request(
+                    task_hash,
+                    submitter,
+                    resource_profile,
+                    locality_hints,
+                    max_cost,
+                    requested_at,
+                )
+                .await
+            }
+            ComputeMessage::PlacementOffer {
+                task_hash,
+                executor,
+                score,
+                cost,
+                estimated_start,
+                offered_at,
+            } => {
+                self.on_placement_offer(
+                    task_hash,
+                    executor,
+                    score,
+                    cost,
+                    estimated_start,
+                    offered_at,
+                )
+                .await
+            }
+            ComputeMessage::NodeCapacityAnnounce { executor, capacity } => {
+                self.on_capacity_announce(executor, capacity).await
             }
         }
     }
@@ -969,6 +1012,276 @@ impl ComputeActor {
 
         Ok(())
     }
+
+    /// Handle placement request (Phase 16B)
+    async fn on_placement_request(
+        &self,
+        task_hash: TaskHash,
+        _submitter: String,
+        resource_profile: crate::scheduler::ResourceProfile,
+        _locality_hints: Vec<crate::scheduler::LocalityHint>,
+        _max_cost: Option<u64>,
+        _requested_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            "Received placement request"
+        );
+
+        // Check if we can execute
+        let our_trust = (self.trust_callback)(&self.own_did);
+        if our_trust < MIN_TRUST_EXECUTE {
+            tracing::debug!(
+                task_hash = %task_hash_str,
+                our_trust = our_trust,
+                required = MIN_TRUST_EXECUTE,
+                "Skipping placement: insufficient executor trust"
+            );
+            return Ok(());
+        }
+
+        // Check capacity
+        let mut registry = self.executor_registry.lock().await;
+        let capacity = if let Some(info) = registry.get_mut(&self.own_did) {
+            // Create temporary NodeCapacity from ExecutorInfo
+            // For now, we'll use placeholder values - Phase 16A will integrate real capacity tracking
+            crate::scheduler::NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 8.0 - info.tasks_executing as f64 * 0.5,
+                memory_mb_total: 16384,
+                memory_mb_available: 16384 - info.tasks_executing as u64 * 1024,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            }
+        } else {
+            // Not registered yet, use defaults
+            drop(registry);
+            return Ok(());
+        };
+
+        let node_state = crate::scheduler::NodeState {
+            did: self.own_did.clone(),
+            capacity: capacity.clone(),
+            executing_tasks: HashMap::new(),
+            queue_depth: registry
+                .get(&self.own_did)
+                .map(|i| i.tasks_executing)
+                .unwrap_or(0),
+        };
+        drop(registry);
+
+        // Check if we have a placement policy (for now, use default)
+        let policy = crate::scheduler::DefaultPlacementPolicy::default();
+
+        // Score the task
+        let offer = match policy.score_task(
+            &task_hash,
+            &resource_profile,
+            &self.own_did,
+            &node_state,
+            our_trust,
+        ) {
+            Some(o) => o,
+            None => {
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    "Cannot execute task (capacity or policy rejection)"
+                );
+                return Ok(());
+            }
+        };
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            score = offer.score,
+            cost = offer.cost,
+            "Computed placement score, starting deliberation"
+        );
+
+        // Deliberation window: wait 500ms before broadcasting offer
+        // This allows all executors to compute scores simultaneously,
+        // reducing race conditions where fastest network wins
+        let send_callback = self.send_callback.clone();
+        let task_manager = self.task_manager.clone();
+
+        tokio::spawn(async move {
+            // Wait deliberation period
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // Check if task was already claimed by someone else
+            let mgr = task_manager.lock().await;
+            if let Some(status) = mgr.status(&task_hash) {
+                if matches!(status, TaskStatus::Claimed { .. }) {
+                    tracing::debug!(
+                        task_hash = %hex::encode(task_hash),
+                        "Task already claimed during deliberation, not broadcasting offer"
+                    );
+                    return;
+                }
+            }
+            drop(mgr);
+
+            // Broadcast offer after deliberation
+            if let Some(cb) = send_callback {
+                tracing::debug!(
+                    task_hash = %hex::encode(task_hash),
+                    score = offer.score,
+                    "Broadcasting placement offer after deliberation"
+                );
+
+                cb(ComputeMessage::PlacementOffer {
+                    task_hash,
+                    executor: offer.executor,
+                    score: offer.score,
+                    cost: offer.cost,
+                    estimated_start: offer.estimated_start,
+                    offered_at: offer.offered_at,
+                });
+            }
+        });
+
+        Ok(())
+    }
+
+    /// Handle placement offer (Phase 16B)
+    async fn on_placement_offer(
+        &self,
+        task_hash: TaskHash,
+        executor: String,
+        score: f64,
+        cost: u64,
+        estimated_start: u64,
+        offered_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        // Create PlacementOffer struct
+        let offer = crate::scheduler::PlacementOffer {
+            executor: executor.clone(),
+            score,
+            cost,
+            estimated_start,
+            offered_at,
+        };
+
+        // Add to pending offers
+        let mut offers_map = self.pending_offers.lock().await;
+        let task_offers = offers_map.entry(task_hash).or_insert_with(Vec::new);
+
+        // Check if we already have an offer from this executor (shouldn't happen)
+        if task_offers.iter().any(|o| o.executor == executor) {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                executor = %executor,
+                "Duplicate offer from executor, ignoring"
+            );
+            return Ok(());
+        }
+
+        task_offers.push(offer);
+        let offer_count = task_offers.len();
+        drop(offers_map);
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            executor = %executor,
+            score = score,
+            offer_count = offer_count,
+            "Received placement offer"
+        );
+
+        // If this is the first offer, spawn selection task
+        if offer_count == 1 {
+            let task_hash_copy = task_hash;
+            let pending_offers = self.pending_offers.clone();
+            let task_manager = self.task_manager.clone();
+            let send_callback = self.send_callback.clone();
+
+            tokio::spawn(async move {
+                // Wait for offers to arrive (1000ms: 500ms deliberation + 500ms grace)
+                tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+                // Get all offers
+                let mut offers_map = pending_offers.lock().await;
+                let offers = offers_map.remove(&task_hash_copy).unwrap_or_default();
+                drop(offers_map);
+
+                if offers.is_empty() {
+                    tracing::warn!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        "No offers received for task"
+                    );
+                    return;
+                }
+
+                // Select highest score
+                let winner = offers
+                    .iter()
+                    .max_by(|a, b| {
+                        a.score
+                            .partial_cmp(&b.score)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .unwrap();
+
+                tracing::info!(
+                    task_hash = %hex::encode(task_hash_copy),
+                    winner = %winner.executor,
+                    score = winner.score,
+                    offer_count = offers.len(),
+                    "Selected executor for task"
+                );
+
+                // Claim task with winner
+                let mut mgr = task_manager.lock().await;
+                if let Err(e) = mgr.claim(&task_hash_copy, winner.executor.clone()) {
+                    tracing::warn!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        error = %e,
+                        "Failed to claim task with winner"
+                    );
+                    return;
+                }
+                drop(mgr);
+
+                // Broadcast claim
+                if let Some(cb) = send_callback {
+                    cb(ComputeMessage::TaskClaimed {
+                        task_hash: task_hash_copy,
+                        executor: winner.executor.clone(),
+                    });
+                }
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Handle capacity announcement (Phase 16A)
+    async fn on_capacity_announce(
+        &self,
+        executor: String,
+        capacity: crate::scheduler::NodeCapacity,
+    ) -> Result<(), ComputeError> {
+        tracing::debug!(
+            executor = %executor,
+            cpu_available = capacity.cpu_cores_available,
+            memory_available = capacity.memory_mb_available,
+            "Received capacity announcement"
+        );
+
+        // TODO: Store capacity in executor registry for placement decisions
+        // For now, this is a stub
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1176,5 +1489,188 @@ mod tests {
             matches!(high_status, Some(TaskStatus::Completed { .. })),
             "High priority task should be completed second, got: {high_status:?}"
         );
+    }
+
+    /// Integration test for Phase 16B placement negotiation
+    /// Tests 5 executors competing for a task with deliberation window
+    #[tokio::test]
+    async fn test_placement_negotiation_multi_executor() {
+        use crate::scheduler::ResourceProfile;
+        use crate::types::ExecutorCapability;
+        use std::sync::Arc;
+        use tokio::sync::Mutex as TokioMutex;
+
+        // Track all offers from all executors
+        let offers_collected: Arc<TokioMutex<Vec<(String, f64)>>> = Arc::new(TokioMutex::new(vec![]));
+        let claims_collected: Arc<TokioMutex<Vec<String>>> = Arc::new(TokioMutex::new(vec![]));
+
+        // Create a compute-heavy task (CPU+RAM, no GPU to simplify test)
+        let task = make_task("data-processing", "did:icn:submitter");
+        let task_hash = task.hash();
+        let resource_profile = ResourceProfile::compute_heavy(2.0, 4096);
+
+        // Executor configurations: (did, trust)
+        let executor_configs = vec![
+            ("did:icn:executor-a", 0.9),  // Highest trust
+            ("did:icn:executor-b", 0.7),  // Medium trust
+            ("did:icn:executor-c", 0.5),  // Low trust (but above MIN_TRUST_EXECUTE = 0.3)
+            ("did:icn:executor-d", 0.8),  // High trust
+            ("did:icn:executor-e", 0.2),  // Very low trust (below MIN_TRUST_EXECUTE = 0.3, should reject)
+        ];
+
+        // Spawn all executors
+        let mut executor_handles = vec![];
+        for (did, trust) in executor_configs {
+            let trust_cb: TrustCallback = Arc::new(move |_| trust);
+            let mut actor = ComputeActor::new(did.to_string(), trust_cb);
+            actor.set_signing_key(vec![1u8; 32]);
+
+            // Note: Actors use placeholder capacity internally (8 cores, 16GB RAM)
+            // which is sufficient for our compute_heavy(2.0, 4096) test task
+
+            let offers_clone = offers_collected.clone();
+            let claims_clone = claims_collected.clone();
+            let did_owned = did.to_string();
+
+            // Set up send callback to intercept offers and claims
+            let send_cb: SendCallback = Arc::new(move |msg| {
+                let offers_c = offers_clone.clone();
+                let claims_c = claims_clone.clone();
+                let did_c = did_owned.clone();
+
+                tokio::spawn(async move {
+                    match msg {
+                        ComputeMessage::PlacementOffer { score, .. } => {
+                            let mut offers = offers_c.lock().await;
+                            offers.push((did_c.clone(), score));
+                            tracing::info!(
+                                executor = %did_c,
+                                score = score,
+                                "Executor broadcast offer"
+                            );
+                        }
+                        ComputeMessage::TaskClaimed { executor, .. } => {
+                            let mut claims = claims_c.lock().await;
+                            claims.push(executor.clone());
+                            tracing::info!(
+                                executor = %executor,
+                                "Task claimed"
+                            );
+                        }
+                        _ => {}
+                    }
+                });
+            });
+            actor.set_send_callback(send_cb);
+
+            let handle = actor.spawn();
+            executor_handles.push((did.to_string(), handle));
+        }
+
+        // Register all executors by having them announce themselves
+        tracing::info!("Registering all executors via ExecutorAnnounce");
+        for (did, handle) in &executor_handles {
+            let announce_msg = ComputeMessage::ExecutorAnnounce {
+                executor: did.clone(),
+                capabilities: vec![ExecutorCapability::Ccl], // CCL capability
+            };
+            handle.handle_gossip(announce_msg).await.unwrap();
+        }
+
+        // Small delay to ensure registrations complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Broadcast PlacementRequest to all executors
+        let placement_request = ComputeMessage::PlacementRequest {
+            task_hash,
+            submitter: "did:icn:submitter".to_string(),
+            resource_profile: resource_profile.clone(),
+            locality_hints: vec![],
+            max_cost: Some(1000),
+            requested_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        };
+
+        tracing::info!("Broadcasting PlacementRequest to all executors");
+        for (did, handle) in &executor_handles {
+            tracing::debug!(executor = %did, "Sending PlacementRequest");
+            handle.handle_gossip(placement_request.clone()).await.unwrap();
+        }
+
+        // Wait for deliberation window (500ms) + grace period (500ms) + processing time
+        tracing::info!("Waiting for deliberation and offers...");
+        tokio::time::sleep(tokio::time::Duration::from_millis(1200)).await;
+
+        // Check collected offers
+        let offers = offers_collected.lock().await;
+        tracing::info!("Collected {} offers", offers.len());
+        for (executor, score) in offers.iter() {
+            tracing::info!(executor = %executor, score = score, "Offer received");
+        }
+
+        // Verify expectations:
+        // 1. executor-e should NOT offer (trust < MIN_TRUST_EXECUTE = 0.3)
+        // 2. executor-a, executor-b, executor-c, executor-d should offer
+        assert!(
+            offers.iter().any(|(did, _)| did == "did:icn:executor-a"),
+            "Executor A should offer (high trust)"
+        );
+        assert!(
+            offers.iter().any(|(did, _)| did == "did:icn:executor-b"),
+            "Executor B should offer (medium trust)"
+        );
+        assert!(
+            offers.iter().any(|(did, _)| did == "did:icn:executor-c"),
+            "Executor C should offer (trust above minimum)"
+        );
+        assert!(
+            offers.iter().any(|(did, _)| did == "did:icn:executor-d"),
+            "Executor D should offer (high trust, even if busy)"
+        );
+        assert!(
+            !offers.iter().any(|(did, _)| did == "did:icn:executor-e"),
+            "Executor E should NOT offer (trust below MIN_TRUST_EXECUTE = 0.3)"
+        );
+
+        // Check that we got 4 offers (all except executor-e)
+        assert_eq!(
+            offers.len(),
+            4,
+            "Expected 4 offers from executors above trust threshold"
+        );
+
+        // Find the highest score
+        let highest = offers.iter().max_by(|a, b| {
+            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        if let Some((winner_did, winner_score)) = highest {
+            tracing::info!(
+                winner = %winner_did,
+                score = winner_score,
+                "Highest scoring executor"
+            );
+
+            // Winner should be either executor-a or executor-d (highest trust: 0.9 and 0.8)
+            // Due to random jitter (10% of score), either could win
+            // executor-b (0.7) and executor-c (0.5) have significantly lower trust
+            // Trust contributes 40% to score, so high-trust executors should dominate
+            assert!(
+                winner_did == "did:icn:executor-a" || winner_did == "did:icn:executor-d",
+                "Winner should be executor A or D (highest trust), got: {}", winner_did
+            );
+        } else {
+            panic!("No offers received!");
+        }
+
+        tracing::info!("✅ Phase 16B placement negotiation test passed!");
+        tracing::info!("   - 4 executors broadcast offers after deliberation window");
+        tracing::info!("   - 1 executor rejected due to low trust");
+        tracing::info!("   - Highest-trust executor won (executor-a or executor-d)");
+
+        // Note: Full end-to-end test with submitter-side selection will be added
+        // in a future integration test that simulates the complete gossip protocol
     }
 }

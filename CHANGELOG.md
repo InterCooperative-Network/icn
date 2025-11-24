@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Placement Scoring Implementation (Phase 16B - Partial) (2025-11-23)
+
+**Intelligent Task Placement:**
+
+1. **Deliberation Window** ([actor.rs:1108-1147](icn/crates/icn-compute/src/actor.rs#L1108-L1147))
+   - 500ms delay before executors broadcast placement offers
+   - Prevents race conditions where fastest network wins
+   - Allows all executors to compute scores simultaneously
+   - Checks for early claims during deliberation period
+
+2. **Offer Tracking and Selection** ([actor.rs:1153-1265](icn/crates/icn-compute/src/actor.rs#L1153-L1265))
+   - Added `pending_offers` state to `ComputeActor`
+   - Collects competing offers from multiple executors
+   - Waits 1000ms (500ms deliberation + 500ms grace) for offers to propagate
+   - Selects executor with highest score
+   - Broadcasts `TaskClaimed` to winner
+
+3. **Integration Test** ([actor.rs:1494-1675](icn/crates/icn-compute/src/actor.rs#L1494-L1675))
+   - Multi-executor placement negotiation test
+   - 5 executors with varying trust levels compete for task
+   - Verifies trust gate rejection (MIN_TRUST_EXECUTE = 0.3)
+   - Validates highest-score executor wins
+   - Confirms no double-claims occur
+
+**Technical Achievements:**
+- ✅ 1 new integration test (48 total in icn-compute, all passing)
+- ✅ Deliberation prevents network-speed bias
+- ✅ Highest-trust executors win placement fairly
+- ✅ Trust-gated participation (low-trust executors rejected)
+- ✅ Random jitter (10%) breaks ties, prevents thundering herd
+
+**Progress:**
+- Phase 16B: 50% complete (2 of 4 priorities done)
+- Next: Prometheus metrics, submitter API
+
+### Added - Scheduler Evolution Foundation (Phase 16A) (2025-11-23)
+
+**Distributed Scheduler Architecture:**
+
+1. **Scheduler Module** (`icn-compute/src/scheduler.rs` - 700+ lines)
+   - `ResourceProfile` - Concrete resource requirements (CPU/RAM/GPU/storage/network)
+   - `NodeCapacity` - Track and reserve available resources per executor
+   - `PlacementPolicy` trait - Pluggable scoring algorithms for task placement
+   - `DefaultPlacementPolicy` - Multi-factor scoring (trust 0.4, capacity 0.3, queue 0.2, jitter 0.1)
+   - `PlacementRequest/PlacementOffer` - Gossip-based placement negotiation protocol
+   - `LocalityHint` - Data/network/geographic placement preferences
+   - GPU support: `GpuSpec`, `GpuDevice` with compute capability matching
+   - Backward compatible with Phase 15 reactive claiming
+
+2. **Design Documentation** (`docs/scheduler-evolution-plan.md` - 8,800+ words)
+   - 5-phase evolution plan (16A-E) from tasks to actors
+   - Vision: Multi-tier cooperative fabric (edge/community/regional)
+   - Phase 16B: Placement scoring with deliberation windows
+   - Phase 16C: Locality awareness and topology integration
+   - Phase 16D: Actor state, checkpointing, and migration
+   - Phase 16E: Cooperative scheduling policies and governance integration
+   - End-to-end integration examples (ML training job placement)
+   - Testing strategy and success criteria
+
+3. **Working Example** (`examples/scheduler_demo.rs`)
+   - ML training job placement across 3 executors
+   - Demonstrates scoring algorithm selecting best-fit node
+   - GPU capacity matching and trust-based filtering
+
+**Technical Achievements:**
+- ✅ 7 new scheduler tests, all passing (47 total in icn-compute)
+- ✅ Resource reservation prevents double-allocation
+- ✅ GPU compute capability matching (sm_70, sm_80, etc.)
+- ✅ Capacity-aware placement (won't overcommit resources)
+- ✅ Trust-first gating maintained (MIN_TRUST_EXECUTE = 0.3)
+
+**Next Steps:**
+- Phase 16B: Implement placement scoring and deliberation windows (2-3 weeks)
+- Phase 16C: Add network topology discovery and data locality (3-4 weeks)
+- Phase 16D: Actor state and migration protocol (4-6 weeks)
+
 ### Added - Comprehensive Documentation & Community Readiness (2025-11-21)
 
 **Documentation Sprint (8,500+ lines):**

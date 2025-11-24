@@ -33,6 +33,7 @@ thiserror = "1.0"
 
 # Utilities
 hex = "0.4"
+rand = "0.8"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }

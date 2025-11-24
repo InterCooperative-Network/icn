@@ -260,22 +260,165 @@ pub enum EntryStatus {
 
 ---
 
-### Phase 16: TBD - Driven by Pilot Learnings
-**Status**: Not Planned Yet
-**Approach**: Let Phase 15 pilots reveal what's actually needed
+### Phase 16: Scheduler Evolution - Intelligent Task Placement (5-phase plan)
+**Status**: Phase 16A Foundation Complete ✅ (2025-11-23)
+**Philosophy**: Incremental evolution from reactive task claiming to distributed, trust-governed scheduling
 
-**Possible Directions** (conditional on pilot feedback):
+**Long-Term Vision**: Transform ICN compute into a multi-tier cooperative fabric (edge/community/regional) with intelligent placement, actor migration, and per-coop policies.
+
+**Design Doc**: [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) (8,800+ words)
+
+---
+
+#### Phase 16A: Resource Profiles & Matching ✅ COMPLETE (2025-11-23)
+**Duration**: 1 week
+**Goal**: Replace vague "capabilities" with concrete resource requirements
+
+**Completed**:
+- ✅ `ResourceProfile` type (CPU/RAM/GPU/storage/network requirements)
+- ✅ `NodeCapacity` tracking and reservation system
+- ✅ `PlacementPolicy` trait for pluggable scoring algorithms
+- ✅ `DefaultPlacementPolicy` with multi-factor scoring
+- ✅ GPU support with compute capability matching
+- ✅ 7 new tests, all passing (47 total in icn-compute)
+- ✅ Backward compatible with Phase 15 reactive claiming
+
+**Example**:
+```rust
+let profile = ResourceProfile::gpu(24, "sm_70".into());
+// Requires: 24GB GPU, compute capability sm_70+
+
+let capacity = NodeCapacity { /* ... */ };
+if capacity.can_fit(&profile) {
+    capacity.reserve(&profile)?;
+    // Execute task
+    capacity.release(&profile);
+}
+```
+
+**Deliverables**:
+- `icn-compute/src/scheduler.rs` (700+ lines)
+- `examples/scheduler_demo.rs` (working placement demo)
+- Full test coverage
+
+---
+
+#### Phase 16B: Placement Scoring (NEXT - 2-3 weeks)
+**Goal**: Replace "first to claim" with "best fit" scoring
+
+**Scope**:
+- Add `PlacementRequest`/`PlacementOffer` gossip messages
+- Implement deliberation window (500ms) to prevent race conditions
+- Multi-factor scoring: trust (0.4), capacity (0.3), queue (0.2), jitter (0.1)
+- Economic cost calculation with load multipliers
+- Prometheus metrics: placement wins/losses, score distribution
+
+**Flow**:
+```
+Submitter → PlacementRequest (broadcast)
+    ↓
+Executors → Compute score
+    ↓
+Deliberation (500ms)
+    ↓
+Highest score → TaskClaimed
+```
+
+**Success Criteria**:
+- Integration test: 5 executors, task goes to highest score
+- No race conditions (deliberation window prevents multiple claims)
+- Metrics show scoring distribution
+
+---
+
+#### Phase 16C: Locality Awareness (3-4 weeks)
+**Goal**: Network topology and data locality as first-class scheduling inputs
+
+**Scope**:
+- Network topology discovery (periodic ping/measure, RTT/bandwidth)
+- Data registry tracking blob locations
+- `LocalityHint` enum: DataLocality, NetworkProximity, GeographicRegion, ColocateWith
+- Updated scoring with locality factors (0.2 weight for data, 0.1 for network)
+- Integration with icn-store for blob location tracking
+
+**Impact**: 50-80% reduction in unnecessary data transfer for batch/ML workloads
+
+---
+
+#### Phase 16D: Actor State & Migration (4-6 weeks)
+**Goal**: Support stateful, long-running actors with fault tolerance
+
+**Key Shift**: Tasks (stateless, one-shot) → Actors (stateful, migratable)
+
+**Scope**:
+- `Actor` type with state, message queue, checkpoints
+- `Checkpoint` protocol: pause → snapshot → transfer → resume
+- Migration triggers: load balancing, failure, policy, locality, economics
+- CCL extensions: `actor_spawn()`, `actor_send()`, `actor_checkpoint()`
+- Message delivery during migration
+
+**Example**:
+```rust
+// Counter actor survives node failures
+let actor = Actor::spawn(counter_contract)?;
+actor.send(Message::Increment)?;
+// Node crashes, actor migrates to backup
+actor.send(Message::Get)?; // State preserved
+```
+
+---
+
+#### Phase 16E: Cooperative Scheduling Policies (3-4 weeks)
+**Goal**: Per-coop rules, quotas, and governance integration
+
+**Scope**:
+- `CoopSchedulingPolicy` with member priorities, resource quotas, scheduling rules
+- Policy enforcement: quotas, data sovereignty, time windows
+- Governance integration (Phase 13): policies updated via proposals
+- Usage tracking: CPU hours, credits spent per member
+
+**Example Policies**:
+- Timebank: "Max 10 CPU-hours per member per month"
+- Research Coop: "All data processing must stay in EU (GDPR)"
+- Housing Coop: "Building automation has Critical priority"
+
+**Integration with Phase 13**:
+```rust
+Proposal {
+    domain_id: "research:biolab",
+    kind: ConfigChange::SchedulingPolicy {
+        rules: vec![
+            SchedulingRule::DataSovereignty { region: "eu-central" }
+        ],
+    },
+}
+```
+
+---
+
+**Success Criteria (Phases 16A-E Complete)**:
+- ✅ Resource-aware placement (CPU/RAM/GPU enforcement)
+- ⏳ Intelligent scoring beats random by 50%+ (benchmark)
+- ⏳ Locality optimization: 80% reduction in data transfer
+- ⏳ Fault tolerance: Actors survive crashes via checkpoints
+- ⏳ Policy compliance: 100% enforcement of coop rules
+
+**Estimated Timeline**: 3-6 months for complete scheduler evolution
+
+**Pilot Validation**: Deploy Phase 16B-C during pilot (Track C), defer 16D-E until actor use cases emerge
+
+---
+
+### Phase 17+: TBD - Driven by Pilot Learnings
+**Status**: Not Planned Yet
+**Approach**: Let pilots reveal what's actually needed
+
+**Possible Directions** (conditional on feedback):
 - **App Runtime** (if co-ops need custom backend logic but can't run servers)
 - **Governance Templates** (if governance patterns are clear and repeatable)
 - **Better Self-Hosting Tools** (if co-ops want to self-host but struggle with devops)
 - **Federation** (if multiple co-ops want to interconnect)
 - **Mobile Apps** (if web-on-phone isn't sufficient)
-
-**Decision Gate**:
-Build these ONLY if pilots reveal patterns like:
-- "We need custom event-driven logic but can't run servers"
-- "We want to deploy small scripts that react to ledger changes"
-- "Self-hosting is the blocker, not the platform"
 
 **Philosophy**: Don't speculate. Build what pilots prove is necessary.
 
@@ -821,5 +964,5 @@ ICN is ready for pilot deployment. The next phase isn't more infrastructure - it
 
 ---
 
-**Last Updated**: 2025-01-15 (Phase 14 Gateway Complete, Gap Analyses Complete, MVC Track Defined)
-**Next Review**: After Track C1 (community selection) completes
+**Last Updated**: 2025-11-23 (Phase 16A Scheduler Foundation Complete)
+**Next Review**: After Phase 16B (Placement Scoring) completes
