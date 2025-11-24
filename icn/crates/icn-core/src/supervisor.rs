@@ -319,11 +319,11 @@ impl Supervisor {
                         // In a full implementation, this could update a local subscription registry
                     }
 
-                    icn_net::MessagePayload::Ping => {
+                    icn_net::MessagePayload::Ping { .. } => {
                         // Ping/Pong handled by network actor
                     }
 
-                    icn_net::MessagePayload::Pong => {
+                    icn_net::MessagePayload::Pong { .. } => {
                         // Ping/Pong handled by network actor
                     }
 
@@ -1243,6 +1243,18 @@ impl Supervisor {
                             (icn_compute::TOPIC_CANCEL, bincode::serialize(&compute_msg))
                         }
                         icn_compute::ComputeMessage::ExecutorAnnounce { .. } => {
+                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::PlacementRequest { .. } => {
+                            // Phase 16B: Broadcast placement requests for executor bidding
+                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::PlacementOffer { .. } => {
+                            // Phase 16B: Broadcast placement offers (executor bids)
+                            (icn_compute::TOPIC_CLAIM, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::NodeCapacityAnnounce { .. } => {
+                            // Phase 16B: Broadcast capacity updates
                             (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
                         }
                     };

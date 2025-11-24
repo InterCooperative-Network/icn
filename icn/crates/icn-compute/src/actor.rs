@@ -1051,9 +1051,9 @@ impl ComputeActor {
     async fn on_placement_request(
         &self,
         task_hash: TaskHash,
-        _submitter: String,
+        submitter: String,
         resource_profile: crate::scheduler::ResourceProfile,
-        _locality_hints: Vec<crate::scheduler::LocalityHint>,
+        locality_hints: Vec<crate::scheduler::LocalityHint>,
         _max_cost: Option<u64>,
         _requested_at: u64,
     ) -> Result<(), ComputeError> {
@@ -1061,6 +1061,7 @@ impl ComputeActor {
 
         tracing::debug!(
             task_hash = %task_hash_str,
+            submitter = %submitter,
             "Received placement request"
         );
 
@@ -1117,13 +1118,19 @@ impl ComputeActor {
         // Check if we have a placement policy (for now, use default)
         let policy = crate::scheduler::DefaultPlacementPolicy::default();
 
+        // Build locality context (Phase 16C)
+        // TODO: Integrate with network layer for RTT and blob registry for data locality
+        let locality_ctx = crate::scheduler::LocalityContext::empty();
+
         // Score the task
         let offer = match policy.score_task(
             &task_hash,
             &resource_profile,
-            &self.own_did,
+            &submitter,
             &node_state,
             our_trust,
+            &locality_hints,
+            &locality_ctx,
         ) {
             Some(o) => o,
             None => {
@@ -1734,13 +1741,15 @@ mod tests {
                 "Highest scoring executor"
             );
 
-            // Winner should be either executor-a or executor-d (highest trust: 0.9 and 0.8)
-            // Due to random jitter (10% of score), either could win
-            // executor-b (0.7) and executor-c (0.5) have significantly lower trust
-            // Trust contributes 40% to score, so high-trust executors should dominate
+            // Winner should be executor-a, executor-b, or executor-d (trust: 0.9, 0.7, 0.8)
+            // Phase 16C: Trust now contributes 25% (reduced from 40%)
+            // With 10% random jitter, executor-b can win with favorable jitter
+            // executor-c (0.5) should still be excluded due to significantly lower trust
             assert!(
-                winner_did == "did:icn:executor-a" || winner_did == "did:icn:executor-d",
-                "Winner should be executor A or D (highest trust), got: {}", winner_did
+                winner_did == "did:icn:executor-a"
+                    || winner_did == "did:icn:executor-b"
+                    || winner_did == "did:icn:executor-d",
+                "Winner should be executor A, B, or D (reasonable trust), got: {}", winner_did
             );
         } else {
             panic!("No offers received!");
@@ -1749,7 +1758,7 @@ mod tests {
         tracing::info!("✅ Phase 16B placement negotiation test passed!");
         tracing::info!("   - 4 executors broadcast offers after deliberation window");
         tracing::info!("   - 1 executor rejected due to low trust");
-        tracing::info!("   - Highest-trust executor won (executor-a or executor-d)");
+        tracing::info!("   - High-trust executor won (executor-a, executor-b, or executor-d)");
 
         // Note: Full end-to-end test with submitter-side selection will be added
         // in a future integration test that simulates the complete gossip protocol

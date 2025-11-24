@@ -419,6 +419,60 @@ impl NodeState {
     }
 }
 
+/// Network locality context for placement scoring (Phase 16C).
+///
+/// Provides network measurements and data location information
+/// to enable locality-aware task placement.
+#[derive(Debug, Clone)]
+pub struct LocalityContext {
+    /// RTT to submitter in milliseconds (if known)
+    pub submitter_rtt_ms: Option<u64>,
+
+    /// Number of input blobs that are locally available
+    pub local_blob_count: usize,
+
+    /// Total number of input blobs requested
+    pub total_blob_count: usize,
+
+    /// Node's geographic region (if topology enabled)
+    pub own_region: Option<String>,
+
+    /// Submitter's geographic region (if known)
+    pub submitter_region: Option<String>,
+}
+
+impl LocalityContext {
+    /// Create empty context (no locality information)
+    pub fn empty() -> Self {
+        Self {
+            submitter_rtt_ms: None,
+            local_blob_count: 0,
+            total_blob_count: 0,
+            own_region: None,
+            submitter_region: None,
+        }
+    }
+
+    /// Calculate data locality ratio (0.0 - 1.0)
+    ///
+    /// Returns the fraction of input blobs available locally.
+    /// Returns 1.0 if no blobs required (no data transfer needed).
+    pub fn data_locality_ratio(&self) -> f64 {
+        if self.total_blob_count == 0 {
+            return 1.0; // No data needed = perfect locality
+        }
+        self.local_blob_count as f64 / self.total_blob_count as f64
+    }
+
+    /// Check if submitter is in same region
+    pub fn same_region(&self) -> bool {
+        match (&self.own_region, &self.submitter_region) {
+            (Some(own), Some(sub)) => own == sub,
+            _ => false,
+        }
+    }
+}
+
 /// Trait for implementing placement policies.
 ///
 /// Different cooperatives can implement custom scoring logic.
@@ -427,6 +481,12 @@ pub trait PlacementPolicy: Send + Sync {
     ///
     /// Returns None if this node cannot or should not execute the task.
     /// Returns Some(offer) with a score between 0.0 and 1.0.
+    ///
+    /// # Phase 16C Enhancement
+    ///
+    /// Added `locality_hints` and `locality_ctx` parameters for network-aware scoring:
+    /// - `locality_hints`: Task placement preferences (region, data locality, etc.)
+    /// - `locality_ctx`: Network context for computing locality scores (RTT, blob locations)
     fn score_task(
         &self,
         task_hash: &[u8; 32],
@@ -434,6 +494,8 @@ pub trait PlacementPolicy: Send + Sync {
         submitter: &str,
         node_state: &NodeState,
         trust_score: f64,
+        locality_hints: &[LocalityHint],
+        locality_ctx: &LocalityContext,
     ) -> Option<PlacementOffer>;
 }
 
@@ -469,6 +531,8 @@ impl PlacementPolicy for DefaultPlacementPolicy {
         _submitter: &str,
         node_state: &NodeState,
         trust_score: f64,
+        locality_hints: &[LocalityHint],
+        locality_ctx: &LocalityContext,
     ) -> Option<PlacementOffer> {
         // Trust gate
         if trust_score < self.min_trust {
@@ -481,27 +545,77 @@ impl PlacementPolicy for DefaultPlacementPolicy {
         }
 
         // Compute score (0.0 - 1.0)
+        // Phase 16C: Rebalanced weights to include locality factors
         let mut score = 0.0;
 
-        // Factor 1: Trust (weight 0.4)
-        // Scale trust score to 0-0.4 range
-        score += (trust_score * 0.4).min(0.4);
+        // Factor 1: Trust (weight 0.25, reduced from 0.4)
+        // Scale trust score to 0-0.25 range
+        score += (trust_score * 0.25).min(0.25);
 
-        // Factor 2: Available capacity (weight 0.3)
+        // Factor 2: Available capacity (weight 0.20, reduced from 0.3)
         // Prefer nodes with more available resources
         let capacity_ratio = node_state.capacity.available_ratio();
-        score += capacity_ratio * 0.3;
+        score += capacity_ratio * 0.20;
 
-        // Factor 3: Queue depth (weight 0.2)
+        // Factor 3: Queue depth (weight 0.15, reduced from 0.2)
         // Prefer nodes with shorter queues
         let queue_penalty = (node_state.queue_depth as f64 / 10.0).min(1.0);
-        score += (1.0 - queue_penalty) * 0.2;
+        score += (1.0 - queue_penalty) * 0.15;
 
-        // Factor 4: Random jitter (weight 0.1)
+        // Factor 4: Network latency (weight 0.15, NEW in Phase 16C)
+        // Prefer nodes with lower RTT to submitter
+        if let Some(rtt_ms) = locality_ctx.submitter_rtt_ms {
+            // Convert RTT to score: lower RTT = higher score
+            // 0ms = 1.0, 500ms = 0.0 (linear interpolation)
+            let rtt_score = (1.0 - (rtt_ms as f64 / 500.0).min(1.0)).max(0.0);
+            score += rtt_score * 0.15;
+        }
+        // If no RTT data, no bonus (neutral)
+
+        // Factor 5: Data locality (weight 0.15, NEW in Phase 16C)
+        // Prefer nodes that already have input blobs
+        let data_locality_ratio = locality_ctx.data_locality_ratio();
+        score += data_locality_ratio * 0.15;
+
+        // Factor 6: Locality hints bonus (weight 0.10, NEW in Phase 16C)
+        // Apply bonus if we match submitter preferences
+        let mut hint_bonus: f64 = 0.0;
+        for hint in locality_hints {
+            match hint {
+                LocalityHint::PreferRegion(region) => {
+                    if let Some(ref own_region) = locality_ctx.own_region {
+                        if own_region == region {
+                            hint_bonus += 0.05; // 5% bonus for region match
+                        }
+                    }
+                }
+                LocalityHint::PreferDid(did) => {
+                    if &node_state.did == did {
+                        hint_bonus += 0.10; // 10% bonus for direct DID preference
+                    }
+                }
+                LocalityHint::AvoidDid(did) => {
+                    if &node_state.did == did {
+                        return None; // Hard reject if blacklisted
+                    }
+                }
+                _ => {
+                    // DataLocality and ColocateWith handled via locality_ctx
+                }
+            }
+        }
+        score += hint_bonus.min(0.10); // Cap hint bonus at 10%
+
+        // Factor 7: Random jitter (weight 0.10, same as before, but rebalanced)
         // Break ties and prevent thundering herd
         use rand::Rng;
-        let jitter = rand::thread_rng().gen::<f64>() * 0.1;
+        let jitter = rand::thread_rng().gen::<f64>() * 0.10;
         score += jitter;
+
+        // Total weights: 0.25 + 0.20 + 0.15 + 0.15 + 0.15 + 0.10 + 0.10 = 1.10 max (with bonuses)
+        // Actual max without bonuses: 1.00
+        // Cap final score at 1.0
+        score = score.min(1.0);
 
         // Calculate cost (base cost + load multiplier)
         let load_factor = if node_state.queue_depth > 5 {
@@ -664,17 +778,19 @@ mod tests {
         };
 
         let task_hash = [0u8; 32];
+        let empty_locality = LocalityContext::empty();
+        let no_hints: Vec<LocalityHint> = vec![];
 
         // High trust, should get good score
         let offer = policy
-            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8)
+            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8, &no_hints, &empty_locality)
             .unwrap();
 
-        assert!(offer.score > 0.5); // Trust (0.32) + capacity (0.225) + queue (0.16) + jitter
+        assert!(offer.score > 0.4); // Trust (0.20) + capacity (0.15) + queue (0.12) + jitter
         assert_eq!(offer.cost, 10); // Base cost
 
         // Low trust, rejected
-        let offer = policy.score_task(&task_hash, &profile, "did:icn:untrusted", &node_state, 0.1);
+        let offer = policy.score_task(&task_hash, &profile, "did:icn:untrusted", &node_state, 0.1, &no_hints, &empty_locality);
         assert!(offer.is_none());
 
         // High queue, cost multiplier kicks in
@@ -684,10 +800,42 @@ mod tests {
         };
 
         let offer = policy
-            .score_task(&task_hash, &profile, "did:icn:alice", &busy_node, 0.8)
+            .score_task(&task_hash, &profile, "did:icn:alice", &busy_node, 0.8, &no_hints, &empty_locality)
             .unwrap();
 
         assert_eq!(offer.cost, 15); // base_cost * load_multiplier
+
+        // Test with locality context (Phase 16C)
+        let locality_with_rtt = LocalityContext {
+            submitter_rtt_ms: Some(50), // 50ms RTT
+            local_blob_count: 0,
+            total_blob_count: 0,
+            own_region: None,
+            submitter_region: None,
+        };
+
+        let offer_with_rtt = policy
+            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8, &no_hints, &locality_with_rtt)
+            .unwrap();
+
+        // Should score higher than without RTT info (RTT bonus: 0.9 * 0.15 = 0.135)
+        assert!(offer_with_rtt.score > offer.score + 0.10);
+
+        // Test with data locality
+        let locality_with_data = LocalityContext {
+            submitter_rtt_ms: None,
+            local_blob_count: 3,
+            total_blob_count: 3, // All blobs available locally
+            own_region: None,
+            submitter_region: None,
+        };
+
+        let offer_with_data = policy
+            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8, &no_hints, &locality_with_data)
+            .unwrap();
+
+        // Should get full data locality bonus (1.0 * 0.15 = 0.15)
+        assert!(offer_with_data.score > offer.score + 0.10);
     }
 
     #[test]

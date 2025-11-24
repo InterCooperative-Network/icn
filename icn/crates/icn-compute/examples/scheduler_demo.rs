@@ -123,21 +123,25 @@ fn demo_gpu_placement() {
             queue_depth,
         };
 
-        match policy.score_task(&task_hash, &task_profile, "did:icn:submitter", &node_state, trust)
+        // Empty locality hints and context for demo
+        let empty_hints: Vec<icn_compute::LocalityHint> = vec![];
+        let empty_ctx = icn_compute::LocalityContext::empty();
+
+        match policy.score_task(&task_hash, &task_profile, "did:icn:submitter", &node_state, trust, &empty_hints, &empty_ctx)
         {
             Some(offer) => {
                 println!("  {}: score = {:.3}", did, offer.score);
                 println!(
                     "    - Trust component: {:.3}",
-                    (trust * 0.4).min(0.4)
+                    (trust * 0.25).min(0.25)
                 );
                 println!(
                     "    - Capacity component: {:.3}",
-                    node_state.capacity.available_ratio() * 0.3
+                    node_state.capacity.available_ratio() * 0.20
                 );
                 println!(
                     "    - Queue component: {:.3}",
-                    (1.0 - (queue_depth as f64 / 10.0).min(1.0)) * 0.2
+                    (1.0 - (queue_depth as f64 / 10.0).min(1.0)) * 0.15
                 );
                 println!(
                     "    - Estimated start: {} ms from now",

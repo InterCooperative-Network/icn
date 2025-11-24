@@ -1628,6 +1628,7 @@ async fn handle_compute_submit(
         deadline: request.deadline_ms,
         payment_rate: request.payment_rate,
         payment_currency: request.payment_currency,
+        resource_profile: None, // TODO: Allow clients to specify resource requirements
     };
 
     match compute_handle.submit(task).await {

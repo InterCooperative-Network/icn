@@ -95,6 +95,7 @@ impl ComputeManager {
             deadline: absolute_deadline,
             payment_rate,
             payment_currency,
+            resource_profile: None, // TODO: Allow REST API clients to specify resource requirements
         };
 
         // Validate task before submission

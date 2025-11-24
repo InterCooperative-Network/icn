@@ -35,8 +35,8 @@ pub use actor::{
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
 pub use scheduler::{
-    DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityHint, NodeCapacity, NodeState,
-    PlacementOffer, PlacementPolicy, PlacementRequest, ResourceProfile,
+    DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity,
+    NodeState, PlacementOffer, PlacementPolicy, PlacementRequest, ResourceProfile,
 };
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
