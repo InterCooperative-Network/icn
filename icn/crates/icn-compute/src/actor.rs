@@ -1055,7 +1055,7 @@ impl ComputeActor {
         resource_profile: crate::scheduler::ResourceProfile,
         _locality_hints: Vec<crate::scheduler::LocalityHint>,
         _max_cost: Option<u64>,
-        requested_at: u64,
+        _requested_at: u64,
     ) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task_hash);
 
@@ -1260,6 +1260,11 @@ impl ComputeActor {
                 let offers = offers_map.remove(&task_hash_copy).unwrap_or_default();
                 drop(offers_map);
 
+                // Always cleanup timestamp (prevent memory leak)
+                let mut timestamps = pending_timestamps.lock().await;
+                let requested_at = timestamps.remove(&task_hash_copy);
+                drop(timestamps);
+
                 if offers.is_empty() {
                     tracing::warn!(
                         task_hash = %hex::encode(task_hash_copy),
@@ -1279,9 +1284,6 @@ impl ComputeActor {
                     .unwrap();
 
                 // Compute placement duration from original request time
-                let mut timestamps = pending_timestamps.lock().await;
-                let requested_at = timestamps.remove(&task_hash_copy);
-                drop(timestamps);
 
                 if let Some(requested_at) = requested_at {
                     let now = std::time::SystemTime::now()
