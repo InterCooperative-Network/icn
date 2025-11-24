@@ -1,7 +1,7 @@
 # ICN Roadmap
 
-**Status**: Phase 16C Locality Awareness ✅, Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅ - All Tests Passing
-**Next**: Track C1 (Pilot Selection) → Phase 16D (Actor Migration - conditional) → MVC Track
+**Status**: Phase 16D Actor Migration ✅, Phase 16C Locality Awareness ✅, Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅ - All Tests Passing (87 compute tests)
+**Next**: Track C1 (Pilot Selection) OR Phase 16E (Cooperative Scheduling) → MVC Track
 
 ## Executive Summary
 
@@ -363,25 +363,41 @@ Highest score → TaskClaimed
 
 ---
 
-#### Phase 16D: Actor State & Migration (4-6 weeks)
+#### Phase 16D: Actor State & Migration ✅ COMPLETE
+**Status**: Complete (2025-01-24)
 **Goal**: Support stateful, long-running actors with fault tolerance
 
 **Key Shift**: Tasks (stateless, one-shot) → Actors (stateful, migratable)
 
-**Scope**:
-- `Actor` type with state, message queue, checkpoints
-- `Checkpoint` protocol: pause → snapshot → transfer → resume
-- Migration triggers: load balancing, failure, policy, locality, economics
-- CCL extensions: `actor_spawn()`, `actor_send()`, `actor_checkpoint()`
-- Message delivery during migration
+**Completed Implementation** (4 weeks):
+- **Week 1**: Core actor model types (ActorId, ActorMode, ActorCheckpoint, MigrationState, ActorEvent)
+- **Week 2**: Checkpoint storage with backends (InMemory, Sled) + gossip protocol (compute:checkpoint)
+- **Week 3**: Migration manager with policy-based decisions + gossip coordination (compute:migration)
+- **Week 4**: Production features (timeout detection, background management, stateful task submission)
+
+**Deliverables**:
+- `ActorCheckpoint` with Ed25519 signatures + Blake3 state hashes
+- `CheckpointStore` with pluggable backends
+- `ActorMigrationManager` with migration protocol (Request/Accept/Reject/Complete)
+- `DefaultMigrationPolicy` + `LocalityFirstPolicy` for intelligent placement
+- Background timeout detection (60s) and cleanup (5min retention)
+- `ComputeTask.actor_mode` field for stateful execution (backward compatible)
+- Comprehensive documentation: [Phase 16D Week 4 Dev Journal](docs/dev-journal/2025-01-XX-phase-16d-week4-production-features.md)
+
+**Test Coverage**: 87 tests passing (11 checkpoint + 8 actor model + 11 migration policy + 6 migration manager + 5 timeout detection + 46 existing compute)
 
 **Example**:
 ```rust
-// Counter actor survives node failures
-let actor = Actor::spawn(counter_contract)?;
-actor.send(Message::Increment)?;
-// Node crashes, actor migrates to backup
-actor.send(Message::Get)?; // State preserved
+// Submit stateful task with checkpointing
+let task = ComputeTask {
+    id: "long-running-service".into(),
+    code: TaskCode::Ccl(service_contract),
+    actor_mode: Some(ActorMode::Stateful {
+        checkpoint_interval_secs: 60,     // Checkpoint every minute
+        max_state_size_bytes: 10_485_760, // 10MB max state
+    }),
+    // ... other fields
+};
 ```
 
 ---
@@ -418,7 +434,7 @@ Proposal {
 - ✅ Resource-aware placement (CPU/RAM/GPU enforcement) - Phase 16A Complete
 - ✅ Intelligent scoring beats random by 50%+ - Phase 16B Complete
 - ✅ Locality optimization: Network + data awareness - Phase 16C Complete
-- ⏳ Fault tolerance: Actors survive crashes via checkpoints - Phase 16D Pending
+- ✅ Fault tolerance: Actors survive crashes via checkpoints - Phase 16D Complete (2025-01-24)
 - ⏳ Policy compliance: 100% enforcement of coop rules - Phase 16E Pending
 
 **Estimated Timeline**: 3-6 months for complete scheduler evolution
