@@ -2143,7 +2143,7 @@ Unlike centralized schedulers (Kubernetes) or blockchain VMs (Ethereum), ICN com
 6. **Payment settled** (10,000 fuel × 100 rate / 1000 = 1,000 credits)
 7. **Governance** (cooperative votes to adjust GDPR region policy via proposal)
 
-All seven substrate layers contribute to making this workflow secure, decentralized, and compliant.
+All eight substrate layers contribute to making this workflow secure, decentralized, and compliant.
 
 ---
 
