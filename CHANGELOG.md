@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Policy Management API & CLI (Phase 16E Week 4) (2025-11-24)
+
+**Complete End-to-End Policy Management Infrastructure:**
+
+1. **CLI Commands** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs#L207-L256))
+   - `icnctl policy set --coop-id <id> --policy <path>` - Set/update policy from JSON file
+   - `icnctl policy show --coop-id <id>` - Display current policy
+   - `icnctl policy list` - List all cooperative policies
+   - `icnctl policy remove --coop-id <id>` - Remove policy
+   - `icnctl quota show --coop-id <id> --member <did>` - Show member usage statistics
+   - `icnctl quota list --coop-id <id>` - List all member usage in cooperative
+
+2. **RPC Backend** ([crates/icn-rpc/src/server.rs](icn/crates/icn-rpc/src/server.rs#L1811-L2007))
+   - 6 new RPC methods: `policy.set`, `policy.get`, `policy.list`, `policy.remove`, `quota.usage`, `quota.list`
+   - JSON-RPC 2.0 compliant request/response handling
+   - Validates policy JSON before applying
+   - Returns detailed error messages for invalid policies or parameters
+
+3. **ComputeHandle API Extensions** ([crates/icn-compute/src/actor.rs](icn/crates/icn-compute/src/actor.rs#L151-L240))
+   - Added 6 async methods: `set_policy()`, `get_policy()`, `list_policies()`, `remove_policy()`, `get_usage()`, `list_coop_usage()`
+   - Message-passing architecture with oneshot channels
+   - Full error propagation with Result types
+   - DID validation in usage queries
+
+4. **PolicyManager Extensions** ([crates/icn-compute/src/policy.rs](icn/crates/icn-compute/src/policy.rs#L205-L209))
+   - Added `list_policies()` method - enumerates all cooperative policies
+   - Added `list_coop_usage()` to UsageTracker - queries all member usage in cooperative
+
+5. **Example Policies** ([docs/examples/policies/](docs/examples/policies/))
+   - `basic-cooperative.json` - Simple starter policy with default quotas
+   - `gdpr-compliant.json` - Healthcare policy with data sovereignty & encryption
+   - `tiered-membership.json` - Multi-tier quotas for building automation & emergency services
+   - `time-restricted.json` - Off-peak scheduling (nights & weekends only)
+   - `executor-filtering.json` - Trusted executor whitelist/blacklist
+   - `permissive-development.json` - Development sandbox with relaxed limits
+   - Comprehensive README with usage examples and best practices
+
+**Architecture Flow:**
+```
+CLI → RPC → ComputeHandle → ComputeActor → PolicyManager/UsageTracker
+```
+
+**Policy Features:**
+- Resource quotas (CPU hours, concurrent tasks, credits)
+- Priority multipliers for members
+- Data sovereignty constraints (GDPR, regional requirements)
+- Time windows (off-peak scheduling)
+- Executor filtering (whitelist/blacklist)
+- Enforcement modes (Strict, Permissive, Monitoring)
+
+**What Works:**
+✅ Complete CLI interface for policy management
+✅ RPC backend with JSON validation
+✅ ComputeHandle async API with error handling
+✅ PolicyManager query methods (list, list_usage)
+✅ 6 comprehensive example policies with documentation
+✅ End-to-end workflow: JSON file → CLI → RPC → Actor → Storage
+
 ### Added - Production Migration Features (Phase 16D Week 4) (2025-01-XX)
 
 **Autonomous Migration Management & Complete Timeout Detection:**

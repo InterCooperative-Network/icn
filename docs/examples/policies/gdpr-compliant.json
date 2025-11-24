@@ -1,0 +1,32 @@
+{
+  "coop_id": "healthcare-coop",
+  "governance_domain": "governance:healthcare",
+  "rules": [
+    {
+      "DataSovereignty": {
+        "region": "eu-central",
+        "tags": ["patient-data", "sensitive"]
+      }
+    },
+    {
+      "RequireCapability": {
+        "capability": "gdpr-compliant",
+        "min_version": null
+      }
+    },
+    {
+      "RequireCapability": {
+        "capability": "encryption",
+        "min_version": "1.0"
+      }
+    }
+  ],
+  "member_quotas": {},
+  "default_quota": {
+    "cpu_hours_per_month": 100.0,
+    "max_concurrent_tasks": 10,
+    "max_priority": "High",
+    "credits_per_month": 1000
+  },
+  "enforcement_mode": "Strict"
+}

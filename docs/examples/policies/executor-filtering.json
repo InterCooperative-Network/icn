@@ -1,0 +1,33 @@
+{
+  "coop_id": "security-focused-coop",
+  "governance_domain": "governance:security",
+  "rules": [
+    {
+      "ExecutorFilter": {
+        "whitelist": [
+          "did:icn:trusted-executor-1",
+          "did:icn:trusted-executor-2",
+          "did:icn:trusted-executor-3"
+        ],
+        "blacklist": [
+          "did:icn:unreliable-executor",
+          "did:icn:compromised-node"
+        ]
+      }
+    },
+    {
+      "RequireCapability": {
+        "capability": "secure-execution",
+        "min_version": "2.0"
+      }
+    }
+  ],
+  "member_quotas": {},
+  "default_quota": {
+    "cpu_hours_per_month": 75.0,
+    "max_concurrent_tasks": 8,
+    "max_priority": "High",
+    "credits_per_month": 750
+  },
+  "enforcement_mode": "Strict"
+}

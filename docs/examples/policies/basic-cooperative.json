@@ -1,0 +1,13 @@
+{
+  "coop_id": "food-coop-001",
+  "governance_domain": "governance:food-coop",
+  "rules": [],
+  "member_quotas": {},
+  "default_quota": {
+    "cpu_hours_per_month": 50.0,
+    "max_concurrent_tasks": 5,
+    "max_priority": "High",
+    "credits_per_month": 500
+  },
+  "enforcement_mode": "Strict"
+}
