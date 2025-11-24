@@ -1383,6 +1383,12 @@ impl Supervisor {
             });
             compute_actor.set_event_callback(compute_event_callback);
 
+            // Initialize policy manager for cooperative scheduling (Phase 16E)
+            let usage_tracker = Arc::new(icn_compute::UsageTracker::new());
+            let policy_manager = Arc::new(icn_compute::PolicyManager::new(usage_tracker.clone()));
+            compute_actor.set_policy_manager(policy_manager.clone());
+            info!("✓ Policy manager initialized for cooperative scheduling");
+
             // Set signing key for result signatures
             let signing_key_bytes = identity_bundle.keypair().to_signing_key_bytes();
             compute_actor.set_signing_key(signing_key_bytes.to_vec());
