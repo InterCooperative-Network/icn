@@ -86,6 +86,7 @@ impl ComputeManager {
         let task = ComputeTask {
             id: task_id.clone(),
             submitter: submitter.clone(),
+            coop_id: None, // TODO: Get from JWT claims or request body
             code: TaskCode::Ccl(code),
             inputs,
             fuel_limit: FuelLimit(fuel_limit),
@@ -96,6 +97,8 @@ impl ComputeManager {
             payment_rate,
             payment_currency,
             resource_profile: None, // TODO: Allow REST API clients to specify resource requirements
+            actor_mode: None, // Not actor mode (Phase 16D)
+            placement_constraints: None, // No constraints from API (Phase 16E will set from policy)
         };
 
         // Validate task before submission

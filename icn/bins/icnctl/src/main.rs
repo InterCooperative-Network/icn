@@ -119,6 +119,14 @@ enum Commands {
     #[command(subcommand)]
     Compute(ComputeCommands),
 
+    /// Cooperative scheduling policy management (Phase 16E)
+    #[command(subcommand)]
+    Policy(PolicyCommands),
+
+    /// Resource quota management (Phase 16E)
+    #[command(subcommand)]
+    Quota(QuotaCommands),
+
     /// Generate shell completions
     Completions {
         /// Shell type
@@ -192,6 +200,58 @@ enum ComputeCommands {
         /// Cancellation reason
         #[arg(short, long, default_value = "Cancelled by user")]
         reason: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PolicyCommands {
+    /// Set or update policy for a cooperative
+    Set {
+        /// Cooperative ID
+        #[arg(short, long)]
+        coop_id: String,
+
+        /// Path to policy JSON file
+        #[arg(short, long)]
+        policy: PathBuf,
+    },
+
+    /// Show policy for a cooperative
+    Show {
+        /// Cooperative ID
+        #[arg(short, long)]
+        coop_id: String,
+    },
+
+    /// List all policies
+    List,
+
+    /// Remove policy for a cooperative
+    Remove {
+        /// Cooperative ID
+        #[arg(short, long)]
+        coop_id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum QuotaCommands {
+    /// Show resource usage for a member
+    Show {
+        /// Cooperative ID
+        #[arg(short, long)]
+        coop_id: String,
+
+        /// Member DID
+        #[arg(short, long)]
+        member: String,
+    },
+
+    /// List usage for all members in a cooperative
+    List {
+        /// Cooperative ID
+        #[arg(short, long)]
+        coop_id: String,
     },
 }
 
@@ -777,6 +837,14 @@ async fn main() -> Result<()> {
 
         Commands::Compute(compute_cmd) => {
             handle_compute_command(compute_cmd, &args.endpoint)?
+        }
+
+        Commands::Policy(policy_cmd) => {
+            handle_policy_command(policy_cmd, &args.endpoint)?
+        }
+
+        Commands::Quota(quota_cmd) => {
+            handle_quota_command(quota_cmd, &args.endpoint)?
         }
 
         Commands::Completions { shell } => {
@@ -3839,6 +3907,138 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             println!("Task hash: {task_hash}");
             println!("Status:    {status}");
             println!("Reason:    {reason}");
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
+    match cmd {
+        PolicyCommands::Set { coop_id, policy } => {
+            // Read policy JSON
+            let policy_json = std::fs::read_to_string(&policy)
+                .with_context(|| format!("Failed to read policy file: {policy:?}"))?;
+
+            let policy_value: serde_json::Value = serde_json::from_str(&policy_json)?;
+
+            let params = serde_json::json!({
+                "coop_id": coop_id,
+                "policy": policy_value,
+            });
+
+            rpc_call(endpoint, "policy.set", params)?;
+
+            println!("✓ Policy set for cooperative: {coop_id}");
+            println!();
+            println!("View policy with:");
+            println!("  icnctl policy show --coop-id {coop_id}");
+        }
+
+        PolicyCommands::Show { coop_id } => {
+            let params = serde_json::json!({ "coop_id": coop_id });
+            let result = rpc_call(endpoint, "policy.get", params)?;
+
+            if result.is_null() {
+                println!("No policy set for cooperative: {coop_id}");
+                return Ok(());
+            }
+
+            println!("Policy for cooperative: {coop_id}");
+            println!();
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        PolicyCommands::List => {
+            let params = serde_json::json!({});
+            let result = rpc_call(endpoint, "policy.list", params)?;
+
+            let policies = result
+                .as_array()
+                .context("Expected array of policies")?;
+
+            if policies.is_empty() {
+                println!("No policies configured");
+                return Ok(());
+            }
+
+            println!("Configured Policies:");
+            for policy in policies {
+                let coop_id = policy.get("coop_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let enforcement_mode = policy.get("enforcement_mode").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let rules_count = policy.get("rules").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                println!("  - {coop_id}: {rules_count} rules ({enforcement_mode})");
+            }
+        }
+
+        PolicyCommands::Remove { coop_id } => {
+            let params = serde_json::json!({ "coop_id": coop_id });
+            rpc_call(endpoint, "policy.remove", params)?;
+
+            println!("✓ Policy removed for cooperative: {coop_id}");
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_quota_command(cmd: QuotaCommands, endpoint: &str) -> Result<()> {
+    match cmd {
+        QuotaCommands::Show { coop_id, member } => {
+            let params = serde_json::json!({
+                "coop_id": coop_id,
+                "member_did": member,
+            });
+            let result = rpc_call(endpoint, "quota.usage", params)?;
+
+            println!("Usage for {member} in {coop_id}:");
+            println!();
+
+            let cpu_hours_month = result.get("cpu_hours_this_month").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let cpu_hours_total = result.get("cpu_hours_total").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let concurrent = result.get("concurrent_tasks").and_then(|v| v.as_u64()).unwrap_or(0);
+            let completed = result.get("tasks_completed_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+            let credits_spent = result.get("credits_spent_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+
+            println!("  CPU Hours (this month): {cpu_hours_month:.2}");
+            println!("  CPU Hours (total):      {cpu_hours_total:.2}");
+            println!("  Concurrent tasks:       {concurrent}");
+            println!("  Tasks completed:        {completed}");
+            println!("  Credits spent:          {credits_spent}");
+        }
+
+        QuotaCommands::List { coop_id } => {
+            let params = serde_json::json!({ "coop_id": coop_id });
+            let result = rpc_call(endpoint, "quota.list", params)?;
+
+            let usage_records = result
+                .as_array()
+                .context("Expected array of usage records")?;
+
+            if usage_records.is_empty() {
+                println!("No usage records for cooperative: {coop_id}");
+                return Ok(());
+            }
+
+            println!("Resource Usage for {coop_id}:");
+            println!();
+            println!("{:<60} {:>12} {:>10} {:>12}", "Member", "CPU Hours", "Tasks", "Credits");
+            println!("{:-<96}", "");
+
+            for record in usage_records {
+                let member = record.get("member_did").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let cpu_hours = record.get("cpu_hours_this_month").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let tasks = record.get("tasks_completed_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+                let credits = record.get("credits_spent_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                let short_member = if member.len() > 55 {
+                    format!("{}...", &member[0..52])
+                } else {
+                    member.to_string()
+                };
+
+                println!("{:<60} {:>12.2} {:>10} {:>12}", short_member, cpu_hours, tasks, credits);
+            }
         }
     }
 

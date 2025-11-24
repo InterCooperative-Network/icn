@@ -1616,6 +1616,7 @@ async fn handle_compute_submit(
     let task = icn_compute::ComputeTask {
         id: request.task_id,
         submitter: "rpc:unknown".to_string(), // TODO: Get from auth context
+        coop_id: None, // TODO: Get from auth context or request
         code: icn_compute::TaskCode::Ccl(request.code),
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
@@ -1629,6 +1630,8 @@ async fn handle_compute_submit(
         payment_rate: request.payment_rate,
         payment_currency: request.payment_currency,
         resource_profile: None, // TODO: Allow clients to specify resource requirements
+        actor_mode: None, // Not actor mode (Phase 16D)
+        placement_constraints: None, // No constraints from RPC (Phase 16E will set from policy)
     };
 
     match compute_handle.submit(task).await {

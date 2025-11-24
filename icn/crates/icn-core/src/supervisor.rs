@@ -1257,6 +1257,34 @@ impl Supervisor {
                             // Phase 16B: Broadcast capacity updates
                             (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
                         }
+                        icn_compute::ComputeMessage::CheckpointQuery { .. } => {
+                            // Phase 16D: Checkpoint query for migration
+                            (icn_compute::TOPIC_CHECKPOINT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::CheckpointResponse { .. } => {
+                            // Phase 16D: Checkpoint response for migration
+                            (icn_compute::TOPIC_CHECKPOINT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::MigrationRequest { .. } => {
+                            // Phase 16D: Migration request
+                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::MigrationAccept { .. } => {
+                            // Phase 16D: Migration acceptance
+                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::CheckpointAnnounce { .. } => {
+                            // Phase 16D: Checkpoint announcement
+                            (icn_compute::TOPIC_CHECKPOINT, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::MigrationReject { .. } => {
+                            // Phase 16D: Migration rejection
+                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                        }
+                        icn_compute::ComputeMessage::MigrationComplete { .. } => {
+                            // Phase 16D: Migration completion
+                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                        }
                     };
 
                     match data {
