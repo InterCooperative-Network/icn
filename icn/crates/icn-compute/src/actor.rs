@@ -485,12 +485,12 @@ impl ComputeActor {
                 }
                 crate::policy::PolicyDecision::Allow {
                     adjusted_priority,
-                    placement_constraints,
+                    placement_constraints: _,
                 } => {
                     // Apply policy adjustments
                     adjusted_task.priority = adjusted_priority;
                     // Store placement constraints for later use in placement scoring
-                    // TODO: Add placement_constraints field to ComputeTask
+                    // TODO: Add placement_constraints field to ComputeTask (Phase 16E Week 2 Part 3)
                     tracing::debug!(
                         task_id = %task.id,
                         original_priority = ?task.priority,
@@ -768,6 +768,29 @@ impl ComputeActor {
 
         icn_obs::metrics::compute::tasks_claimed_inc();
 
+        // Track usage for quota enforcement (Phase 16E)
+        if let Some(ref policy_manager) = self.policy_manager {
+            // Parse submitter DID
+            if let Ok(submitter_did) = icn_identity::Did::from_str(&claimed_task.submitter) {
+                // TODO: Extract coop_id from task - using "default" placeholder for now
+                let coop_id = "default";
+
+                // Increment concurrent task counter
+                if let Err(e) = policy_manager
+                    .usage_tracker()
+                    .task_claimed(coop_id, &submitter_did)
+                    .await
+                {
+                    tracing::warn!(
+                        task_id = %claimed_task.id,
+                        submitter = %claimed_task.submitter,
+                        error = %e,
+                        "Failed to track task claim"
+                    );
+                }
+            }
+        }
+
         // Update our own executor load
         let mut registry = self.executor_registry.lock().await;
         if let Some(info) = registry.get_mut(&self.own_did) {
@@ -873,6 +896,47 @@ impl ComputeActor {
             }
         }
         drop(registry);
+
+        // Track usage for quota enforcement (Phase 16E)
+        if let Some(ref policy_manager) = self.policy_manager {
+            // Parse submitter DID
+            if let Ok(submitter_did) = icn_identity::Did::from_str(&claimed_task.submitter) {
+                // TODO: Extract coop_id from task - using "default" placeholder for now
+                let coop_id = "default";
+
+                // Calculate credits spent (same formula as payment settlement)
+                let credits_spent = if let Some(rate) = claimed_task.payment_rate {
+                    (result.fuel_used * rate) / 1000
+                } else {
+                    0
+                };
+
+                let usage_tracker = policy_manager.usage_tracker();
+
+                // Record execution (CPU hours and credits)
+                if let Err(e) = usage_tracker
+                    .record_execution(coop_id, &submitter_did, result.duration_ms, credits_spent)
+                    .await
+                {
+                    tracing::warn!(
+                        task_id = %claimed_task.id,
+                        submitter = %claimed_task.submitter,
+                        error = %e,
+                        "Failed to record task execution"
+                    );
+                }
+
+                // Decrement concurrent task counter
+                if let Err(e) = usage_tracker.task_completed(coop_id, &submitter_did).await {
+                    tracing::warn!(
+                        task_id = %claimed_task.id,
+                        submitter = %claimed_task.submitter,
+                        error = %e,
+                        "Failed to track task completion"
+                    );
+                }
+            }
+        }
 
         // Settle payment if configured and execution succeeded
         if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
@@ -2301,7 +2365,7 @@ mod tests {
     /// Demonstrates complete migration flow with checkpoint transfer
     #[tokio::test]
     async fn test_actor_migration_integration() {
-        use crate::actor_model::{ActorCheckpoint, ActorId, ActorMode, ActorRuntimeState, MigrationReason};
+        use crate::actor_model::{ActorCheckpoint, ActorId, ActorRuntimeState, MigrationReason};
         use crate::checkpoint_store::{CheckpointStore, InMemoryBackend};
         use crate::migration_manager::{ActorMigrationManager, MigrationSender};
         use crate::migration_policy::DefaultMigrationPolicy;
@@ -2367,7 +2431,7 @@ mod tests {
         let mut actor_a = ComputeActor::new(executor_a_did.clone(), trust_cb.clone());
         actor_a.set_checkpoint_store(store_a.clone());
         actor_a.set_migration_manager(manager_a.clone());
-        let handle_a = actor_a.spawn();
+        let _handle_a = actor_a.spawn();
 
         let mut actor_b = ComputeActor::new(executor_b_did.clone(), trust_cb.clone());
         actor_b.set_checkpoint_store(store_b.clone());

@@ -185,6 +185,11 @@ impl PolicyManager {
         policies.insert(policy.coop_id.clone(), policy);
     }
 
+    /// Get usage tracker for direct access
+    pub fn usage_tracker(&self) -> Arc<UsageTracker> {
+        Arc::clone(&self.usage_tracker)
+    }
+
     /// Get policy for cooperative
     pub async fn get_policy(&self, coop_id: &str) -> Option<CoopSchedulingPolicy> {
         let policies = self.policies.read().await;

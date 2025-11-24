@@ -368,7 +368,6 @@ impl MigrationPolicy for LocalityFirstPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduler::GpuDevice;
 
     fn make_executor(did: &str, trust: f64, load: f64) -> ExecutorInfo {
         ExecutorInfo {

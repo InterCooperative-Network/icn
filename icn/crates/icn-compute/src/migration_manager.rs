@@ -569,7 +569,7 @@ mod tests {
     use super::*;
     use crate::checkpoint_store::InMemoryBackend;
     use crate::migration_policy::{DefaultMigrationPolicy, ExecutorInfo, NetworkState};
-    use crate::scheduler::{GpuDevice, NodeCapacity};
+    use crate::scheduler::NodeCapacity;
     use std::sync::Mutex;
 
     fn make_manager(own_did: &str) -> (ActorMigrationManager, Arc<Mutex<Vec<ComputeMessage>>>) {
