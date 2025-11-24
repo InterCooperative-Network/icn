@@ -127,6 +127,14 @@ pub enum ProposalPayload {
         /// New config (JSON-encoded)
         new_config: String,
     },
+
+    /// Cooperative scheduling policy update (Phase 16E integration)
+    SchedulingPolicy {
+        /// Cooperative identifier
+        coop_id: String,
+        /// New policy (JSON-encoded CoopSchedulingPolicy)
+        policy_json: String,
+    },
 }
 
 /// Membership action
