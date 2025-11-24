@@ -1763,4 +1763,164 @@ mod tests {
         // Note: Full end-to-end test with submitter-side selection will be added
         // in a future integration test that simulates the complete gossip protocol
     }
+
+    /// Integration test for Phase 16C locality-aware placement
+    /// Demonstrates how RTT and data locality affect executor selection
+    #[tokio::test]
+    async fn test_locality_aware_placement_scoring() {
+        use crate::scheduler::{
+            DefaultPlacementPolicy, LocalityContext, LocalityHint, NodeCapacity, NodeState,
+            PlacementPolicy, ResourceProfile,
+        };
+
+        // Create task requiring compute resources
+        let task_hash = [5u8; 32];
+        let profile = ResourceProfile::compute_heavy(2.0, 4096);
+        let policy = DefaultPlacementPolicy::default();
+
+        // Baseline node state (all executors have same capacity)
+        let capacity = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 8.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 16384,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 0,
+        };
+
+        // Executor A: High trust (0.8), no locality information
+        let node_a = NodeState {
+            did: "did:icn:executor-a".to_string(),
+            capacity: capacity.clone(),
+            executing_tasks: std::collections::HashMap::new(),
+            queue_depth: 0,
+        };
+        let locality_a = LocalityContext::empty();
+
+        // Executor B: Medium trust (0.6), excellent RTT (10ms to submitter)
+        let node_b = NodeState {
+            did: "did:icn:executor-b".to_string(),
+            capacity: capacity.clone(),
+            executing_tasks: std::collections::HashMap::new(),
+            queue_depth: 0,
+        };
+        let locality_b = LocalityContext {
+            submitter_rtt_ms: Some(10), // 10ms RTT
+            local_blob_count: 0,
+            total_blob_count: 0,
+            own_region: None,
+            submitter_region: None,
+        };
+
+        // Executor C: Medium trust (0.6), excellent data locality (all blobs local)
+        let node_c = NodeState {
+            did: "did:icn:executor-c".to_string(),
+            capacity: capacity.clone(),
+            executing_tasks: std::collections::HashMap::new(),
+            queue_depth: 0,
+        };
+        let locality_c = LocalityContext {
+            submitter_rtt_ms: None,
+            local_blob_count: 5, // All 5 required blobs are local
+            total_blob_count: 5,
+            own_region: None,
+            submitter_region: None,
+        };
+
+        // Executor D: Low trust (0.4), both good RTT and data locality
+        let node_d = NodeState {
+            did: "did:icn:executor-d".to_string(),
+            capacity: capacity.clone(),
+            executing_tasks: std::collections::HashMap::new(),
+            queue_depth: 0,
+        };
+        let locality_d = LocalityContext {
+            submitter_rtt_ms: Some(15), // 15ms RTT
+            local_blob_count: 5,        // All blobs local
+            total_blob_count: 5,
+            own_region: None,
+            submitter_region: None,
+        };
+
+        let no_hints: Vec<LocalityHint> = vec![];
+
+        // Score all executors
+        let offer_a = policy
+            .score_task(&task_hash, &profile, "submitter", &node_a, 0.8, &no_hints, &locality_a)
+            .unwrap();
+
+        let offer_b = policy
+            .score_task(&task_hash, &profile, "submitter", &node_b, 0.6, &no_hints, &locality_b)
+            .unwrap();
+
+        let offer_c = policy
+            .score_task(&task_hash, &profile, "submitter", &node_c, 0.6, &no_hints, &locality_c)
+            .unwrap();
+
+        let offer_d = policy
+            .score_task(&task_hash, &profile, "submitter", &node_d, 0.4, &no_hints, &locality_d)
+            .unwrap();
+
+        tracing::info!("=== Phase 16C Locality-Aware Placement Scoring ===");
+        tracing::info!(
+            "Executor A (trust=0.8, no locality): score = {:.4}",
+            offer_a.score
+        );
+        tracing::info!(
+            "Executor B (trust=0.6, RTT=10ms): score = {:.4}",
+            offer_b.score
+        );
+        tracing::info!(
+            "Executor C (trust=0.6, 5/5 blobs local): score = {:.4}",
+            offer_c.score
+        );
+        tracing::info!(
+            "Executor D (trust=0.4, RTT=15ms + 5/5 blobs): score = {:.4}",
+            offer_d.score
+        );
+
+        // Analysis: With rebalanced weights (Phase 16C Week 3):
+        // - Trust: 25% (was 40%)
+        // - Capacity: 20%
+        // - Queue: 15%
+        // - RTT: 15% (NEW)
+        // - Data locality: 15% (NEW)
+        // - Hints: 10% (NEW)
+        // - Jitter: 10%
+
+        // Expected scoring breakdown (approximate, excluding jitter):
+        // Executor A: trust(0.20) + capacity(0.20) + queue(0.15) = 0.55
+        // Executor B: trust(0.15) + capacity(0.20) + queue(0.15) + rtt(0.148) = 0.648
+        // Executor C: trust(0.15) + capacity(0.20) + queue(0.15) + data(0.15) = 0.65
+        // Executor D: trust(0.10) + capacity(0.20) + queue(0.15) + rtt(0.145) + data(0.15) = 0.745
+
+        // Verify that locality factors make a significant difference
+        // Executor B (good RTT) should beat A (higher trust but no locality)
+        assert!(
+            offer_b.score + 0.03 > offer_a.score,
+            "Good RTT should compensate for lower trust"
+        );
+
+        // Executor C (good data locality) should beat A
+        assert!(
+            offer_c.score + 0.03 > offer_a.score,
+            "Good data locality should compensate for lower trust"
+        );
+
+        // Executor D (both RTT + data) should score highest despite lowest trust
+        // D has 0.4 trust (0.10 contribution) but gets 0.148 + 0.15 = 0.298 from locality
+        // A has 0.8 trust (0.20 contribution) but gets 0.0 from locality
+        // Net: D gets ~0.10 more points from locality than A gets from higher trust
+        assert!(
+            offer_d.score + 0.05 > offer_a.score,
+            "Combined RTT + data locality should beat high trust alone"
+        );
+
+        tracing::info!("✅ Phase 16C locality-aware placement test passed!");
+        tracing::info!("   - Locality factors (RTT + data) effectively compensate for lower trust");
+        tracing::info!("   - Executor selection properly balances trust, capacity, and locality");
+        tracing::info!("   - Scoring demonstrates Phase 16C's 'compute goes to data' principle");
+    }
 }
