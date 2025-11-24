@@ -28,6 +28,7 @@ mod error;
 mod executor;
 mod migration_manager;
 mod migration_policy;
+mod policy;
 mod scheduler;
 mod task;
 mod types;
@@ -48,6 +49,10 @@ pub use executor::{ExecutionContext, Executor, LocalExecutor};
 pub use migration_manager::{ActorMigrationManager, MigrationSender};
 pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
+};
+pub use policy::{
+    CoopSchedulingPolicy, EnforcementMode, MemberQuota, PlacementConstraints, PolicyDecision,
+    PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
 };
 pub use scheduler::{
     DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity,

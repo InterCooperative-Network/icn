@@ -34,6 +34,7 @@ thiserror = "1.0"
 # Utilities
 hex = "0.4"
 rand = "0.8"
+chrono = "0.4"
 
 # Storage
 sled.workspace = true
