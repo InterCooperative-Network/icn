@@ -13,7 +13,7 @@ use icn_identity::KeyPair;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{info, warn, instrument};
+use tracing::{debug, info, warn, instrument};
 
 use crate::{
     protocol::{NetworkMessage, read_message, write_message, MessagePayload},
@@ -91,6 +91,7 @@ pub struct NetworkHandle {
     peer_connections: Option<Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>>,
     session_manager: Arc<RwLock<SessionManager>>,
     own_did: Did,
+    blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
 }
 
 impl NetworkHandle {
@@ -320,6 +321,35 @@ impl NetworkHandle {
         &self.neighbor_sets
     }
 
+    /// Get reference to blob location registry (for testing and inspection)
+    pub fn blob_registry(&self) -> &Option<Arc<RwLock<crate::BlobLocationRegistry>>> {
+        &self.blob_registry
+    }
+
+    /// Query peers that have a specific blob
+    ///
+    /// Returns list of peers with blob locations (DID, size_bytes), sorted by freshness.
+    /// Only returns non-expired locations (24-hour TTL).
+    pub async fn get_peers_with_blob(&self, blob_hash: &icn_gossip::types::ContentHash) -> Vec<crate::BlobLocation> {
+        if let Some(ref registry) = self.blob_registry {
+            registry.read().await.get_peers_with_blob(blob_hash)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Find peers that have all requested blobs (data locality optimization)
+    ///
+    /// Returns peers sorted by number of matching blobs (descending).
+    /// Useful for placing tasks near their input data.
+    pub async fn find_peers_with_all(&self, blob_hashes: &[icn_gossip::types::ContentHash]) -> Vec<(icn_identity::Did, usize)> {
+        if let Some(ref registry) = self.blob_registry {
+            registry.read().await.find_peers_with_all(blob_hashes)
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Export network state for persistence
     ///
     /// This exports peer connection info (version, capabilities, X25519 keys)
@@ -429,6 +459,8 @@ pub struct NetworkActor {
     trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
     /// Per-peer connection metadata (version, capabilities, X25519 keys)
     peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+    /// Blob location registry for data locality (Phase 16C Week 2)
+    blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
 }
 
 impl NetworkActor {
@@ -527,6 +559,10 @@ impl NetworkActor {
             None
         };
 
+        // Initialize blob location registry (Phase 16C Week 2)
+        let blob_registry = Some(Arc::new(RwLock::new(crate::BlobLocationRegistry::new())));
+        info!("Blob location registry initialized for data locality tracking");
+
         // Spawn incoming connection handler if handler is provided
         if let Some(handler) = incoming_handler.clone() {
             let session_manager_clone = session_manager.clone();
@@ -536,6 +572,7 @@ impl NetworkActor {
             let topology_config_clone = topology_config.clone();
             let trust_graph_clone = trust_graph.clone();
             let peer_connections_clone = peer_connections.clone();
+            let blob_registry_clone = blob_registry.clone();
             let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = did.clone();
             let shutdown_rx = shutdown_tx.subscribe();
@@ -549,6 +586,7 @@ impl NetworkActor {
                     topology_config_clone,
                     trust_graph_clone,
                     peer_connections_clone,
+                    blob_registry_clone,
                     identity_bundle_clone,
                     own_did_clone,
                     shutdown_rx,
@@ -638,6 +676,7 @@ impl NetworkActor {
             topology_config: topology_config.clone(),
             trust_graph: trust_graph.clone(),
             peer_connections: peer_connections.clone(),
+            blob_registry: blob_registry.clone(),
         };
 
         // Spawn actor task
@@ -654,6 +693,7 @@ impl NetworkActor {
             peer_connections: Some(peer_connections),
             session_manager,
             own_did: did,
+            blob_registry: blob_registry.clone(),
         })
     }
 
@@ -736,6 +776,7 @@ impl NetworkActor {
                             let trust_graph = self.trust_graph.clone();
                             let session_manager = self.session_manager.clone();
                             let peer_connections = self.peer_connections.clone();
+                            let blob_registry = self.blob_registry.clone();
                             let identity_bundle = self.identity_bundle.clone();
                             let own_did = self.own_did.clone();
 
@@ -750,6 +791,7 @@ impl NetworkActor {
                                     trust_graph,
                                     session_manager,
                                     peer_connections,
+                                    blob_registry,
                                     identity_bundle,
                                     own_did,
                                 ).await {
@@ -923,6 +965,7 @@ impl NetworkActor {
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+        blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
@@ -963,6 +1006,7 @@ impl NetworkActor {
                         let trust_graph_clone = trust_graph.clone();
                         let session_mgr_clone = session_manager.clone();
                         let peer_connections_clone = peer_connections.clone();
+                        let blob_registry_clone = blob_registry.clone();
                         let identity_bundle_clone = identity_bundle.clone();
                         let own_did_clone = own_did.clone();
                         tokio::spawn(async move {
@@ -976,6 +1020,7 @@ impl NetworkActor {
                                 trust_graph_clone,
                                 session_mgr_clone,
                                 peer_connections_clone,
+                                blob_registry_clone,
                                 identity_bundle_clone,
                                 own_did_clone,
                             ).await {
@@ -1031,6 +1076,7 @@ impl NetworkActor {
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         _session_manager: Arc<RwLock<SessionManager>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+        blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
     ) -> Result<()> {
@@ -1386,6 +1432,29 @@ impl NetworkActor {
                                         icn_obs::metrics::topology::rtt_observe(rtt_ms as f64);
                                     }
                                 }
+                                MessagePayload::Gossip(ref gossip_msg) => {
+                                    // Extract BlobAnnounce from gossip messages for data locality tracking
+                                    if let icn_gossip::types::GossipMessage::BlobAnnounce { blob_hash, peer_did, size_bytes } = gossip_msg {
+                                        debug!(
+                                            peer_did = %peer_did,
+                                            blob_hash_len = blob_hash.len(),
+                                            size_bytes = size_bytes,
+                                            "Received blob announcement via gossip"
+                                        );
+
+                                        // Update blob location registry
+                                        if let Some(ref registry) = blob_registry {
+                                            registry.write().await.announce_blob(
+                                                *blob_hash,
+                                                peer_did.clone(),
+                                                *size_bytes,
+                                            );
+                                        }
+                                    }
+
+                                    // Forward gossip message to external handler
+                                    handler(message);
+                                }
                                 MessagePayload::Signed(ref envelope) => {
                                     // Verify SignedEnvelope (signature + replay protection)
                                     match replay_guard.write().await.check(envelope) {
@@ -1611,6 +1680,7 @@ mod tests {
             peer_connections: Some(peer_connections),
             session_manager: test_session_mgr,
             own_did: test_did,
+            blob_registry: None,
         };
 
         // Test peer_has_capability
@@ -1685,6 +1755,7 @@ mod tests {
             peer_connections: Some(peer_connections),
             session_manager: test_session_mgr,
             own_did: test_did,
+            blob_registry: None,
         };
 
         // Get peers with E2E encryption (should be Alice and Charlie)
@@ -1749,6 +1820,7 @@ mod tests {
             peer_connections: Some(peer_connections),
             session_manager: test_session_mgr,
             own_did: test_did,
+            blob_registry: None,
         };
 
         // Get versions
@@ -1787,6 +1859,7 @@ mod tests {
             peer_connections: Some(peer_connections),
             session_manager: test_session_mgr,
             own_did: test_did,
+            blob_registry: None,
         };
 
         // Get full connection info
