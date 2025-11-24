@@ -158,6 +158,16 @@ pub enum GossipMessage {
         truncated: bool,
         nonce: u64,
     },
+
+    /// Announce blob availability (Phase 16C - data locality)
+    BlobAnnounce {
+        /// Blob hash (same as ContentHash)
+        blob_hash: ContentHash,
+        /// Peer that has the blob
+        peer_did: Did,
+        /// Blob size in bytes
+        size_bytes: u64,
+    },
 }
 
 impl GossipMessage {
@@ -173,6 +183,7 @@ impl GossipMessage {
             GossipMessage::Digest { .. } => "Digest",
             GossipMessage::PullRequest { .. } => "PullRequest",
             GossipMessage::PullResponse { .. } => "PullResponse",
+            GossipMessage::BlobAnnounce { .. } => "BlobAnnounce",
         }
     }
 }

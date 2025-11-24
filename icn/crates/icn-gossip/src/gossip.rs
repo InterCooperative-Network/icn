@@ -977,6 +977,20 @@ impl GossipActor {
                 debug!("PullResponse processed: {} bytes received, truncated={}", total_bytes, truncated);
                 Ok(())
             }
+
+            GossipMessage::BlobAnnounce { blob_hash, peer_did, size_bytes } => {
+                debug!(
+                    peer_did = %peer_did,
+                    blob_hash = %hex::encode(blob_hash),
+                    size_bytes = size_bytes,
+                    message_type = "BlobAnnounce",
+                    "Received blob announcement"
+                );
+
+                // BlobAnnounce is handled by the NetworkActor/BlobLocationRegistry
+                // This message type is just forwarded through gossip, not stored
+                Ok(())
+            }
         }
     }
 
