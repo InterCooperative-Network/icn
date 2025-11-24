@@ -347,6 +347,55 @@ pub enum ComputeMessage {
         executor: String,
         capacity: crate::scheduler::NodeCapacity,
     },
+
+    // === Phase 16D: Actor Checkpointing & Migration ===
+    /// Checkpoint announcement (Phase 16D)
+    CheckpointAnnounce {
+        checkpoint: crate::actor_model::ActorCheckpoint,
+    },
+
+    /// Query for latest checkpoint (Phase 16D)
+    CheckpointQuery {
+        actor_id: crate::actor_model::ActorId,
+        requester: String,
+    },
+
+    /// Response to checkpoint query (Phase 16D)
+    CheckpointResponse {
+        actor_id: crate::actor_model::ActorId,
+        checkpoint: Option<crate::actor_model::ActorCheckpoint>,
+    },
+
+    /// Initiate actor migration (Phase 16D)
+    MigrationRequest {
+        actor_id: crate::actor_model::ActorId,
+        from_executor: String,
+        to_executor: String,
+        checkpoint: crate::actor_model::ActorCheckpoint,
+        reason: crate::actor_model::MigrationReason,
+    },
+
+    /// Target accepts migration (Phase 16D)
+    MigrationAccept {
+        actor_id: crate::actor_model::ActorId,
+        to_executor: String,
+    },
+
+    /// Target rejects migration (Phase 16D)
+    MigrationReject {
+        actor_id: crate::actor_model::ActorId,
+        to_executor: String,
+        reason: String,
+    },
+
+    /// Source confirms actor stopped and migration complete (Phase 16D)
+    MigrationComplete {
+        actor_id: crate::actor_model::ActorId,
+        from_executor: String,
+        to_executor: String,
+        final_checkpoint: crate::actor_model::ActorCheckpoint,
+        duration_ms: u64,
+    },
 }
 
 #[cfg(test)]

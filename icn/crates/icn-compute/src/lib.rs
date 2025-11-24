@@ -22,8 +22,11 @@
 //! - `compute:result` - Execution results
 
 mod actor;
+mod actor_model;
+mod checkpoint_store;
 mod error;
 mod executor;
+mod migration_policy;
 mod scheduler;
 mod task;
 mod types;
@@ -32,8 +35,18 @@ pub use actor::{
     ComputeActor, ComputeEvent, ComputeHandle, EventCallback, PaymentCallback, PaymentRequest,
     SendCallback, TrustCallback,
 };
+pub use actor_model::{
+    ActorCheckpoint, ActorEvent, ActorId, ActorMode, ActorRuntimeState, MigrationDecision,
+    MigrationReason, MigrationState, TerminationReason,
+};
+pub use checkpoint_store::{
+    CheckpointBackend, CheckpointStore, InMemoryBackend, SledCheckpointBackend,
+};
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
+pub use migration_policy::{
+    DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
+};
 pub use scheduler::{
     DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity,
     NodeState, PlacementOffer, PlacementPolicy, PlacementRequest, ResourceProfile,
@@ -55,6 +68,12 @@ pub const TOPIC_RESULT: &str = "compute:result";
 
 /// Gossip topic for cancellations
 pub const TOPIC_CANCEL: &str = "compute:cancel";
+
+/// Gossip topic for checkpoint announcements (Phase 16D)
+pub const TOPIC_CHECKPOINT: &str = "compute:checkpoint";
+
+/// Gossip topic for migration coordination (Phase 16D)
+pub const TOPIC_MIGRATION: &str = "compute:migration";
 
 /// Minimum trust score to submit tasks (0.0 - 1.0)
 pub const MIN_TRUST_SUBMIT: f64 = 0.1;

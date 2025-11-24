@@ -569,6 +569,82 @@ impl ComputeActor {
             ComputeMessage::NodeCapacityAnnounce { executor, capacity } => {
                 self.on_capacity_announce(executor, capacity).await
             }
+
+            // Phase 16D: Checkpoint & Migration messages (stubs for Week 3 implementation)
+            ComputeMessage::CheckpointAnnounce { checkpoint } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(checkpoint.actor_id),
+                    sequence = checkpoint.sequence,
+                    executor = %checkpoint.executor,
+                    "Received checkpoint announcement (handler not yet implemented)"
+                );
+                Ok(())
+            }
+            ComputeMessage::CheckpointQuery { actor_id, requester } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(actor_id),
+                    requester = %requester,
+                    "Received checkpoint query (handler not yet implemented)"
+                );
+                Ok(())
+            }
+            ComputeMessage::CheckpointResponse { actor_id, checkpoint } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(actor_id),
+                    has_checkpoint = checkpoint.is_some(),
+                    "Received checkpoint response (handler not yet implemented)"
+                );
+                Ok(())
+            }
+            ComputeMessage::MigrationRequest {
+                actor_id,
+                from_executor,
+                to_executor,
+                checkpoint: _,
+                reason,
+            } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(actor_id),
+                    from = %from_executor,
+                    to = %to_executor,
+                    reason = ?reason,
+                    "Received migration request (handler not yet implemented)"
+                );
+                Ok(())
+            }
+            ComputeMessage::MigrationAccept { actor_id, to_executor } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(actor_id),
+                    to = %to_executor,
+                    "Received migration accept (handler not yet implemented)"
+                );
+                Ok(())
+            }
+            ComputeMessage::MigrationReject { actor_id, to_executor, reason } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(actor_id),
+                    to = %to_executor,
+                    reason = %reason,
+                    "Received migration reject (handler not yet implemented)"
+                );
+                Ok(())
+            }
+            ComputeMessage::MigrationComplete {
+                actor_id,
+                from_executor,
+                to_executor,
+                final_checkpoint: _,
+                duration_ms,
+            } => {
+                tracing::debug!(
+                    actor_id = %hex::encode(actor_id),
+                    from = %from_executor,
+                    to = %to_executor,
+                    duration_ms,
+                    "Received migration complete (handler not yet implemented)"
+                );
+                Ok(())
+            }
         }
     }
 
