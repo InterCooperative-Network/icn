@@ -350,6 +350,78 @@ impl NetworkHandle {
         }
     }
 
+    /// Announce blob availability to the network
+    ///
+    /// Broadcasts a BlobAnnounce message via gossip protocol to notify other peers
+    /// that this node has a specific blob. The announcement is automatically
+    /// recorded in the local BlobLocationRegistry.
+    ///
+    /// # Arguments
+    /// * `blob_hash` - Content-addressed hash of the blob (32 bytes)
+    /// * `peer_did` - DID of the peer announcing the blob (typically own_did)
+    /// * `size_bytes` - Size of the blob in bytes
+    ///
+    /// # Usage
+    ///
+    /// Call this method when storing a blob locally to announce its availability:
+    ///
+    /// ```no_run
+    /// # use icn_net::NetworkHandle;
+    /// # use icn_identity::Did;
+    /// # async fn example(network: &NetworkHandle, own_did: &Did) {
+    /// let blob_hash = [0u8; 32]; // Content hash of stored blob
+    /// let size = 1024; // Blob size in bytes
+    ///
+    /// network.announce_blob_availability(blob_hash, own_did.clone(), size).await;
+    /// # }
+    /// ```
+    ///
+    /// # Integration Pattern
+    ///
+    /// Future blob storage components should call this method after successfully
+    /// storing a blob:
+    ///
+    /// ```no_run
+    /// # use icn_net::NetworkHandle;
+    /// # use icn_identity::Did;
+    /// # async fn example(network: &NetworkHandle, own_did: &Did) {
+    /// // 1. Store blob to local storage
+    /// // store.put(blob_hash, blob_data)?;
+    ///
+    /// // 2. Announce availability to network
+    /// let blob_hash = [0u8; 32]; // compute_hash(blob_data)
+    /// let size = 1024; // blob_data.len()
+    /// network.announce_blob_availability(blob_hash, own_did.clone(), size).await;
+    /// # }
+    /// ```
+    pub async fn announce_blob_availability(
+        &self,
+        blob_hash: icn_gossip::types::ContentHash,
+        peer_did: icn_identity::Did,
+        size_bytes: u64,
+    ) {
+        // Update local registry
+        if let Some(ref registry) = self.blob_registry {
+            registry.write().await.announce_blob(blob_hash, peer_did.clone(), size_bytes);
+        }
+
+        // Broadcast BlobAnnounce message via gossip
+        let gossip_msg = icn_gossip::types::GossipMessage::BlobAnnounce {
+            blob_hash,
+            peer_did,
+            size_bytes,
+        };
+
+        let network_msg = crate::protocol::NetworkMessage::new(
+            self.own_did.clone(),
+            None, // Broadcast to all peers
+            crate::protocol::MessagePayload::Gossip(gossip_msg),
+        );
+
+        // Broadcast via network (best-effort, ignore errors)
+        let _ = self.broadcast(network_msg).await;
+    }
+
     /// Export network state for persistence
     ///
     /// This exports peer connection info (version, capabilities, X25519 keys)
@@ -1875,5 +1947,54 @@ mod tests {
         let bob_keypair = KeyPair::generate().unwrap();
         let bob_did = bob_keypair.did();
         assert!(handle.get_peer_connection_info(&bob_did).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_announce_blob_availability() {
+        // Setup blob registry
+        let blob_registry = Arc::new(RwLock::new(crate::BlobLocationRegistry::new()));
+
+        // Setup NetworkHandle with mock channel
+        let (tx, mut rx) = mpsc::channel(10);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let own_did = KeyPair::generate().unwrap().did().clone();
+
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: None,
+            session_manager: test_session_mgr,
+            own_did: own_did.clone(),
+            blob_registry: Some(blob_registry.clone()),
+        };
+
+        // Spawn task to handle response channel (prevents hanging)
+        tokio::spawn(async move {
+            if let Some(NetworkMsg::Broadcast { response, .. }) = rx.recv().await {
+                let _ = response.send(Ok(()));
+            }
+        });
+
+        // Announce blob availability
+        let blob_hash = [42u8; 32];
+        let size_bytes = 1024;
+        handle.announce_blob_availability(blob_hash, own_did.clone(), size_bytes).await;
+
+        // Verify blob was recorded in local registry
+        let peers = blob_registry.read().await.get_peers_with_blob(&blob_hash);
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].peer_did, own_did);
+        assert_eq!(peers[0].size_bytes, size_bytes);
+
+        // Test query API
+        let query_peers = handle.get_peers_with_blob(&blob_hash).await;
+        assert_eq!(query_peers.len(), 1);
+        assert_eq!(query_peers[0].peer_did, own_did);
+
+        // Test find_peers_with_all API
+        let peer_matches = handle.find_peers_with_all(&[blob_hash]).await;
+        assert_eq!(peer_matches.len(), 1);
+        assert_eq!(peer_matches[0].0, own_did);
+        assert_eq!(peer_matches[0].1, 1); // 1 matching blob
     }
 }
