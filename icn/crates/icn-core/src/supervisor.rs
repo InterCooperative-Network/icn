@@ -87,6 +87,11 @@ impl Supervisor {
         // Event broadcaster for WebSocket delivery (shared between compute actor and gateway)
         let event_broadcaster: Option<Arc<icn_gateway::EventBroadcaster>>;
 
+        // Governance event subscription handles - MUST persist for daemon lifetime
+        // Stored at function scope to prevent premature Drop (which would unsubscribe)
+        let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
+        let policy_governance_subscription: Option<crate::events::SubscriptionHandle>;
+
         // Spawn actors (requires identity bundle from unlocked keystore)
         let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) = &self.identity_bundle {
             info!("Identity bundle available - spawning actors");
@@ -1021,7 +1026,7 @@ impl Supervisor {
 
             // Subscribe to governance events for ledger execution
             // CRITICAL: Must store handle to keep subscription alive for daemon lifetime
-            let _governance_event_subscription = {
+            governance_event_subscription = Some({
                 use crate::events::SystemEvent;
                 use icn_governance::ProposalPayload;
 
@@ -1202,7 +1207,7 @@ impl Supervisor {
                         _ => {}
                     }
                 })).await
-            };
+            });
 
             info!("✓ Governance event handlers registered");
 
@@ -1419,7 +1424,7 @@ impl Supervisor {
             }
 
             // Subscribe to governance events for scheduling policy updates (Phase 16E integration)
-            let _policy_governance_subscription = {
+            policy_governance_subscription = Some({
                 use crate::events::SystemEvent;
                 use icn_governance::ProposalPayload;
 
@@ -1512,7 +1517,7 @@ impl Supervisor {
                         _ => {}
                     }
                 })).await
-            };
+            });
 
             info!("✓ Policy governance integration active");
 
@@ -1592,6 +1597,10 @@ impl Supervisor {
         } else {
             warn!("No identity bundle available - actors not spawned");
             warn!("Run 'icnctl id init' to create an identity");
+
+            // No governance subscriptions when identity bundle unavailable
+            governance_event_subscription = None;
+            policy_governance_subscription = None;
 
             // Still spawn metrics update task for system metrics
             let start_time = std::time::Instant::now();
@@ -1818,6 +1827,13 @@ impl Supervisor {
         if ledger_handle.is_some() {
             info!("Ledger will be dropped when all references are released");
         }
+
+        // Governance event subscriptions are kept alive by holding their handles
+        // for the lifetime of this function. When this function returns, the handles
+        // are dropped and the subscriptions are automatically removed from the event bus.
+        // This prevents memory leaks while ensuring subscriptions remain active during runtime.
+        drop(governance_event_subscription);
+        drop(policy_governance_subscription);
 
         info!("Supervisor stopped");
         Ok(())
