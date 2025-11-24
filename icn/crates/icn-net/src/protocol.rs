@@ -43,11 +43,19 @@ pub enum MessagePayload {
     /// Gossip protocol message
     Gossip(GossipMessage),
 
-    /// Ping (keepalive)
-    Ping,
+    /// Ping (keepalive + RTT measurement)
+    Ping {
+        /// Timestamp when ping was sent (milliseconds since UNIX epoch)
+        sent_at: u64,
+    },
 
-    /// Pong (response to ping)
-    Pong,
+    /// Pong (response to ping + RTT measurement)
+    Pong {
+        /// Echo of ping's sent_at timestamp
+        ping_sent_at: u64,
+        /// Timestamp when pong was sent (milliseconds since UNIX epoch)
+        pong_sent_at: u64,
+    },
 
     /// Subscribe to peer's topics
     Subscribe { topics: Vec<String> },
@@ -92,8 +100,8 @@ impl MessagePayload {
     pub fn variant_name(&self) -> &'static str {
         match self {
             MessagePayload::Gossip(_) => "Gossip",
-            MessagePayload::Ping => "Ping",
-            MessagePayload::Pong => "Pong",
+            MessagePayload::Ping { .. } => "Ping",
+            MessagePayload::Pong { .. } => "Pong",
             MessagePayload::Subscribe { .. } => "Subscribe",
             MessagePayload::Unsubscribe { .. } => "Unsubscribe",
             MessagePayload::SubscribeAck { .. } => "SubscribeAck",
@@ -121,14 +129,29 @@ impl NetworkMessage {
         Self::new(from, to, MessagePayload::Gossip(gossip_msg))
     }
 
-    /// Create a ping message
+    /// Create a ping message with current timestamp
     pub fn ping(from: Did, to: Did) -> Self {
-        Self::new(from, Some(to), MessagePayload::Ping)
+        let sent_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        Self::new(from, Some(to), MessagePayload::Ping { sent_at })
     }
 
-    /// Create a pong message
-    pub fn pong(from: Did, to: Did) -> Self {
-        Self::new(from, Some(to), MessagePayload::Pong)
+    /// Create a pong message echoing ping timestamp
+    pub fn pong(from: Did, to: Did, ping_sent_at: u64) -> Self {
+        let pong_sent_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        Self::new(
+            from,
+            Some(to),
+            MessagePayload::Pong {
+                ping_sent_at,
+                pong_sent_at,
+            },
+        )
     }
 
     /// Create a subscribe message
@@ -354,7 +377,7 @@ mod tests {
         let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
 
         assert_eq!(decoded.version, PROTOCOL_VERSION);
-        assert!(matches!(decoded.payload, MessagePayload::Ping));
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
     }
 
     #[test]

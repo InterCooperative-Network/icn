@@ -59,11 +59,90 @@ impl Ord for PeerId {
 #[derive(Debug, Clone)]
 struct PeerMetadata {
     topology_info: TopologyInfo,
-    #[allow(dead_code)]
-    rtt_ms: Option<u64>,
     trust_score: f32,
-    #[allow(dead_code)]
     connected_at: Instant,
+    network_metrics: NetworkMetrics,
+}
+
+/// Network performance metrics for a peer
+#[derive(Debug, Clone)]
+pub struct NetworkMetrics {
+    /// Round-trip time in milliseconds
+    rtt_ms: Option<u64>,
+    /// Timestamp when RTT was last measured
+    rtt_measured_at: Option<Instant>,
+    /// Bandwidth in bytes/sec
+    bandwidth_bps: Option<u64>,
+    /// Timestamp when bandwidth was last measured
+    bandwidth_measured_at: Option<Instant>,
+}
+
+impl NetworkMetrics {
+    /// Create new empty metrics
+    pub fn new() -> Self {
+        Self {
+            rtt_ms: None,
+            rtt_measured_at: None,
+            bandwidth_bps: None,
+            bandwidth_measured_at: None,
+        }
+    }
+
+    /// Record RTT measurement
+    pub fn record_rtt(&mut self, rtt_ms: u64) {
+        self.rtt_ms = Some(rtt_ms);
+        self.rtt_measured_at = Some(Instant::now());
+    }
+
+    /// Record bandwidth measurement
+    pub fn record_bandwidth(&mut self, bandwidth_bps: u64) {
+        self.bandwidth_bps = Some(bandwidth_bps);
+        self.bandwidth_measured_at = Some(Instant::now());
+    }
+
+    /// Get current RTT if not expired (5 min TTL)
+    pub fn get_rtt(&self) -> Option<u64> {
+        if let (Some(rtt), Some(measured_at)) = (self.rtt_ms, self.rtt_measured_at) {
+            if measured_at.elapsed() < std::time::Duration::from_secs(300) {
+                return Some(rtt);
+            }
+        }
+        None
+    }
+
+    /// Get current bandwidth if not expired (10 min TTL)
+    pub fn get_bandwidth(&self) -> Option<u64> {
+        if let (Some(bw), Some(measured_at)) = (self.bandwidth_bps, self.bandwidth_measured_at) {
+            if measured_at.elapsed() < std::time::Duration::from_secs(600) {
+                return Some(bw);
+            }
+        }
+        None
+    }
+
+    /// Check if RTT measurement is stale
+    pub fn is_rtt_stale(&self) -> bool {
+        if let Some(measured_at) = self.rtt_measured_at {
+            measured_at.elapsed() >= std::time::Duration::from_secs(300)
+        } else {
+            true
+        }
+    }
+
+    /// Check if bandwidth measurement is stale
+    pub fn is_bandwidth_stale(&self) -> bool {
+        if let Some(measured_at) = self.bandwidth_measured_at {
+            measured_at.elapsed() >= std::time::Duration::from_secs(600)
+        } else {
+            true
+        }
+    }
+}
+
+impl Default for NetworkMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Geographic and organizational topology information
@@ -163,11 +242,16 @@ impl NeighborSets {
         self.remove_neighbor(&peer);
 
         // 2. Create metadata
+        let mut network_metrics = NetworkMetrics::new();
+        if let Some(rtt) = rtt_ms {
+            network_metrics.record_rtt(rtt);
+        }
+
         let metadata = PeerMetadata {
             topology_info: topology_info.clone(),
-            rtt_ms,
             trust_score,
             connected_at: Instant::now(),
+            network_metrics,
         };
 
         // 3. Determine placement based on topology_info + trust
@@ -272,6 +356,52 @@ impl NeighborSets {
             + self.regional.len()
             + self.backbone.len()
             + self.trusted.len()
+    }
+
+    /// Record RTT measurement for a peer
+    pub fn record_rtt(&mut self, peer: &PeerId, rtt_ms: u64) {
+        if let Some(metadata) = self.metadata.get_mut(peer) {
+            metadata.network_metrics.record_rtt(rtt_ms);
+        }
+    }
+
+    /// Record bandwidth measurement for a peer
+    pub fn record_bandwidth(&mut self, peer: &PeerId, bandwidth_bps: u64) {
+        if let Some(metadata) = self.metadata.get_mut(peer) {
+            metadata.network_metrics.record_bandwidth(bandwidth_bps);
+        }
+    }
+
+    /// Get RTT for a peer (if not expired)
+    pub fn get_rtt(&self, peer: &PeerId) -> Option<u64> {
+        self.metadata
+            .get(peer)
+            .and_then(|m| m.network_metrics.get_rtt())
+    }
+
+    /// Get bandwidth for a peer (if not expired)
+    pub fn get_bandwidth(&self, peer: &PeerId) -> Option<u64> {
+        self.metadata
+            .get(peer)
+            .and_then(|m| m.network_metrics.get_bandwidth())
+    }
+
+    /// Get peers with stale RTT measurements
+    pub fn peers_needing_rtt_refresh(&self) -> Vec<PeerId> {
+        self.metadata
+            .iter()
+            .filter(|(_, m)| m.network_metrics.is_rtt_stale())
+            .map(|(peer, _)| peer.clone())
+            .collect()
+    }
+
+    /// Get peers with stale bandwidth measurements
+    pub fn peers_needing_bandwidth_refresh(&self) -> Vec<PeerId> {
+        self.metadata
+            .iter()
+            .filter(|(_, m)| m.network_metrics.is_bandwidth_stale())
+            .map(|(peer, _)| peer.clone())
+            .collect()
     }
 
     /// Determine which set a peer belongs to based on topology and trust
@@ -666,5 +796,106 @@ mod tests {
         // Request 10 but should only get 3
         let sampled = sets.sample(Scope::LocalCluster, 10);
         assert_eq!(sampled.len(), 3);
+    }
+
+    #[test]
+    fn test_network_metrics_rtt() {
+        let mut metrics = NetworkMetrics::new();
+
+        // Initially no RTT
+        assert_eq!(metrics.get_rtt(), None);
+        assert!(metrics.is_rtt_stale());
+
+        // Record RTT
+        metrics.record_rtt(42);
+        assert_eq!(metrics.get_rtt(), Some(42));
+        assert!(!metrics.is_rtt_stale());
+
+        // Update RTT
+        metrics.record_rtt(50);
+        assert_eq!(metrics.get_rtt(), Some(50));
+    }
+
+    #[test]
+    fn test_network_metrics_bandwidth() {
+        let mut metrics = NetworkMetrics::new();
+
+        // Initially no bandwidth
+        assert_eq!(metrics.get_bandwidth(), None);
+        assert!(metrics.is_bandwidth_stale());
+
+        // Record bandwidth
+        metrics.record_bandwidth(1_000_000);
+        assert_eq!(metrics.get_bandwidth(), Some(1_000_000));
+        assert!(!metrics.is_bandwidth_stale());
+
+        // Update bandwidth
+        metrics.record_bandwidth(2_000_000);
+        assert_eq!(metrics.get_bandwidth(), Some(2_000_000));
+    }
+
+    #[test]
+    fn test_neighbor_sets_record_rtt() {
+        let own_topo = create_test_topology("na-east", "coop-1");
+        let mut sets = NeighborSets::new(own_topo);
+        let limits = NeighborLimitsConfig::default();
+
+        let peer = create_test_peer_id();
+        let peer_topo = create_test_topology("na-east", "coop-1");
+
+        // Add neighbor with initial RTT
+        sets.add_neighbor(peer.clone(), peer_topo, Some(100), 0.5, &limits);
+        assert_eq!(sets.get_rtt(&peer), Some(100));
+
+        // Update RTT
+        sets.record_rtt(&peer, 75);
+        assert_eq!(sets.get_rtt(&peer), Some(75));
+    }
+
+    #[test]
+    fn test_neighbor_sets_record_bandwidth() {
+        let own_topo = create_test_topology("na-east", "coop-1");
+        let mut sets = NeighborSets::new(own_topo);
+        let limits = NeighborLimitsConfig::default();
+
+        let peer = create_test_peer_id();
+        let peer_topo = create_test_topology("na-east", "coop-1");
+
+        // Add neighbor without bandwidth
+        sets.add_neighbor(peer.clone(), peer_topo, Some(50), 0.5, &limits);
+        assert_eq!(sets.get_bandwidth(&peer), None);
+
+        // Record bandwidth
+        sets.record_bandwidth(&peer, 5_000_000);
+        assert_eq!(sets.get_bandwidth(&peer), Some(5_000_000));
+    }
+
+    #[test]
+    fn test_peers_needing_refresh() {
+        let own_topo = create_test_topology("na-east", "coop-1");
+        let mut sets = NeighborSets::new(own_topo);
+        let limits = NeighborLimitsConfig::default();
+
+        let peer1 = create_test_peer_id();
+        let peer2 = create_test_peer_id();
+        let peer_topo = create_test_topology("na-east", "coop-1");
+
+        // Add two peers without RTT
+        sets.add_neighbor(peer1.clone(), peer_topo.clone(), None, 0.5, &limits);
+        sets.add_neighbor(peer2.clone(), peer_topo.clone(), None, 0.5, &limits);
+
+        // Both need RTT refresh
+        let needing_rtt = sets.peers_needing_rtt_refresh();
+        assert_eq!(needing_rtt.len(), 2);
+        assert!(needing_rtt.contains(&peer1));
+        assert!(needing_rtt.contains(&peer2));
+
+        // Record RTT for peer1
+        sets.record_rtt(&peer1, 50);
+
+        // Only peer2 needs refresh now
+        let needing_rtt = sets.peers_needing_rtt_refresh();
+        assert_eq!(needing_rtt.len(), 1);
+        assert!(needing_rtt.contains(&peer2));
     }
 }
