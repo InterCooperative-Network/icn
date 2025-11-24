@@ -236,14 +236,14 @@ impl PolicyManager {
             // Emit metrics
             icn_obs::metrics::compute::policy_violations_inc(coop_id, &rejection);
 
-            // Determine quota type for detailed metric
-            let quota_type = if rejection.contains("CPU hours") {
+            // Determine quota type for detailed metric (matches actual rejection messages)
+            let quota_type = if rejection.contains("CPU quota") {
                 "cpu_hours"
-            } else if rejection.contains("concurrent") {
+            } else if rejection.contains("Concurrent") {
                 "concurrent_tasks"
             } else if rejection.contains("priority") {
                 "priority"
-            } else if rejection.contains("credits") {
+            } else if rejection.contains("credit quota") {
                 "credits"
             } else {
                 "unknown"
@@ -1064,5 +1064,261 @@ mod tests {
         assert!((usage.cpu_hours_this_month - 0.75).abs() < 0.01);
         assert!((usage.cpu_hours_total - 0.75).abs() < 0.01);
         assert_eq!(usage.tasks_completed_this_month, 2);
+    }
+
+    #[tokio::test]
+    async fn test_policy_lifecycle_integration() {
+        use crate::types::{FuelLimit, TaskCode};
+
+        // Setup: Create PolicyManager with UsageTracker
+        let tracker = Arc::new(UsageTracker::new());
+        let manager = PolicyManager::new(tracker.clone());
+
+        let coop_id = "integration-coop";
+        let regular_member = make_test_did();
+        let premium_member = make_test_did();
+        let over_quota_member = make_test_did();
+
+        // Create comprehensive policy with quotas, rules, and constraints
+        let mut member_quotas = HashMap::new();
+
+        // Premium member gets higher quotas
+        member_quotas.insert(
+            premium_member.to_string(),
+            MemberQuota {
+                cpu_hours_per_month: 200.0,
+                max_concurrent_tasks: 20,
+                max_priority: TaskPriority::Critical,
+                credits_per_month: Some(2000),
+            },
+        );
+
+        // Over-quota member gets low quotas (for testing rejection)
+        member_quotas.insert(
+            over_quota_member.to_string(),
+            MemberQuota {
+                cpu_hours_per_month: 1.0,
+                max_concurrent_tasks: 2,
+                max_priority: TaskPriority::Normal,
+                credits_per_month: Some(100),
+            },
+        );
+
+        let policy = CoopSchedulingPolicy {
+            coop_id: coop_id.to_string(),
+            governance_domain: Some("governance:integration".to_string()),
+            rules: vec![
+                // Priority multiplier for premium member
+                SchedulingRule::MemberPriority {
+                    member: premium_member.to_string(),
+                    multiplier: 1.5,
+                },
+                // Executor whitelist/blacklist
+                SchedulingRule::ExecutorFilter {
+                    whitelist: vec![
+                        "did:icn:executor-a".to_string(),
+                        "did:icn:executor-b".to_string(),
+                    ],
+                    blacklist: vec!["did:icn:executor-bad".to_string()],
+                },
+                // Data sovereignty constraint
+                SchedulingRule::DataSovereignty {
+                    region: "eu-west".to_string(),
+                    tags: vec![],
+                },
+                // Required capability
+                SchedulingRule::RequireCapability {
+                    capability: "gdpr-compliant".to_string(),
+                    min_version: None,
+                },
+            ],
+            member_quotas,
+            default_quota: MemberQuota {
+                cpu_hours_per_month: 50.0,
+                max_concurrent_tasks: 5,
+                max_priority: TaskPriority::High,
+                credits_per_month: Some(500),
+            },
+            enforcement_mode: EnforcementMode::Strict,
+        };
+
+        manager.set_policy(policy).await;
+
+        // Test 1: Regular member with normal task - should be allowed
+        let task1 = make_test_task(TaskPriority::Normal);
+        let decision1 = manager
+            .check_submission(&task1, &regular_member, coop_id)
+            .await
+            .unwrap();
+
+        assert!(matches!(decision1, PolicyDecision::Allow { .. }));
+        if let PolicyDecision::Allow {
+            placement_constraints,
+            adjusted_priority,
+        } = decision1
+        {
+            // Priority unchanged
+            assert_eq!(adjusted_priority, TaskPriority::Normal);
+
+            // Executor filter constraints applied
+            assert_eq!(
+                placement_constraints.allowed_executors,
+                vec![
+                    "did:icn:executor-a".to_string(),
+                    "did:icn:executor-b".to_string()
+                ]
+            );
+            assert_eq!(
+                placement_constraints.forbidden_executors,
+                vec!["did:icn:executor-bad".to_string()]
+            );
+
+            // Data sovereignty constraint applied
+            assert_eq!(
+                placement_constraints.required_region,
+                Some("eu-west".to_string())
+            );
+            assert_eq!(
+                placement_constraints.required_capabilities,
+                vec!["gdpr-compliant".to_string()]
+            );
+        }
+
+        // Test 2: Premium member with high priority - should get priority boost
+        let task2 = make_test_task(TaskPriority::High);
+        let decision2 = manager
+            .check_submission(&task2, &premium_member, coop_id)
+            .await
+            .unwrap();
+
+        if let PolicyDecision::Allow {
+            adjusted_priority, ..
+        } = decision2
+        {
+            // Priority boosted by 1.5x multiplier (High → Critical)
+            assert_eq!(adjusted_priority, TaskPriority::Critical);
+        } else {
+            panic!("Expected Allow decision for premium member");
+        }
+
+        // Test 3: CPU hours quota exceeded - should reject
+        // Simulate heavy usage (2 hours of execution)
+        tracker
+            .record_execution(coop_id, &over_quota_member, 7200000, 0)
+            .await
+            .unwrap();
+
+        let task3 = make_test_task(TaskPriority::Normal);
+        let decision3 = manager
+            .check_submission(&task3, &over_quota_member, coop_id)
+            .await
+            .unwrap();
+
+        assert!(matches!(decision3, PolicyDecision::Reject { .. }));
+        if let PolicyDecision::Reject { reason } = decision3 {
+            assert!(reason.contains("CPU quota"));
+        }
+
+        // Reset over_quota_member usage for next test
+        {
+            let mut usage_map = tracker.records.write().await;
+            usage_map.remove(&(coop_id.to_string(), over_quota_member.to_string()));
+        }
+
+        // Test 4: Concurrent tasks limit exceeded - should reject
+        // Claim 3 tasks (exceeds limit of 2)
+        tracker
+            .task_claimed(coop_id, &over_quota_member)
+            .await
+            .unwrap();
+        tracker
+            .task_claimed(coop_id, &over_quota_member)
+            .await
+            .unwrap();
+
+        let task4 = make_test_task(TaskPriority::Normal);
+        let decision4 = manager
+            .check_submission(&task4, &over_quota_member, coop_id)
+            .await
+            .unwrap();
+
+        assert!(matches!(decision4, PolicyDecision::Reject { .. }));
+        if let PolicyDecision::Reject { reason } = decision4 {
+            assert!(reason.contains("Concurrent"));
+        }
+
+        // Complete tasks to reset concurrent count
+        tracker
+            .task_completed(coop_id, &over_quota_member)
+            .await
+            .unwrap();
+        tracker
+            .task_completed(coop_id, &over_quota_member)
+            .await
+            .unwrap();
+
+        // Test 5: Priority limit exceeded - should reject
+        let task5 = ComputeTask {
+            id: "priority-test".to_string(),
+            submitter: over_quota_member.to_string(),
+            coop_id: Some(coop_id.to_string()),
+            code: TaskCode::Ccl("contract {}".to_string()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10000),
+            required_capabilities: vec![],
+            priority: TaskPriority::Critical, // Exceeds Normal limit
+            created_at: 0,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let decision5 = manager
+            .check_submission(&task5, &over_quota_member, coop_id)
+            .await
+            .unwrap();
+
+        assert!(matches!(decision5, PolicyDecision::Reject { .. }));
+        if let PolicyDecision::Reject { reason } = decision5 {
+            assert!(reason.contains("priority"));
+        }
+
+        // Test 6: Credits quota exceeded - should reject
+        // Simulate spending 150 credits (exceeds limit of 100)
+        tracker
+            .record_execution(coop_id, &over_quota_member, 1000, 150)
+            .await
+            .unwrap();
+
+        let task6 = make_test_task(TaskPriority::Normal);
+        let decision6 = manager
+            .check_submission(&task6, &over_quota_member, coop_id)
+            .await
+            .unwrap();
+
+        assert!(matches!(decision6, PolicyDecision::Reject { .. }));
+        if let PolicyDecision::Reject { reason } = decision6 {
+            assert!(reason.contains("credit quota"));
+        }
+
+        // Test 7: Verify usage tracking state
+        let usage_regular = tracker.get_usage(&regular_member, coop_id).await.unwrap();
+        assert_eq!(usage_regular.concurrent_tasks, 0);
+        // Regular member submitted 1 task (not completed/executed yet in this test)
+
+        let _usage_premium = tracker.get_usage(&premium_member, coop_id).await.unwrap();
+        // Premium member submitted 1 task (not completed/executed yet in this test)
+
+        let usage_over = tracker
+            .get_usage(&over_quota_member, coop_id)
+            .await
+            .unwrap();
+        assert_eq!(usage_over.concurrent_tasks, 0); // All completed
+        // Only record_execution increments tasks_completed_this_month (test 6)
+        assert_eq!(usage_over.tasks_completed_this_month, 1);
+        assert_eq!(usage_over.credits_spent_this_month, 150);
     }
 }
