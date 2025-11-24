@@ -202,6 +202,12 @@ impl PolicyManager {
         policies.remove(coop_id)
     }
 
+    /// List all policies
+    pub async fn list_policies(&self) -> Vec<CoopSchedulingPolicy> {
+        let policies = self.policies.read().await;
+        policies.values().cloned().collect()
+    }
+
     /// Check if task submission is allowed
     pub async fn check_submission(
         &self,
@@ -600,6 +606,19 @@ impl UsageTracker {
             last_reset_at: Self::now_millis(),
             updated_at: Self::now_millis(),
         }))
+    }
+
+    /// List all usage records for a cooperative
+    pub async fn list_coop_usage(&self, coop_id: &str) -> Result<Vec<UsageRecord>, ComputeError> {
+        let records = self.records.read().await;
+
+        let coop_records: Vec<UsageRecord> = records
+            .iter()
+            .filter(|((c, _), _)| c == coop_id)
+            .map(|(_, record)| record.clone())
+            .collect();
+
+        Ok(coop_records)
     }
 
     fn now_millis() -> u64 {

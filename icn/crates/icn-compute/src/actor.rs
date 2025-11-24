@@ -1,6 +1,7 @@
 //! Compute actor for distributed task execution.
 
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
@@ -147,6 +148,97 @@ impl ComputeHandle {
             .await
             .map_err(|_| ComputeError::Internal("actor closed".into()))
     }
+
+    // Policy management methods (Phase 16E)
+
+    /// Set or update a cooperative scheduling policy
+    pub async fn set_policy(
+        &self,
+        policy: crate::policy::CoopSchedulingPolicy,
+    ) -> Result<(), ComputeError> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::SetPolicy { policy, resp: resp_tx })
+            .await
+            .map_err(|_| ComputeError::Internal("actor closed".into()))?;
+        resp_rx
+            .await
+            .map_err(|_| ComputeError::Internal("no response".into()))?
+    }
+
+    /// Get policy for a cooperative
+    pub async fn get_policy(&self, coop_id: &str) -> Option<crate::policy::CoopSchedulingPolicy> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::GetPolicy {
+                coop_id: coop_id.to_string(),
+                resp: resp_tx,
+            })
+            .await
+            .ok()?;
+        resp_rx.await.ok()?
+    }
+
+    /// List all policies
+    pub async fn list_policies(&self) -> Vec<crate::policy::CoopSchedulingPolicy> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::ListPolicies { resp: resp_tx })
+            .await
+            .ok();
+        resp_rx.await.unwrap_or_default()
+    }
+
+    /// Remove a policy
+    pub async fn remove_policy(&self, coop_id: &str) -> Option<crate::policy::CoopSchedulingPolicy> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::RemovePolicy {
+                coop_id: coop_id.to_string(),
+                resp: resp_tx,
+            })
+            .await
+            .ok()?;
+        resp_rx.await.ok()?
+    }
+
+    /// Get usage record for a member in a cooperative
+    pub async fn get_usage(
+        &self,
+        coop_id: &str,
+        member_did: &str,
+    ) -> Result<crate::policy::UsageRecord, ComputeError> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::GetUsage {
+                coop_id: coop_id.to_string(),
+                member_did: member_did.to_string(),
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ComputeError::Internal("actor closed".into()))?;
+        resp_rx
+            .await
+            .map_err(|_| ComputeError::Internal("no response".into()))?
+    }
+
+    /// List all usage records for a cooperative
+    pub async fn list_coop_usage(
+        &self,
+        coop_id: &str,
+    ) -> Result<Vec<crate::policy::UsageRecord>, ComputeError> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::ListCoopUsage {
+                coop_id: coop_id.to_string(),
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ComputeError::Internal("actor closed".into()))?;
+        resp_rx
+            .await
+            .map_err(|_| ComputeError::Internal("no response".into()))?
+    }
 }
 
 /// Commands sent to the ComputeActor
@@ -166,6 +258,31 @@ enum ComputeCommand {
         resp: tokio::sync::oneshot::Sender<Result<(), ComputeError>>,
     },
     GossipMessage(ComputeMessage),
+    // Policy management commands (Phase 16E)
+    SetPolicy {
+        policy: crate::policy::CoopSchedulingPolicy,
+        resp: tokio::sync::oneshot::Sender<Result<(), ComputeError>>,
+    },
+    GetPolicy {
+        coop_id: String,
+        resp: tokio::sync::oneshot::Sender<Option<crate::policy::CoopSchedulingPolicy>>,
+    },
+    ListPolicies {
+        resp: tokio::sync::oneshot::Sender<Vec<crate::policy::CoopSchedulingPolicy>>,
+    },
+    RemovePolicy {
+        coop_id: String,
+        resp: tokio::sync::oneshot::Sender<Option<crate::policy::CoopSchedulingPolicy>>,
+    },
+    GetUsage {
+        coop_id: String,
+        member_did: String,
+        resp: tokio::sync::oneshot::Sender<Result<crate::policy::UsageRecord, ComputeError>>,
+    },
+    ListCoopUsage {
+        coop_id: String,
+        resp: tokio::sync::oneshot::Sender<Result<Vec<crate::policy::UsageRecord>, ComputeError>>,
+    },
 }
 
 /// Actor managing distributed compute tasks
@@ -340,6 +457,72 @@ impl ComputeActor {
                     ComputeCommand::GossipMessage(msg) => {
                         if let Err(e) = self.handle_message(msg).await {
                             tracing::warn!("compute message error: {}", e);
+                        }
+                    }
+                    // Policy management commands (Phase 16E)
+                    ComputeCommand::SetPolicy { policy, resp } => {
+                        if let Some(ref pm) = self.policy_manager {
+                            pm.set_policy(policy).await;
+                            let _ = resp.send(Ok(()));
+                        } else {
+                            let _ = resp.send(Err(ComputeError::Internal(
+                                "policy manager not available".into(),
+                            )));
+                        }
+                    }
+                    ComputeCommand::GetPolicy { coop_id, resp } => {
+                        if let Some(ref pm) = self.policy_manager {
+                            let policy = pm.get_policy(&coop_id).await;
+                            let _ = resp.send(policy);
+                        } else {
+                            let _ = resp.send(None);
+                        }
+                    }
+                    ComputeCommand::ListPolicies { resp } => {
+                        if let Some(ref pm) = self.policy_manager {
+                            let policies = pm.list_policies().await;
+                            let _ = resp.send(policies);
+                        } else {
+                            let _ = resp.send(vec![]);
+                        }
+                    }
+                    ComputeCommand::RemovePolicy { coop_id, resp } => {
+                        if let Some(ref pm) = self.policy_manager {
+                            let removed = pm.remove_policy(&coop_id).await;
+                            let _ = resp.send(removed);
+                        } else {
+                            let _ = resp.send(None);
+                        }
+                    }
+                    ComputeCommand::GetUsage { coop_id, member_did, resp } => {
+                        if let Some(ref pm) = self.policy_manager {
+                            let usage_tracker = pm.usage_tracker();
+                            match icn_identity::Did::from_str(&member_did) {
+                                Ok(did) => {
+                                    let result = usage_tracker.get_usage(&did, &coop_id).await;
+                                    let _ = resp.send(result);
+                                }
+                                Err(_) => {
+                                    let _ = resp.send(Err(ComputeError::InvalidInput(
+                                        format!("invalid DID: {}", member_did),
+                                    )));
+                                }
+                            }
+                        } else {
+                            let _ = resp.send(Err(ComputeError::Internal(
+                                "policy manager not available".into(),
+                            )));
+                        }
+                    }
+                    ComputeCommand::ListCoopUsage { coop_id, resp } => {
+                        if let Some(ref pm) = self.policy_manager {
+                            let usage_tracker = pm.usage_tracker();
+                            let result = usage_tracker.list_coop_usage(&coop_id).await;
+                            let _ = resp.send(result);
+                        } else {
+                            let _ = resp.send(Err(ComputeError::Internal(
+                                "policy manager not available".into(),
+                            )));
                         }
                     }
                 }
