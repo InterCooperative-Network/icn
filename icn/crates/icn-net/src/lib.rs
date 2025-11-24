@@ -1,6 +1,7 @@
 //! ICN Net - Network transport, discovery, and session management
 
 pub mod actor;
+pub mod blob_registry;
 pub mod candidate;
 pub mod candidate_cache;
 pub mod discovery;
@@ -17,6 +18,7 @@ pub mod topology;
 pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
+pub use blob_registry::{BlobLocation, BlobLocationRegistry};
 pub use candidate::ConnectionCandidate;
 pub use candidate_cache::CandidateCache;
 pub use discovery::{Discovery, PeerInfo};
@@ -29,7 +31,7 @@ pub use replay_guard::ReplayGuard;
 pub use session::SessionManager;
 pub use stun::StunClient;
 pub use topology::{
-    FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NodeRole, PeerId,
-    TopologyConfig, TopologyInfo,
+    FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NetworkMetrics, NodeRole,
+    PeerId, TopologyConfig, TopologyInfo,
 };
 pub use version::{common_capabilities, negotiate_version, CapabilityFlags, VersionInfo};
