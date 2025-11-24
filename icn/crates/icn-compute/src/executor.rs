@@ -283,6 +283,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         }
     }
 
@@ -364,6 +365,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -387,6 +389,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());

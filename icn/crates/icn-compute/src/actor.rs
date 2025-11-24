@@ -484,16 +484,16 @@ impl ComputeActor {
                 }
                 crate::policy::PolicyDecision::Allow {
                     adjusted_priority,
-                    placement_constraints: _,
+                    placement_constraints,
                 } => {
                     // Apply policy adjustments
                     adjusted_task.priority = adjusted_priority;
-                    // Store placement constraints for later use in placement scoring
-                    // TODO: Add placement_constraints field to ComputeTask (Phase 16E Week 2 Part 3)
+                    adjusted_task.placement_constraints = Some(placement_constraints.clone());
                     tracing::debug!(
                         task_id = %task.id,
                         original_priority = ?task.priority,
                         adjusted_priority = ?adjusted_priority,
+                        has_constraints = !placement_constraints.required_region.is_none(),
                         "Policy check passed with adjustments"
                     );
                 }
@@ -1306,6 +1306,77 @@ impl ComputeActor {
         // TODO: Integrate with network layer for RTT and blob registry for data locality
         let locality_ctx = crate::scheduler::LocalityContext::empty();
 
+        // Check placement constraints from policy (Phase 16E)
+        // Look up task to get its placement_constraints
+        let mgr = self.task_manager.lock().await;
+        if let Some(task) = mgr.get(&task_hash) {
+            if let Some(ref constraints) = task.placement_constraints {
+                // Check required region
+                if let Some(ref required_region) = constraints.required_region {
+                    // TODO: Get own region from config/network context
+                    // For now, we don't have region info, so we'll skip this check
+                    tracing::debug!(
+                        task_hash = %task_hash_str,
+                        required_region = %required_region,
+                        "Task has region constraint (region checking not yet implemented)"
+                    );
+                }
+
+                // Check executor whitelist
+                if !constraints.allowed_executors.is_empty()
+                    && !constraints.allowed_executors.contains(&self.own_did)
+                {
+                    tracing::info!(
+                        task_hash = %task_hash_str,
+                        executor = %self.own_did,
+                        "Executor not in whitelist, skipping placement"
+                    );
+                    drop(mgr);
+                    return Ok(());
+                }
+
+                // Check executor blacklist
+                if constraints.forbidden_executors.contains(&self.own_did) {
+                    tracing::info!(
+                        task_hash = %task_hash_str,
+                        executor = %self.own_did,
+                        "Executor in blacklist, skipping placement"
+                    );
+                    drop(mgr);
+                    return Ok(());
+                }
+
+                // Check required capabilities
+                if !constraints.required_capabilities.is_empty() {
+                    // Get our capabilities from registry
+                    let registry = self.executor_registry.lock().await;
+                    if let Some(info) = registry.get(&self.own_did) {
+                        let our_caps = &info.capabilities;
+                        for required in &constraints.required_capabilities {
+                            // Convert string to capability and check
+                            let has_cap = our_caps.iter().any(|cap| match cap {
+                                crate::types::ExecutorCapability::Ccl => required == "Ccl",
+                                crate::types::ExecutorCapability::Wasm => required == "Wasm",
+                                crate::types::ExecutorCapability::Custom(name) => name == required,
+                            });
+                            if !has_cap {
+                                tracing::info!(
+                                    task_hash = %task_hash_str,
+                                    executor = %self.own_did,
+                                    missing_capability = %required,
+                                    "Missing required capability, skipping placement"
+                                );
+                                drop(registry);
+                                drop(mgr);
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        drop(mgr);
+
         // Score the task
         let offer = match policy.score_task(
             &task_hash,
@@ -1843,6 +1914,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         }
     }
 

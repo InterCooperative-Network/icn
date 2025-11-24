@@ -277,6 +277,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         }
     }
 

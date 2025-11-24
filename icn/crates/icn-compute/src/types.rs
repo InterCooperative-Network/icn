@@ -85,6 +85,9 @@ pub struct ComputeTask {
     /// None = ephemeral (default), Some(mode) = stateful actor
     #[serde(default)]
     pub actor_mode: Option<crate::actor_model::ActorMode>,
+    /// Placement constraints from policy (Phase 16E Week 2)
+    #[serde(default)]
+    pub placement_constraints: Option<crate::policy::PlacementConstraints>,
 }
 
 impl ComputeTask {
@@ -426,6 +429,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         };
 
         let hash1 = task.hash();
@@ -579,6 +583,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         }
     }
 

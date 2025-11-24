@@ -146,7 +146,7 @@ pub enum PolicyDecision {
 }
 
 /// Placement constraints extracted from policy
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PlacementConstraints {
     /// Required region (data sovereignty)
     pub required_region: Option<String>,
@@ -623,6 +623,7 @@ mod tests {
             payment_currency: None,
             resource_profile: None,
             actor_mode: None,
+            placement_constraints: None,
         }
     }
 
