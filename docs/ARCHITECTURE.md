@@ -4,6 +4,9 @@
 **Version:** 0.1.0
 **Last Updated:** 2025-11-24
 
+**Abstract:**
+ICNd is a decentralized coordination substrate providing identity, trust computation, encrypted P2P transport, cooperative ledgering, contract execution, gossip-based synchronization, and a distributed compute fabric for federated cooperatives.
+
 This document captures architectural decisions, design tradeoffs, and the reasoning behind ICNd's implementation.
 
 ---
@@ -21,6 +24,52 @@ This document captures architectural decisions, design tradeoffs, and the reason
 9. [Performance & Scalability](#9-performance--scalability)
 10. [Operational Considerations](#10-operational-considerations)
 11. [Distributed Compute Layer](#11-distributed-compute-layer)
+    - 11.1 [Core Architecture](#111-core-architecture)
+    - 11.2 [Scheduler Evolution](#112-scheduler-evolution-phase-16a-e)
+    - 11.3 [Cooperative Scheduling Policies](#113-cooperative-scheduling-policies-phase-16e)
+    - 11.4 [Example Policies](#114-example-policies)
+    - 11.5 [API Surface](#115-api-surface)
+    - 11.6 [Future Enhancements](#116-future-enhancements)
+    - 11.7 [Decision Rationale](#117-decision-rationale)
+    - 11.8 [Integration Summary](#118-integration-summary)
+
+---
+
+## How to Read This Document
+
+**Sections 1–4** define ICN's identity, trust, transport, and ledger primitives—the foundational substrate.
+
+**Sections 5–8** define contract execution, gossip synchronization, persistent storage, and the security model.
+
+**Sections 9–10** outline performance considerations and operational best practices.
+
+**Section 11** integrates all prior components into the distributed compute system, demonstrating how the substrate enables cooperative task execution.
+
+---
+
+## ICN Layer Stack
+
+```
++------------------------------+
+|  Distributed Compute (§11)   |  Trust-gated task execution
++------------------------------+
+|  Contracts (§5)              |  CCL interpreter, capabilities
++------------------------------+
+|  Ledger (§4)                 |  Mutual credit, double-entry
++------------------------------+
+|  Gossip (§6)                 |  Causal sync, anti-entropy
++------------------------------+
+|  Trust Graph (§2)            |  Web-of-participation scores
++------------------------------+
+|  Identity (§1)               |  DID, Ed25519, keystore
++------------------------------+
+|  Transport (§3)              |  QUIC/TLS, mDNS, NAT traversal
++------------------------------+
+|  Storage (§7) + Security(§8) |  Sled, production hardening
++------------------------------+
+```
+
+Each layer builds on the layers below it, with the distributed compute layer leveraging all substrate components.
 
 ---
 
@@ -2186,6 +2235,28 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 | 2025-11-10 | QUIC transport | Modern, multiplexed |
 | 2025-11-10 | Double-entry ledger | Cooperative finance model |
 | 2025-11-10 | Trust-gated everything | Security through relationships |
+
+### D. Versioning Policy
+
+**Semantic Versioning:**
+
+- **Major version:** Breaking changes to core protocol or wire format (e.g., 1.x → 2.0)
+- **Minor version:** New capabilities, optional fields, non-breaking extensions (e.g., 1.0 → 1.1)
+- **Patch version:** Bugfixes, clarifications, documentation improvements (e.g., 1.0.0 → 1.0.1)
+
+**Protocol Compatibility:**
+
+ICN nodes negotiate protocol versions during handshake. Old nodes can communicate with new nodes within the same major version. Major version bumps require coordinated network upgrades.
+
+### E. Contributions
+
+**Development:**
+
+Contributions via GitHub pull requests are welcome. Major design changes require an ICN Design Proposal (ICN-DEP) for community review before implementation.
+
+**Security Disclosures:**
+
+Security vulnerabilities should be reported via the encrypted contact in Section 8.3 (Incident Response). Public disclosure only after fixes are deployed.
 
 ---
 
