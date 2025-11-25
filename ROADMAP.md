@@ -393,7 +393,7 @@ Highest score → TaskClaimed
 ---
 
 #### Phase 16D: Actor State & Migration ✅ COMPLETE
-**Status**: Complete (2025-01-24)
+**Status**: Complete (2025-11-24)
 **Goal**: Support stateful, long-running actors with fault tolerance
 
 **Key Shift**: Tasks (stateless, one-shot) → Actors (stateful, migratable)
@@ -487,7 +487,7 @@ Proposal {
 - ✅ Resource-aware placement (CPU/RAM/GPU enforcement) - Phase 16A Complete (2025-11-23)
 - ✅ Intelligent scoring beats random by 50%+ - Phase 16B Complete (2025-11-23)
 - ✅ Locality optimization: Network + data awareness - Phase 16C Complete (2025-11-24)
-- ✅ Fault tolerance: Actors survive crashes via checkpoints - Phase 16D Complete (2025-01-24)
+- ✅ Fault tolerance: Actors survive crashes via checkpoints - Phase 16D Complete (2025-11-24)
 - ✅ Policy compliance: 100% enforcement of coop rules - Phase 16E Complete (2025-11-24)
 
 **Scheduler Evolution: COMPLETE ✅** (5 phases completed in 6 months)
@@ -875,7 +875,7 @@ impl StorageQuotaManager {
 | Nodes per cooperative | 10 | 100 | ~1,000 (vector clock overhead) |
 | Transactions per second | 10/node | 100/node | ~500/node (signature verification CPU) |
 | Trust graph size | 100 DIDs | 1,000 DIDs | ~10,000 (computation time) |
-| Gossip topics | 10 | 50 | ~200 (subscription overhead) |
+| Gossip topics | 10 | 100 | ~1,000 (memory overhead) |
 | Concurrent connections | 20 | 100 | ~500 (file descriptor limits) |
 
 **Optimization Plan**:
