@@ -504,8 +504,8 @@ Proposal {
 ---
 
 ### Phase 17: Storage Hardening & Replication (4 weeks)
-**Status**: Week 3 Complete ✅, Week 4 In Progress - **PRE-PILOT CRITICAL**
-**Progress**: 75% complete (3 of 4 weeks done)
+**Status**: Complete ✅ - **PRE-PILOT CRITICAL**
+**Completed**: 2025-11-24 (All 4 weeks done)
 **Blocker For**: Production deployment with fault tolerance
 **Duration**: 4 weeks
 
@@ -617,12 +617,14 @@ strategy = "participants"  # All contract participants + trusted backups
 - Clear operational dashboards show replication health
 - Prometheus metrics: `icn_storage_replicas_count`, `icn_storage_replication_failures_total`
 
-**Deliverables**:
-- `icn-storage/src/replication.rs` - ReplicationPolicy and storage extensions
-- `icn-core/src/replication_manager.rs` - ReplicationManager actor
-- `icn-gossip/src/protocol.rs` - Replica gossip messages
-- `docs/replication-operations.md` - Operational guide
-- Integration tests for failure scenarios
+**Deliverables** (Complete ✅):
+- `icn-store/src/lib.rs` - ReplicaMetadata, ReplicaInfo, ReplicaHealth types + Store trait extensions (11 methods)
+- `icn-core/src/replication/manager.rs` - ReplicationManager actor with health monitoring (348 lines)
+- `icn-core/src/replication/mod.rs` - Public API (ReplicationConfig, ReplicationHandle)
+- `icn-gossip/src/types.rs` - Replica gossip messages (ReplicaRequest, ReplicaOffer, ReplicaStatus)
+- `icn-gossip/src/gossip.rs` - request_replicas() method for replica coordination
+- `icn-core/tests/replication_integration.rs` - 5 comprehensive integration tests (283 lines)
+- `docs/replication-operations.md` - Production operational guide (446 lines)
 - Updated ARCHITECTURE.md with replication semantics (already complete)
 
 **Spec Impact**: Implements [ARCHITECTURE.md Section 7.4](docs/ARCHITECTURE.md#74-data-durability--replication) (Data Durability & Replication)
