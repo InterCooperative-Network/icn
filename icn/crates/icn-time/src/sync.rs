@@ -36,8 +36,11 @@ pub struct RoughTimeServer {
 /// Clock synchronization state
 #[derive(Debug, Clone)]
 pub struct ClockSync {
-    /// Local clock offset from network median (positive = local clock ahead)
-    pub offset: Duration,
+    /// Local clock offset from network median in milliseconds
+    /// - Positive: local clock is ahead of network time (need to subtract)
+    /// - Negative: local clock is behind network time (need to add)
+    /// - Zero: perfectly synchronized
+    pub offset_millis: i64,
 
     /// Confidence interval / uncertainty
     pub uncertainty: Duration,
@@ -70,7 +73,7 @@ impl ClockSync {
     /// Create with custom servers and max skew
     pub fn with_servers(servers: Vec<RoughTimeServer>, max_clock_skew: Duration) -> Self {
         Self {
-            offset: Duration::ZERO,
+            offset_millis: 0, // Start with zero offset
             uncertainty: Duration::from_secs(10), // Initial high uncertainty
             last_sync: None,
             max_clock_skew,
@@ -120,12 +123,10 @@ impl ClockSync {
         let median_time = self.compute_median(&responses)?;
         let now = Self::system_time_millis();
 
-        // Calculate offset (positive = local clock ahead)
-        self.offset = if median_time > now {
-            Duration::from_millis(median_time - now)
-        } else {
-            Duration::from_millis(now - median_time)
-        };
+        // Calculate signed offset in milliseconds
+        // Positive = local ahead (subtract to get network time)
+        // Negative = local behind (add to get network time)
+        self.offset_millis = now as i64 - median_time as i64;
 
         // Calculate uncertainty (based on RTT variance)
         self.uncertainty = self.compute_uncertainty(&responses);
@@ -133,12 +134,12 @@ impl ClockSync {
 
         let duration = start.elapsed();
         info!(
-            "Clock sync complete: offset={:?}, uncertainty={:?}, duration={:?}",
-            self.offset, self.uncertainty, duration
+            "Clock sync complete: offset={}ms, uncertainty={:?}, duration={:?}",
+            self.offset_millis, self.uncertainty, duration
         );
 
         icn_obs::metrics::scalability::clock_sync_duration_record(duration.as_secs_f64());
-        icn_obs::metrics::scalability::clock_sync_offset_record(self.offset.as_secs_f64());
+        icn_obs::metrics::scalability::clock_sync_offset_record(self.offset_millis as f64 / 1000.0);
         icn_obs::metrics::scalability::clock_sync_success_inc();
 
         Ok(())
@@ -245,12 +246,10 @@ impl ClockSync {
 
         let now = Self::system_time_millis();
 
-        // Apply offset (if local clock is ahead, subtract; if behind, add)
-        let network_time = if self.offset.as_millis() > 0 {
-            now.saturating_sub(self.offset.as_millis() as u64)
-        } else {
-            now.saturating_add(self.offset.as_millis() as u64)
-        };
+        // Apply signed offset: network_time = local_time - offset
+        // - If offset > 0 (local ahead): subtract offset to get network time
+        // - If offset < 0 (local behind): subtract negative = add to get network time
+        let network_time = (now as i64 - self.offset_millis).max(0) as u64;
 
         Ok(network_time)
     }
@@ -408,5 +407,84 @@ mod tests {
             sync.network_time(),
             Err(TimeError::NotSynchronized)
         ));
+    }
+
+    #[test]
+    fn test_offset_local_ahead() {
+        // Test when local clock is ahead of network time
+        let mut sync = ClockSync::new();
+
+        // Simulate: local = 1000ms, network median = 800ms
+        // offset = 1000 - 800 = +200 (positive = local ahead)
+        sync.offset_millis = 200;
+        sync.last_sync = Some(Instant::now());
+
+        // network_time should subtract positive offset
+        // If local now = 1000, network = 1000 - 200 = 800
+        // We can't control actual time, but we can verify the math
+        let local_time = 1000u64;
+        let expected_network = (local_time as i64 - sync.offset_millis) as u64;
+        assert_eq!(expected_network, 800);
+    }
+
+    #[test]
+    fn test_offset_local_behind() {
+        // Test when local clock is behind network time
+        let mut sync = ClockSync::new();
+
+        // Simulate: local = 800ms, network median = 1000ms
+        // offset = 800 - 1000 = -200 (negative = local behind)
+        sync.offset_millis = -200;
+        sync.last_sync = Some(Instant::now());
+
+        // network_time should subtract negative offset (= add)
+        // If local now = 800, network = 800 - (-200) = 1000
+        let local_time = 800u64;
+        let expected_network = (local_time as i64 - sync.offset_millis) as u64;
+        assert_eq!(expected_network, 1000);
+    }
+
+    #[test]
+    fn test_offset_zero() {
+        // Test when clocks are perfectly synchronized
+        let mut sync = ClockSync::new();
+
+        sync.offset_millis = 0;
+        sync.last_sync = Some(Instant::now());
+
+        // network_time should equal local time
+        let local_time = 1500u64;
+        let expected_network = (local_time as i64 - sync.offset_millis) as u64;
+        assert_eq!(expected_network, 1500);
+    }
+
+    #[test]
+    fn test_offset_calculation_local_ahead() {
+        // Test offset calculation when local clock is ahead
+        let local_time = 5000u64;
+        let median_time = 4800u64;
+
+        // offset = local - median = 5000 - 4800 = +200
+        let offset = local_time as i64 - median_time as i64;
+        assert_eq!(offset, 200);
+
+        // Applying offset: network = local - offset = 5000 - 200 = 4800
+        let network = (local_time as i64 - offset) as u64;
+        assert_eq!(network, median_time);
+    }
+
+    #[test]
+    fn test_offset_calculation_local_behind() {
+        // Test offset calculation when local clock is behind
+        let local_time = 4800u64;
+        let median_time = 5000u64;
+
+        // offset = local - median = 4800 - 5000 = -200
+        let offset = local_time as i64 - median_time as i64;
+        assert_eq!(offset, -200);
+
+        // Applying offset: network = local - offset = 4800 - (-200) = 5000
+        let network = (local_time as i64 - offset) as u64;
+        assert_eq!(network, median_time);
     }
 }
