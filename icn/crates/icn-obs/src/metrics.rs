@@ -346,6 +346,32 @@ pub fn init_descriptions() {
         "Current number of entries in sharded topics by topic name"
     );
 
+    // Clock sync metrics
+    describe_counter!(
+        "icn_scalability_clock_sync_success_total",
+        "Total number of successful clock synchronizations"
+    );
+    describe_counter!(
+        "icn_scalability_clock_sync_failed_total",
+        "Total number of failed clock synchronization attempts"
+    );
+    describe_histogram!(
+        "icn_scalability_clock_sync_duration_seconds",
+        "Duration of clock sync operations in seconds"
+    );
+    describe_histogram!(
+        "icn_scalability_clock_sync_offset_seconds",
+        "Clock offset from network median in seconds"
+    );
+    describe_counter!(
+        "icn_scalability_timestamp_validation_accepted_total",
+        "Total number of timestamps accepted as valid"
+    );
+    describe_counter!(
+        "icn_scalability_timestamp_validation_rejected_total",
+        "Total number of timestamps rejected (out of range)"
+    );
+
     // Ledger metrics
     describe_gauge!(
         "icn_ledger_accounts_total",
@@ -1237,6 +1263,31 @@ pub mod scalability {
     pub fn sharded_topic_size_set(topic: &str, size: usize) {
         gauge!("icn_scalability_sharded_topic_size", "topic" => topic.to_string())
             .set(size as f64);
+    }
+
+    // Clock sync metrics
+    pub fn clock_sync_success_inc() {
+        counter!("icn_scalability_clock_sync_success_total").increment(1);
+    }
+
+    pub fn clock_sync_failed_inc() {
+        counter!("icn_scalability_clock_sync_failed_total").increment(1);
+    }
+
+    pub fn clock_sync_duration_record(duration_secs: f64) {
+        histogram!("icn_scalability_clock_sync_duration_seconds").record(duration_secs);
+    }
+
+    pub fn clock_sync_offset_record(offset_secs: f64) {
+        histogram!("icn_scalability_clock_sync_offset_seconds").record(offset_secs);
+    }
+
+    pub fn timestamp_validation_accepted_inc() {
+        counter!("icn_scalability_timestamp_validation_accepted_total").increment(1);
+    }
+
+    pub fn timestamp_validation_rejected_inc() {
+        counter!("icn_scalability_timestamp_validation_rejected_total").increment(1);
     }
 }
 

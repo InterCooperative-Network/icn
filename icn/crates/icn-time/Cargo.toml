@@ -1,0 +1,18 @@
+[package]
+name = "icn-time"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+tracing.workspace = true
+icn-obs.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+
+[dev-dependencies]
