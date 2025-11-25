@@ -10,7 +10,7 @@ use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
 use icn_trust::TrustClass;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
@@ -177,6 +177,44 @@ impl GossipActor {
     /// Set the store for replica metadata tracking (Phase 17)
     pub fn set_store(&mut self, store: Arc<dyn icn_store::Store>) {
         self.store = Some(store);
+    }
+
+    /// Request replicas from specific peers (Phase 17 Week 3 - ReplicationManager integration)
+    ///
+    /// This is a public API for the ReplicationManager to request replicas
+    /// from trusted peers for under-replicated content.
+    pub fn request_replicas(&self, content_hash: &[u8; 32], peers: &[Did]) {
+        for peer_did in peers {
+            self.send_message(
+                Some(peer_did.clone()),
+                GossipMessage::ReplicaRequest {
+                    content_hash: *content_hash,
+                    requesting_peer: self.own_did.clone(),
+                },
+            );
+        }
+    }
+
+    /// Get all known peers (Phase 17 Week 3 - ReplicationManager peer discovery)
+    ///
+    /// Returns the set of all DIDs that have interacted with this node
+    /// (subscribers to any topic, vector clock peers, etc.)
+    pub fn get_known_peers(&self) -> Vec<Did> {
+        let mut peers = HashSet::new();
+
+        // Collect all subscribers from all topics
+        for topic_name in self.topics.keys() {
+            for subscriber in self.get_subscribers(topic_name) {
+                peers.insert(subscriber);
+            }
+        }
+
+        // Collect all peers from vector clock (they've sent us messages)
+        for did in self.clock.clock.keys() {
+            peers.insert(did.clone());
+        }
+
+        peers.into_iter().collect()
     }
 
     /// Send a message to a peer (if callback is set)

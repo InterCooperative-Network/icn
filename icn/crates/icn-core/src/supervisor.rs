@@ -197,6 +197,31 @@ impl Supervisor {
                 }
             };
 
+            // Set up gossip store for replica metadata tracking (Phase 17)
+            let gossip_store_path = self.config.store_path().join("gossip");
+            let gossip_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gossip_store_path)?);
+            {
+                let mut gossip = gossip_handle.write().await;
+                gossip.set_store(gossip_store.clone());
+            }
+            info!("Gossip store initialized at {} for replica tracking", gossip_store_path.display());
+
+            // Spawn ReplicationManager for monitoring and maintaining data durability (Phase 17 Week 3)
+            let replication_config = crate::replication::ReplicationConfig::default();
+            let _replication_handle = crate::replication::ReplicationManager::spawn(
+                did.clone(),
+                replication_config.clone(),
+                gossip_store.clone(),
+                trust_graph_handle.clone(),
+                gossip_handle.clone(),
+            );
+
+            info!(
+                "ReplicationManager spawned (target: {} replicas, health check: {}s)",
+                replication_config.target_replicas,
+                replication_config.health_check_interval_secs
+            );
+
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
             let store = Arc::new(SledStore::open(&store_path)?);
