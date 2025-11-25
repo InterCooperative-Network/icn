@@ -11,6 +11,20 @@ This document captures architectural decisions, design tradeoffs, and the reason
 
 ---
 
+## Design Principles
+
+ICN is built on five foundational principles that guide all architectural decisions:
+
+- **Local-first**: Nodes operate independently and reconcile via gossip, maximizing autonomy and resilience
+- **Trust-native**: Security and coordination derive from social trust edges, not global consensus or proof-of-work
+- **Deterministic compute**: Same inputs → same outputs → same ledger state on all nodes
+- **Capability-based security**: Contracts cannot do anything they are not explicitly permitted to do
+- **Human-governed**: Cooperative governance makes policy changes democratic and auditable
+
+These principles ensure ICN remains decentralized, resilient, and aligned with cooperative values.
+
+---
+
 ## Table of Contents
 
 1. [Identity & Key Management](#1-identity--key-management)
@@ -74,6 +88,8 @@ Each layer builds on the layers below it, with the distributed compute layer lev
 ---
 
 ## 1. Identity & Key Management
+
+Identity is the foundation of all authentication, trust computation, and ledger authorship in ICN. Every node, contract participant, and transaction is tied to a cryptographically verifiable decentralized identifier (DID).
 
 ### 1.1 DID Format
 
@@ -203,6 +219,8 @@ pub struct Delegation {
 ---
 
 ## 2. Trust Graph Model
+
+The trust graph turns social relationships into machine-relevant security primitives. It gates access to resources, prioritizes computation, and resists Sybil attacks—all without requiring global consensus on reputation.
 
 ### 2.1 Trust Representation
 
@@ -336,6 +354,8 @@ pub struct IntroductionVoucher {
 ---
 
 ## 3. Network Transport
+
+Networking provides authenticated, encrypted, NAT-resistant communication between peers. It is the backbone for all gossip, ledger sync, contract distribution, and distributed compute flows.
 
 ### 3.1 Transport Protocol
 
@@ -492,6 +512,8 @@ pub struct ConnectionLimits {
 ---
 
 ## 4. Ledger Design
+
+The ledger encodes cooperative economic reality as an append-only, tamper-evident Merkle-DAG. It enables mutual credit, transparent accounting, and eventual consistency without requiring consensus on global state.
 
 ### 4.1 Data Model
 
@@ -694,6 +716,8 @@ pub struct CreditLimit {
 ---
 
 ## 5. Contract Execution (CCL)
+
+Contracts define rules governing economic or procedural interactions, executed deterministically across all nodes. They enable cooperatives to codify agreements without trusting a central authority.
 
 ### 5.1 Language Design
 
@@ -1002,6 +1026,8 @@ All contract operations tracked via Prometheus:
 
 ## 6. Gossip & Synchronization
 
+Gossip is the substrate for all coordination: dissemination, consistency, and convergence. It provides causal consistency without consensus, enabling local-first operation with eventual network-wide agreement.
+
 ### 6.1 Consistency Model
 
 **Decision: Causal consistency with anti-entropy**
@@ -1012,6 +1038,24 @@ All contract operations tracked via Prometheus:
 - **Local-first:** Nodes apply changes immediately, sync later
 
 **Not:** Strong consistency (would require consensus, kills availability)
+
+---
+
+**Why Not Consensus?**
+
+ICN deliberately avoids consensus algorithms (Raft, Paxos, PBFT) for core substrate operations:
+
+- **Availability**: Consensus requires quorum; partitions block progress
+- **Autonomy**: Nodes must wait for network agreement before acting locally
+- **Complexity**: Leader election, view changes, and reconfiguration add failure modes
+- **Centralization**: Consensus creates implicit coordination points and attack surfaces
+- **Liveness coupling**: A single slow node can block the entire system
+
+ICN chooses **causal consistency** and **trust-local computation** instead. Conflicts are detected and resolved deterministically. This maximizes resilience and aligns with cooperative values of autonomy.
+
+**Where consensus may appear in v2**: Governance layers requiring global agreement (e.g., network-wide protocol upgrades), but never for day-to-day ledger/contract/compute operations.
+
+---
 
 **Mechanism: Vector clocks**
 ```rust
@@ -1309,6 +1353,8 @@ icn_gossip_subscribe_acks_sent_total    # Counter: SubscribeAck messages sent
 
 ## 7. Data Storage
 
+Persistent storage anchors all ephemeral network state: identities, trust edges, ledger entries, contracts, and task queues. The pluggable storage trait enables evolution from embedded databases to distributed backends.
+
 ### 7.1 Storage Backend
 
 **Decision: Pluggable trait with Sled default (v1)**
@@ -1424,6 +1470,17 @@ pub struct RetentionPolicy {
 
 ## 8. Security Model
 
+Security in ICN is defense-in-depth: cryptographic primitives, trust-based access control, resource limits, and operational hardening work together to resist attacks while preserving decentralization.
+
+**Security Guarantees (v1):**
+
+- **Authenticity**: Ed25519 signatures on all messages, ledger entries, and compute results
+- **Integrity**: Merkle-DAG ledger structure prevents tampering; signature chains prevent forgery
+- **Sybil resistance**: Trust graph gatekeeping prevents identity farming attacks
+- **DoS protection**: Rate limiting + trust-gated access + fuel metering prevent resource exhaustion
+- **Privacy**: Semi-private ledger with selective disclosure; optional auditor roles
+- **Resilience**: Gossip-based divergence recovery; no single point of failure
+
 ### 8.1 Threat Model
 
 **Assumptions:**
@@ -1513,6 +1570,8 @@ ICN implements comprehensive DoS protection and resource management:
 
 ## 9. Performance & Scalability
 
+ICN targets cooperative-scale deployments (100s-1000s of nodes), optimizing for interactive UX and reasonable throughput rather than high-frequency trading or global-scale consensus.
+
 ### 9.1 Target Metrics (v1)
 
 | Metric | Target | Rationale |
@@ -1561,6 +1620,8 @@ ICN implements comprehensive DoS protection and resource management:
 ---
 
 ## 10. Operational Considerations
+
+Running ICN in production requires packaging, monitoring, backup procedures, and upgrade coordination. This section covers deployment patterns and operational best practices.
 
 ### 10.1 Deployment
 
