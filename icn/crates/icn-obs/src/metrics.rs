@@ -743,6 +743,36 @@ pub fn init_descriptions() {
         "icn_misbehavior_reputation_penalties_total",
         "Total number of reputation penalties applied"
     );
+
+    // Partition detection and healing metrics (Phase 18 Week 3)
+    describe_gauge!(
+        "icn_partition_peers_detected",
+        "Number of peers detected as partitioned"
+    );
+    describe_counter!(
+        "icn_partition_heals_total",
+        "Total number of partition healing operations"
+    );
+    describe_counter!(
+        "icn_partition_conflicts_detected_total",
+        "Total number of conflicts detected during partition healing"
+    );
+    describe_counter!(
+        "icn_partition_conflicts_resolved_total",
+        "Total number of conflicts successfully resolved"
+    );
+    describe_counter!(
+        "icn_partition_conflicts_manual_total",
+        "Total number of conflicts requiring manual resolution"
+    );
+    describe_histogram!(
+        "icn_partition_heal_duration_seconds",
+        "Duration of partition healing operations in seconds"
+    );
+    describe_counter!(
+        "icn_partition_vector_clock_merges_total",
+        "Total number of vector clock merges performed"
+    );
 }
 
 /// Network metrics
@@ -1674,5 +1704,51 @@ pub mod misbehavior {
             "severity" => severity.to_string()
         )
         .increment(1);
+    }
+}
+
+/// Partition detection and healing metrics (Phase 18 Week 3)
+pub mod partition {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn peers_detected_set(count: u64) {
+        gauge!("icn_partition_peers_detected").set(count as f64);
+    }
+
+    pub fn heals_inc() {
+        counter!("icn_partition_heals_total").increment(1);
+    }
+
+    pub fn conflicts_detected_inc(data_type: &str) {
+        counter!(
+            "icn_partition_conflicts_detected_total",
+            "data_type" => data_type.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn conflicts_resolved_inc(data_type: &str, strategy: &str) {
+        counter!(
+            "icn_partition_conflicts_resolved_total",
+            "data_type" => data_type.to_string(),
+            "strategy" => strategy.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn conflicts_manual_inc(data_type: &str) {
+        counter!(
+            "icn_partition_conflicts_manual_total",
+            "data_type" => data_type.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn heal_duration_record(duration_secs: f64) {
+        histogram!("icn_partition_heal_duration_seconds").record(duration_secs);
+    }
+
+    pub fn vector_clock_merges_inc() {
+        counter!("icn_partition_vector_clock_merges_total").increment(1);
     }
 }

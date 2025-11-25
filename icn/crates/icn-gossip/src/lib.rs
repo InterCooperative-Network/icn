@@ -30,6 +30,7 @@
 
 pub mod bloom;
 pub mod gossip;
+pub mod partition;
 pub mod sync;
 pub mod types;
 pub mod vector_clock;
@@ -38,6 +39,10 @@ pub use bloom::BloomFilter;
 pub use gossip::{
     start_digest_emitter, EntryNotificationCallback, GossipActor, GossipHandle, PeerSamplingCallback,
     SendMessageCallback,
+};
+pub use partition::{
+    Conflict, ConflictResolution, ConflictResolver, DataType, PartitionConfig, PartitionDetector,
+    PartitionHealer, ResolutionOutcome, VectorClockMerger,
 };
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
