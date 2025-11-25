@@ -190,14 +190,14 @@ impl ReputationScore {
         );
     }
 
-    /// Is this DID quarantined? (score < 0.5)
-    pub fn is_quarantined(&self) -> bool {
-        self.score < 0.5
+    /// Is this DID quarantined based on threshold?
+    pub fn is_quarantined(&self, threshold: f64) -> bool {
+        self.score < threshold
     }
 
-    /// Is this DID banned? (score = 0.0)
-    pub fn is_banned(&self) -> bool {
-        self.score == 0.0
+    /// Is this DID banned based on threshold?
+    pub fn is_banned(&self, threshold: f64) -> bool {
+        self.score <= threshold
     }
 }
 
@@ -301,9 +301,9 @@ impl MisbehaviorDetector {
         metrics::violations_inc(&did.to_string(), &violation.description());
 
         // Check for auto-quarantine/ban
-        if violation.is_auto_ban() || score.is_banned() {
+        if violation.is_auto_ban() || score.is_banned(self.thresholds.ban_threshold) {
             self.ban_peer(did);
-        } else if score.is_quarantined() {
+        } else if score.is_quarantined(self.thresholds.quarantine_threshold) {
             self.quarantine_peer(did);
         }
 
@@ -360,7 +360,11 @@ impl MisbehaviorDetector {
         warn!("BANNING peer {} for severe violation", did);
 
         self.banned.insert(did.clone(), SystemTime::now());
-        self.quarantined.remove(did);
+
+        // If peer was quarantined, remove from quarantine and decrement metric
+        if self.quarantined.remove(did).is_some() {
+            metrics::quarantined_dec();
+        }
 
         // Set reputation to zero
         if let Some(score) = self.reputation_scores.get_mut(did) {
@@ -451,10 +455,12 @@ mod tests {
     #[test]
     fn test_reputation_score_new() {
         let score = ReputationScore::new();
+        let thresholds = MisbehaviorThresholds::default();
+
         assert_eq!(score.score, 1.0);
         assert_eq!(score.total_violations, 0);
-        assert!(!score.is_quarantined());
-        assert!(!score.is_banned());
+        assert!(!score.is_quarantined(thresholds.quarantine_threshold));
+        assert!(!score.is_banned(thresholds.ban_threshold));
     }
 
     #[test]
@@ -478,6 +484,7 @@ mod tests {
     #[test]
     fn test_reputation_quarantine_threshold() {
         let mut score = ReputationScore::new();
+        let thresholds = MisbehaviorThresholds::default();
 
         // Apply critical violations to drop below quarantine threshold
         for _ in 0..6 {
@@ -487,7 +494,12 @@ mod tests {
             score.apply_penalty(&violation, 0.01);
         }
 
-        assert!(score.is_quarantined(), "Score should be below 0.5");
+        assert!(
+            score.is_quarantined(thresholds.quarantine_threshold),
+            "Score should be below threshold ({}): actual score = {}",
+            thresholds.quarantine_threshold,
+            score.score
+        );
     }
 
     #[test]
