@@ -374,6 +374,8 @@ Networking provides authenticated, encrypted, NAT-resistant communication betwee
   - Forward secrecy
   - Standard, audited
 
+**Important distinction**: TLS verifies cryptographic identity only (proves the peer controls the DID's private key). Authorization decisions (whether this DID can publish, execute contracts, claim tasks, etc.) are enforced at higher layers via the trust graph. This separation allows flexible, context-dependent access control without coupling authentication to authorization.
+
 **Stack:**
 ```
 Application (CCL, Ledger sync, Gossip)
@@ -1041,7 +1043,7 @@ Gossip is the substrate for all coordination: dissemination, consistency, and co
 
 ---
 
-**Why Not Consensus?**
+#### 6.1.1 Why Not Consensus?
 
 ICN deliberately avoids consensus algorithms (Raft, Paxos, PBFT) for core substrate operations:
 
@@ -1468,6 +1470,255 @@ pub struct RetentionPolicy {
 
 ---
 
+### 7.4 Data Durability & Replication
+
+**Decision: Trust-weighted automatic replication (Phase 17)**
+
+**Current State (v1): Gossip-based implicit replication**
+
+ICN v1 relies on gossip protocol for data distribution with social redundancy:
+
+- **Ledger entries**: Replicated to all participants in currency/contract
+- **Contracts**: Replicated to all signatories
+- **Compute tasks**: Ephemeral, replicated to interested executors
+- **Trust edges**: Local-only (subjective, not replicated)
+- **Identity keys**: User-managed backups (never replicated for security)
+
+**Durability by Data Type:**
+
+| Data Type | Current Replication | Durability | Recovery Mechanism |
+|-----------|---------------------|------------|-------------------|
+| Ledger entries | All participants (social) | High | Re-sync from any participant |
+| Contracts | All participants | High | Re-deploy from source |
+| Trust edges | Single node | Low | Manual backup/restore |
+| Identity keys | User backups only | User responsibility | Restore from `icnctl backup` |
+| Compute tasks | Subscribed executors | Medium | Timeout and retry |
+| Compute results | Submitter + witnesses | Medium | Re-execute if lost |
+
+**Failure Modes:**
+
+- **Single node failure**: No data loss if other participants exist
+- **Network partition**: Nodes continue operating, re-sync when partition heals via anti-entropy
+- **Simultaneous failure of all participants**: Data loss (requires external backup)
+- **Disk corruption**: Manual restore from backup + re-sync from peers
+
+---
+
+**Phase 17: Explicit Replication Management**
+
+**Architecture:**
+
+```rust
+pub struct ReplicationPolicy {
+    data_type: DataType,
+    min_replicas: usize,        // Hard minimum (alert if below)
+    target_replicas: usize,     // Soft target (continuous optimization)
+    strategy: ReplicationStrategy,
+}
+
+pub enum ReplicationStrategy {
+    TrustWeighted { min_trust: f64 },           // Replicate to high-trust peers
+    Participants { dids: Vec<Did> },            // Contract/ledger participants
+    GeoDiverse { regions: Vec<String> },        // Regional spread for resilience
+    Hybrid(Vec<ReplicationStrategy>),           // Combine strategies
+}
+
+pub enum DataType {
+    LedgerEntry,      // Critical: all participants + 3 trusted peers
+    Contract,         // Critical: all participants + 2 trusted peers
+    TrustEdge,        // Personal: local + 2 high-trust backups
+    ComputeTask,      // Ephemeral: 2 executors (temporary)
+    ComputeResult,    // Important: submitter + 2 trusted peers
+}
+```
+
+**ReplicationManager Actor:**
+
+Monitors replication health and triggers re-replication when needed:
+
+1. **Periodic Health Check** (every 60s):
+   - Scan all stored content
+   - Check current replica count vs. policy
+   - Trigger re-replication if below `min_replicas`
+
+2. **Replica Selection**:
+   - Query trust graph for candidates
+   - Filter by trust threshold and strategy
+   - Prefer peers with available capacity
+
+3. **Replication Protocol**:
+   ```
+   Under-replicated data detected
+   → Select N new replica holders (trust-weighted)
+   → Send ReplicaRequest via gossip
+   → Peer accepts → transfers data
+   → Update metadata → increment replica count
+   ```
+
+4. **Metrics**:
+   - `icn_data_replicas{data_type, hash}` - Current count
+   - `icn_data_under_replicated_total` - Alert trigger
+   - `icn_replication_requests_sent_total`
+   - `icn_replication_duration_seconds`
+
+**Default Policies:**
+
+```rust
+// Ledger entries: Critical financial data
+ReplicationPolicy {
+    data_type: LedgerEntry,
+    min_replicas: 3,        // Participants + 3 trusted backups
+    target_replicas: 5,
+    strategy: Hybrid([
+        Participants { dids },
+        TrustWeighted { min_trust: 0.4 },
+    ]),
+}
+
+// Contracts: Critical code + state
+ReplicationPolicy {
+    data_type: Contract,
+    min_replicas: 2,        // Participants + 2 backups
+    target_replicas: 4,
+    strategy: Participants { dids },
+}
+
+// Trust edges: Personal relationship data
+ReplicationPolicy {
+    data_type: TrustEdge,
+    min_replicas: 2,        // Local + 2 high-trust peers
+    target_replicas: 3,
+    strategy: TrustWeighted { min_trust: 0.7 },
+}
+```
+
+**Configuration:**
+
+```toml
+[storage.replication]
+enabled = true
+check_interval_seconds = 60
+
+[storage.replication.ledger]
+min_replicas = 3
+target_replicas = 5
+strategy = "trust_weighted"
+min_trust = 0.4
+
+[storage.replication.contracts]
+min_replicas = 2
+target_replicas = 4
+strategy = "participants"
+
+[storage.replication.trust_edges]
+min_replicas = 2
+target_replicas = 3
+strategy = "trust_weighted"
+min_trust = 0.7
+```
+
+**Gossip Protocol Extensions:**
+
+```rust
+pub enum GossipMessage {
+    // ... existing messages
+
+    ReplicaRequest {
+        content_hash: ContentHash,
+        requester: Did,
+        reason: ReplicationReason,
+    },
+
+    ReplicaOffer {
+        content_hash: ContentHash,
+        holder: Did,
+        replica_count: usize,
+    },
+
+    ReplicaStatus {
+        content_hash: ContentHash,
+        replicas: Vec<ReplicaInfo>,
+    },
+}
+
+pub enum ReplicationReason {
+    UnderReplicated,    // Below min_replicas
+    PeerLeaving,        // Node announced shutdown
+    TrustDegraded,      // Replica holder's trust dropped
+    GeoDiversity,       // Need regional spread
+}
+```
+
+**Storage Layer Extensions:**
+
+```rust
+pub trait Store: Send + Sync {
+    // ... existing methods
+
+    // Replication tracking
+    fn get_replica_count(&self, hash: &ContentHash) -> Result<usize>;
+    fn get_replica_holders(&self, hash: &ContentHash) -> Result<Vec<Did>>;
+    fn mark_replica(&self, hash: &ContentHash, holder: &Did) -> Result<()>;
+    fn remove_replica(&self, hash: &ContentHash, holder: &Did) -> Result<()>;
+}
+```
+
+**Implementation Timeline:**
+
+Phase 17 will be implemented in 4 weeks:
+- **Week 1**: Storage layer extensions (replica tracking metadata)
+- **Week 2**: Gossip protocol extensions (ReplicaRequest/Offer/Status)
+- **Week 3**: ReplicationManager actor (monitoring + selection)
+- **Week 4**: Integration testing (failure scenarios, performance)
+
+**Critical Test Scenarios:**
+
+```rust
+// Automatic replication on node join
+#[tokio::test]
+async fn test_new_node_receives_replicas() {
+    // 1. Start 2 nodes with critical data
+    // 2. Third node joins with high trust
+    // 3. Verify ReplicationManager replicates to new node
+}
+
+// Re-replication after node failure
+#[tokio::test]
+async fn test_replication_after_failure() {
+    // 1. Start 5 nodes, min_replicas=3, data on all 5
+    // 2. Kill 2 nodes
+    // 3. Verify manager detects under-replication
+    // 4. Verify new replicas created within 2 minutes
+}
+
+// Trust degradation triggers replacement
+#[tokio::test]
+async fn test_trust_degradation_replacement() {
+    // 1. Data replicated to high-trust peers
+    // 2. One peer's trust drops below threshold
+    // 3. Verify manager selects replacement replica holder
+}
+```
+
+**Tradeoffs:**
+
+- ✅ **Prevents data loss** from node failures
+- ✅ **Automatic** (no manual intervention)
+- ✅ **Trust-aware** (replicate to reliable peers)
+- ✅ **Configurable** (per-data-type policies)
+- ❌ **Storage overhead** (3-5x vs single copy)
+- ❌ **Bandwidth cost** (replication traffic)
+- ❌ **Complexity** (monitoring, selection logic)
+
+**Future Enhancements:**
+
+- **Erasure coding** for bulk data (1.5x storage vs 3x)
+- **Geo-aware placement** (regional compliance, latency optimization)
+- **Economic incentives** (pay peers in credits to store replicas)
+- **Pinning API** (`icnctl pin <hash>` to guarantee persistence)
+
+---
+
 ## 8. Security Model
 
 Security in ICN is defense-in-depth: cryptographic primitives, trust-based access control, resource limits, and operational hardening work together to resist attacks while preserving decentralization.
@@ -1648,7 +1899,59 @@ ENTRYPOINT ["icnd"]
 
 ---
 
-### 10.2 Monitoring
+### 10.2 Configuration
+
+**Config file:** `$ICN_DATA_DIR/config.toml`
+
+**Example configuration:**
+
+```toml
+[node]
+data_dir = "/var/lib/icn"
+log_level = "info"
+
+[network]
+bind_addr = "0.0.0.0:4433"
+max_connections = 500
+
+[compute]
+enabled = true
+
+[compute.trust]
+min_trust_submit = 0.1     # Minimum trust to submit tasks
+min_trust_execute = 0.3    # Minimum trust to execute tasks
+
+[compute.resources]
+max_concurrent_tasks = 10
+cpu_cores = 8
+ram_gb = 16
+gpu_units = 0
+
+[gateway]
+enabled = false
+bind_addr = "127.0.0.1:8080"
+jwt_secret = "your-secret-here"
+token_expiry_hours = 24
+```
+
+**Environment variable overrides:**
+
+- `ICN_DATA_DIR` - Override data directory
+- `ICN_LOG_LEVEL` - Override log level (trace, debug, info, warn, error)
+- `ICN_GATEWAY_JWT_SECRET` - Override JWT secret
+
+**Trust thresholds:**
+
+The `min_trust_submit` and `min_trust_execute` values gate access to the compute layer:
+
+- `min_trust_submit = 0.1` - Members with trust score >= 0.1 can submit tasks (Known tier)
+- `min_trust_execute = 0.3` - Executors with trust score >= 0.3 can claim tasks (Partner tier)
+
+These defaults balance accessibility (low barrier for task submission) with security (higher barrier for code execution).
+
+---
+
+### 10.3 Monitoring
 
 **Observability stack:**
 - **Logs:** Structured (JSON) to stdout, rotate with logrotate
@@ -1673,7 +1976,7 @@ icn_trust_score_changes_total
 
 ---
 
-### 10.3 Backup & Disaster Recovery
+### 10.4 Backup & Disaster Recovery
 
 **Backup:**
 ```bash
@@ -1699,7 +2002,7 @@ icnctl backup restore backup-20251110.tar.gz
 
 ---
 
-### 10.4 Upgrades
+### 10.5 Upgrades
 
 **Process:**
 1. Release new version (GitHub releases)
@@ -1724,6 +2027,10 @@ icnctl backup restore backup-20251110.tar.gz
 **Introduced:** Phase 15 (2025-11-21)
 **Evolution:** Phase 16A-E (2025-11-23 to 2025-11-24)
 
+**Mental Model:**
+
+Think of ICN's compute layer as a **federated job board** combined with a **cooperative cluster scheduler**. Members post tasks to the network via gossip (like pinning a job listing on a community board). Executors browse available work, claim tasks based on their capabilities and trust relationships, execute them locally using the CCL interpreter, and get paid automatically via the mutual credit ledger. Unlike centralized schedulers (Kubernetes) or blockchain VMs (Ethereum), there's no central coordinator—just peers cooperating through social trust and economic incentives. Policies are democratic: cooperatives vote on rules (GDPR compliance, time windows, resource quotas) via governance proposals, and the network enforces them automatically.
+
 The distributed compute layer turns the ICN substrate into a cooperative, trust-aware scheduling fabric for secure job execution, resource sharing, and cross-community workflows.
 
 It enables cooperative task execution across ICN nodes, with trust-gated access, intelligent scheduling, and democratic policy management.
@@ -1733,6 +2040,25 @@ It enables cooperative task execution across ICN nodes, with trust-gated access,
 ### 11.1 Core Architecture
 
 **Decision: Actor-based compute model with gossip coordination**
+
+**Core Types:**
+
+```rust
+// Task priority levels (controls scheduling preference)
+pub enum TaskPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
+}
+
+// Actor types (controls migration behavior)
+pub enum ActorType {
+    Stateless,   // No state; 0-RTT migration
+    Stateful,    // In-memory state; checkpoint required
+    Persistent,  // Durable state; checkpoint + storage sync
+}
+```
 
 **Components:**
 ```
@@ -1889,6 +2215,12 @@ pub struct ActorCheckpoint {
     dependencies: Vec<String>,  // Required resources/actors
 }
 ```
+
+**Migration Operational Guarantees:**
+
+- **Stateless actors:** No checkpoint required; can migrate instantly (0-RTT restart on new executor)
+- **Stateful actors:** Checkpoint required; migration completes within 2× average task duration
+- **Persistent actors:** Checkpoint + durable storage sync; migration may pause execution briefly (<5s)
 
 **Rationale:**
 - Enables long-running stateful computations
@@ -2134,18 +2466,19 @@ icnctl quota list my-coop
 ```
 
 **RPC Methods:**
-```json
+
+```javascript
 // policy.set
-{"coop_id": "...", "policy": {...}}
+{"coop_id": "food-coop", "policy": {"rules": [], "default_quota": {...}}}
 
 // policy.get
-{"coop_id": "..."}
+{"coop_id": "food-coop"}
 
 // quota.get
-{"coop_id": "...", "member_did": "..."}
+{"coop_id": "food-coop", "member_did": "did:icn:abc123"}
 
 // quota.reset
-{"coop_id": "...", "member_did": "..."}
+{"coop_id": "food-coop", "member_did": "did:icn:abc123"}
 ```
 
 **Gateway REST API:**
@@ -2267,9 +2600,524 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 
 ---
 
+---
+
+## 12. Known Limitations & Future Work
+
+This section documents acknowledged gaps, limitations, and planned improvements for ICN. It serves as both a roadmap for future development and transparent disclosure of current system boundaries.
+
+### 12.1 Byzantine Fault Tolerance
+
+**Current State:** ICN detects some malicious behavior but lacks comprehensive Byzantine fault detection and mitigation.
+
+**What Works:**
+- ✅ Sybil resistance via trust graph
+- ✅ Message authentication (Ed25519 signatures)
+- ✅ Replay protection (sequence numbers + Bloom filters)
+- ✅ Trust-gated access control
+
+**What's Missing:**
+- ❌ No automatic detection of conflicting signed statements
+- ❌ No reputation slashing for proven misbehavior
+- ❌ No ban/quarantine mechanism for malicious nodes
+- ❌ No detection of selective message dropping
+
+**Planned (Phase 18):**
+
+```rust
+pub struct MisbehaviorDetector {
+    violations: HashMap<Did, Vec<Violation>>,
+    thresholds: MisbehaviorThresholds,
+    reputation_scores: HashMap<Did, ReputationScore>,
+}
+
+pub enum Violation {
+    InvalidSignature { message_hash: ContentHash },
+    ConflictingLedgerEntries { entry1: ContentHash, entry2: ContentHash },
+    FailedComputeVerification { task_hash: ContentHash, expected: ContentHash, actual: ContentHash },
+    ExcessiveResourceUse { metric: String, observed: u64, limit: u64 },
+    TrustGraphSpam { rate: f64, threshold: f64 },
+}
+
+pub struct MisbehaviorThresholds {
+    max_violations_per_hour: usize,       // Ban if exceeded
+    reputation_penalty_per_violation: f64, // Reduce trust score
+    auto_ban_violation_types: Vec<ViolationType>,
+}
+```
+
+**Detection Strategy:**
+- Monitor for contradictory signed statements
+- Cross-verify compute results with re-execution
+- Track resource usage patterns (rate limiting violations)
+- Community reporting mechanism (governance integration)
+
+**Mitigation:**
+- Automatic trust score reduction
+- Temporary quarantine (24-48h)
+- Permanent ban for severe violations (with appeal process)
+- Network-wide gossip of violation proofs
+
+**Metrics:**
+- `icn_misbehavior_violations_detected_total{did, violation_type}`
+- `icn_misbehavior_auto_bans_total`
+- `icn_misbehavior_reputation_penalties_total`
+
+---
+
+### 12.2 Network Partition Healing
+
+**Current State:** ICN handles short partitions well but lacks explicit strategy for long-duration splits.
+
+**What Works:**
+- ✅ Causal consistency with vector clocks
+- ✅ Anti-entropy Bloom filter exchange
+- ✅ Deterministic merge ordering
+
+**What's Missing:**
+- ❌ No documented maximum partition duration
+- ❌ No "too divergent to auto-merge" detection
+- ❌ No split-brain detection for cooperatives
+- ❌ No staged reconciliation for large divergences
+
+**Planned (Phase 18):**
+
+**Partition Tolerance Thresholds:**
+```toml
+[network.partition_healing]
+max_offline_duration_days = 30
+divergence_threshold_entries = 10000  # Beyond this, require manual review
+auto_reconcile_window_hours = 72      # Automatic within 3 days
+```
+
+**Healing Protocol:**
+```
+1. Reconnection Detection
+   → Exchange vector clocks
+   → Calculate divergence magnitude
+
+2. Divergence Classification
+   → Small (<100 entries): Auto-merge
+   → Medium (100-10k entries): Staged reconciliation
+   → Large (>10k entries): Manual review required
+
+3. Staged Reconciliation
+   → Phase 1: Sync critical data (identity, trust edges)
+   → Phase 2: Sync ledger (apply deterministic ordering)
+   → Phase 3: Sync contracts and compute state
+   → Phase 4: Verify invariants and emit metrics
+
+4. Conflict Resolution
+   → Quarantine contradictory entries
+   → Invoke dispute resolution (Phase 12 integration)
+   → Emit reconciliation report
+```
+
+**Split-Brain Detection:**
+- Monitor for cooperatives with duplicate governance domains
+- Detect conflicting policy proposals with same ID
+- Alert operators when cooperative members see different leaders
+
+---
+
+### 12.3 Contract Execution Disputes
+
+**Current State:** CCL interpreter is deterministic but lacks multi-executor verification and dispute resolution.
+
+**What Works:**
+- ✅ Deterministic execution (same inputs → same outputs)
+- ✅ Fuel metering prevents runaway execution
+- ✅ Ed25519-signed results
+
+**What's Missing:**
+- ❌ No automatic detection of differing execution results
+- ❌ No multi-executor verification (consensus on results)
+- ❌ No slashing for incorrect execution
+
+**Planned (Phase 18):**
+
+```rust
+pub struct ComputeDispute {
+    task_hash: ContentHash,
+    submitter: Did,
+    executors: Vec<(Did, ComputeResult)>,
+    evidence: Vec<Evidence>,
+    initiated_at: u64,
+    resolution: Option<DisputeResolution>,
+}
+
+pub enum DisputeResolution {
+    Consensus { result: ComputeResult, majority: usize, minority: usize },
+    Reexecution { arbiter: Did, result: ComputeResult },
+    Quarantine { reason: String },
+}
+```
+
+**Multi-Executor Verification (Optional):**
+- Submitter can request N executors (N=3, 5, etc.)
+- Results compared via content hash
+- Majority consensus determines payment
+- Minority executors penalized (reputation hit)
+
+**Dispute Workflow:**
+```
+1. Differing results detected
+   → Create ComputeDispute record
+
+2. Evidence collection (24h window)
+   → Executors submit execution logs
+   → Submitter provides input data
+
+3. Re-execution by arbiter
+   → High-trust node re-runs task
+   → Arbiter result is canonical
+
+4. Resolution
+   → Correct executors paid
+   → Incorrect executors penalized
+   → Audit trail stored
+```
+
+---
+
+### 12.4 Ledger Fork Resolution
+
+**Current State:** Basic quarantine mechanism exists but lacks formalized multi-party dispute resolution.
+
+**What Works:**
+- ✅ Deterministic ordering (timestamp, author DID, entry hash)
+- ✅ Quarantine for invalid entries
+- ✅ Invariant checking (double-entry, credit limits)
+
+**What's Missing:**
+- ❌ No formalized fork resolution algorithm
+- ❌ No multi-party mediation workflow
+- ❌ No definition of "too divergent to merge"
+
+**Planned (Phase 18):**
+
+**Fork Classification:**
+```rust
+pub enum ForkSeverity {
+    Trivial,      // Concurrent but compatible (auto-merge)
+    Resolvable,   // Conflicts but within credit limits (mediation)
+    Severe,       // Overdrafts or double-spends (governance decision)
+}
+```
+
+**Resolution Algorithm:**
+```
+1. Detect Fork
+   → Multiple entries with same parent
+   → Calculate severity
+
+2. Auto-Merge (Trivial)
+   → Apply deterministic ordering
+   → Verify invariants hold
+   → Emit merged ledger state
+
+3. Mediation (Resolvable)
+   → Freeze affected accounts
+   → Invoke Phase 12 dispute resolution
+   → Designated mediator reviews evidence
+   → Governance vote if needed
+
+4. Governance Decision (Severe)
+   → Create emergency proposal
+   → Community votes on resolution
+   → Execute outcome (write-off, reversal, etc.)
+```
+
+**Integration with Phase 12 Disputes:**
+- Ledger forks automatically create disputes
+- Mediators assigned based on trust + availability
+- Resolution stored as signed governance record
+
+---
+
+### 12.5 Storage Exhaustion Protection
+
+**Current State:** Section 7.3 describes pruning but lacks automatic enforcement.
+
+**What's Missing:**
+- ❌ No disk quota monitoring
+- ❌ No automatic pruning enforcement
+- ❌ No emergency shedding of non-critical data
+
+**Planned (Phase 18):**
+
+```toml
+[storage.limits]
+max_disk_usage_gb = 100
+emergency_pruning_threshold_gb = 90
+critical_data_minimum_gb = 10
+
+[storage.pruning]
+auto_prune_enabled = true
+prune_interval_hours = 24
+prune_non_participants = true  # Prune data for non-participated contracts
+```
+
+**Monitoring:**
+```rust
+// Periodic storage health check (every 10 minutes)
+fn check_storage_health() {
+    let usage = disk_usage();
+
+    if usage > emergency_threshold {
+        trigger_emergency_pruning();
+        alert_operator();
+    } else if usage > warning_threshold {
+        schedule_pruning();
+        emit_metric("storage_warning");
+    }
+}
+```
+
+**Pruning Priority:**
+1. Ephemeral compute tasks (oldest first)
+2. Old gossip entries (keep recent 10k)
+3. Non-participated contract state
+4. Archived ledger entries (keep Merkle roots)
+
+**Metrics:**
+- `icn_storage_disk_usage_bytes`
+- `icn_storage_pruning_events_total`
+- `icn_storage_emergency_pruning_total`
+
+---
+
+### 12.6 Upgrade Coordination
+
+**Current State:** Section 10.5 describes manual upgrade process but lacks in-protocol coordination.
+
+**What's Missing:**
+- ❌ No governance-driven protocol upgrades
+- ❌ No automatic version negotiation for major bumps
+- ❌ No network-wide upgrade deadlines
+
+**Planned (Phase 18):**
+
+```rust
+pub struct UpgradeProposal {
+    new_version: Version,
+    breaking_changes: Vec<String>,
+    migration_code: Option<MigrationCode>,
+    deadline: u64,  // Unix timestamp
+    required_approval: f64,  // e.g., 0.66 for 2/3 majority
+}
+
+// Governance integration
+ProposalPayload::ProtocolUpgrade {
+    version: Version,
+    migration: MigrationCode,
+    deadline: u64,
+}
+```
+
+**Upgrade Workflow:**
+```
+1. Proposal Creation
+   → Core team proposes upgrade
+   → Includes migration guide
+   → Sets reasonable deadline (e.g., 90 days)
+
+2. Community Review
+   → Governance vote
+   → 2/3 majority required for breaking changes
+   → 1/2 majority for non-breaking
+
+3. Adoption Period
+   → Nodes upgrade at their pace
+   → Version negotiation handles mixed network
+   → Metrics track adoption rate
+
+4. Deadline Enforcement
+   → Old nodes warned (30 days before)
+   → Old nodes deprecated (at deadline)
+   → Network refuses connections from ancient versions
+```
+
+**Metrics:**
+- `icn_upgrade_proposals_total`
+- `icn_upgrade_adoption_rate{version}`
+- `icn_upgrade_deadline_warnings_sent`
+
+---
+
+### 12.7 Scalability Limits
+
+**Current State:** Section 9.1 has target metrics but no documented breaking points.
+
+**Tested Bounds (v1):**
+
+| Dimension | Tested | Target | Breaking Point |
+|-----------|--------|--------|----------------|
+| Nodes per cooperative | 10 | 100 | ~1,000 (vector clock overhead) |
+| Transactions per second | 10/node | 100/node | ~500/node (signature verification CPU) |
+| Trust graph size | 100 DIDs | 1,000 DIDs | ~10,000 (computation time) |
+| Gossip topics | 10 | 100 | ~1,000 (memory overhead) |
+| Storage per node | 1 GB | 100 GB | ~1 TB (Sled limit) |
+| mDNS discovery | 5 LAN nodes | 50 LAN nodes | ~100 (broadcast storm) |
+
+**Known Bottlenecks:**
+
+1. **Vector Clock Growth:** O(n) per message where n = number of peers
+   - Mitigation: Sparse vector clocks (only active participants)
+
+2. **Trust Graph Computation:** O(n²) for transitive trust
+   - Mitigation: Cache scores, recompute only on edge changes
+
+3. **Bloom Filter Size:** O(m) where m = entries per topic
+   - Mitigation: Configurable false-positive rate, periodic compaction
+
+4. **Signature Verification:** CPU-bound, ~1ms per signature
+   - Mitigation: Batch verification, async verification queue
+
+**Mitigation Strategies:**
+- Cooperative-based sharding (different coops = different gossip neighborhoods)
+- Specialized archival nodes (high storage, low compute)
+- Regional topology clustering (reduce cross-region gossip)
+
+---
+
+### 12.8 Clock Synchronization
+
+**Current State:** Relies on "reasonable" clock skew tolerance (300s default).
+
+**What's Missing:**
+- ❌ No NTP integration
+- ❌ No clock drift monitoring
+- ❌ No operator alerts for severe clock skew
+
+**Planned (Phase 19 - Nice-to-Have):**
+
+```toml
+[time]
+max_clock_skew_seconds = 300
+ntp_servers = ["pool.ntp.org", "time.cloudflare.com"]
+ntp_sync_enabled = true
+ntp_sync_interval_hours = 6
+clock_drift_alert_threshold_seconds = 60
+```
+
+**Monitoring:**
+- Periodic NTP sync (every 6h)
+- Measure drift vs. NTP time
+- Alert if drift > 60s
+- Reject messages with timestamp > 5min in future/past
+
+**Metrics:**
+- `icn_time_clock_drift_seconds`
+- `icn_time_ntp_sync_failures_total`
+- `icn_time_skew_rejections_total`
+
+---
+
+### 12.9 Privacy & Metadata Leakage
+
+**Current State:** TLS encryption protects content but metadata is observable.
+
+**Observable by Network Observer:**
+- Connection graph (who connects to whom)
+- Gossip topic subscriptions (interest patterns)
+- Message timing and sizes (traffic analysis)
+- Compute task submission patterns
+
+**Out of Scope (v1):**
+- Traffic analysis resistance
+- Timing attack mitigation
+- Subscription privacy
+
+**Future (Phase 20+):**
+- Onion routing for gossip (Tor-like)
+- Private topic subscriptions (Bloom filter interests)
+- Timing obfuscation (random delays)
+- Cover traffic (decoy messages)
+
+---
+
+### 12.10 Trust Graph Gaming
+
+**Current State:** Transitive trust prevents some gaming but lacks anomaly detection.
+
+**Potential Attack Vectors:**
+- Circular vouching (A trusts B trusts C trusts A)
+- Trust inflation via Sybil identities
+- Fake evidence generation
+
+**Planned (Phase 19):**
+
+```rust
+pub struct TrustGraphAnalyzer {
+    anomaly_detector: AnomalyDetector,
+    circular_vouch_detector: CircularVouchDetector,
+    sybil_detector: SybilDetector,
+}
+
+pub enum TrustAnomaly {
+    CircularVouching { cycle: Vec<Did> },
+    TrustInflation { did: Did, suspicious_edges: Vec<TrustEdge> },
+    SybilCluster { cluster: Vec<Did>, evidence: String },
+}
+```
+
+**Detection Strategies:**
+- Graph cycle detection (find circular trust chains)
+- Trust score velocity monitoring (rapid changes suspicious)
+- Evidence quality analysis (weak evidence = low weight)
+- Community reporting + manual review
+
+**Metrics:**
+- `icn_trust_anomalies_detected_total{type}`
+- `icn_trust_circular_vouching_incidents`
+- `icn_trust_inflation_warnings`
+
+---
+
+### 12.11 Implementation Priorities
+
+**Phase 17 (Storage Hardening) - 4 weeks:**
+- ✅ Section 7.4 (Data Replication) - just added
+- Trust-weighted automatic replication
+- Replica tracking and monitoring
+- Re-replication on node failure
+
+**Phase 18 (Pre-Pilot Hardening) - 6 weeks:**
+1. Byzantine fault detection (12.1)
+2. Network partition healing (12.2)
+3. Contract execution disputes (12.3)
+4. Ledger fork resolution (12.4)
+5. Storage exhaustion protection (12.5)
+6. Upgrade coordination via governance (12.6)
+
+**Phase 19 (Post-Pilot Improvements) - 4 weeks:**
+7. Clock synchronization (12.8)
+8. Scalability testing & documentation (12.7)
+9. Trust graph gaming detection (12.10)
+
+**Phase 20+ (Future Enhancements):**
+10. Privacy & metadata protection (12.9)
+
+**Total estimated time to production-ready:** 14 weeks (Phase 17-18)
+
+---
+
 ## Appendix
 
-### A. Glossary
+### A. Phase Numbering
+
+**Note:** Phase references throughout this document (e.g., Phase 7, Phase 16A-E) correspond to milestones in the internal ICN development roadmap. These numbers are preserved for traceability between this architectural specification and the project's implementation history.
+
+- **Early phases (7-9):** Core substrate delivery (identity, transport, gossip)
+- **Phase 11-14:** Platform layer (multi-device, economic safety, governance, gateway API)
+- **Phase 15-16:** Distributed compute layer evolution
+
+Phase numbers remain in-place to anchor architectural decisions to specific implementation commits and to provide context for design rationale.
+
+---
+
+### B. Glossary
 
 - **DID:** Decentralized Identifier
 - **CCL:** Cooperative Contract Language
@@ -2279,7 +3127,7 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 - **QUIC:** Quick UDP Internet Connections
 - **HSM:** Hardware Security Module
 
-### B. References
+### C. References
 
 - **DIDs:** https://www.w3.org/TR/did-core/
 - **Ed25519:** https://ed25519.cr.yp.to/
@@ -2287,7 +3135,7 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 - **Age encryption:** https://age-encryption.org/
 - **Mutual credit:** https://www.mutual-credit.org/
 
-### C. Decision Log
+### D. Decision Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
@@ -2297,7 +3145,7 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 | 2025-11-10 | Double-entry ledger | Cooperative finance model |
 | 2025-11-10 | Trust-gated everything | Security through relationships |
 
-### D. Versioning Policy
+### E. Versioning Policy
 
 **Semantic Versioning:**
 
@@ -2309,7 +3157,7 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 
 ICN nodes negotiate protocol versions during handshake. Old nodes can communicate with new nodes within the same major version. Major version bumps require coordinated network upgrades.
 
-### E. Contributions
+### F. Contributions
 
 **Development:**
 

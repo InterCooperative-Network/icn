@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 17-20 Roadmap Formalized + Document Consistency Fixes (2025-11-24)
+
+**ICN-DEP-ROADMAP-01 v0.3.0 Released:**
+
+1. **Document Metadata & Structure**:
+   - Added document ID (ICN-DEP-ROADMAP-01), version (0.3.0), maintainer
+   - Explicit reference to ARCHITECTURE.md as ICN-DEP-01 (canonical protocol spec)
+   - "Spec Impact" annotations on all major phases tie roadmap to architecture sections
+   - Consistency fixes: aligned status header, dates, and completion markers
+
+2. **Phase 14 Completion Update**:
+   - Fixed SDK/app deferral vs Track C completion conflict
+   - TypeScript SDK ✅ (completed 2025-01-17 in Track C Pilot Tooling)
+   - Pilot Web UI ✅ (completed 2025-01-17 in Track C Pilot Tooling)
+   - OpenAPI Specification ✅ (completed 2025-01-17 in Track C Pilot Tooling)
+   - Phase 14 now marked as "ALL COMPLETE" (Gateway + Client Infrastructure)
+
+3. **Pre-Pilot Critical Path Defined**:
+
+Comprehensive 14-week roadmap to production-ready pilot deployment, addressing all critical gaps identified in architecture analysis:
+
+1. **Phase 17: Storage Hardening & Replication (4 weeks)**
+   - Trust-weighted replica selection algorithm
+   - ReplicationManager actor with health monitoring
+   - Gossip protocol extensions (ReplicaRequest/Offer/Status)
+   - Configurable replication policies per data type
+   - 99.9% durability target (ledger entries survive single node failure)
+   - Prometheus metrics for replication health
+
+2. **Phase 18: Pre-Pilot Hardening (6 weeks)**
+   - Byzantine fault detection with misbehavior tracking
+   - Network partition healing with conflict resolution
+   - Contract execution dispute system
+   - Ledger fork resolution strategies
+   - Storage quota management with automatic cleanup
+   - Upgrade coordination via governance integration
+
+3. **Phase 19: Post-Pilot Improvements (4 weeks)**
+   - Scalability optimizations (vector clock compression, trust caching, signature batching)
+   - Clock synchronization (Rough Time Protocol - RFC 8915)
+   - Driven by actual pilot load patterns
+
+4. **Phase 20+: Future Enhancements**
+   - Privacy improvements (onion routing, private set intersection)
+   - Trust graph hardening (Sybil detection, contribution decay)
+   - Conditional on pilot feedback
+
+**See Also:**
+- [ROADMAP.md](ROADMAP.md#phase-17-storage-hardening--replication-4-weeks) - Complete phase specifications
+- [ARCHITECTURE.md Section 7.4](docs/ARCHITECTURE.md#74-data-durability--replication) - Replication design
+- [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work) - Gap analysis
+
+**Critical Milestone**: After Phase 18 completion (~10 weeks), ICN is production-ready for pilot deployment with fault-tolerant storage, Byzantine fault detection, conflict resolution, and resource protection.
+
+---
+
 ### Added - Policy Management API & CLI (Phase 16E Week 4) (2025-11-24)
 
 **Complete End-to-End Policy Management Infrastructure:**

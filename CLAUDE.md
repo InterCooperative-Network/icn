@@ -830,11 +830,39 @@ This enables real-time task monitoring for web/mobile applications via WebSocket
 
 ---
 
-**What's Next**: See [ROADMAP.md](/ROADMAP.md) for strategic roadmap. Critical path:
-- **Phase 13**: ✅ Governance Primitives v1 COMPLETE (CLI + integration test ready for pilot)
-- **Track C1**: Pilot Community Selection & Deployment - NEXT PRIORITY
-- **Track B2**: Legal & Regulatory Radar (lightweight, ongoing)
-- **Track B3**: ✅ Economic Modeling COMPLETE (simulation validates Phase 12 defaults)
+**Phase 16 - Scheduler Evolution (Complete ✓)** (2025-11-23 to 2025-11-24):
+Five-phase incremental evolution from reactive task claiming to intelligent, trust-governed scheduling:
+
+- **Phase 16A**: Resource Profiles & Matching (CPU/RAM/GPU requirements + capacity tracking)
+- **Phase 16B**: Placement Scoring (multi-factor scoring: trust 40%, capacity 30%, queue 20%, jitter 10%)
+- **Phase 16C**: Locality Awareness (network topology + data locality for "compute goes to data" optimization)
+- **Phase 16D**: Actor State & Migration (stateful actors with checkpoint-based fault tolerance)
+- **Phase 16E**: Cooperative Policies (per-coop quotas, rules, enforcement modes)
+
+**Deliverables**:
+- 98 tests passing across all compute features
+- Complete CLI (`icnctl policy`, `icnctl quota`) and RPC interface (`policy.*`, `quota.*` methods)
+- 6 example policies with comprehensive documentation (800+ lines)
+- PolicyManager with 8 rule types (DataSovereignty, TimeWindow, MemberPriority, RequireCapability, ExecutorFilter, etc.)
+- Placement scoring integrates trust, capacity, network latency, data locality, and user hints
+- Full scheduler stack ready for pilot deployment
+
+**Spec Impact**: Updates [ARCHITECTURE.md Section 5](docs/ARCHITECTURE.md#5-compute-layer) (Compute Layer)
+
+See [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) for complete 8,800+ word design document.
+
+---
+
+**What's Next**: See [ROADMAP.md](/ROADMAP.md) (ICN-DEP-ROADMAP-01) for complete strategic roadmap. Critical path:
+- **Phase 16**: ✅ Scheduler Evolution (16A-E) COMPLETE - Intelligent placement, locality awareness, cooperative policies (2025-11-24)
+- **Phase 17**: Storage Hardening & Replication (4 weeks) - **NEXT PRIORITY**
+  - Trust-weighted replica selection, ReplicationManager actor, 99.9% durability target
+- **Phase 18**: Pre-Pilot Hardening (6 weeks) - **PRE-PILOT CRITICAL**
+  - Byzantine fault detection, partition healing, conflict resolution, storage quotas
+- **Track C1**: Pilot Community Selection - **CAN START IN PARALLEL** with Phase 17
+- **Phase 19+**: Post-pilot scalability & privacy improvements (driven by pilot feedback)
+
+**Pre-Pilot Timeline**: 10 weeks (Phase 17 + 18) → pilot-ready infrastructure with fault tolerance and Byzantine resistance
 
 **Three-Layer Security Architecture (Production Ready ✅)**:
 1. **Transport Layer**: QUIC/TLS with DID-TLS binding

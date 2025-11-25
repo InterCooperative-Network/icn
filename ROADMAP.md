@@ -1,18 +1,38 @@
 # ICN Roadmap
 
-**Status**: Phase 16E Policies ✅, Phase 16D Actor Migration ✅, Phase 16C Locality ✅, Phase 14 Gateway ✅, Phase 12 ✅, Track B1 ✅, Track B3 ✅ - All Tests Passing (98 compute tests)
-**Next**: Track C1 (Pilot Selection) → MVC Track | Scheduler Evolution (16A-E) Complete
+**Document ID**: ICN-DEP-ROADMAP-01
+**Version**: 0.3.0
+**Maintainer**: ICN Foundation (Matthew Faherty, lead)
+**Canonical Spec**: [ARCHITECTURE.md](docs/ARCHITECTURE.md) (ICN-DEP-01 - Foundation Protocol Specification)
+
+---
+
+**Status**: Phase 16 Complete ✅ (Scheduler Evolution 16A-E), Phase 15 ✅ (Compute), Phase 14 ✅ (Gateway), Phases 11-12 ✅, Tracks B1-B3 ✅, Pilot Tooling ✅ - All 460+ Tests Passing
+**Next**: Phase 17 Storage Hardening (4 weeks) → Phase 18 Pre-Pilot Hardening (6 weeks) → Track C1 Pilot Selection (parallel)
 
 ## Executive Summary
 
-**Substrate Status**: Production-ready. Security hardened, multi-device identity, economic safety rails, operational tooling, economic validation, and Gateway API complete.
+**Substrate Status**: Core features complete (Phases 1-16). Pre-pilot hardening in progress.
 
-**Gap Analysis**: ICN is a *substrate daemon*, not a deployable product for cooperatives. Two complementary gap assessments:
+**Completed Infrastructure**:
+- Three-layer security (transport/message/application encryption)
+- Multi-device identity with key rotation
+- Economic safety rails (dynamic credit limits, disputes, quotas)
+- Gateway API (REST + WebSocket events)
+- Distributed compute with intelligent scheduling
+- Operational tooling (backup/restore, monitoring, graceful restart)
+- Economic validation (agent-based simulation)
+
+**Pre-Pilot Critical Work** (10 weeks):
+- **Phase 17** (4 weeks): Storage replication with 99.9% durability
+- **Phase 18** (6 weeks): Byzantine fault tolerance, partition healing, conflict resolution
+
+**Gap Analysis**:
+- [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work): Complete technical gap analysis (10 critical gaps identified)
 - [Strategic Gap Analysis](docs/strategic-gap-analysis.md): 15 structural gaps (substrate→system transition)
-- [Implementation Gap Analysis](docs/gap-analysis.md): Documentation vs reality audit with status markers (✅🚧📋❌)
-- [Minimal Viable Coop Track](docs/MINIMAL-VIABLE-COOP.md): Focused 13-week roadmap to pilot deployment
+- [Implementation Gap Analysis](docs/gap-analysis.md): Documentation vs reality audit
 
-**Critical Path**: MVC Track (Minimal Viable Coop) - ruthlessly focused on one end-to-end use case rather than polishing individual components. Select pilot community, close only gaps blocking that pilot, deploy and learn.
+**Critical Path**: Complete Phase 17-18 hardening (10 weeks) → Select pilot community (parallel) → Build pilot MVP (4-6 weeks) → 3-month pilot deployment → Phase 19+ driven by learnings.
 
 ---
 
@@ -90,6 +110,8 @@ RotationEvent {
 - Migration path from v2.1 keystore to multi-device format
 - Documentation: `docs/multi-device-identity.md`
 
+**Spec Impact**: Updates [ARCHITECTURE.md Section 2.1](docs/ARCHITECTURE.md#21-identity-layer) (Identity Layer - Multi-Device Support)
+
 ---
 
 ### Phase 12: Economic Safety Rails ✅ COMPLETE
@@ -152,11 +174,13 @@ pub enum EntryStatus {
 - Economic simulation (see Track B3)
 - Documentation: `docs/economic-safety.md`
 
+**Spec Impact**: Updates [ARCHITECTURE.md Section 3](docs/ARCHITECTURE.md#3-ledger-layer) (Ledger Layer - Economic Safety)
+
 ---
 
-### Phase 14: Gateway API ✅ COMPLETE (Core), SDK & Reference App (Pending)
-**Status**: Gateway Complete (2025-01-15), SDK/App Deferred until Pilot Selected
-**Blocker For**: Client applications - Partially Unblocked
+### Phase 14: Gateway API ✅ COMPLETE
+**Status**: Gateway Complete (2025-01-15), SDK & Pilot UI Complete (2025-01-17, see Track C Pilot Tooling)
+**Blocker For**: Client applications - NOW UNBLOCKED
 
 **Strategic Shift**: ICN as Cooperative Backend Platform
 
@@ -192,9 +216,10 @@ pub enum EntryStatus {
    - ✅ Authenticated user DID extraction for cooperative ownership
    - 38 passing tests (5 rate limiting + 2 authorization + 1 ownership)
 
-**Still Needed** (Deferred until pilot selection):
-4. **TypeScript SDK** - `@icn/client` npm package
-5. **Reference App** - Timebank or other pilot-specific application
+**Client Infrastructure** ✅ (Completed in Track C Pilot Tooling, 2025-01-17):
+4. **TypeScript SDK** - `@icn/client` npm package (see [sdk/typescript/](sdk/typescript/))
+5. **Pilot Web UI** - Simple browser interface (see [web/pilot-ui/](web/pilot-ui/))
+6. **OpenAPI Specification** - Complete API documentation (see [docs/api/openapi.yaml](docs/api/openapi.yaml))
 
 **Recently Completed** (2025-11-21):
 - ✅ WebSocket reconnection and event backfill
@@ -203,28 +228,32 @@ pub enum EntryStatus {
   - Client can request missed events via `Backfill` message
   - AuthOk includes `current_seq` for reconnection tracking
 
-**Success Criteria**: ✅ Gateway Complete
+**Success Criteria**: ✅ ALL COMPLETE
 - ✅ Gateway API operational and integrated into icnd
 - ✅ JWT authentication working (challenge → token → protected endpoints)
 - ✅ WebSocket events streaming to connected clients
 - ✅ WebSocket reconnection with event backfill
 - ✅ Cooperative namespace isolation functional
-- 🔲 TypeScript SDK (deferred)
-- 🔲 Reference application (deferred)
+- ✅ TypeScript SDK (completed in Track C Pilot Tooling)
+- ✅ Pilot web UI (completed in Track C Pilot Tooling)
 
-**Deliverables**: ✅ Gateway Complete
+**Deliverables**: ✅ Gateway Complete + Client Infrastructure
 - ✅ `icn-gateway` crate with 38 passing tests (updated 2025-11-16)
 - ✅ Integration into icnd supervisor
 - ✅ Configuration system and CLI support
 - ✅ Documentation: dev journals, CHANGELOG.md, example configs
 - ✅ API versioning, rate limiting, scope-based authorization, and authenticated ownership (Phase 14 production hardening)
-- 🔲 `@icn/client` SDK (deferred)
-- 🔲 Reference app (deferred)
+- ✅ `@icn/client` TypeScript SDK (completed in Track C Pilot Tooling, 2025-01-17)
+- ✅ Pilot web UI (completed in Track C Pilot Tooling, 2025-01-17)
+- ✅ OpenAPI specification (completed in Track C Pilot Tooling, 2025-01-17)
+
+**Spec Impact**: Updates [ARCHITECTURE.md Section 6](docs/ARCHITECTURE.md#6-gateway-api-layer) (Gateway API Layer)
 
 **Next Steps**:
-- Select pilot community (Track C1)
-- Build SDK + reference app for pilot's specific workflows
-- Don't build generic SDK speculatively - build what pilots need
+- Phase 17: Storage hardening (4 weeks)
+- Phase 18: Pre-pilot hardening (6 weeks)
+- Track C1: Select pilot community (parallel with Phase 17)
+- Track C2: Build pilot MVP using existing SDK and UI
 
 ---
 
@@ -450,6 +479,8 @@ Proposal {
 - Documentation: CHANGELOG.md, dev journal (1,365 lines total)
 - **Test Coverage**: 98 tests passing (30 policy tests + 68 existing compute)
 
+**Spec Impact**: Updates [ARCHITECTURE.md Section 5](docs/ARCHITECTURE.md#5-compute-layer) (Compute Layer - Scheduler Evolution & Cooperative Policies)
+
 ---
 
 **Success Criteria (Phases 16A-E Complete) ✅**:
@@ -472,18 +503,584 @@ Proposal {
 
 ---
 
-### Phase 17+: TBD - Driven by Pilot Learnings
-**Status**: Not Planned Yet
-**Approach**: Let pilots reveal what's actually needed
+### Phase 17: Storage Hardening & Replication (4 weeks)
+**Status**: Not Started - **PRE-PILOT CRITICAL**
+**Blocker For**: Production deployment with fault tolerance
+**Duration**: 4 weeks
 
-**Possible Directions** (conditional on feedback):
-- **App Runtime** (if co-ops need custom backend logic but can't run servers)
-- **Governance Templates** (if governance patterns are clear and repeatable)
-- **Better Self-Hosting Tools** (if co-ops want to self-host but struggle with devops)
-- **Federation** (if multiple co-ops want to interconnect)
-- **Mobile Apps** (if web-on-phone isn't sufficient)
+**Motivation**: Current ICN relies on implicit gossip-based replication with no guarantees. If a node fails, data loss is probabilistic. Before pilots deploy to real communities, we need explicit replication policies with health monitoring and automatic recovery.
 
-**Philosophy**: Don't speculate. Build what pilots prove is necessary.
+**Critical Gap Addressed**: Data durability and fault tolerance (see [ARCHITECTURE.md Section 7.4](docs/ARCHITECTURE.md#74-data-durability--replication))
+
+**Scope**:
+- Trust-weighted replica selection algorithm
+- ReplicationManager actor for health monitoring
+- Storage layer extensions for replica tracking
+- Gossip protocol extensions (ReplicaRequest/Offer/Status)
+- Configurable replication policies per data type
+- Automatic re-replication when replicas lost
+
+**Technical Design**:
+```rust
+// icn-storage/src/replication.rs
+pub struct ReplicationPolicy {
+    data_type: DataType,
+    min_replicas: usize,        // Hard minimum (alert if below)
+    target_replicas: usize,     // Soft target (continuous optimization)
+    strategy: ReplicationStrategy,
+}
+
+pub enum ReplicationStrategy {
+    TrustWeighted { min_trust: f64 },           // Replicate to high-trust peers
+    Participants { dids: Vec<Did> },            // Contract/ledger participants
+    GeoDiverse { regions: Vec<String> },        // Regional spread for resilience
+    Hybrid(Vec<ReplicationStrategy>),           // Combine strategies
+}
+
+pub enum DataType {
+    LedgerEntry,      // Critical: all participants + 3 trusted peers
+    Contract,         // Critical: all participants + 2 trusted peers
+    TrustEdge,        // Personal: local + 2 high-trust backups
+    ComputeTask,      // Ephemeral: 2 executors (temporary)
+    ComputeResult,    // Important: submitter + 2 trusted peers
+}
+
+// icn-core/src/replication_manager.rs
+pub struct ReplicationManager {
+    policies: HashMap<DataType, ReplicationPolicy>,
+    health_checker: Arc<HealthChecker>,
+    replica_selector: Arc<ReplicaSelector>,
+}
+
+impl ReplicationManager {
+    /// Background task: check replication health every 60s
+    pub async fn monitor_loop(&self) {
+        loop {
+            self.check_all_data_types().await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+    }
+
+    /// Trigger re-replication if below min_replicas
+    async fn check_all_data_types(&self) {
+        for (data_type, policy) in &self.policies {
+            let status = self.health_checker.check(data_type).await?;
+            if status.replica_count < policy.min_replicas {
+                self.trigger_replication(data_type, policy).await?;
+            }
+        }
+    }
+}
+```
+
+**Configuration**:
+```toml
+[storage.replication]
+enabled = true
+check_interval_seconds = 60
+
+[storage.replication.ledger]
+min_replicas = 3
+target_replicas = 5
+strategy = "trust_weighted"
+min_trust = 0.4
+
+[storage.replication.contracts]
+min_replicas = 2
+target_replicas = 3
+strategy = "participants"  # All contract participants + trusted backups
+```
+
+**Implementation Timeline**:
+- **Week 1**: Storage layer extensions
+  - Add replica tracking metadata to Store trait
+  - Implement `list_replicas(content_hash)` and `get_replica_count()`
+  - Add replica metadata to gossip entry announcements
+- **Week 2**: Gossip protocol extensions
+  - New message types: `ReplicaRequest`, `ReplicaOffer`, `ReplicaStatus`
+  - Update gossip actor to track replica locations
+  - Implement replica transfer protocol
+- **Week 3**: ReplicationManager actor
+  - Implement health monitoring loop
+  - Trust-weighted replica selection algorithm
+  - Integrate with supervisor lifecycle
+- **Week 4**: Integration testing and tuning
+  - Test failure scenarios (node crash, network partition)
+  - Performance testing (replication overhead)
+  - Documentation and operational guides
+
+**Success Criteria**:
+- Ledger entries survive single node failure (99.9% durability)
+- Replica count recovers within 5 minutes of node failure
+- Replication overhead <10% of network bandwidth
+- Clear operational dashboards show replication health
+- Prometheus metrics: `icn_storage_replicas_count`, `icn_storage_replication_failures_total`
+
+**Deliverables**:
+- `icn-storage/src/replication.rs` - ReplicationPolicy and storage extensions
+- `icn-core/src/replication_manager.rs` - ReplicationManager actor
+- `icn-gossip/src/protocol.rs` - Replica gossip messages
+- `docs/replication-operations.md` - Operational guide
+- Integration tests for failure scenarios
+- Updated ARCHITECTURE.md with replication semantics (already complete)
+
+**Spec Impact**: Implements [ARCHITECTURE.md Section 7.4](docs/ARCHITECTURE.md#74-data-durability--replication) (Data Durability & Replication)
+
+**Prometheus Metrics**:
+- `icn_storage_replicas_count{data_type, content_hash}` - Current replica count
+- `icn_storage_replicas_below_min_total{data_type}` - Count of under-replicated items
+- `icn_storage_replication_requests_total` - Replication requests sent
+- `icn_storage_replication_transfers_total` - Successful replica transfers
+- `icn_storage_replication_failures_total{reason}` - Failed replication attempts
+
+---
+
+### Phase 18: Pre-Pilot Hardening (6 weeks)
+**Status**: Not Started - **PRE-PILOT CRITICAL**
+**Blocker For**: Production deployment with malicious nodes
+**Duration**: 6 weeks
+
+**Motivation**: Phase 17 provides fault tolerance against crashes. Phase 18 provides safety against malicious behavior. Before deploying to real communities with real economic stakes, we need Byzantine fault detection, conflict resolution, and resource protection.
+
+**Critical Gaps Addressed**: See [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work)
+- 12.1 Byzantine Fault Tolerance
+- 12.2 Network Partition Healing
+- 12.3 Contract Execution Disputes
+- 12.4 Ledger Fork Resolution
+- 12.5 Storage Exhaustion Protection
+- 12.6 Upgrade Coordination
+
+**Scope - Week 1-2: Byzantine Fault Detection**:
+```rust
+// icn-security/src/misbehavior.rs
+pub struct MisbehaviorDetector {
+    violations: HashMap<Did, Vec<Violation>>,
+    thresholds: MisbehaviorThresholds,
+    reputation_scores: HashMap<Did, ReputationScore>,
+}
+
+pub enum Violation {
+    InvalidSignature { message_hash: ContentHash },
+    ConflictingLedgerEntries { entry1: ContentHash, entry2: ContentHash },
+    FailedComputeVerification { task_hash: ContentHash, expected: ContentHash, actual: ContentHash },
+    ExcessiveResourceUse { metric: String, observed: u64, limit: u64 },
+    TrustGraphSpam { rate: f64, threshold: f64 },
+}
+
+pub struct MisbehaviorThresholds {
+    quarantine_threshold: usize,    // Violations before auto-quarantine
+    ban_threshold: usize,           // Violations before auto-ban
+    decay_period: Duration,         // Time for violations to decay
+}
+
+impl MisbehaviorDetector {
+    pub fn record_violation(&mut self, did: &Did, violation: Violation) {
+        self.violations.entry(did.clone()).or_default().push(violation);
+        self.update_reputation(did);
+
+        if self.should_quarantine(did) {
+            self.emit_quarantine_event(did);
+        }
+    }
+}
+```
+
+**Scope - Week 3: Network Partition Healing**:
+```rust
+// icn-gossip/src/partition.rs
+pub struct PartitionDetector {
+    last_seen: HashMap<Did, Instant>,
+    partition_threshold: Duration,  // 5 minutes of no contact = suspected partition
+}
+
+pub struct PartitionHealer {
+    vector_clock_merger: VectorClockMerger,
+    conflict_resolver: ConflictResolver,
+}
+
+impl PartitionHealer {
+    /// When partition heals, merge vector clocks and resolve conflicts
+    pub async fn heal_partition(&self, peer: &Did, their_clock: VectorClock) -> Result<()> {
+        // Merge clocks (detect causality violations)
+        let conflicts = self.vector_clock_merger.merge(peer, their_clock)?;
+
+        // Resolve conflicts per data type
+        for conflict in conflicts {
+            match conflict.data_type {
+                DataType::LedgerEntry => self.resolve_ledger_conflict(conflict).await?,
+                DataType::Contract => self.resolve_contract_conflict(conflict).await?,
+                DataType::TrustEdge => self.resolve_trust_conflict(conflict).await?,
+                _ => self.log_and_keep_both(conflict).await?,
+            }
+        }
+
+        Ok(())
+    }
+}
+```
+
+**Scope - Week 4: Contract Execution Disputes**:
+```rust
+// icn-ccl/src/disputes.rs
+pub struct DisputeResolutionSystem {
+    dispute_store: Arc<dyn Store>,
+    mediator_pool: Vec<Did>,  // Elected mediators from governance
+}
+
+pub enum DisputeOutcome {
+    SubmitterCorrect,           // Original result stands
+    ExecutorCorrect,            // Challenger was wrong
+    BothWrong { correct_result: Value },  // Third-party re-execution
+    Inconclusive { reason: String },      // Human arbitration needed
+}
+
+impl DisputeResolutionSystem {
+    /// Challenge a compute result
+    pub async fn file_dispute(&self,
+        task_hash: ContentHash,
+        claimed_result: Value,
+        evidence: Vec<u8>,
+        challenger: Did,
+    ) -> Result<DisputeId> {
+        // Automatically re-execute contract
+        let canonical_result = self.re_execute_contract(task_hash).await?;
+
+        // If mismatch, quarantine executor
+        if canonical_result != claimed_result {
+            self.record_misbehavior(&executor, Violation::FailedComputeVerification { ... });
+        }
+
+        Ok(dispute_id)
+    }
+}
+```
+
+**Scope - Week 5: Ledger Fork Resolution**:
+```rust
+// icn-ledger/src/fork_resolution.rs
+pub enum ForkResolutionStrategy {
+    /// Prefer entry with earlier timestamp (first-write-wins)
+    TimestampPreference,
+
+    /// Prefer entry from higher-trust participant
+    TrustWeighted,
+
+    /// Prefer entry with more co-signatures (participant consensus)
+    MajoritySignatures,
+
+    /// Combination strategy (trust-weighted majority)
+    Hybrid,
+}
+
+impl Ledger {
+    pub fn resolve_fork(&mut self, entry1: &JournalEntry, entry2: &JournalEntry) -> Result<JournalEntry> {
+        // Both entries reference same parent but different hashes
+        match self.fork_strategy {
+            ForkResolutionStrategy::TrustWeighted => {
+                let trust1 = self.trust_graph.compute_trust(&entry1.author)?;
+                let trust2 = self.trust_graph.compute_trust(&entry2.author)?;
+
+                if trust1 > trust2 { entry1.clone() } else { entry2.clone() }
+            }
+            // ... other strategies
+        }
+    }
+}
+```
+
+**Scope - Week 6: Storage Exhaustion & Upgrade Coordination**:
+```rust
+// icn-storage/src/quotas.rs
+pub struct StorageQuotaManager {
+    quotas: HashMap<Did, StorageQuota>,
+    global_limit: u64,
+}
+
+pub struct StorageQuota {
+    max_bytes: u64,
+    current_bytes: u64,
+    priority: QuotaPriority,  // Critical, High, Normal, Low
+}
+
+impl StorageQuotaManager {
+    pub fn can_store(&self, did: &Did, size: u64) -> Result<()> {
+        let quota = self.quotas.get(did).ok_or(Error::NoQuota)?;
+
+        if quota.current_bytes + size > quota.max_bytes {
+            return Err(Error::QuotaExceeded);
+        }
+
+        Ok(())
+    }
+
+    /// Automatic cleanup: evict low-priority data when approaching global limit
+    pub fn evict_if_needed(&mut self) -> Result<()> {
+        if self.total_usage() > 0.9 * self.global_limit {
+            self.evict_lowest_priority_data()?;
+        }
+        Ok(())
+    }
+}
+
+// Upgrade coordination via governance (Phase 13 integration)
+// See ARCHITECTURE.md Section 12.6 for full design
+```
+
+**Success Criteria**:
+- Byzantine node (invalid signatures, conflicting entries) detected within 3 messages
+- Network partition heal completes within 60 seconds of reconnection
+- Ledger forks resolve deterministically (100% of test cases)
+- Storage exhaustion prevented (no crashes from disk full)
+- Upgrade proposals can be created and voted on via governance
+
+**Deliverables**:
+- `icn-security/src/misbehavior.rs` - Byzantine fault detection
+- `icn-gossip/src/partition.rs` - Partition detection and healing
+- `icn-ccl/src/disputes.rs` - Contract execution disputes
+- `icn-ledger/src/fork_resolution.rs` - Ledger conflict resolution
+- `icn-storage/src/quotas.rs` - Storage quota management
+- Integration with Phase 13 governance for upgrade coordination
+- Comprehensive test suite for all failure modes
+- `docs/security-operations.md` - Incident response procedures
+
+**Spec Impact**: Implements [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work) (Byzantine Fault Tolerance, Partition Healing, Conflict Resolution, Storage Quotas)
+
+**Prometheus Metrics**:
+- `icn_security_violations_total{did, violation_type}` - Misbehavior tracking
+- `icn_security_quarantined_peers` - Currently quarantined nodes
+- `icn_gossip_partitions_detected_total` - Partition events
+- `icn_gossip_partition_heal_duration_seconds` - Healing time
+- `icn_ledger_forks_resolved_total{strategy}` - Fork resolution stats
+- `icn_storage_quota_exceeded_total{did}` - Quota violations
+- `icn_storage_evictions_total{priority}` - Automatic cleanup events
+
+---
+
+### Phase 19: Post-Pilot Improvements (4 weeks)
+**Status**: Not Started - **POST-PILOT PRIORITY**
+**Timing**: After 3-month pilot, driven by real usage patterns
+**Duration**: 4 weeks
+
+**Motivation**: Phases 17-18 address critical safety gaps. Phase 19 addresses scalability and usability issues that pilots reveal. These are important but not deployment-blockers.
+
+**Critical Gaps Addressed**: See [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work)
+- 12.7 Scalability Limits
+- 12.8 Clock Synchronization
+
+**Scope - Week 1-2: Scalability Analysis & Optimization**:
+
+**Current Tested Limits** (baseline):
+| Dimension | Tested | Target | Breaking Point |
+|-----------|--------|--------|----------------|
+| Nodes per cooperative | 10 | 100 | ~1,000 (vector clock overhead) |
+| Transactions per second | 10/node | 100/node | ~500/node (signature verification CPU) |
+| Trust graph size | 100 DIDs | 1,000 DIDs | ~10,000 (computation time) |
+| Gossip topics | 10 | 50 | ~200 (subscription overhead) |
+| Concurrent connections | 20 | 100 | ~500 (file descriptor limits) |
+
+**Optimization Plan**:
+```rust
+// icn-gossip/src/scalability.rs
+
+/// Week 1: Vector clock compression (reduce from 32 bytes/peer to 8 bytes)
+pub struct CompressedVectorClock {
+    // Store only deltas from baseline, use varint encoding
+    deltas: HashMap<Did, VarInt>,
+    baseline_version: u64,
+}
+
+/// Week 1: Trust graph caching (reduce computation from O(n²) to O(1) lookups)
+pub struct TrustGraphCache {
+    precomputed_scores: LruCache<(Did, Did), f64>,
+    recompute_threshold: Duration,  // Recompute every 5 minutes
+}
+
+/// Week 2: Signature verification batching (verify 100 signatures in parallel)
+pub struct SignatureBatchVerifier {
+    pending: Vec<(PublicKey, Signature, Message)>,
+    batch_size: usize,  // 100 signatures
+    max_wait: Duration, // 10ms max latency
+}
+
+/// Week 2: Gossip topic sharding (partition large topics across peers)
+pub struct TopicShard {
+    shard_id: usize,
+    total_shards: usize,
+    responsible_range: (ContentHash, ContentHash),
+}
+```
+
+**Scope - Week 3-4: Clock Synchronization**:
+```rust
+// icn-time/src/sync.rs
+
+/// Implement Rough Time Protocol (RFC 8915) for cooperative-wide clock sync
+pub struct RoughTimeClient {
+    trusted_servers: Vec<RoughTimeServer>,
+    max_clock_skew: Duration,  // 300 seconds
+}
+
+pub struct ClockSync {
+    offset: Duration,           // Local clock offset from network median
+    uncertainty: Duration,      // Confidence interval
+    last_sync: Instant,
+}
+
+impl ClockSync {
+    /// Query multiple time servers, use median
+    pub async fn sync(&mut self) -> Result<()> {
+        let responses = self.query_servers().await?;
+        let median_time = self.compute_median(responses)?;
+
+        self.offset = median_time - Instant::now();
+        self.uncertainty = self.compute_uncertainty(responses);
+
+        Ok(())
+    }
+
+    /// Reject messages with timestamps outside uncertainty window
+    pub fn validate_timestamp(&self, timestamp: u64) -> Result<()> {
+        let now = self.network_time();
+        let acceptable_range = (
+            now - self.max_clock_skew,
+            now + self.max_clock_skew,
+        );
+
+        if timestamp < acceptable_range.0 || timestamp > acceptable_range.1 {
+            return Err(Error::TimestampOutOfRange);
+        }
+
+        Ok(())
+    }
+}
+```
+
+**Configuration**:
+```toml
+[time_sync]
+enabled = true
+sync_interval_seconds = 600  # Sync every 10 minutes
+max_clock_skew_seconds = 300
+rough_time_servers = [
+    "roughtime.cloudflare.com:2003",
+    "roughtime.int08h.com:2002",
+]
+
+[scalability]
+vector_clock_compression = true
+trust_cache_size = 10000
+signature_batch_size = 100
+topic_sharding_threshold = 1000  # Shard topics with >1000 entries
+```
+
+**Success Criteria**:
+- Support 100-node cooperatives without degradation
+- Process 100 tx/sec/node sustained load
+- Trust graph queries <10ms for 1,000 DIDs
+- Clock skew <300s across all nodes
+- Graceful degradation beyond target limits
+
+**Deliverables**:
+- `icn-gossip/src/scalability.rs` - Compression and batching optimizations
+- `icn-time/src/sync.rs` - Clock synchronization (Rough Time Protocol)
+- `icn-trust/src/cache.rs` - Trust graph caching layer
+- Performance benchmarks and scaling tests
+- `docs/scalability-guide.md` - Capacity planning guide
+- Updated metrics dashboards with scaling indicators
+
+**Prometheus Metrics**:
+- `icn_gossip_vector_clock_size_bytes` - Clock size tracking
+- `icn_trust_cache_hit_ratio` - Cache effectiveness
+- `icn_signature_batch_size` - Batching efficiency
+- `icn_time_sync_offset_seconds` - Clock offset from network median
+- `icn_time_sync_uncertainty_seconds` - Time uncertainty window
+
+---
+
+### Phase 20+: Future Enhancements
+**Status**: Not Planned - **DRIVEN BY PILOT LEARNINGS**
+**Timing**: After 6+ months of production use
+**Approach**: Let real-world usage reveal priorities
+
+**Critical Gaps Deferred**: See [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work)
+- 12.9 Privacy & Metadata Leakage
+- 12.10 Trust Graph Gaming
+
+**Possible Future Work** (conditional on pilot feedback):
+
+**Privacy Enhancements**:
+- Onion routing for gossip (hide message graph topology)
+- Private set intersection (discover mutual connections without revealing all edges)
+- Encrypted topic metadata (hide topic names from network observers)
+- Traffic analysis resistance (constant-rate padding)
+
+**Trust Graph Hardening**:
+- Sybil detection algorithms (graph analysis for fake identities)
+- Contribution decay (require ongoing participation to maintain trust)
+- Attestation chains (evidence-based trust, not just social links)
+- Trust delegation limits (prevent cascading trust exploitation)
+
+**App Runtime** (if co-ops need custom backend logic):
+- WASM-based app platform
+- Sandboxed execution environment
+- Resource quotas per application
+
+**Governance Templates** (if patterns emerge from pilots):
+- Consensus-with-fallback contracts
+- Sociocracy consent decision templates
+- Council delegation patterns
+
+**Better Self-Hosting Tools** (if co-ops struggle with devops):
+- One-click deployment (Ansible playbooks)
+- Automatic TLS certificate management
+- Monitoring stack templates
+
+**Federation** (if 2+ cooperatives want to interconnect):
+- Cross-cooperative credit settlement
+- Governance bridging protocols
+- Shared resource pools
+
+**Mobile Apps** (if web-on-phone isn't sufficient):
+- Native iOS/Android clients
+- Offline-first sync
+- Push notifications
+
+**Philosophy**: Don't speculate. Build what pilots prove is necessary. These are hypotheses to validate, not a fixed roadmap.
+
+---
+
+### Implementation Priorities
+
+**Pre-Pilot Critical Path** (10 weeks total):
+1. ✅ **Phases 11-12 Complete**: Multi-device identity, economic safety (2025-01-14)
+2. ✅ **Phase 14 Gateway Complete**: REST API, WebSocket events (2025-01-15)
+3. ✅ **Track B1 Complete**: Operational hardening (2025-01-14)
+4. ✅ **Track B3 Complete**: Economic modeling (2025-01-14)
+5. **Phase 17** (4 weeks): Storage hardening & replication - **NEXT PRIORITY**
+6. **Phase 18** (6 weeks): Pre-pilot hardening (Byzantine, conflicts, quotas)
+
+**Total time to pilot-ready**: ~10 weeks from Phase 17 start
+
+**Post-Pilot Improvements** (4+ weeks):
+7. **Phase 19** (4 weeks): Scalability & clock sync - **AFTER 3-MONTH PILOT**
+8. **Phase 20+**: Privacy, trust hardening, federation - **AS NEEDED**
+
+**Parallelization Opportunities**:
+- Track C1 (pilot selection) can start immediately alongside Phase 17
+- Track B2 (legal docs) continues in background
+- Phase 19 scope can be refined during Phase 18 based on early pilot feedback
+
+**Critical Milestone**: After Phase 18 completion, ICN is production-ready for pilot deployment with:
+- Fault-tolerant data storage
+- Byzantine fault detection
+- Conflict resolution mechanisms
+- Resource protection
+- Economic safety rails
+- Operational tooling
+
+**See Also**:
+- [ARCHITECTURE.md Section 7.4](docs/ARCHITECTURE.md#74-data-durability--replication) - Replication design
+- [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work) - Complete gap analysis
 
 ---
 
@@ -912,25 +1509,43 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 4. ✅ Track B1: Operational Hardening (COMPLETE - 2025-01-14)
 5. ✅ Track B3: Economic Modeling (COMPLETE - 2025-01-14)
 6. ✅ Phase 14: Gateway API Core (COMPLETE - 2025-01-15)
+7. ✅ Phase 15: Distributed Compute (COMPLETE - 2025-11-21)
+8. ✅ Phase 16: Scheduler Evolution (COMPLETE - 2025-11-24)
 
 **What Must Happen Before Pilot Deployment:**
-1. ⏳ C1: Select pilot community (2-4 weeks, can start NOW) - **CRITICAL PATH**
-2. ⏳ C2: Build MVP for that community's workflows (4-6 weeks)
+1. **Phase 17** (4 weeks): Storage hardening & replication - **NEXT PRIORITY**
+   - Trust-weighted replica selection
+   - ReplicationManager actor with health monitoring
+   - Gossip protocol extensions for replica coordination
+   - 99.9% durability target
+2. **Phase 18** (6 weeks): Pre-pilot hardening - **PRE-PILOT CRITICAL**
+   - Byzantine fault detection and quarantine
+   - Network partition healing with conflict resolution
+   - Contract execution disputes and ledger fork resolution
+   - Storage quotas and upgrade coordination
+3. ⏳ **C1**: Select pilot community (2-4 weeks, can start NOW) - **CRITICAL PATH**
+4. ⏳ **C2**: Build MVP for that community's workflows (4-6 weeks)
    - TypeScript SDK for pilot needs
    - Simple web UI for pilot workflows
    - Pilot-specific integrations (email, notifications)
 
-**Total time to pilot: ~6-10 weeks** (1.5-2.5 months) from pilot selection
+**Total time to pilot-ready infrastructure: ~10 weeks** (Phase 17 + Phase 18)
+**Total time to pilot deployment: ~16-20 weeks** (infrastructure + community selection + MVP)
 
 **Parallelization**:
-- C1 (community selection) can start immediately
-- B3 (economic modeling) can run during Phase 11
-- B2 (legal docs) can be written anytime
+- C1 (community selection) can start immediately alongside Phase 17
+- C2 (MVP development) scope refined during Phase 18
+- B2 (legal docs) continues in background
 
 **What Happens After Pilot:**
-- Phase 13 scope is driven by pilot learnings
-- Track A future phases prioritized by what pilot communities actually need
-- Federation (Phase 16+) only makes sense when 2+ communities are running ICN
+- **Phase 19** (4 weeks): Scalability & clock sync - **POST-PILOT IMPROVEMENTS**
+  - Driven by actual pilot load patterns
+  - Vector clock compression, trust caching, signature batching
+  - Rough Time Protocol for clock synchronization
+- **Phase 20+**: Privacy, trust hardening, federation - **AS NEEDED**
+  - Conditional on pilot feedback and real-world requirements
+- Phase 13 governance scope prioritized by what pilot communities actually need
+- Federation only makes sense when 2+ communities are running ICN
 
 ---
 
@@ -972,60 +1587,90 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 
 ---
 
-## Strategic Assessment (2025-01-15)
+## Strategic Assessment (2025-11-24)
 
 ### What We've Built
 
-**Substrate Infrastructure** (Phases 1-12):
+**Substrate Infrastructure** (Phases 1-16):
 - Three-layer security architecture (transport, message, application)
 - Multi-device identity with key rotation and gossip sync
 - Dynamic credit limits with new member protection
 - Dispute resolution and write-off mechanisms
 - Backup/restore, graceful restart, monitoring
 - Economic validation via agent-based simulation
+- Gateway API with JWT auth, rate limiting, WebSocket events
+- Distributed compute with trust-gated task execution
+- Intelligent scheduler with locality awareness and cooperative policies
 
-**All 268 tests passing** ✅
+**All tests passing** ✅ (460+ tests across all crates)
 
-### What We're Missing
+### What We're Missing (Pre-Pilot Critical)
 
-**Social Layer**:
-- Invitation flows, role management, consent mechanisms
+**Data Durability** (Phase 17 - 4 weeks):
+- Explicit replication policies with trust-weighted selection
+- ReplicationManager actor for health monitoring
+- Automatic re-replication on node failure
+- 99.9% durability target
+
+**Byzantine Fault Tolerance** (Phase 18 - 6 weeks):
+- Misbehavior detection and quarantine
+- Network partition healing with conflict resolution
+- Contract execution disputes
+- Ledger fork resolution
+- Storage quota management
+- Upgrade coordination via governance
+
+**Total Pre-Pilot Work**: 10 weeks (Phases 17-18)
+
+See [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work) for complete gap analysis.
+
+### What We're Missing (Social Layer)
+
+**Usability & Integration**:
+- Web/mobile clients (basic pilot UI exists, needs refinement)
 - Onboarding workflows for non-technical users
-- Social protocols (how humans coordinate, not just protocols)
-
-**Usability**:
-- Web/mobile clients (currently CLI only)
-- Intuitive UI for cooperative workflows
 - Visualization tools (trust graph, ledger browser, topology)
-
-**Real-World Integration**:
-- Guided cooperative setup (group creation → governance → ledger)
 - Email/SMS notifications
 - Export formats for accountants/treasurers
+
+**Cooperative Workflows**:
+- Guided cooperative setup (group creation → governance → ledger)
+- Invitation flows, role management, consent mechanisms
+- Social protocols (how humans coordinate, not just protocols)
 
 See [Strategic Gap Analysis](docs/strategic-gap-analysis.md) for complete 15-gap assessment.
 
 ### The Path Forward
 
-**Build with communities, not for them.**
+**Build critical infrastructure first, then learn from communities.**
 
-ICN is ready for pilot deployment. The next phase isn't more infrastructure - it's learning from a real cooperative what actually matters.
+**Updated Timeline**:
+1. **Phase 17** (4 weeks): Storage hardening - **IN PROGRESS**
+2. **Phase 18** (6 weeks): Byzantine fault tolerance - **NEXT**
+3. **Track C1** (2-4 weeks): Select pilot community - **PARALLEL WITH PHASE 17**
+4. **Track C2** (4-6 weeks): Build MVP for pilot workflows
+5. **3-month pilot**: Deploy, learn, iterate
+6. **Phase 19** (4 weeks): Scalability improvements (post-pilot)
 
 **Success Criteria (3-month pilot)**:
 - 10+ active users logging hours/transactions weekly
 - 3+ governance decisions made using ICN primitives
+- No data loss events (99.9% durability validated)
+- No successful Byzantine attacks (detection <3 messages)
 - Community prefers ICN over their previous system
 - 2-3 other communities express interest
 
 **Next Actions**:
-1. Select pilot community (timebank recommended)
-2. Build minimal MVP for their workflows
-3. Run weekly learning loop
-4. Let their needs drive Phase 13+ scope
+1. Start Phase 17 implementation (storage replication) - **IMMEDIATE**
+2. Select pilot community (timebank recommended) - **PARALLEL**
+3. Complete Phase 18 (Byzantine hardening)
+4. Build minimal MVP for pilot workflows
+5. Run weekly learning loop
+6. Let pilot needs drive Phase 19+ scope
 
-**Philosophy**: We're building infrastructure for civilizational transition. The substrate is ready. Now we listen to communities and build what they need.
+**Philosophy**: We're building infrastructure for civilizational transition. The substrate needs fault tolerance and security before deployment. Then we listen to communities and build what they need.
 
 ---
 
-**Last Updated**: 2025-11-24 (Phase 16C Locality Awareness Complete)
-**Next Review**: After pilot community selection (Track C1) or Phase 16D planning
+**Last Updated**: 2025-11-24 (Scheduler Evolution 16A-E Complete, Phase 17-20 Roadmap Formalized)
+**Next Review**: After Phase 17 completion (Storage Hardening) or pilot community selection (Track C1)
