@@ -773,6 +773,40 @@ pub fn init_descriptions() {
         "icn_partition_vector_clock_merges_total",
         "Total number of vector clock merges performed"
     );
+
+    // Contract execution dispute metrics (Phase 18 Week 4)
+    describe_counter!(
+        "icn_disputes_filed_total",
+        "Total number of disputes filed"
+    );
+    describe_gauge!(
+        "icn_disputes_pending",
+        "Number of disputes currently pending"
+    );
+    describe_gauge!(
+        "icn_disputes_investigating",
+        "Number of disputes currently being investigated"
+    );
+    describe_counter!(
+        "icn_disputes_resolved_total",
+        "Total number of disputes resolved"
+    );
+    describe_counter!(
+        "icn_disputes_under_mediation_total",
+        "Total number of disputes assigned to mediators"
+    );
+    describe_histogram!(
+        "icn_disputes_investigation_duration_seconds",
+        "Duration of dispute investigation in seconds"
+    );
+    describe_counter!(
+        "icn_disputes_outcome_total",
+        "Total number of disputes by outcome type"
+    );
+    describe_gauge!(
+        "icn_disputes_mediator_pool_size",
+        "Number of mediators in the pool"
+    );
 }
 
 /// Network metrics
@@ -1750,5 +1784,60 @@ pub mod partition {
 
     pub fn vector_clock_merges_inc() {
         counter!("icn_partition_vector_clock_merges_total").increment(1);
+    }
+}
+
+/// Contract execution dispute metrics (Phase 18 Week 4)
+pub mod disputes {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn filed_inc(executor: &str, challenger: &str) {
+        counter!(
+            "icn_disputes_filed_total",
+            "executor" => executor.to_string(),
+            "challenger" => challenger.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn pending_set(count: u64) {
+        gauge!("icn_disputes_pending").set(count as f64);
+    }
+
+    pub fn investigating_set(count: u64) {
+        gauge!("icn_disputes_investigating").set(count as f64);
+    }
+
+    pub fn resolved_inc(outcome_type: &str) {
+        counter!(
+            "icn_disputes_resolved_total",
+            "outcome" => outcome_type.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn under_mediation_inc(mediator: &str) {
+        counter!(
+            "icn_disputes_under_mediation_total",
+            "mediator" => mediator.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn investigation_duration_record(duration_secs: f64) {
+        histogram!("icn_disputes_investigation_duration_seconds").record(duration_secs);
+    }
+
+    pub fn outcome_inc(outcome_type: &str, executor: &str) {
+        counter!(
+            "icn_disputes_outcome_total",
+            "outcome" => outcome_type.to_string(),
+            "executor" => executor.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn mediator_pool_size_set(count: usize) {
+        gauge!("icn_disputes_mediator_pool_size").set(count as f64);
     }
 }

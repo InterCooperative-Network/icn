@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Contract Execution Dispute Resolution (Phase 18 Week 4) (2025-11-25)
+
+**Comprehensive dispute resolution system for verifying compute task results:**
+
+1. **DisputeResolutionSystem** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs))
+   - File disputes with evidence (claimed result, task hash, reason)
+   - Automatic re-execution of contracts for verification
+   - Misbehavior detection integration via callback mechanism
+   - Mediator pool management for inconclusive disputes
+   - Persistent dispute storage with status tracking
+
+2. **Dispute Filing & Investigation**:
+   - `file_dispute()`: Create dispute with evidence
+   - `investigate_dispute()`: Re-execute contract and compare results
+   - Automatic status updates: Pending → Investigating → Resolved
+   - Four dispute outcomes: SubmitterCorrect, ExecutorCorrect, BothWrong, Inconclusive
+   - Mediator assignment for inconclusive cases
+
+3. **Dispute Outcomes**:
+   - **SubmitterCorrect**: Re-execution matches challenger's expected result → executor misbehavior recorded
+   - **ExecutorCorrect**: Re-execution matches executor's claimed result → dispute dismissed
+   - **BothWrong**: Re-execution differs from both parties → executor misbehavior recorded
+   - **Inconclusive**: Re-execution failed or timeout → mediator assigned
+
+4. **Misbehavior Integration**:
+   - `MisbehaviorCallback` type for pluggable misbehavior recording
+   - Automatic violation recording when executor provides incorrect results
+   - Evidence includes expected vs actual results with task hash
+   - Decoupled design: icn-ccl doesn't depend on icn-security
+
+5. **Prometheus Metrics** (8 new metrics):
+   - `icn_disputes_filed_total` - Total disputes filed (by executor, challenger)
+   - `icn_disputes_pending` - Current pending disputes
+   - `icn_disputes_investigating` - Current investigations in progress
+   - `icn_disputes_resolved_total` - Total resolved disputes (by outcome_type)
+   - `icn_disputes_under_mediation_total` - Disputes with mediator assigned
+   - `icn_disputes_investigation_duration_seconds` - Investigation duration histogram
+   - `icn_disputes_outcome_total` - Dispute outcomes (by type, executor)
+   - `icn_disputes_mediator_pool_size` - Current mediator pool size
+
+6. **Test Coverage** (5 comprehensive tests):
+   - Dispute filing with evidence validation
+   - Re-execution verification (executor correct)
+   - Re-execution verification (both parties wrong)
+   - Mediator pool management
+   - Dispute statistics tracking
+
+**Integration**: DisputeResolutionSystem can be integrated into ComputeActor or run as standalone validator. Misbehavior callback connects to MisbehaviorDetector for automatic trust score updates.
+
+**Commits**: 10bb4f6
+
 ### Added - Network Partition Detection and Healing (Phase 18 Week 3) (2025-11-24)
 
 **Comprehensive partition detection and healing system with automatic conflict resolution:**
