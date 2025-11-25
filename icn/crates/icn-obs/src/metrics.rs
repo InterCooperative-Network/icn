@@ -721,6 +721,28 @@ pub fn init_descriptions() {
         "icn_compute_placement_constraints_enforced_total",
         "Total number of placement constraint enforcements"
     );
+
+    // Misbehavior detection metrics (Phase 18)
+    describe_counter!(
+        "icn_misbehavior_violations_total",
+        "Total number of misbehavior violations detected"
+    );
+    describe_gauge!(
+        "icn_misbehavior_quarantined_peers",
+        "Number of peers currently quarantined"
+    );
+    describe_gauge!(
+        "icn_misbehavior_banned_peers",
+        "Number of peers permanently banned"
+    );
+    describe_counter!(
+        "icn_misbehavior_auto_bans_total",
+        "Total number of automatic bans issued"
+    );
+    describe_counter!(
+        "icn_misbehavior_reputation_penalties_total",
+        "Total number of reputation penalties applied"
+    );
 }
 
 /// Network metrics
@@ -1603,6 +1625,53 @@ pub mod compute {
         counter!(
             "icn_compute_placement_constraints_enforced_total",
             "constraint_type" => constraint_type.to_string()
+        )
+        .increment(1);
+    }
+}
+
+/// Misbehavior detection metrics (Phase 18)
+pub mod misbehavior {
+    use metrics::{counter, gauge};
+
+    pub fn violations_inc(did: &str, violation_type: &str) {
+        counter!(
+            "icn_misbehavior_violations_total",
+            "did" => did.to_string(),
+            "violation_type" => violation_type.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn quarantined_inc() {
+        gauge!("icn_misbehavior_quarantined_peers").increment(1.0);
+    }
+
+    pub fn quarantined_dec() {
+        gauge!("icn_misbehavior_quarantined_peers").decrement(1.0);
+    }
+
+    pub fn quarantined_set(count: u64) {
+        gauge!("icn_misbehavior_quarantined_peers").set(count as f64);
+    }
+
+    pub fn banned_inc() {
+        gauge!("icn_misbehavior_banned_peers").increment(1.0);
+    }
+
+    pub fn banned_set(count: u64) {
+        gauge!("icn_misbehavior_banned_peers").set(count as f64);
+    }
+
+    pub fn auto_bans_inc() {
+        counter!("icn_misbehavior_auto_bans_total").increment(1);
+    }
+
+    pub fn reputation_penalties_inc(did: &str, severity: u32) {
+        counter!(
+            "icn_misbehavior_reputation_penalties_total",
+            "did" => did.to_string(),
+            "severity" => severity.to_string()
         )
         .increment(1);
     }

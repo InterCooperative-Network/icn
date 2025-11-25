@@ -1,0 +1,22 @@
+[package]
+name = "icn-security"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tokio.workspace = true
+icn-identity.workspace = true
+icn-store.workspace = true
+icn-obs.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+icn-store.workspace = true
