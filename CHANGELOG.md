@@ -130,9 +130,15 @@ Cooperative-wide clock synchronization for timestamp validation and replay attac
 - `rand`/`rand_core` for nonce generation
 
 **Testing:**
-- 4 comprehensive tests covering creation, median, uncertainty, errors
+- 9 comprehensive tests covering creation, median, uncertainty, errors, offset bidirectional handling
 - 1 doc test
 - All tests passing
+
+**Integration:**
+- Clock sync background task integrated into supervisor ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs))
+- Automatic synchronization every 10 minutes during daemon runtime
+- Graceful shutdown on SIGTERM/SIGINT
+- Metrics recording on each sync (offset, duration, success/failure)
 
 **Configuration** (planned):
 ```toml

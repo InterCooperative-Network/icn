@@ -6,9 +6,11 @@ use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC
 use icn_ledger::Ledger;
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
+use icn_time::ClockSync;
 use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::select;
 use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
@@ -1586,6 +1588,34 @@ impl Supervisor {
             );
 
             info!("Digest emitter spawned");
+
+            // Start clock synchronization background task
+            let clock_sync = ClockSync::new();
+            let sync_interval = Duration::from_secs(600); // 10 minutes
+            let mut clock_sync_shutdown = self.shutdown_tx.subscribe();
+            background_tasks.spawn(async move {
+                let mut sync = clock_sync;
+                loop {
+                    // Perform sync
+                    if let Err(e) = sync.sync().await {
+                        warn!("Clock sync failed: {}", e);
+                        icn_obs::metrics::scalability::clock_sync_failed_inc();
+                    }
+
+                    // Wait for next sync interval or shutdown
+                    select! {
+                        _ = tokio::time::sleep(sync_interval) => {
+                            // Continue to next sync
+                        }
+                        _ = clock_sync_shutdown.recv() => {
+                            info!("Clock sync task shutting down");
+                            break;
+                        }
+                    }
+                }
+            });
+
+            info!("Clock sync background task spawned (interval: 10 minutes)");
 
             // Spawn metrics update task
             let start_time = std::time::Instant::now();
