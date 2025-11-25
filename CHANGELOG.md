@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Storage Replication Integration Tests & Operational Guide (Phase 17 Week 4) (2025-11-24)
+
+**ReplicationManager Integration Testing & Production Documentation:**
+
+1. **Integration Tests** ([crates/icn-core/tests/replication_integration.rs](icn/crates/icn-core/tests/replication_integration.rs))
+   - `TestNode` helper struct for multi-node replication scenarios
+   - 5 comprehensive integration tests (283 lines):
+     - `test_two_node_replication_request` - Validates replica request flow between nodes
+     - `test_health_status_transitions` - Tests Healthy→Stale health transitions
+     - `test_trust_weighted_selection` - Validates trust-based peer ranking
+     - `test_no_suitable_candidates` - Edge case handling with no trusted peers
+     - `test_replication_config_customization` - Custom configuration verification
+   - Full multi-node setup with gossip, trust graph, and replication manager
+   - All 5 tests passing (563 total tests)
+
+2. **Operational Documentation** ([docs/replication-operations.md](docs/replication-operations.md))
+   - 446-line production-ready operational guide
+   - Architecture overview, configuration guide, trust-weighted selection algorithm
+   - Health monitoring procedures, Prometheus metrics, troubleshooting guide
+   - Performance analysis: 250 bytes/request, <2.5 KB/sec overhead (negligible)
+   - Security considerations, best practices, emergency procedures
+
+**Phase 17 Progress**: Week 3 Complete ✅ (ReplicationManager actor), Week 4 In Progress (75% complete)
+
+**Commits**: 9245116 (integration tests), 8bff5b4 (operational docs)
+
+---
+
+### Added - ReplicationManager Actor with Trust-Weighted Selection (Phase 17 Week 3) (2025-11-24)
+
+**Complete ReplicationManager Implementation:**
+
+1. **ReplicationManager Actor** ([crates/icn-core/src/replication/manager.rs](icn/crates/icn-core/src/replication/manager.rs))
+   - Background health monitoring loop (60s interval)
+   - Trust-weighted replica selection algorithm
+   - Automatic detection of under-replicated content
+   - Request rate limiting (5-minute cooldown per content hash)
+   - Integration with gossip, trust graph, and store layers
+
+2. **Core Features**:
+   - **ReplicationConfig**: Configurable target replicas, trust requirements, health check intervals
+   - **Health Monitoring**: Tracks replica health states (Healthy <5min, Stale 5-15min, Unreachable >15min)
+   - **Trust-Weighted Selection**: Filters peers by Partner+ trust (0.4+), sorts by trust score
+   - **Gossip Integration**: Sends ReplicaRequest messages to candidate peers
+   - **ReplicationHandle**: Public API with `trigger_health_check()` for manual testing
+
+3. **Configuration**:
+   - Default: 3 target replicas, Partner trust (0.4+), 60s health checks
+   - Stale threshold: 5 minutes, Unreachable threshold: 15 minutes
+   - Customizable per-deployment via `ReplicationConfig`
+
+4. **Test Coverage**:
+   - 3 unit tests in manager.rs (replica health update, candidate filtering, manager creation)
+   - All 558 tests passing
+
+**Phase 17 Progress**: Week 1-2 Complete ✅ (storage + gossip extensions), Week 3 Complete ✅ (ReplicationManager)
+
+**Commit**: f855f47
+
+---
+
 ### Added - Phase 17-20 Roadmap Formalized + Document Consistency Fixes (2025-11-24)
 
 **ICN-DEP-ROADMAP-01 v0.3.0 Released:**
