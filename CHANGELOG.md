@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Sparse updates: >10x compression when most peers at baseline
    - `CompressedVectorClock::from_vector_clock()` - Compress with median baseline
    - `CompressedVectorClock::to_vector_clock()` - Decompress to full clock
-   - 12 comprehensive tests covering compression ratio, roundtrip, edge cases
+   - **Bug fix**: Fixed decompression filtering out peers with version 0, breaking roundtrip consistency
+   - 14 comprehensive tests covering compression ratio, roundtrip, edge cases, version 0 handling
 
 2. **Trust Graph Caching** ([crates/icn-trust/src/trust_cache.rs](icn/crates/icn-trust/src/trust_cache.rs))
    - LRU cache with configurable capacity (default: 1000 entries)
@@ -41,16 +42,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Returns indices of invalid signatures for error handling
    - 9 comprehensive tests covering valid/invalid signatures, batching, reuse
 
-4. **Prometheus Metrics** (16 new scalability metrics):
+4. **Topic Sharding** ([crates/icn-gossip/src/scalability.rs](icn/crates/icn-gossip/src/scalability.rs))
+   - 256-shard partitioning for large topics (>1000 entries)
+   - Per-shard Bloom filters reduce anti-entropy from O(n) to O(n/256)
+   - Hash-based shard assignment (first byte of content hash)
+   - Automatic sharding enablement when topic reaches threshold
+   - `TopicShard` - Individual shard with entries and Bloom filter
+   - `ShardedTopic` - Manages 256 shards with coordinated operations
+   - `ShardStats` - Monitoring metrics for shard distribution
+   - 11 comprehensive tests covering insertion, distribution, stats, Bloom filters
+   - Enables efficient sync for topics with 10K+ entries
+
+5. **Prometheus Metrics** (18 new scalability metrics):
    - **Compression**: `vector_clocks_compressed_total`, `compression_ratio`, `compressed_size_bytes`, `delta_count`, `compression_duration_seconds`
    - **Trust Cache**: `trust_cache_hits_total`, `trust_cache_misses_total`, `trust_cache_expired_total`, `trust_cache_invalidations_total`, `trust_cache_size`
    - **Batch Verify**: `batch_verify_success_total`, `batch_verify_failed_total`, `batch_verify_invalid_signatures_total`, `batch_verify_duration_seconds`, `batch_verify_size`
+   - **Topic Sharding**: `topic_sharding_enabled_total`, `sharded_topic_size`
 
 **Performance Impact:**
 - Vector clocks: 4-10x memory reduction for gossip state
 - Trust lookups: O(n²) → O(1) with 5-minute cache
 - Signature verification: ~100x speedup for 100 signatures
-- Target: 100 nodes, 100 tx/sec/node, <10ms trust queries
+- Topic anti-entropy: O(n) → O(n/256) with sharding
+- Target: 100 nodes, 100 tx/sec/node, <10ms trust queries, 10K+ entry topics
 
 **Dependencies:**
 - Added `lru = "0.12"` to workspace for LRU cache implementation
@@ -58,8 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `icn-obs` dependency to `icn-identity` for metrics
 
 **Testing:**
-- 32 new tests (12 compression + 11 cache + 9 batch verification)
-- All 356 tests passing across codebase
+- 45 new tests (14 compression + 11 cache + 9 batch verification + 11 sharding)
+- All 91 gossip tests passing (89 unit + 2 doc tests)
+- Bug fix validated with 2 regression tests for version 0 handling
 
 ### Added - Storage Exhaustion Protection (Phase 18 Week 6) (2025-11-25)
 
