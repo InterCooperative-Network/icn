@@ -2386,4 +2386,68 @@ mod tests {
         assert_eq!(subs.len(), 1);
         assert!(subs.contains(&did));
     }
+
+    #[test]
+    fn test_replica_message_types() {
+        // Phase 17: Test that replica coordination messages can be created and handled
+        use crate::types::{GossipMessage, ReplicaHealth};
+
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a simple trust lookup (always returns None)
+        let trust_lookup: TrustLookup = Arc::new(|_did| None);
+        let mut gossip = GossipActor::new(did.clone(), trust_lookup);
+
+        let content_hash = [0xAA; 32];
+
+        // Test ReplicaRequest message
+        let request = GossipMessage::ReplicaRequest {
+            content_hash,
+            requesting_peer: did.clone(),
+        };
+        let result = gossip.handle_message(&did, request);
+        assert!(result.is_ok(), "ReplicaRequest should be handled successfully");
+
+        // Test ReplicaOffer message
+        let offer = GossipMessage::ReplicaOffer {
+            content_hash,
+            offering_peer: did.clone(),
+            health: ReplicaHealth::Healthy,
+        };
+        let result = gossip.handle_message(&did, offer);
+        assert!(result.is_ok(), "ReplicaOffer should be handled successfully");
+
+        // Test ReplicaStatus message
+        let peer2 = KeyPair::generate().unwrap().did().clone();
+        let status = GossipMessage::ReplicaStatus {
+            content_hash,
+            replicas: vec![
+                (did.clone(), ReplicaHealth::Healthy),
+                (peer2, ReplicaHealth::Stale),
+            ],
+        };
+        let result = gossip.handle_message(&did, status);
+        assert!(result.is_ok(), "ReplicaStatus should be handled successfully");
+
+        // Verify message variant names
+        let request2 = GossipMessage::ReplicaRequest {
+            content_hash,
+            requesting_peer: did.clone(),
+        };
+        assert_eq!(request2.variant_name(), "ReplicaRequest");
+
+        let offer2 = GossipMessage::ReplicaOffer {
+            content_hash,
+            offering_peer: did.clone(),
+            health: ReplicaHealth::Healthy,
+        };
+        assert_eq!(offer2.variant_name(), "ReplicaOffer");
+
+        let status2 = GossipMessage::ReplicaStatus {
+            content_hash,
+            replicas: vec![],
+        };
+        assert_eq!(status2.variant_name(), "ReplicaStatus");
+    }
 }
