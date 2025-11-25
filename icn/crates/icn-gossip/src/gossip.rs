@@ -249,6 +249,7 @@ impl GossipActor {
             data,
             compressed: false,
             timestamp,
+            replica_offered: None, // Phase 17: Will be set by replication manager
         };
 
         // Compress large entries before storing/sending
@@ -989,6 +990,53 @@ impl GossipActor {
 
                 // BlobAnnounce is handled by the NetworkActor/BlobLocationRegistry
                 // This message type is just forwarded through gossip, not stored
+                Ok(())
+            }
+
+            // Phase 17: Replica coordination messages
+            GossipMessage::ReplicaRequest { content_hash, requesting_peer } => {
+                debug!(
+                    peer_did = %requesting_peer,
+                    content_hash = %hex::encode(content_hash),
+                    message_type = "ReplicaRequest",
+                    "Received replica request"
+                );
+
+                // TODO (Phase 17 Week 2): Implement replica request handling
+                // 1. Check if we have the content hash
+                // 2. If yes, respond with ReplicaOffer
+                // 3. Update replica metadata in store
+                Ok(())
+            }
+
+            GossipMessage::ReplicaOffer { content_hash, offering_peer, health } => {
+                debug!(
+                    peer_did = %offering_peer,
+                    content_hash = %hex::encode(content_hash),
+                    health = ?health,
+                    message_type = "ReplicaOffer",
+                    "Received replica offer"
+                );
+
+                // TODO (Phase 17 Week 2): Implement replica offer handling
+                // 1. Record replica metadata in store
+                // 2. Update replica count for this content hash
+                // 3. Emit metrics
+                Ok(())
+            }
+
+            GossipMessage::ReplicaStatus { content_hash, replicas } => {
+                debug!(
+                    content_hash = %hex::encode(content_hash),
+                    replica_count = replicas.len(),
+                    message_type = "ReplicaStatus",
+                    "Received replica status update"
+                );
+
+                // TODO (Phase 17 Week 2): Implement replica status handling
+                // 1. Batch update replica metadata in store
+                // 2. Mark stale replicas
+                // 3. Trigger re-replication if below min threshold
                 Ok(())
             }
         }
@@ -1939,6 +1987,7 @@ mod tests {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
+            replica_offered: None,
         };
 
         // Simulate receiving a Response message from the author
@@ -1989,6 +2038,7 @@ mod tests {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64,
+                replica_offered: None,
             };
 
             // Small delay to ensure distinct timestamps

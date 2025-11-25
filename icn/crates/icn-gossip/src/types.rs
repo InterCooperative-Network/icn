@@ -29,6 +29,17 @@ pub enum Scope {
 }
 
 
+/// Replica health status (Phase 17)
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ReplicaHealth {
+    /// Replica verified recently (healthy)
+    Healthy,
+    /// Replica not verified recently (stale)
+    Stale,
+    /// Peer reported as offline/unreachable
+    Unreachable,
+}
+
 /// Gossip entry metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GossipEntry {
@@ -53,6 +64,11 @@ pub struct GossipEntry {
 
     /// Timestamp (local, not for ordering)
     pub timestamp: u64,
+
+    /// Optional: Replica metadata for data durability (Phase 17)
+    /// If present, indicates this peer is willing to serve as a replica
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replica_offered: Option<bool>,
 }
 
 impl GossipEntry {
@@ -168,6 +184,32 @@ pub enum GossipMessage {
         /// Blob size in bytes
         size_bytes: u64,
     },
+
+    /// Request replica for a content hash (Phase 17 - data durability)
+    ReplicaRequest {
+        /// Content hash to replicate
+        content_hash: ContentHash,
+        /// DID of peer requesting replication
+        requesting_peer: Did,
+    },
+
+    /// Offer to serve as replica for a content hash (Phase 17)
+    ReplicaOffer {
+        /// Content hash being offered for replication
+        content_hash: ContentHash,
+        /// DID of peer offering to replicate
+        offering_peer: Did,
+        /// Health status of this replica
+        health: ReplicaHealth,
+    },
+
+    /// Status update about replicas for a content hash (Phase 17)
+    ReplicaStatus {
+        /// Content hash being reported
+        content_hash: ContentHash,
+        /// Known replicas and their health
+        replicas: Vec<(Did, ReplicaHealth)>,
+    },
 }
 
 impl GossipMessage {
@@ -184,6 +226,9 @@ impl GossipMessage {
             GossipMessage::PullRequest { .. } => "PullRequest",
             GossipMessage::PullResponse { .. } => "PullResponse",
             GossipMessage::BlobAnnounce { .. } => "BlobAnnounce",
+            GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
+            GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
+            GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
         }
     }
 }
@@ -431,6 +476,7 @@ mod tests {
             data: data.clone(),
             compressed: false,
             timestamp: 0,
+            replica_offered: None,
         };
 
         // Should not compress (too small)
@@ -453,6 +499,7 @@ mod tests {
             data: data.clone(),
             compressed: false,
             timestamp: 0,
+            replica_offered: None,
         };
 
         let original_size = entry.data.len();
@@ -484,6 +531,7 @@ mod tests {
             data: data.clone(),
             compressed: false,
             timestamp: 0,
+            replica_offered: None,
         };
 
         // Compress
@@ -509,6 +557,7 @@ mod tests {
             data: data.clone(),
             compressed: false,
             timestamp: 0,
+            replica_offered: None,
         };
 
         // Compress twice - should be idempotent
