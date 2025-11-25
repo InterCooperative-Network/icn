@@ -45,7 +45,7 @@ prost = "0.13"
 mdns-sd = "0.11"
 
 # Identity & Crypto
-ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core", "batch"] }
 x25519-dalek = "2.0"
 chacha20poly1305 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
@@ -80,6 +80,7 @@ thiserror = "1.0"
 # Utilities
 bytes = "1.5"
 futures = "0.3"
+lru = "0.12"
 
 # Internal workspace crates
 icn-core = { path = "crates/icn-core" }

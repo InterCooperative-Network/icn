@@ -272,6 +272,72 @@ pub fn init_descriptions() {
         "Total number of pull responses truncated due to size limits"
     );
 
+    // Scalability metrics (Phase 19)
+    describe_counter!(
+        "icn_scalability_vector_clocks_compressed_total",
+        "Total number of vector clocks compressed"
+    );
+    describe_counter!(
+        "icn_scalability_vector_clocks_decompressed_total",
+        "Total number of vector clocks decompressed"
+    );
+    describe_histogram!(
+        "icn_scalability_compression_ratio",
+        "Vector clock compression ratio (uncompressed/compressed)"
+    );
+    describe_gauge!(
+        "icn_scalability_compressed_size_bytes",
+        "Current size of compressed vector clock in bytes"
+    );
+    describe_gauge!(
+        "icn_scalability_delta_count",
+        "Number of non-zero deltas in compressed vector clock"
+    );
+    describe_histogram!(
+        "icn_scalability_compression_duration_seconds",
+        "Time to compress a vector clock"
+    );
+    describe_counter!(
+        "icn_scalability_trust_cache_hits_total",
+        "Total number of trust cache hits"
+    );
+    describe_counter!(
+        "icn_scalability_trust_cache_misses_total",
+        "Total number of trust cache misses"
+    );
+    describe_counter!(
+        "icn_scalability_trust_cache_expired_total",
+        "Total number of expired trust cache entries"
+    );
+    describe_counter!(
+        "icn_scalability_trust_cache_invalidations_total",
+        "Total number of trust cache invalidations"
+    );
+    describe_gauge!(
+        "icn_scalability_trust_cache_size",
+        "Current number of entries in trust cache"
+    );
+    describe_counter!(
+        "icn_scalability_batch_verify_success_total",
+        "Total number of successful batch verifications"
+    );
+    describe_counter!(
+        "icn_scalability_batch_verify_failed_total",
+        "Total number of failed batch verifications"
+    );
+    describe_counter!(
+        "icn_scalability_batch_verify_invalid_signatures_total",
+        "Total number of invalid signatures found during batch verification"
+    );
+    describe_histogram!(
+        "icn_scalability_batch_verify_duration_seconds",
+        "Duration of batch signature verification operations"
+    );
+    describe_histogram!(
+        "icn_scalability_batch_verify_size",
+        "Number of signatures verified in each batch"
+    );
+
     // Ledger metrics
     describe_gauge!(
         "icn_ledger_accounts_total",
@@ -807,6 +873,70 @@ pub fn init_descriptions() {
         "icn_disputes_mediator_pool_size",
         "Number of mediators in the pool"
     );
+
+    // Ledger fork resolution metrics (Phase 18 Week 5)
+    describe_counter!(
+        "icn_ledger_forks_detected_total",
+        "Total number of ledger forks detected"
+    );
+    describe_counter!(
+        "icn_ledger_forks_resolved_total",
+        "Total number of ledger forks resolved"
+    );
+    describe_histogram!(
+        "icn_ledger_forks_resolution_duration_seconds",
+        "Duration of fork resolution in seconds"
+    );
+    describe_counter!(
+        "icn_ledger_forks_manual_required_total",
+        "Total number of forks requiring manual resolution"
+    );
+    describe_counter!(
+        "icn_ledger_forks_timestamp_tiebreaker_total",
+        "Total number of forks resolved by timestamp tiebreaker"
+    );
+    describe_counter!(
+        "icn_ledger_forks_trust_resolution_total",
+        "Total number of forks resolved by trust score"
+    );
+
+    // Storage quota metrics (Phase 18 Week 6)
+    describe_counter!(
+        "icn_storage_quota_exceeded_total",
+        "Total number of quota exceeded errors"
+    );
+    describe_counter!(
+        "icn_storage_evictions_total",
+        "Total number of storage evictions by priority"
+    );
+    describe_gauge!(
+        "icn_storage_global_usage_bytes",
+        "Current global storage usage in bytes"
+    );
+    describe_gauge!(
+        "icn_storage_global_limit_bytes",
+        "Global storage limit in bytes"
+    );
+    describe_gauge!(
+        "icn_storage_global_usage_percentage",
+        "Global storage usage as percentage (0.0 to 1.0)"
+    );
+    describe_gauge!(
+        "icn_storage_did_quota_usage_bytes",
+        "Per-DID storage usage in bytes"
+    );
+    describe_gauge!(
+        "icn_storage_did_quota_percentage",
+        "Per-DID storage usage as percentage (0.0 to 1.0)"
+    );
+    describe_gauge!(
+        "icn_storage_total_quotas",
+        "Total number of configured storage quotas"
+    );
+    describe_gauge!(
+        "icn_storage_exceeded_quotas",
+        "Number of quotas currently exceeded"
+    );
 }
 
 /// Network metrics
@@ -1018,6 +1148,77 @@ pub mod gossip {
 
     pub fn pull_truncated_inc() {
         counter!("icn_gossip_pull_truncated_total").increment(1);
+    }
+}
+
+/// Scalability metrics (Phase 19)
+pub mod scalability {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn vector_clocks_compressed_inc() {
+        counter!("icn_scalability_vector_clocks_compressed_total").increment(1);
+    }
+
+    pub fn vector_clocks_decompressed_inc() {
+        counter!("icn_scalability_vector_clocks_decompressed_total").increment(1);
+    }
+
+    pub fn compression_ratio_record(ratio: f64) {
+        histogram!("icn_scalability_compression_ratio").record(ratio);
+    }
+
+    pub fn compressed_size_bytes_set(bytes: usize) {
+        gauge!("icn_scalability_compressed_size_bytes").set(bytes as f64);
+    }
+
+    pub fn delta_count_set(count: usize) {
+        gauge!("icn_scalability_delta_count").set(count as f64);
+    }
+
+    pub fn compression_duration_record(duration_secs: f64) {
+        histogram!("icn_scalability_compression_duration_seconds").record(duration_secs);
+    }
+
+    // Trust cache metrics
+    pub fn trust_cache_hits_inc() {
+        counter!("icn_scalability_trust_cache_hits_total").increment(1);
+    }
+
+    pub fn trust_cache_misses_inc() {
+        counter!("icn_scalability_trust_cache_misses_total").increment(1);
+    }
+
+    pub fn trust_cache_expired_inc() {
+        counter!("icn_scalability_trust_cache_expired_total").increment(1);
+    }
+
+    pub fn trust_cache_invalidations_inc() {
+        counter!("icn_scalability_trust_cache_invalidations_total").increment(1);
+    }
+
+    pub fn trust_cache_size_set(size: usize) {
+        gauge!("icn_scalability_trust_cache_size").set(size as f64);
+    }
+
+    // Batch verification metrics
+    pub fn batch_verify_success_inc() {
+        counter!("icn_scalability_batch_verify_success_total").increment(1);
+    }
+
+    pub fn batch_verify_failed_inc() {
+        counter!("icn_scalability_batch_verify_failed_total").increment(1);
+    }
+
+    pub fn batch_verify_invalid_inc() {
+        counter!("icn_scalability_batch_verify_invalid_signatures_total").increment(1);
+    }
+
+    pub fn batch_verify_duration_record(duration_secs: f64) {
+        histogram!("icn_scalability_batch_verify_duration_seconds").record(duration_secs);
+    }
+
+    pub fn batch_verify_size_record(count: usize) {
+        histogram!("icn_scalability_batch_verify_size").record(count as f64);
     }
 }
 
@@ -1839,5 +2040,103 @@ pub mod disputes {
 
     pub fn mediator_pool_size_set(count: usize) {
         gauge!("icn_disputes_mediator_pool_size").set(count as f64);
+    }
+}
+
+/// Ledger fork resolution metrics (Phase 18 Week 5)
+pub mod ledger_forks {
+    use metrics::{counter, histogram};
+
+    pub fn detected_inc() {
+        counter!("icn_ledger_forks_detected_total").increment(1);
+    }
+
+    pub fn resolved_inc(strategy: &str) {
+        counter!(
+            "icn_ledger_forks_resolved_total",
+            "strategy" => strategy.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn resolution_duration_record(duration_secs: f64) {
+        histogram!("icn_ledger_forks_resolution_duration_seconds").record(duration_secs);
+    }
+
+    pub fn manual_resolution_required_inc(reason: &str) {
+        counter!(
+            "icn_ledger_forks_manual_required_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn timestamp_tiebreaker_inc() {
+        counter!("icn_ledger_forks_timestamp_tiebreaker_total").increment(1);
+    }
+
+    pub fn trust_resolution_inc(winner: &str) {
+        counter!(
+            "icn_ledger_forks_trust_resolution_total",
+            "winner" => winner.to_string()
+        )
+        .increment(1);
+    }
+}
+
+/// Storage quota metrics (Phase 18 Week 6)
+pub mod storage_quotas {
+    use metrics::{counter, gauge};
+
+    pub fn quota_exceeded_inc(did: &str) {
+        counter!(
+            "icn_storage_quota_exceeded_total",
+            "did" => did.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn evictions_inc(priority: &str) {
+        counter!(
+            "icn_storage_evictions_total",
+            "priority" => priority.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn global_usage_set(bytes: u64) {
+        gauge!("icn_storage_global_usage_bytes").set(bytes as f64);
+    }
+
+    pub fn global_limit_set(bytes: u64) {
+        gauge!("icn_storage_global_limit_bytes").set(bytes as f64);
+    }
+
+    pub fn global_usage_percentage_set(percentage: f64) {
+        gauge!("icn_storage_global_usage_percentage").set(percentage);
+    }
+
+    pub fn did_quota_usage_set(did: &str, bytes: u64) {
+        gauge!(
+            "icn_storage_did_quota_usage_bytes",
+            "did" => did.to_string()
+        )
+        .set(bytes as f64);
+    }
+
+    pub fn did_quota_percentage_set(did: &str, percentage: f64) {
+        gauge!(
+            "icn_storage_did_quota_percentage",
+            "did" => did.to_string()
+        )
+        .set(percentage);
+    }
+
+    pub fn total_quotas_set(count: usize) {
+        gauge!("icn_storage_total_quotas").set(count as f64);
+    }
+
+    pub fn exceeded_quotas_set(count: usize) {
+        gauge!("icn_storage_exceeded_quotas").set(count as f64);
     }
 }

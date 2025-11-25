@@ -1,15 +1,16 @@
 //! ICN Trust - Trust graph management and policy enforcement
 
 pub mod attestation;
+pub mod trust_cache;
 
 pub use attestation::TrustAttestation;
+pub use trust_cache::TrustCache;
 
 use anyhow::Result;
 use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tracing::{debug, info};
 
 /// Trust classification for a peer
@@ -106,8 +107,8 @@ impl TrustEdge {
 pub struct TrustGraph {
     store: Arc<dyn Store>,
     own_did: Did,
-    /// Cached trust scores with interior mutability for concurrent read access
-    cache: Mutex<HashMap<Did, f64>>,
+    /// LRU cache for trust scores with TTL-based invalidation (Phase 19)
+    cache: TrustCache,
 }
 
 impl TrustGraph {
@@ -116,7 +117,21 @@ impl TrustGraph {
         Self {
             store,
             own_did,
-            cache: Mutex::new(HashMap::new()),
+            cache: TrustCache::new(),
+        }
+    }
+
+    /// Create a new trust graph with custom cache configuration
+    pub fn with_cache_config(
+        store: Arc<dyn Store>,
+        own_did: Did,
+        cache_size: usize,
+        cache_ttl: std::time::Duration,
+    ) -> Self {
+        Self {
+            store,
+            own_did,
+            cache: TrustCache::with_config(cache_size, cache_ttl),
         }
     }
 
@@ -132,10 +147,8 @@ impl TrustGraph {
 
         self.store.put(key.as_bytes(), &value)?;
 
-        // Invalidate cache for target
-        if let Ok(mut cache) = self.cache.lock() {
-            cache.remove(&edge.target);
-        }
+        // Invalidate cache for target (LRU cache with TTL)
+        self.cache.invalidate(&edge.target);
 
         Ok(())
     }
@@ -193,12 +206,10 @@ impl TrustGraph {
         // Record lookup
         icn_obs::metrics::trust::lookups_inc();
 
-        // Check cache first (using interior mutability via Mutex)
-        if let Ok(cache) = self.cache.lock() {
-            if let Some(&score) = cache.get(target) {
-                icn_obs::metrics::trust::cache_hits_inc();
-                return Ok(score);
-            }
+        // Check LRU cache first (with TTL validation)
+        if let Some(score) = self.cache.get(target) {
+            icn_obs::metrics::trust::cache_hits_inc();
+            return Ok(score);
         }
 
         icn_obs::metrics::trust::cache_misses_inc();
@@ -245,10 +256,8 @@ impl TrustGraph {
             target, direct_score, transitive_score, final_score
         );
 
-        // Cache result (using interior mutability via Mutex)
-        if let Ok(mut cache) = self.cache.lock() {
-            cache.insert(target.clone(), final_score);
-        }
+        // Cache result (LRU cache with automatic eviction)
+        self.cache.put(target.clone(), final_score);
 
         // Record score distribution
         icn_obs::metrics::trust::score_distribution_record(final_score);
@@ -268,18 +277,14 @@ impl TrustGraph {
         self.store.delete(key.as_bytes())?;
 
         // Invalidate cache for target
-        if let Ok(mut cache) = self.cache.lock() {
-            cache.remove(target);
-        }
+        self.cache.invalidate(target);
 
         Ok(())
     }
 
     /// Clear the trust score cache
     pub fn clear_cache(&self) {
-        if let Ok(mut cache) = self.cache.lock() {
-            cache.clear();
-        }
+        self.cache.clear();
     }
 
     /// Map trust relationships from old_did to new_did during recovery

@@ -46,6 +46,7 @@ pub mod balance;
 pub mod credit_policy;
 pub mod dispute;
 pub mod entry;
+pub mod fork_resolution;
 pub mod hash;
 pub mod ledger;
 pub mod merge;
@@ -55,6 +56,7 @@ pub mod types;
 
 pub use credit_policy::{CreditPolicy, CreditPolicyManager, NewMemberPolicy};
 pub use dispute::DisputeManager;
+pub use fork_resolution::{Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver};
 pub use ledger::Ledger;
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use quarantine::QuarantineStore;

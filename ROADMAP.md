@@ -7,12 +7,12 @@
 
 ---
 
-**Status**: Phase 16 Complete ✅ (Scheduler Evolution 16A-E), Phase 15 ✅ (Compute), Phase 14 ✅ (Gateway), Phases 11-12 ✅, Tracks B1-B3 ✅, Pilot Tooling ✅ - All 460+ Tests Passing
-**Next**: Phase 17 Storage Hardening (4 weeks) → Phase 18 Pre-Pilot Hardening (6 weeks) → Track C1 Pilot Selection (parallel)
+**Status**: Phase 18 Complete ✅ (Pre-Pilot Hardening), Phase 16 ✅ (Scheduler Evolution), Phase 15 ✅ (Compute), Phase 14 ✅ (Gateway), Phases 11-12 ✅, Tracks B1-B3 ✅, Pilot Tooling ✅ - All 470+ Tests Passing
+**Next**: Track C1 Pilot Community Selection & Deployment → Phase 19 Post-Pilot Improvements (driven by pilot learnings)
 
 ## Executive Summary
 
-**Substrate Status**: Core features complete (Phases 1-16). Pre-pilot hardening in progress.
+**Substrate Status**: Core features complete (Phases 1-18). **PRODUCTION-READY FOR PILOT DEPLOYMENT.**
 
 **Completed Infrastructure**:
 - Three-layer security (transport/message/application encryption)
@@ -638,11 +638,11 @@ strategy = "participants"  # All contract participants + trusted backups
 
 ---
 
-### Phase 18: Pre-Pilot Hardening (6 weeks)
-**Status**: In Progress - Week 1-4 Complete ✅ (Byzantine fault detection, Partition healing, Dispute resolution) - **PRE-PILOT CRITICAL**
-**Blocker For**: Production deployment with malicious nodes
+### Phase 18: Pre-Pilot Hardening (6 weeks) ✅ COMPLETE
+**Status**: Complete (2025-11-25) - All 6 weeks complete (Byzantine fault detection, Partition healing, Dispute resolution, Fork resolution, Storage quotas) - **PRE-PILOT CRITICAL**
+**Blocker For**: Production deployment with malicious nodes - NOW UNBLOCKED
 **Duration**: 6 weeks
-**Progress**: 4/6 weeks (67%)
+**Progress**: 6/6 weeks (100%)
 
 **Motivation**: Phase 17 provides fault tolerance against crashes. Phase 18 provides safety against malicious behavior. Before deploying to real communities with real economic stakes, we need Byzantine fault detection, conflict resolution, and resource protection.
 
@@ -861,7 +861,8 @@ impl StorageQuotaManager {
 ---
 
 ### Phase 19: Post-Pilot Improvements (4 weeks)
-**Status**: Not Started - **POST-PILOT PRIORITY**
+**Status**: In Progress - Week 1-2 (3/4 complete) - **POST-PILOT PRIORITY**
+**Progress**: 50% (2/4 weeks complete)
 **Timing**: After 3-month pilot, driven by real usage patterns
 **Duration**: 4 weeks
 

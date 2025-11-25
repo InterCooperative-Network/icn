@@ -14,6 +14,7 @@ serde.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+icn-obs.workspace = true
 multibase = "0.9"
 age = "0.10"
 secrecy = "0.8"

@@ -1,5 +1,6 @@
 //! ICN Identity - DID management, key generation, and cryptographic operations
 
+pub mod batch_verify;
 pub mod bundle;
 pub mod keystore;
 pub mod multi_device;
@@ -12,6 +13,7 @@ use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
+pub use batch_verify::{BatchVerifier, BatchVerifyResult, SignatureToVerify, verify_signatures_batched};
 pub use bundle::{BindingInfo, IdentityBundle, verify_binding_info};
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 pub use multi_device::{

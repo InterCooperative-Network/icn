@@ -31,6 +31,7 @@
 pub mod bloom;
 pub mod gossip;
 pub mod partition;
+pub mod scalability;
 pub mod sync;
 pub mod types;
 pub mod vector_clock;
@@ -44,6 +45,7 @@ pub use partition::{
     Conflict, ConflictResolution, ConflictResolver, DataType, PartitionConfig, PartitionDetector,
     PartitionHealer, ResolutionOutcome, VectorClockMerger,
 };
+pub use scalability::{CompressedVectorClock, VarInt};
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
     AccessControl, ContentHash, GossipEntry, GossipMessage, Scope, Subscription, Topic,

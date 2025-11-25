@@ -1,8 +1,13 @@
 //! ICN Store - Persistent key-value storage abstraction
 
+pub mod quotas;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
+
+// Re-export quota types
+pub use quotas::{QuotaPriority, QuotaStats, StorageItem, StorageQuota, StorageQuotaManager};
 
 /// Content hash type (32-byte SHA-256)
 pub type ContentHash = [u8; 32];
