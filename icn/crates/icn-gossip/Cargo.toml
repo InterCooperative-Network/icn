@@ -9,6 +9,7 @@ icn-identity.workspace = true
 icn-trust.workspace = true
 icn-obs.workspace = true
 icn-snapshot.workspace = true
+icn-store.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true

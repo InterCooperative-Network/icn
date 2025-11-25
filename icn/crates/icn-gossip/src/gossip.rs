@@ -84,6 +84,9 @@ pub struct GossipActor {
 
     /// Per-peer sync state manager
     peer_sync: PeerSyncManager,
+
+    /// Store for replica metadata tracking (Phase 17 - optional)
+    store: Option<Arc<dyn icn_store::Store>>,
 }
 
 impl GossipActor {
@@ -116,6 +119,7 @@ impl GossipActor {
             notification_callback: None,
             peer_sampling: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
+            store: None, // Phase 17: Set via set_store()
         };
 
         // Create default topics with appropriate scopes
@@ -168,6 +172,11 @@ impl GossipActor {
     /// Set the peer sampling callback for scope-aware peer selection
     pub fn set_peer_sampling(&mut self, callback: PeerSamplingCallback) {
         self.peer_sampling = Some(callback);
+    }
+
+    /// Set the store for replica metadata tracking (Phase 17)
+    pub fn set_store(&mut self, store: Arc<dyn icn_store::Store>) {
+        self.store = Some(store);
     }
 
     /// Send a message to a peer (if callback is set)
@@ -1002,10 +1011,53 @@ impl GossipActor {
                     "Received replica request"
                 );
 
-                // TODO (Phase 17 Week 2): Implement replica request handling
-                // 1. Check if we have the content hash
-                // 2. If yes, respond with ReplicaOffer
-                // 3. Update replica metadata in store
+                // Check if we have this content hash in any topic
+                let mut have_content = false;
+                for entries in self.entries.values() {
+                    if entries.contains_key(&content_hash) {
+                        have_content = true;
+                        break;
+                    }
+                }
+
+                if have_content {
+                    debug!(
+                        content_hash = %hex::encode(content_hash),
+                        "We have this content, responding with ReplicaOffer"
+                    );
+
+                    // Respond with ReplicaOffer
+                    use crate::types::ReplicaHealth;
+                    self.send_message(
+                        Some(requesting_peer.clone()),
+                        GossipMessage::ReplicaOffer {
+                            content_hash,
+                            offering_peer: self.own_did.clone(),
+                            health: ReplicaHealth::Healthy,
+                        },
+                    );
+
+                    // Record ourselves as a replica in the store (if available)
+                    if let Some(store) = &self.store {
+                        if let Err(e) = store.add_replica(
+                            &content_hash,
+                            self.own_did.to_string(),
+                            icn_store::ReplicaHealth::Healthy,
+                        ) {
+                            warn!(
+                                content_hash = %hex::encode(content_hash),
+                                error = %e,
+                                "Failed to record replica metadata"
+                            );
+                        }
+                    }
+                } else {
+                    debug!(
+                        content_hash = %hex::encode(content_hash),
+                        "We don't have this content, ignoring request"
+                    );
+                }
+
                 Ok(())
             }
 
@@ -1018,10 +1070,45 @@ impl GossipActor {
                     "Received replica offer"
                 );
 
-                // TODO (Phase 17 Week 2): Implement replica offer handling
-                // 1. Record replica metadata in store
-                // 2. Update replica count for this content hash
-                // 3. Emit metrics
+                // Record replica metadata in store (if available)
+                if let Some(store) = &self.store {
+                    // Convert gossip ReplicaHealth to store ReplicaHealth
+                    let store_health = match health {
+                        crate::types::ReplicaHealth::Healthy => icn_store::ReplicaHealth::Healthy,
+                        crate::types::ReplicaHealth::Stale => icn_store::ReplicaHealth::Stale,
+                        crate::types::ReplicaHealth::Unreachable => icn_store::ReplicaHealth::Unreachable,
+                    };
+
+                    match store.add_replica(&content_hash, offering_peer.to_string(), store_health) {
+                        Ok(_) => {
+                            debug!(
+                                content_hash = %hex::encode(content_hash),
+                                peer = %offering_peer,
+                                "Recorded replica metadata"
+                            );
+
+                            // Get updated replica count for logging
+                            if let Ok(count) = store.get_replica_count(&content_hash) {
+                                info!(
+                                    content_hash = %hex::encode(content_hash),
+                                    replica_count = count,
+                                    "Replica count updated"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                content_hash = %hex::encode(content_hash),
+                                peer = %offering_peer,
+                                error = %e,
+                                "Failed to record replica metadata"
+                            );
+                        }
+                    }
+                } else {
+                    debug!("No store configured, replica metadata not persisted");
+                }
+
                 Ok(())
             }
 
@@ -1033,10 +1120,46 @@ impl GossipActor {
                     "Received replica status update"
                 );
 
-                // TODO (Phase 17 Week 2): Implement replica status handling
-                // 1. Batch update replica metadata in store
-                // 2. Mark stale replicas
-                // 3. Trigger re-replication if below min threshold
+                // Batch update replica metadata in store (if available)
+                if let Some(store) = &self.store {
+                    let mut updated_count = 0;
+                    let mut failed_count = 0;
+
+                    for (did, health) in replicas {
+                        // Convert gossip ReplicaHealth to store ReplicaHealth
+                        let store_health = match health {
+                            crate::types::ReplicaHealth::Healthy => icn_store::ReplicaHealth::Healthy,
+                            crate::types::ReplicaHealth::Stale => icn_store::ReplicaHealth::Stale,
+                            crate::types::ReplicaHealth::Unreachable => icn_store::ReplicaHealth::Unreachable,
+                        };
+
+                        match store.add_replica(&content_hash, did.to_string(), store_health) {
+                            Ok(_) => updated_count += 1,
+                            Err(e) => {
+                                warn!(
+                                    content_hash = %hex::encode(content_hash),
+                                    peer = %did,
+                                    error = %e,
+                                    "Failed to update replica status"
+                                );
+                                failed_count += 1;
+                            }
+                        }
+                    }
+
+                    info!(
+                        content_hash = %hex::encode(content_hash),
+                        updated = updated_count,
+                        failed = failed_count,
+                        "Batch updated replica status"
+                    );
+
+                    // TODO (Phase 17 Week 3): Check if replica count below threshold
+                    // This will be handled by ReplicationManager actor
+                } else {
+                    debug!("No store configured, replica status not persisted");
+                }
+
                 Ok(())
             }
         }
@@ -2449,5 +2572,138 @@ mod tests {
             replicas: vec![],
         };
         assert_eq!(status2.variant_name(), "ReplicaStatus");
+    }
+
+    #[test]
+    fn test_replica_coordination_with_store() -> Result<()> {
+        // Phase 17: Test full replica coordination flow with storage
+        use crate::types::{GossipMessage, ReplicaHealth};
+        use icn_store::SledStore;
+
+        // Create two gossip actors
+        let keypair1 = KeyPair::generate()?;
+        let did1 = keypair1.did().clone();
+        let trust_lookup1: TrustLookup = Arc::new(|_did| None);
+        let mut gossip1 = GossipActor::new(did1.clone(), trust_lookup1);
+
+        let keypair2 = KeyPair::generate()?;
+        let did2 = keypair2.did().clone();
+        let trust_lookup2: TrustLookup = Arc::new(|_did| None);
+        let mut gossip2 = GossipActor::new(did2.clone(), trust_lookup2);
+
+        // Set up stores for both actors
+        let store1 = Arc::new(SledStore::temporary()?) as Arc<dyn icn_store::Store>;
+        let store2 = Arc::new(SledStore::temporary()?) as Arc<dyn icn_store::Store>;
+        gossip1.set_store(store1.clone());
+        gossip2.set_store(store2.clone());
+
+        // Gossip1 publishes some content
+        let data = b"test content for replication".to_vec();
+        let mut hasher = sha2::Sha256::new();
+        use sha2::Digest;
+        hasher.update(&data);
+        let result_bytes = hasher.finalize();
+        let mut content_hash = [0u8; 32];
+        content_hash.copy_from_slice(&result_bytes);
+
+        let entry = GossipEntry {
+            hash: content_hash,
+            author: did1.clone(),
+            clock: VectorClock::new(),
+            topic: "test:replication".to_string(),
+            data: data.clone(),
+            compressed: false,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_millis() as u64,
+            replica_offered: Some(true),
+        };
+
+        // Store the entry in gossip1
+        gossip1.create_topic(Topic::new("test:replication".to_string(), AccessControl::Public));
+        gossip1.entries.entry("test:replication".to_string())
+            .or_insert_with(HashMap::new)
+            .insert(content_hash, entry.clone());
+
+        // Test 1: ReplicaRequest from gossip2 to gossip1
+        // Gossip2 doesn't have the content, requests it
+        let request = GossipMessage::ReplicaRequest {
+            content_hash,
+            requesting_peer: did2.clone(),
+        };
+
+        // Track sent messages
+        let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sent_clone = sent_messages.clone();
+        gossip1.set_send_callback(Arc::new(move |recipient, message| {
+            sent_clone.lock().unwrap().push((recipient, message));
+        }));
+
+        // Handle the request
+        gossip1.handle_message(&did2, request)?;
+
+        // Verify gossip1 responded with ReplicaOffer
+        let messages = sent_messages.lock().unwrap();
+        assert_eq!(messages.len(), 1, "Should have sent one message");
+        match &messages[0] {
+            (Some(recipient), GossipMessage::ReplicaOffer { content_hash: hash, offering_peer, health }) => {
+                assert_eq!(recipient, &did2, "Offer should be sent to requester");
+                assert_eq!(hash, &content_hash, "Hash should match");
+                assert_eq!(offering_peer, &did1, "Offerer should be gossip1");
+                assert_eq!(health, &ReplicaHealth::Healthy, "Health should be Healthy");
+            }
+            _ => panic!("Expected ReplicaOffer message"),
+        }
+
+        // Verify gossip1 recorded itself as a replica in its store
+        let replica_count = store1.get_replica_count(&content_hash)?;
+        assert_eq!(replica_count, 1, "Gossip1 should have recorded itself as replica");
+
+        // Test 2: ReplicaOffer from gossip1 to gossip2
+        // Gossip2 receives the offer
+        let offer = GossipMessage::ReplicaOffer {
+            content_hash,
+            offering_peer: did1.clone(),
+            health: ReplicaHealth::Healthy,
+        };
+
+        gossip2.handle_message(&did1, offer)?;
+
+        // Verify gossip2 recorded gossip1 as a replica
+        let replica_count = store2.get_replica_count(&content_hash)?;
+        assert_eq!(replica_count, 1, "Gossip2 should have recorded gossip1 as replica");
+
+        let metadata = store2.get_replica_metadata(&content_hash)?.unwrap();
+        assert_eq!(metadata.replicas.len(), 1);
+        assert_eq!(metadata.replicas[0].peer_did, did1.to_string());
+        assert_eq!(metadata.replicas[0].health, icn_store::ReplicaHealth::Healthy);
+
+        // Test 3: ReplicaStatus batch update
+        // Gossip2 receives a status update with multiple replicas
+        let did3 = KeyPair::generate()?.did().clone();
+        let status = GossipMessage::ReplicaStatus {
+            content_hash,
+            replicas: vec![
+                (did1.clone(), ReplicaHealth::Healthy),
+                (did3.clone(), ReplicaHealth::Stale),
+            ],
+        };
+
+        gossip2.handle_message(&did1, status)?;
+
+        // Verify all replicas were recorded
+        let replica_count = store2.get_replica_count(&content_hash)?;
+        assert_eq!(replica_count, 2, "Should have 2 replicas");
+
+        let metadata = store2.get_replica_metadata(&content_hash)?.unwrap();
+        assert_eq!(metadata.replicas.len(), 2);
+
+        // Find the stale replica
+        let stale_replica = metadata.replicas.iter()
+            .find(|r| r.peer_did == did3.to_string())
+            .expect("Should have did3 replica");
+        assert_eq!(stale_replica.health, icn_store::ReplicaHealth::Stale);
+
+        Ok(())
     }
 }
