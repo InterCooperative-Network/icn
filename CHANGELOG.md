@@ -76,6 +76,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All 91 gossip tests passing (89 unit + 2 doc tests)
 - Bug fix validated with 2 regression tests for version 0 handling
 
+### Added - Clock Synchronization (Phase 19 Week 3-4) (2025-11-25)
+
+**New Crate: icn-time** ([crates/icn-time/](icn/crates/icn-time/))
+
+Cooperative-wide clock synchronization for timestamp validation and replay attack prevention:
+
+1. **Clock Sync Module** ([crates/icn-time/src/sync.rs](icn/crates/icn-time/src/sync.rs))
+   - `ClockSync` - Network time offset and uncertainty tracking
+   - Query multiple Rough Time servers concurrently (Cloudflare, int08h, Google)
+   - Median time calculation resilient to single-server failures
+   - RTT-based uncertainty for confidence intervals
+   - Background sync task with 10-minute interval (configurable)
+   - `MAX_CLOCK_SKEW: 300s` - 5-minute tolerance window
+   - `MIN_SERVERS: 3` - Required for median calculation
+
+2. **Timestamp Validation**:
+   - `validate_timestamp()` - Reject messages outside ±300s window
+   - `network_time()` - Local time adjusted by sync offset
+   - `is_fresh()` - Check if sync within last 10 minutes
+   - Prevents replay attacks with strict time bounds
+
+3. **Simplified Rough Time Protocol** (RFC 8915):
+   - UDP-based time server queries with 5-second timeout
+   - Nonce-based request/response (32-byte random nonce)
+   - Server response: 8 bytes milliseconds since epoch
+   - Automatic server resolution and retry logic
+   - Concurrent queries reduce sync latency
+
+4. **Error Handling** ([error.rs](icn/crates/icn-time/src/error.rs)):
+   - `TimestampOutOfRange` - Message timestamp outside acceptable window
+   - `SyncFailed` - Clock sync operation failed
+   - `NoServersAvailable` - All time servers unreachable
+   - `InsufficientResponses` - Not enough servers for median calculation
+   - `NotSynchronized` - Validation attempted before first sync
+
+5. **Prometheus Metrics** (6 new clock sync metrics):
+   - `clock_sync_success_total` - Successful synchronizations
+   - `clock_sync_failed_total` - Failed sync attempts
+   - `clock_sync_duration_seconds` - Sync operation duration
+   - `clock_sync_offset_seconds` - Clock offset from network median
+   - `timestamp_validation_accepted_total` - Valid timestamps
+   - `timestamp_validation_rejected_total` - Out-of-range timestamps
+
+**Performance Impact:**
+- Concurrent server queries reduce sync latency
+- Median calculation resilient to outliers
+- Background task prevents blocking main runtime
+- 5-second timeout per server prevents hangs
+
+**Dependencies:**
+- Added `icn-time` crate to workspace
+- `rand`/`rand_core` for nonce generation
+
+**Testing:**
+- 4 comprehensive tests covering creation, median, uncertainty, errors
+- 1 doc test
+- All tests passing
+
+**Configuration** (planned):
+```toml
+[time_sync]
+enabled = true
+sync_interval_seconds = 600
+max_clock_skew_seconds = 300
+rough_time_servers = [
+    "roughtime.cloudflare.com:2003",
+    "roughtime.int08h.com:2002",
+]
+```
+
 ### Added - Storage Exhaustion Protection (Phase 18 Week 6) (2025-11-25)
 
 **Storage quota management with priority-based eviction:**
