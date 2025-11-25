@@ -337,6 +337,14 @@ pub fn init_descriptions() {
         "icn_scalability_batch_verify_size",
         "Number of signatures verified in each batch"
     );
+    describe_counter!(
+        "icn_scalability_topic_sharding_enabled_total",
+        "Total number of topics that enabled sharding (exceeded 1000 entries)"
+    );
+    describe_gauge!(
+        "icn_scalability_sharded_topic_size",
+        "Current number of entries in sharded topics by topic name"
+    );
 
     // Ledger metrics
     describe_gauge!(
@@ -1219,6 +1227,16 @@ pub mod scalability {
 
     pub fn batch_verify_size_record(count: usize) {
         histogram!("icn_scalability_batch_verify_size").record(count as f64);
+    }
+
+    // Topic sharding metrics
+    pub fn topic_sharding_enabled_inc() {
+        counter!("icn_scalability_topic_sharding_enabled_total").increment(1);
+    }
+
+    pub fn sharded_topic_size_set(topic: &str, size: usize) {
+        gauge!("icn_scalability_sharded_topic_size", "topic" => topic.to_string())
+            .set(size as f64);
     }
 }
 

@@ -45,7 +45,7 @@ pub use partition::{
     Conflict, ConflictResolution, ConflictResolver, DataType, PartitionConfig, PartitionDetector,
     PartitionHealer, ResolutionOutcome, VectorClockMerger,
 };
-pub use scalability::{CompressedVectorClock, VarInt};
+pub use scalability::{CompressedVectorClock, ShardedTopic, ShardStats, TopicShard, VarInt};
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
     AccessControl, ContentHash, GossipEntry, GossipMessage, Scope, Subscription, Topic,
