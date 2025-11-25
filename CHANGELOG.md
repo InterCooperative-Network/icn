@@ -7,6 +7,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Network Partition Detection and Healing (Phase 18 Week 3) (2025-11-24)
+
+**Comprehensive partition detection and healing system with automatic conflict resolution:**
+
+1. **PartitionDetector** ([crates/icn-gossip/src/partition.rs](icn/crates/icn-gossip/src/partition.rs))
+   - Last-seen timestamp tracking for all peers
+   - Configurable partition threshold (default: 5 minutes of no contact)
+   - Automatic partition detection via `is_partitioned()` and `get_partitioned_peers()`
+   - Peer removal on explicit disconnect
+
+2. **PartitionHealer**:
+   - **VectorClockMerger**: Detects version gaps and concurrent updates during partition healing
+   - **ConflictResolver**: Policy-based conflict resolution per data type
+   - **Data-type-specific policies**:
+     - **LedgerEntry**: RequiresManual (critical financial data)
+     - **Contract**: LastWriteWins (timestamp-based)
+     - **TrustEdge**: LastWriteWins (timestamp-based)
+     - **GossipEntry**: KeepBoth (append-only)
+   - Async partition healing with conflict detection and resolution tracking
+
+3. **Conflict Types**:
+   - `DataType` enum: LedgerEntry, Contract, TrustEdge, GossipEntry, Other
+   - `Conflict` struct: Tracks local/remote versions, timestamps, and data
+   - `ConflictResolution` strategies: KeepLocal, KeepRemote, KeepBoth, LastWriteWins, RequiresManual
+   - `ResolutionOutcome`: Reports auto-resolved vs manual intervention required
+
+4. **Prometheus Metrics** (7 new metrics):
+   - `icn_partition_peers_detected` - Current number of partitioned peers
+   - `icn_partition_heals_total` - Total partition healing operations
+   - `icn_partition_conflicts_detected_total` - Conflicts detected (by data_type)
+   - `icn_partition_conflicts_resolved_total` - Auto-resolved conflicts (by strategy)
+   - `icn_partition_conflicts_manual_total` - Conflicts requiring manual resolution
+   - `icn_partition_heal_duration_seconds` - Healing operation duration histogram
+   - `icn_partition_vector_clock_merges_total` - Total vector clock merges performed
+
+5. **Test Coverage** (7 comprehensive tests):
+   - Partition detector with timeout-based detection
+   - Partitioned peer tracking and recovery
+   - Vector clock merging with version gap detection
+   - Conflict resolver policies (manual, LWW, keep-both)
+   - Last-Write-Wins timestamp comparison
+   - Partition healer with empty conflicts
+   - Partition healer with multiple conflicts (gossip + contract)
+
+**Phase 18 Progress**: Week 1-2 Complete ✅ (Byzantine fault detection), Week 3 Complete ✅ (Partition healing)
+
+**Commit**: 436d16b
+
+**Files Changed**:
+- `icn-gossip/src/partition.rs` - 667 lines (new)
+- `icn-gossip/src/lib.rs` - Export partition types
+- `icn-obs/src/metrics.rs` - 7 partition metrics (+93 lines)
+
+All 71 tests passing (64 gossip + 4 obs + 7 partition)
+
+---
+
+### Added - Byzantine Fault Detection with Reputation Management (Phase 18 Week 1-2) (2025-11-24)
+
+**Automatic detection and mitigation of Byzantine faults with reputation-based peer management:**
+
+1. **MisbehaviorDetector** ([crates/icn-security/src/misbehavior.rs](icn/crates/icn-security/src/misbehavior.rs) - 490 lines)
+   - 7 violation types with severity scoring:
+     - **Critical (10 points)**: ConflictingLedgerEntries, ConflictingSignedStatements, ReplayAttack (auto-ban)
+     - **Major (5 points)**: FailedComputeVerification, InvalidSignature
+     - **Minor (1 point)**: ExcessiveResourceUse, TrustGraphSpam
+   - Violation history tracking with cryptographic evidence
+   - Rate-based quarantine (10 violations/hour triggers quarantine)
+
+2. **ReputationScore** (0.0 to 1.0):
+   - Dynamic penalty system: 5% reputation loss per severity point
+   - Time-based decay: 1% recovery per hour (configurable)
+   - Automatic state transitions: Pristine → Quarantined → Banned
+   - Configurable thresholds:
+     - `quarantine_threshold` (default: 0.5) - Below this = quarantined
+     - `ban_threshold` (default: 0.0) - At or below = permanently banned
+
+3. **Auto-Quarantine/Ban** (with bug fixes from user feedback):
+   - **Quarantine**: Reputation < 0.5 (configurable)
+   - **Ban**: Reputation = 0.0 OR critical violation (conflicting statements, replay attacks)
+   - Fixed hardcoded thresholds to use configured values ✅
+   - Fixed metric gauge accuracy (quarantined_dec on ban transition) ✅
+
+4. **Prometheus Metrics** (5 new metrics):
+   - `icn_misbehavior_violations_total` - By DID and violation type
+   - `icn_misbehavior_quarantined_peers` - Current quarantine count (gauge)
+   - `icn_misbehavior_banned_peers` - Current ban count (gauge)
+   - `icn_misbehavior_auto_bans_total` - Total automatic bans issued
+   - `icn_misbehavior_reputation_penalties_total` - By DID and severity
+
+5. **Configuration**:
+   - `MisbehaviorThresholds`: Configurable quarantine/ban thresholds, decay rate
+   - Default: 0.5 quarantine, 0.0 ban, 0.01/hour decay
+   - Runtime-adjustable for different security postures
+
+**Test Coverage** (8 tests):
+- Violation tracking and severity scoring
+- Reputation penalty application with time-based decay
+- Quarantine and ban threshold enforcement (fixed)
+- Auto-ban for critical violations
+- Rate-based quarantine (10 violations/hour)
+- Reputation recovery over time
+- Metric gauge accuracy (fixed)
+
+**Phase 18 Progress**: Week 1-2 Complete ✅
+
+**Commits**: cf21391 (initial implementation), 16b4e13 (bug fixes)
+
+**Critical Bug Fixes**:
+1. Fixed hardcoded thresholds ignored configuration (is_quarantined/is_banned now accept threshold parameters)
+2. Fixed quarantine metric gauge never decremented (added quarantined_dec on ban transition)
+
+All 8 tests passing
+
+---
+
 ### Added - Storage Replication Integration Tests & Operational Guide (Phase 17 Week 4) (2025-11-24)
 
 **ReplicationManager Integration Testing & Production Documentation:**
