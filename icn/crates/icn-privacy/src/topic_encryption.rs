@@ -55,6 +55,7 @@ pub struct EncryptedTopic {
 pub struct TopicEncryptor {
     /// Shared secret for topic encryption (32 bytes)
     /// In production, this would be derived from cooperative membership
+    #[allow(dead_code)]
     shared_key: [u8; 32],
 
     /// Cipher instance

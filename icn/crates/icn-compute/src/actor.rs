@@ -1,7 +1,6 @@
 //! Compute actor for distributed task execution.
 
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 

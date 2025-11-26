@@ -343,7 +343,7 @@ mod tests {
         };
 
         let obfuscator = TrafficObfuscator::with_config(config);
-        let _should_send = obfuscator.should_send_cover_traffic(Duration::from_secs(10));
+        let should_send = obfuscator.should_send_cover_traffic(Duration::from_secs(10));
 
         assert!(!should_send);
     }

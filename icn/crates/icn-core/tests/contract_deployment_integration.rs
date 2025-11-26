@@ -140,6 +140,10 @@ impl TestNode {
                         icn_gossip::GossipMessage::Digest { .. } => "Digest",
                         icn_gossip::GossipMessage::PullRequest { .. } => "PullRequest",
                         icn_gossip::GossipMessage::PullResponse { .. } => "PullResponse",
+                        icn_gossip::GossipMessage::BlobAnnounce { .. } => "BlobAnnounce",
+                        icn_gossip::GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
+                        icn_gossip::GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
+                        icn_gossip::GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
                     };
 
                     let result = if let Some(target_did) = recipient {

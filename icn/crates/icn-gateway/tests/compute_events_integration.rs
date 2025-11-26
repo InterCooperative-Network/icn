@@ -62,6 +62,7 @@ async fn test_compute_events_to_websocket() {
     let task = ComputeTask {
         id: "test-task".to_string(),
         submitter: "did:icn:alice".to_string(),
+        coop_id: None,
         code: TaskCode::Ccl(simple_ccl()),
         inputs: vec![],
         fuel_limit: FuelLimit(10_000),
@@ -71,6 +72,9 @@ async fn test_compute_events_to_websocket() {
         deadline: None,
         payment_rate: None,
         payment_currency: None,
+        resource_profile: None,
+        actor_mode: None,
+        placement_constraints: None,
     };
 
     let task_hash = handle.submit(task.clone()).await.expect("Should submit task");
@@ -159,6 +163,7 @@ async fn test_multiple_subscribers_receive_events() {
     let task = ComputeTask {
         id: "broadcast-test".to_string(),
         submitter: "did:icn:alice".to_string(),
+        coop_id: None,
         code: TaskCode::Ccl(simple_ccl()),
         inputs: vec![],
         fuel_limit: FuelLimit(10_000),
@@ -168,6 +173,9 @@ async fn test_multiple_subscribers_receive_events() {
         deadline: None,
         payment_rate: None,
         payment_currency: None,
+        resource_profile: None,
+        actor_mode: None,
+        placement_constraints: None,
     };
 
     handle.submit(task.clone()).await.expect("Should submit task");
@@ -264,6 +272,7 @@ async fn test_events_have_sequence_numbers() {
     let task = ComputeTask {
         id: "seq-test".to_string(),
         submitter: "did:icn:alice".to_string(),
+        coop_id: None,
         code: TaskCode::Ccl(simple_ccl()),
         inputs: vec![],
         fuel_limit: FuelLimit(10_000),
@@ -273,6 +282,9 @@ async fn test_events_have_sequence_numbers() {
         deadline: None,
         payment_rate: None,
         payment_currency: None,
+        resource_profile: None,
+        actor_mode: None,
+        placement_constraints: None,
     };
 
     handle.submit(task.clone()).await.expect("Should submit task");
