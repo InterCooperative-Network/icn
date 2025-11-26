@@ -1545,44 +1545,60 @@ impl NetworkActor {
                                     handler(message);
                                 }
                                 MessagePayload::Signed(ref envelope) => {
-                                    // Verify SignedEnvelope (signature + replay protection)
-                                    match replay_guard.write().await.check(envelope) {
-                                        Ok(()) => {
-                                            info!("Verified signed message from {} (seq={})", envelope.from, envelope.sequence);
-                                            // Forward verified message to handler
-                                            handler(message);
+                                    // Verify signature and age first (separate from replay check)
+                                    // This allows us to distinguish InvalidSignature from ReplayAttack without string matching
+                                    let sig_result = envelope.verify(300);
+
+                                    if let Err(e) = sig_result {
+                                        warn!("Signature/age verification failed from {}: {}", envelope.from, e);
+
+                                        // Record InvalidSignature violation
+                                        if let Some(ref detector) = misbehavior_detector {
+                                            let message_hash = {
+                                                use sha2::{Digest, Sha256};
+                                                let mut hasher = Sha256::new();
+                                                hasher.update(&envelope.sequence.to_be_bytes());
+                                                hasher.update(envelope.from.as_str().as_bytes());
+                                                hasher.finalize().to_vec()
+                                            };
+
+                                            let violation = icn_security::Violation::InvalidSignature {
+                                                message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
+                                            };
+
+                                            detector.write().await.record_violation(&envelope.from, violation, message_hash);
                                         }
-                                        Err(e) => {
-                                            let err_msg = e.to_string();
-                                            warn!("Rejecting signed message from {}: {}", envelope.from, err_msg);
+                                        // Drop message (don't forward to handler)
+                                    } else {
+                                        // Signature valid, now check for replay attack
+                                        match replay_guard.write().await.check(envelope) {
+                                            Ok(()) => {
+                                                info!("Verified signed message from {} (seq={})", envelope.from, envelope.sequence);
+                                                // Forward verified message to handler
+                                                handler(message);
+                                            }
+                                            Err(e) => {
+                                                warn!("Replay attack detected from {}: {}", envelope.from, e);
 
-                                            // Record misbehavior if detector is enabled
-                                            if let Some(ref detector) = misbehavior_detector {
-                                                // Compute message hash for evidence
-                                                let message_hash = {
-                                                    use sha2::{Digest, Sha256};
-                                                    let mut hasher = Sha256::new();
-                                                    hasher.update(&envelope.sequence.to_be_bytes());
-                                                    hasher.update(envelope.from.as_str().as_bytes());
-                                                    hasher.finalize().to_vec()
-                                                };
+                                                // Record ReplayAttack violation
+                                                if let Some(ref detector) = misbehavior_detector {
+                                                    let message_hash = {
+                                                        use sha2::{Digest, Sha256};
+                                                        let mut hasher = Sha256::new();
+                                                        hasher.update(&envelope.sequence.to_be_bytes());
+                                                        hasher.update(envelope.from.as_str().as_bytes());
+                                                        hasher.finalize().to_vec()
+                                                    };
 
-                                                // Distinguish between replay attacks and signature failures
-                                                let violation = if err_msg.contains("Replay") {
-                                                    icn_security::Violation::ReplayAttack {
+                                                    let violation = icn_security::Violation::ReplayAttack {
                                                         message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
                                                         sequence: envelope.sequence,
-                                                    }
-                                                } else {
-                                                    icn_security::Violation::InvalidSignature {
-                                                        message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
-                                                    }
-                                                };
+                                                    };
 
-                                                detector.write().await.record_violation(&envelope.from, violation, message_hash);
+                                                    detector.write().await.record_violation(&envelope.from, violation, message_hash);
+                                                }
+                                                // Drop message (don't forward to handler)
                                             }
-
-                                            // Drop message (don't forward to handler)
                                         }
                                     }
                                 }
