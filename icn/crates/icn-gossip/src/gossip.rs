@@ -87,6 +87,9 @@ pub struct GossipActor {
 
     /// Store for replica metadata tracking (Phase 17 - optional)
     store: Option<Arc<dyn icn_store::Store>>,
+
+    /// Byzantine fault detector (Phase 18 Week 1-2 - optional)
+    misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
 }
 
 impl GossipActor {
@@ -120,6 +123,7 @@ impl GossipActor {
             peer_sampling: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
             store: None, // Phase 17: Set via set_store()
+            misbehavior_detector: None, // Phase 18: Set via set_misbehavior_detector()
         };
 
         // Create default topics with appropriate scopes
@@ -177,6 +181,11 @@ impl GossipActor {
     /// Set the store for replica metadata tracking (Phase 17)
     pub fn set_store(&mut self, store: Arc<dyn icn_store::Store>) {
         self.store = Some(store);
+    }
+
+    /// Set the misbehavior detector for Byzantine fault detection (Phase 18)
+    pub fn set_misbehavior_detector(&mut self, detector: Arc<RwLock<icn_security::MisbehaviorDetector>>) {
+        self.misbehavior_detector = Some(detector);
     }
 
     /// Request replicas from specific peers (Phase 17 Week 3 - ReplicationManager integration)
@@ -426,6 +435,29 @@ impl GossipActor {
                     // Track rejection metrics
                     icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
 
+                    // Record misbehavior violation (Phase 18 Week 1-2)
+                    if let Some(ref detector) = self.misbehavior_detector {
+                        use sha2::{Digest, Sha256};
+                        let mut hasher = Sha256::new();
+                        hasher.update(subscriber.as_str().as_bytes());
+                        hasher.update(topic.as_bytes());
+                        hasher.update(b"unauthorized_subscription");
+                        let evidence = hasher.finalize().to_vec();
+
+                        let violation = icn_security::Violation::ExcessiveResourceUse {
+                            metric: format!("unauthorized_subscription:{}", topic),
+                            observed: 1,
+                            limit: 0,
+                        };
+
+                        tokio::task::block_in_place(|| {
+                            let rt = tokio::runtime::Handle::current();
+                            rt.block_on(async {
+                                detector.write().await.record_violation(&subscriber, violation, evidence);
+                            })
+                        });
+                    }
+
                     bail!(
                         "Insufficient trust: score {trust_score:.3} < required {threshold:.3}"
                     );
@@ -446,6 +478,29 @@ impl GossipActor {
         // Priority 2: Check AccessControl-based ACL (coarse-grained)
         let trust_class = (self.trust_lookup)(&subscriber);
         if !topic_obj.can_subscribe(&subscriber, trust_class) {
+            // Record misbehavior violation (Phase 18 Week 1-2)
+            if let Some(ref detector) = self.misbehavior_detector {
+                use sha2::{Digest, Sha256};
+                let mut hasher = Sha256::new();
+                hasher.update(subscriber.as_str().as_bytes());
+                hasher.update(topic.as_bytes());
+                hasher.update(b"acl_violation");
+                let evidence = hasher.finalize().to_vec();
+
+                let violation = icn_security::Violation::ExcessiveResourceUse {
+                    metric: format!("acl_violation:{}", topic),
+                    observed: 1,
+                    limit: 0,
+                };
+
+                tokio::task::block_in_place(|| {
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(async {
+                        detector.write().await.record_violation(&subscriber, violation, evidence);
+                    })
+                });
+            }
+
             bail!("Not authorized to subscribe to topic: {topic}");
         }
 
@@ -458,6 +513,29 @@ impl GossipActor {
         if !subscribers.contains(&subscriber) {
             // Check subscriber limit to prevent unbounded growth
             if subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
+                // Record misbehavior violation (Phase 18 Week 1-2)
+                if let Some(ref detector) = self.misbehavior_detector {
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(subscriber.as_str().as_bytes());
+                    hasher.update(topic.as_bytes());
+                    hasher.update(b"subscriber_limit");
+                    let evidence = hasher.finalize().to_vec();
+
+                    let violation = icn_security::Violation::ExcessiveResourceUse {
+                        metric: format!("topic_subscribers:{}", topic),
+                        observed: (subscribers.len() + 1) as u64,
+                        limit: MAX_SUBSCRIBERS_PER_TOPIC as u64,
+                    };
+
+                    tokio::task::block_in_place(|| {
+                        let rt = tokio::runtime::Handle::current();
+                        rt.block_on(async {
+                            detector.write().await.record_violation(&subscriber, violation, evidence);
+                        })
+                    });
+                }
+
                 bail!(
                     "Topic subscription limit reached: {} (max {})",
                     subscribers.len(),

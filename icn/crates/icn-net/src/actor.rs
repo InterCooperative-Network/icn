@@ -533,6 +533,8 @@ pub struct NetworkActor {
     peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
     /// Blob location registry for data locality (Phase 16C Week 2)
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
+    /// Byzantine fault detector (Phase 18 Week 1-2)
+    misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
 }
 
 impl NetworkActor {
@@ -635,6 +637,12 @@ impl NetworkActor {
         let blob_registry = Some(Arc::new(RwLock::new(crate::BlobLocationRegistry::new())));
         info!("Blob location registry initialized for data locality tracking");
 
+        // Initialize misbehavior detector (Phase 18 Week 1-2)
+        let misbehavior_detector = Some(Arc::new(RwLock::new(
+            icn_security::MisbehaviorDetector::new(icn_security::MisbehaviorThresholds::default())
+        )));
+        info!("Byzantine fault detection enabled with default thresholds");
+
         // Spawn incoming connection handler if handler is provided
         if let Some(handler) = incoming_handler.clone() {
             let session_manager_clone = session_manager.clone();
@@ -645,6 +653,7 @@ impl NetworkActor {
             let trust_graph_clone = trust_graph.clone();
             let peer_connections_clone = peer_connections.clone();
             let blob_registry_clone = blob_registry.clone();
+            let misbehavior_detector_clone = misbehavior_detector.clone();
             let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = did.clone();
             let shutdown_rx = shutdown_tx.subscribe();
@@ -659,6 +668,7 @@ impl NetworkActor {
                     trust_graph_clone,
                     peer_connections_clone,
                     blob_registry_clone,
+                    misbehavior_detector_clone,
                     identity_bundle_clone,
                     own_did_clone,
                     shutdown_rx,
@@ -749,6 +759,7 @@ impl NetworkActor {
             trust_graph: trust_graph.clone(),
             peer_connections: peer_connections.clone(),
             blob_registry: blob_registry.clone(),
+            misbehavior_detector: misbehavior_detector.clone(),
         };
 
         // Spawn actor task
@@ -849,6 +860,7 @@ impl NetworkActor {
                             let session_manager = self.session_manager.clone();
                             let peer_connections = self.peer_connections.clone();
                             let blob_registry = self.blob_registry.clone();
+                            let misbehavior_detector = self.misbehavior_detector.clone();
                             let identity_bundle = self.identity_bundle.clone();
                             let own_did = self.own_did.clone();
 
@@ -864,6 +876,7 @@ impl NetworkActor {
                                     session_manager,
                                     peer_connections,
                                     blob_registry,
+                                    misbehavior_detector,
                                     identity_bundle,
                                     own_did,
                                 ).await {
@@ -1038,6 +1051,7 @@ impl NetworkActor {
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
+        misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
@@ -1079,6 +1093,7 @@ impl NetworkActor {
                         let session_mgr_clone = session_manager.clone();
                         let peer_connections_clone = peer_connections.clone();
                         let blob_registry_clone = blob_registry.clone();
+                        let misbehavior_detector_clone = misbehavior_detector.clone();
                         let identity_bundle_clone = identity_bundle.clone();
                         let own_did_clone = own_did.clone();
                         tokio::spawn(async move {
@@ -1093,6 +1108,7 @@ impl NetworkActor {
                                 session_mgr_clone,
                                 peer_connections_clone,
                                 blob_registry_clone,
+                                misbehavior_detector_clone,
                                 identity_bundle_clone,
                                 own_did_clone,
                             ).await {
@@ -1149,6 +1165,7 @@ impl NetworkActor {
         _session_manager: Arc<RwLock<SessionManager>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
+        misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
     ) -> Result<()> {
@@ -1536,7 +1553,35 @@ impl NetworkActor {
                                             handler(message);
                                         }
                                         Err(e) => {
-                                            warn!("Rejecting signed message from {}: {}", envelope.from, e);
+                                            let err_msg = e.to_string();
+                                            warn!("Rejecting signed message from {}: {}", envelope.from, err_msg);
+
+                                            // Record misbehavior if detector is enabled
+                                            if let Some(ref detector) = misbehavior_detector {
+                                                // Compute message hash for evidence
+                                                let message_hash = {
+                                                    use sha2::{Digest, Sha256};
+                                                    let mut hasher = Sha256::new();
+                                                    hasher.update(&envelope.sequence.to_be_bytes());
+                                                    hasher.update(envelope.from.as_str().as_bytes());
+                                                    hasher.finalize().to_vec()
+                                                };
+
+                                                // Distinguish between replay attacks and signature failures
+                                                let violation = if err_msg.contains("Replay") {
+                                                    icn_security::Violation::ReplayAttack {
+                                                        message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
+                                                        sequence: envelope.sequence,
+                                                    }
+                                                } else {
+                                                    icn_security::Violation::InvalidSignature {
+                                                        message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
+                                                    }
+                                                };
+
+                                                detector.write().await.record_violation(&envelope.from, violation, message_hash);
+                                            }
+
                                             // Drop message (don't forward to handler)
                                         }
                                     }

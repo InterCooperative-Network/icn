@@ -98,5 +98,6 @@ icn-testkit = { path = "crates/icn-testkit" }
 icn-gateway = { path = "crates/icn-gateway" }
 icn-governance = { path = "crates/icn-governance" }
 icn-compute = { path = "crates/icn-compute" }
+icn-security = { path = "crates/icn-security" }
 icn-time = { path = "crates/icn-time" }
 icn-privacy = { path = "crates/icn-privacy" }
