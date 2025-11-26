@@ -49,12 +49,13 @@
 pub mod error;
 pub mod topic_encryption;
 
-// Week 3-4: Onion routing (in progress)
+// Week 3-4: Onion routing (production-ready)
 pub mod onion_routing;
 
-// Week 5-6: Traffic obfuscation (planned)
-// pub mod traffic_obfuscation;
+// Week 5-6: Traffic obfuscation
+pub mod traffic_obfuscation;
 
 pub use error::{PrivacyError, Result};
-pub use topic_encryption::{EncryptedTopic, TopicBloomFilter, TopicEncryptor};
 pub use onion_routing::{select_relays, Circuit, OnionMessage, OnionRouter};
+pub use topic_encryption::{EncryptedTopic, TopicBloomFilter, TopicEncryptor};
+pub use traffic_obfuscation::{ObfuscatedMessage, ObfuscationConfig, TrafficObfuscator};

@@ -22,6 +22,9 @@ pub enum PrivacyError {
     #[error("Onion routing error: {0}")]
     OnionRoutingError(String),
 
+    #[error("Traffic obfuscation error: {0}")]
+    ObfuscationError(String),
+
     #[error("Topic not found in encrypted set")]
     TopicNotFound,
 }
