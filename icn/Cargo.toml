@@ -17,7 +17,7 @@ members = [
     "bins/icnctl",
     "bins/icn-console",
     "crates/icn-gateway",
-    "crates/icn-governance", "crates/icn-compute", "crates/icn-security", "crates/icn-time",
+    "crates/icn-governance", "crates/icn-compute", "crates/icn-security", "crates/icn-time", "crates/icn-privacy",
 ]
 
 [workspace.package]
@@ -99,3 +99,4 @@ icn-gateway = { path = "crates/icn-gateway" }
 icn-governance = { path = "crates/icn-governance" }
 icn-compute = { path = "crates/icn-compute" }
 icn-time = { path = "crates/icn-time" }
+icn-privacy = { path = "crates/icn-privacy" }

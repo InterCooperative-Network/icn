@@ -971,6 +971,40 @@ pub fn init_descriptions() {
         "icn_storage_exceeded_quotas",
         "Number of quotas currently exceeded"
     );
+
+    // Privacy metrics (Phase 20)
+    describe_counter!(
+        "icn_privacy_topics_encrypted_total",
+        "Total number of topics encrypted for privacy"
+    );
+    describe_counter!(
+        "icn_privacy_topics_decrypted_total",
+        "Total number of encrypted topics decrypted"
+    );
+    describe_counter!(
+        "icn_privacy_bloom_filter_hits_total",
+        "Total number of Bloom filter matches"
+    );
+    describe_counter!(
+        "icn_privacy_bloom_filter_misses_total",
+        "Total number of Bloom filter misses"
+    );
+    describe_counter!(
+        "icn_privacy_onion_routes_created_total",
+        "Total number of onion routes created"
+    );
+    describe_counter!(
+        "icn_privacy_onion_hops_forwarded_total",
+        "Total number of onion routing hops forwarded"
+    );
+    describe_counter!(
+        "icn_privacy_cover_traffic_sent_total",
+        "Total number of cover traffic messages sent"
+    );
+    describe_counter!(
+        "icn_privacy_messages_padded_total",
+        "Total number of messages padded for size obfuscation"
+    );
 }
 
 /// Network metrics
@@ -2207,5 +2241,41 @@ pub mod storage_quotas {
 
     pub fn exceeded_quotas_set(count: usize) {
         gauge!("icn_storage_exceeded_quotas").set(count as f64);
+    }
+}
+
+pub mod privacy {
+    use metrics::counter;
+
+    pub fn topics_encrypted_inc() {
+        counter!("icn_privacy_topics_encrypted_total").increment(1);
+    }
+
+    pub fn topics_decrypted_inc() {
+        counter!("icn_privacy_topics_decrypted_total").increment(1);
+    }
+
+    pub fn bloom_filter_hits_inc() {
+        counter!("icn_privacy_bloom_filter_hits_total").increment(1);
+    }
+
+    pub fn bloom_filter_misses_inc() {
+        counter!("icn_privacy_bloom_filter_misses_total").increment(1);
+    }
+
+    pub fn onion_routes_created_inc() {
+        counter!("icn_privacy_onion_routes_created_total").increment(1);
+    }
+
+    pub fn onion_hops_forwarded_inc() {
+        counter!("icn_privacy_onion_hops_forwarded_total").increment(1);
+    }
+
+    pub fn cover_traffic_sent_inc() {
+        counter!("icn_privacy_cover_traffic_sent_total").increment(1);
+    }
+
+    pub fn messages_padded_inc() {
+        counter!("icn_privacy_messages_padded_total").increment(1);
     }
 }
