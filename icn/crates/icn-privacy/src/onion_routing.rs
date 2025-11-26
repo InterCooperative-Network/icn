@@ -60,6 +60,10 @@ pub struct OnionLayer {
 
     /// Next hop's DID (for routing)
     pub next_hop: Did,
+
+    /// Ephemeral public key for this layer
+    /// Relay derives shared key via ECDH(relay_secret, ephemeral_pubkey)
+    pub ephemeral_pubkey: [u8; 32],
 }
 
 /// Inner content of an onion layer
@@ -83,10 +87,6 @@ pub struct Circuit {
 
     /// Final recipient
     pub recipient: Did,
-
-    /// Shared keys with each hop (for encryption)
-    /// Index 0 = first relay, index n-1 = recipient
-    shared_keys: Vec<[u8; 32]>,
 }
 
 /// Onion router for creating and processing onion messages
@@ -129,44 +129,34 @@ impl OnionRouter {
     /// - `recipient`: Final recipient DID
     ///
     /// # Returns
-    /// Circuit with computed shared keys for each hop
+    /// Circuit with public keys for each hop (ephemeral keys generated during wrapping)
     pub fn create_circuit(&self, relays: Vec<Did>, recipient: Did) -> Result<Circuit> {
-        // Compute shared keys with each hop using X25519 ECDH
-        let mut shared_keys = Vec::new();
-
-        // Keys for relays
+        // Validate we have public keys for all hops
         for relay_did in &relays {
-            let relay_pk = self
-                .peer_public_keys
-                .get(relay_did)
-                .ok_or_else(|| {
-                    PrivacyError::OnionRoutingError(format!("Missing public key for {}", relay_did))
-                })?;
-
-            let shared_secret = self.secret_key.diffie_hellman(relay_pk);
-            shared_keys.push(*shared_secret.as_bytes());
+            if !self.peer_public_keys.contains_key(relay_did) {
+                return Err(PrivacyError::OnionRoutingError(format!(
+                    "Missing public key for {}",
+                    relay_did
+                )));
+            }
         }
 
-        // Key for recipient
-        let recipient_pk = self.peer_public_keys.get(&recipient).ok_or_else(|| {
-            PrivacyError::OnionRoutingError(format!("Missing public key for {}", recipient))
-        })?;
-
-        let shared_secret = self.secret_key.diffie_hellman(recipient_pk);
-        shared_keys.push(*shared_secret.as_bytes());
+        if !self.peer_public_keys.contains_key(&recipient) {
+            return Err(PrivacyError::OnionRoutingError(format!(
+                "Missing public key for {}",
+                recipient
+            )));
+        }
 
         icn_obs::metrics::privacy::onion_routes_created_inc();
 
-        Ok(Circuit {
-            relays,
-            recipient,
-            shared_keys,
-        })
+        Ok(Circuit { relays, recipient })
     }
 
     /// Wrap a message in onion layers
     ///
     /// Creates layered encryption from innermost (recipient) to outermost (first relay).
+    /// Each layer is encrypted with an ephemeral keypair for forward secrecy.
     ///
     /// # Arguments
     /// - `circuit`: The routing circuit
@@ -184,11 +174,19 @@ impl OnionRouter {
         let final_bytes = bincode::serialize(&final_content)
             .map_err(|e| PrivacyError::OnionRoutingError(format!("Serialization failed: {}", e)))?;
 
-        let mut current_layer =
-            self.encrypt_layer(&final_bytes, circuit.shared_keys.last().unwrap())?;
+        // Get recipient's public key
+        let recipient_pk = self.peer_public_keys.get(&circuit.recipient).ok_or_else(|| {
+            PrivacyError::OnionRoutingError(format!(
+                "Missing public key for recipient {}",
+                circuit.recipient
+            ))
+        })?;
+
+        let mut current_layer = self.encrypt_layer(&final_bytes, recipient_pk)?;
+        current_layer.next_hop = circuit.recipient.clone();
 
         // Wrap in relay layers (reverse order)
-        for (i, _relay_did) in circuit.relays.iter().enumerate().rev() {
+        for (i, relay_did) in circuit.relays.iter().enumerate().rev() {
             let relay_content = LayerContent::Relay {
                 next_hop: if i == circuit.relays.len() - 1 {
                     circuit.recipient.clone()
@@ -202,15 +200,14 @@ impl OnionRouter {
                 PrivacyError::OnionRoutingError(format!("Serialization failed: {}", e))
             })?;
 
-            current_layer = self.encrypt_layer(&relay_bytes, &circuit.shared_keys[i])?;
-        }
+            // Get relay's public key
+            let relay_pk = self.peer_public_keys.get(relay_did).ok_or_else(|| {
+                PrivacyError::OnionRoutingError(format!("Missing public key for relay {}", relay_did))
+            })?;
 
-        // Create onion message with first hop
-        let _first_hop = if circuit.relays.is_empty() {
-            circuit.recipient.clone()
-        } else {
-            circuit.relays[0].clone()
-        };
+            current_layer = self.encrypt_layer(&relay_bytes, relay_pk)?;
+            current_layer.next_hop = relay_did.clone();
+        }
 
         Ok(OnionMessage {
             layers: vec![current_layer],
@@ -220,12 +217,12 @@ impl OnionRouter {
 
     /// Peel one layer off an onion message
     ///
-    /// Decrypts the current layer and returns:
-    /// - Next hop to forward to
-    /// - Updated message (with layer removed) OR final payload
+    /// Decrypts the current layer using this node's secret key and the ephemeral
+    /// public key embedded in the layer. Returns the next hop to forward to, or
+    /// None if this node is the final destination.
     ///
     /// # Returns
-    /// - `Ok(Some((next_hop, onion_msg)))` - Forward to next hop
+    /// - `Ok(Some((next_hop, onion_msg)))` - Forward to next hop (layer replaced with inner)
     /// - `Ok(None)` - This is the final destination (extract payload separately)
     pub fn peel_layer(&self, mut onion: OnionMessage) -> Result<Option<(Did, OnionMessage)>> {
         if onion.layers.is_empty() {
@@ -234,7 +231,7 @@ impl OnionRouter {
             ));
         }
 
-        let current_layer = &onion.layers[onion.hop_index];
+        let current_layer = &onion.layers[0];
 
         // Decrypt current layer
         let decrypted = self.decrypt_layer(current_layer)?;
@@ -251,9 +248,8 @@ impl OnionRouter {
                 next_hop,
                 inner_layer,
             } => {
-                // Forward to next relay
-                onion.layers.push(*inner_layer);
-                onion.hop_index += 1;
+                // Replace current layer with inner layer (peel one layer off)
+                onion.layers[0] = *inner_layer;
                 Ok(Some((next_hop, onion)))
             }
             LayerContent::Final { .. } => {
@@ -273,7 +269,7 @@ impl OnionRouter {
             ));
         }
 
-        let current_layer = &onion.layers[onion.hop_index];
+        let current_layer = &onion.layers[0];
         let decrypted = self.decrypt_layer(current_layer)?;
 
         let content: LayerContent = bincode::deserialize(&decrypted).map_err(|e| {
@@ -288,9 +284,19 @@ impl OnionRouter {
         }
     }
 
-    /// Encrypt a layer with a shared key
-    fn encrypt_layer(&self, plaintext: &[u8], shared_key: &[u8; 32]) -> Result<OnionLayer> {
-        let cipher = ChaCha20Poly1305::new(shared_key.into());
+    /// Encrypt a layer with recipient's public key
+    ///
+    /// Generates ephemeral keypair, derives shared secret via ECDH, then encrypts.
+    fn encrypt_layer(&self, plaintext: &[u8], recipient_pubkey: &PublicKey) -> Result<OnionLayer> {
+        // Generate ephemeral keypair for this layer
+        let ephemeral_secret = StaticSecret::random_from_rng(rand::thread_rng());
+        let ephemeral_pubkey = PublicKey::from(&ephemeral_secret);
+
+        // Derive shared secret via ECDH
+        let shared_secret = ephemeral_secret.diffie_hellman(recipient_pubkey);
+        let shared_key: [u8; 32] = *shared_secret.as_bytes();
+
+        let cipher = ChaCha20Poly1305::new(&shared_key.into());
 
         // Generate random nonce
         let mut nonce_bytes = [0u8; 12];
@@ -305,23 +311,31 @@ impl OnionRouter {
         Ok(OnionLayer {
             ciphertext,
             nonce: nonce_bytes,
-            next_hop: self.my_did.clone(), // Placeholder (overwritten by caller)
+            next_hop: self.my_did.clone(), // Placeholder (will be set by caller)
+            ephemeral_pubkey: ephemeral_pubkey.to_bytes(),
         })
     }
 
     /// Decrypt a layer with this node's secret key
-    fn decrypt_layer(&self, _layer: &OnionLayer) -> Result<Vec<u8>> {
-        // For proper implementation, we'd need to derive the shared key from:
-        // - Our secret key
-        // - Sender's ephemeral public key (should be in layer)
-        //
-        // For now, this is a simplified version that assumes we have the key.
-        // In production, each layer would include an ephemeral public key.
+    ///
+    /// Derives shared secret via ECDH(my_secret, layer.ephemeral_pubkey), then decrypts.
+    fn decrypt_layer(&self, layer: &OnionLayer) -> Result<Vec<u8>> {
+        // Reconstruct ephemeral public key from bytes
+        let ephemeral_pubkey = PublicKey::from(layer.ephemeral_pubkey);
 
-        // This is a placeholder - real implementation needs ephemeral keys
-        Err(PrivacyError::OnionRoutingError(
-            "Decryption requires ephemeral public keys (not yet implemented)".to_string(),
-        ))
+        // Derive shared secret via ECDH
+        let shared_secret = self.secret_key.diffie_hellman(&ephemeral_pubkey);
+        let shared_key: [u8; 32] = *shared_secret.as_bytes();
+
+        let cipher = ChaCha20Poly1305::new(&shared_key.into());
+        let nonce = Nonce::from(layer.nonce);
+
+        // Decrypt
+        let plaintext = cipher
+            .decrypt(&nonce, Payload { msg: &layer.ciphertext, aad: b"" })
+            .map_err(|e| PrivacyError::DecryptionFailed(e.to_string()))?;
+
+        Ok(plaintext)
     }
 }
 
@@ -353,10 +367,14 @@ pub fn select_relays(
     }
 
     // Sort by trust (highest first) for better security
+    // Handle NaN gracefully by treating it as 0.0
     trusted.sort_by(|a, b| {
         let trust_a = trust_scores.get(a).copied().unwrap_or(0.0);
         let trust_b = trust_scores.get(b).copied().unwrap_or(0.0);
-        trust_b.partial_cmp(&trust_a).unwrap()
+
+        // Use total_cmp to handle NaN/Infinity safely
+        // NaN is treated as greater than positive infinity, so NaN scores go to the end
+        trust_b.total_cmp(&trust_a)
     });
 
     // Take top N relays
@@ -396,7 +414,6 @@ mod tests {
         assert_eq!(circuit.relays.len(), 1);
         assert_eq!(circuit.relays[0], relay1_did);
         assert_eq!(circuit.recipient, recipient_did);
-        assert_eq!(circuit.shared_keys.len(), 2); // relay + recipient
     }
 
     #[test]
@@ -440,5 +457,73 @@ mod tests {
         let selected = select_relays(&candidates, &trust_scores, 2, 0.3);
 
         assert_eq!(selected.len(), 0); // Not enough trusted relays
+    }
+
+    #[test]
+    fn test_select_relays_handles_nan() {
+        let (relay1, _, _) = make_test_did();
+        let (relay2, _, _) = make_test_did();
+        let (relay3, _, _) = make_test_did();
+
+        let candidates = vec![relay1.clone(), relay2.clone(), relay3.clone()];
+
+        let mut trust_scores = HashMap::new();
+        trust_scores.insert(relay1.clone(), 0.9); // High trust
+        trust_scores.insert(relay2.clone(), f64::NAN); // NaN from upstream
+        trust_scores.insert(relay3.clone(), 0.7); // Medium trust
+
+        // Should not panic and should select non-NaN relays
+        let selected = select_relays(&candidates, &trust_scores, 2, 0.3);
+
+        assert_eq!(selected.len(), 2);
+        // NaN should be sorted to end, so we get relay1 and relay3
+        assert_eq!(selected[0], relay1);
+        assert_eq!(selected[1], relay3);
+    }
+
+    #[test]
+    fn test_wrap_peel_extract() {
+        // End-to-end test: sender wraps, relay peels, recipient extracts
+
+        // Sender
+        let (sender_did, sender_secret, _) = make_test_did();
+        let mut sender_router = OnionRouter::new(sender_did, sender_secret);
+
+        // Relay
+        let (relay_did, relay_secret, relay_pk) = make_test_did();
+        let relay_router = OnionRouter::new(relay_did.clone(), relay_secret);
+
+        // Recipient
+        let (recipient_did, recipient_secret, recipient_pk) = make_test_did();
+        let recipient_router = OnionRouter::new(recipient_did.clone(), recipient_secret);
+
+        // Sender adds peer keys
+        sender_router.add_peer_key(relay_did.clone(), relay_pk);
+        sender_router.add_peer_key(recipient_did.clone(), recipient_pk);
+
+        // Create circuit: sender → relay → recipient
+        let circuit = sender_router
+            .create_circuit(vec![relay_did.clone()], recipient_did.clone())
+            .unwrap();
+
+        // Wrap message
+        let payload = b"secret message";
+        let onion = sender_router.wrap_message(&circuit, payload).unwrap();
+
+        // Verify outermost layer points to relay
+        assert_eq!(onion.layers[0].next_hop, relay_did);
+
+        // Relay peels one layer
+        let (next_hop, peeled_onion) = relay_router.peel_layer(onion).unwrap().unwrap();
+        assert_eq!(next_hop, recipient_did);
+        assert_eq!(peeled_onion.layers[0].next_hop, recipient_did);
+
+        // Recipient receives and checks if final
+        let result = recipient_router.peel_layer(peeled_onion.clone());
+        assert!(result.unwrap().is_none()); // None = final destination
+
+        // Extract payload
+        let extracted = recipient_router.extract_payload(&peeled_onion).unwrap();
+        assert_eq!(extracted, payload);
     }
 }
