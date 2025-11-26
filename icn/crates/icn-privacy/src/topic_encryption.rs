@@ -137,7 +137,16 @@ impl TopicEncryptor {
     /// False negatives are not possible.
     pub fn bloom_matches(&self, topic: &str, encrypted: &EncryptedTopic) -> bool {
         let hint = Self::compute_bloom_hint(topic);
-        hint == encrypted.bloom_hint
+        let matches = hint == encrypted.bloom_hint;
+
+        // Record metric
+        if matches {
+            icn_obs::metrics::privacy::bloom_filter_hits_inc();
+        } else {
+            icn_obs::metrics::privacy::bloom_filter_misses_inc();
+        }
+
+        matches
     }
 
     /// Compute Bloom filter hint for a topic
@@ -202,12 +211,30 @@ impl TopicBloomFilter {
     /// Returns `false` if topic is definitely not present.
     pub fn contains(&self, topic: &str) -> bool {
         let hint = Self::compute_hint(topic);
-        self.hints.contains(&hint)
+        let result = self.hints.contains(&hint);
+
+        // Record metric
+        if result {
+            icn_obs::metrics::privacy::bloom_filter_hits_inc();
+        } else {
+            icn_obs::metrics::privacy::bloom_filter_misses_inc();
+        }
+
+        result
     }
 
     /// Check if an encrypted topic might match our interests
     pub fn matches(&self, encrypted: &EncryptedTopic) -> bool {
-        self.hints.contains(&encrypted.bloom_hint)
+        let result = self.hints.contains(&encrypted.bloom_hint);
+
+        // Record metric
+        if result {
+            icn_obs::metrics::privacy::bloom_filter_hits_inc();
+        } else {
+            icn_obs::metrics::privacy::bloom_filter_misses_inc();
+        }
+
+        result
     }
 
     /// Get number of topics in filter
