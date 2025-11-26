@@ -1003,24 +1003,88 @@ topic_sharding_threshold = 1000  # Shard topics with >1000 entries
 
 ---
 
-### Phase 20+: Future Enhancements
+### Phase 20: Privacy Enhancements (6 weeks)
+**Status**: In Progress - Week 1-2 Complete ✅
+**Progress**: 33% (2/6 weeks complete)
+**Duration**: 6 weeks
+**Completion Date (Week 1-2)**: 2025-11-26
+
+**Motivation**: Network observers can currently see topic subscriptions, connection graphs, and message timing/sizes, revealing privacy-sensitive patterns. Before wide deployment, we need metadata protection to prevent surveillance and correlation attacks.
+
+**Critical Gap Addressed**: ARCHITECTURE.md Section 12.9 (Privacy & Metadata Leakage)
+
+**Scope - Week 1-2: Encrypted Topic Metadata** ✅ **COMPLETE**:
+```rust
+// icn-privacy/src/topic_encryption.rs
+
+/// Prevent observers from learning subscription patterns
+pub struct TopicEncryptor {
+    cipher: ChaCha20Poly1305,
+}
+
+pub struct EncryptedTopic {
+    ciphertext: Vec<u8>,        // Encrypted topic name
+    nonce: [u8; 12],            // Random 96-bit nonce
+    bloom_hint: [u8; 32],       // SHA256 hash for discovery
+}
+
+impl TopicEncryptor {
+    /// Encrypt topic name (observer can't see "ledger:sync")
+    pub fn encrypt(&self, topic: &str) -> Result<EncryptedTopic>;
+
+    /// Decrypt if you have the key
+    pub fn decrypt(&self, encrypted: &EncryptedTopic) -> Result<String>;
+
+    /// Check if topic might match (probabilistic via Bloom)
+    pub fn bloom_matches(&self, topic: &str, encrypted: &EncryptedTopic) -> bool;
+}
+```
+
+**Deliverables (Week 1-2)** ✅:
+- `icn-privacy` crate ([crates/icn-privacy/](icn/crates/icn-privacy/))
+- `topic_encryption.rs` - TopicEncryptor, EncryptedTopic, TopicBloomFilter (425 lines)
+- `error.rs` - PrivacyError types
+- 8 Prometheus privacy metrics in `icn-obs`
+- 8 tests passing (7 unit + 1 doc)
+
+**Security Properties**:
+- **Confidentiality**: Topic names unreadable to network observers
+- **Unlinkability**: Can't correlate multiple topics to same subscriber
+- **Plausible Deniability**: Bloom filter false positives provide cover
+
+**Scope - Week 3-4: Onion Routing for Gossip** (Pending):
+- Multi-hop message routing (Tor-like) to hide sender/receiver
+- Protect against traffic analysis
+- Circuit building with layered encryption
+- Relay node selection based on trust
+
+**Scope - Week 5-6: Traffic Obfuscation** (Pending):
+- Random message delays (resist timing analysis)
+- Message size padding (hide content patterns)
+- Cover traffic generation (decoy messages)
+- Constant-rate dummy traffic
+
+**Prometheus Metrics** (8 privacy metrics):
+- `icn_privacy_topics_encrypted_total` - Topics encrypted
+- `icn_privacy_topics_decrypted_total` - Topics decrypted
+- `icn_privacy_bloom_filter_hits_total` - Bloom matches
+- `icn_privacy_bloom_filter_misses_total` - Bloom misses
+- `icn_privacy_onion_routes_created_total` - Onion routes (Week 3-4)
+- `icn_privacy_onion_hops_forwarded_total` - Hops forwarded (Week 3-4)
+- `icn_privacy_cover_traffic_sent_total` - Cover traffic (Week 5-6)
+- `icn_privacy_messages_padded_total` - Messages padded (Week 5-6)
+
+**Testing**:
+- 8 tests passing (Week 1-2)
+- Week 3-4: Onion routing integration tests
+- Week 5-6: Traffic obfuscation tests
+
+---
+
+### Phase 21+: Future Enhancements
 **Status**: Not Planned - **DRIVEN BY PILOT LEARNINGS**
-**Timing**: After 6+ months of production use
-**Approach**: Let real-world usage reveal priorities
 
-**Critical Gaps Deferred**: See [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work)
-- 12.9 Privacy & Metadata Leakage
-- 12.10 Trust Graph Gaming
-
-**Possible Future Work** (conditional on pilot feedback):
-
-**Privacy Enhancements**:
-- Onion routing for gossip (hide message graph topology)
-- Private set intersection (discover mutual connections without revealing all edges)
-- Encrypted topic metadata (hide topic names from network observers)
-- Traffic analysis resistance (constant-rate padding)
-
-**Trust Graph Hardening**:
+**Trust Graph Hardening** (Phase 21?):
 - Sybil detection algorithms (graph analysis for fake identities)
 - Contribution decay (require ongoing participation to maintain trust)
 - Attestation chains (evidence-based trust, not just social links)

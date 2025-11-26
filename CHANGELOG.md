@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Privacy Enhancements (Phase 20 Week 1-2) (2025-11-26)
+
+**New Crate: icn-privacy** ([crates/icn-privacy/](icn/crates/icn-privacy/))
+
+Privacy primitives addressing ARCHITECTURE.md Gap 12.9 (Privacy & Metadata Leakage):
+
+1. **Encrypted Topic Metadata** ([crates/icn-privacy/src/topic_encryption.rs](icn/crates/icn-privacy/src/topic_encryption.rs))
+   - ChaCha20-Poly1305 AEAD encryption for topic names
+   - Bloom filter-based topic discovery (privacy-preserving)
+   - Plausible deniability via false positives
+   - Prevents network observers from learning subscription patterns
+   - `TopicEncryptor::encrypt()` - Encrypt topic with random nonce
+   - `TopicEncryptor::decrypt()` - Decrypt topic if you have the key
+   - `TopicEncryptor::bloom_matches()` - Check if topic might match (probabilistic)
+   - `TopicBloomFilter` - Privacy-preserving interest matching
+   - 8 comprehensive tests (7 unit + 1 doc test)
+
+**Security Properties:**
+- **Confidentiality**: Topic names encrypted, unreadable to network observers
+- **Unlinkability**: Can't correlate multiple encrypted topics to same subscriber
+- **Plausible Deniability**: Bloom filter false positives provide cover
+- **Forward Secrecy**: Rotating shared keys limit exposure window (planned)
+
+**Prometheus Metrics** (8 new privacy metrics):
+- `icn_privacy_topics_encrypted_total` - Topics encrypted count
+- `icn_privacy_topics_decrypted_total` - Topics decrypted count
+- `icn_privacy_bloom_filter_hits_total` - Bloom filter matches
+- `icn_privacy_bloom_filter_misses_total` - Bloom filter non-matches
+- `icn_privacy_onion_routes_created_total` - Onion routes (Week 3-4)
+- `icn_privacy_onion_hops_forwarded_total` - Onion hops (Week 3-4)
+- `icn_privacy_cover_traffic_sent_total` - Cover traffic (Week 5-6)
+- `icn_privacy_messages_padded_total` - Message padding (Week 5-6)
+
+**Testing:**
+- 8 tests passing (7 unit + 1 doc)
+- Test coverage: encryption roundtrip, nonce randomness, Bloom matching, wrong key failure, multi-topic search
+
+**Next:**
+- Week 3-4: Onion routing for gossip (hide sender/receiver)
+- Week 5-6: Traffic obfuscation (timing, padding, cover traffic)
+
+---
+
 ### Added - Scalability Optimizations (Phase 19 Week 1-2) (2025-11-25)
 
 **Performance optimizations for 100-node cooperatives:**
