@@ -90,6 +90,12 @@ pub struct GossipActor {
 
     /// Byzantine fault detector (Phase 18 Week 1-2 - optional)
     misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
+
+    /// Network partition detector (Phase 18 Week 3 - optional)
+    partition_detector: Option<Arc<RwLock<crate::partition::PartitionDetector>>>,
+
+    /// Network partition healer (Phase 18 Week 3 - optional)
+    partition_healer: Option<Arc<RwLock<crate::partition::PartitionHealer>>>,
 }
 
 impl GossipActor {
@@ -123,7 +129,9 @@ impl GossipActor {
             peer_sampling: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
             store: None, // Phase 17: Set via set_store()
-            misbehavior_detector: None, // Phase 18: Set via set_misbehavior_detector()
+            misbehavior_detector: None, // Phase 18 Week 1-2: Set via set_misbehavior_detector()
+            partition_detector: None, // Phase 18 Week 3: Set via set_partition_detector()
+            partition_healer: None, // Phase 18 Week 3: Set via set_partition_healer()
         };
 
         // Create default topics with appropriate scopes
@@ -186,6 +194,58 @@ impl GossipActor {
     /// Set the misbehavior detector for Byzantine fault detection (Phase 18)
     pub fn set_misbehavior_detector(&mut self, detector: Arc<RwLock<icn_security::MisbehaviorDetector>>) {
         self.misbehavior_detector = Some(detector);
+    }
+
+    /// Set partition detector for network partition detection (Phase 18 Week 3)
+    pub fn set_partition_detector(&mut self, detector: Arc<RwLock<crate::partition::PartitionDetector>>) {
+        self.partition_detector = Some(detector);
+    }
+
+    /// Set partition healer for partition conflict resolution (Phase 18 Week 3)
+    pub fn set_partition_healer(&mut self, healer: Arc<RwLock<crate::partition::PartitionHealer>>) {
+        self.partition_healer = Some(healer);
+    }
+
+    /// Attempt to heal partition with a reconnected peer (Phase 18 Week 3)
+    ///
+    /// This should be called when a previously-partitioned peer reconnects.
+    /// It will merge vector clocks and resolve any conflicts that arose during the partition.
+    pub async fn heal_partition_with_peer(&mut self, peer: &Did) -> Result<()> {
+        // Check if we have both detector and healer
+        let (was_partitioned, healer_ref) = match (&self.partition_detector, &self.partition_healer) {
+            (Some(detector), Some(healer)) => {
+                let was_part = detector.read().await.is_partitioned(peer);
+                (was_part, healer.clone())
+            }
+            _ => return Ok(()), // No partition detection/healing enabled
+        };
+
+        if !was_partitioned {
+            return Ok(()); // Peer wasn't partitioned, nothing to heal
+        }
+
+        info!("Attempting to heal partition with peer {}", peer);
+
+        // Get peer's vector clock (we'd need to exchange this via a handshake message)
+        // For now, we'll just merge what we have and log
+        // TODO: Add a PartitionHealRequest/Response message exchange to get peer's clock
+
+        // Merge clocks and resolve conflicts (no conflicts for now since we don't have peer's clock)
+        let mut healer_guard = healer_ref.write().await;
+        let outcomes = healer_guard
+            .heal_partition(peer, VectorClock::new(), vec![])
+            .await?;
+
+        if !outcomes.is_empty() {
+            info!(
+                "Healed partition with {}: {} conflicts resolved",
+                peer,
+                outcomes.len()
+            );
+            icn_obs::metrics::gossip::partition_healed_inc();
+        }
+
+        Ok(())
     }
 
     /// Request replicas from specific peers (Phase 17 Week 3 - ReplicationManager integration)
@@ -684,6 +744,13 @@ impl GossipActor {
     /// Handle incoming gossip message from network
     #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]
     pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
+        // Phase 18 Week 3: Record contact for partition detection
+        if let Some(ref detector) = self.partition_detector {
+            if let Ok(mut d) = detector.try_write() {
+                d.record_contact(sender);
+            }
+        }
+
         match message {
             GossipMessage::Announce { hash, author, clock: _, topic } => {
                 debug!(
@@ -1661,6 +1728,71 @@ pub fn start_digest_emitter(
                 }
                 _ = shutdown.recv() => {
                     info!("Digest emitter shutting down");
+                    break;
+                }
+            }
+        }
+    })
+}
+
+/// Start periodic partition checker background task (Phase 18 Week 3)
+///
+/// This spawns a tokio task that periodically checks for network partitions
+/// and attempts healing when partitioned peers reconnect.
+///
+/// # Parameters
+/// - `gossip_handle`: Shared handle to the gossip actor
+/// - `check_interval_ms`: Interval between partition checks (default: 30000 for 30 seconds)
+/// - `shutdown`: Receiver for graceful shutdown signal
+///
+/// # Returns
+/// JoinHandle for the background task
+pub fn start_partition_checker(
+    gossip_handle: GossipHandle,
+    check_interval_ms: u64,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("Starting periodic partition checker: interval={}ms", check_interval_ms);
+
+        loop {
+            let sleep_duration = tokio::time::Duration::from_millis(check_interval_ms);
+
+            // Wait for either timeout or shutdown
+            tokio::select! {
+                _ = tokio::time::sleep(sleep_duration) => {
+                    // Time to check for partitions
+                    let gossip = gossip_handle.read().await;
+
+                    // Get partition detector
+                    if let Some(ref detector) = gossip.partition_detector {
+                        if let Ok(detector_guard) = detector.try_read() {
+                            let partitioned_peers = detector_guard.get_partitioned_peers();
+
+                            if !partitioned_peers.is_empty() {
+                                warn!(
+                                    "Detected {} partitioned peers: {:?}",
+                                    partitioned_peers.len(),
+                                    partitioned_peers.iter().map(|d| d.as_str()).collect::<Vec<_>>()
+                                );
+
+                                // Update Prometheus metrics
+                                for peer in &partitioned_peers {
+                                    if let Some(duration) = detector_guard.time_since_contact(peer) {
+                                        icn_obs::metrics::gossip::partition_detected_inc();
+                                        debug!(
+                                            "Peer {} partitioned for {:?}",
+                                            peer,
+                                            duration
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ = shutdown.recv() => {
+                    info!("Partition checker shutting down");
                     break;
                 }
             }

@@ -224,6 +224,24 @@ impl Supervisor {
                 replication_config.health_check_interval_secs
             );
 
+            // Phase 18 Week 3: Initialize PartitionDetector and PartitionHealer
+            let partition_config = icn_gossip::PartitionConfig::default(); // 5 min threshold, 30s check interval
+            let partition_detector = icn_gossip::PartitionDetector::new(partition_config.clone());
+            let partition_detector_handle = Arc::new(tokio::sync::RwLock::new(partition_detector));
+
+            // Create partition healer with new vector clock (will be merged during healing)
+            let partition_healer = icn_gossip::PartitionHealer::new(icn_gossip::VectorClock::new());
+            let partition_healer_handle = Arc::new(tokio::sync::RwLock::new(partition_healer));
+
+            // Set partition detector and healer on gossip actor
+            {
+                let mut gossip = gossip_handle.write().await;
+                gossip.set_partition_detector(partition_detector_handle.clone());
+                gossip.set_partition_healer(partition_healer_handle.clone());
+            }
+
+            info!("Partition detector and healer initialized (threshold: {:?})", partition_config.partition_threshold);
+
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
             let store = Arc::new(SledStore::open(&store_path)?);
@@ -1588,6 +1606,15 @@ impl Supervisor {
             );
 
             info!("Digest emitter spawned");
+
+            // Start periodic partition checker (Phase 18 Week 3)
+            let _partition_checker_handle = icn_gossip::start_partition_checker(
+                gossip_handle.clone(),
+                30_000, // 30 seconds check interval (matches PartitionConfig default)
+                self.shutdown_tx.subscribe(),
+            );
+
+            info!("Partition checker spawned");
 
             // Start clock synchronization background task
             let clock_sync = ClockSync::new();

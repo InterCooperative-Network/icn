@@ -38,7 +38,7 @@ pub mod vector_clock;
 
 pub use bloom::BloomFilter;
 pub use gossip::{
-    start_digest_emitter, EntryNotificationCallback, GossipActor, GossipHandle, PeerSamplingCallback,
+    start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor, GossipHandle, PeerSamplingCallback,
     SendMessageCallback,
 };
 pub use partition::{

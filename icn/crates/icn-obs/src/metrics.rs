@@ -1217,6 +1217,39 @@ pub mod gossip {
     pub fn pull_truncated_inc() {
         counter!("icn_gossip_pull_truncated_total").increment(1);
     }
+
+    // Phase 18 Week 3: Partition detection and healing
+    pub fn partition_detected_inc() {
+        counter!("icn_partition_detections_total").increment(1);
+    }
+
+    pub fn partition_healed_inc() {
+        counter!("icn_partition_heals_total").increment(1);
+    }
+
+    pub fn partition_peers_detected_set(count: usize) {
+        gauge!("icn_partition_peers_detected").set(count as f64);
+    }
+
+    pub fn partition_conflicts_detected_inc() {
+        counter!("icn_partition_conflicts_detected_total").increment(1);
+    }
+
+    pub fn partition_conflicts_resolved_inc() {
+        counter!("icn_partition_conflicts_resolved_total").increment(1);
+    }
+
+    pub fn partition_conflicts_manual_inc() {
+        counter!("icn_partition_conflicts_manual_total").increment(1);
+    }
+
+    pub fn partition_heal_duration_record(duration_secs: f64) {
+        histogram!("icn_partition_heal_duration_seconds").record(duration_secs);
+    }
+
+    pub fn partition_vector_clock_merges_inc() {
+        counter!("icn_partition_vector_clock_merges_total").increment(1);
+    }
 }
 
 /// Scalability metrics (Phase 19)
