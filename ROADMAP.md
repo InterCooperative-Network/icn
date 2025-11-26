@@ -638,11 +638,11 @@ strategy = "participants"  # All contract participants + trusted backups
 
 ---
 
-### Phase 18: Pre-Pilot Hardening (6 weeks) ✅ COMPLETE
-**Status**: Complete (2025-11-25) - All 6 weeks complete (Byzantine fault detection, Partition healing, Dispute resolution, Fork resolution, Storage quotas) - **PRE-PILOT CRITICAL**
-**Blocker For**: Production deployment with malicious nodes - NOW UNBLOCKED
-**Duration**: 6 weeks
-**Progress**: 6/6 weeks (100%)
+### Phase 18: Pre-Pilot Hardening (6 weeks) 🚧 IN PROGRESS
+**Status**: Integration Phase (2025-11-26) - All standalone modules built, now integrating into production system - **PRE-PILOT CRITICAL**
+**Blocker For**: Production deployment with malicious nodes
+**Duration**: 6 weeks (standalone) + integration
+**Progress**: Week 1-2 integration complete ✅, Weeks 3-6 pending
 
 **Motivation**: Phase 17 provides fault tolerance against crashes. Phase 18 provides safety against malicious behavior. Before deploying to real communities with real economic stakes, we need Byzantine fault detection, conflict resolution, and resource protection.
 
@@ -688,6 +688,12 @@ impl MisbehaviorDetector {
     }
 }
 ```
+
+**✅ Integration Complete (2025-11-26)**:
+- **NetworkActor** ([crates/icn-net/src/actor.rs](icn/crates/icn-net/src/actor.rs)): Records `InvalidSignature` and `ReplayAttack` violations during message verification
+- **GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)): Records `ExcessiveResourceUse` violations for unauthorized subscriptions and ACL violations
+- **Test Coverage**: 108 icn-net tests + 89 icn-gossip tests passing ✅
+- **Security Impact**: Automatic Byzantine behavior detection across network and gossip layers with reputation-based quarantine/ban
 
 **Scope - Week 3: Network Partition Healing**:
 ```rust

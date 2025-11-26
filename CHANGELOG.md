@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Byzantine Fault Detection Integration (Phase 18 Week 1-2) (2025-11-26)
+
+**NetworkActor & GossipActor Integration**
+
+Integrated MisbehaviorDetector from Phase 18 into production network and gossip layers for automatic Byzantine behavior detection.
+
+**NetworkActor** ([crates/icn-net/src/actor.rs](icn/crates/icn-net/src/actor.rs)):
+- Added `misbehavior_detector` field (optional, initialized with default thresholds)
+- Records `InvalidSignature` violations when message signature verification fails
+- Records `ReplayAttack` violations when duplicate sequence numbers detected
+- Violations tracked during `SignedEnvelope` verification in message handling
+- All 108 unit tests pass ✅
+
+**GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Added `misbehavior_detector` field (optional)
+- Added `set_misbehavior_detector()` method for runtime configuration
+- Records `ExcessiveResourceUse` violations for:
+  * Unauthorized subscription attempts (trust score below threshold)
+  * ACL violations (AccessControl rules deny access)
+  * Subscriber limit exceeded (DoS protection)
+- Uses async `block_in_place` pattern for violation recording in sync contexts
+- All 89 tests pass ✅
+
+**Security Impact:**
+- Automatic detection of malicious peers across network and gossip layers
+- Reputation scoring enables gradual quarantine/ban based on violation severity
+- Defense against signature spoofing, replay attacks, and unauthorized access
+- Resource exhaustion protection via subscriber limit enforcement
+
+**Dependencies:**
+- Workspace dependency `icn-security` added to `icn-net` and `icn-gossip`
+
 ### Added - Privacy Enhancements (Phase 20 COMPLETE ✅) (2025-11-26)
 
 **New Crate: icn-privacy** ([crates/icn-privacy/](icn/crates/icn-privacy/))
