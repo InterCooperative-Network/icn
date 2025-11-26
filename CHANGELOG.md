@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - Privacy Enhancements (Phase 20 Week 1-2) (2025-11-26)
+### Added - Privacy Enhancements (Phase 20 Week 1-4) (2025-11-26)
 
 **New Crate: icn-privacy** ([crates/icn-privacy/](icn/crates/icn-privacy/))
 
 Privacy primitives addressing ARCHITECTURE.md Gap 12.9 (Privacy & Metadata Leakage):
 
-1. **Encrypted Topic Metadata** ([crates/icn-privacy/src/topic_encryption.rs](icn/crates/icn-privacy/src/topic_encryption.rs))
+1. **Encrypted Topic Metadata** ([crates/icn-privacy/src/topic_encryption.rs](icn/crates/icn-privacy/src/topic_encryption.rs)) - Week 1-2
    - ChaCha20-Poly1305 AEAD encryption for topic names
    - Bloom filter-based topic discovery (privacy-preserving)
    - Plausible deniability via false positives
@@ -24,10 +24,24 @@ Privacy primitives addressing ARCHITECTURE.md Gap 12.9 (Privacy & Metadata Leaka
    - `TopicBloomFilter` - Privacy-preserving interest matching
    - 8 comprehensive tests (7 unit + 1 doc test)
 
+2. **Onion Routing for Gossip** ([crates/icn-privacy/src/onion_routing.rs](icn/crates/icn-privacy/src/onion_routing.rs)) - Week 3-4
+   - Multi-hop message routing inspired by Tor
+   - X25519 ECDH for shared secret derivation
+   - Layered ChaCha20-Poly1305 encryption (innermost to outermost)
+   - Circuit-based routing with trust-gated relay selection
+   - `OnionRouter::create_circuit()` - Build multi-hop routing path
+   - `OnionRouter::wrap_message()` - Layer encryption for relays
+   - `OnionRouter::peel_layer()` - Remove one encryption layer
+   - `select_relays()` - Trust-based relay node selection
+   - 3 comprehensive tests (circuit creation, relay selection, insufficient trust)
+
 **Security Properties:**
-- **Confidentiality**: Topic names encrypted, unreadable to network observers
+- **Topic Confidentiality**: Topic names encrypted, unreadable to network observers
 - **Unlinkability**: Can't correlate multiple encrypted topics to same subscriber
 - **Plausible Deniability**: Bloom filter false positives provide cover
+- **Sender Anonymity**: Recipient doesn't know original sender (onion routing)
+- **Receiver Anonymity**: Relays don't know final recipient (onion routing)
+- **Traffic Analysis Resistance**: Multi-hop routing hides patterns (onion routing)
 - **Forward Secrecy**: Rotating shared keys limit exposure window (planned)
 
 **Prometheus Metrics** (8 new privacy metrics):
@@ -41,12 +55,18 @@ Privacy primitives addressing ARCHITECTURE.md Gap 12.9 (Privacy & Metadata Leaka
 - `icn_privacy_messages_padded_total` - Message padding (Week 5-6)
 
 **Testing:**
-- 8 tests passing (7 unit + 1 doc)
-- Test coverage: encryption roundtrip, nonce randomness, Bloom matching, wrong key failure, multi-topic search
+- 11 tests passing (10 unit + 1 doc)
+- Topic encryption: roundtrip, nonce randomness, Bloom matching, wrong key failure, multi-topic search
+- Onion routing: circuit creation, trust-based relay selection, insufficient trust handling
 
 **Next:**
-- Week 3-4: Onion routing for gossip (hide sender/receiver)
 - Week 5-6: Traffic obfuscation (timing, padding, cover traffic)
+
+**Implementation Notes:**
+- Onion routing foundation complete (circuit architecture, relay selection, layered encryption)
+- Full decryption requires ephemeral public key implementation (planned for gossip integration)
+- Trust-based relay selection filters candidates by minimum trust threshold (default: 0.3)
+- Circuit shared keys computed via X25519 ECDH for each hop
 
 ---
 

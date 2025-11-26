@@ -83,13 +83,13 @@ impl TopicEncryptor {
         // Generate random nonce (96 bits for ChaCha20-Poly1305)
         let mut nonce_bytes = [0u8; 12];
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt topic name
         let plaintext = topic.as_bytes();
         let ciphertext = self
             .cipher
-            .encrypt(nonce, Payload { msg: plaintext, aad: b"" })
+            .encrypt(&nonce, Payload { msg: plaintext, aad: b"" })
             .map_err(|e| PrivacyError::EncryptionFailed(e.to_string()))?;
 
         // Generate Bloom filter hint (hash of plaintext)
@@ -113,11 +113,11 @@ impl TopicEncryptor {
     /// - Wrong key used
     /// - Nonce reused (AEAD violation)
     pub fn decrypt(&self, encrypted: &EncryptedTopic) -> Result<String> {
-        let nonce = Nonce::from_slice(&encrypted.nonce);
+        let nonce = Nonce::from(encrypted.nonce);
 
         let plaintext_bytes = self
             .cipher
-            .decrypt(nonce, Payload { msg: &encrypted.ciphertext, aad: b"" })
+            .decrypt(&nonce, Payload { msg: &encrypted.ciphertext, aad: b"" })
             .map_err(|e| PrivacyError::DecryptionFailed(e.to_string()))?;
 
         let topic = String::from_utf8(plaintext_bytes)
