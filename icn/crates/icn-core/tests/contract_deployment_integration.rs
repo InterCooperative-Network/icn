@@ -144,6 +144,8 @@ impl TestNode {
                         icn_gossip::GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
                         icn_gossip::GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
                         icn_gossip::GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
+                        icn_gossip::GossipMessage::PartitionHealRequest { .. } => "PartitionHealRequest",
+                        icn_gossip::GossipMessage::PartitionHealResponse { .. } => "PartitionHealResponse",
                     };
 
                     let result = if let Some(target_did) = recipient {
