@@ -148,19 +148,23 @@ impl StorageQuotaManager {
     }
 
     /// Check if DID can store data of given size
+    ///
+    /// If no per-DID quota is configured, only the global limit is checked.
+    /// This allows dynamic quota assignment while still enforcing global limits.
     pub fn can_store(&self, did: &Did, size: u64) -> Result<()> {
-        // Check per-DID quota
-        let quota = self.quotas.get(did)
-            .ok_or_else(|| anyhow!("No quota configured for DID: {}", did))?;
-
-        if quota.would_exceed(size) {
-            return Err(anyhow!(
-                "DID quota exceeded: {} + {} > {} bytes",
-                quota.current_bytes,
-                size,
-                quota.max_bytes
-            ));
+        // Check per-DID quota if one exists
+        if let Some(quota) = self.quotas.get(did) {
+            if quota.would_exceed(size) {
+                return Err(anyhow!(
+                    "Storage quota exceeded for {}: {} + {} > {} bytes",
+                    did,
+                    quota.current_bytes,
+                    size,
+                    quota.max_bytes
+                ));
+            }
         }
+        // If no per-DID quota exists, we allow storage up to global limit
 
         // Check global limit
         if self.global_usage.saturating_add(size) > self.global_limit {
@@ -176,10 +180,15 @@ impl StorageQuotaManager {
     }
 
     /// Record storage usage for a DID
+    ///
+    /// If no per-DID quota exists, creates a default quota with the global limit.
+    /// This allows dynamic quota assignment based on actual usage.
     pub fn record_usage(&mut self, did: &Did, key: Vec<u8>, size: u64, priority: QuotaPriority) -> Result<()> {
-        // Update DID quota
-        let quota = self.quotas.get_mut(did)
-            .ok_or_else(|| anyhow!("No quota configured for DID: {}", did))?;
+        // Get or create DID quota with default (global limit as per-DID max)
+        let quota = self.quotas.entry(did.clone()).or_insert_with(|| {
+            debug!("Auto-creating default quota for DID: {}", did);
+            StorageQuota::new(self.global_limit, QuotaPriority::Normal)
+        });
 
         quota.record_usage(size);
 
