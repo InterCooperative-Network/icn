@@ -299,6 +299,7 @@ impl Supervisor {
             let network_handle_for_handler = Arc::new(tokio::sync::RwLock::new(None::<icn_net::NetworkHandle>));
             let network_handle_for_handler_clone = network_handle_for_handler.clone();
             let own_did_for_handler = did.clone();
+            let federation_enabled = self.config.federation.enabled;
 
             let incoming_handler: icn_net::IncomingMessageHandler = Arc::new(move |net_msg| {
                 let sender_did = net_msg.from.clone();
@@ -446,6 +447,8 @@ impl Supervisor {
                         // Request messages are handled directly by NetworkActor
                         // Response/Announce/Unannounce are forwarded here for processing
                         use icn_net::PeerExchangeMessage;
+                        let network_handle_lock = network_handle_for_handler_clone.clone();
+
                         match peer_msg {
                             PeerExchangeMessage::Request { .. } => {
                                 // Requests are handled by NetworkActor directly
@@ -455,20 +458,71 @@ impl Supervisor {
                                 // Received peer list from another node
                                 info!("Received {} federation peers from {} (total: {})",
                                       peers.len(), sender_did, total_known);
-                                // TODO: If federation is enabled, dial these peers
-                                // For now, just log them
-                                for peer in peers {
-                                    debug!("Discovered peer: {} at {:?}", peer.did, peer.addresses);
+
+                                if federation_enabled {
+                                    // Auto-dial discovered peers
+                                    let peers_to_dial: Vec<_> = peers.iter()
+                                        .filter_map(|p| {
+                                            // Parse first address
+                                            p.addresses.first()
+                                                .and_then(|addr_str| addr_str.parse::<std::net::SocketAddr>().ok())
+                                                .map(|addr| (p.did.clone(), addr))
+                                        })
+                                        .collect();
+
+                                    tokio::spawn(async move {
+                                        if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
+                                            for (did_str, addr) in peers_to_dial {
+                                                // Skip if DID is invalid
+                                                let peer_did = match icn_identity::Did::from_str(&did_str) {
+                                                    Ok(d) => d,
+                                                    Err(e) => {
+                                                        debug!("Skipping invalid DID {}: {}", did_str, e);
+                                                        continue;
+                                                    }
+                                                };
+
+                                                info!("Auto-dialing discovered peer {} at {}", peer_did, addr);
+                                                if let Err(e) = net_handle.dial(addr, peer_did.clone()).await {
+                                                    debug!("Failed to dial {}: {}", peer_did, e);
+                                                }
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    // Just log discovered peers
+                                    for peer in peers {
+                                        debug!("Discovered peer (federation disabled): {} at {:?}", peer.did, peer.addresses);
+                                    }
                                 }
                             }
                             PeerExchangeMessage::Announce { peer } => {
                                 info!("Peer announced by {}: {} at {:?}",
                                       sender_did, peer.did, peer.addresses);
-                                // TODO: If federation is enabled, consider dialing this peer
+
+                                if federation_enabled {
+                                    // Auto-dial announced peer
+                                    if let Some(addr_str) = peer.addresses.first() {
+                                        if let Ok(addr) = addr_str.parse::<std::net::SocketAddr>() {
+                                            let peer_did_str = peer.did.clone();
+                                            tokio::spawn(async move {
+                                                if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
+                                                    if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
+                                                        info!("Auto-dialing announced peer {} at {}", peer_did, addr);
+                                                        if let Err(e) = net_handle.dial(addr, peer_did.clone()).await {
+                                                            debug!("Failed to dial announced peer {}: {}", peer_did, e);
+                                                        }
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
                             }
                             PeerExchangeMessage::Unannounce { did } => {
                                 info!("Peer unannounced by {}: {}", sender_did, did);
-                                // TODO: Update local peer cache if tracking
+                                // Peer disconnected - no action needed
+                                // (Network layer handles connection cleanup)
                             }
                         }
                     }
@@ -1056,17 +1110,44 @@ impl Supervisor {
             // Dial bootstrap peers for WAN connectivity
             if !self.config.network.bootstrap_peers.is_empty() {
                 info!("Dialing {} bootstrap peers", self.config.network.bootstrap_peers.len());
+                let mut connected_bootstrap_peers = Vec::new();
+
                 for peer_url in &self.config.network.bootstrap_peers {
                     match parse_bootstrap_peer(peer_url) {
                         Ok((peer_did, peer_addr)) => {
                             info!("Connecting to bootstrap peer: {} at {}", peer_did, peer_addr);
                             match network_handle.dial(peer_addr, peer_did.clone()).await {
-                                Ok(_) => info!("✓ Connected to bootstrap peer: {}", peer_did),
+                                Ok(_) => {
+                                    info!("✓ Connected to bootstrap peer: {}", peer_did);
+                                    connected_bootstrap_peers.push(peer_did);
+                                }
                                 Err(e) => warn!("Failed to connect to bootstrap peer {}: {}", peer_did, e),
                             }
                         }
                         Err(e) => {
                             warn!("Failed to parse bootstrap peer URL '{}': {}", peer_url, e);
+                        }
+                    }
+                }
+
+                // Request peer exchange from bootstrap peers if federation is enabled
+                if self.config.federation.enabled && !connected_bootstrap_peers.is_empty() {
+                    info!("Federation enabled - requesting peer exchange from {} bootstrap peers",
+                          connected_bootstrap_peers.len());
+
+                    let network_filter = if self.config.federation.network_name != "icn-mainnet" {
+                        Some(self.config.federation.network_name.clone())
+                    } else {
+                        None
+                    };
+
+                    for peer_did in connected_bootstrap_peers {
+                        // Small delay to allow Hello handshake to complete
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+                        match network_handle.request_peer_exchange(&peer_did, Some(50), network_filter.clone()).await {
+                            Ok(_) => info!("✓ Requested peer exchange from {}", peer_did),
+                            Err(e) => debug!("Failed to request peer exchange from {}: {}", peer_did, e),
                         }
                     }
                 }
