@@ -49,6 +49,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `icn_peer_exchange_peers_dialed_total`
 - `icn_peer_exchange_dial_failures_total`
 
+### Added - Network Partition Detection and Healing (Phase 18 Week 3) (2025-11-27)
+
+**Partition Gossip Messages** ([crates/icn-gossip/src/types.rs](icn/crates/icn-gossip/src/types.rs)):
+- `PartitionHealRequest` - Sent to initiate partition healing with vector clock exchange
+- `PartitionHealResponse` - Response with vector clock, diverged topics, and entries behind
+
+**GossipActor Integration** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Message handlers for `PartitionHealRequest` and `PartitionHealResponse`
+- `initiate_partition_healing()` - Start healing process with partitioned peer
+- `get_clock()` - Expose vector clock state for partition healing
+- Automatic vector clock merging on heal response
+- Automatic PullRequest generation for diverged topics
+
+**Integration Tests** ([crates/icn-core/tests/partition_integration.rs](icn/crates/icn-core/tests/partition_integration.rs)):
+- `test_partition_detection_basic` - Basic partition detection threshold behavior
+- `test_partition_heal_request_response` - Full heal request/response flow
+- `test_vector_clock_merge_on_partition_heal` - Vector clock merging verification
+- `test_partition_detector_multiple_peers` - Multi-peer partition tracking
+- `test_partition_healer_conflict_resolution` - Conflict resolution by data type
+
 ### Fixed - Storage Quota Validation (2025-11-27)
 
 **QuotaManager** ([crates/icn-store/src/quotas.rs](icn/crates/icn-store/src/quotas.rs)):
