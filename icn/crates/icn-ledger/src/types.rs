@@ -214,6 +214,9 @@ pub enum QuarantineReason {
 
     /// Exceeds credit limit
     ExceedsCreditLimit,
+
+    /// Fork conflict - lost fork resolution (Phase 18 Week 5)
+    ForkConflict(String),
 }
 
 /// Quarantined entry awaiting resolution

@@ -1,6 +1,7 @@
 //! Ledger implementation with storage
 
 use crate::balance::compute_all_balances;
+use crate::fork_resolution::{Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver};
 use crate::merge::{MergeDecision, QuarantineItem};
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
@@ -9,12 +10,23 @@ use anyhow::{Context, Result};
 use icn_gossip::GossipHandle;
 use icn_identity::Did;
 use icn_store::Store;
+use icn_trust::TrustGraph;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tracing::{debug, info, warn, instrument};
 
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
+
+/// Statistics about forks in the ledger
+#[derive(Debug, Clone)]
+pub struct ForkStats {
+    /// Total number of detected forks
+    pub total_forks: usize,
+    /// Parent hashes that have forks
+    pub parents_with_forks: Vec<ContentHash>,
+}
 
 /// Key prefix for cached balances in storage
 const BALANCE_PREFIX: &str = "ledger:balance:";
@@ -35,6 +47,12 @@ pub struct Ledger {
 
     /// Last merge decision (for reporting)
     last_merge: Option<MergeDecision>,
+
+    /// Fork detector for detecting conflicting entries (Phase 18 Week 5)
+    fork_detector: ForkDetector,
+
+    /// Fork resolver for resolving detected forks (Phase 18 Week 5)
+    fork_resolver: ForkResolver,
 }
 
 impl Ledger {
@@ -48,12 +66,27 @@ impl Ledger {
             gossip: None,
             quarantine,
             last_merge: None,
+            fork_detector: ForkDetector::new(),
+            fork_resolver: ForkResolver::new(ForkResolutionStrategy::default()), // Hybrid strategy
         };
 
         // Load cached balances from storage
         ledger.load_cached_balances()?;
 
+        // Index existing entries for fork detection
+        ledger.rebuild_fork_index()?;
+
         Ok(ledger)
+    }
+
+    /// Set the trust graph for trust-weighted fork resolution (Phase 18 Week 5)
+    pub fn set_trust_graph(&mut self, trust_graph: Arc<TrustGraph>) {
+        self.fork_resolver.set_trust_graph(trust_graph);
+    }
+
+    /// Set the fork resolution strategy
+    pub fn set_fork_resolution_strategy(&mut self, strategy: ForkResolutionStrategy) {
+        self.fork_resolver = ForkResolver::new(strategy);
     }
 
     /// Set the gossip handle for distributed synchronization
@@ -101,6 +134,21 @@ impl Ledger {
             timestamp = entry.timestamp,
             "Ledger entry appended"
         );
+
+        // Phase 18 Week 5: Index entry for fork detection
+        self.fork_detector.index_entry(&entry);
+
+        // Check if this creates a fork (multiple children of same parent)
+        for parent in &entry.parents {
+            if self.fork_detector.has_fork(parent) {
+                icn_obs::metrics::ledger_forks::detected_inc();
+                warn!(
+                    parent = %parent.to_hex(),
+                    new_entry = %hash.to_hex(),
+                    "Potential fork detected - multiple entries share parent"
+                );
+            }
+        }
 
         // Publish to gossip if available
         if let Some(gossip) = &self.gossip {
@@ -283,6 +331,160 @@ impl Ledger {
         entries.sort_by_key(|e| e.timestamp);
 
         Ok(entries)
+    }
+
+    // === Phase 18 Week 5: Fork Detection and Resolution ===
+
+    /// Rebuild the fork detection index from stored entries
+    fn rebuild_fork_index(&mut self) -> Result<()> {
+        let entries = self.get_all_entries()?;
+        let entry_count = entries.len();
+
+        for entry in entries {
+            self.fork_detector.index_entry(&entry);
+        }
+
+        info!(
+            entry_count = entry_count,
+            "Rebuilt fork detection index"
+        );
+
+        Ok(())
+    }
+
+    /// Detect any forks in the ledger
+    pub fn detect_forks(&self) -> Vec<(ContentHash, Vec<ContentHash>)> {
+        self.fork_detector.detect_forks()
+    }
+
+    /// Check if a specific parent has a fork
+    pub fn has_fork(&self, parent: &ContentHash) -> bool {
+        self.fork_detector.has_fork(parent)
+    }
+
+    /// Detect and resolve all forks in the ledger
+    ///
+    /// Returns a list of resolved forks with their resolutions.
+    /// Entries that should be discarded are quarantined.
+    pub fn detect_and_resolve_forks(&mut self) -> Result<Vec<(Fork, ForkResolution)>> {
+        let forks = self.fork_detector.detect_forks();
+
+        if forks.is_empty() {
+            debug!("No forks detected in ledger");
+            return Ok(vec![]);
+        }
+
+        info!(
+            fork_count = forks.len(),
+            "Detected forks in ledger, attempting resolution"
+        );
+
+        let mut resolutions = Vec::new();
+
+        for (parent, children) in forks {
+            // Get the actual entries for comparison
+            let mut entries = Vec::new();
+            for child_hash in &children {
+                if let Some(entry) = self.get_entry(child_hash)? {
+                    entries.push(entry);
+                }
+            }
+
+            // Resolve pairwise (for now, handle 2-way forks)
+            // TODO: Handle n-way forks by iteratively resolving
+            if entries.len() >= 2 {
+                let fork = Fork {
+                    common_parents: vec![parent.clone()],
+                    entry1: entries[0].clone(),
+                    entry2: entries[1].clone(),
+                    detected_at: SystemTime::now(),
+                };
+
+                match self.fork_resolver.resolve_fork(&fork) {
+                    Ok(resolution) => {
+                        info!(
+                            parent = %parent.to_hex(),
+                            resolution = ?resolution,
+                            "Resolved fork"
+                        );
+
+                        // Quarantine the losing entry
+                        match &resolution {
+                            ForkResolution::KeepFirst => {
+                                if let Some(hash) = &fork.entry2.id {
+                                    self.quarantine_forked_entry(&fork.entry2, "Lost fork resolution")?;
+                                    icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
+                                    debug!(
+                                        quarantined = %hash.to_hex(),
+                                        "Quarantined losing fork entry"
+                                    );
+                                }
+                            }
+                            ForkResolution::KeepSecond => {
+                                if let Some(hash) = &fork.entry1.id {
+                                    self.quarantine_forked_entry(&fork.entry1, "Lost fork resolution")?;
+                                    icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
+                                    debug!(
+                                        quarantined = %hash.to_hex(),
+                                        "Quarantined losing fork entry"
+                                    );
+                                }
+                            }
+                            ForkResolution::RequiresManual { reason } => {
+                                warn!(
+                                    parent = %parent.to_hex(),
+                                    reason = reason,
+                                    "Fork requires manual resolution"
+                                );
+                                icn_obs::metrics::ledger_forks::manual_resolution_required_inc(reason);
+                            }
+                        }
+
+                        resolutions.push((fork, resolution));
+                    }
+                    Err(e) => {
+                        warn!(
+                            parent = %parent.to_hex(),
+                            error = %e,
+                            "Failed to resolve fork"
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(resolutions)
+    }
+
+    /// Quarantine an entry that lost fork resolution
+    fn quarantine_forked_entry(&mut self, entry: &JournalEntry, reason: &str) -> Result<()> {
+        let hash = entry.id.as_ref().context("Entry missing hash")?;
+
+        // Remove from main store
+        let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
+        self.store.delete(key.as_bytes())?;
+
+        // Add to quarantine
+        let item = QuarantineItem::new(
+            hash.clone(),
+            QuarantineReason::ForkConflict(reason.to_string()),
+            entry.author.clone(),
+        );
+        self.quarantine.add(entry.clone(), item)?;
+
+        // Recompute balances (expensive but necessary for correctness)
+        self.recompute_balances()?;
+
+        Ok(())
+    }
+
+    /// Get fork resolution statistics
+    pub fn get_fork_stats(&self) -> ForkStats {
+        let forks = self.fork_detector.detect_forks();
+        ForkStats {
+            total_forks: forks.len(),
+            parents_with_forks: forks.iter().map(|(p, _)| p.clone()).collect(),
+        }
     }
 
     /// Get account balance for a specific currency
