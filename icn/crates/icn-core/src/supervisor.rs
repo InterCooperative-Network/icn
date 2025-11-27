@@ -1445,6 +1445,18 @@ impl Supervisor {
             compute_actor.set_policy_manager(policy_manager.clone());
             info!("✓ Policy manager initialized for cooperative scheduling");
 
+            // Initialize dispute resolution system (Phase 18 Week 4)
+            let dispute_store_path = self.config.store_path().join("disputes");
+            let dispute_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&dispute_store_path)?);
+            let dispute_config = icn_ccl::DisputeConfig::default();
+            let dispute_system = icn_ccl::DisputeResolutionSystem::new(dispute_config.clone(), dispute_store);
+            let dispute_system_handle = Arc::new(tokio::sync::RwLock::new(dispute_system));
+            compute_actor.set_dispute_resolution(dispute_system_handle.clone());
+            info!(
+                "✓ Dispute resolution system initialized (re-execution timeout: {:?})",
+                dispute_config.re_execution_timeout
+            );
+
             // Set signing key for result signatures
             let signing_key_bytes = identity_bundle.keypair().to_signing_key_bytes();
             compute_actor.set_signing_key(signing_key_bytes.to_vec());

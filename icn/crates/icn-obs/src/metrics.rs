@@ -2029,6 +2029,23 @@ pub mod compute {
         )
         .increment(1);
     }
+
+    // Dispute resolution metrics (Phase 18 Week 4)
+    pub fn disputes_filed_inc() {
+        counter!("icn_compute_disputes_filed_total").increment(1);
+    }
+
+    pub fn disputes_resolved_inc(outcome: &str) {
+        counter!("icn_compute_disputes_resolved_total", "outcome" => outcome.to_string()).increment(1);
+    }
+
+    pub fn disputes_pending_set(count: u64) {
+        gauge!("icn_compute_disputes_pending").set(count as f64);
+    }
+
+    pub fn disputes_investigating_set(count: u64) {
+        gauge!("icn_compute_disputes_investigating").set(count as f64);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)

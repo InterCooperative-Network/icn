@@ -238,6 +238,50 @@ impl ComputeHandle {
             .await
             .map_err(|_| ComputeError::Internal("no response".into()))?
     }
+
+    // Dispute resolution methods (Phase 18 Week 4)
+
+    /// File a dispute for a compute task result
+    pub async fn file_dispute(
+        &self,
+        task_hash: TaskHash,
+        executor: String,
+        challenger: String,
+        expected_result: icn_ccl::Value,
+        actual_result: icn_ccl::Value,
+    ) -> Result<icn_ccl::DisputeId, ComputeError> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::FileDispute {
+                task_hash,
+                executor,
+                challenger,
+                expected_result,
+                actual_result,
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ComputeError::Internal("actor closed".into()))?;
+        resp_rx
+            .await
+            .map_err(|_| ComputeError::Internal("no response".into()))?
+    }
+
+    /// Get dispute status by ID
+    pub async fn get_dispute_status(
+        &self,
+        dispute_id: icn_ccl::DisputeId,
+    ) -> Option<icn_ccl::DisputeStatus> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::GetDisputeStatus {
+                dispute_id,
+                resp: resp_tx,
+            })
+            .await
+            .ok()?;
+        resp_rx.await.ok()?
+    }
 }
 
 /// Commands sent to the ComputeActor
@@ -282,6 +326,19 @@ enum ComputeCommand {
         coop_id: String,
         resp: tokio::sync::oneshot::Sender<Result<Vec<crate::policy::UsageRecord>, ComputeError>>,
     },
+    // Dispute resolution commands (Phase 18 Week 4)
+    FileDispute {
+        task_hash: TaskHash,
+        executor: String,
+        challenger: String,
+        expected_result: icn_ccl::Value,
+        actual_result: icn_ccl::Value,
+        resp: tokio::sync::oneshot::Sender<Result<icn_ccl::DisputeId, ComputeError>>,
+    },
+    GetDisputeStatus {
+        dispute_id: icn_ccl::DisputeId,
+        resp: tokio::sync::oneshot::Sender<Option<icn_ccl::DisputeStatus>>,
+    },
 }
 
 /// Actor managing distributed compute tasks
@@ -319,6 +376,8 @@ pub struct ComputeActor {
     migration_manager: Option<Arc<ActorMigrationManager>>,
     /// Policy manager for cooperative scheduling policies (Phase 16E)
     policy_manager: Option<Arc<crate::policy::PolicyManager>>,
+    /// Dispute resolution system for contract execution (Phase 18 Week 4)
+    dispute_resolution: Option<Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>>,
 }
 
 impl ComputeActor {
@@ -341,6 +400,7 @@ impl ComputeActor {
             checkpoint_store: None,
             migration_manager: None,
             policy_manager: None,
+            dispute_resolution: None, // Phase 18 Week 4
         }
     }
 
@@ -357,6 +417,11 @@ impl ComputeActor {
     /// Set policy manager for cooperative scheduling policies
     pub fn set_policy_manager(&mut self, manager: Arc<crate::policy::PolicyManager>) {
         self.policy_manager = Some(manager);
+    }
+
+    /// Set dispute resolution system (Phase 18 Week 4)
+    pub fn set_dispute_resolution(&mut self, system: Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>) {
+        self.dispute_resolution = Some(system);
     }
 
     /// Set maximum concurrent tasks this executor will claim
@@ -522,6 +587,82 @@ impl ComputeActor {
                             let _ = resp.send(Err(ComputeError::Internal(
                                 "policy manager not available".into(),
                             )));
+                        }
+                    }
+                    // Phase 18 Week 4: Dispute resolution commands
+                    ComputeCommand::FileDispute {
+                        task_hash,
+                        executor,
+                        challenger,
+                        expected_result,
+                        actual_result,
+                        resp,
+                    } => {
+                        if let Some(ref dispute_system) = self.dispute_resolution {
+                            let evidence = icn_ccl::DisputeEvidence {
+                                task_hash,
+                                claimed_result: actual_result.clone(),
+                                reason: icn_ccl::DisputeReason::IncorrectResult {
+                                    expected: expected_result,
+                                    actual: actual_result,
+                                },
+                                additional_data: vec![],
+                                filed_at: std::time::SystemTime::now(),
+                            };
+
+                            let executor_did: icn_identity::Did = match executor.parse() {
+                                Ok(did) => did,
+                                Err(_) => {
+                                    let _ = resp.send(Err(ComputeError::InvalidInput(
+                                        format!("invalid executor DID: {}", executor),
+                                    )));
+                                    continue;
+                                }
+                            };
+
+                            let challenger_did: icn_identity::Did = match challenger.parse() {
+                                Ok(did) => did,
+                                Err(_) => {
+                                    let _ = resp.send(Err(ComputeError::InvalidInput(
+                                        format!("invalid challenger DID: {}", challenger),
+                                    )));
+                                    continue;
+                                }
+                            };
+
+                            let mut system = dispute_system.write().await;
+                            match system.file_dispute(task_hash, executor_did, challenger_did, evidence).await {
+                                Ok(dispute_id) => {
+                                    icn_obs::metrics::compute::disputes_filed_inc();
+                                    tracing::info!(
+                                        dispute_id = hex::encode(&dispute_id),
+                                        task_hash = hex::encode(&task_hash),
+                                        "Dispute filed successfully"
+                                    );
+                                    let _ = resp.send(Ok(dispute_id));
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        task_hash = hex::encode(&task_hash),
+                                        error = %e,
+                                        "Failed to file dispute"
+                                    );
+                                    let _ = resp.send(Err(ComputeError::Internal(e.to_string())));
+                                }
+                            }
+                        } else {
+                            let _ = resp.send(Err(ComputeError::Internal(
+                                "dispute resolution not available".into(),
+                            )));
+                        }
+                    }
+                    ComputeCommand::GetDisputeStatus { dispute_id, resp } => {
+                        if let Some(ref dispute_system) = self.dispute_resolution {
+                            let system = dispute_system.read().await;
+                            let status = system.get_dispute(&dispute_id).map(|d| d.status.clone());
+                            let _ = resp.send(status);
+                        } else {
+                            let _ = resp.send(None);
                         }
                     }
                 }
