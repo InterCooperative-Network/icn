@@ -1369,6 +1369,13 @@ impl NetworkActor {
                                         );
                                     }
 
+                                    // Store the incoming QUIC connection in session_manager
+                                    // This enables us to send messages back to the peer on this connection
+                                    session_manager.read().await.store_incoming_connection(
+                                        message.from.to_string(),
+                                        connection.clone(),
+                                    ).await;
+
                                     // Add peer to neighbor sets if topology is enabled
                                     if let Some(ref sets) = neighbor_sets {
                                         if let Some(peer_topology) = topology_info {
@@ -1574,6 +1581,9 @@ impl NetworkActor {
                                             }
                                         }
                                     });
+
+                                    // Forward Ping to external handler for observability
+                                    handler(message);
                                 }
                                 MessagePayload::Pong { ping_sent_at, pong_sent_at } => {
                                     // Calculate RTT

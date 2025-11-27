@@ -368,7 +368,6 @@ impl TestNode {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues - Response sent but not delivered"]
 async fn test_two_node_contract_deployment() {
     // Create two nodes
     let node_a = TestNode::new(19001).await.expect("Failed to create node A");
@@ -451,7 +450,6 @@ async fn test_two_node_contract_deployment() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues"]
 async fn test_contract_execution_after_deployment() {
     // Create two nodes
     let node_a = TestNode::new(19003).await.expect("Failed to create node A");
@@ -535,7 +533,6 @@ async fn test_contract_execution_after_deployment() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues"]
 async fn test_untrusted_deployer_rejected() {
     // Create two nodes
     let node_a = TestNode::new(19005).await.expect("Failed to create node A");
@@ -590,7 +587,6 @@ async fn test_untrusted_deployer_rejected() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues"]
 async fn test_three_participant_contract_deployment() {
     // Create three nodes (Alice, Bob, Carol)
     let node_a = TestNode::new(19007).await.expect("Failed to create node A (Alice)");
@@ -749,7 +745,6 @@ async fn test_three_participant_contract_deployment() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues"]
 async fn test_contract_with_state_variables() {
     // Create two nodes
     let node_a = TestNode::new(19010).await.expect("Failed to create node A");
@@ -901,7 +896,6 @@ async fn test_contract_with_state_variables() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues"]
 async fn test_contract_with_ledger_integration() {
     // Create two nodes
     let node_a = TestNode::new(19012).await.expect("Failed to create node A");
@@ -1013,7 +1007,6 @@ async fn test_contract_with_ledger_integration() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky: QUIC bidirectional session timing issues"]
 async fn test_large_contract_near_limits() {
     // Create two nodes
     let node_a = TestNode::new(19014).await.expect("Failed to create node A");

@@ -67,7 +67,8 @@ pub struct GossipEntry {
 
     /// Optional: Replica metadata for data durability (Phase 17)
     /// If present, indicates this peer is willing to serve as a replica
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Note: Don't use skip_serializing_if with bincode - it doesn't support self-describing format
+    #[serde(default)]
     pub replica_offered: Option<bool>,
 }
 

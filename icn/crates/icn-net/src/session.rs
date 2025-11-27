@@ -179,11 +179,15 @@ impl SessionManager {
 
         info!("Connected to peer at {}", addr);
 
-        // Store connection
-        self.connections
-            .write()
-            .await
-            .insert(peer_did, connection.clone());
+        // Store connection (but don't overwrite if we already have one from an incoming connection)
+        {
+            let mut connections = self.connections.write().await;
+            if connections.contains_key(&peer_did) {
+                info!("Connection already exists for {} (from incoming), keeping existing connection", peer_did);
+            } else {
+                connections.insert(peer_did, connection.clone());
+            }
+        }
 
         Ok(connection)
     }
@@ -208,6 +212,25 @@ impl SessionManager {
                 Ok(Some(connection))
             }
             None => Ok(None),
+        }
+    }
+
+    /// Store an incoming connection by peer DID
+    ///
+    /// This is called when we receive a Hello message from a peer on an incoming
+    /// connection, allowing us to send messages back on that connection.
+    ///
+    /// Note: If a connection already exists for this peer (e.g., from a dial we made),
+    /// we don't overwrite it to avoid connection confusion. Both connections will
+    /// have handlers running, but we prefer the connection we dialed.
+    pub async fn store_incoming_connection(&self, peer_did: String, connection: quinn::Connection) {
+        let mut connections = self.connections.write().await;
+        if connections.contains_key(&peer_did) {
+            info!("Connection already exists for {}, not overwriting with incoming connection from {}",
+                  peer_did, connection.remote_address());
+        } else {
+            info!("Storing incoming connection from {} at {}", peer_did, connection.remote_address());
+            connections.insert(peer_did, connection);
         }
     }
 
