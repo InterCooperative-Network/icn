@@ -2292,6 +2292,16 @@ pub mod storage_quotas {
     pub fn exceeded_quotas_set(count: usize) {
         gauge!("icn_storage_exceeded_quotas").set(count as f64);
     }
+
+    /// Simple counter for quota exceeded events (without DID label)
+    pub fn exceeded_inc() {
+        counter!("icn_storage_quota_exceeded_total").increment(1);
+    }
+
+    /// Counter for total evicted entries
+    pub fn evicted_inc(count: u64) {
+        counter!("icn_storage_evicted_total").increment(count);
+    }
 }
 
 pub mod privacy {

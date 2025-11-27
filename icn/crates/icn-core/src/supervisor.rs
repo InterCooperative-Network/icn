@@ -242,6 +242,22 @@ impl Supervisor {
 
             info!("Partition detector and healer initialized (threshold: {:?})", partition_config.partition_threshold);
 
+            // Phase 18 Week 6: Initialize StorageQuotaManager for gossip entries
+            // Default: 1GB global limit, 90% eviction threshold, 10MB per-DID quota
+            let storage_quota_manager = icn_store::StorageQuotaManager::new(
+                1024 * 1024 * 1024, // 1GB global limit
+                0.9, // Start evicting at 90% capacity
+            );
+            let storage_quota_handle = Arc::new(tokio::sync::RwLock::new(storage_quota_manager));
+
+            // Set storage quota manager on gossip actor
+            {
+                let mut gossip = gossip_handle.write().await;
+                gossip.set_storage_quota_manager(storage_quota_handle.clone());
+            }
+
+            info!("Storage quota manager initialized (global limit: 1GB, eviction threshold: 90%)");
+
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
             let store = Arc::new(SledStore::open(&store_path)?);

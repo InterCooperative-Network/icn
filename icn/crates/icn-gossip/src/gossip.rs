@@ -96,6 +96,10 @@ pub struct GossipActor {
 
     /// Network partition healer (Phase 18 Week 3 - optional)
     partition_healer: Option<Arc<RwLock<crate::partition::PartitionHealer>>>,
+
+    /// Storage quota manager (Phase 18 Week 6 - optional)
+    /// Enforces per-DID storage limits and provides priority-based eviction
+    storage_quota_manager: Option<Arc<RwLock<icn_store::StorageQuotaManager>>>,
 }
 
 impl GossipActor {
@@ -132,6 +136,7 @@ impl GossipActor {
             misbehavior_detector: None, // Phase 18 Week 1-2: Set via set_misbehavior_detector()
             partition_detector: None, // Phase 18 Week 3: Set via set_partition_detector()
             partition_healer: None, // Phase 18 Week 3: Set via set_partition_healer()
+            storage_quota_manager: None, // Phase 18 Week 6: Set via set_storage_quota_manager()
         };
 
         // Create default topics with appropriate scopes
@@ -204,6 +209,11 @@ impl GossipActor {
     /// Set partition healer for partition conflict resolution (Phase 18 Week 3)
     pub fn set_partition_healer(&mut self, healer: Arc<RwLock<crate::partition::PartitionHealer>>) {
         self.partition_healer = Some(healer);
+    }
+
+    /// Set storage quota manager for per-DID storage limits (Phase 18 Week 6)
+    pub fn set_storage_quota_manager(&mut self, manager: Arc<RwLock<icn_store::StorageQuotaManager>>) {
+        self.storage_quota_manager = Some(manager);
     }
 
     /// Attempt to heal partition with a reconnected peer (Phase 18 Week 3)
@@ -400,6 +410,8 @@ impl GossipActor {
     fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
         let topic = &entry.topic;
         let hash = entry.hash;
+        let entry_size = entry.data.len() as u64;
+        let author = entry.author.clone();
 
         // Get or create topic entries
         let topic_entries = self.entries.entry(topic.clone()).or_default();
@@ -407,6 +419,35 @@ impl GossipActor {
         // Check if already have this entry
         if topic_entries.contains_key(&hash) {
             return Ok(()); // Already have it
+        }
+
+        // Phase 18 Week 6: Check storage quota for author
+        if let Some(quota_manager) = &self.storage_quota_manager {
+            let can_store = tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::try_current();
+                if let Ok(handle) = rt {
+                    handle.block_on(async {
+                        let manager = quota_manager.read().await;
+                        manager.can_store(&author, entry_size)
+                    })
+                } else {
+                    // No async runtime, try sync access
+                    let manager = quota_manager.blocking_read();
+                    manager.can_store(&author, entry_size)
+                }
+            });
+
+            if let Err(e) = can_store {
+                warn!(
+                    author = %author,
+                    entry_size = entry_size,
+                    topic = %topic,
+                    error = %e,
+                    "Rejecting entry - storage quota exceeded"
+                );
+                icn_obs::metrics::storage_quotas::exceeded_inc();
+                bail!("Storage quota exceeded for author {}: {}", author, e);
+            }
         }
 
         // Check topic max_entries limit BEFORE inserting to prevent unbounded growth
@@ -421,7 +462,26 @@ impl GossipActor {
                         "Topic {} at capacity ({}), removing oldest entry",
                         topic, topic_obj.max_entries
                     );
-                    topic_entries.remove(&oldest.hash);
+                    let oldest_hash = oldest.hash;
+                    let oldest_size = oldest.data.len() as u64;
+                    let oldest_author = oldest.author.clone();
+                    topic_entries.remove(&oldest_hash);
+
+                    // Phase 18 Week 6: Release quota for evicted entry
+                    if let Some(quota_manager) = &self.storage_quota_manager {
+                        tokio::task::block_in_place(|| {
+                            let rt = tokio::runtime::Handle::try_current();
+                            if let Ok(handle) = rt {
+                                handle.block_on(async {
+                                    let mut manager = quota_manager.write().await;
+                                    let _ = manager.release_usage(&oldest_author, &oldest_hash, oldest_size);
+                                });
+                            } else {
+                                let mut manager = quota_manager.blocking_write();
+                                let _ = manager.release_usage(&oldest_author, &oldest_hash, oldest_size);
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -433,6 +493,57 @@ impl GossipActor {
 
         // Store entry
         topic_entries.insert(hash, entry.clone());
+
+        // Phase 18 Week 6: Record quota usage for new entry
+        if let Some(quota_manager) = &self.storage_quota_manager {
+            tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::try_current();
+                if let Ok(handle) = rt {
+                    handle.block_on(async {
+                        let mut manager = quota_manager.write().await;
+                        // Use Normal priority for gossip entries (evicted before ledger/contracts)
+                        let _ = manager.record_usage(
+                            &author,
+                            hash.to_vec(),
+                            entry_size,
+                            icn_store::QuotaPriority::Normal,
+                        );
+
+                        // Check if eviction is needed
+                        if manager.needs_eviction() {
+                            if let Ok(evicted) = manager.evict_if_needed() {
+                                if !evicted.is_empty() {
+                                    info!(
+                                        evicted_count = evicted.len(),
+                                        "Storage quota eviction triggered"
+                                    );
+                                    icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    let mut manager = quota_manager.blocking_write();
+                    let _ = manager.record_usage(
+                        &author,
+                        hash.to_vec(),
+                        entry_size,
+                        icn_store::QuotaPriority::Normal,
+                    );
+                    if manager.needs_eviction() {
+                        if let Ok(evicted) = manager.evict_if_needed() {
+                            if !evicted.is_empty() {
+                                info!(
+                                    evicted_count = evicted.len(),
+                                    "Storage quota eviction triggered"
+                                );
+                                icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // Merge vector clock
         self.clock.merge(&entry.clock);
@@ -2951,6 +3062,85 @@ mod tests {
             .find(|r| r.peer_did == did3.to_string())
             .expect("Should have did3 replica");
         assert_eq!(stale_replica.health, icn_store::ReplicaHealth::Stale);
+
+        Ok(())
+    }
+
+    /// Test storage quota enforcement (Phase 18 Week 6)
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_storage_quota_enforcement() -> Result<()> {
+        let keypair = KeyPair::generate()?;
+        let did = keypair.did().clone();
+
+        let trust_lookup: TrustLookup = Arc::new(|_did| Some(TrustClass::Federated));
+        let mut gossip = GossipActor::new(did.clone(), trust_lookup);
+
+        // Create storage quota manager with small limits for testing
+        // 1KB global limit, 500 byte per-DID quota
+        let mut quota_manager = icn_store::StorageQuotaManager::new(1024, 0.9);
+        quota_manager.set_quota(did.clone(), 500, icn_store::QuotaPriority::Normal);
+        let quota_handle = Arc::new(tokio::sync::RwLock::new(quota_manager));
+
+        gossip.set_storage_quota_manager(quota_handle.clone());
+
+        // Create a test topic
+        gossip.create_topic(Topic::new("test:quota".to_string(), AccessControl::Public));
+
+        // First publish should succeed (100 bytes < 500 byte quota)
+        let data1 = vec![1u8; 100];
+        let result = gossip.publish("test:quota", data1);
+        assert!(result.is_ok(), "First publish should succeed within quota");
+
+        // Second publish should also succeed (100 + 100 = 200 < 500)
+        let data2 = vec![2u8; 100];
+        let result = gossip.publish("test:quota", data2);
+        assert!(result.is_ok(), "Second publish should succeed within quota");
+
+        // Third publish should also succeed (200 + 100 = 300 < 500)
+        let data3 = vec![3u8; 100];
+        let result = gossip.publish("test:quota", data3);
+        assert!(result.is_ok(), "Third publish should succeed within quota");
+
+        // Verify quota usage is being tracked
+        let manager = quota_handle.read().await;
+        let quota = manager.get_quota(&did).unwrap();
+        assert_eq!(quota.current_bytes, 300, "Should have recorded 300 bytes of usage");
+
+        Ok(())
+    }
+
+    /// Test storage quota exceeded rejection (Phase 18 Week 6)
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_storage_quota_exceeded() -> Result<()> {
+        let keypair = KeyPair::generate()?;
+        let did = keypair.did().clone();
+
+        let trust_lookup: TrustLookup = Arc::new(|_did| Some(TrustClass::Federated));
+        let mut gossip = GossipActor::new(did.clone(), trust_lookup);
+
+        // Create storage quota manager with very small limit
+        // 200 byte per-DID quota
+        let mut quota_manager = icn_store::StorageQuotaManager::new(10000, 0.9);
+        quota_manager.set_quota(did.clone(), 200, icn_store::QuotaPriority::Normal);
+        let quota_handle = Arc::new(tokio::sync::RwLock::new(quota_manager));
+
+        gossip.set_storage_quota_manager(quota_handle.clone());
+
+        // Create a test topic
+        gossip.create_topic(Topic::new("test:quota".to_string(), AccessControl::Public));
+
+        // First publish should succeed (150 bytes < 200 byte quota)
+        let data1 = vec![1u8; 150];
+        let result = gossip.publish("test:quota", data1);
+        assert!(result.is_ok(), "First publish should succeed within quota");
+
+        // Second publish should fail (150 + 100 = 250 > 200 byte quota)
+        let data2 = vec![2u8; 100];
+        let result = gossip.publish("test:quota", data2);
+        assert!(result.is_err(), "Second publish should fail - quota exceeded");
+
+        let error = result.unwrap_err().to_string();
+        assert!(error.contains("quota exceeded"), "Error should mention quota exceeded: {}", error);
 
         Ok(())
     }
