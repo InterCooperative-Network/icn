@@ -183,12 +183,36 @@ impl StorageQuotaManager {
     ///
     /// If no per-DID quota exists, creates a default quota with the global limit.
     /// This allows dynamic quota assignment based on actual usage.
+    ///
+    /// This method validates against both per-DID quota (if exists) and global limit
+    /// before recording usage, ensuring the storage operation is valid.
     pub fn record_usage(&mut self, did: &Did, key: Vec<u8>, size: u64, priority: QuotaPriority) -> Result<()> {
+        // Check global limit first (always enforced)
+        if self.global_usage.saturating_add(size) > self.global_limit {
+            return Err(anyhow!(
+                "Global storage limit exceeded: {} + {} > {} bytes",
+                self.global_usage,
+                size,
+                self.global_limit
+            ));
+        }
+
         // Get or create DID quota with default (global limit as per-DID max)
         let quota = self.quotas.entry(did.clone()).or_insert_with(|| {
             debug!("Auto-creating default quota for DID: {}", did);
             StorageQuota::new(self.global_limit, QuotaPriority::Normal)
         });
+
+        // Check per-DID quota
+        if quota.would_exceed(size) {
+            return Err(anyhow!(
+                "Storage quota exceeded for {}: {} + {} > {} bytes",
+                did,
+                quota.current_bytes,
+                size,
+                quota.max_bytes
+            ));
+        }
 
         quota.record_usage(size);
 
