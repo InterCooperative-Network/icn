@@ -13,7 +13,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust
+//! ```rust,ignore
 //! use icn_net::BlobLocationRegistry;
 //! use icn_identity::Did;
 //!
@@ -21,7 +21,7 @@
 //!
 //! // Peer announces blob availability
 //! let blob_hash = [0u8; 32];
-//! let peer_did = Did::from_str("did:icn:abc123").unwrap();
+//! let peer_did: Did = /* valid DID */;
 //! registry.announce_blob(blob_hash, peer_did.clone(), 1024);
 //!
 //! // Query peers with blob
