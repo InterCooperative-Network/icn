@@ -39,6 +39,108 @@ Integrated MisbehaviorDetector from Phase 18 into production network and gossip 
 **Dependencies:**
 - Workspace dependency `icn-security` added to `icn-net` and `icn-gossip`
 
+### Added - Partition Detection & Healing (Phase 18 Week 3) (2025-11-27)
+
+**Integrated partition detection and healing into GossipActor:**
+
+**GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Added `partition_detector` and `partition_healer` optional fields
+- Added `set_partition_detector()` and `set_partition_healer()` setter methods
+- Added `heal_partition_with_peer()` method for reconnected peer handling
+- Partition detection based on configurable threshold (default: 5 min)
+
+**Supervisor** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- Initializes `PartitionDetector` and `PartitionHealer` on startup
+- Configures default partition threshold (5 min) and check interval (30s)
+
+**Prometheus Metrics:**
+- `icn_gossip_partition_healed_total` - Successful partition healings
+
+### Added - Dispute Resolution for Contract Execution (Phase 18 Week 4) (2025-11-27)
+
+**Integrated dispute resolution system into ComputeActor:**
+
+**ComputeActor** ([crates/icn-compute/src/actor.rs](icn/crates/icn-compute/src/actor.rs)):
+- Added `dispute_resolution` optional field for `DisputeResolutionSystem`
+- Added `FileDispute` command for challengers to file disputes
+- Added `GetDisputeStatus` command for querying dispute status
+- Re-executes contracts to verify challenger's claims
+
+**Supervisor Integration:**
+- Initializes `DisputeResolutionSystem` with persistent storage
+- Sets up dispute system on ComputeActor at startup
+
+**Prometheus Metrics:**
+- `icn_compute_disputes_filed_total` - Disputes filed
+- `icn_compute_disputes_resolved_total` - Disputes resolved by outcome
+
+### Added - Fork Resolution for Ledger Conflicts (Phase 18 Week 5) (2025-11-27)
+
+**Integrated fork detection and resolution into Ledger:**
+
+**Ledger** ([crates/icn-ledger/src/ledger.rs](icn/crates/icn-ledger/src/ledger.rs)):
+- Added `fork_detector` and `fork_resolver` fields
+- Indexes entries for fork detection on `append_entry()`
+- Warns when potential forks detected (multiple children of same parent)
+- Added `get_fork_stats()`, `get_fork_children()`, `resolve_fork()` methods
+- Quarantines losing entries using `QuarantineReason::ForkConflict`
+
+**Fork Resolution Strategies:**
+- `TimestampPreference` - First-write-wins
+- `TrustWeighted` - Prefer higher-trust authors
+- `MajoritySignatures` - Prefer more co-signers
+- `Hybrid` - Combined strategy (40% trust, 30% timestamp, 30% signatures)
+
+**Types** ([crates/icn-ledger/src/types.rs](icn/crates/icn-ledger/src/types.rs)):
+- Added `QuarantineReason::ForkConflict(String)` variant
+
+**Prometheus Metrics:**
+- `icn_ledger_forks_detected_total` - Fork detection events
+
+### Added - Storage Quotas Integration (Phase 18 Week 6) (2025-11-27)
+
+**Integrated StorageQuotaManager into GossipActor for per-DID storage limits:**
+
+**GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Added `storage_quota_manager` optional field
+- Added `set_storage_quota_manager()` setter method
+- Enforces per-DID quota in `store_entry()` before storage
+- Records usage after successful entry storage
+- Releases usage when entries evicted due to topic limits
+- Auto-evicts low-priority entries when approaching capacity
+- Uses `block_in_place` pattern for async quota operations
+- 2 new tests: `test_storage_quota_enforcement`, `test_storage_quota_exceeded`
+
+**Supervisor** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- Initializes `StorageQuotaManager` with defaults (1GB global, 90% eviction threshold)
+- Configures quota manager on GossipActor at startup
+
+**Prometheus Metrics:**
+- `icn_storage_quota_exceeded_total` - Quota exceeded events
+- `icn_storage_evicted_total` - Entries evicted for quota
+
+**Upgrade Coordination:**
+Version negotiation already integrated in NetworkActor (Track B1):
+- `VersionInfo` exchange during Hello handshake
+- `negotiate_version()` finds compatible protocol versions
+- `common_capabilities()` identifies shared features
+- Per-connection tracking of negotiated version and capabilities
+
+---
+
+**Phase 18 Pre-Pilot Hardening COMPLETE ✅** (2025-11-27)
+
+All 6 weeks integrated:
+- Week 1-2: Byzantine fault detection ✅
+- Week 3: Partition detection & healing ✅
+- Week 4: Dispute resolution for compute ✅
+- Week 5: Fork resolution for ledger ✅
+- Week 6: Storage quotas & upgrade coordination ✅
+
+**Tests:** 91 gossip tests, 46 ledger tests, 98 compute tests, 23 store tests all passing.
+
+---
+
 ### Added - Privacy Enhancements (Phase 20 COMPLETE ✅) (2025-11-26)
 
 **New Crate: icn-privacy** ([crates/icn-privacy/](icn/crates/icn-privacy/))
