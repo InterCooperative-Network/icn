@@ -86,6 +86,52 @@ pub fn init_descriptions() {
         "Total number of successful version negotiations"
     );
 
+    // Peer Exchange metrics (Federation)
+    describe_counter!(
+        "icn_peer_exchange_requests_sent_total",
+        "Total number of peer exchange requests sent"
+    );
+    describe_counter!(
+        "icn_peer_exchange_requests_received_total",
+        "Total number of peer exchange requests received"
+    );
+    describe_counter!(
+        "icn_peer_exchange_responses_sent_total",
+        "Total number of peer exchange responses sent"
+    );
+    describe_counter!(
+        "icn_peer_exchange_responses_received_total",
+        "Total number of peer exchange responses received"
+    );
+    describe_counter!(
+        "icn_peer_exchange_announces_sent_total",
+        "Total number of peer announce messages sent"
+    );
+    describe_counter!(
+        "icn_peer_exchange_announces_received_total",
+        "Total number of peer announce messages received"
+    );
+    describe_counter!(
+        "icn_peer_exchange_unannounces_sent_total",
+        "Total number of peer unannounce messages sent"
+    );
+    describe_counter!(
+        "icn_peer_exchange_unannounces_received_total",
+        "Total number of peer unannounce messages received"
+    );
+    describe_counter!(
+        "icn_peer_exchange_peers_discovered_total",
+        "Total number of peers discovered via peer exchange"
+    );
+    describe_counter!(
+        "icn_peer_exchange_peers_dialed_total",
+        "Total number of peers auto-dialed from peer exchange"
+    );
+    describe_counter!(
+        "icn_peer_exchange_dial_failures_total",
+        "Total number of peer exchange dial failures"
+    );
+
     // NAT Traversal metrics (STUN)
     describe_counter!(
         "icn_stun_queries_total",
@@ -1102,6 +1148,55 @@ pub mod network {
 
     pub fn version_negotiation_success_inc(negotiated_version: u32) {
         counter!("icn_network_version_negotiation_success_total", "negotiated_version" => negotiated_version.to_string()).increment(1);
+    }
+}
+
+/// Peer exchange metrics (Federation)
+pub mod peer_exchange {
+    use metrics::counter;
+
+    pub fn requests_sent_inc() {
+        counter!("icn_peer_exchange_requests_sent_total").increment(1);
+    }
+
+    pub fn requests_received_inc() {
+        counter!("icn_peer_exchange_requests_received_total").increment(1);
+    }
+
+    pub fn responses_sent_inc() {
+        counter!("icn_peer_exchange_responses_sent_total").increment(1);
+    }
+
+    pub fn responses_received_inc() {
+        counter!("icn_peer_exchange_responses_received_total").increment(1);
+    }
+
+    pub fn announces_sent_inc() {
+        counter!("icn_peer_exchange_announces_sent_total").increment(1);
+    }
+
+    pub fn announces_received_inc() {
+        counter!("icn_peer_exchange_announces_received_total").increment(1);
+    }
+
+    pub fn unannounces_sent_inc() {
+        counter!("icn_peer_exchange_unannounces_sent_total").increment(1);
+    }
+
+    pub fn unannounces_received_inc() {
+        counter!("icn_peer_exchange_unannounces_received_total").increment(1);
+    }
+
+    pub fn peers_discovered_add(count: u64) {
+        counter!("icn_peer_exchange_peers_discovered_total").increment(count);
+    }
+
+    pub fn peers_dialed_inc() {
+        counter!("icn_peer_exchange_peers_dialed_total").increment(1);
+    }
+
+    pub fn dial_failures_inc() {
+        counter!("icn_peer_exchange_dial_failures_total").increment(1);
     }
 }
 

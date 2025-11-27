@@ -483,8 +483,14 @@ impl Supervisor {
                                                 };
 
                                                 info!("Auto-dialing discovered peer {} at {}", peer_did, addr);
-                                                if let Err(e) = net_handle.dial(addr, peer_did.clone()).await {
-                                                    debug!("Failed to dial {}: {}", peer_did, e);
+                                                match net_handle.dial(addr, peer_did.clone()).await {
+                                                    Ok(_) => {
+                                                        icn_obs::metrics::peer_exchange::peers_dialed_inc();
+                                                    }
+                                                    Err(e) => {
+                                                        debug!("Failed to dial {}: {}", peer_did, e);
+                                                        icn_obs::metrics::peer_exchange::dial_failures_inc();
+                                                    }
                                                 }
                                             }
                                         }
@@ -509,8 +515,14 @@ impl Supervisor {
                                                 if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
                                                     if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
                                                         info!("Auto-dialing announced peer {} at {}", peer_did, addr);
-                                                        if let Err(e) = net_handle.dial(addr, peer_did.clone()).await {
-                                                            debug!("Failed to dial announced peer {}: {}", peer_did, e);
+                                                        match net_handle.dial(addr, peer_did.clone()).await {
+                                                            Ok(_) => {
+                                                                icn_obs::metrics::peer_exchange::peers_dialed_inc();
+                                                            }
+                                                            Err(e) => {
+                                                                debug!("Failed to dial announced peer {}: {}", peer_did, e);
+                                                                icn_obs::metrics::peer_exchange::dial_failures_inc();
+                                                            }
                                                         }
                                                     }
                                                 }

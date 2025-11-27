@@ -546,7 +546,11 @@ impl NetworkHandle {
             network_filter,
         );
 
-        self.send_message(peer_did.clone(), request_msg).await
+        let result = self.send_message(peer_did.clone(), request_msg).await;
+        if result.is_ok() {
+            icn_obs::metrics::peer_exchange::requests_sent_inc();
+        }
+        result
     }
 
     /// Announce a new peer to connected peers
@@ -563,7 +567,11 @@ impl NetworkHandle {
         );
 
         // Broadcast to all connected peers
-        self.broadcast(announce_msg).await
+        let result = self.broadcast(announce_msg).await;
+        if result.is_ok() {
+            icn_obs::metrics::peer_exchange::announces_sent_inc();
+        }
+        result
     }
 
     /// Unannounce a peer (notify when peer disconnects)
@@ -580,7 +588,11 @@ impl NetworkHandle {
         );
 
         // Broadcast to all connected peers
-        self.broadcast(unannounce_msg).await
+        let result = self.broadcast(unannounce_msg).await;
+        if result.is_ok() {
+            icn_obs::metrics::peer_exchange::unannounces_sent_inc();
+        }
+        result
     }
 }
 
@@ -1679,6 +1691,7 @@ impl NetworkActor {
                                         PeerExchangeMessage::Request { max_peers, network_filter } => {
                                             info!("Received peer exchange request from {} (max={}, filter={:?})",
                                                   message.from, max_peers, network_filter);
+                                            icn_obs::metrics::peer_exchange::requests_received_inc();
 
                                             // Gather known peers from session manager (currently connected peers)
                                             let sm = session_manager.read().await;
@@ -1736,6 +1749,7 @@ impl NetworkActor {
                                                             warn!("Failed to finish peer exchange response stream: {}", e);
                                                         } else {
                                                             info!("Sent {} peers to {}", total_known, from_did);
+                                                            icn_obs::metrics::peer_exchange::responses_sent_inc();
                                                         }
                                                     }
                                                     Err(e) => {
@@ -1747,6 +1761,8 @@ impl NetworkActor {
                                         PeerExchangeMessage::Response { peers, total_known } => {
                                             info!("Received {} peers from {} (total known: {})",
                                                   peers.len(), message.from, total_known);
+                                            icn_obs::metrics::peer_exchange::responses_received_inc();
+                                            icn_obs::metrics::peer_exchange::peers_discovered_add(peers.len() as u64);
 
                                             // Forward to handler for processing
                                             // The supervisor can dial these peers if configured for federation
@@ -1754,11 +1770,13 @@ impl NetworkActor {
                                         }
                                         PeerExchangeMessage::Announce { peer } => {
                                             info!("Peer announced: {} at {:?}", peer.did, peer.addresses);
+                                            icn_obs::metrics::peer_exchange::announces_received_inc();
                                             // Forward to handler for processing
                                             handler(message);
                                         }
                                         PeerExchangeMessage::Unannounce { did } => {
                                             info!("Peer unannounced: {}", did);
+                                            icn_obs::metrics::peer_exchange::unannounces_received_inc();
                                             // Forward to handler for processing
                                             handler(message);
                                         }
