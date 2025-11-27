@@ -25,7 +25,9 @@ pub use discovery::{Discovery, PeerInfo};
 pub use encryption::EncryptedEnvelope;
 pub use envelope::{PayloadType, SignedEnvelope};
 pub use global_rate_limit::GlobalRateLimiter;
-pub use protocol::{MessagePayload, NetworkMessage, read_message, write_message};
+pub use protocol::{
+    KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, read_message, write_message,
+};
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;
 pub use session::SessionManager;

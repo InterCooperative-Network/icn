@@ -93,6 +93,69 @@ pub enum MessagePayload {
     /// Signed application-level message (authenticated + replay protected)
     /// This wraps any message that requires cryptographic proof of authenticity
     Signed(SignedEnvelope),
+
+    /// Peer exchange for cross-network discovery
+    /// Nodes share their known peers to enable discovery beyond local network
+    PeerExchange(PeerExchangeMessage),
+}
+
+/// Peer exchange message for cross-network discovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PeerExchangeMessage {
+    /// Request peer list from a connected peer
+    Request {
+        /// Maximum number of peers to return
+        max_peers: usize,
+        /// Filter by network name (optional)
+        network_filter: Option<String>,
+    },
+
+    /// Response with known peers
+    Response {
+        /// List of known peers
+        peers: Vec<KnownPeer>,
+        /// Total peers known (may be > peers.len() if limited)
+        total_known: usize,
+    },
+
+    /// Announce new peer (push notification)
+    Announce {
+        /// New peer being announced
+        peer: KnownPeer,
+    },
+
+    /// Unannounce peer (peer went offline)
+    Unannounce {
+        /// DID of peer that went offline
+        did: String,
+    },
+}
+
+/// Information about a known peer for exchange
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnownPeer {
+    /// Peer's DID
+    pub did: String,
+
+    /// Socket addresses where peer can be reached
+    /// Multiple addresses support multi-homed nodes
+    pub addresses: Vec<String>,
+
+    /// Protocol version
+    pub version: String,
+
+    /// Network name (for federation filtering)
+    pub network_name: Option<String>,
+
+    /// Trust score (as observed by the sharing peer)
+    /// Recipients should NOT directly trust this value
+    pub observed_trust: Option<f64>,
+
+    /// Unix timestamp when this peer was last seen
+    pub last_seen: u64,
+
+    /// Whether this peer was discovered via mDNS (local) or exchange (remote)
+    pub is_local: bool,
 }
 
 impl MessagePayload {
@@ -109,6 +172,7 @@ impl MessagePayload {
             MessagePayload::Handshake { .. } => "Handshake",
             MessagePayload::HandshakeAck => "HandshakeAck",
             MessagePayload::Signed(_) => "Signed",
+            MessagePayload::PeerExchange(_) => "PeerExchange",
         }
     }
 }
@@ -203,6 +267,58 @@ impl NetworkMessage {
     pub fn signed(to: Option<Did>, envelope: SignedEnvelope) -> Self {
         let from = envelope.from.clone();
         Self::new(from, to, MessagePayload::Signed(envelope))
+    }
+
+    /// Create a peer exchange request message
+    pub fn peer_exchange_request(
+        from: Did,
+        to: Did,
+        max_peers: usize,
+        network_filter: Option<String>,
+    ) -> Self {
+        Self::new(
+            from,
+            Some(to),
+            MessagePayload::PeerExchange(PeerExchangeMessage::Request {
+                max_peers,
+                network_filter,
+            }),
+        )
+    }
+
+    /// Create a peer exchange response message
+    pub fn peer_exchange_response(
+        from: Did,
+        to: Did,
+        peers: Vec<KnownPeer>,
+        total_known: usize,
+    ) -> Self {
+        Self::new(
+            from,
+            Some(to),
+            MessagePayload::PeerExchange(PeerExchangeMessage::Response {
+                peers,
+                total_known,
+            }),
+        )
+    }
+
+    /// Create a peer announce message (broadcast to all connected peers)
+    pub fn peer_announce(from: Did, peer: KnownPeer) -> Self {
+        Self::new(
+            from,
+            None,
+            MessagePayload::PeerExchange(PeerExchangeMessage::Announce { peer }),
+        )
+    }
+
+    /// Create a peer unannounce message (broadcast peer went offline)
+    pub fn peer_unannounce(from: Did, did: String) -> Self {
+        Self::new(
+            from,
+            None,
+            MessagePayload::PeerExchange(PeerExchangeMessage::Unannounce { did }),
+        )
     }
 
     /// Serialize to bytes using bincode
@@ -543,5 +659,132 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("too new"));
+    }
+
+    #[test]
+    fn test_peer_exchange_request_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::peer_exchange_request(
+            alice.clone(),
+            bob.clone(),
+            50,
+            Some("my-coop-network".to_string()),
+        );
+
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Request { max_peers, network_filter }) = decoded.payload {
+            assert_eq!(max_peers, 50);
+            assert_eq!(network_filter, Some("my-coop-network".to_string()));
+        } else {
+            panic!("Expected PeerExchange::Request payload");
+        }
+    }
+
+    #[test]
+    fn test_peer_exchange_response_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let peers = vec![
+            KnownPeer {
+                did: "did:icn:peer1".to_string(),
+                addresses: vec!["192.168.1.100:7777".to_string()],
+                version: "0.1.0".to_string(),
+                network_name: Some("my-coop".to_string()),
+                observed_trust: Some(0.5),
+                last_seen: 1234567890,
+                is_local: false,
+            },
+            KnownPeer {
+                did: "did:icn:peer2".to_string(),
+                addresses: vec!["192.168.1.101:7777".to_string()],
+                version: "0.1.0".to_string(),
+                network_name: None,
+                observed_trust: None,
+                last_seen: 1234567891,
+                is_local: true,
+            },
+        ];
+
+        let msg = NetworkMessage::peer_exchange_response(
+            alice.clone(),
+            bob.clone(),
+            peers.clone(),
+            10,
+        );
+
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Response { peers: decoded_peers, total_known }) = decoded.payload {
+            assert_eq!(decoded_peers.len(), 2);
+            assert_eq!(total_known, 10);
+            assert_eq!(decoded_peers[0].did, "did:icn:peer1");
+            assert_eq!(decoded_peers[0].observed_trust, Some(0.5));
+            assert_eq!(decoded_peers[1].did, "did:icn:peer2");
+            assert!(decoded_peers[1].is_local);
+        } else {
+            panic!("Expected PeerExchange::Response payload");
+        }
+    }
+
+    #[test]
+    fn test_peer_announce_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+
+        let peer = KnownPeer {
+            did: "did:icn:newpeer".to_string(),
+            addresses: vec!["10.0.0.1:7777".to_string(), "10.0.0.2:7777".to_string()],
+            version: "0.2.0".to_string(),
+            network_name: Some("icn-mainnet".to_string()),
+            observed_trust: Some(0.8),
+            last_seen: 1234567895,
+            is_local: false,
+        };
+
+        let msg = NetworkMessage::peer_announce(alice.clone(), peer.clone());
+
+        // Announce is a broadcast (no to field)
+        assert!(msg.is_broadcast());
+
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Announce { peer: decoded_peer }) = decoded.payload {
+            assert_eq!(decoded_peer.did, "did:icn:newpeer");
+            assert_eq!(decoded_peer.addresses.len(), 2);
+            assert_eq!(decoded_peer.observed_trust, Some(0.8));
+        } else {
+            panic!("Expected PeerExchange::Announce payload");
+        }
+    }
+
+    #[test]
+    fn test_peer_unannounce_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::peer_unannounce(
+            alice.clone(),
+            "did:icn:departed".to_string(),
+        );
+
+        // Unannounce is a broadcast (no to field)
+        assert!(msg.is_broadcast());
+
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Unannounce { did }) = decoded.payload {
+            assert_eq!(did, "did:icn:departed");
+        } else {
+            panic!("Expected PeerExchange::Unannounce payload");
+        }
     }
 }

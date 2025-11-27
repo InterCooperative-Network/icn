@@ -440,6 +440,38 @@ impl Supervisor {
                             }
                         }
                     }
+
+                    icn_net::MessagePayload::PeerExchange(ref peer_msg) => {
+                        // Peer exchange messages for cross-network federation discovery
+                        // Request messages are handled directly by NetworkActor
+                        // Response/Announce/Unannounce are forwarded here for processing
+                        use icn_net::PeerExchangeMessage;
+                        match peer_msg {
+                            PeerExchangeMessage::Request { .. } => {
+                                // Requests are handled by NetworkActor directly
+                                debug!("Peer exchange request forwarded to handler (unexpected)");
+                            }
+                            PeerExchangeMessage::Response { peers, total_known } => {
+                                // Received peer list from another node
+                                info!("Received {} federation peers from {} (total: {})",
+                                      peers.len(), sender_did, total_known);
+                                // TODO: If federation is enabled, dial these peers
+                                // For now, just log them
+                                for peer in peers {
+                                    debug!("Discovered peer: {} at {:?}", peer.did, peer.addresses);
+                                }
+                            }
+                            PeerExchangeMessage::Announce { peer } => {
+                                info!("Peer announced by {}: {} at {:?}",
+                                      sender_did, peer.did, peer.addresses);
+                                // TODO: If federation is enabled, consider dialing this peer
+                            }
+                            PeerExchangeMessage::Unannounce { did } => {
+                                info!("Peer unannounced by {}: {}", sender_did, did);
+                                // TODO: Update local peer cache if tracking
+                            }
+                        }
+                    }
                 }
             });
 

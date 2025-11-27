@@ -513,6 +513,75 @@ impl NetworkHandle {
         }
         Ok(())
     }
+
+    /// Request peer exchange from a connected peer
+    ///
+    /// Sends a PeerExchangeMessage::Request to the specified peer, asking for
+    /// a list of known peers. This is used for cross-network discovery in
+    /// federation scenarios where mDNS doesn't work (WAN connectivity).
+    ///
+    /// # Arguments
+    /// * `peer_did` - DID of the peer to request peers from
+    /// * `max_peers` - Maximum number of peers to request (default: 50)
+    /// * `network_filter` - Optional network name filter
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// // Request up to 20 peers from a bootstrap node
+    /// network_handle.request_peer_exchange(&bootstrap_did, Some(20), None).await?;
+    ///
+    /// // Request peers from a specific federation network
+    /// network_handle.request_peer_exchange(&peer_did, Some(50), Some("my-coop-network")).await?;
+    /// ```
+    pub async fn request_peer_exchange(
+        &self,
+        peer_did: &Did,
+        max_peers: Option<usize>,
+        network_filter: Option<String>,
+    ) -> Result<()> {
+        let request_msg = NetworkMessage::peer_exchange_request(
+            self.own_did.clone(),
+            peer_did.clone(),
+            max_peers.unwrap_or(50),
+            network_filter,
+        );
+
+        self.send_message(peer_did.clone(), request_msg).await
+    }
+
+    /// Announce a new peer to connected peers
+    ///
+    /// Broadcasts a PeerExchangeMessage::Announce to inform connected peers
+    /// about a new peer. This enables peer introductions in federation.
+    ///
+    /// # Arguments
+    /// * `peer` - KnownPeer information to announce
+    pub async fn announce_peer(&self, peer: crate::KnownPeer) -> Result<()> {
+        let announce_msg = NetworkMessage::peer_announce(
+            self.own_did.clone(),
+            peer,
+        );
+
+        // Broadcast to all connected peers
+        self.broadcast(announce_msg).await
+    }
+
+    /// Unannounce a peer (notify when peer disconnects)
+    ///
+    /// Broadcasts a PeerExchangeMessage::Unannounce to inform connected peers
+    /// that a peer is no longer available.
+    ///
+    /// # Arguments
+    /// * `did` - DID of the peer that disconnected
+    pub async fn unannounce_peer(&self, did: &str) -> Result<()> {
+        let unannounce_msg = NetworkMessage::peer_unannounce(
+            self.own_did.clone(),
+            did.to_string(),
+        );
+
+        // Broadcast to all connected peers
+        self.broadcast(unannounce_msg).await
+    }
 }
 
 /// Network actor state
@@ -1162,7 +1231,7 @@ impl NetworkActor {
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-        _session_manager: Arc<RwLock<SessionManager>>,
+        session_manager: Arc<RwLock<SessionManager>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
@@ -1599,6 +1668,99 @@ impl NetworkActor {
                                                 }
                                                 // Drop message (don't forward to handler)
                                             }
+                                        }
+                                    }
+                                }
+                                MessagePayload::PeerExchange(ref peer_msg) => {
+                                    // Handle peer exchange messages for cross-network discovery
+                                    use crate::protocol::{PeerExchangeMessage, KnownPeer};
+
+                                    match peer_msg {
+                                        PeerExchangeMessage::Request { max_peers, network_filter } => {
+                                            info!("Received peer exchange request from {} (max={}, filter={:?})",
+                                                  message.from, max_peers, network_filter);
+
+                                            // Gather known peers from session manager (currently connected peers)
+                                            let sm = session_manager.read().await;
+                                            let connections = sm.connections().await;
+                                            drop(sm); // Release lock after getting connections
+
+                                            let now_secs = std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .unwrap_or_default()
+                                                .as_secs();
+
+                                            let mut known_peers: Vec<KnownPeer> = Vec::new();
+
+                                            // Add connected peers from session manager
+                                            for (did_str, conn) in connections {
+                                                // Skip the requesting peer
+                                                if did_str == message.from.as_str() {
+                                                    continue;
+                                                }
+
+                                                known_peers.push(KnownPeer {
+                                                    did: did_str.to_string(),
+                                                    addresses: vec![conn.remote_address().to_string()],
+                                                    version: "0.1.0".to_string(),
+                                                    network_name: network_filter.clone(),
+                                                    observed_trust: None,
+                                                    last_seen: now_secs,
+                                                    is_local: false,
+                                                });
+
+                                                if known_peers.len() >= *max_peers {
+                                                    break;
+                                                }
+                                            }
+
+                                            let total_known = known_peers.len();
+
+                                            // Send response
+                                            let response = NetworkMessage::peer_exchange_response(
+                                                own_did.clone(),
+                                                message.from.clone(),
+                                                known_peers,
+                                                total_known,
+                                            );
+
+                                            // Open a new stream to send the response
+                                            let connection_clone = connection.clone();
+                                            let from_did = message.from.clone();
+                                            tokio::spawn(async move {
+                                                match connection_clone.open_bi().await {
+                                                    Ok((mut send_stream, _recv)) => {
+                                                        if let Err(e) = crate::protocol::write_message(&mut send_stream, &response).await {
+                                                            warn!("Failed to send peer exchange response: {}", e);
+                                                        } else if let Err(e) = send_stream.finish() {
+                                                            warn!("Failed to finish peer exchange response stream: {}", e);
+                                                        } else {
+                                                            info!("Sent {} peers to {}", total_known, from_did);
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        warn!("Failed to open stream for peer exchange response: {}", e);
+                                                    }
+                                                }
+                                            });
+                                        }
+                                        PeerExchangeMessage::Response { peers, total_known } => {
+                                            info!("Received {} peers from {} (total known: {})",
+                                                  peers.len(), message.from, total_known);
+
+                                            // Forward to handler for processing
+                                            // The supervisor can dial these peers if configured for federation
+                                            handler(message);
+                                        }
+                                        PeerExchangeMessage::Announce { peer } => {
+                                            info!("Peer announced: {} at {:?}", peer.did, peer.addresses);
+                                            // Forward to handler for processing
+                                            handler(message);
+                                        }
+                                        PeerExchangeMessage::Unannounce { did } => {
+                                            info!("Peer unannounced: {}", did);
+                                            // Forward to handler for processing
+                                            handler(message);
                                         }
                                     }
                                 }
