@@ -68,6 +68,10 @@ enum Commands {
     #[command(subcommand)]
     Network(NetworkCommands),
 
+    /// Federation management (cross-network connectivity)
+    #[command(subcommand)]
+    Federation(FederationCommands),
+
     /// Governance operations (domains, proposals, votes)
     #[command(subcommand)]
     Gov(GovCommands),
@@ -535,6 +539,52 @@ enum NetworkCommands {
 }
 
 #[derive(Subcommand, Debug)]
+enum FederationCommands {
+    /// Show current federation status
+    Status,
+
+    /// List configured bootstrap peers
+    Peers,
+
+    /// Add a bootstrap peer
+    Add {
+        /// Peer URL in format: icn://did:icn:PUBKEY@IP:PORT
+        peer_url: String,
+
+        /// Initial trust score for this peer (0.0-1.0)
+        #[arg(short, long, default_value = "0.3")]
+        trust: f64,
+    },
+
+    /// Remove a bootstrap peer
+    Remove {
+        /// DID of the peer to remove
+        did: String,
+    },
+
+    /// Connect to a bootstrap peer immediately
+    Connect {
+        /// Peer URL in format: icn://did:icn:PUBKEY@IP:PORT
+        peer_url: String,
+    },
+
+    /// Show federation configuration
+    Config,
+
+    /// Set federation configuration options
+    Set {
+        /// Configuration key (e.g., enabled, network_name, bootstrap_peer_trust)
+        key: String,
+
+        /// Configuration value
+        value: String,
+    },
+
+    /// Generate a federation invite URL for this node
+    Invite,
+}
+
+#[derive(Subcommand, Debug)]
 enum GovCommands {
     /// Domain management
     #[command(subcommand)]
@@ -818,6 +868,8 @@ async fn main() -> Result<()> {
         Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?,
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
+
+        Commands::Federation(fed_cmd) => handle_federation_command(fed_cmd, &data_dir, &args.endpoint).await?,
 
         Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir, &args.endpoint)?,
 
@@ -1606,6 +1658,323 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
     }
 
     Ok(())
+}
+
+async fn handle_federation_command(cmd: FederationCommands, data_dir: &PathBuf, endpoint: &str) -> Result<()> {
+    use icn_core::config::{Config, FederationConfig};
+
+    let config_path = data_dir.join("icn.toml");
+
+    match cmd {
+        FederationCommands::Status => {
+            // Try to get status from daemon first
+            let rpc_addr: std::net::SocketAddr = endpoint.parse()?;
+            let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+            match client.get_peers().await {
+                Ok(peers) => {
+                    // Load config for federation settings
+                    let fed_config = if config_path.exists() {
+                        let config = Config::from_file(&config_path)?;
+                        config.federation
+                    } else {
+                        FederationConfig::default()
+                    };
+
+                    println!("Federation Status:\n");
+                    println!("  Enabled:           {}", fed_config.enabled);
+                    println!("  Network name:      {}", fed_config.network_name);
+                    println!("  Connected peers:   {}", peers.len());
+                    println!("  Max federations:   {}", fed_config.max_federations);
+                    println!("  Auto-accept:       {}", fed_config.auto_accept_invites);
+                    if fed_config.auto_accept_invites {
+                        println!("  Min invite trust:  {:.2}", fed_config.min_invite_trust);
+                    }
+                }
+                Err(_) => {
+                    // Daemon not running, show config-only status
+                    let fed_config = if config_path.exists() {
+                        let config = Config::from_file(&config_path)?;
+                        config.federation
+                    } else {
+                        FederationConfig::default()
+                    };
+
+                    println!("Federation Status (daemon not running):\n");
+                    println!("  Enabled:           {}", fed_config.enabled);
+                    println!("  Network name:      {}", fed_config.network_name);
+                    println!("  Max federations:   {}", fed_config.max_federations);
+                    println!("  Auto-accept:       {}", fed_config.auto_accept_invites);
+                    println!("\nNote: Start icnd to see connected peers.");
+                }
+            }
+        }
+
+        FederationCommands::Peers => {
+            // Load config to get bootstrap peers
+            let config = if config_path.exists() {
+                Config::from_file(&config_path)?
+            } else {
+                Config::default()
+            };
+
+            if config.network.bootstrap_peers.is_empty() {
+                println!("No bootstrap peers configured.\n");
+                println!("Add peers with: icnctl federation add <peer_url>");
+            } else {
+                println!("Configured Bootstrap Peers:\n");
+                println!("{:<60} {}", "URL", "Status");
+                println!("{}", "-".repeat(70));
+
+                // Try to check status from daemon
+                let rpc_addr: std::net::SocketAddr = endpoint.parse()?;
+                let mut client = icn_rpc::RpcClient::new(rpc_addr);
+                let connected_peers = client.get_peers().await.unwrap_or_default();
+                let connected_dids: std::collections::HashSet<String> = connected_peers
+                    .iter()
+                    .map(|p| p.did.clone())
+                    .collect();
+
+                for peer_url in &config.network.bootstrap_peers {
+                    // Extract DID from URL
+                    let status = if let Some(did) = extract_did_from_peer_url(peer_url) {
+                        if connected_dids.contains(&did) {
+                            "Connected"
+                        } else {
+                            "Disconnected"
+                        }
+                    } else {
+                        "Invalid URL"
+                    };
+                    println!("{:<60} {}", peer_url, status);
+                }
+            }
+        }
+
+        FederationCommands::Add { peer_url, trust } => {
+            // Validate URL format
+            if !peer_url.starts_with("icn://") {
+                bail!("Invalid peer URL format. Expected: icn://did:icn:PUBKEY@IP:PORT");
+            }
+
+            // Validate trust range
+            if !(0.0..=1.0).contains(&trust) {
+                bail!("Trust score must be between 0.0 and 1.0");
+            }
+
+            // Load existing config
+            let mut config = if config_path.exists() {
+                Config::from_file(&config_path)?
+            } else {
+                Config::default()
+            };
+
+            // Check if already exists
+            if config.network.bootstrap_peers.contains(&peer_url) {
+                println!("Peer already configured: {peer_url}");
+                return Ok(());
+            }
+
+            // Add peer
+            config.network.bootstrap_peers.push(peer_url.clone());
+            config.to_file(&config_path)?;
+
+            println!("✓ Added bootstrap peer: {peer_url}");
+            println!("  Initial trust: {trust:.2}");
+            println!("\nNote: Restart icnd or use 'icnctl federation connect' to connect immediately.");
+        }
+
+        FederationCommands::Remove { did } => {
+            // Load existing config
+            let mut config = if config_path.exists() {
+                Config::from_file(&config_path)?
+            } else {
+                bail!("No configuration file found at {}", config_path.display());
+            };
+
+            // Find and remove peer by DID
+            let original_len = config.network.bootstrap_peers.len();
+            config.network.bootstrap_peers.retain(|url| {
+                !url.contains(&did)
+            });
+
+            if config.network.bootstrap_peers.len() == original_len {
+                println!("No peer found with DID: {did}");
+            } else {
+                config.to_file(&config_path)?;
+                println!("✓ Removed bootstrap peer: {did}");
+            }
+        }
+
+        FederationCommands::Connect { peer_url } => {
+            // Validate URL format
+            if !peer_url.starts_with("icn://") {
+                bail!("Invalid peer URL format. Expected: icn://did:icn:PUBKEY@IP:PORT");
+            }
+
+            // Extract DID and address from URL
+            let (did, addr) = parse_peer_url(&peer_url)?;
+
+            // Connect via RPC
+            let rpc_addr: std::net::SocketAddr = endpoint.parse()?;
+            let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+            println!("Connecting to peer...");
+            println!("  DID:     {did}");
+            println!("  Address: {addr}\n");
+
+            client
+                .dial(did.clone(), addr)
+                .await
+                .context("Failed to connect to peer. Is icnd running?")?;
+
+            println!("✓ Successfully connected to {did}");
+        }
+
+        FederationCommands::Config => {
+            // Show federation configuration
+            let config = if config_path.exists() {
+                Config::from_file(&config_path)?
+            } else {
+                Config::default()
+            };
+
+            let fed = &config.federation;
+
+            println!("Federation Configuration:\n");
+            println!("  enabled:              {}", fed.enabled);
+            println!("  network_name:         {}", fed.network_name);
+            println!("  bootstrap_peer_trust: {:.2}", fed.bootstrap_peer_trust);
+            println!("  auto_accept_invites:  {}", fed.auto_accept_invites);
+            println!("  min_invite_trust:     {:.2}", fed.min_invite_trust);
+            println!("  max_federations:      {}", fed.max_federations);
+            println!("  announce_public_addr: {}", fed.announce_public_addr);
+            println!("\nRetry Configuration:");
+            println!("  max_retries:            {}", fed.retry.max_retries);
+            println!("  initial_delay_secs:     {}", fed.retry.initial_delay_secs);
+            println!("  max_delay_secs:         {}", fed.retry.max_delay_secs);
+            println!("  reconnect_interval_secs:{}", fed.retry.reconnect_interval_secs);
+
+            println!("\nBootstrap Peers: {}", config.network.bootstrap_peers.len());
+            for peer in &config.network.bootstrap_peers {
+                println!("  • {peer}");
+            }
+        }
+
+        FederationCommands::Set { key, value } => {
+            // Load existing config
+            let mut config = if config_path.exists() {
+                Config::from_file(&config_path)?
+            } else {
+                Config::default()
+            };
+
+            // Clone value for display after potential move
+            let display_value = value.clone();
+
+            match key.as_str() {
+                "enabled" => {
+                    config.federation.enabled = value.parse()
+                        .context("Invalid value for 'enabled'. Use 'true' or 'false'.")?;
+                }
+                "network_name" => {
+                    config.federation.network_name = value;
+                }
+                "bootstrap_peer_trust" => {
+                    let trust: f64 = value.parse()
+                        .context("Invalid value for 'bootstrap_peer_trust'. Use a number between 0.0 and 1.0.")?;
+                    if !(0.0..=1.0).contains(&trust) {
+                        bail!("Trust score must be between 0.0 and 1.0");
+                    }
+                    config.federation.bootstrap_peer_trust = trust;
+                }
+                "auto_accept_invites" => {
+                    config.federation.auto_accept_invites = value.parse()
+                        .context("Invalid value for 'auto_accept_invites'. Use 'true' or 'false'.")?;
+                }
+                "min_invite_trust" => {
+                    let trust: f64 = value.parse()
+                        .context("Invalid value for 'min_invite_trust'. Use a number between 0.0 and 1.0.")?;
+                    if !(0.0..=1.0).contains(&trust) {
+                        bail!("Trust score must be between 0.0 and 1.0");
+                    }
+                    config.federation.min_invite_trust = trust;
+                }
+                "max_federations" => {
+                    config.federation.max_federations = value.parse()
+                        .context("Invalid value for 'max_federations'. Use a positive integer.")?;
+                }
+                "announce_public_addr" => {
+                    config.federation.announce_public_addr = value.parse()
+                        .context("Invalid value for 'announce_public_addr'. Use 'true' or 'false'.")?;
+                }
+                _ => {
+                    bail!("Unknown configuration key: {key}\n\nValid keys:\n  enabled, network_name, bootstrap_peer_trust, auto_accept_invites,\n  min_invite_trust, max_federations, announce_public_addr");
+                }
+            }
+
+            config.to_file(&config_path)?;
+            println!("✓ Set federation.{key} = {display_value}");
+        }
+
+        FederationCommands::Invite => {
+            // Generate invite URL for this node
+            let keystore_path = data_dir.join("identity.age");
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            // Get DID from keystore
+            let passphrase = read_passphrase("Enter keystore passphrase: ")?;
+            let mut keystore = AgeKeyStore::new(&keystore_path);
+            keystore.unlock(&passphrase)?;
+            let did = keystore.get_keypair()?.did().to_string();
+
+            // Try to get our listen address from daemon
+            let rpc_addr: std::net::SocketAddr = endpoint.parse()?;
+            let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+            match client.get_status().await {
+                Ok(status) => {
+                    let invite_url = format!("icn://{}@{}", did, status.listen_addr);
+                    println!("Federation Invite URL:\n");
+                    println!("  {invite_url}");
+                    println!("\nShare this URL with peers who want to connect to your node.");
+                    println!("They can add it with: icnctl federation add '{invite_url}'");
+                }
+                Err(_) => {
+                    println!("Your DID: {did}\n");
+                    println!("Start icnd to generate a complete invite URL with your network address.");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Extract DID from a peer URL (icn://DID@IP:PORT)
+fn extract_did_from_peer_url(url: &str) -> Option<String> {
+    let url = url.strip_prefix("icn://")?;
+    let parts: Vec<&str> = url.split('@').collect();
+    if parts.len() == 2 {
+        Some(parts[0].to_string())
+    } else {
+        None
+    }
+}
+
+/// Parse peer URL into (DID, address)
+fn parse_peer_url(url: &str) -> Result<(String, String)> {
+    let url = url.strip_prefix("icn://")
+        .context("URL must start with 'icn://'")?;
+
+    let parts: Vec<&str> = url.split('@').collect();
+    if parts.len() != 2 {
+        bail!("Invalid peer URL format. Expected: icn://did:icn:PUBKEY@IP:PORT");
+    }
+
+    Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
 #[tokio::main]

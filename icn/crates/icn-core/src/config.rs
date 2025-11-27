@@ -26,6 +26,10 @@ pub struct Config {
     /// Gateway API configuration
     #[serde(default)]
     pub gateway: GatewayConfig,
+
+    /// Federation configuration for cross-network connectivity
+    #[serde(default)]
+    pub federation: FederationConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,6 +202,125 @@ pub struct GatewayConfig {
     pub jwt_secret: String,
 }
 
+/// Federation configuration for cross-network connectivity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationConfig {
+    /// Enable federation features
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Federation network name (used for network identification)
+    /// Nodes with the same network name will preferentially connect
+    #[serde(default = "default_network_name")]
+    pub network_name: String,
+
+    /// Initial trust score to assign to bootstrap peers
+    /// Range: 0.0 to 1.0 (default: 0.3 = trusted enough to relay gossip)
+    #[serde(default = "default_bootstrap_trust")]
+    pub bootstrap_peer_trust: f64,
+
+    /// Automatically accept federation invites from trusted peers
+    /// If false, requires manual approval via CLI
+    #[serde(default)]
+    pub auto_accept_invites: bool,
+
+    /// Minimum trust score required to accept federation invite
+    /// Only used when auto_accept_invites is true
+    #[serde(default = "default_min_invite_trust")]
+    pub min_invite_trust: f64,
+
+    /// Maximum number of federated networks to join
+    #[serde(default = "default_max_federations")]
+    pub max_federations: usize,
+
+    /// Connection retry settings
+    #[serde(default)]
+    pub retry: FederationRetryConfig,
+
+    /// Announce this node's public address to federation peers
+    /// Set to false if behind NAT without proper port forwarding
+    #[serde(default = "default_true")]
+    pub announce_public_addr: bool,
+}
+
+/// Retry settings for federation connections
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationRetryConfig {
+    /// Maximum number of connection retry attempts
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    /// Initial retry delay in seconds
+    #[serde(default = "default_initial_delay_secs")]
+    pub initial_delay_secs: u64,
+
+    /// Maximum retry delay in seconds (exponential backoff caps here)
+    #[serde(default = "default_max_delay_secs")]
+    pub max_delay_secs: u64,
+
+    /// Reconnect interval for established peers that disconnect (seconds)
+    #[serde(default = "default_reconnect_interval_secs")]
+    pub reconnect_interval_secs: u64,
+}
+
+fn default_network_name() -> String {
+    "icn-mainnet".to_string()
+}
+
+fn default_bootstrap_trust() -> f64 {
+    0.3
+}
+
+fn default_min_invite_trust() -> f64 {
+    0.5
+}
+
+fn default_max_federations() -> usize {
+    10
+}
+
+fn default_max_retries() -> u32 {
+    5
+}
+
+fn default_initial_delay_secs() -> u64 {
+    1
+}
+
+fn default_max_delay_secs() -> u64 {
+    60
+}
+
+fn default_reconnect_interval_secs() -> u64 {
+    30
+}
+
+impl Default for FederationConfig {
+    fn default() -> Self {
+        FederationConfig {
+            enabled: false,
+            network_name: default_network_name(),
+            bootstrap_peer_trust: default_bootstrap_trust(),
+            auto_accept_invites: false,
+            min_invite_trust: default_min_invite_trust(),
+            max_federations: default_max_federations(),
+            retry: FederationRetryConfig::default(),
+            announce_public_addr: true,
+        }
+    }
+}
+
+impl Default for FederationRetryConfig {
+    fn default() -> Self {
+        FederationRetryConfig {
+            max_retries: default_max_retries(),
+            initial_delay_secs: default_initial_delay_secs(),
+            max_delay_secs: default_max_delay_secs(),
+            reconnect_interval_secs: default_reconnect_interval_secs(),
+        }
+    }
+}
+
 fn default_gateway_bind_addr() -> String {
     "127.0.0.1:8080".to_string()
 }
@@ -246,6 +369,7 @@ impl Default for Config {
             rate_limiting: RateLimitingConfig::default(),
             topology: TopologyConfig::default(),
             gateway: GatewayConfig::default(),
+            federation: FederationConfig::default(),
         }
     }
 }
@@ -505,5 +629,118 @@ jwt_secret = "test-secret"
         let deserialized: Config = toml::from_str(&toml_str).unwrap();
         assert!(!deserialized.gateway.enabled);
         assert_eq!(deserialized.gateway.bind_addr, "127.0.0.1:8080");
+    }
+
+    #[test]
+    fn test_federation_config_defaults() {
+        let config = FederationConfig::default();
+
+        assert!(!config.enabled); // Disabled by default
+        assert_eq!(config.network_name, "icn-mainnet");
+        assert!((config.bootstrap_peer_trust - 0.3).abs() < f64::EPSILON);
+        assert!(!config.auto_accept_invites);
+        assert!((config.min_invite_trust - 0.5).abs() < f64::EPSILON);
+        assert_eq!(config.max_federations, 10);
+        assert!(config.announce_public_addr);
+
+        // Retry defaults
+        assert_eq!(config.retry.max_retries, 5);
+        assert_eq!(config.retry.initial_delay_secs, 1);
+        assert_eq!(config.retry.max_delay_secs, 60);
+        assert_eq!(config.retry.reconnect_interval_secs, 30);
+    }
+
+    #[test]
+    fn test_federation_config_serialization() {
+        let toml_str = r#"
+enabled = true
+network_name = "my-coop-network"
+bootstrap_peer_trust = 0.5
+auto_accept_invites = true
+min_invite_trust = 0.7
+max_federations = 5
+announce_public_addr = false
+
+[retry]
+max_retries = 10
+initial_delay_secs = 2
+max_delay_secs = 120
+reconnect_interval_secs = 60
+"#;
+
+        let config: FederationConfig = toml::from_str(toml_str).unwrap();
+
+        assert!(config.enabled);
+        assert_eq!(config.network_name, "my-coop-network");
+        assert!((config.bootstrap_peer_trust - 0.5).abs() < f64::EPSILON);
+        assert!(config.auto_accept_invites);
+        assert!((config.min_invite_trust - 0.7).abs() < f64::EPSILON);
+        assert_eq!(config.max_federations, 5);
+        assert!(!config.announce_public_addr);
+
+        // Retry settings
+        assert_eq!(config.retry.max_retries, 10);
+        assert_eq!(config.retry.initial_delay_secs, 2);
+        assert_eq!(config.retry.max_delay_secs, 120);
+        assert_eq!(config.retry.reconnect_interval_secs, 60);
+    }
+
+    #[test]
+    fn test_config_with_federation() {
+        let config = Config::default();
+
+        // Verify federation config is present and has defaults
+        assert!(!config.federation.enabled);
+        assert_eq!(config.federation.network_name, "icn-mainnet");
+
+        // Serialize to TOML
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        assert!(toml_str.contains("[federation]"));
+        assert!(toml_str.contains("[federation.retry]"));
+
+        // Deserialize back
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+        assert!(!deserialized.federation.enabled);
+        assert_eq!(deserialized.federation.network_name, "icn-mainnet");
+    }
+
+    #[test]
+    fn test_partial_federation_config() {
+        // Test that we can override individual federation settings
+        let toml_str = r#"
+data_dir = "/tmp/icn"
+
+[network]
+mdns_enabled = true
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
+bootstrap_peers = ["icn://did:icn:test@192.168.1.100:7777"]
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = "info"
+
+[federation]
+enabled = true
+network_name = "test-network"
+bootstrap_peer_trust = 0.4
+"#;
+
+        let config: Config = toml::from_str(toml_str).unwrap();
+
+        // Custom federation settings
+        assert!(config.federation.enabled);
+        assert_eq!(config.federation.network_name, "test-network");
+        assert!((config.federation.bootstrap_peer_trust - 0.4).abs() < f64::EPSILON);
+
+        // Default federation settings
+        assert!(!config.federation.auto_accept_invites);
+        assert_eq!(config.federation.max_federations, 10);
+        assert_eq!(config.federation.retry.max_retries, 5);
+
+        // Verify bootstrap peers in network config
+        assert_eq!(config.network.bootstrap_peers.len(), 1);
+        assert!(config.network.bootstrap_peers[0].contains("did:icn:test"));
     }
 }

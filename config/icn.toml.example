@@ -210,6 +210,114 @@ global = 4
 # or set region = "" and cluster_id = "".
 
 # ============================================================================
+# Federation Configuration (Cross-Network Connectivity)
+# ============================================================================
+# Federation enables nodes from different cooperatives or networks to discover
+# each other and exchange gossip. This is essential for connecting isolated
+# networks into a larger ecosystem.
+
+[federation]
+
+# Enable federation features
+# When enabled, this node will:
+#   - Accept connections from federated networks
+#   - Share gossip with trusted peers from other networks
+#   - Potentially forward messages between networks
+# Default: false
+enabled = false
+
+# Network name for identification
+# Nodes with the same network name will preferentially connect
+# Use unique names for private networks, "icn-mainnet" for public
+# Default: "icn-mainnet"
+network_name = "icn-mainnet"
+
+# Initial trust score assigned to bootstrap peers
+# Range: 0.0 to 1.0
+#   - 0.1-0.3: Minimal trust (can send gossip but limited bandwidth)
+#   - 0.3-0.5: Moderate trust (standard operations)
+#   - 0.5-0.7: High trust (can introduce new peers)
+# Default: 0.3
+bootstrap_peer_trust = 0.3
+
+# Automatically accept federation invites from trusted peers
+# When true, peers with trust >= min_invite_trust can add this node
+# to their network without manual approval
+# Default: false (requires manual approval via CLI)
+auto_accept_invites = false
+
+# Minimum trust score required to accept automatic invites
+# Only used when auto_accept_invites = true
+# Range: 0.0 to 1.0
+# Default: 0.5
+min_invite_trust = 0.5
+
+# Maximum number of federated networks to join
+# Prevents resource exhaustion from joining too many networks
+# Default: 10
+max_federations = 10
+
+# Announce this node's public address to federation peers
+# Set to false if behind NAT without proper port forwarding
+# When false, this node can initiate connections but not receive them
+# Default: true
+announce_public_addr = true
+
+# Connection retry settings for federation peers
+[federation.retry]
+
+# Maximum number of connection retry attempts before giving up
+# After max_retries failures, the peer is marked as unreachable
+# Default: 5
+max_retries = 5
+
+# Initial retry delay in seconds (exponential backoff)
+# Delay doubles with each retry: 1s, 2s, 4s, 8s, ...
+# Default: 1
+initial_delay_secs = 1
+
+# Maximum retry delay in seconds
+# Exponential backoff caps at this value
+# Default: 60
+max_delay_secs = 60
+
+# Reconnect interval for established peers that disconnect
+# After a peer disconnects, wait this long before reconnecting
+# Default: 30
+reconnect_interval_secs = 30
+
+# ============================================================================
+# Federation Configuration Examples
+# ============================================================================
+#
+# Example 1: Private cooperative network (no external federation)
+# [federation]
+# enabled = false
+#
+# Example 2: Public network node accepting federation
+# [federation]
+# enabled = true
+# network_name = "icn-mainnet"
+# bootstrap_peer_trust = 0.3
+# auto_accept_invites = true
+# min_invite_trust = 0.6
+#
+# Example 3: Node behind NAT (outbound-only connections)
+# [federation]
+# enabled = true
+# announce_public_addr = false
+#
+# Example 4: High-availability federation node
+# [federation]
+# enabled = true
+# max_federations = 20
+# [federation.retry]
+# max_retries = 10
+# initial_delay_secs = 1
+# max_delay_secs = 120
+# reconnect_interval_secs = 15
+
+# ============================================================================
 # PLANNED FEATURES (Not Yet Implemented)
 # ============================================================================
 # The following sections are shown for completeness but are not yet supported.
