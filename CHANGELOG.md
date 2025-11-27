@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Federation & Cross-Network Discovery (2025-11-27)
+
+**Federation Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):
+- Added `FederationConfig` struct with comprehensive settings
+- Network name, bootstrap peer trust, auto-accept invites, retry settings
+- Added `FederationRetryConfig` for connection retry with exponential backoff
+- Configuration example in [config/icn.toml.example](config/icn.toml.example)
+
+**Federation CLI** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `icnctl federation status` - Show federation status
+- `icnctl federation peers` - List federated peers
+- `icnctl federation add/remove` - Manage federation peers
+- `icnctl federation connect` - Connect to specific peer
+- `icnctl federation config/set` - View/modify configuration
+- `icnctl federation invite` - Generate invite URL
+
+**Peer Exchange Protocol** ([crates/icn-net/src/protocol.rs](icn/crates/icn-net/src/protocol.rs)):
+- `PeerExchangeMessage::Request` - Query known peers from a node
+- `PeerExchangeMessage::Response` - Return list of known peers
+- `PeerExchangeMessage::Announce` - Broadcast new peer availability
+- `PeerExchangeMessage::Unannounce` - Broadcast peer departure
+- `KnownPeer` struct with DID, addresses, trust, network info
+
+**NetworkHandle API** ([crates/icn-net/src/actor.rs](icn/crates/icn-net/src/actor.rs)):
+- `request_peer_exchange()` - Request peers from bootstrap/federation nodes
+- `announce_peer()` - Broadcast new peer to connected nodes
+- `unannounce_peer()` - Broadcast peer departure
+
+**Supervisor Integration** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- Auto-dial peers from PeerExchange Response when federation enabled
+- Auto-dial peers from PeerExchange Announce when federation enabled
+- Request peer exchange from bootstrap peers after connecting
+
+**Prometheus Metrics** ([crates/icn-obs/src/metrics.rs](icn/crates/icn-obs/src/metrics.rs)):
+- `icn_peer_exchange_requests_{sent,received}_total`
+- `icn_peer_exchange_responses_{sent,received}_total`
+- `icn_peer_exchange_announces_{sent,received}_total`
+- `icn_peer_exchange_unannounces_{sent,received}_total`
+- `icn_peer_exchange_peers_discovered_total`
+- `icn_peer_exchange_peers_dialed_total`
+- `icn_peer_exchange_dial_failures_total`
+
+### Fixed - Storage Quota Validation (2025-11-27)
+
+**QuotaManager** ([crates/icn-store/src/quotas.rs](icn/crates/icn-store/src/quotas.rs)):
+- Auto-create default quotas for DIDs without explicit quota
+- Validate both global and per-DID limits in `record_usage()`
+- Allow storage up to global limit when no per-DID quota configured
+
 ### Added - Byzantine Fault Detection Integration (Phase 18 Week 1-2) (2025-11-26)
 
 **NetworkActor & GossipActor Integration**
