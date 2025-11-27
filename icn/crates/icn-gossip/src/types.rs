@@ -210,6 +210,29 @@ pub enum GossipMessage {
         /// Known replicas and their health
         replicas: Vec<(Did, ReplicaHealth)>,
     },
+
+    /// Request partition healing with peer (Phase 18 Week 3)
+    /// Sent when a node detects it's reconnecting after a partition
+    PartitionHealRequest {
+        /// Requesting peer's DID
+        requesting_peer: Did,
+        /// Requesting peer's current vector clock
+        vector_clock: VectorClock,
+        /// Time of last known contact (Unix timestamp ms)
+        last_contact_ms: u64,
+    },
+
+    /// Response to partition heal request (Phase 18 Week 3)
+    PartitionHealResponse {
+        /// Responding peer's DID
+        responding_peer: Did,
+        /// Responding peer's current vector clock
+        vector_clock: VectorClock,
+        /// Topics that may have conflicts
+        diverged_topics: Vec<String>,
+        /// Number of entries that need sync
+        entries_behind: u64,
+    },
 }
 
 impl GossipMessage {
@@ -229,6 +252,8 @@ impl GossipMessage {
             GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
             GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
             GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
+            GossipMessage::PartitionHealRequest { .. } => "PartitionHealRequest",
+            GossipMessage::PartitionHealResponse { .. } => "PartitionHealResponse",
         }
     }
 }

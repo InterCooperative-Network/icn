@@ -1456,12 +1456,161 @@ impl GossipActor {
 
                 Ok(())
             }
+
+            // Phase 18 Week 3: Partition healing messages
+            GossipMessage::PartitionHealRequest { requesting_peer, vector_clock, last_contact_ms } => {
+                info!(
+                    peer_did = %requesting_peer,
+                    last_contact_ms = last_contact_ms,
+                    message_type = "PartitionHealRequest",
+                    "Received partition heal request"
+                );
+                icn_obs::metrics::gossip::partition_detected_inc();
+
+                // Get list of topics that may have diverged
+                // (topics where our vector clock has entries they don't)
+                let mut diverged_topics = Vec::new();
+                let mut entries_behind = 0u64;
+
+                for (topic_name, entries) in &self.entries {
+                    // Count entries they might be missing
+                    for (_, entry) in entries {
+                        // Check if our entry clock is ahead of their clock for any peer
+                        let our_version = entry.clock.get(&entry.author);
+                        let their_version = vector_clock.get(&entry.author);
+                        if our_version > their_version {
+                            if !diverged_topics.contains(topic_name) {
+                                diverged_topics.push(topic_name.clone());
+                            }
+                            entries_behind += 1;
+                        }
+                    }
+                }
+
+                info!(
+                    peer = %requesting_peer,
+                    diverged_topics = ?diverged_topics,
+                    entries_behind = entries_behind,
+                    "Preparing partition heal response"
+                );
+
+                // Send our vector clock back
+                self.send_message(
+                    Some(requesting_peer.clone()),
+                    GossipMessage::PartitionHealResponse {
+                        responding_peer: self.own_did.clone(),
+                        vector_clock: self.clock.clone(),
+                        diverged_topics,
+                        entries_behind,
+                    },
+                );
+
+                icn_obs::metrics::gossip::partition_vector_clock_merges_inc();
+                Ok(())
+            }
+
+            GossipMessage::PartitionHealResponse { responding_peer, vector_clock, diverged_topics, entries_behind } => {
+                info!(
+                    peer_did = %responding_peer,
+                    diverged_topics_count = diverged_topics.len(),
+                    entries_behind = entries_behind,
+                    message_type = "PartitionHealResponse",
+                    "Received partition heal response"
+                );
+
+                // Merge their vector clock with ours (sync operation)
+                self.clock.merge(&vector_clock);
+                icn_obs::metrics::gossip::partition_vector_clock_merges_inc();
+
+                info!(
+                    peer = %responding_peer,
+                    "Vector clocks merged during partition healing"
+                );
+                icn_obs::metrics::gossip::partition_healed_inc();
+
+                // Update partition detector to clear partitioned status
+                if let Some(ref detector) = self.partition_detector {
+                    if let Ok(mut d) = detector.try_write() {
+                        d.record_contact(&responding_peer);
+                    }
+                }
+
+                // Request entries from diverged topics
+                if entries_behind > 0 && !diverged_topics.is_empty() {
+                    info!(
+                        peer = %responding_peer,
+                        diverged_topics = ?diverged_topics,
+                        entries_behind = entries_behind,
+                        "Requesting missing entries from diverged topics"
+                    );
+
+                    // For each diverged topic, send a PullRequest
+                    for topic in diverged_topics {
+                        if self.topics.contains_key(&topic) {
+                            // Request all entries (empty want_ids means "send everything")
+                            let nonce = self.peer_sync.get_or_create(responding_peer.clone()).next_nonce();
+                            self.send_message(
+                                Some(responding_peer.clone()),
+                                GossipMessage::PullRequest {
+                                    topic,
+                                    want_ids: vec![],
+                                    max_bytes: 1_000_000, // 1MB max
+                                    nonce,
+                                },
+                            );
+                        }
+                    }
+                }
+
+                Ok(())
+            }
         }
+    }
+
+    /// Initiate partition healing with a peer (Phase 18 Week 3)
+    ///
+    /// Sends a PartitionHealRequest to the specified peer to synchronize
+    /// vector clocks and request missing entries after a partition.
+    pub fn initiate_partition_healing(&mut self, peer: &Did) {
+        info!(
+            peer = %peer,
+            "Initiating partition healing"
+        );
+
+        // Get last contact time (if tracked)
+        let last_contact_ms = if let Some(ref detector) = self.partition_detector {
+            if let Ok(d) = detector.try_read() {
+                d.time_since_contact(peer)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0)
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        // Send heal request with our current vector clock
+        self.send_message(
+            Some(peer.clone()),
+            GossipMessage::PartitionHealRequest {
+                requesting_peer: self.own_did.clone(),
+                vector_clock: self.clock.clone(),
+                last_contact_ms,
+            },
+        );
+
+        icn_obs::metrics::gossip::partition_detected_inc();
     }
 
     /// Get all topic names
     pub fn get_topics(&self) -> Vec<String> {
         self.topics.keys().cloned().collect()
+    }
+
+    /// Get a reference to this node's vector clock
+    pub fn get_clock(&self) -> &VectorClock {
+        &self.clock
     }
 
     /// Perform anti-entropy for a specific topic
