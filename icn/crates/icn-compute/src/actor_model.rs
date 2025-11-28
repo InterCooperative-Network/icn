@@ -102,31 +102,23 @@ impl ActorCheckpoint {
         use ed25519_dalek::Verifier;
 
         // Extract public key from executor DID
-        let verifying_key = executor_did
-            .to_verifying_key()
-            .map_err(|e| {
-                crate::error::ComputeError::InvalidSignature(format!(
-                    "Cannot extract public key from DID: {e}"
-                ))
-            })?;
+        let verifying_key = executor_did.to_verifying_key().map_err(|e| {
+            crate::error::ComputeError::InvalidSignature(format!(
+                "Cannot extract public key from DID: {e}"
+            ))
+        })?;
 
-        let signature = ed25519_dalek::Signature::from_bytes(
-            self.signature
-                .as_slice()
-                .try_into()
-                .map_err(|_| {
-                    crate::error::ComputeError::InvalidSignature("Invalid signature length".into())
-                })?,
-        );
+        let signature =
+            ed25519_dalek::Signature::from_bytes(self.signature.as_slice().try_into().map_err(
+                |_| crate::error::ComputeError::InvalidSignature("Invalid signature length".into()),
+            )?);
 
         let payload = self.signing_payload();
-        verifying_key
-            .verify(&payload, &signature)
-            .map_err(|e| {
-                crate::error::ComputeError::InvalidSignature(format!(
-                    "Signature verification failed: {e}"
-                ))
-            })?;
+        verifying_key.verify(&payload, &signature).map_err(|e| {
+            crate::error::ComputeError::InvalidSignature(format!(
+                "Signature verification failed: {e}"
+            ))
+        })?;
 
         Ok(())
     }
@@ -264,16 +256,10 @@ pub enum MigrationState {
     Idle,
 
     /// Waiting for target executor to accept
-    Requesting {
-        target: String,
-        sent_at: u64,
-    },
+    Requesting { target: String, sent_at: u64 },
 
     /// Target accepted, source creating final checkpoint
-    Checkpointing {
-        target: String,
-        started_at: u64,
-    },
+    Checkpointing { target: String, started_at: u64 },
 
     /// Transferring checkpoint to target
     Transferring {
@@ -283,10 +269,7 @@ pub enum MigrationState {
     },
 
     /// Target loading checkpoint and resuming actor
-    Restoring {
-        target: String,
-        started_at: u64,
-    },
+    Restoring { target: String, started_at: u64 },
 
     /// Migration complete
     Complete {
@@ -295,16 +278,16 @@ pub enum MigrationState {
     },
 
     /// Migration failed (actor remains on source)
-    Failed {
-        reason: String,
-        failed_at: u64,
-    },
+    Failed { reason: String, failed_at: u64 },
 }
 
 impl MigrationState {
     /// Check if migration is in progress
     pub fn is_active(&self) -> bool {
-        !matches!(self, MigrationState::Idle | MigrationState::Complete { .. } | MigrationState::Failed { .. })
+        !matches!(
+            self,
+            MigrationState::Idle | MigrationState::Complete { .. } | MigrationState::Failed { .. }
+        )
     }
 
     /// Get target executor if migration active

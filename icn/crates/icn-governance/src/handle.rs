@@ -4,8 +4,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::{
-    GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, Proposal,
-    ProposalId, ProposalPayload, VoteChoice,
+    GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, Proposal, ProposalId,
+    ProposalPayload, VoteChoice,
 };
 
 /// Trait for governance operations exposed to RPC layer

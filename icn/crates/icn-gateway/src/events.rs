@@ -34,10 +34,7 @@ pub enum GatewayEvent {
         role: String,
     },
     /// A member was removed from a cooperative
-    MemberRemoved {
-        coop_id: String,
-        did: String,
-    },
+    MemberRemoved { coop_id: String, did: String },
     /// A member's role was updated
     RoleUpdated {
         coop_id: String,
@@ -45,9 +42,7 @@ pub enum GatewayEvent {
         new_role: String,
     },
     /// Cooperative settings were updated
-    SettingsUpdated {
-        coop_id: String,
-    },
+    SettingsUpdated { coop_id: String },
     /// A governance domain was created
     GovernanceDomainCreated {
         domain_id: String,
@@ -89,10 +84,7 @@ pub enum GatewayEvent {
         fuel_limit: u64,
     },
     /// A compute task was claimed by an executor
-    ComputeTaskClaimed {
-        task_hash: String,
-        executor: String,
-    },
+    ComputeTaskClaimed { task_hash: String, executor: String },
     /// A compute task completed
     ComputeTaskCompleted {
         task_hash: String,
@@ -122,7 +114,8 @@ pub struct SequencedEvent {
 /// Event broadcaster manages subscribers and sends events
 pub struct EventBroadcaster {
     /// Subscribers per cooperative (coop_id -> list of subscriber channels)
-    subscribers: Arc<RwLock<HashMap<CoopId, Vec<tokio::sync::mpsc::UnboundedSender<SequencedEvent>>>>>,
+    subscribers:
+        Arc<RwLock<HashMap<CoopId, Vec<tokio::sync::mpsc::UnboundedSender<SequencedEvent>>>>>,
     /// Recent events for backfill (coop_id -> ring buffer of recent events)
     backfill_buffer: Arc<RwLock<HashMap<CoopId, VecDeque<SequencedEvent>>>>,
 }
@@ -138,7 +131,10 @@ impl EventBroadcaster {
 
     /// Subscribe to events for a cooperative
     /// Returns None if the subscriber limit has been reached for this cooperative
-    pub async fn subscribe(&self, coop_id: &str) -> Option<tokio::sync::mpsc::UnboundedReceiver<SequencedEvent>> {
+    pub async fn subscribe(
+        &self,
+        coop_id: &str,
+    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<SequencedEvent>> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         let mut subscribers = self.subscribers.write().await;
@@ -184,7 +180,9 @@ impl EventBroadcaster {
         // Store in backfill buffer
         {
             let mut buffer = self.backfill_buffer.write().await;
-            let events = buffer.entry(coop_id.to_string()).or_insert_with(VecDeque::new);
+            let events = buffer
+                .entry(coop_id.to_string())
+                .or_insert_with(VecDeque::new);
             events.push_back(sequenced.clone());
             // Trim to max size
             while events.len() > MAX_BACKFILL_EVENTS {
@@ -253,7 +251,10 @@ mod tests {
     async fn test_subscribe_and_broadcast() {
         let broadcaster = EventBroadcaster::new();
 
-        let mut rx = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
+        let mut rx = broadcaster
+            .subscribe("test-coop")
+            .await
+            .expect("Should subscribe successfully");
 
         let event = GatewayEvent::PaymentCreated {
             coop_id: "test-coop".to_string(),
@@ -272,7 +273,9 @@ mod tests {
         let sequenced = received.unwrap();
         assert!(sequenced.seq > 0);
         match sequenced.event {
-            GatewayEvent::PaymentCreated { coop_id, amount, .. } => {
+            GatewayEvent::PaymentCreated {
+                coop_id, amount, ..
+            } => {
                 assert_eq!(coop_id, "test-coop");
                 assert_eq!(amount, 10);
             }
@@ -311,8 +314,14 @@ mod tests {
     async fn test_multiple_subscribers() {
         let broadcaster = EventBroadcaster::new();
 
-        let mut rx1 = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
-        let mut rx2 = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
+        let mut rx1 = broadcaster
+            .subscribe("test-coop")
+            .await
+            .expect("Should subscribe successfully");
+        let mut rx2 = broadcaster
+            .subscribe("test-coop")
+            .await
+            .expect("Should subscribe successfully");
 
         let event = GatewayEvent::MemberAdded {
             coop_id: "test-coop".to_string(),
@@ -330,7 +339,10 @@ mod tests {
     async fn test_cleanup_closed_channels() {
         let broadcaster = EventBroadcaster::new();
 
-        let rx = broadcaster.subscribe("test-coop").await.expect("Should subscribe successfully");
+        let rx = broadcaster
+            .subscribe("test-coop")
+            .await
+            .expect("Should subscribe successfully");
         drop(rx); // Close the channel
 
         broadcaster.cleanup("test-coop").await;

@@ -33,6 +33,5 @@ pub mod sync;
 
 pub use error::{Result, TimeError};
 pub use sync::{
-    start_clock_sync_task, ClockSync, RoughTimeServer, MAX_CLOCK_SKEW, MIN_SERVERS,
-    QUERY_TIMEOUT,
+    start_clock_sync_task, ClockSync, RoughTimeServer, MAX_CLOCK_SKEW, MIN_SERVERS, QUERY_TIMEOUT,
 };

@@ -351,10 +351,7 @@ mod tests {
 
         // Can cancel from Draft
         proposal.cancel().unwrap();
-        assert!(matches!(
-            proposal.state,
-            ProposalState::Cancelled { .. }
-        ));
+        assert!(matches!(proposal.state, ProposalState::Cancelled { .. }));
 
         // Cannot cancel after closed
         assert!(proposal.cancel().is_err());

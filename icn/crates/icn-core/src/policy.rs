@@ -187,9 +187,7 @@ impl DefaultPolicySource {
 impl PolicySource for DefaultPolicySource {
     async fn policy_for(&self, did: &Did) -> TrustPolicy {
         let trust_graph = self.trust_graph.read().await;
-        let class = trust_graph
-            .trust_class(did)
-            .unwrap_or(TrustClass::Isolated);
+        let class = trust_graph.trust_class(did).unwrap_or(TrustClass::Isolated);
 
         TrustPolicy::for_trust_class(class)
     }

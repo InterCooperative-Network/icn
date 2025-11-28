@@ -108,7 +108,9 @@ impl SignedEnvelope {
     pub fn verify(&self, max_age_secs: u64) -> Result<()> {
         // 1. Verify signature
         let sig_input = self.canonical_encoding();
-        let verifying_key = self.from.to_verifying_key()
+        let verifying_key = self
+            .from
+            .to_verifying_key()
             .context("Failed to extract verifying key from DID")?;
 
         let signature = ed25519_dalek::Signature::from_slice(&self.signature)
@@ -134,7 +136,11 @@ impl SignedEnvelope {
 
         // Also check for messages from the future (clock skew)
         if self.timestamp > now + max_age_ms {
-            anyhow::bail!("Message from future: timestamp {} > now {}", self.timestamp, now);
+            anyhow::bail!(
+                "Message from future: timestamp {} > now {}",
+                self.timestamp,
+                now
+            );
         }
 
         Ok(())
@@ -154,8 +160,7 @@ impl SignedEnvelope {
 
     /// Deserialize payload as the specified type
     pub fn decode_payload<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
-        bincode::deserialize(&self.payload)
-            .context("Failed to deserialize payload")
+        bincode::deserialize(&self.payload).context("Failed to deserialize payload")
     }
 
     /// Serialize and create envelope for a typed payload
@@ -166,8 +171,7 @@ impl SignedEnvelope {
         payload_type: PayloadType,
         payload: &T,
     ) -> Result<Self> {
-        let payload_bytes = bincode::serialize(payload)
-            .context("Failed to serialize payload")?;
+        let payload_bytes = bincode::serialize(payload).context("Failed to serialize payload")?;
         Self::new(from, keypair, sequence, payload_type, payload_bytes)
     }
 }
@@ -317,14 +321,9 @@ mod tests {
             text: "hello".to_string(),
         };
 
-        let envelope = SignedEnvelope::from_payload(
-            keypair.did(),
-            &keypair,
-            1,
-            PayloadType::Gossip,
-            &msg,
-        )
-        .unwrap();
+        let envelope =
+            SignedEnvelope::from_payload(keypair.did(), &keypair, 1, PayloadType::Gossip, &msg)
+                .unwrap();
 
         // Should verify and decode
         assert!(envelope.verify(300).is_ok());

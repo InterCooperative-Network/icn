@@ -110,9 +110,7 @@ impl ForkResolver {
     pub fn resolve_fork(&self, fork: &Fork) -> Result<ForkResolution> {
         info!(
             "Resolving fork with strategy {:?}: {} vs {}",
-            self.strategy,
-            fork.entry1.author,
-            fork.entry2.author
+            self.strategy, fork.entry1.author, fork.entry2.author
         );
 
         match self.strategy {
@@ -227,10 +225,7 @@ impl ForkResolver {
         let score1 = self.calculate_hybrid_score(entry1)?;
         let score2 = self.calculate_hybrid_score(entry2)?;
 
-        debug!(
-            "Hybrid scores: entry1={:.2}, entry2={:.2}",
-            score1, score2
-        );
+        debug!("Hybrid scores: entry1={:.2}, entry2={:.2}", score1, score2);
 
         if score1 > score2 {
             Ok(ForkResolution::KeepFirst)
@@ -361,11 +356,7 @@ mod tests {
         KeyPair::generate().unwrap().did().clone()
     }
 
-    fn make_test_entry(
-        author: Did,
-        parents: Vec<ContentHash>,
-        timestamp: u64,
-    ) -> JournalEntry {
+    fn make_test_entry(author: Did, parents: Vec<ContentHash>, timestamp: u64) -> JournalEntry {
         // Create unique ID based on timestamp + author (simple hash)
         let mut id = [0u8; 32];
         id[0..8].copy_from_slice(&timestamp.to_le_bytes());

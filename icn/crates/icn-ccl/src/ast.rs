@@ -24,8 +24,17 @@ const MAX_RULES: usize = 50;
 
 /// Reserved keywords that cannot be used as variable names
 const RESERVED_KEYWORDS: &[&str] = &[
-    "if", "else", "for", "return", "true", "false", "none",
-    "ledger_transfer", "set_credit_limit", "caller", "self",
+    "if",
+    "else",
+    "for",
+    "return",
+    "true",
+    "false",
+    "none",
+    "ledger_transfer",
+    "set_credit_limit",
+    "caller",
+    "self",
 ];
 
 /// A complete contract definition
@@ -274,7 +283,11 @@ impl Contract {
             bail!("Contract name cannot be empty");
         }
         if self.name.len() > MAX_NAME_LENGTH {
-            bail!("Contract name too long: {} chars (max {})", self.name.len(), MAX_NAME_LENGTH);
+            bail!(
+                "Contract name too long: {} chars (max {})",
+                self.name.len(),
+                MAX_NAME_LENGTH
+            );
         }
         if RESERVED_KEYWORDS.contains(&self.name.as_str()) {
             bail!("Contract name '{}' is a reserved keyword", self.name);
@@ -319,11 +332,7 @@ impl Contract {
             );
         }
         if self.rules.len() > MAX_RULES {
-            bail!(
-                "Too many rules: {} (max {})",
-                self.rules.len(),
-                MAX_RULES
-            );
+            bail!("Too many rules: {} (max {})", self.rules.len(), MAX_RULES);
         }
 
         // Check for duplicate state variable names
@@ -367,16 +376,32 @@ impl Contract {
                     bail!("Parameter name cannot be empty in rule '{}'", rule.name);
                 }
                 if param.name.len() > MAX_NAME_LENGTH {
-                    bail!("Parameter name '{}' too long in rule '{}'", param.name, rule.name);
+                    bail!(
+                        "Parameter name '{}' too long in rule '{}'",
+                        param.name,
+                        rule.name
+                    );
                 }
                 if RESERVED_KEYWORDS.contains(&param.name.as_str()) {
-                    bail!("Parameter name '{}' is a reserved keyword in rule '{}'", param.name, rule.name);
+                    bail!(
+                        "Parameter name '{}' is a reserved keyword in rule '{}'",
+                        param.name,
+                        rule.name
+                    );
                 }
                 if state_names.contains(&param.name) {
-                    bail!("Parameter '{}' shadows state variable in rule '{}'", param.name, rule.name);
+                    bail!(
+                        "Parameter '{}' shadows state variable in rule '{}'",
+                        param.name,
+                        rule.name
+                    );
                 }
                 if !param_names.insert(&param.name) {
-                    bail!("Duplicate parameter name '{}' in rule '{}'", param.name, rule.name);
+                    bail!(
+                        "Duplicate parameter name '{}' in rule '{}'",
+                        param.name,
+                        rule.name
+                    );
                 }
             }
 
@@ -401,11 +426,19 @@ impl Contract {
             match stmt {
                 Stmt::For { body, .. } => {
                     if current_depth >= MAX_LOOP_DEPTH {
-                        bail!("Loop nesting too deep: {} (max {})", current_depth + 1, MAX_LOOP_DEPTH);
+                        bail!(
+                            "Loop nesting too deep: {} (max {})",
+                            current_depth + 1,
+                            MAX_LOOP_DEPTH
+                        );
                     }
                     Self::validate_stmt_depth(body, current_depth + 1)?;
                 }
-                Stmt::If { then_block, else_block, .. } => {
+                Stmt::If {
+                    then_block,
+                    else_block,
+                    ..
+                } => {
                     Self::validate_stmt_depth(then_block, current_depth)?;
                     if let Some(else_stmts) = else_block {
                         Self::validate_stmt_depth(else_stmts, current_depth)?;
@@ -414,13 +447,22 @@ impl Contract {
                 Stmt::Assign { value, .. } => {
                     Self::validate_expr_depth(value, 0)?;
                 }
-                Stmt::LedgerTransfer { from, to, amount, currency } => {
+                Stmt::LedgerTransfer {
+                    from,
+                    to,
+                    amount,
+                    currency,
+                } => {
                     Self::validate_expr_depth(from, 0)?;
                     Self::validate_expr_depth(to, 0)?;
                     Self::validate_expr_depth(amount, 0)?;
                     Self::validate_expr_depth(currency, 0)?;
                 }
-                Stmt::SetCreditLimit { account, currency, limit } => {
+                Stmt::SetCreditLimit {
+                    account,
+                    currency,
+                    limit,
+                } => {
                     Self::validate_expr_depth(account, 0)?;
                     Self::validate_expr_depth(currency, 0)?;
                     Self::validate_expr_depth(limit, 0)?;
@@ -596,8 +638,7 @@ mod tests {
             };
         }
 
-        let rule = Rule::new("test".to_string())
-            .add_stmt(Stmt::Return { value: expr });
+        let rule = Rule::new("test".to_string()).add_stmt(Stmt::Return { value: expr });
 
         let contract = Contract::new("test".to_string())
             .add_participant(kp.did().clone())
@@ -618,8 +659,7 @@ mod tests {
             expr = Expr::Set(vec![expr]);
         }
 
-        let rule = Rule::new("test".to_string())
-            .add_stmt(Stmt::Return { value: expr });
+        let rule = Rule::new("test".to_string()).add_stmt(Stmt::Return { value: expr });
 
         let contract = Contract::new("test".to_string())
             .add_participant(kp.did().clone())
@@ -640,8 +680,7 @@ mod tests {
             expr = Expr::Map(vec![("key".to_string(), expr)]);
         }
 
-        let rule = Rule::new("test".to_string())
-            .add_stmt(Stmt::Return { value: expr });
+        let rule = Rule::new("test".to_string()).add_stmt(Stmt::Return { value: expr });
 
         let contract = Contract::new("test".to_string())
             .add_participant(kp.did().clone())
@@ -665,8 +704,7 @@ mod tests {
             };
         }
 
-        let rule = Rule::new("test".to_string())
-            .add_stmt(Stmt::Return { value: expr });
+        let rule = Rule::new("test".to_string()).add_stmt(Stmt::Return { value: expr });
 
         let contract = Contract::new("test".to_string())
             .add_participant(kp.did().clone())
@@ -687,8 +725,7 @@ mod tests {
             field: "name".to_string(),
         };
 
-        let rule = Rule::new("test".to_string())
-            .add_stmt(Stmt::Return { value: expr });
+        let rule = Rule::new("test".to_string()).add_stmt(Stmt::Return { value: expr });
 
         let contract = Contract::new("test".to_string())
             .add_participant(kp.did().clone())
@@ -703,7 +740,10 @@ mod tests {
         let contract = Contract::new("test".to_string());
         let result = contract.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("at least one participant"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("at least one participant"));
     }
 
     #[test]
@@ -715,7 +755,10 @@ mod tests {
 
         let result = contract.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Duplicate participant"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate participant"));
     }
 
     #[test]
@@ -730,14 +773,16 @@ mod tests {
 
         let result = contract.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Too many participants"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Too many participants"));
     }
 
     #[test]
     fn test_too_many_state_vars() {
         let kp = KeyPair::generate().unwrap();
-        let mut contract = Contract::new("test".to_string())
-            .add_participant(kp.did().clone());
+        let mut contract = Contract::new("test".to_string()).add_participant(kp.did().clone());
 
         // Add MAX_STATE_VARS + 1 state variables
         for i in 0..=MAX_STATE_VARS {
@@ -746,14 +791,16 @@ mod tests {
 
         let result = contract.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Too many state variables"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Too many state variables"));
     }
 
     #[test]
     fn test_too_many_rules() {
         let kp = KeyPair::generate().unwrap();
-        let mut contract = Contract::new("test".to_string())
-            .add_participant(kp.did().clone());
+        let mut contract = Contract::new("test".to_string()).add_participant(kp.did().clone());
 
         // Add MAX_RULES + 1 rules
         for i in 0..=MAX_RULES {

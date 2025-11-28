@@ -40,8 +40,7 @@
 //! ```
 
 use crate::actor_model::{
-    ActorCheckpoint, ActorId, ActorRuntimeState, MigrationDecision, MigrationReason,
-    MigrationState,
+    ActorCheckpoint, ActorId, ActorRuntimeState, MigrationDecision, MigrationReason, MigrationState,
 };
 use crate::checkpoint_store::CheckpointStore;
 use crate::error::ComputeError;
@@ -53,8 +52,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
 /// Type alias for migration message sender (gossip callback)
-pub type MigrationSender =
-    Arc<dyn Fn(ComputeMessage) -> Result<(), ComputeError> + Send + Sync>;
+pub type MigrationSender = Arc<dyn Fn(ComputeMessage) -> Result<(), ComputeError> + Send + Sync>;
 
 /// Actor migration coordinator.
 ///
@@ -118,12 +116,9 @@ impl ActorMigrationManager {
         drop(migrations);
 
         // Query policy
-        let decision = self.policy.should_migrate(
-            &actor_id,
-            &self.own_did,
-            &actor_state,
-            network_state,
-        )?;
+        let decision =
+            self.policy
+                .should_migrate(&actor_id, &self.own_did, &actor_state, network_state)?;
 
         tracing::info!(
             actor_id = %hex::encode(actor_id),
@@ -242,10 +237,13 @@ impl ActorMigrationManager {
 
             // Update state to Restoring
             let mut migrations = self.migrations.write().await;
-            migrations.insert(actor_id, MigrationState::Restoring {
-                target: self.own_did.clone(),
-                started_at: now_millis(),
-            });
+            migrations.insert(
+                actor_id,
+                MigrationState::Restoring {
+                    target: self.own_did.clone(),
+                    started_at: now_millis(),
+                },
+            );
             drop(migrations);
 
             // Send accept
@@ -292,10 +290,13 @@ impl ActorMigrationManager {
 
         // Update state to Checkpointing
         let mut migrations = self.migrations.write().await;
-        migrations.insert(actor_id, MigrationState::Checkpointing {
-            target: to_executor.clone(),
+        migrations.insert(
+            actor_id,
+            MigrationState::Checkpointing {
+                target: to_executor.clone(),
                 started_at: now_millis(),
-        });
+            },
+        );
         drop(migrations);
 
         // TODO: Pause actor execution here (Week 4 - actor runtime integration)
@@ -319,13 +320,12 @@ impl ActorMigrationManager {
 
         // Calculate duration
         let migrations = self.migrations.read().await;
-        let duration_ms = if let Some(MigrationState::Requesting { sent_at, .. }) =
-            migrations.get(&actor_id)
-        {
-            now_millis().saturating_sub(*sent_at)
-        } else {
-            0
-        };
+        let duration_ms =
+            if let Some(MigrationState::Requesting { sent_at, .. }) = migrations.get(&actor_id) {
+                now_millis().saturating_sub(*sent_at)
+            } else {
+                0
+            };
         drop(migrations);
 
         // Send completion
@@ -405,10 +405,13 @@ impl ActorMigrationManager {
 
         // Update state to Complete
         let mut migrations = self.migrations.write().await;
-        migrations.insert(actor_id, MigrationState::Complete {
-            new_executor: self.own_did.clone(),
-            completed_at: now_millis(),
-        });
+        migrations.insert(
+            actor_id,
+            MigrationState::Complete {
+                new_executor: self.own_did.clone(),
+                completed_at: now_millis(),
+            },
+        );
         drop(migrations);
 
         // TODO: Resume actor execution with checkpoint state (Week 4)
@@ -435,9 +438,7 @@ impl ActorMigrationManager {
             MigrationState::Complete { completed_at, .. } => {
                 now.saturating_sub(*completed_at) < max_age_ms
             }
-            MigrationState::Failed { failed_at, .. } => {
-                now.saturating_sub(*failed_at) < max_age_ms
-            }
+            MigrationState::Failed { failed_at, .. } => now.saturating_sub(*failed_at) < max_age_ms,
             _ => true, // Keep active migrations
         });
 
@@ -585,12 +586,8 @@ mod tests {
             Ok(())
         });
 
-        let manager = ActorMigrationManager::new(
-            policy,
-            checkpoints,
-            send_message,
-            own_did.to_string(),
-        );
+        let manager =
+            ActorMigrationManager::new(policy, checkpoints, send_message, own_did.to_string());
 
         (manager, sent_messages)
     }
@@ -665,7 +662,10 @@ mod tests {
             benefit_score: 5.0,
         };
 
-        manager.initiate_migration(decision, &signing_key).await.unwrap();
+        manager
+            .initiate_migration(decision, &signing_key)
+            .await
+            .unwrap();
 
         // Check state
         let state = manager.get_state(&[2u8; 32]).await;
@@ -674,7 +674,10 @@ mod tests {
         // Check message sent
         let messages = sent_messages.lock().unwrap();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], ComputeMessage::MigrationRequest { .. }));
+        assert!(matches!(
+            &messages[0],
+            ComputeMessage::MigrationRequest { .. }
+        ));
     }
 
     #[tokio::test]
@@ -715,7 +718,10 @@ mod tests {
         // Check accept message sent
         let messages = sent_messages.lock().unwrap();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], ComputeMessage::MigrationAccept { .. }));
+        assert!(matches!(
+            &messages[0],
+            ComputeMessage::MigrationAccept { .. }
+        ));
     }
 
     #[tokio::test]
@@ -751,7 +757,10 @@ mod tests {
         // Check reject message sent
         let messages = sent_messages.lock().unwrap();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], ComputeMessage::MigrationReject { .. }));
+        assert!(matches!(
+            &messages[0],
+            ComputeMessage::MigrationReject { .. }
+        ));
     }
 
     #[tokio::test]

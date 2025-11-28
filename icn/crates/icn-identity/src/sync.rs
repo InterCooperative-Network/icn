@@ -427,9 +427,6 @@ mod tests {
         // Check that document was updated
         let updated_doc = cache.get(&did).unwrap();
         assert_eq!(updated_doc.version, 2);
-        assert_eq!(
-            updated_doc.verification_method.len(),
-            3
-        ); // device-1 Ed25519, enc-1 X25519, device-2 Ed25519
+        assert_eq!(updated_doc.verification_method.len(), 3); // device-1 Ed25519, enc-1 X25519, device-2 Ed25519
     }
 }

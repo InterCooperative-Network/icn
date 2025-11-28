@@ -208,8 +208,8 @@ impl Store for SledStore {
     fn get_replica_metadata(&self, content_hash: &ContentHash) -> Result<Option<ReplicaMetadata>> {
         let key = Self::replica_key(content_hash);
         if let Some(value) = self.db.get(&key)? {
-            let metadata: ReplicaMetadata = serde_json::from_slice(&value)
-                .context("Failed to deserialize replica metadata")?;
+            let metadata: ReplicaMetadata =
+                serde_json::from_slice(&value).context("Failed to deserialize replica metadata")?;
             Ok(Some(metadata))
         } else {
             Ok(None)
@@ -218,8 +218,7 @@ impl Store for SledStore {
 
     fn put_replica_metadata(&self, metadata: &ReplicaMetadata) -> Result<()> {
         let key = Self::replica_key(&metadata.content_hash);
-        let value = serde_json::to_vec(metadata)
-            .context("Failed to serialize replica metadata")?;
+        let value = serde_json::to_vec(metadata).context("Failed to serialize replica metadata")?;
         self.db.insert(&key, value)?;
         Ok(())
     }
@@ -335,8 +334,12 @@ mod tests {
 
         assert_eq!(metadata.healthy_count(), 2);
         assert_eq!(metadata.healthy_replicas().len(), 2);
-        assert!(metadata.healthy_replicas().contains(&"did:icn:peer1".to_string()));
-        assert!(metadata.healthy_replicas().contains(&"did:icn:peer3".to_string()));
+        assert!(metadata
+            .healthy_replicas()
+            .contains(&"did:icn:peer1".to_string()));
+        assert!(metadata
+            .healthy_replicas()
+            .contains(&"did:icn:peer3".to_string()));
     }
 
     #[test]
@@ -398,7 +401,11 @@ mod tests {
         assert_eq!(metadata.replicas.len(), 2);
 
         // Update first replica health
-        store.add_replica(&hash, "did:icn:peer1".to_string(), ReplicaHealth::Unreachable)?;
+        store.add_replica(
+            &hash,
+            "did:icn:peer1".to_string(),
+            ReplicaHealth::Unreachable,
+        )?;
         let metadata = store.get_replica_metadata(&hash)?.unwrap();
         assert_eq!(metadata.replicas.len(), 2); // Still 2, not 3
         assert_eq!(metadata.replicas[0].health, ReplicaHealth::Unreachable);

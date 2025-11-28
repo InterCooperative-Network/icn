@@ -256,7 +256,10 @@ pub async fn handle_trust_attestation_entry(
 
     // Check rate limits (if rate limiter provided)
     if let Some(limiter) = rate_limiter {
-        if let Err(reason) = limiter.check(&attestation.issuer, &attestation.subject).await {
+        if let Err(reason) = limiter
+            .check(&attestation.issuer, &attestation.subject)
+            .await
+        {
             warn!("Rate limited attestation: {}", reason);
             icn_obs::metrics::trust::attestations_rejected_rate_limited_inc();
             return Ok(()); // Don't propagate error, just log and ignore
@@ -403,14 +406,12 @@ mod tests {
         )));
 
         let bob_store = Arc::new(SledStore::temporary().unwrap());
-        let bob_graph = Arc::new(RwLock::new(TrustGraph::new(
-            bob_store,
-            bob.did().clone(),
-        )));
+        let bob_graph = Arc::new(RwLock::new(TrustGraph::new(bob_store, bob.did().clone())));
 
         // Create gossip actors
         let trust_lookup = Arc::new(|_: &Did| Some(TrustClass::Partner));
-        let alice_gossip = icn_gossip::GossipActor::spawn(alice.did().clone(), trust_lookup.clone());
+        let alice_gossip =
+            icn_gossip::GossipActor::spawn(alice.did().clone(), trust_lookup.clone());
         let _bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), trust_lookup);
 
         // Alice trusts Bob

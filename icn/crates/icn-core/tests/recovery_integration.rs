@@ -89,7 +89,7 @@ impl RecoveryTestNode {
             // Create the topic if it doesn't exist
             let topic = icn_gossip::Topic::new(
                 IDENTITY_RECOVERY_TOPIC.to_string(),
-                icn_gossip::AccessControl::Public
+                icn_gossip::AccessControl::Public,
             );
             gossip.create_topic(topic);
             gossip.subscribe(IDENTITY_RECOVERY_TOPIC, did.clone())?;
@@ -167,7 +167,10 @@ impl RecoveryTestNode {
                                         let key = format!("recovery:{id}");
                                         let value = serde_json::to_vec(&recovery)?;
                                         recovery_store.put(key.as_bytes(), &value)?;
-                                        info!("Stored new recovery: {} ({} → {})", id, old_did, new_did);
+                                        info!(
+                                            "Stored new recovery: {} ({} → {})",
+                                            id, old_did, new_did
+                                        );
                                         Ok(false)
                                     }
                                     RecoveryMessage::Attestation {
@@ -180,10 +183,12 @@ impl RecoveryTestNode {
                                             Some(data) => {
                                                 let mut recovery: RecoveryEvent =
                                                     serde_json::from_slice(&data)?;
-                                                match recovery.add_attestation(attestation.clone()) {
+                                                match recovery.add_attestation(attestation.clone())
+                                                {
                                                     Ok(threshold_reached) => {
                                                         let value = serde_json::to_vec(&recovery)?;
-                                                        recovery_store.put(key.as_bytes(), &value)?;
+                                                        recovery_store
+                                                            .put(key.as_bytes(), &value)?;
                                                         if threshold_reached {
                                                             info!(
                                                                 "Recovery {} reached threshold",
@@ -193,10 +198,7 @@ impl RecoveryTestNode {
                                                         Ok(false)
                                                     }
                                                     Err(e) => {
-                                                        warn!(
-                                                            "Failed to add attestation: {}",
-                                                            e
-                                                        );
+                                                        warn!("Failed to add attestation: {}", e);
                                                         Err(e)
                                                     }
                                                 }
@@ -221,7 +223,8 @@ impl RecoveryTestNode {
                                                 match recovery.finalize() {
                                                     Ok(_) => {
                                                         let value = serde_json::to_vec(&recovery)?;
-                                                        recovery_store.put(key.as_bytes(), &value)?;
+                                                        recovery_store
+                                                            .put(key.as_bytes(), &value)?;
                                                         info!(
                                                             "✅ Recovery finalized: {} → {}",
                                                             old_did, new_did
@@ -274,9 +277,9 @@ impl RecoveryTestNode {
 
                                         // Update ledger
                                         let mut ledger_guard = ledger.write().await;
-                                        match ledger_guard.transfer_balances_for_recovery(
-                                            old_did, new_did, id,
-                                        ) {
+                                        match ledger_guard
+                                            .transfer_balances_for_recovery(old_did, new_did, id)
+                                        {
                                             Ok(count) => {
                                                 info!(
                                                     "Ledger: transferred {} currencies from {} to {}",
@@ -329,16 +332,22 @@ impl RecoveryTestNode {
         // Set up gossip send callback
         let network_handle_clone = network_handle.clone();
         let from_did = did.clone();
-        let send_callback = Arc::new(move |recipient_did: Option<icn_identity::Did>, gossip_msg| {
-            let network_handle = network_handle_clone.clone();
-            let from = from_did.clone();
-            tokio::spawn(async move {
-                if let Some(recipient) = recipient_did {
-                    let net_msg = NetworkMessage::new(from, Some(recipient.clone()), MessagePayload::Gossip(gossip_msg));
-                    let _ = network_handle.send_message(recipient, net_msg).await;
-                }
-            });
-        });
+        let send_callback = Arc::new(
+            move |recipient_did: Option<icn_identity::Did>, gossip_msg| {
+                let network_handle = network_handle_clone.clone();
+                let from = from_did.clone();
+                tokio::spawn(async move {
+                    if let Some(recipient) = recipient_did {
+                        let net_msg = NetworkMessage::new(
+                            from,
+                            Some(recipient.clone()),
+                            MessagePayload::Gossip(gossip_msg),
+                        );
+                        let _ = network_handle.send_message(recipient, net_msg).await;
+                    }
+                });
+            },
+        );
 
         {
             let mut gossip = gossip_handle.write().await;
@@ -450,8 +459,8 @@ async fn test_full_recovery_flow() -> Result<()> {
         let mut ledger = alice.ledger.write().await;
         // In mutual credit: debit increases assets (Alice receives), credit increases liabilities (Bob gives)
         let entry = JournalEntryBuilder::new(alice_did.clone())
-            .debit(alice_did.clone(), "hours".to_string(), 100)  // Alice receives 100 hours
-            .credit(bob_did.clone(), "hours".to_string(), 100)   // Bob gives 100 hours
+            .debit(alice_did.clone(), "hours".to_string(), 100) // Alice receives 100 hours
+            .credit(bob_did.clone(), "hours".to_string(), 100) // Bob gives 100 hours
             .build()?;
         ledger.append_entry(entry)?;
     }
@@ -460,7 +469,11 @@ async fn test_full_recovery_flow() -> Result<()> {
     {
         let ledger = alice.ledger.read().await;
         let balances = ledger.get_account_balances(&alice_did);
-        assert_eq!(balances.balances.get("hours"), Some(&100), "Alice should have 100 hours balance");
+        assert_eq!(
+            balances.balances.get("hours"),
+            Some(&100),
+            "Alice should have 100 hours balance"
+        );
         info!("Alice has 100 hours");
     }
 
@@ -496,7 +509,8 @@ async fn test_full_recovery_flow() -> Result<()> {
     )?;
 
     // Bob broadcasts attestation
-    let attestation_msg = RecoveryMessage::attestation(recovery_id.clone(), bob_attestation.clone());
+    let attestation_msg =
+        RecoveryMessage::attestation(recovery_id.clone(), bob_attestation.clone());
     let attestation_bytes = attestation_msg.to_bytes()?;
     {
         let mut gossip = bob.gossip_handle.write().await;
@@ -514,7 +528,8 @@ async fn test_full_recovery_flow() -> Result<()> {
         "In-person verification".to_string(),
     )?;
 
-    let attestation_msg = RecoveryMessage::attestation(recovery_id.clone(), carol_attestation.clone());
+    let attestation_msg =
+        RecoveryMessage::attestation(recovery_id.clone(), carol_attestation.clone());
     let attestation_bytes = attestation_msg.to_bytes()?;
     {
         let mut gossip = carol.gossip_handle.write().await;
@@ -558,12 +573,18 @@ async fn test_full_recovery_flow() -> Result<()> {
     {
         let mut trust = alice.trust_graph.write().await;
         let count = trust.map_did_recovery(&alice_did, &alice2_did)?;
-        info!("Trust graph: migrated {} edges from {} to {}", count, alice_did, alice2_did);
+        info!(
+            "Trust graph: migrated {} edges from {} to {}",
+            count, alice_did, alice2_did
+        );
     }
     {
         let mut ledger = alice.ledger.write().await;
         let count = ledger.transfer_balances_for_recovery(&alice_did, &alice2_did, &recovery_id)?;
-        info!("Ledger: transferred {} currencies from {} to {}", count, alice_did, alice2_did);
+        info!(
+            "Ledger: transferred {} currencies from {} to {}",
+            count, alice_did, alice2_did
+        );
     }
 
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -575,7 +596,11 @@ async fn test_full_recovery_flow() -> Result<()> {
 
         // Old DID should have no outgoing edges
         let old_edges = trust.get_outgoing_edges(&alice_did)?;
-        assert_eq!(old_edges.len(), 0, "Old DID should have no edges after migration");
+        assert_eq!(
+            old_edges.len(),
+            0,
+            "Old DID should have no edges after migration"
+        );
 
         // New DID should have the migrated edges
         let new_edges = trust.get_outgoing_edges(&alice2_did)?;
@@ -595,11 +620,19 @@ async fn test_full_recovery_flow() -> Result<()> {
 
         // Old DID should have 0 balance
         let old_balances = ledger.get_account_balances(&alice_did);
-        assert_eq!(old_balances.balances.get("hours"), Some(&0), "Old DID should have 0 hours");
+        assert_eq!(
+            old_balances.balances.get("hours"),
+            Some(&0),
+            "Old DID should have 0 hours"
+        );
 
         // New DID should have the transferred balance
         let new_balances = ledger.get_account_balances(&alice2_did);
-        assert_eq!(new_balances.balances.get("hours"), Some(&100), "New DID should have 100 hours");
+        assert_eq!(
+            new_balances.balances.get("hours"),
+            Some(&100),
+            "New DID should have 100 hours"
+        );
 
         info!("✅ Ledger balance transfer verified");
     }

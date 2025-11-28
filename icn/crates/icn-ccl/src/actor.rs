@@ -118,7 +118,9 @@ impl ContractActor {
         );
 
         // Verify the message before publishing
-        deployment_msg.verify().context("Deployment message verification failed")?;
+        deployment_msg
+            .verify()
+            .context("Deployment message verification failed")?;
 
         // TODO: Publish to gossip topic `contracts:deploy`
         // This will be wired up when integrating with Supervisor
@@ -131,10 +133,7 @@ impl ContractActor {
     ///
     /// This checks authorization (caller must be participant or meet trust threshold),
     /// executes the rule, and applies ledger operations.
-    pub async fn execute_rule(
-        &self,
-        request: ContractExecutionRequest,
-    ) -> Result<ExecutionResult> {
+    pub async fn execute_rule(&self, request: ContractExecutionRequest) -> Result<ExecutionResult> {
         debug!(
             "Executing contract {} rule {}",
             request.code_hash, request.rule_name
@@ -166,7 +165,12 @@ impl ContractActor {
         let result = {
             let mut runtime = self.runtime.write().await;
             runtime
-                .execute_rule(&request.code_hash, &request.rule_name, context, request.args)
+                .execute_rule(
+                    &request.code_hash,
+                    &request.rule_name,
+                    context,
+                    request.args,
+                )
                 .await?
         };
 
@@ -179,10 +183,7 @@ impl ContractActor {
     }
 
     /// Handle incoming contract deployment message from gossip
-    pub async fn handle_deployment_message(
-        &self,
-        msg: ContractDeploymentMessage,
-    ) -> Result<()> {
+    pub async fn handle_deployment_message(&self, msg: ContractDeploymentMessage) -> Result<()> {
         info!(
             "Received contract deployment: {} from {}",
             msg.contract.name, msg.installation.installed_by
@@ -194,7 +195,10 @@ impl ContractActor {
         // Check deployer trust
         // Skip trust check if deployment is from local node (self-deployment via gossip)
         if msg.installation.installed_by == self.did {
-            debug!("Deployment from local node {}, skipping trust check", self.did);
+            debug!(
+                "Deployment from local node {}, skipping trust check",
+                self.did
+            );
         } else if let Some(ref trust_graph) = self.trust_graph {
             let trust_score = {
                 let graph = trust_graph.read().await;
@@ -329,7 +333,8 @@ mod tests {
         installed_at: u64,
         keypairs: &[&KeyPair],
     ) -> Vec<(icn_identity::Did, Vec<u8>)> {
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(code_hash, installed_at);
 
         keypairs
             .iter()
@@ -368,7 +373,8 @@ mod tests {
             min_caller_trust: None,
         };
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
 
         let result = actor
@@ -421,7 +427,8 @@ mod tests {
             min_caller_trust: None,
         };
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
 
         let returned_code_hash = actor
@@ -467,12 +474,9 @@ mod tests {
             .add_participant(alice.clone())
             .add_participant(bob.clone())
             .with_currency("hours".to_string())
-            .add_rule(
-                Rule::new("noop".to_string())
-                    .add_stmt(Stmt::Return {
-                        value: Expr::Literal(Value::Bool(true)),
-                    }),
-            );
+            .add_rule(Rule::new("noop".to_string()).add_stmt(Stmt::Return {
+                value: Expr::Literal(Value::Bool(true)),
+            }));
 
         let code_hash = compute_code_hash(&contract);
         let installed_at = 1234567890u64;
@@ -488,7 +492,8 @@ mod tests {
             min_caller_trust: None, // Participant-only
         };
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
 
         let returned_code_hash = actor
@@ -521,8 +526,7 @@ mod tests {
         let alice = alice_kp.did().clone();
 
         // Deploy two contracts
-        let contract1 = Contract::new("contract1".to_string())
-            .add_participant(alice.clone());
+        let contract1 = Contract::new("contract1".to_string()).add_participant(alice.clone());
 
         let code_hash1 = compute_code_hash(&contract1);
         let installed_at1 = 1234567890u64;
@@ -538,7 +542,8 @@ mod tests {
             min_caller_trust: None,
         };
 
-        let signing_bytes1 = ContractDeploymentMessage::compute_signing_bytes(&code_hash1, installed_at1);
+        let signing_bytes1 =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash1, installed_at1);
         let deployer_signature1 = alice_kp.sign(&signing_bytes1).to_bytes().to_vec();
 
         actor
@@ -546,8 +551,7 @@ mod tests {
             .await
             .unwrap();
 
-        let contract2 = Contract::new("contract2".to_string())
-            .add_participant(alice.clone());
+        let contract2 = Contract::new("contract2".to_string()).add_participant(alice.clone());
 
         let code_hash2 = compute_code_hash(&contract2);
         let installed_at2 = 1234567891u64;
@@ -563,7 +567,8 @@ mod tests {
             min_caller_trust: None,
         };
 
-        let signing_bytes2 = ContractDeploymentMessage::compute_signing_bytes(&code_hash2, installed_at2);
+        let signing_bytes2 =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash2, installed_at2);
         let deployer_signature2 = alice_kp.sign(&signing_bytes2).to_bytes().to_vec();
 
         actor

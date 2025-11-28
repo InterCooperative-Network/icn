@@ -41,11 +41,9 @@ impl StunClient {
     /// Create a STUN client with Google's public STUN servers
     pub async fn with_google_stun() -> Result<Self> {
         // Resolve DNS hostnames to IP addresses
-        let servers = Self::resolve_stun_servers(&[
-            "stun.l.google.com:19302",
-            "stun1.l.google.com:19302",
-        ])
-        .await?;
+        let servers =
+            Self::resolve_stun_servers(&["stun.l.google.com:19302", "stun1.l.google.com:19302"])
+                .await?;
         Ok(Self::new(servers))
     }
 
@@ -85,10 +83,7 @@ impl StunClient {
     /// This method queries multiple STUN servers in parallel and uses majority
     /// vote to determine the correct public endpoint. This provides resilience
     /// against misconfigured or malicious STUN servers.
-    pub async fn discover_public_endpoint(
-        &self,
-        local_socket: &UdpSocket,
-    ) -> Result<SocketAddr> {
+    pub async fn discover_public_endpoint(&self, local_socket: &UdpSocket) -> Result<SocketAddr> {
         // Build futures for querying each server in parallel
         let query_futures: Vec<_> = self
             .servers
@@ -148,11 +143,8 @@ impl StunClient {
                 attempt, self.max_retries, server
             );
 
-            match tokio::time::timeout(
-                self.timeout,
-                Self::do_stun_query(local_socket, server),
-            )
-            .await
+            match tokio::time::timeout(self.timeout, Self::do_stun_query(local_socket, server))
+                .await
             {
                 Ok(Ok(addr)) => return Ok(addr),
                 Ok(Err(e)) => {
@@ -187,10 +179,7 @@ impl StunClient {
     ///
     /// Implements RFC 5389 STUN Binding Request/Response for NAT discovery.
     /// This is a minimal implementation focused on discovering public endpoints.
-    async fn do_stun_query(
-        local_socket: &UdpSocket,
-        server: &SocketAddr,
-    ) -> Result<SocketAddr> {
+    async fn do_stun_query(local_socket: &UdpSocket, server: &SocketAddr) -> Result<SocketAddr> {
         // Create STUN Binding Request
         let transaction_id = rand::random::<[u8; 12]>();
         let request = create_stun_binding_request(&transaction_id);
@@ -209,9 +198,7 @@ impl StunClient {
             .context("Failed to receive STUN response")?;
 
         if from != *server {
-            anyhow::bail!(
-                "Received response from unexpected source: {from} (expected {server})"
-            );
+            anyhow::bail!("Received response from unexpected source: {from} (expected {server})");
         }
 
         // Parse STUN response and extract public endpoint
@@ -259,9 +246,7 @@ fn parse_stun_binding_response(
 
     // Verify magic cookie
     if magic_cookie != 0x2112A442 {
-        anyhow::bail!(
-            "Invalid STUN magic cookie: 0x{magic_cookie:08x} (expected 0x2112A442)"
-        );
+        anyhow::bail!("Invalid STUN magic cookie: 0x{magic_cookie:08x} (expected 0x2112A442)");
     }
 
     // Verify transaction ID

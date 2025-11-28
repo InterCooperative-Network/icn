@@ -62,9 +62,9 @@ impl Default for ObfuscationConfig {
             min_delay_ms: 0,
             max_delay_ms: 500, // Up to 500ms jitter
             enable_padding: true,
-            padded_size: 1024, // Pad to 1KB
+            padded_size: 1024,           // Pad to 1KB
             enable_cover_traffic: false, // Disabled by default (bandwidth intensive)
-            cover_traffic_rate: 0.1, // 0.1 messages/sec = 1 every 10 seconds
+            cover_traffic_rate: 0.1,     // 0.1 messages/sec = 1 every 10 seconds
         }
     }
 }
@@ -108,8 +108,8 @@ impl TrafficObfuscator {
             return Duration::from_millis(0);
         }
 
-        let delay_ms = rand::thread_rng()
-            .gen_range(self.config.min_delay_ms..=self.config.max_delay_ms);
+        let delay_ms =
+            rand::thread_rng().gen_range(self.config.min_delay_ms..=self.config.max_delay_ms);
 
         Duration::from_millis(delay_ms)
     }
@@ -262,10 +262,7 @@ mod tests {
         let obfuscated = obfuscator.pad_message(message).unwrap();
 
         // Verify total size equals padded_size
-        assert_eq!(
-            obfuscated.payload.len() + obfuscated.padding.len(),
-            256
-        );
+        assert_eq!(obfuscated.payload.len() + obfuscated.padding.len(), 256);
         assert_eq!(obfuscated.original_len, message.len());
         assert_eq!(obfuscated.payload, message);
     }

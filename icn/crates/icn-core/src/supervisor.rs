@@ -27,7 +27,8 @@ const NETWORK_CANDIDATES_TOPIC: &str = "network:candidates";
 /// Note: Currently only supports IP addresses. DNS hostname resolution can be added later.
 fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
     // Check for icn:// prefix
-    let url = url.strip_prefix("icn://")
+    let url = url
+        .strip_prefix("icn://")
         .context("Bootstrap peer URL must start with 'icn://'")?;
 
     // Split on @ to get DID and address
@@ -45,7 +46,8 @@ fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
 
     // Parse socket address (IP:PORT)
     // Note: This requires an IP address, not a DNS hostname
-    let addr: SocketAddr = addr_str.parse()
+    let addr: SocketAddr = addr_str
+        .parse()
         .context("Failed to parse socket address (must be IP:PORT, DNS names not yet supported)")?;
 
     Ok((did, addr))
@@ -60,7 +62,11 @@ pub struct Supervisor {
 
 impl Supervisor {
     /// Create a new supervisor
-    pub fn new(config: Config, identity_bundle: Option<IdentityBundle>, shutdown_tx: ShutdownTx) -> Self {
+    pub fn new(
+        config: Config,
+        identity_bundle: Option<IdentityBundle>,
+        shutdown_tx: ShutdownTx,
+    ) -> Self {
         Supervisor {
             config,
             identity_bundle,
@@ -95,14 +101,17 @@ impl Supervisor {
         let policy_governance_subscription: Option<crate::events::SubscriptionHandle>;
 
         // Spawn actors (requires identity bundle from unlocked keystore)
-        let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) = &self.identity_bundle {
+        let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) =
+            &self.identity_bundle
+        {
             info!("Identity bundle available - spawning actors");
 
             let did = identity_bundle.did().clone();
 
             // Create trust graph
             let trust_store_path = self.config.store_path().join("trust");
-            let trust_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&trust_store_path)?);
+            let trust_store: Arc<dyn icn_store::Store> =
+                Arc::new(SledStore::open(&trust_store_path)?);
             let trust_graph = icn_trust::TrustGraph::new(trust_store, did.clone());
             let trust_graph_handle = Arc::new(tokio::sync::RwLock::new(trust_graph));
 
@@ -110,8 +119,12 @@ impl Supervisor {
 
             // Create recovery store for social recovery events
             let recovery_store_path = self.config.store_path().join("recovery");
-            let recovery_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&recovery_store_path)?);
-            info!("Recovery store initialized at {}", recovery_store_path.display());
+            let recovery_store: Arc<dyn icn_store::Store> =
+                Arc::new(SledStore::open(&recovery_store_path)?);
+            info!(
+                "Recovery store initialized at {}",
+                recovery_store_path.display()
+            );
 
             // Create trust lookup closure for gossip actor
             let trust_graph_for_gossip = trust_graph_handle.clone();
@@ -156,8 +169,12 @@ impl Supervisor {
                     icn_obs::metrics::snapshot::load_total_inc();
                     icn_obs::metrics::snapshot::load_duration_record(load_duration.as_secs_f64());
 
-                    info!("Found state snapshot (version {}, created at {}) - loaded in {:.3}s",
-                          snapshot.version, snapshot.created_at, load_duration.as_secs_f64());
+                    info!(
+                        "Found state snapshot (version {}, created at {}) - loaded in {:.3}s",
+                        snapshot.version,
+                        snapshot.created_at,
+                        load_duration.as_secs_f64()
+                    );
 
                     // Warn if checksum file is missing (legacy snapshot)
                     let checksum_path = data_dir.join("state.snapshot.sha256");
@@ -169,12 +186,18 @@ impl Supervisor {
 
                     // Record snapshot contents metrics
                     if let Some(ref gossip_state) = snapshot.gossip_state {
-                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());
-                        icn_obs::metrics::snapshot::gossip_subscriptions_set(gossip_state.subscriptions.len());
+                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(
+                            gossip_state.vector_clock.len(),
+                        );
+                        icn_obs::metrics::snapshot::gossip_subscriptions_set(
+                            gossip_state.subscriptions.len(),
+                        );
                         icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
                     }
                     if let Some(ref network_state) = snapshot.network_state {
-                        icn_obs::metrics::snapshot::network_x25519_keys_set(network_state.peer_x25519_keys.len());
+                        icn_obs::metrics::snapshot::network_x25519_keys_set(
+                            network_state.peer_x25519_keys.len(),
+                        );
                     }
 
                     if let Some(gossip_state) = snapshot.gossip_state.clone() {
@@ -201,12 +224,16 @@ impl Supervisor {
 
             // Set up gossip store for replica metadata tracking (Phase 17)
             let gossip_store_path = self.config.store_path().join("gossip");
-            let gossip_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gossip_store_path)?);
+            let gossip_store: Arc<dyn icn_store::Store> =
+                Arc::new(SledStore::open(&gossip_store_path)?);
             {
                 let mut gossip = gossip_handle.write().await;
                 gossip.set_store(gossip_store.clone());
             }
-            info!("Gossip store initialized at {} for replica tracking", gossip_store_path.display());
+            info!(
+                "Gossip store initialized at {} for replica tracking",
+                gossip_store_path.display()
+            );
 
             // Spawn ReplicationManager for monitoring and maintaining data durability (Phase 17 Week 3)
             let replication_config = crate::replication::ReplicationConfig::default();
@@ -220,8 +247,7 @@ impl Supervisor {
 
             info!(
                 "ReplicationManager spawned (target: {} replicas, health check: {}s)",
-                replication_config.target_replicas,
-                replication_config.health_check_interval_secs
+                replication_config.target_replicas, replication_config.health_check_interval_secs
             );
 
             // Phase 18 Week 3: Initialize PartitionDetector and PartitionHealer
@@ -240,13 +266,16 @@ impl Supervisor {
                 gossip.set_partition_healer(partition_healer_handle.clone());
             }
 
-            info!("Partition detector and healer initialized (threshold: {:?})", partition_config.partition_threshold);
+            info!(
+                "Partition detector and healer initialized (threshold: {:?})",
+                partition_config.partition_threshold
+            );
 
             // Phase 18 Week 6: Initialize StorageQuotaManager for gossip entries
             // Default: 1GB global limit, 90% eviction threshold, 10MB per-DID quota
             let storage_quota_manager = icn_store::StorageQuotaManager::new(
                 1024 * 1024 * 1024, // 1GB global limit
-                0.9, // Start evicting at 90% capacity
+                0.9,                // Start evicting at 90% capacity
             );
             let storage_quota_handle = Arc::new(tokio::sync::RwLock::new(storage_quota_manager));
 
@@ -296,7 +325,8 @@ impl Supervisor {
 
             // Create incoming message handler that routes to gossip
             let gossip_handle_clone = gossip_handle.clone();
-            let network_handle_for_handler = Arc::new(tokio::sync::RwLock::new(None::<icn_net::NetworkHandle>));
+            let network_handle_for_handler =
+                Arc::new(tokio::sync::RwLock::new(None::<icn_net::NetworkHandle>));
             let network_handle_for_handler_clone = network_handle_for_handler.clone();
             let own_did_for_handler = did.clone();
             let federation_enabled = self.config.federation.enabled;
@@ -318,7 +348,10 @@ impl Supervisor {
                     }
 
                     icn_net::MessagePayload::Subscribe { topics } => {
-                        info!("Received Subscribe from {} for topics: {:?}", sender_did, topics);
+                        info!(
+                            "Received Subscribe from {} for topics: {:?}",
+                            sender_did, topics
+                        );
                         icn_obs::metrics::gossip::subscribes_received_inc();
 
                         // Spawn async task to avoid blocking the callback thread
@@ -337,7 +370,10 @@ impl Supervisor {
                                         acked_topics.push(topic.clone());
                                     }
                                     Err(e) => {
-                                        warn!("Failed to subscribe {} to topic {}: {}", sender_did, topic, e);
+                                        warn!(
+                                            "Failed to subscribe {} to topic {}: {}",
+                                            sender_did, topic, e
+                                        );
                                     }
                                 }
                             }
@@ -345,13 +381,16 @@ impl Supervisor {
                             // Send SubscribeAck back if we have any successful subscriptions
                             if !acked_topics.is_empty() {
                                 icn_obs::metrics::gossip::subscribe_acks_sent_inc();
-                                if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
+                                if let Some(net_handle) = network_handle_lock.read().await.as_ref()
+                                {
                                     let ack_msg = icn_net::NetworkMessage::subscribe_ack(
                                         own_did,
                                         sender_did.clone(),
-                                        acked_topics
+                                        acked_topics,
                                     );
-                                    if let Err(e) = net_handle.send_message(sender_did, ack_msg).await {
+                                    if let Err(e) =
+                                        net_handle.send_message(sender_did, ack_msg).await
+                                    {
                                         warn!("Failed to send SubscribeAck: {}", e);
                                     }
                                 }
@@ -360,7 +399,10 @@ impl Supervisor {
                     }
 
                     icn_net::MessagePayload::Unsubscribe { topics } => {
-                        info!("Received Unsubscribe from {} for topics: {:?}", sender_did, topics);
+                        info!(
+                            "Received Unsubscribe from {} for topics: {:?}",
+                            sender_did, topics
+                        );
                         icn_obs::metrics::gossip::unsubscribes_received_inc();
 
                         // Spawn async task to avoid blocking the callback thread
@@ -373,7 +415,10 @@ impl Supervisor {
                                         info!("Unsubscribed {} from topic: {}", sender_did, topic);
                                     }
                                     Err(e) => {
-                                        warn!("Failed to unsubscribe {} from topic {}: {}", sender_did, topic, e);
+                                        warn!(
+                                            "Failed to unsubscribe {} from topic {}: {}",
+                                            sender_did, topic, e
+                                        );
                                     }
                                 }
                             }
@@ -381,7 +426,10 @@ impl Supervisor {
                     }
 
                     icn_net::MessagePayload::SubscribeAck { topics } => {
-                        info!("Received SubscribeAck from {} for topics: {:?}", sender_did, topics);
+                        info!(
+                            "Received SubscribeAck from {} for topics: {:?}",
+                            sender_did, topics
+                        );
                         // Track successful subscription acknowledgment
                         // In a full implementation, this could update a local subscription registry
                     }
@@ -409,20 +457,26 @@ impl Supervisor {
                     icn_net::MessagePayload::Signed(ref envelope) => {
                         // Signed messages have been verified by NetworkActor
                         // The signature and replay protection checks have passed
-                        debug!("Received verified signed message from {} (seq={}, type={:?})",
-                               envelope.from, envelope.sequence, envelope.payload_type);
+                        debug!(
+                            "Received verified signed message from {} (seq={}, type={:?})",
+                            envelope.from, envelope.sequence, envelope.payload_type
+                        );
 
                         // Route based on payload type
                         match envelope.payload_type {
                             icn_net::PayloadType::Gossip => {
                                 // Decode gossip message from signed envelope
-                                let gossip_msg: icn_gossip::GossipMessage = match envelope.decode_payload() {
-                                    Ok(msg) => msg,
-                                    Err(e) => {
-                                        warn!("Failed to decode gossip payload from {}: {}", envelope.from, e);
-                                        return;
-                                    }
-                                };
+                                let gossip_msg: icn_gossip::GossipMessage =
+                                    match envelope.decode_payload() {
+                                        Ok(msg) => msg,
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to decode gossip payload from {}: {}",
+                                                envelope.from, e
+                                            );
+                                            return;
+                                        }
+                                    };
 
                                 // Handle gossip message (sender is authenticated via signature)
                                 let gossip_handle = gossip_handle_clone.clone();
@@ -430,14 +484,20 @@ impl Supervisor {
                                 tokio::spawn(async move {
                                     let mut gossip = gossip_handle.write().await;
                                     if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                                        warn!("Failed to handle gossip message from {}: {}", sender, e);
+                                        warn!(
+                                            "Failed to handle gossip message from {}: {}",
+                                            sender, e
+                                        );
                                     }
                                 });
                             }
 
                             _ => {
                                 // Other payload types not yet implemented
-                                debug!("Received signed message with unhandled payload type: {:?}", envelope.payload_type);
+                                debug!(
+                                    "Received signed message with unhandled payload type: {:?}",
+                                    envelope.payload_type
+                                );
                             }
                         }
                     }
@@ -456,39 +516,60 @@ impl Supervisor {
                             }
                             PeerExchangeMessage::Response { peers, total_known } => {
                                 // Received peer list from another node
-                                info!("Received {} federation peers from {} (total: {})",
-                                      peers.len(), sender_did, total_known);
+                                info!(
+                                    "Received {} federation peers from {} (total: {})",
+                                    peers.len(),
+                                    sender_did,
+                                    total_known
+                                );
 
                                 if federation_enabled {
                                     // Auto-dial discovered peers
-                                    let peers_to_dial: Vec<_> = peers.iter()
+                                    let peers_to_dial: Vec<_> = peers
+                                        .iter()
                                         .filter_map(|p| {
                                             // Parse first address
-                                            p.addresses.first()
-                                                .and_then(|addr_str| addr_str.parse::<std::net::SocketAddr>().ok())
+                                            p.addresses
+                                                .first()
+                                                .and_then(|addr_str| {
+                                                    addr_str.parse::<std::net::SocketAddr>().ok()
+                                                })
                                                 .map(|addr| (p.did.clone(), addr))
                                         })
                                         .collect();
 
                                     tokio::spawn(async move {
-                                        if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
+                                        if let Some(net_handle) =
+                                            network_handle_lock.read().await.as_ref()
+                                        {
                                             for (did_str, addr) in peers_to_dial {
                                                 // Skip if DID is invalid
-                                                let peer_did = match icn_identity::Did::from_str(&did_str) {
-                                                    Ok(d) => d,
-                                                    Err(e) => {
-                                                        debug!("Skipping invalid DID {}: {}", did_str, e);
-                                                        continue;
-                                                    }
-                                                };
+                                                let peer_did =
+                                                    match icn_identity::Did::from_str(&did_str) {
+                                                        Ok(d) => d,
+                                                        Err(e) => {
+                                                            debug!(
+                                                                "Skipping invalid DID {}: {}",
+                                                                did_str, e
+                                                            );
+                                                            continue;
+                                                        }
+                                                    };
 
-                                                info!("Auto-dialing discovered peer {} at {}", peer_did, addr);
-                                                match net_handle.dial(addr, peer_did.clone()).await {
+                                                info!(
+                                                    "Auto-dialing discovered peer {} at {}",
+                                                    peer_did, addr
+                                                );
+                                                match net_handle.dial(addr, peer_did.clone()).await
+                                                {
                                                     Ok(_) => {
                                                         icn_obs::metrics::peer_exchange::peers_dialed_inc();
                                                     }
                                                     Err(e) => {
-                                                        debug!("Failed to dial {}: {}", peer_did, e);
+                                                        debug!(
+                                                            "Failed to dial {}: {}",
+                                                            peer_did, e
+                                                        );
                                                         icn_obs::metrics::peer_exchange::dial_failures_inc();
                                                     }
                                                 }
@@ -498,13 +579,18 @@ impl Supervisor {
                                 } else {
                                     // Just log discovered peers
                                     for peer in peers {
-                                        debug!("Discovered peer (federation disabled): {} at {:?}", peer.did, peer.addresses);
+                                        debug!(
+                                            "Discovered peer (federation disabled): {} at {:?}",
+                                            peer.did, peer.addresses
+                                        );
                                     }
                                 }
                             }
                             PeerExchangeMessage::Announce { peer } => {
-                                info!("Peer announced by {}: {} at {:?}",
-                                      sender_did, peer.did, peer.addresses);
+                                info!(
+                                    "Peer announced by {}: {} at {:?}",
+                                    sender_did, peer.did, peer.addresses
+                                );
 
                                 if federation_enabled {
                                     // Auto-dial announced peer
@@ -512,10 +598,20 @@ impl Supervisor {
                                         if let Ok(addr) = addr_str.parse::<std::net::SocketAddr>() {
                                             let peer_did_str = peer.did.clone();
                                             tokio::spawn(async move {
-                                                if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
-                                                    if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
-                                                        info!("Auto-dialing announced peer {} at {}", peer_did, addr);
-                                                        match net_handle.dial(addr, peer_did.clone()).await {
+                                                if let Some(net_handle) =
+                                                    network_handle_lock.read().await.as_ref()
+                                                {
+                                                    if let Ok(peer_did) =
+                                                        icn_identity::Did::from_str(&peer_did_str)
+                                                    {
+                                                        info!(
+                                                            "Auto-dialing announced peer {} at {}",
+                                                            peer_did, addr
+                                                        );
+                                                        match net_handle
+                                                            .dial(addr, peer_did.clone())
+                                                            .await
+                                                        {
                                                             Ok(_) => {
                                                                 icn_obs::metrics::peer_exchange::peers_dialed_inc();
                                                             }
@@ -542,18 +638,22 @@ impl Supervisor {
             });
 
             // Prepare rate limiting configuration
-            let (trust_graph_for_rate_limit, trust_gated_config, fallback_config) = if self.config.rate_limiting.enabled {
-                (
-                    Some(trust_graph_handle.clone()), // Enable trust-gated rate limiting
-                    Some(self.config.rate_limiting.to_trust_gated_config()),
-                    Some(self.config.rate_limiting.to_fallback_config()),
-                )
-            } else {
-                (None, None, None) // Disable trust-gated rate limiting
-            };
+            let (trust_graph_for_rate_limit, trust_gated_config, fallback_config) =
+                if self.config.rate_limiting.enabled {
+                    (
+                        Some(trust_graph_handle.clone()), // Enable trust-gated rate limiting
+                        Some(self.config.rate_limiting.to_trust_gated_config()),
+                        Some(self.config.rate_limiting.to_fallback_config()),
+                    )
+                } else {
+                    (None, None, None) // Disable trust-gated rate limiting
+                };
 
             // Use identity bundle loaded from keystore (preserves TLS cert across restarts)
-            info!("Using identity bundle with DID-TLS binding: {}", identity_bundle.did());
+            info!(
+                "Using identity bundle with DID-TLS binding: {}",
+                identity_bundle.did()
+            );
 
             // Parse STUN servers from config
             let stun_servers = if !self.config.network.stun_servers.is_empty() {
@@ -613,8 +713,9 @@ impl Supervisor {
             }
 
             // Create compute handle holder (will be filled after ComputeActor is spawned)
-            let compute_handle_holder: Arc<tokio::sync::RwLock<Option<icn_compute::ComputeHandle>>> =
-                Arc::new(tokio::sync::RwLock::new(None));
+            let compute_handle_holder: Arc<
+                tokio::sync::RwLock<Option<icn_compute::ComputeHandle>>,
+            > = Arc::new(tokio::sync::RwLock::new(None));
 
             // Set send callback on gossip actor to enable request/response
             {
@@ -624,57 +725,68 @@ impl Supervisor {
                 let keypair_clone = identity_bundle.keypair().clone();
                 let sequence_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-                let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient, gossip_msg| {
-                    let net_handle = network_handle_clone.clone();
-                    let from_did = own_did_clone.clone();
-                    let keypair = keypair_clone.clone();
-                    let sequence_ctr = sequence_counter.clone();
+                let send_callback: icn_gossip::SendMessageCallback =
+                    Arc::new(move |recipient, gossip_msg| {
+                        let net_handle = network_handle_clone.clone();
+                        let from_did = own_did_clone.clone();
+                        let keypair = keypair_clone.clone();
+                        let sequence_ctr = sequence_counter.clone();
 
-                    // Track metrics based on message type
-                    use icn_gossip::GossipMessage;
-                    match &gossip_msg {
-                        GossipMessage::Announce { .. } => icn_obs::metrics::gossip::announces_sent_inc(),
-                        GossipMessage::Request { .. } => icn_obs::metrics::gossip::requests_sent_inc(),
-                        GossipMessage::Response { .. } => icn_obs::metrics::gossip::responses_sent_inc(),
-                        _ => {} // Other message types
-                    }
-
-                    // Spawn async task to send message
-                    tokio::spawn(async move {
-                        // Get next sequence number
-                        let sequence = sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-                        // Create signed envelope
-                        let envelope = match icn_net::SignedEnvelope::from_payload(
-                            &from_did,
-                            &keypair,
-                            sequence,
-                            icn_net::PayloadType::Gossip,
-                            &gossip_msg,
-                        ) {
-                            Ok(env) => env,
-                            Err(e) => {
-                                warn!("Failed to create signed envelope: {}", e);
-                                return;
+                        // Track metrics based on message type
+                        use icn_gossip::GossipMessage;
+                        match &gossip_msg {
+                            GossipMessage::Announce { .. } => {
+                                icn_obs::metrics::gossip::announces_sent_inc()
                             }
-                        };
-
-                        // Send signed message
-                        let result = if let Some(target_did) = recipient {
-                            // Unicast
-                            let net_msg = icn_net::NetworkMessage::signed(Some(target_did.clone()), envelope);
-                            net_handle.send_message(target_did, net_msg).await
-                        } else {
-                            // Broadcast
-                            let net_msg = icn_net::NetworkMessage::signed(None, envelope);
-                            net_handle.broadcast(net_msg).await
-                        };
-
-                        if let Err(e) = result {
-                            warn!("Failed to send gossip message: {}", e);
+                            GossipMessage::Request { .. } => {
+                                icn_obs::metrics::gossip::requests_sent_inc()
+                            }
+                            GossipMessage::Response { .. } => {
+                                icn_obs::metrics::gossip::responses_sent_inc()
+                            }
+                            _ => {} // Other message types
                         }
+
+                        // Spawn async task to send message
+                        tokio::spawn(async move {
+                            // Get next sequence number
+                            let sequence =
+                                sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+                            // Create signed envelope
+                            let envelope = match icn_net::SignedEnvelope::from_payload(
+                                &from_did,
+                                &keypair,
+                                sequence,
+                                icn_net::PayloadType::Gossip,
+                                &gossip_msg,
+                            ) {
+                                Ok(env) => env,
+                                Err(e) => {
+                                    warn!("Failed to create signed envelope: {}", e);
+                                    return;
+                                }
+                            };
+
+                            // Send signed message
+                            let result = if let Some(target_did) = recipient {
+                                // Unicast
+                                let net_msg = icn_net::NetworkMessage::signed(
+                                    Some(target_did.clone()),
+                                    envelope,
+                                );
+                                net_handle.send_message(target_did, net_msg).await
+                            } else {
+                                // Broadcast
+                                let net_msg = icn_net::NetworkMessage::signed(None, envelope);
+                                net_handle.broadcast(net_msg).await
+                            };
+
+                            if let Err(e) = result {
+                                warn!("Failed to send gossip message: {}", e);
+                            }
+                        });
                     });
-                });
 
                 gossip.set_send_callback(send_callback);
 
@@ -693,378 +805,485 @@ impl Supervisor {
 
                 let compute_handle_for_notifications = compute_handle_holder.clone();
 
-                let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, _subscriber_did| {
-                    // Handle trust attestations
-                    if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
-                        let trust_graph = trust_graph_for_notifications.clone();
-                        let own_did = own_did_for_notifications.clone();
+                let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(
+                    move |topic, entry, _subscriber_did| {
+                        // Handle trust attestations
+                        if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
+                            let trust_graph = trust_graph_for_notifications.clone();
+                            let own_did = own_did_for_notifications.clone();
 
-                        tokio::spawn(async move {
-                            if let Err(e) = crate::trust_propagation::handle_trust_attestation_entry(
-                                &entry,
-                                &trust_graph,
-                                &own_did,
-                                None, // TODO: Add rate limiter in Phase 8A+
-                            ).await {
-                                warn!("Failed to handle trust attestation: {}", e);
-                            }
-                        });
-                    }
-                    // Handle contract deployments
-                    else if topic == "contracts:deploy" {
-                        let contract_actor = contract_actor_for_notifications.clone();
-                        // Use get_data() to handle decompression if needed
-                        let entry_data = match entry.get_data() {
-                            Ok(data) => data,
-                            Err(e) => {
-                                warn!("Failed to get entry data: {}", e);
-                                return;
-                            }
-                        };
+                            tokio::spawn(async move {
+                                if let Err(e) =
+                                    crate::trust_propagation::handle_trust_attestation_entry(
+                                        &entry,
+                                        &trust_graph,
+                                        &own_did,
+                                        None, // TODO: Add rate limiter in Phase 8A+
+                                    )
+                                    .await
+                                {
+                                    warn!("Failed to handle trust attestation: {}", e);
+                                }
+                            });
+                        }
+                        // Handle contract deployments
+                        else if topic == "contracts:deploy" {
+                            let contract_actor = contract_actor_for_notifications.clone();
+                            // Use get_data() to handle decompression if needed
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get entry data: {}", e);
+                                    return;
+                                }
+                            };
 
-                        tokio::spawn(async move {
-                            // Deserialize contract deployment message
-                            match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
-                                Ok(deployment_msg) => {
-                                    let deployer = deployment_msg.installation.installed_by.to_string();
-                                    let actor = contract_actor.write().await;
-                                    if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
-                                        let error_str = e.to_string();
-                                        if error_str.contains("signature") {
-                                            warn!("Contract deployment signature verification failed from {}: {}", deployer, e);
-                                            icn_obs::metrics::contract::deployments_rejected_signature_inc(&deployer);
+                            tokio::spawn(async move {
+                                // Deserialize contract deployment message
+                                match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(
+                                    &entry_data,
+                                ) {
+                                    Ok(deployment_msg) => {
+                                        let deployer =
+                                            deployment_msg.installation.installed_by.to_string();
+                                        let actor = contract_actor.write().await;
+                                        if let Err(e) =
+                                            actor.handle_deployment_message(deployment_msg).await
+                                        {
+                                            let error_str = e.to_string();
+                                            if error_str.contains("signature") {
+                                                warn!("Contract deployment signature verification failed from {}: {}", deployer, e);
+                                                icn_obs::metrics::contract::deployments_rejected_signature_inc(&deployer);
+                                            } else {
+                                                warn!(
+                                                    "Failed to handle contract deployment: {}",
+                                                    e
+                                                );
+                                                icn_obs::metrics::contract::deployments_rejected_inc("handling_error");
+                                            }
                                         } else {
-                                            warn!("Failed to handle contract deployment: {}", e);
-                                            icn_obs::metrics::contract::deployments_rejected_inc("handling_error");
+                                            info!("Contract deployment processed successfully");
+                                            icn_obs::metrics::contract::deployments_received_inc();
                                         }
-                                    } else {
-                                        info!("Contract deployment processed successfully");
-                                        icn_obs::metrics::contract::deployments_received_inc();
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to deserialize contract deployment message: {}",
+                                            e
+                                        );
+                                        icn_obs::metrics::contract::deployments_rejected_inc(
+                                            "deserialization_error",
+                                        );
                                     }
                                 }
+                            });
+                        }
+                        // Handle identity recovery events
+                        else if topic == IDENTITY_RECOVERY_TOPIC {
+                            let recovery_store = recovery_store_for_notifications.clone();
+                            let trust_graph = trust_graph_for_notifications.clone();
+                            let ledger = ledger_for_notifications.clone();
+
+                            // Use get_data() to handle decompression if needed
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
                                 Err(e) => {
-                                    warn!("Failed to deserialize contract deployment message: {}", e);
-                                    icn_obs::metrics::contract::deployments_rejected_inc("deserialization_error");
+                                    warn!("Failed to get recovery entry data: {}", e);
+                                    return;
                                 }
-                            }
-                        });
-                    }
-                    // Handle identity recovery events
-                    else if topic == IDENTITY_RECOVERY_TOPIC {
-                        let recovery_store = recovery_store_for_notifications.clone();
-                        let trust_graph = trust_graph_for_notifications.clone();
-                        let ledger = ledger_for_notifications.clone();
+                            };
 
-                        // Use get_data() to handle decompression if needed
-                        let entry_data = match entry.get_data() {
-                            Ok(data) => data,
-                            Err(e) => {
-                                warn!("Failed to get recovery entry data: {}", e);
-                                return;
-                            }
-                        };
+                            tokio::spawn(async move {
+                                use icn_identity::RecoveryEvent;
 
-                        tokio::spawn(async move {
-                            use icn_identity::RecoveryEvent;
+                                // Deserialize recovery message
+                                match RecoveryMessage::from_bytes(&entry_data) {
+                                    Ok(recovery_msg) => {
+                                        info!(
+                                            "Received recovery message: {}",
+                                            recovery_msg.summary()
+                                        );
 
-                            // Deserialize recovery message
-                            match RecoveryMessage::from_bytes(&entry_data) {
-                                Ok(recovery_msg) => {
-                                    info!("Received recovery message: {}", recovery_msg.summary());
+                                        // Handle different recovery message types
+                                        // Returns Ok(true) if recovery was finalized, Ok(false) otherwise, Err on failure
+                                        let result: Result<bool> = (|| {
+                                            match &recovery_msg {
+                                                RecoveryMessage::Initiated {
+                                                    id,
+                                                    old_did,
+                                                    new_did,
+                                                    threshold,
+                                                    delay_period,
+                                                    timestamp: _,
+                                                } => {
+                                                    // Create new recovery event
+                                                    let recovery = RecoveryEvent::new(
+                                                        old_did.clone(),
+                                                        new_did.clone(),
+                                                        *threshold,
+                                                        *delay_period,
+                                                    );
 
-                                    // Handle different recovery message types
-                                    // Returns Ok(true) if recovery was finalized, Ok(false) otherwise, Err on failure
-                                    let result: Result<bool> = (|| {
-                                        match &recovery_msg {
-                                            RecoveryMessage::Initiated { id, old_did, new_did, threshold, delay_period, timestamp: _ } => {
-                                                // Create new recovery event
-                                                let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), *threshold, *delay_period);
+                                                    // Store recovery event
+                                                    let key = format!("recovery:{id}");
+                                                    let value = serde_json::to_vec(&recovery)
+                                                        .map_err(|e| {
+                                                            anyhow::anyhow!(
+                                                                "Serialization error: {e}"
+                                                            )
+                                                        })?;
+                                                    recovery_store.put(key.as_bytes(), &value)?;
 
-                                                // Store recovery event
-                                                let key = format!("recovery:{id}");
-                                                let value = serde_json::to_vec(&recovery).map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
-                                                recovery_store.put(key.as_bytes(), &value)?;
-
-                                                info!("Stored new recovery: {} ({} → {})", id, old_did, new_did);
-                                                Ok(false)
-                                            }
-                                            RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
-                                            // Load existing recovery
-                                            let key = format!("recovery:{recovery_id}");
-                                            match recovery_store.get(key.as_bytes())? {
-                                                Some(data) => {
-                                                    let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
+                                                    info!(
+                                                        "Stored new recovery: {} ({} → {})",
+                                                        id, old_did, new_did
+                                                    );
+                                                    Ok(false)
+                                                }
+                                                RecoveryMessage::Attestation {
+                                                    recovery_id,
+                                                    attestation,
+                                                    ..
+                                                } => {
+                                                    // Load existing recovery
+                                                    let key = format!("recovery:{recovery_id}");
+                                                    match recovery_store.get(key.as_bytes())? {
+                                                        Some(data) => {
+                                                            let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
                                                         .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
 
-                                                    // Add attestation
-                                                    match recovery.add_attestation(attestation.clone()) {
-                                                        Ok(threshold_reached) => {
-                                                            // Save updated recovery
-                                                            let value = serde_json::to_vec(&recovery)
+                                                            // Add attestation
+                                                            match recovery.add_attestation(
+                                                                attestation.clone(),
+                                                            ) {
+                                                                Ok(threshold_reached) => {
+                                                                    // Save updated recovery
+                                                                    let value = serde_json::to_vec(&recovery)
                                                                 .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
-                                                            recovery_store.put(key.as_bytes(), &value)?;
+                                                                    recovery_store.put(
+                                                                        key.as_bytes(),
+                                                                        &value,
+                                                                    )?;
 
-                                                            if threshold_reached {
-                                                                info!("Recovery {} reached threshold, entering delay period", recovery_id);
-                                                            } else {
-                                                                info!("Added attestation to recovery {}: {}", recovery_id, recovery.progress_summary());
+                                                                    if threshold_reached {
+                                                                        info!("Recovery {} reached threshold, entering delay period", recovery_id);
+                                                                    } else {
+                                                                        info!("Added attestation to recovery {}: {}", recovery_id, recovery.progress_summary());
+                                                                    }
+                                                                    Ok(false)
+                                                                }
+                                                                Err(e) => {
+                                                                    warn!("Failed to add attestation to recovery {}: {}", recovery_id, e);
+                                                                    Err(e)
+                                                                }
                                                             }
+                                                        }
+                                                        None => {
+                                                            warn!("Received attestation for unknown recovery: {}", recovery_id);
                                                             Ok(false)
                                                         }
-                                                        Err(e) => {
-                                                            warn!("Failed to add attestation to recovery {}: {}", recovery_id, e);
-                                                            Err(e)
+                                                    }
+                                                }
+                                                RecoveryMessage::Finalized {
+                                                    id,
+                                                    old_did,
+                                                    new_did,
+                                                    ..
+                                                } => {
+                                                    // Load recovery and mark as finalized
+                                                    let key = format!("recovery:{id}");
+                                                    match recovery_store.get(key.as_bytes())? {
+                                                        Some(data) => {
+                                                            let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
+                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
+
+                                                            // Finalize the recovery
+                                                            match recovery.finalize() {
+                                                                Ok(_) => {
+                                                                    let value = serde_json::to_vec(&recovery)
+                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
+                                                                    recovery_store.put(
+                                                                        key.as_bytes(),
+                                                                        &value,
+                                                                    )?;
+
+                                                                    info!("✅ Recovery finalized: {} → {}", old_did, new_did);
+                                                                    Ok(true) // Successfully finalized - trigger trust/ledger updates
+                                                                }
+                                                                Err(e) => {
+                                                                    warn!("Failed to finalize recovery {}: {}", id, e);
+                                                                    Err(e)
+                                                                }
+                                                            }
+                                                        }
+                                                        None => {
+                                                            warn!("Received finalization for unknown recovery: {}", id);
+                                                            Ok(false) // Unknown recovery - don't trigger trust/ledger updates
                                                         }
                                                     }
                                                 }
-                                                None => {
-                                                    warn!("Received attestation for unknown recovery: {}", recovery_id);
-                                                    Ok(false)
-                                                }
-                                            }
-                                        }
-                                        RecoveryMessage::Finalized { id, old_did, new_did, .. } => {
-                                            // Load recovery and mark as finalized
-                                            let key = format!("recovery:{id}");
-                                            match recovery_store.get(key.as_bytes())? {
-                                                Some(data) => {
-                                                    let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
+                                                RecoveryMessage::Cancelled {
+                                                    id,
+                                                    cancelled_by,
+                                                    reason,
+                                                    ..
+                                                } => {
+                                                    // Load recovery and mark as cancelled
+                                                    let key = format!("recovery:{id}");
+                                                    match recovery_store.get(key.as_bytes())? {
+                                                        Some(data) => {
+                                                            let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
                                                         .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
 
-                                                    // Finalize the recovery
-                                                    match recovery.finalize() {
-                                                        Ok(_) => {
-                                                            let value = serde_json::to_vec(&recovery)
+                                                            match recovery.cancel(
+                                                                cancelled_by.clone(),
+                                                                reason.clone(),
+                                                            ) {
+                                                                Ok(_) => {
+                                                                    let value = serde_json::to_vec(&recovery)
                                                                 .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
-                                                            recovery_store.put(key.as_bytes(), &value)?;
+                                                                    recovery_store.put(
+                                                                        key.as_bytes(),
+                                                                        &value,
+                                                                    )?;
 
-                                                            info!("✅ Recovery finalized: {} → {}", old_did, new_did);
-                                                            Ok(true)  // Successfully finalized - trigger trust/ledger updates
+                                                                    info!("⚠️  Recovery {} cancelled by {}: {}", id, cancelled_by, reason);
+                                                                    Ok(false)
+                                                                }
+                                                                Err(e) => {
+                                                                    warn!("Failed to cancel recovery {}: {}", id, e);
+                                                                    Err(e)
+                                                                }
+                                                            }
                                                         }
-                                                        Err(e) => {
-                                                            warn!("Failed to finalize recovery {}: {}", id, e);
-                                                            Err(e)
-                                                        }
-                                                    }
-                                                }
-                                                None => {
-                                                    warn!("Received finalization for unknown recovery: {}", id);
-                                                    Ok(false)  // Unknown recovery - don't trigger trust/ledger updates
-                                                }
-                                            }
-                                        }
-                                        RecoveryMessage::Cancelled { id, cancelled_by, reason, .. } => {
-                                            // Load recovery and mark as cancelled
-                                            let key = format!("recovery:{id}");
-                                            match recovery_store.get(key.as_bytes())? {
-                                                Some(data) => {
-                                                    let mut recovery: RecoveryEvent = serde_json::from_slice(&data)
-                                                        .map_err(|e| anyhow::anyhow!("Deserialization error: {e}"))?;
-
-                                                    match recovery.cancel(cancelled_by.clone(), reason.clone()) {
-                                                        Ok(_) => {
-                                                            let value = serde_json::to_vec(&recovery)
-                                                                .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
-                                                            recovery_store.put(key.as_bytes(), &value)?;
-
-                                                            info!("⚠️  Recovery {} cancelled by {}: {}", id, cancelled_by, reason);
+                                                        None => {
+                                                            warn!("Received cancellation for unknown recovery: {}", id);
                                                             Ok(false)
                                                         }
-                                                        Err(e) => {
-                                                            warn!("Failed to cancel recovery {}: {}", id, e);
-                                                            Err(e)
-                                                        }
                                                     }
                                                 }
-                                                None => {
-                                                    warn!("Received cancellation for unknown recovery: {}", id);
-                                                    Ok(false)
+                                            }
+                                        })(
+                                        );
+
+                                        match result {
+                                            Err(ref e) => {
+                                                warn!("Failed to handle recovery message: {}", e);
+                                            }
+                                            Ok(true) => {
+                                                // Recovery was successfully finalized - update trust graph and ledger
+                                                if let RecoveryMessage::Finalized {
+                                                    id,
+                                                    old_did,
+                                                    new_did,
+                                                    ..
+                                                } = &recovery_msg
+                                                {
+                                                    // Update trust graph: map old_did relationships to new_did
+                                                    let mut trust = trust_graph.write().await;
+                                                    match trust.map_did_recovery(old_did, new_did) {
+                                                        Ok(count) => {
+                                                            info!("Trust graph: migrated {} edges from {} to {}", count, old_did, new_did);
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to migrate trust graph for recovery {}: {}", id, e);
+                                                        }
+                                                    }
+                                                    drop(trust); // Release write lock
+
+                                                    // Update ledger: transfer balances from old_did to new_did
+                                                    let mut ledger_guard = ledger.write().await;
+                                                    match ledger_guard
+                                                        .transfer_balances_for_recovery(
+                                                            old_did, new_did, id,
+                                                        ) {
+                                                        Ok(count) => {
+                                                            info!("Ledger: transferred {} currencies from {} to {}", count, old_did, new_did);
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to transfer ledger balances for recovery {}: {}", id, e);
+                                                        }
+                                                    }
+                                                    drop(ledger_guard); // Release write lock
                                                 }
+                                            }
+                                            Ok(false) => {
+                                                // Message handled but no finalization occurred - do nothing
                                             }
                                         }
                                     }
-                                    })();
-
-                                    match result {
-                                        Err(ref e) => {
-                                            warn!("Failed to handle recovery message: {}", e);
-                                        }
-                                        Ok(true) => {
-                                            // Recovery was successfully finalized - update trust graph and ledger
-                                            if let RecoveryMessage::Finalized { id, old_did, new_did, .. } = &recovery_msg {
-                                            // Update trust graph: map old_did relationships to new_did
-                                            let mut trust = trust_graph.write().await;
-                                            match trust.map_did_recovery(old_did, new_did) {
-                                                Ok(count) => {
-                                                    info!("Trust graph: migrated {} edges from {} to {}", count, old_did, new_did);
-                                                }
-                                                Err(e) => {
-                                                    warn!("Failed to migrate trust graph for recovery {}: {}", id, e);
-                                                }
-                                            }
-                                            drop(trust); // Release write lock
-
-                                            // Update ledger: transfer balances from old_did to new_did
-                                            let mut ledger_guard = ledger.write().await;
-                                            match ledger_guard.transfer_balances_for_recovery(old_did, new_did, id) {
-                                                Ok(count) => {
-                                                    info!("Ledger: transferred {} currencies from {} to {}", count, old_did, new_did);
-                                                }
-                                                Err(e) => {
-                                                    warn!("Failed to transfer ledger balances for recovery {}: {}", id, e);
-                                                }
-                                            }
-                                            drop(ledger_guard); // Release write lock
-                                            }
-                                        }
-                                        Ok(false) => {
-                                            // Message handled but no finalization occurred - do nothing
-                                        }
+                                    Err(e) => {
+                                        warn!("Failed to deserialize recovery message: {}", e);
                                     }
                                 }
+                            });
+                        }
+                        // Handle connection candidates for NAT traversal
+                        else if topic == NETWORK_CANDIDATES_TOPIC {
+                            // Use get_data() to handle decompression if needed
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
                                 Err(e) => {
-                                    warn!("Failed to deserialize recovery message: {}", e);
+                                    warn!("Failed to get candidate entry data: {}", e);
+                                    return;
                                 }
-                            }
-                        });
-                    }
-                    // Handle connection candidates for NAT traversal
-                    else if topic == NETWORK_CANDIDATES_TOPIC {
-                        // Use get_data() to handle decompression if needed
-                        let entry_data = match entry.get_data() {
-                            Ok(data) => data,
-                            Err(e) => {
-                                warn!("Failed to get candidate entry data: {}", e);
-                                return;
-                            }
-                        };
+                            };
 
-                        // Deserialize connection candidate
-                        match serde_json::from_slice::<icn_net::ConnectionCandidate>(&entry_data) {
-                            Ok(candidate) => {
-                                info!("Received connection candidate from {}: local={}, public={:?}, relay={:?}",
+                            // Deserialize connection candidate
+                            match serde_json::from_slice::<icn_net::ConnectionCandidate>(
+                                &entry_data,
+                            ) {
+                                Ok(candidate) => {
+                                    info!("Received connection candidate from {}: local={}, public={:?}, relay={:?}",
                                       candidate.did, candidate.local_addr, candidate.public_addr, candidate.relay_addr);
 
-                                // Store candidate in cache and attempt connection (Phase 3: Hole Punching)
-                                let cache = candidate_cache_for_notifications.clone();
-                                let net_handle = network_handle_for_candidates.clone();
-                                let did = candidate.did.clone();
+                                    // Store candidate in cache and attempt connection (Phase 3: Hole Punching)
+                                    let cache = candidate_cache_for_notifications.clone();
+                                    let net_handle = network_handle_for_candidates.clone();
+                                    let did = candidate.did.clone();
 
-                                tokio::spawn(async move {
-                                    // Store the candidate
-                                    if !cache.store(candidate.clone()).await {
-                                        debug!("Ignored stale/older candidate for {}", did);
-                                        return;
-                                    }
+                                    tokio::spawn(async move {
+                                        // Store the candidate
+                                        if !cache.store(candidate.clone()).await {
+                                            debug!("Ignored stale/older candidate for {}", did);
+                                            return;
+                                        }
 
-                                    info!("✓ Stored fresh candidate for {}", did);
+                                        info!("✓ Stored fresh candidate for {}", did);
 
-                                    // Check if already connected
-                                    match net_handle.get_peers().await {
-                                        Ok(peers) => {
-                                            if peers.iter().any(|p| p.did == did) {
-                                                debug!("Already connected to {}, skipping dial", did);
+                                        // Check if already connected
+                                        match net_handle.get_peers().await {
+                                            Ok(peers) => {
+                                                if peers.iter().any(|p| p.did == did) {
+                                                    debug!(
+                                                        "Already connected to {}, skipping dial",
+                                                        did
+                                                    );
+                                                    return;
+                                                }
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to get peers: {}", e);
                                                 return;
                                             }
                                         }
-                                        Err(e) => {
-                                            warn!("Failed to get peers: {}", e);
-                                            return;
-                                        }
-                                    }
 
-                                    // Try to establish connection
-                                    // Priority: 1) local_addr, 2) public_addr (for NAT hole punching)
-                                    let mut connected = false;
+                                        // Try to establish connection
+                                        // Priority: 1) local_addr, 2) public_addr (for NAT hole punching)
+                                        let mut connected = false;
 
-                                    // Try local address first (LAN connectivity)
-                                    debug!("Attempting connection to {} via local address {}", did, candidate.local_addr);
-                                    match net_handle.dial(candidate.local_addr, did.clone()).await {
-                                        Ok(_) => {
-                                            info!("✅ Connected to {} via local address {}", did, candidate.local_addr);
-                                            connected = true;
+                                        // Try local address first (LAN connectivity)
+                                        debug!(
+                                            "Attempting connection to {} via local address {}",
+                                            did, candidate.local_addr
+                                        );
+                                        match net_handle
+                                            .dial(candidate.local_addr, did.clone())
+                                            .await
+                                        {
+                                            Ok(_) => {
+                                                info!(
+                                                    "✅ Connected to {} via local address {}",
+                                                    did, candidate.local_addr
+                                                );
+                                                connected = true;
+                                            }
+                                            Err(e) => {
+                                                debug!(
+                                                    "Failed to connect via local address: {}",
+                                                    e
+                                                );
+                                            }
                                         }
-                                        Err(e) => {
-                                            debug!("Failed to connect via local address: {}", e);
-                                        }
-                                    }
 
-                                    // If local connection failed, try public address (NAT hole punching)
-                                    if !connected {
-                                        if let Some(public_addr) = candidate.public_addr {
-                                            debug!("Attempting connection to {} via public address {}", did, public_addr);
-                                            match net_handle.dial(public_addr, did.clone()).await {
-                                                Ok(_) => {
-                                                    info!("✅ Connected to {} via public address {} (NAT traversal)", did, public_addr);
-                                                    connected = true;
-                                                }
-                                                Err(e) => {
-                                                    debug!("Failed to connect via public address: {}", e);
+                                        // If local connection failed, try public address (NAT hole punching)
+                                        if !connected {
+                                            if let Some(public_addr) = candidate.public_addr {
+                                                debug!("Attempting connection to {} via public address {}", did, public_addr);
+                                                match net_handle
+                                                    .dial(public_addr, did.clone())
+                                                    .await
+                                                {
+                                                    Ok(_) => {
+                                                        info!("✅ Connected to {} via public address {} (NAT traversal)", did, public_addr);
+                                                        connected = true;
+                                                    }
+                                                    Err(e) => {
+                                                        debug!("Failed to connect via public address: {}", e);
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    // TODO Phase 4: Try relay address (TURN relay) if both direct methods failed
-                                    if !connected {
-                                        debug!("Could not establish direct connection to {}", did);
-                                    }
-                                });
-                            }
-                            Err(e) => {
-                                warn!("Failed to deserialize connection candidate: {}", e);
-                            }
-                        }
-                    }
-                    // Handle compute topics
-                    else if topic == icn_compute::TOPIC_SUBMIT
-                        || topic == icn_compute::TOPIC_CLAIM
-                        || topic == icn_compute::TOPIC_RESULT
-                    {
-                        let entry_data = match entry.get_data() {
-                            Ok(data) => data,
-                            Err(e) => {
-                                warn!("Failed to get compute entry data: {}", e);
-                                return;
-                            }
-                        };
-
-                        match bincode::deserialize::<icn_compute::ComputeMessage>(&entry_data) {
-                            Ok(compute_msg) => {
-                                let compute_holder = compute_handle_for_notifications.clone();
-                                tokio::spawn(async move {
-                                    if let Some(handle) = compute_holder.read().await.as_ref() {
-                                        if let Err(e) = handle.handle_gossip(compute_msg).await {
-                                            warn!("Failed to handle compute message: {}", e);
+                                        // TODO Phase 4: Try relay address (TURN relay) if both direct methods failed
+                                        if !connected {
+                                            debug!(
+                                                "Could not establish direct connection to {}",
+                                                did
+                                            );
                                         }
-                                    }
-                                });
-                            }
-                            Err(e) => {
-                                warn!("Failed to deserialize compute message: {}", e);
+                                    });
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize connection candidate: {}", e);
+                                }
                             }
                         }
-                    }
-                });
+                        // Handle compute topics
+                        else if topic == icn_compute::TOPIC_SUBMIT
+                            || topic == icn_compute::TOPIC_CLAIM
+                            || topic == icn_compute::TOPIC_RESULT
+                        {
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get compute entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            match bincode::deserialize::<icn_compute::ComputeMessage>(&entry_data) {
+                                Ok(compute_msg) => {
+                                    let compute_holder = compute_handle_for_notifications.clone();
+                                    tokio::spawn(async move {
+                                        if let Some(handle) = compute_holder.read().await.as_ref() {
+                                            if let Err(e) = handle.handle_gossip(compute_msg).await
+                                            {
+                                                warn!("Failed to handle compute message: {}", e);
+                                            }
+                                        }
+                                    });
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize compute message: {}", e);
+                                }
+                            }
+                        }
+                    },
+                );
 
                 gossip.set_notification_callback(notification_callback);
 
                 // Set up peer sampling callback for scope-aware gossip fanout
                 let network_handle_for_sampling = network_handle.clone();
-                let peer_sampling_callback: icn_gossip::PeerSamplingCallback = Arc::new(move |scope, count| {
-                    let net_handle = network_handle_for_sampling.clone();
-                    // Use tokio::task::block_in_place to safely block in async context
-                    tokio::task::block_in_place(move || {
-                        tokio::runtime::Handle::current().block_on(async move {
-                            net_handle.sample_peers(scope, count).await
+                let peer_sampling_callback: icn_gossip::PeerSamplingCallback =
+                    Arc::new(move |scope, count| {
+                        let net_handle = network_handle_for_sampling.clone();
+                        // Use tokio::task::block_in_place to safely block in async context
+                        tokio::task::block_in_place(move || {
+                            tokio::runtime::Handle::current().block_on(async move {
+                                net_handle.sample_peers(scope, count).await
+                            })
                         })
-                    })
-                });
+                    });
 
                 gossip.set_peer_sampling(peer_sampling_callback);
 
                 // Subscribe to trust attestations topic
-                if let Err(e) = gossip.subscribe(crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC, did.clone()) {
+                if let Err(e) = gossip.subscribe(
+                    crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC,
+                    did.clone(),
+                ) {
                     warn!("Failed to subscribe to trust attestations topic: {}", e);
                 } else {
                     info!("Subscribed to trust:attestations topic");
@@ -1121,19 +1340,27 @@ impl Supervisor {
 
             // Dial bootstrap peers for WAN connectivity
             if !self.config.network.bootstrap_peers.is_empty() {
-                info!("Dialing {} bootstrap peers", self.config.network.bootstrap_peers.len());
+                info!(
+                    "Dialing {} bootstrap peers",
+                    self.config.network.bootstrap_peers.len()
+                );
                 let mut connected_bootstrap_peers = Vec::new();
 
                 for peer_url in &self.config.network.bootstrap_peers {
                     match parse_bootstrap_peer(peer_url) {
                         Ok((peer_did, peer_addr)) => {
-                            info!("Connecting to bootstrap peer: {} at {}", peer_did, peer_addr);
+                            info!(
+                                "Connecting to bootstrap peer: {} at {}",
+                                peer_did, peer_addr
+                            );
                             match network_handle.dial(peer_addr, peer_did.clone()).await {
                                 Ok(_) => {
                                     info!("✓ Connected to bootstrap peer: {}", peer_did);
                                     connected_bootstrap_peers.push(peer_did);
                                 }
-                                Err(e) => warn!("Failed to connect to bootstrap peer {}: {}", peer_did, e),
+                                Err(e) => {
+                                    warn!("Failed to connect to bootstrap peer {}: {}", peer_did, e)
+                                }
                             }
                         }
                         Err(e) => {
@@ -1144,8 +1371,10 @@ impl Supervisor {
 
                 // Request peer exchange from bootstrap peers if federation is enabled
                 if self.config.federation.enabled && !connected_bootstrap_peers.is_empty() {
-                    info!("Federation enabled - requesting peer exchange from {} bootstrap peers",
-                          connected_bootstrap_peers.len());
+                    info!(
+                        "Federation enabled - requesting peer exchange from {} bootstrap peers",
+                        connected_bootstrap_peers.len()
+                    );
 
                     let network_filter = if self.config.federation.network_name != "icn-mainnet" {
                         Some(self.config.federation.network_name.clone())
@@ -1157,9 +1386,14 @@ impl Supervisor {
                         // Small delay to allow Hello handshake to complete
                         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-                        match network_handle.request_peer_exchange(&peer_did, Some(50), network_filter.clone()).await {
+                        match network_handle
+                            .request_peer_exchange(&peer_did, Some(50), network_filter.clone())
+                            .await
+                        {
                             Ok(_) => info!("✓ Requested peer exchange from {}", peer_did),
-                            Err(e) => debug!("Failed to request peer exchange from {}: {}", peer_did, e),
+                            Err(e) => {
+                                debug!("Failed to request peer exchange from {}: {}", peer_did, e)
+                            }
                         }
                     }
                 }
@@ -1170,8 +1404,10 @@ impl Supervisor {
                 info!("Announcing connection candidate for NAT traversal...");
                 match network_handle.connection_candidate().await {
                     Ok(candidate) => {
-                        info!("Connection candidate: local={}, public={:?}, relay={:?}",
-                              candidate.local_addr, candidate.public_addr, candidate.relay_addr);
+                        info!(
+                            "Connection candidate: local={}, public={:?}, relay={:?}",
+                            candidate.local_addr, candidate.public_addr, candidate.relay_addr
+                        );
 
                         // Serialize candidate and publish to gossip
                         match serde_json::to_vec(&candidate) {
@@ -1179,7 +1415,9 @@ impl Supervisor {
                                 let mut gossip = gossip_handle.write().await;
                                 match gossip.publish(NETWORK_CANDIDATES_TOPIC, candidate_bytes) {
                                     Ok(_) => info!("✓ Published connection candidate to gossip"),
-                                    Err(e) => warn!("Failed to publish connection candidate: {}", e),
+                                    Err(e) => {
+                                        warn!("Failed to publish connection candidate: {}", e)
+                                    }
                                 }
                             }
                             Err(e) => warn!("Failed to serialize connection candidate: {}", e),
@@ -1399,27 +1637,26 @@ impl Supervisor {
 
             // Spawn Compute actor for distributed task execution
             let trust_graph_for_compute = trust_graph_handle.clone();
-            let compute_trust_callback: icn_compute::TrustCallback = Arc::new(move |did_str: &str| {
-                let graph = trust_graph_for_compute.clone();
-                let did_string = did_str.to_string();
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let did: icn_identity::Did = match serde_json::from_value(
-                            serde_json::Value::String(did_string.clone())
-                        ) {
-                            Ok(d) => d,
-                            Err(_) => return 0.0,
-                        };
-                        let graph = graph.read().await;
-                        graph.compute_trust_score(&did).unwrap_or(0.0)
+            let compute_trust_callback: icn_compute::TrustCallback =
+                Arc::new(move |did_str: &str| {
+                    let graph = trust_graph_for_compute.clone();
+                    let did_string = did_str.to_string();
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            let did: icn_identity::Did = match serde_json::from_value(
+                                serde_json::Value::String(did_string.clone()),
+                            ) {
+                                Ok(d) => d,
+                                Err(_) => return 0.0,
+                            };
+                            let graph = graph.read().await;
+                            graph.compute_trust_score(&did).unwrap_or(0.0)
+                        })
                     })
-                })
-            });
+                });
 
-            let mut compute_actor = icn_compute::ComputeActor::new(
-                did.to_string(),
-                compute_trust_callback,
-            );
+            let mut compute_actor =
+                icn_compute::ComputeActor::new(did.to_string(), compute_trust_callback);
 
             // Set up compute send callback to route through gossip
             let gossip_handle_for_compute = gossip_handle.clone();
@@ -1456,31 +1693,52 @@ impl Supervisor {
                         }
                         icn_compute::ComputeMessage::CheckpointQuery { .. } => {
                             // Phase 16D: Checkpoint query for migration
-                            (icn_compute::TOPIC_CHECKPOINT, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_CHECKPOINT,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                         icn_compute::ComputeMessage::CheckpointResponse { .. } => {
                             // Phase 16D: Checkpoint response for migration
-                            (icn_compute::TOPIC_CHECKPOINT, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_CHECKPOINT,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                         icn_compute::ComputeMessage::MigrationRequest { .. } => {
                             // Phase 16D: Migration request
-                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_MIGRATION,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                         icn_compute::ComputeMessage::MigrationAccept { .. } => {
                             // Phase 16D: Migration acceptance
-                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_MIGRATION,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                         icn_compute::ComputeMessage::CheckpointAnnounce { .. } => {
                             // Phase 16D: Checkpoint announcement
-                            (icn_compute::TOPIC_CHECKPOINT, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_CHECKPOINT,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                         icn_compute::ComputeMessage::MigrationReject { .. } => {
                             // Phase 16D: Migration rejection
-                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_MIGRATION,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                         icn_compute::ComputeMessage::MigrationComplete { .. } => {
                             // Phase 16D: Migration completion
-                            (icn_compute::TOPIC_MIGRATION, bincode::serialize(&compute_msg))
+                            (
+                                icn_compute::TOPIC_MIGRATION,
+                                bincode::serialize(&compute_msg),
+                            )
                         }
                     };
 
@@ -1506,24 +1764,22 @@ impl Supervisor {
                 let ledger = ledger_for_compute.clone();
                 tokio::spawn(async move {
                     // Parse DIDs
-                    let from_did: icn_identity::Did = match serde_json::from_value(
-                        serde_json::Value::String(req.from.clone())
-                    ) {
-                        Ok(d) => d,
-                        Err(e) => {
-                            warn!("Failed to parse payer DID: {}", e);
-                            return;
-                        }
-                    };
-                    let to_did: icn_identity::Did = match serde_json::from_value(
-                        serde_json::Value::String(req.to.clone())
-                    ) {
-                        Ok(d) => d,
-                        Err(e) => {
-                            warn!("Failed to parse payee DID: {}", e);
-                            return;
-                        }
-                    };
+                    let from_did: icn_identity::Did =
+                        match serde_json::from_value(serde_json::Value::String(req.from.clone())) {
+                            Ok(d) => d,
+                            Err(e) => {
+                                warn!("Failed to parse payer DID: {}", e);
+                                return;
+                            }
+                        };
+                    let to_did: icn_identity::Did =
+                        match serde_json::from_value(serde_json::Value::String(req.to.clone())) {
+                            Ok(d) => d,
+                            Err(e) => {
+                                warn!("Failed to parse payee DID: {}", e);
+                                return;
+                            }
+                        };
 
                     // Create journal entry for transfer: debit from payer, credit to payee
                     let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
@@ -1542,8 +1798,10 @@ impl Supervisor {
                     let mut ledger = ledger.write().await;
                     match ledger.append_entry(entry) {
                         Ok(_) => {
-                            info!("✓ Compute payment settled: {} {} from {} to {} for task {}",
-                                  req.amount, req.currency, req.from, req.to, req.task_id);
+                            info!(
+                                "✓ Compute payment settled: {} {} from {} to {} for task {}",
+                                req.amount, req.currency, req.from, req.to, req.task_id
+                            );
                         }
                         Err(e) => {
                             warn!("Failed to settle compute payment: {}", e);
@@ -1561,13 +1819,24 @@ impl Supervisor {
             let compute_event_callback: icn_compute::EventCallback = Arc::new(move |event| {
                 // Log and update metrics
                 match &event {
-                    icn_compute::ComputeEvent::TaskClaimed { task_hash, executor } => {
+                    icn_compute::ComputeEvent::TaskClaimed {
+                        task_hash,
+                        executor,
+                    } => {
                         info!("🔧 Task claimed: {} by {}", task_hash, executor);
                         icn_obs::metrics::compute::tasks_claimed_inc();
                     }
-                    icn_compute::ComputeEvent::TaskCompleted { task_hash, executor, outcome, fuel_used, duration_ms } => {
-                        info!("✅ Task completed: {} by {} - outcome: {}, fuel: {}, duration: {}ms",
-                              task_hash, executor, outcome, fuel_used, duration_ms);
+                    icn_compute::ComputeEvent::TaskCompleted {
+                        task_hash,
+                        executor,
+                        outcome,
+                        fuel_used,
+                        duration_ms,
+                    } => {
+                        info!(
+                            "✅ Task completed: {} by {} - outcome: {}, fuel: {}, duration: {}ms",
+                            task_hash, executor, outcome, fuel_used, duration_ms
+                        );
                         icn_obs::metrics::compute::tasks_completed_inc(outcome);
                     }
                 }
@@ -1588,9 +1857,11 @@ impl Supervisor {
 
             // Initialize dispute resolution system (Phase 18 Week 4)
             let dispute_store_path = self.config.store_path().join("disputes");
-            let dispute_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&dispute_store_path)?);
+            let dispute_store: Arc<dyn icn_store::Store> =
+                Arc::new(SledStore::open(&dispute_store_path)?);
             let dispute_config = icn_ccl::DisputeConfig::default();
-            let dispute_system = icn_ccl::DisputeResolutionSystem::new(dispute_config.clone(), dispute_store);
+            let dispute_system =
+                icn_ccl::DisputeResolutionSystem::new(dispute_config.clone(), dispute_store);
             let dispute_system_handle = Arc::new(tokio::sync::RwLock::new(dispute_system));
             compute_actor.set_dispute_resolution(dispute_system_handle.clone());
             info!(
@@ -1612,7 +1883,12 @@ impl Supervisor {
             // Subscribe to compute topics
             {
                 let mut gossip = gossip_handle.write().await;
-                for topic in &[icn_compute::TOPIC_SUBMIT, icn_compute::TOPIC_CLAIM, icn_compute::TOPIC_RESULT, icn_compute::TOPIC_CANCEL] {
+                for topic in &[
+                    icn_compute::TOPIC_SUBMIT,
+                    icn_compute::TOPIC_CLAIM,
+                    icn_compute::TOPIC_RESULT,
+                    icn_compute::TOPIC_CANCEL,
+                ] {
                     if let Err(e) = gossip.subscribe(topic, did.clone()) {
                         warn!("Failed to subscribe to compute topic {}: {}", topic, e);
                     } else {
@@ -1828,7 +2104,11 @@ impl Supervisor {
             // Assign broadcaster to outer scope for gateway use
             event_broadcaster = Some(broadcaster);
 
-            (Some(network_handle), Some(gossip_handle), Some(ledger_handle))
+            (
+                Some(network_handle),
+                Some(gossip_handle),
+                Some(ledger_handle),
+            )
         } else {
             warn!("No identity bundle available - actors not spawned");
             warn!("Run 'icnctl id init' to create an identity");
@@ -1867,7 +2147,10 @@ impl Supervisor {
 
         // Spawn Gateway API server if enabled (works with or without identity)
         if self.config.gateway.enabled {
-            info!("Gateway spawn check - enabled: true, jwt_secret length: {}", self.config.gateway.jwt_secret.len());
+            info!(
+                "Gateway spawn check - enabled: true, jwt_secret length: {}",
+                self.config.gateway.jwt_secret.len()
+            );
             let gateway_addr: std::net::SocketAddr = self.config.gateway.bind_addr.parse()?;
 
             // Check that JWT secret is configured
@@ -1933,9 +2216,14 @@ impl Supervisor {
             while background_tasks.join_next().await.is_some() {
                 // Task completed successfully
             }
-        }).await {
+        })
+        .await
+        {
             Ok(_) => info!("All background tasks completed successfully"),
-            Err(_) => warn!("Shutdown timeout reached, {} tasks may still be running", background_tasks.len()),
+            Err(_) => warn!(
+                "Shutdown timeout reached, {} tasks may still be running",
+                background_tasks.len()
+            ),
         }
 
         // Abort any remaining tasks that didn't finish
@@ -1954,9 +2242,11 @@ impl Supervisor {
                 // Export gossip state
                 if let Some(ref gossip_handle) = gossip_handle {
                     let gossip_state = gossip_handle.read().await.export_state();
-                    info!("Exported gossip state: {} vector clock entries, {} subscriptions",
-                          gossip_state.vector_clock.len(),
-                          gossip_state.subscriptions.len());
+                    info!(
+                        "Exported gossip state: {} vector clock entries, {} subscriptions",
+                        gossip_state.vector_clock.len(),
+                        gossip_state.subscriptions.len()
+                    );
                     snapshot.gossip_state = Some(gossip_state);
                 }
 
@@ -1965,14 +2255,15 @@ impl Supervisor {
                     // Need to use blocking context for async export_state
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current().block_on(async {
-                                network_handle.export_state().await
-                            })
+                            tokio::runtime::Handle::current()
+                                .block_on(async { network_handle.export_state().await })
                         })
                     })) {
                         Ok(state) => {
-                            info!("Exported network state: {} peer X25519 keys",
-                                  state.peer_x25519_keys.len());
+                            info!(
+                                "Exported network state: {} peer X25519 keys",
+                                state.peer_x25519_keys.len()
+                            );
                             snapshot.network_state = Some(state);
                         }
                         Err(e) => {
@@ -1982,18 +2273,25 @@ impl Supervisor {
                 }
 
                 Ok::<_, anyhow::Error>(snapshot)
-            }.await;
+            }
+            .await;
 
             match snapshot_result {
                 Ok(snapshot) => {
                     // Record snapshot metrics before saving
                     if let Some(ref gossip_state) = snapshot.gossip_state {
-                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(gossip_state.vector_clock.len());
-                        icn_obs::metrics::snapshot::gossip_subscriptions_set(gossip_state.subscriptions.len());
+                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(
+                            gossip_state.vector_clock.len(),
+                        );
+                        icn_obs::metrics::snapshot::gossip_subscriptions_set(
+                            gossip_state.subscriptions.len(),
+                        );
                         icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
                     }
                     if let Some(ref network_state) = snapshot.network_state {
-                        icn_obs::metrics::snapshot::network_x25519_keys_set(network_state.peer_x25519_keys.len());
+                        icn_obs::metrics::snapshot::network_x25519_keys_set(
+                            network_state.peer_x25519_keys.len(),
+                        );
                     }
 
                     // Save snapshot to disk
@@ -2005,7 +2303,9 @@ impl Supervisor {
                     match save_result {
                         Ok(()) => {
                             icn_obs::metrics::snapshot::save_total_inc();
-                            icn_obs::metrics::snapshot::save_duration_record(save_duration.as_secs_f64());
+                            icn_obs::metrics::snapshot::save_duration_record(
+                                save_duration.as_secs_f64(),
+                            );
 
                             // Record snapshot file size
                             let snapshot_path = data_dir.join("state.snapshot");
@@ -2013,11 +2313,16 @@ impl Supervisor {
                                 icn_obs::metrics::snapshot::size_bytes_set(metadata.len());
                             }
 
-                            info!("✅ State snapshot saved to {}/state.snapshot in {:.3}s",
-                                  data_dir.display(), save_duration.as_secs_f64());
+                            info!(
+                                "✅ State snapshot saved to {}/state.snapshot in {:.3}s",
+                                data_dir.display(),
+                                save_duration.as_secs_f64()
+                            );
 
                             // Save timestamped backup for archival
-                            if let Err(e) = icn_snapshot::save_timestamped_snapshot(&snapshot, &data_dir) {
+                            if let Err(e) =
+                                icn_snapshot::save_timestamped_snapshot(&snapshot, &data_dir)
+                            {
                                 warn!("Failed to save timestamped snapshot backup: {}", e);
                             }
 
@@ -2026,7 +2331,7 @@ impl Supervisor {
                                 Ok(deleted) if deleted > 0 => {
                                     info!("Cleaned up {} old snapshot(s)", deleted);
                                 }
-                                Ok(_) => {},
+                                Ok(_) => {}
                                 Err(e) => {
                                     warn!("Failed to cleanup old snapshots: {}", e);
                                 }
@@ -2078,23 +2383,31 @@ mod tests {
 
     #[test]
     fn test_parse_bootstrap_peer_valid() {
-        let url = "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
+        let url =
+            "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
         let result = parse_bootstrap_peer(url);
         assert!(result.is_ok());
 
         let (did, addr) = result.unwrap();
-        assert_eq!(did.as_str(), "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK");
+        assert_eq!(
+            did.as_str(),
+            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+        );
         assert_eq!(addr.to_string(), "203.0.113.50:7777");
     }
 
     #[test]
     fn test_parse_bootstrap_peer_ipv4() {
-        let url = "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@192.168.1.100:7777";
+        let url =
+            "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@192.168.1.100:7777";
         let result = parse_bootstrap_peer(url);
         assert!(result.is_ok());
 
         let (did, addr) = result.unwrap();
-        assert_eq!(did.as_str(), "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH");
+        assert_eq!(
+            did.as_str(),
+            "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+        );
         assert_eq!(addr.to_string(), "192.168.1.100:7777");
     }
 
@@ -2103,22 +2416,33 @@ mod tests {
         let url = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
         let result = parse_bootstrap_peer(url);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("must start with 'icn://'"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must start with 'icn://'"));
     }
 
     #[test]
     fn test_parse_bootstrap_peer_missing_at() {
-        let url = "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK_203.0.113.50:7777";
+        let url =
+            "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK_203.0.113.50:7777";
         let result = parse_bootstrap_peer(url);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("expected icn://DID@IP:PORT"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("expected icn://DID@IP:PORT"));
     }
 
     #[test]
     fn test_parse_bootstrap_peer_invalid_port() {
-        let url = "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:invalid";
+        let url =
+            "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:invalid";
         let result = parse_bootstrap_peer(url);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to parse socket address"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse socket address"));
     }
 }

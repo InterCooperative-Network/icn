@@ -259,11 +259,7 @@ async fn test_trust_attestation_propagation() -> Result<()> {
 
     let bob_edge = bob_has_edge.unwrap();
     assert_eq!(bob_edge.score, 0.75, "Trust score should match");
-    assert_eq!(
-        bob_edge.labels,
-        vec!["test-partner"],
-        "Labels should match"
-    );
+    assert_eq!(bob_edge.labels, vec!["test-partner"], "Labels should match");
 
     info!("✓ Bob successfully received and applied Alice's trust attestation");
 
@@ -329,8 +325,12 @@ async fn test_three_node_transitive_trust() -> Result<()> {
         alice_graph.add_edge(edge_alice_bob.clone())?;
     }
     let mut attestation_alice_bob = TrustAttestation::from_trust_edge(&edge_alice_bob);
-    broadcast_trust_attestation(&mut attestation_alice_bob, &alice.keypair, &alice.gossip_handle)
-        .await?;
+    broadcast_trust_attestation(
+        &mut attestation_alice_bob,
+        &alice.keypair,
+        &alice.gossip_handle,
+    )
+    .await?;
 
     // Bob trusts Carol (0.6)
     info!("Bob trusting Carol...");

@@ -26,7 +26,7 @@ pub use encryption::EncryptedEnvelope;
 pub use envelope::{PayloadType, SignedEnvelope};
 pub use global_rate_limit::GlobalRateLimiter;
 pub use protocol::{
-    KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, read_message, write_message,
+    read_message, write_message, KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage,
 };
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;

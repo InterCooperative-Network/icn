@@ -4,8 +4,8 @@
 //! and conflict resolution when partitioned nodes reconnect.
 
 use icn_gossip::{
-    AccessControl, GossipActor, GossipMessage, PartitionConfig, PartitionDetector,
-    PartitionHealer, Topic, VectorClock,
+    AccessControl, GossipActor, GossipMessage, PartitionConfig, PartitionDetector, PartitionHealer,
+    Topic, VectorClock,
 };
 use icn_identity::KeyPair;
 use icn_trust::TrustClass;
@@ -17,7 +17,11 @@ use tokio::sync::RwLock;
 fn create_test_gossip_with_partition(
     keypair: &KeyPair,
     partition_threshold_ms: u64,
-) -> (GossipActor, Arc<RwLock<PartitionDetector>>, Arc<RwLock<PartitionHealer>>) {
+) -> (
+    GossipActor,
+    Arc<RwLock<PartitionDetector>>,
+    Arc<RwLock<PartitionHealer>>,
+) {
     let did = keypair.did().clone();
     let trust_lookup = Arc::new(|_: &icn_identity::Did| Some(TrustClass::Partner));
 
@@ -97,13 +101,12 @@ async fn test_partition_heal_request_response() {
     // Set up message capture for gossip1
     let captured_messages = Arc::new(RwLock::new(Vec::new()));
     let captured_clone = captured_messages.clone();
-    let send_callback: icn_gossip::SendMessageCallback =
-        Arc::new(move |recipient, message| {
-            let captured = captured_clone.clone();
-            tokio::spawn(async move {
-                captured.write().await.push((recipient, message));
-            });
+    let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient, message| {
+        let captured = captured_clone.clone();
+        tokio::spawn(async move {
+            captured.write().await.push((recipient, message));
         });
+    });
     gossip1.set_send_callback(send_callback);
 
     // Node 1 initiates partition healing with Node 2
@@ -118,17 +121,21 @@ async fn test_partition_heal_request_response() {
     );
 
     // Find the PartitionHealRequest
-    let heal_request = messages.iter().find(|(_, msg)| {
-        matches!(msg, GossipMessage::PartitionHealRequest { .. })
-    });
+    let heal_request = messages
+        .iter()
+        .find(|(_, msg)| matches!(msg, GossipMessage::PartitionHealRequest { .. }));
     assert!(
         heal_request.is_some(),
         "Should have sent a PartitionHealRequest"
     );
 
     // Verify the request contains expected data
-    if let Some((recipient, GossipMessage::PartitionHealRequest { requesting_peer, .. })) =
-        heal_request
+    if let Some((
+        recipient,
+        GossipMessage::PartitionHealRequest {
+            requesting_peer, ..
+        },
+    )) = heal_request
     {
         assert_eq!(
             recipient.as_ref().unwrap(),
@@ -172,17 +179,23 @@ async fn test_partition_heal_request_response() {
         tokio::time::sleep(Duration::from_millis(50)).await;
         let messages2 = captured2.read().await;
 
-        let heal_response = messages2.iter().find(|(_, msg)| {
-            matches!(msg, GossipMessage::PartitionHealResponse { .. })
-        });
+        let heal_response = messages2
+            .iter()
+            .find(|(_, msg)| matches!(msg, GossipMessage::PartitionHealResponse { .. }));
         assert!(
             heal_response.is_some(),
             "Should have sent a PartitionHealResponse"
         );
 
         // Verify the response contains diverged topics info
-        if let Some((_, GossipMessage::PartitionHealResponse { diverged_topics, entries_behind, .. })) =
-            heal_response
+        if let Some((
+            _,
+            GossipMessage::PartitionHealResponse {
+                diverged_topics,
+                entries_behind,
+                ..
+            },
+        )) = heal_response
         {
             // gossip2 has one entry that gossip1 doesn't have
             assert!(

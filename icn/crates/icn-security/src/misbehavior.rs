@@ -5,8 +5,8 @@
 //! This module implements automatic detection of malicious behavior, reputation scoring,
 //! and quarantine/ban mechanisms to protect the network from Byzantine actors.
 
-use icn_obs::metrics::misbehavior as metrics;
 use icn_identity::Did;
+use icn_obs::metrics::misbehavior as metrics;
 use icn_store::ContentHash;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,9 +17,7 @@ use tracing::{debug, info, warn};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Violation {
     /// Invalid signature detected on a message
-    InvalidSignature {
-        message_hash: ContentHash,
-    },
+    InvalidSignature { message_hash: ContentHash },
 
     /// Conflicting ledger entries from same author
     ConflictingLedgerEntries {
@@ -42,10 +40,7 @@ pub enum Violation {
     },
 
     /// Trust graph spam (excessive attestation publishing)
-    TrustGraphSpam {
-        rate_per_hour: f64,
-        threshold: f64,
-    },
+    TrustGraphSpam { rate_per_hour: f64, threshold: f64 },
 
     /// Conflicting signed statements (generic Byzantine behavior)
     ConflictingSignedStatements {
@@ -95,12 +90,22 @@ impl Violation {
                 )
             }
             Violation::FailedComputeVerification { task_hash, .. } => {
-                format!("Compute verification failed for task {}", hex::encode(task_hash))
+                format!(
+                    "Compute verification failed for task {}",
+                    hex::encode(task_hash)
+                )
             }
-            Violation::ExcessiveResourceUse { metric, observed, limit } => {
+            Violation::ExcessiveResourceUse {
+                metric,
+                observed,
+                limit,
+            } => {
                 format!("{metric}: {observed} (limit: {limit})")
             }
-            Violation::TrustGraphSpam { rate_per_hour, threshold } => {
+            Violation::TrustGraphSpam {
+                rate_per_hour,
+                threshold,
+            } => {
                 format!("Trust graph spam: {rate_per_hour:.1}/hr (threshold: {threshold:.1})")
             }
             Violation::ConflictingSignedStatements { conflict_type, .. } => {
@@ -232,7 +237,7 @@ impl Default for MisbehaviorThresholds {
             quarantine_threshold: 0.5,
             ban_threshold: 0.0,
             max_violations_per_hour: 10,
-            decay_rate: 0.01, // 1% per hour
+            decay_rate: 0.01,                        // 1% per hour
             violation_retention_secs: 7 * 24 * 3600, // 7 days
         }
     }
@@ -284,16 +289,10 @@ impl MisbehaviorDetector {
         };
 
         // Add to violation history
-        self.violations
-            .entry(did.clone())
-            .or_default()
-            .push(record);
+        self.violations.entry(did.clone()).or_default().push(record);
 
         // Update reputation score
-        let score = self
-            .reputation_scores
-            .entry(did.clone())
-            .or_default();
+        let score = self.reputation_scores.entry(did.clone()).or_default();
 
         score.apply_penalty(&violation, self.thresholds.decay_rate);
 
@@ -533,7 +532,10 @@ mod tests {
         detector.record_violation(&did, violation, vec![]);
 
         assert!(detector.is_banned(&did), "DID should be auto-banned");
-        assert!(!detector.is_quarantined(&did), "Banned DIDs not quarantined");
+        assert!(
+            !detector.is_quarantined(&did),
+            "Banned DIDs not quarantined"
+        );
     }
 
     #[test]

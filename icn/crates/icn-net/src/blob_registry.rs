@@ -125,7 +125,10 @@ impl BlobLocationRegistry {
     /// Query multiple blobs at once
     ///
     /// Returns a map of blob hash → peer list for each requested blob.
-    pub fn query_blobs(&self, blob_hashes: &[ContentHash]) -> HashMap<ContentHash, Vec<BlobLocation>> {
+    pub fn query_blobs(
+        &self,
+        blob_hashes: &[ContentHash],
+    ) -> HashMap<ContentHash, Vec<BlobLocation>> {
         blob_hashes
             .iter()
             .map(|hash| (*hash, self.get_peers_with_blob(hash)))

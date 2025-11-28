@@ -242,10 +242,7 @@ mod tests {
         let msg = GovernanceMessage::vote_cast(vote.clone(), None);
 
         match msg {
-            GovernanceMessage::VoteCast {
-                vote: v,
-                signature,
-            } => {
+            GovernanceMessage::VoteCast { vote: v, signature } => {
                 assert_eq!(v.choice, VoteChoice::For);
                 assert!(signature.is_none());
             }

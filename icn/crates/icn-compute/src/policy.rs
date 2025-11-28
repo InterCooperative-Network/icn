@@ -341,9 +341,10 @@ impl PolicyManager {
         }
 
         // Credits check (if applicable)
-        if let (Some(credits_limit), Some(credits_spent)) =
-            (quota.credits_per_month, Some(usage.credits_spent_this_month))
-        {
+        if let (Some(credits_limit), Some(credits_spent)) = (
+            quota.credits_per_month,
+            Some(usage.credits_spent_this_month),
+        ) {
             if credits_spent >= credits_limit {
                 return Ok(Some(format!(
                     "Monthly credit quota exceeded: {credits_spent}/{credits_limit}"
@@ -1333,7 +1334,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(usage_over.concurrent_tasks, 0); // All completed
-        // Only record_execution increments tasks_completed_this_month (test 6)
+                                                    // Only record_execution increments tasks_completed_this_month (test 6)
         assert_eq!(usage_over.tasks_completed_this_month, 1);
         assert_eq!(usage_over.credits_spent_this_month, 150);
     }

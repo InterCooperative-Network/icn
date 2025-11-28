@@ -1,8 +1,8 @@
 //! Health check endpoint
 
-use actix_web::{get, web, HttpResponse};
-use crate::models::{ComponentHealth, HealthResponse};
 use crate::coop::CoopManager;
+use crate::models::{ComponentHealth, HealthResponse};
+use actix_web::{get, web, HttpResponse};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -19,9 +19,7 @@ pub async fn health() -> HttpResponse {
 
 /// GET /health/detailed - Detailed health check with component status
 #[get("/health/detailed")]
-pub async fn health_detailed(
-    coop_manager: web::Data<Arc<CoopManager>>,
-) -> HttpResponse {
+pub async fn health_detailed(coop_manager: web::Data<Arc<CoopManager>>) -> HttpResponse {
     let mut checks = HashMap::new();
 
     // Check cooperative manager
@@ -38,10 +36,13 @@ pub async fn health_detailed(
     checks.insert("cooperative_manager".to_string(), coop_health);
 
     // Check system resources
-    checks.insert("system".to_string(), ComponentHealth {
-        status: "ok".to_string(),
-        details: Some("System resources available".to_string()),
-    });
+    checks.insert(
+        "system".to_string(),
+        ComponentHealth {
+            status: "ok".to_string(),
+            details: Some("System resources available".to_string()),
+        },
+    );
 
     // Determine overall status
     let overall_status = if checks.values().any(|c| c.status == "error") {

@@ -7,10 +7,12 @@
 //! - Trust + topology combined peer selection
 
 use anyhow::Result;
-use icn_net::{FanoutConfig, NeighborLimitsConfig, TopologyConfig};
 use icn_gossip::{GossipActor, Scope};
 use icn_identity::{Did, IdentityBundle, KeyPair};
-use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle, NetworkMessage};
+use icn_net::{FanoutConfig, NeighborLimitsConfig, TopologyConfig};
+use icn_net::{
+    IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle, NetworkMessage,
+};
 use icn_trust::TrustGraph;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -33,11 +35,7 @@ struct TestNode {
 }
 
 impl TestNode {
-    async fn spawn(
-        port: u16,
-        region: String,
-        cluster_id: String,
-    ) -> Result<Self> {
+    async fn spawn(port: u16, region: String, cluster_id: String) -> Result<Self> {
         Self::spawn_with_limits(port, region, cluster_id, None).await
     }
 
@@ -59,12 +57,8 @@ impl TestNode {
         )));
 
         // Create gossip actor with trust lookup
-        let trust_lookup: TrustLookup =
-            Arc::new(|_| Some(icn_trust::TrustClass::Partner)); // Allow all peers for testing
-        let gossip_handle = Arc::new(RwLock::new(GossipActor::new(
-            did.clone(),
-            trust_lookup,
-        )));
+        let trust_lookup: TrustLookup = Arc::new(|_| Some(icn_trust::TrustClass::Partner)); // Allow all peers for testing
+        let gossip_handle = Arc::new(RwLock::new(GossipActor::new(did.clone(), trust_lookup)));
 
         // Set up incoming message handler for network actor
         let gossip_handle_clone = gossip_handle.clone();
@@ -108,10 +102,10 @@ impl TestNode {
             shutdown_tx.clone(),
             Some(incoming_handler),
             Some(trust_graph.clone()),
-            None, // No trust-gated config for tests
-            None, // No fallback config for tests
+            None,                  // No trust-gated config for tests
+            None,                  // No fallback config for tests
             Some(topology_config), // Enable topology
-            None, // No STUN servers for tests
+            None,                  // No STUN servers for tests
         )
         .await?;
 
@@ -121,29 +115,30 @@ impl TestNode {
             let network_handle_clone = network_handle.clone();
             let did_clone = did.clone();
 
-            let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient_opt, gossip_msg| {
-                let net_handle = network_handle_clone.clone();
-                let from = did_clone.clone();
+            let send_callback: icn_gossip::SendMessageCallback =
+                Arc::new(move |recipient_opt, gossip_msg| {
+                    let net_handle = network_handle_clone.clone();
+                    let from = did_clone.clone();
 
-                // Spawn async task to send message
-                tokio::spawn(async move {
-                    let net_msg = NetworkMessage::new(
-                        from.clone(),
-                        recipient_opt.clone(), // Option<Did>
-                        MessagePayload::Gossip(gossip_msg),
-                    );
+                    // Spawn async task to send message
+                    tokio::spawn(async move {
+                        let net_msg = NetworkMessage::new(
+                            from.clone(),
+                            recipient_opt.clone(), // Option<Did>
+                            MessagePayload::Gossip(gossip_msg),
+                        );
 
-                    let result = if let Some(recipient) = recipient_opt {
-                        net_handle.send_message(recipient, net_msg).await
-                    } else {
-                        net_handle.broadcast(net_msg).await
-                    };
+                        let result = if let Some(recipient) = recipient_opt {
+                            net_handle.send_message(recipient, net_msg).await
+                        } else {
+                            net_handle.broadcast(net_msg).await
+                        };
 
-                    if let Err(e) = result {
-                        warn!("Failed to send gossip message: {}", e);
-                    }
+                        if let Err(e) = result {
+                            warn!("Failed to send gossip message: {}", e);
+                        }
+                    });
                 });
-            });
 
             gossip.set_send_callback(send_callback);
         }
@@ -153,21 +148,22 @@ impl TestNode {
             let mut gossip = gossip_handle.write().await;
             let network_handle_clone = network_handle.clone();
 
-            let peer_sampling_callback: icn_gossip::PeerSamplingCallback = Arc::new(move |scope, count| {
-                let net_handle = network_handle_clone.clone();
-                tokio::task::block_in_place(move || {
-                    tokio::runtime::Handle::current().block_on(async move {
-                        net_handle.sample_peers(scope, count).await
+            let peer_sampling_callback: icn_gossip::PeerSamplingCallback =
+                Arc::new(move |scope, count| {
+                    let net_handle = network_handle_clone.clone();
+                    tokio::task::block_in_place(move || {
+                        tokio::runtime::Handle::current()
+                            .block_on(async move { net_handle.sample_peers(scope, count).await })
                     })
-                })
-            });
+                });
 
             gossip.set_peer_sampling(peer_sampling_callback);
         }
 
-        info!("Node spawned: {} on {} (region: {}, cluster: {})",
-              did, listen_addr,
-              topology_region, topology_cluster);
+        info!(
+            "Node spawned: {} on {} (region: {}, cluster: {})",
+            did, listen_addr, topology_region, topology_cluster
+        );
 
         Ok(TestNode {
             _keypair: keypair,
@@ -235,11 +231,17 @@ async fn test_local_cluster_categorization() -> Result<()> {
     info!("Node A neighbor counts: {:?}", counts_a);
     info!("Node B neighbor counts: {:?}", counts_b);
 
-    assert_eq!(counts_a.local_cluster, 1, "Node A should have 1 local cluster peer");
+    assert_eq!(
+        counts_a.local_cluster, 1,
+        "Node A should have 1 local cluster peer"
+    );
     assert_eq!(counts_a.regional, 0, "Node A should have 0 regional peers");
     assert_eq!(counts_a.backbone, 0, "Node A should have 0 backbone peers");
 
-    assert_eq!(counts_b.local_cluster, 1, "Node B should have 1 local cluster peer");
+    assert_eq!(
+        counts_b.local_cluster, 1,
+        "Node B should have 1 local cluster peer"
+    );
     assert_eq!(counts_b.regional, 0, "Node B should have 0 regional peers");
     assert_eq!(counts_b.backbone, 0, "Node B should have 0 backbone peers");
 
@@ -268,11 +270,17 @@ async fn test_regional_categorization() -> Result<()> {
     info!("Node A neighbor counts: {:?}", counts_a);
     info!("Node B neighbor counts: {:?}", counts_b);
 
-    assert_eq!(counts_a.local_cluster, 0, "Node A should have 0 local cluster peers");
+    assert_eq!(
+        counts_a.local_cluster, 0,
+        "Node A should have 0 local cluster peers"
+    );
     assert_eq!(counts_a.regional, 1, "Node A should have 1 regional peer");
     assert_eq!(counts_a.backbone, 0, "Node A should have 0 backbone peers");
 
-    assert_eq!(counts_b.local_cluster, 0, "Node B should have 0 local cluster peers");
+    assert_eq!(
+        counts_b.local_cluster, 0,
+        "Node B should have 0 local cluster peers"
+    );
     assert_eq!(counts_b.regional, 1, "Node B should have 1 regional peer");
     assert_eq!(counts_b.backbone, 0, "Node B should have 0 backbone peers");
 
@@ -301,11 +309,17 @@ async fn test_backbone_categorization() -> Result<()> {
     info!("Node A neighbor counts: {:?}", counts_a);
     info!("Node B neighbor counts: {:?}", counts_b);
 
-    assert_eq!(counts_a.local_cluster, 0, "Node A should have 0 local cluster peers");
+    assert_eq!(
+        counts_a.local_cluster, 0,
+        "Node A should have 0 local cluster peers"
+    );
     assert_eq!(counts_a.regional, 0, "Node A should have 0 regional peers");
     assert_eq!(counts_a.backbone, 1, "Node A should have 1 backbone peer");
 
-    assert_eq!(counts_b.local_cluster, 0, "Node B should have 0 local cluster peers");
+    assert_eq!(
+        counts_b.local_cluster, 0,
+        "Node B should have 0 local cluster peers"
+    );
     assert_eq!(counts_b.regional, 0, "Node B should have 0 regional peers");
     assert_eq!(counts_b.backbone, 1, "Node B should have 1 backbone peer");
 
@@ -339,9 +353,18 @@ async fn test_multi_region_topology() -> Result<()> {
     let counts_a = node_a.get_neighbor_counts().await;
     info!("Node A neighbor counts: {:?}", counts_a);
 
-    assert_eq!(counts_a.local_cluster, 1, "Node A should have 1 local cluster peer (node_b)");
-    assert_eq!(counts_a.regional, 1, "Node A should have 1 regional peer (node_c)");
-    assert_eq!(counts_a.backbone, 1, "Node A should have 1 backbone peer (node_d)");
+    assert_eq!(
+        counts_a.local_cluster, 1,
+        "Node A should have 1 local cluster peer (node_b)"
+    );
+    assert_eq!(
+        counts_a.regional, 1,
+        "Node A should have 1 regional peer (node_c)"
+    );
+    assert_eq!(
+        counts_a.backbone, 1,
+        "Node A should have 1 backbone peer (node_d)"
+    );
 
     Ok(())
 }
@@ -365,15 +388,25 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
     tokio::time::sleep(Duration::from_millis(1500)).await;
 
     // Test LocalCluster scope sampling
-    let local_peers = node_a.network_handle.sample_peers(Scope::LocalCluster, 10).await;
+    let local_peers = node_a
+        .network_handle
+        .sample_peers(Scope::LocalCluster, 10)
+        .await;
     info!("LocalCluster sampled peers: {:?}", local_peers);
     assert_eq!(local_peers.len(), 1, "Should sample 1 local cluster peer");
     assert_eq!(local_peers[0], node_b.did, "Should sample node_b");
 
     // Test Regional scope sampling
-    let regional_peers = node_a.network_handle.sample_peers(Scope::Regional, 10).await;
+    let regional_peers = node_a
+        .network_handle
+        .sample_peers(Scope::Regional, 10)
+        .await;
     info!("Regional sampled peers: {:?}", regional_peers);
-    assert_eq!(regional_peers.len(), 2, "Should sample 2 regional peers (local + regional)");
+    assert_eq!(
+        regional_peers.len(),
+        2,
+        "Should sample 2 regional peers (local + regional)"
+    );
 
     // Test Global scope sampling
     let global_peers = node_a.network_handle.sample_peers(Scope::Global, 10).await;
@@ -421,7 +454,10 @@ async fn test_neighbor_set_lru_eviction() -> Result<()> {
 
     // Verify that only 2 peers are kept (LRU eviction)
     let counts_a = node_a.get_neighbor_counts().await;
-    info!("Node A neighbor counts after connecting to 3 peers: {:?}", counts_a);
+    info!(
+        "Node A neighbor counts after connecting to 3 peers: {:?}",
+        counts_a
+    );
 
     // Note: Due to the limit of 2, one peer should have been evicted
     assert!(

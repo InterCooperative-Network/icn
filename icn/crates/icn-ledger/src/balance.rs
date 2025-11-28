@@ -37,11 +37,7 @@ pub fn compute_account_balance(account_id: &Did, entries: &[JournalEntry]) -> Ac
 }
 
 /// Compute balance for a specific account and currency
-pub fn compute_balance(
-    account_id: &Did,
-    currency: &str,
-    entries: &[JournalEntry],
-) -> i64 {
+pub fn compute_balance(account_id: &Did, currency: &str, entries: &[JournalEntry]) -> i64 {
     let mut balance = 0i64;
 
     for entry in entries {

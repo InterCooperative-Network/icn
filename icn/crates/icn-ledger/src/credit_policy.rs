@@ -34,7 +34,12 @@ pub struct CreditPolicy {
 
 impl CreditPolicy {
     /// Create a new credit policy
-    pub fn new(baseline: i64, trust_multiplier: f64, history_bonus_rate: f64, currency: String) -> Self {
+    pub fn new(
+        baseline: i64,
+        trust_multiplier: f64,
+        history_bonus_rate: f64,
+        currency: String,
+    ) -> Self {
         CreditPolicy {
             baseline,
             trust_multiplier,
@@ -46,9 +51,9 @@ impl CreditPolicy {
     /// Create a conservative policy for new communities
     pub fn conservative(currency: String) -> Self {
         Self::new(
-            10_000,  // 100 hours (assuming 2 decimals)
-            0.3,     // 30% trust bonus (max +30 hours)
-            0.05,    // 5% of cleared volume
+            10_000, // 100 hours (assuming 2 decimals)
+            0.3,    // 30% trust bonus (max +30 hours)
+            0.05,   // 5% of cleared volume
             currency,
         )
     }
@@ -56,9 +61,9 @@ impl CreditPolicy {
     /// Create a permissive policy for established communities
     pub fn permissive(currency: String) -> Self {
         Self::new(
-            50_000,  // 500 hours (assuming 2 decimals)
-            0.5,     // 50% trust bonus (max +250 hours)
-            0.15,    // 15% of cleared volume
+            50_000, // 500 hours (assuming 2 decimals)
+            0.5,    // 50% trust bonus (max +250 hours)
+            0.15,   // 15% of cleared volume
             currency,
         )
     }
@@ -152,9 +157,9 @@ impl NewMemberPolicy {
     /// Create a conservative policy for protecting communities
     pub fn conservative(currency: String) -> Self {
         Self::new(
-            1_000,                       // 10 hours initial limit
-            Duration::from_secs(90 * 86400),  // 90 days
-            5_000,                       // Must clear 50 hours first
+            1_000,                           // 10 hours initial limit
+            Duration::from_secs(90 * 86400), // 90 days
+            5_000,                           // Must clear 50 hours first
             currency,
         )
     }
@@ -178,10 +183,10 @@ impl NewMemberPolicy {
     pub fn calculate_effective_limit(
         &self,
         _member: &Did,
-        member_since: u64,  // Unix timestamp when member joined
-        current_time: u64,  // Current Unix timestamp
+        member_since: u64, // Unix timestamp when member joined
+        current_time: u64, // Current Unix timestamp
         cleared_volume: i64,
-        full_limit: i64,    // The limit they'll eventually reach
+        full_limit: i64, // The limit they'll eventually reach
     ) -> i64 {
         // If hasn't met contribution threshold, use initial limit
         if cleared_volume < self.contribution_threshold {
@@ -248,7 +253,9 @@ impl CreditPolicyManager {
         trust_graph: &TrustGraph,
     ) -> Result<CreditLimit> {
         // Calculate base limit from credit policy
-        let base_limit = self.credit_policy.calculate_limit(member, ledger, trust_graph)?;
+        let base_limit = self
+            .credit_policy
+            .calculate_limit(member, ledger, trust_graph)?;
 
         // Get cleared volume for new member check
         let cleared_volume = ledger.total_cleared_by(member, &self.credit_policy.currency)?;
@@ -285,7 +292,8 @@ impl CreditPolicyManager {
         ledger: &Ledger,
         trust_graph: &TrustGraph,
     ) -> Result<bool> {
-        let limit = self.calculate_credit_limit(member, member_since, current_time, ledger, trust_graph)?;
+        let limit =
+            self.calculate_credit_limit(member, member_since, current_time, ledger, trust_graph)?;
 
         let would_exceed = self.credit_policy.would_exceed_limit(
             member,
@@ -355,13 +363,25 @@ mod tests {
         // Test 1: Not enough cleared volume yet
         let cleared = 4_000; // Only 40 hours cleared (< 50 threshold)
         let current_time = member_since + 30 * 86400; // 30 days later
-        let limit = policy.calculate_effective_limit(&member, member_since, current_time, cleared, full_limit);
+        let limit = policy.calculate_effective_limit(
+            &member,
+            member_since,
+            current_time,
+            cleared,
+            full_limit,
+        );
         assert_eq!(limit, policy.initial_limit); // Still at initial limit
 
         // Test 2: Cleared enough, 30 days in (1/3 of 90 day ramp)
         let cleared = 6_000; // 60 hours cleared (> 50 threshold)
         let current_time = member_since + 30 * 86400; // 30 days later
-        let limit = policy.calculate_effective_limit(&member, member_since, current_time, cleared, full_limit);
+        let limit = policy.calculate_effective_limit(
+            &member,
+            member_since,
+            current_time,
+            cleared,
+            full_limit,
+        );
 
         // Expected: 1,000 + ((10,000 - 1,000) * (30/90))
         //         = 1,000 + (9,000 * 0.333...)
@@ -374,7 +394,13 @@ mod tests {
         // Test 3: Full ramp period complete
         let cleared = 10_000;
         let current_time = member_since + 100 * 86400; // 100 days (> 90 day ramp)
-        let limit = policy.calculate_effective_limit(&member, member_since, current_time, cleared, full_limit);
+        let limit = policy.calculate_effective_limit(
+            &member,
+            member_since,
+            current_time,
+            cleared,
+            full_limit,
+        );
         assert_eq!(limit, full_limit); // Should be at full limit now
     }
 }

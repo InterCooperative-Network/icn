@@ -79,7 +79,9 @@ async fn main() -> Result<()> {
         config.gateway.jwt_secret = jwt_secret;
     } else if let Ok(jwt_secret) = std::env::var("ICN_GATEWAY_JWT_SECRET") {
         config.gateway.jwt_secret = jwt_secret;
-        tracing::debug!("Gateway JWT secret loaded from ICN_GATEWAY_JWT_SECRET environment variable");
+        tracing::debug!(
+            "Gateway JWT secret loaded from ICN_GATEWAY_JWT_SECRET environment variable"
+        );
     }
 
     // Ensure data directory exists
@@ -93,7 +95,10 @@ async fn main() -> Result<()> {
         if config.gateway.jwt_secret.is_empty() {
             tracing::warn!("Gateway enabled but JWT secret not configured!");
         } else {
-            tracing::info!("Gateway JWT secret configured (length: {})", config.gateway.jwt_secret.len());
+            tracing::info!(
+                "Gateway JWT secret configured (length: {})",
+                config.gateway.jwt_secret.len()
+            );
         }
     } else {
         tracing::debug!("Gateway API disabled");
@@ -109,16 +114,17 @@ async fn main() -> Result<()> {
         // preventing recovery from memory dumps or swap space.
         // Note: This will fail when run as a systemd service (non-interactive)
         // Consider using environment variable or socket-based authentication for production
-        let passphrase = read_passphrase("Enter keystore passphrase: ")
-            .context("Failed to read passphrase")?;
+        let passphrase =
+            read_passphrase("Enter keystore passphrase: ").context("Failed to read passphrase")?;
 
         // Load and unlock keystore
-        let mut keystore = AgeKeyStore::open(&keystore_path)
-            .context("Failed to open keystore")?;
-        keystore.unlock(&passphrase)
+        let mut keystore = AgeKeyStore::open(&keystore_path).context("Failed to open keystore")?;
+        keystore
+            .unlock(&passphrase)
             .context("Failed to unlock keystore - incorrect passphrase?")?;
 
-        let bundle = keystore.get_identity_bundle()
+        let bundle = keystore
+            .get_identity_bundle()
             .context("Failed to get identity bundle from keystore")?;
 
         tracing::info!("Identity loaded: {} (with DID-TLS binding)", bundle.did());
@@ -137,9 +143,7 @@ async fn main() -> Result<()> {
     let shutdown_tx = runtime.shutdown_tx();
 
     // Spawn runtime task
-    let mut runtime_handle = tokio::spawn(async move {
-        runtime.run().await
-    });
+    let mut runtime_handle = tokio::spawn(async move { runtime.run().await });
 
     // Wait for shutdown signal or runtime completion
     let shutdown_result = tokio::select! {
@@ -201,10 +205,8 @@ fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
     print!("{prompt}");
     io::stdout().flush()?;
     // Wrap the String immediately in Zeroizing to prevent it from lingering in memory
-    let passphrase_str = Zeroizing::new(
-        rpassword::read_password()
-            .context("Failed to read password")?
-    );
+    let passphrase_str =
+        Zeroizing::new(rpassword::read_password().context("Failed to read password")?);
     // Convert to bytes (copies from zeroized String, which is then dropped and zeroed)
     Ok(Zeroizing::new(passphrase_str.as_bytes().to_vec()))
 }

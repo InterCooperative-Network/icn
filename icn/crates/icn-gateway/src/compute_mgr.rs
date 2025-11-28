@@ -6,7 +6,9 @@
 //! 2. ComputeHandle (when integrated with daemon)
 
 use anyhow::Result;
-use icn_compute::{ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TaskStatus};
+use icn_compute::{
+    ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TaskStatus,
+};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -97,7 +99,7 @@ impl ComputeManager {
             payment_rate,
             payment_currency,
             resource_profile: None, // TODO: Allow REST API clients to specify resource requirements
-            actor_mode: None, // Not actor mode (Phase 16D)
+            actor_mode: None,       // Not actor mode (Phase 16D)
             placement_constraints: None, // No constraints from API (Phase 16E will set from policy)
         };
 
@@ -107,7 +109,9 @@ impl ComputeManager {
 
         // If we have a daemon handle, use it
         if let Some(ref handle) = self.compute_handle {
-            let hash = handle.submit(task).await
+            let hash = handle
+                .submit(task)
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to submit task: {e}"))?;
 
             // Track locally
@@ -118,7 +122,9 @@ impl ComputeManager {
                 submitted_at: now,
             };
 
-            let mut tasks = self.tasks.write()
+            let mut tasks = self
+                .tasks
+                .write()
                 .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
             tasks.insert(hash, info);
 
@@ -149,7 +155,8 @@ impl ComputeManager {
                         TaskStatus::Completed { result } => {
                             let (outcome, output, error) = match &result.outcome {
                                 icn_compute::ExecutionOutcome::Success(data) => {
-                                    let output: Option<serde_json::Value> = serde_json::from_slice(data).ok();
+                                    let output: Option<serde_json::Value> =
+                                        serde_json::from_slice(data).ok();
                                     ("success".to_string(), output, None)
                                 }
                                 icn_compute::ExecutionOutcome::Failed(e) => {
@@ -208,7 +215,9 @@ impl ComputeManager {
             }
         } else {
             // Check local cache
-            let tasks = self.tasks.read()
+            let tasks = self
+                .tasks
+                .read()
                 .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
             if let Some(info) = tasks.get(&task_hash) {
@@ -232,7 +241,9 @@ impl ComputeManager {
         reason: String,
     ) -> Result<()> {
         if let Some(ref handle) = self.compute_handle {
-            handle.cancel_task(&task_hash, &requester, reason).await
+            handle
+                .cancel_task(&task_hash, &requester, reason)
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to cancel task: {e}"))?;
             Ok(())
         } else {
@@ -283,17 +294,19 @@ mod tests {
     #[tokio::test]
     async fn test_submit_without_daemon() {
         let mgr = ComputeManager::new();
-        let result = mgr.submit_task(
-            "task-1".to_string(),
-            "did:icn:alice".to_string(),
-            r#"{"name": "Test"}"#.to_string(),
-            vec![],
-            10_000,
-            "normal",
-            None,
-            None,
-            None,
-        ).await;
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "did:icn:alice".to_string(),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                10_000,
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not connected"));
@@ -302,17 +315,19 @@ mod tests {
     #[tokio::test]
     async fn test_submit_invalid_fuel() {
         let mgr = ComputeManager::new();
-        let result = mgr.submit_task(
-            "task-1".to_string(),
-            "did:icn:alice".to_string(),
-            r#"{"name": "Test"}"#.to_string(),
-            vec![],
-            50, // Below minimum (100)
-            "normal",
-            None,
-            None,
-            None,
-        ).await;
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "did:icn:alice".to_string(),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                50, // Below minimum (100)
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("too low"));
@@ -321,36 +336,43 @@ mod tests {
     #[tokio::test]
     async fn test_submit_invalid_did() {
         let mgr = ComputeManager::new();
-        let result = mgr.submit_task(
-            "task-1".to_string(),
-            "not-a-did".to_string(), // Invalid DID format
-            r#"{"name": "Test"}"#.to_string(),
-            vec![],
-            10_000,
-            "normal",
-            None,
-            None,
-            None,
-        ).await;
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "not-a-did".to_string(), // Invalid DID format
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                10_000,
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid submitter DID"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid submitter DID"));
     }
 
     #[tokio::test]
     async fn test_submit_empty_task_id() {
         let mgr = ComputeManager::new();
-        let result = mgr.submit_task(
-            "".to_string(), // Empty ID
-            "did:icn:alice".to_string(),
-            r#"{"name": "Test"}"#.to_string(),
-            vec![],
-            10_000,
-            "normal",
-            None,
-            None,
-            None,
-        ).await;
+        let result = mgr
+            .submit_task(
+                "".to_string(), // Empty ID
+                "did:icn:alice".to_string(),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                10_000,
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
@@ -359,19 +381,24 @@ mod tests {
     #[tokio::test]
     async fn test_submit_payment_rate_too_high() {
         let mgr = ComputeManager::new();
-        let result = mgr.submit_task(
-            "task-1".to_string(),
-            "did:icn:alice".to_string(),
-            r#"{"name": "Test"}"#.to_string(),
-            vec![],
-            10_000,
-            "normal",
-            None,
-            Some(2_000_000), // Above max (1M)
-            None,
-        ).await;
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "did:icn:alice".to_string(),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                10_000,
+                "normal",
+                None,
+                Some(2_000_000), // Above max (1M)
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Payment rate too high"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Payment rate too high"));
     }
 }

@@ -8,7 +8,9 @@ use crate::coop::{CoopManager, MemberRole};
 use crate::error::Result;
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::middleware::{require_coop_access, require_scope};
-use crate::models::{AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest};
+use crate::models::{
+    AddMemberRequest, CreateCoopRequest, UpdateRoleRequest, UpdateSettingsRequest,
+};
 use crate::validation;
 use icn_obs::metrics::gateway;
 
@@ -16,9 +18,11 @@ fn timestamp() -> Result<u64> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
-        .map_err(|e| crate::error::GatewayError::InternalError(
-            format!("System clock error (clock may be set before 1970): {e}")
-        ))
+        .map_err(|e| {
+            crate::error::GatewayError::InternalError(format!(
+                "System clock error (clock may be set before 1970): {e}"
+            ))
+        })
 }
 
 fn parse_role(role_str: &str) -> Result<MemberRole> {
@@ -26,9 +30,9 @@ fn parse_role(role_str: &str) -> Result<MemberRole> {
         "owner" => Ok(MemberRole::Owner),
         "admin" => Ok(MemberRole::Admin),
         "member" => Ok(MemberRole::Member),
-        _ => Err(crate::error::GatewayError::BadRequest(
-            format!("Invalid role: {role_str}")
-        )),
+        _ => Err(crate::error::GatewayError::BadRequest(format!(
+            "Invalid role: {role_str}"
+        ))),
     }
 }
 
@@ -44,11 +48,13 @@ pub async fn create_coop(
 
     // Extract owner DID from authenticated token
     use crate::middleware::get_claims;
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
-    let owner: icn_identity::Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let owner: icn_identity::Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     // Validate inputs
     validation::validate_coop_id(&req.id)?;
@@ -56,12 +62,7 @@ pub async fn create_coop(
 
     // Note: Global cooperative limit is checked atomically inside create_coop()
     // to prevent TOCTOU race condition
-    coop_mgr.create_coop(
-        req.id.clone(),
-        req.name.clone(),
-        owner,
-        timestamp()?,
-    )?;
+    coop_mgr.create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?)?;
 
     // Track cooperative creation
     gateway::coops_created_inc();
@@ -184,7 +185,9 @@ pub async fn add_member(
     require_coop_access(&http_req, &id)?; // CRITICAL: Prevent cross-coop attacks
 
     // Parse and validate inputs first
-    let did: icn_identity::Did = req.did.parse()
+    let did: icn_identity::Did = req
+        .did
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let role = parse_role(&req.role)?;
@@ -225,7 +228,8 @@ pub async fn remove_member(
     let (coop_id, did_str) = path.into_inner();
     require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop attacks
 
-    let did = did_str.parse()
+    let did = did_str
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     // Use atomic operation to prevent race conditions
@@ -263,7 +267,8 @@ pub async fn update_member_role(
     let (coop_id, did_str) = path.into_inner();
     require_coop_access(&http_req, &coop_id)?; // CRITICAL: Prevent cross-coop attacks
 
-    let did = did_str.parse()
+    let did = did_str
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let new_role = parse_role(&req.role)?;
@@ -289,8 +294,8 @@ pub async fn update_member_role(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App, HttpMessage};
     use crate::auth::TokenClaims;
+    use actix_web::{test, App, HttpMessage};
     use icn_identity::IdentityBundle;
 
     #[actix_web::test]
@@ -301,12 +306,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
-                .service(
-                    web::scope("/coops")
-                        .service(create_coop)
-                        .service(get_coop)
-                )
-        ).await;
+                .service(web::scope("/coops").service(create_coop).service(get_coop)),
+        )
+        .await;
 
         // Create coop with authorization
         let req_body = CreateCoopRequest {
@@ -357,12 +359,14 @@ mod tests {
         let member = IdentityBundle::generate().unwrap();
 
         // Create coop directly
-        coop_mgr.create_coop(
-            "test-coop".to_string(),
-            "Test".to_string(),
-            owner.did().clone(),
-            timestamp().unwrap(),
-        ).unwrap();
+        coop_mgr
+            .create_coop(
+                "test-coop".to_string(),
+                "Test".to_string(),
+                owner.did().clone(),
+                timestamp().unwrap(),
+            )
+            .unwrap();
 
         let app = test::init_service(
             App::new()
@@ -371,9 +375,10 @@ mod tests {
                 .service(
                     web::scope("/coops")
                         .service(add_member)
-                        .service(remove_member)
-                )
-        ).await;
+                        .service(remove_member),
+                ),
+        )
+        .await;
 
         // Add member with authorization
         let req_body = AddMemberRequest {
@@ -400,9 +405,7 @@ mod tests {
 
         // Remove member with authorization
         let uri = format!("/coops/test-coop/members/{}", member.did());
-        let req = test::TestRequest::delete()
-            .uri(&uri)
-            .to_request();
+        let req = test::TestRequest::delete().uri(&uri).to_request();
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
@@ -417,12 +420,14 @@ mod tests {
         let member = IdentityBundle::generate().unwrap();
 
         // Create coop directly
-        coop_mgr.create_coop(
-            "test-coop".to_string(),
-            "Test".to_string(),
-            owner.did().clone(),
-            timestamp().unwrap(),
-        ).unwrap();
+        coop_mgr
+            .create_coop(
+                "test-coop".to_string(),
+                "Test".to_string(),
+                owner.did().clone(),
+                timestamp().unwrap(),
+            )
+            .unwrap();
 
         let app = test::init_service(
             App::new()
@@ -431,9 +436,10 @@ mod tests {
                 .service(
                     web::scope("/coops")
                         .service(add_member)
-                        .service(update_settings)
-                )
-        ).await;
+                        .service(update_settings),
+                ),
+        )
+        .await;
 
         // Try to add member with only "coop:read" scope (should fail)
         let req_body = AddMemberRequest {
@@ -491,11 +497,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
-                .service(
-                    web::scope("/coops")
-                        .service(create_coop)
-                )
-        ).await;
+                .service(web::scope("/coops").service(create_coop)),
+        )
+        .await;
 
         // Create coop with Alice's token
         let req_body = CreateCoopRequest {
@@ -522,12 +526,22 @@ mod tests {
 
         // Verify that Alice is the owner
         let coop = coop_mgr.get_coop(&"alice-coop".to_string()).unwrap();
-        assert_eq!(coop.members.len(), 1, "Coop should have exactly one member (the owner)");
+        assert_eq!(
+            coop.members.len(),
+            1,
+            "Coop should have exactly one member (the owner)"
+        );
 
-        let alice_member = coop.members.iter()
+        let alice_member = coop
+            .members
+            .iter()
             .find(|m| m.did == *alice.did())
             .expect("Alice should be a member");
-        assert_eq!(alice_member.role, MemberRole::Owner, "Alice should be the owner");
+        assert_eq!(
+            alice_member.role,
+            MemberRole::Owner,
+            "Alice should be the owner"
+        );
     }
 
     #[actix_web::test]
@@ -538,19 +552,23 @@ mod tests {
         let bob = IdentityBundle::generate().unwrap();
 
         // Create two cooperatives
-        coop_mgr.create_coop(
-            "coop-food".to_string(),
-            "Food Coop".to_string(),
-            alice.did().clone(),
-            timestamp().unwrap(),
-        ).unwrap();
+        coop_mgr
+            .create_coop(
+                "coop-food".to_string(),
+                "Food Coop".to_string(),
+                alice.did().clone(),
+                timestamp().unwrap(),
+            )
+            .unwrap();
 
-        coop_mgr.create_coop(
-            "coop-tech".to_string(),
-            "Tech Coop".to_string(),
-            bob.did().clone(),
-            timestamp().unwrap(),
-        ).unwrap();
+        coop_mgr
+            .create_coop(
+                "coop-tech".to_string(),
+                "Tech Coop".to_string(),
+                bob.did().clone(),
+                timestamp().unwrap(),
+            )
+            .unwrap();
 
         let app = test::init_service(
             App::new()
@@ -561,9 +579,10 @@ mod tests {
                         .service(get_coop)
                         .service(update_settings)
                         .service(add_member)
-                        .service(delete_coop)
-                )
-        ).await;
+                        .service(delete_coop),
+                ),
+        )
+        .await;
 
         // Alice tries to read coop-tech info using her coop-food token (should fail)
         let claims = TokenClaims {

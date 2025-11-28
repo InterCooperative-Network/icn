@@ -12,10 +12,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use icn_identity::Did;
-use jsonwebtoken::{encode, decode, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
 use ed25519_dalek::{Signature, Verifier};
+use icn_identity::Did;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 
 use crate::error::{GatewayError, Result};
 
@@ -35,10 +35,10 @@ struct Challenge {
 /// JWT claims for capability tokens
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenClaims {
-    pub sub: String,      // Subject (DID)
-    pub iat: u64,         // Issued at (timestamp)
-    pub exp: u64,         // Expiration (timestamp)
-    pub coop_id: String,  // Cooperative namespace
+    pub sub: String,         // Subject (DID)
+    pub iat: u64,            // Issued at (timestamp)
+    pub exp: u64,            // Expiration (timestamp)
+    pub coop_id: String,     // Cooperative namespace
     pub scopes: Vec<String>, // Capabilities (e.g., "ledger:read", "ledger:write")
 }
 
@@ -70,7 +70,9 @@ impl AuthManager {
             created_at: Self::current_timestamp()?,
         };
 
-        let mut challenges = self.challenges.write()
+        let mut challenges = self
+            .challenges
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         challenges.insert(did.clone(), challenge);
@@ -93,17 +95,16 @@ impl AuthManager {
     ) -> Result<String> {
         // Generic error message for all authentication failures
         // This prevents information leakage about why authentication failed
-        let auth_error = || GatewayError::AuthenticationFailed(
-            "Authentication failed".to_string()
-        );
+        let auth_error = || GatewayError::AuthenticationFailed("Authentication failed".to_string());
 
         // Retrieve and remove challenge
         let challenge = {
-            let mut challenges = self.challenges.write()
+            let mut challenges = self
+                .challenges
+                .write()
                 .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-            challenges.remove(did)
-                .ok_or_else(auth_error)?
+            challenges.remove(did).ok_or_else(auth_error)?
         };
 
         // Parse all inputs WITHOUT early returns
@@ -114,7 +115,11 @@ impl AuthManager {
 
         // ALWAYS perform signature verification (expensive crypto operation)
         // Even if parsing failed, we perform a dummy verification to maintain constant timing
-        let signature_valid = match (verifying_key_result, nonce_bytes_result, signature_obj_result) {
+        let signature_valid = match (
+            verifying_key_result,
+            nonce_bytes_result,
+            signature_obj_result,
+        ) {
             (Ok(verifying_key), Ok(nonce_bytes), Ok(signature_obj)) => {
                 // All parsing succeeded - perform real verification
                 verifying_key.verify(&nonce_bytes, &signature_obj).is_ok()
@@ -122,7 +127,7 @@ impl AuthManager {
             _ => {
                 // Parsing failed - perform dummy verification with hardcoded values
                 // This ensures constant-time behavior (attackers can't distinguish parsing failures)
-                use ed25519_dalek::{SigningKey, Signer};
+                use ed25519_dalek::{Signer, SigningKey};
 
                 // Create dummy key and sign a message
                 let dummy_key = SigningKey::from_bytes(&[0u8; 32]);
@@ -205,23 +210,25 @@ impl AuthManager {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
-            .map_err(|e| GatewayError::InternalError(
-                format!("System clock error (clock may be set before 1970): {e}")
-            ))
+            .map_err(|e| {
+                GatewayError::InternalError(format!(
+                    "System clock error (clock may be set before 1970): {e}"
+                ))
+            })
     }
 
     /// Clean up expired challenges (periodic task)
     pub fn cleanup_expired_challenges(&self) -> Result<usize> {
-        let mut challenges = self.challenges.write()
+        let mut challenges = self
+            .challenges
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let now = Self::current_timestamp()?;
         let ttl = self.challenge_ttl.as_secs();
         let initial_count = challenges.len();
 
-        challenges.retain(|_, challenge| {
-            now - challenge.created_at < ttl
-        });
+        challenges.retain(|_, challenge| now - challenge.created_at < ttl);
 
         Ok(initial_count - challenges.len())
     }
@@ -260,9 +267,7 @@ impl AuthManager {
                 let ttl = challenge_ttl.as_secs();
                 let initial_count = challenges_guard.len();
 
-                challenges_guard.retain(|_, challenge| {
-                    now - challenge.created_at < ttl
-                });
+                challenges_guard.retain(|_, challenge| now - challenge.created_at < ttl);
 
                 let removed = initial_count - challenges_guard.len();
                 if removed > 0 {
@@ -301,12 +306,14 @@ mod tests {
         let signature_bytes = signature.to_bytes();
 
         // Verify and get token
-        let token = auth.verify_challenge(
-            bundle.did(),
-            &signature_bytes,
-            "test-coop",
-            vec!["ledger:read".to_string()],
-        ).unwrap();
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature_bytes,
+                "test-coop",
+                vec!["ledger:read".to_string()],
+            )
+            .unwrap();
 
         assert!(!token.is_empty());
     }
@@ -316,12 +323,7 @@ mod tests {
         let auth = AuthManager::new(b"test_secret".to_vec());
         let bundle = IdentityBundle::generate().unwrap();
 
-        let result = auth.verify_challenge(
-            bundle.did(),
-            &[0u8; 64],
-            "test-coop",
-            vec![],
-        );
+        let result = auth.verify_challenge(bundle.did(), &[0u8; 64], "test-coop", vec![]);
 
         assert!(matches!(result, Err(GatewayError::AuthenticationFailed(_))));
     }
@@ -335,12 +337,7 @@ mod tests {
         let _nonce = auth.create_challenge(bundle.did()).unwrap();
 
         // Invalid signature
-        let result = auth.verify_challenge(
-            bundle.did(),
-            &[0u8; 64],
-            "test-coop",
-            vec![],
-        );
+        let result = auth.verify_challenge(bundle.did(), &[0u8; 64], "test-coop", vec![]);
 
         assert!(matches!(result, Err(GatewayError::AuthenticationFailed(_))));
     }

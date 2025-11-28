@@ -169,7 +169,6 @@ pub enum NodeRole {
     Archive,
 }
 
-
 /// Neighbor set size limits
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NeighborLimitsConfig {
@@ -351,10 +350,7 @@ impl NeighborSets {
 
     /// Get total neighbor count across all sets
     pub fn total_count(&self) -> usize {
-        self.local_cluster.len()
-            + self.regional.len()
-            + self.backbone.len()
-            + self.trusted.len()
+        self.local_cluster.len() + self.regional.len() + self.backbone.len() + self.trusted.len()
     }
 
     /// Record RTT measurement for a peer
@@ -444,15 +440,18 @@ impl NeighborSets {
         let mut peers_with_scores: Vec<(PeerId, f32)> = set_ref
             .iter()
             .map(|peer| {
-                let score = self.metadata.get(peer).map(|m| m.trust_score).unwrap_or(0.0);
+                let score = self
+                    .metadata
+                    .get(peer)
+                    .map(|m| m.trust_score)
+                    .unwrap_or(0.0);
                 (peer.clone(), score)
             })
             .collect();
 
         // Sort by score (ascending)
-        peers_with_scores.sort_by(|a, b| {
-            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        peers_with_scores
+            .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Calculate how many to evict
         let to_evict_count = set_ref.len() - max + 1; // +1 to make room for new peer
@@ -460,15 +459,22 @@ impl NeighborSets {
         // Evict lowest-scoring peers
         for (peer, _score) in peers_with_scores.iter().take(to_evict_count) {
             match target {
-                NeighborSet::LocalCluster => { self.local_cluster.remove(peer); }
-                NeighborSet::Regional => { self.regional.remove(peer); }
-                NeighborSet::Backbone => { self.backbone.remove(peer); }
-                NeighborSet::Trusted => { self.trusted.remove(peer); }
+                NeighborSet::LocalCluster => {
+                    self.local_cluster.remove(peer);
+                }
+                NeighborSet::Regional => {
+                    self.regional.remove(peer);
+                }
+                NeighborSet::Backbone => {
+                    self.backbone.remove(peer);
+                }
+                NeighborSet::Trusted => {
+                    self.trusted.remove(peer);
+                }
             }
             self.metadata.remove(peer);
         }
     }
-
 }
 
 /// Topology configuration for regional/cluster-based networking
@@ -728,7 +734,13 @@ mod tests {
         sets.add_neighbor(create_test_peer_id(), local_topo, Some(10), 0.5, &limits);
         sets.add_neighbor(create_test_peer_id(), regional_topo, Some(15), 0.5, &limits);
         sets.add_neighbor(create_test_peer_id(), backbone_topo, Some(50), 0.5, &limits);
-        sets.add_neighbor(create_test_peer_id(), create_test_topology("ap-south", "coop-1"), Some(60), 0.8, &limits);
+        sets.add_neighbor(
+            create_test_peer_id(),
+            create_test_topology("ap-south", "coop-1"),
+            Some(60),
+            0.8,
+            &limits,
+        );
 
         // Global scope includes all sets
         let sampled = sets.sample(Scope::Global, 4);

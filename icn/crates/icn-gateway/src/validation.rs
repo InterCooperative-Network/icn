@@ -84,19 +84,25 @@ pub const MAX_VOTING_PERIOD_SECONDS: u64 = 31_536_000;
 /// Validate governance domain ID
 pub fn validate_domain_id(id: &str) -> Result<()> {
     if id.is_empty() {
-        return Err(GatewayError::BadRequest("Domain ID cannot be empty".to_string()));
-    }
-
-    if id.len() > MAX_DOMAIN_ID_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Domain ID exceeds maximum length of {MAX_DOMAIN_ID_LEN} characters")
+            "Domain ID cannot be empty".to_string(),
         ));
     }
 
+    if id.len() > MAX_DOMAIN_ID_LEN {
+        return Err(GatewayError::BadRequest(format!(
+            "Domain ID exceeds maximum length of {MAX_DOMAIN_ID_LEN} characters"
+        )));
+    }
+
     // Validate characters (alphanumeric, hyphens, underscores, colons for namespacing)
-    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':') {
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':')
+    {
         return Err(GatewayError::BadRequest(
-            "Domain ID must contain only alphanumeric characters, hyphens, underscores, and colons".to_string()
+            "Domain ID must contain only alphanumeric characters, hyphens, underscores, and colons"
+                .to_string(),
         ));
     }
 
@@ -106,13 +112,15 @@ pub fn validate_domain_id(id: &str) -> Result<()> {
 /// Validate governance domain name
 pub fn validate_domain_name(name: &str) -> Result<()> {
     if name.is_empty() || name.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Domain name cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Domain name cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if name.len() > MAX_DOMAIN_NAME_LEN {
-        return Err(GatewayError::BadRequest(
-            format!("Domain name exceeds maximum length of {MAX_DOMAIN_NAME_LEN} characters")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Domain name exceeds maximum length of {MAX_DOMAIN_NAME_LEN} characters"
+        )));
     }
 
     Ok(())
@@ -121,19 +129,25 @@ pub fn validate_domain_name(name: &str) -> Result<()> {
 /// Validate cooperative ID
 pub fn validate_coop_id(id: &str) -> Result<()> {
     if id.is_empty() {
-        return Err(GatewayError::BadRequest("Cooperative ID cannot be empty".to_string()));
-    }
-
-    if id.len() > MAX_COOP_ID_LEN {
         return Err(GatewayError::BadRequest(
-            format!("Cooperative ID exceeds maximum length of {MAX_COOP_ID_LEN} characters")
+            "Cooperative ID cannot be empty".to_string(),
         ));
     }
 
+    if id.len() > MAX_COOP_ID_LEN {
+        return Err(GatewayError::BadRequest(format!(
+            "Cooperative ID exceeds maximum length of {MAX_COOP_ID_LEN} characters"
+        )));
+    }
+
     // Validate characters (alphanumeric, hyphens, underscores)
-    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
         return Err(GatewayError::BadRequest(
-            "Cooperative ID must contain only alphanumeric characters, hyphens, and underscores".to_string()
+            "Cooperative ID must contain only alphanumeric characters, hyphens, and underscores"
+                .to_string(),
         ));
     }
 
@@ -143,13 +157,15 @@ pub fn validate_coop_id(id: &str) -> Result<()> {
 /// Validate cooperative name
 pub fn validate_coop_name(name: &str) -> Result<()> {
     if name.is_empty() || name.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Cooperative name cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Cooperative name cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if name.len() > MAX_COOP_NAME_LEN {
-        return Err(GatewayError::BadRequest(
-            format!("Cooperative name exceeds maximum length of {MAX_COOP_NAME_LEN} characters")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Cooperative name exceeds maximum length of {MAX_COOP_NAME_LEN} characters"
+        )));
     }
 
     Ok(())
@@ -158,13 +174,15 @@ pub fn validate_coop_name(name: &str) -> Result<()> {
 /// Validate currency identifier
 pub fn validate_currency(currency: &str) -> Result<()> {
     if currency.is_empty() || currency.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Currency cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Currency cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if currency.len() > MAX_CURRENCY_LEN {
-        return Err(GatewayError::BadRequest(
-            format!("Currency identifier exceeds maximum length of {MAX_CURRENCY_LEN} characters")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Currency identifier exceeds maximum length of {MAX_CURRENCY_LEN} characters"
+        )));
     }
 
     Ok(())
@@ -174,9 +192,9 @@ pub fn validate_currency(currency: &str) -> Result<()> {
 pub fn validate_memo(memo: &Option<String>) -> Result<()> {
     if let Some(memo_text) = memo {
         if memo_text.len() > MAX_MEMO_LEN {
-            return Err(GatewayError::BadRequest(
-                format!("Memo exceeds maximum length of {MAX_MEMO_LEN} characters")
-            ));
+            return Err(GatewayError::BadRequest(format!(
+                "Memo exceeds maximum length of {MAX_MEMO_LEN} characters"
+            )));
         }
     }
 
@@ -186,13 +204,15 @@ pub fn validate_memo(memo: &Option<String>) -> Result<()> {
 /// Validate governance model string
 pub fn validate_governance_model(model: &str) -> Result<()> {
     if model.is_empty() || model.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Governance model cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Governance model cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if model.len() > MAX_GOVERNANCE_MODEL_LEN {
-        return Err(GatewayError::BadRequest(
-            format!("Governance model exceeds maximum length of {MAX_GOVERNANCE_MODEL_LEN} characters")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Governance model exceeds maximum length of {MAX_GOVERNANCE_MODEL_LEN} characters"
+        )));
     }
 
     Ok(())
@@ -201,13 +221,15 @@ pub fn validate_governance_model(model: &str) -> Result<()> {
 /// Validate credit policy string
 pub fn validate_credit_policy(policy: &str) -> Result<()> {
     if policy.is_empty() || policy.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Credit policy cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Credit policy cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if policy.len() > MAX_CREDIT_POLICY_LEN {
-        return Err(GatewayError::BadRequest(
-            format!("Credit policy exceeds maximum length of {MAX_CREDIT_POLICY_LEN} characters")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Credit policy exceeds maximum length of {MAX_CREDIT_POLICY_LEN} characters"
+        )));
     }
 
     Ok(())
@@ -216,9 +238,9 @@ pub fn validate_credit_policy(policy: &str) -> Result<()> {
 /// Validate member count doesn't exceed limit
 pub fn validate_member_count(current_count: usize) -> Result<()> {
     if current_count >= MAX_MEMBERS_PER_COOP {
-        return Err(GatewayError::BadRequest(
-            format!("Cooperative has reached maximum member limit of {MAX_MEMBERS_PER_COOP}")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Cooperative has reached maximum member limit of {MAX_MEMBERS_PER_COOP}"
+        )));
     }
 
     Ok(())
@@ -227,9 +249,9 @@ pub fn validate_member_count(current_count: usize) -> Result<()> {
 /// Validate scopes list
 pub fn validate_scopes(scopes: &[String]) -> Result<()> {
     if scopes.len() > MAX_SCOPES {
-        return Err(GatewayError::BadRequest(
-            format!("Number of scopes exceeds maximum of {MAX_SCOPES}")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Number of scopes exceeds maximum of {MAX_SCOPES}"
+        )));
     }
 
     Ok(())
@@ -238,13 +260,15 @@ pub fn validate_scopes(scopes: &[String]) -> Result<()> {
 /// Validate payment amount
 pub fn validate_payment_amount(amount: i64) -> Result<()> {
     if amount <= 0 {
-        return Err(GatewayError::BadRequest("Amount must be positive".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Amount must be positive".to_string(),
+        ));
     }
 
     if amount > MAX_PAYMENT_AMOUNT {
-        return Err(GatewayError::BadRequest(
-            format!("Amount exceeds maximum of {MAX_PAYMENT_AMOUNT}")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Amount exceeds maximum of {MAX_PAYMENT_AMOUNT}"
+        )));
     }
 
     Ok(())
@@ -253,9 +277,9 @@ pub fn validate_payment_amount(amount: i64) -> Result<()> {
 /// Validate cooperative count doesn't exceed global limit
 pub fn validate_coop_count(current_count: usize) -> Result<()> {
     if current_count >= MAX_COOPERATIVES {
-        return Err(GatewayError::BadRequest(
-            format!("Gateway has reached maximum cooperative limit of {MAX_COOPERATIVES}")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Gateway has reached maximum cooperative limit of {MAX_COOPERATIVES}"
+        )));
     }
 
     Ok(())
@@ -264,13 +288,15 @@ pub fn validate_coop_count(current_count: usize) -> Result<()> {
 /// Validate history limit parameter
 pub fn validate_history_limit(limit: usize) -> Result<usize> {
     if limit == 0 {
-        return Err(GatewayError::BadRequest("Limit must be greater than 0".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Limit must be greater than 0".to_string(),
+        ));
     }
 
     if limit > MAX_HISTORY_LIMIT {
-        return Err(GatewayError::BadRequest(
-            format!("Limit exceeds maximum of {MAX_HISTORY_LIMIT}")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Limit exceeds maximum of {MAX_HISTORY_LIMIT}"
+        )));
     }
 
     Ok(limit)
@@ -285,7 +311,7 @@ pub fn validate_history_offset(offset: usize) -> Result<usize> {
 
     if offset > MAX_HISTORY_OFFSET {
         return Err(GatewayError::BadRequest(
-            "Offset exceeds maximum allowed value".to_string()
+            "Offset exceeds maximum allowed value".to_string(),
         ));
     }
 
@@ -295,13 +321,15 @@ pub fn validate_history_offset(offset: usize) -> Result<usize> {
 /// Validate proposal title
 pub fn validate_proposal_title(title: &str) -> Result<()> {
     if title.is_empty() || title.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Proposal title cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Proposal title cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if title.len() > MAX_PROPOSAL_TITLE_LEN {
-        return Err(GatewayError::BadRequest(
-            format!("Proposal title exceeds maximum length of {MAX_PROPOSAL_TITLE_LEN} characters")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Proposal title exceeds maximum length of {MAX_PROPOSAL_TITLE_LEN} characters"
+        )));
     }
 
     Ok(())
@@ -310,7 +338,9 @@ pub fn validate_proposal_title(title: &str) -> Result<()> {
 /// Validate proposal description
 pub fn validate_proposal_description(description: &str) -> Result<()> {
     if description.is_empty() || description.trim().is_empty() {
-        return Err(GatewayError::BadRequest("Proposal description cannot be empty or whitespace-only".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Proposal description cannot be empty or whitespace-only".to_string(),
+        ));
     }
 
     if description.len() > MAX_PROPOSAL_DESCRIPTION_LEN {
@@ -329,14 +359,14 @@ pub fn validate_vote_comment(comment: &Option<String>) -> Result<()> {
         // But reject whitespace-only comments as they provide no value
         if !comment_text.is_empty() && comment_text.trim().is_empty() {
             return Err(GatewayError::BadRequest(
-                "Vote comment cannot be whitespace-only".to_string()
+                "Vote comment cannot be whitespace-only".to_string(),
             ));
         }
 
         if comment_text.len() > MAX_VOTE_COMMENT_LEN {
-            return Err(GatewayError::BadRequest(
-                format!("Vote comment exceeds maximum length of {MAX_VOTE_COMMENT_LEN} characters")
-            ));
+            return Err(GatewayError::BadRequest(format!(
+                "Vote comment exceeds maximum length of {MAX_VOTE_COMMENT_LEN} characters"
+            )));
         }
     }
 
@@ -346,22 +376,24 @@ pub fn validate_vote_comment(comment: &Option<String>) -> Result<()> {
 /// Validate domain members list
 pub fn validate_domain_members(members: &[String]) -> Result<()> {
     if members.is_empty() {
-        return Err(GatewayError::BadRequest("Domain must have at least one member".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Domain must have at least one member".to_string(),
+        ));
     }
 
     if members.len() > MAX_DOMAIN_MEMBERS {
-        return Err(GatewayError::BadRequest(
-            format!("Number of members exceeds maximum of {MAX_DOMAIN_MEMBERS}")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Number of members exceeds maximum of {MAX_DOMAIN_MEMBERS}"
+        )));
     }
 
     // Check for duplicates (prevents quorum calculation bugs)
     let mut seen = std::collections::HashSet::new();
     for member in members {
         if !seen.insert(member) {
-            return Err(GatewayError::BadRequest(
-                format!("Duplicate member DID not allowed: {member}")
-            ));
+            return Err(GatewayError::BadRequest(format!(
+                "Duplicate member DID not allowed: {member}"
+            )));
         }
     }
 
@@ -377,28 +409,28 @@ pub fn validate_governance_params(
     // Quorum percentage must be 0-100
     if quorum_percent > 100 {
         return Err(GatewayError::BadRequest(
-            "Quorum percentage must be between 0 and 100".to_string()
+            "Quorum percentage must be between 0 and 100".to_string(),
         ));
     }
 
     // Approval percentage must be 0-100
     if approval_percent > 100 {
         return Err(GatewayError::BadRequest(
-            "Approval percentage must be between 0 and 100".to_string()
+            "Approval percentage must be between 0 and 100".to_string(),
         ));
     }
 
     // Voting period must be reasonable (not zero, not more than 1 year)
     if voting_period_seconds == 0 {
         return Err(GatewayError::BadRequest(
-            "Voting period must be greater than 0".to_string()
+            "Voting period must be greater than 0".to_string(),
         ));
     }
 
     if voting_period_seconds > MAX_VOTING_PERIOD_SECONDS {
-        return Err(GatewayError::BadRequest(
-            format!("Voting period exceeds maximum of {MAX_VOTING_PERIOD_SECONDS} seconds (1 year)")
-        ));
+        return Err(GatewayError::BadRequest(format!(
+            "Voting period exceeds maximum of {MAX_VOTING_PERIOD_SECONDS} seconds (1 year)"
+        )));
     }
 
     Ok(())
@@ -470,7 +502,8 @@ mod tests {
         assert!(validate_governance_model(&"a".repeat(MAX_GOVERNANCE_MODEL_LEN)).is_ok());
         assert!(validate_governance_model("").is_err()); // Empty
         assert!(validate_governance_model("   ").is_err()); // Whitespace-only
-        assert!(validate_governance_model(&"a".repeat(MAX_GOVERNANCE_MODEL_LEN + 1)).is_err()); // Too long
+        assert!(validate_governance_model(&"a".repeat(MAX_GOVERNANCE_MODEL_LEN + 1)).is_err());
+        // Too long
     }
 
     #[test]
@@ -529,7 +562,8 @@ mod tests {
         assert!(validate_proposal_title("").is_err()); // Empty
         assert!(validate_proposal_title("   ").is_err()); // Whitespace-only
         assert!(validate_proposal_title("\t\n  ").is_err()); // Whitespace-only (tabs/newlines)
-        assert!(validate_proposal_title(&"a".repeat(MAX_PROPOSAL_TITLE_LEN + 1)).is_err()); // Too long
+        assert!(validate_proposal_title(&"a".repeat(MAX_PROPOSAL_TITLE_LEN + 1)).is_err());
+        // Too long
     }
 
     #[test]
@@ -538,7 +572,9 @@ mod tests {
         assert!(validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN)).is_ok());
         assert!(validate_proposal_description("").is_err()); // Empty
         assert!(validate_proposal_description("   ").is_err()); // Whitespace-only
-        assert!(validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN + 1)).is_err()); // Too long
+        assert!(
+            validate_proposal_description(&"a".repeat(MAX_PROPOSAL_DESCRIPTION_LEN + 1)).is_err()
+        ); // Too long
     }
 
     #[test]
@@ -548,7 +584,8 @@ mod tests {
         assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN))).is_ok());
         assert!(validate_vote_comment(&Some("".to_string())).is_ok()); // Empty is allowed
         assert!(validate_vote_comment(&Some("   ".to_string())).is_err()); // Whitespace-only rejected
-        assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN + 1))).is_err()); // Too long
+        assert!(validate_vote_comment(&Some("a".repeat(MAX_VOTE_COMMENT_LEN + 1))).is_err());
+        // Too long
     }
 
     #[test]
@@ -559,15 +596,21 @@ mod tests {
         assert!(validate_domain_name("").is_err()); // Empty
         assert!(validate_domain_name("   ").is_err()); // Whitespace-only
         assert!(validate_domain_name("\t\n  ").is_err()); // Whitespace-only (tabs/newlines)
-        assert!(validate_domain_name(&"a".repeat(MAX_DOMAIN_NAME_LEN + 1)).is_err()); // Too long
+        assert!(validate_domain_name(&"a".repeat(MAX_DOMAIN_NAME_LEN + 1)).is_err());
+        // Too long
     }
 
     #[test]
     fn test_validate_domain_members() {
         assert!(validate_domain_members(&["did:icn:alice".to_string()]).is_ok());
-        assert!(validate_domain_members(&["did:icn:alice".to_string(), "did:icn:bob".to_string()]).is_ok());
+        assert!(
+            validate_domain_members(&["did:icn:alice".to_string(), "did:icn:bob".to_string()])
+                .is_ok()
+        );
         assert!(validate_domain_members(&[]).is_err()); // Empty
-        let too_many: Vec<String> = (0..MAX_DOMAIN_MEMBERS + 1).map(|i| format!("did:icn:{i}")).collect();
+        let too_many: Vec<String> = (0..MAX_DOMAIN_MEMBERS + 1)
+            .map(|i| format!("did:icn:{i}"))
+            .collect();
         assert!(validate_domain_members(&too_many).is_err()); // Too many
 
         // Duplicate detection

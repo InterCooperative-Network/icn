@@ -7,20 +7,22 @@
 //! - Connection lifecycle management
 
 use anyhow::{Context, Result};
-use icn_identity::{Did, IdentityBundle};
 #[cfg(test)]
 use icn_identity::KeyPair;
+use icn_identity::{Did, IdentityBundle};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{debug, info, warn, instrument};
+use tracing::{debug, info, instrument, warn};
 
 use crate::{
-    protocol::{NetworkMessage, read_message, write_message, MessagePayload},
+    protocol::{read_message, write_message, MessagePayload, NetworkMessage},
     rate_limit::{RateLimitConfig, RateLimiter},
     replay_guard::ReplayGuard,
-    topology::{NeighborLimitsConfig, NeighborSets, NodeRole, PeerId, TopologyConfig, TopologyInfo},
-    Discovery, PeerInfo, SessionManager, CapabilityFlags,
+    topology::{
+        NeighborLimitsConfig, NeighborSets, NodeRole, PeerId, TopologyConfig, TopologyInfo,
+    },
+    CapabilityFlags, Discovery, PeerInfo, SessionManager,
 };
 
 /// Per-peer connection metadata
@@ -153,10 +155,13 @@ impl NetworkHandle {
         sequence: u64,
         payload: &[u8],
     ) -> Result<()> {
-        use crate::{EncryptedEnvelope, SignedEnvelope, NetworkMessage};
+        use crate::{EncryptedEnvelope, NetworkMessage, SignedEnvelope};
 
         // Check if peer supports E2E encryption
-        if !self.peer_has_capability(recipient, CapabilityFlags::E2E_ENCRYPTION).await {
+        if !self
+            .peer_has_capability(recipient, CapabilityFlags::E2E_ENCRYPTION)
+            .await
+        {
             anyhow::bail!(
                 "Peer {recipient} does not support E2E_ENCRYPTION capability (or handshake not complete)"
             );
@@ -222,7 +227,11 @@ impl NetworkHandle {
     pub async fn sample_peers(&self, scope: icn_gossip::Scope, count: usize) -> Vec<Did> {
         if let Some(ref sets) = self.neighbor_sets {
             let sets_read = sets.read().await;
-            sets_read.sample(scope, count).into_iter().map(|peer_id| peer_id.0).collect()
+            sets_read
+                .sample(scope, count)
+                .into_iter()
+                .map(|peer_id| peer_id.0)
+                .collect()
         } else {
             // No topology support - return empty list (fall back to broadcast)
             Vec::new()
@@ -234,7 +243,11 @@ impl NetworkHandle {
     /// Returns None if the peer's key hasn't been received yet (no Hello message exchange)
     pub async fn get_peer_x25519_key(&self, did: &Did) -> Option<[u8; 32]> {
         let connections = self.peer_connections.as_ref()?;
-        connections.read().await.get(did).map(|info| info.x25519_key)
+        connections
+            .read()
+            .await
+            .get(did)
+            .map(|info| info.x25519_key)
     }
 
     /// Get this node's connection candidate for NAT traversal
@@ -284,7 +297,11 @@ impl NetworkHandle {
     /// Returns None if the peer hasn't completed Hello handshake yet
     pub async fn get_peer_protocol_version(&self, did: &Did) -> Option<u32> {
         if let Some(ref connections) = self.peer_connections {
-            connections.read().await.get(did).map(|info| info.negotiated_version)
+            connections
+                .read()
+                .await
+                .get(did)
+                .map(|info| info.negotiated_version)
         } else {
             None
         }
@@ -305,7 +322,9 @@ impl NetworkHandle {
     /// ```
     pub async fn get_peers_with_capability(&self, capability: CapabilityFlags) -> Vec<Did> {
         if let Some(ref connections) = self.peer_connections {
-            connections.read().await
+            connections
+                .read()
+                .await
                 .iter()
                 .filter(|(_, info)| info.peer_capabilities.contains(capability))
                 .map(|(did, _)| did.clone())
@@ -329,7 +348,10 @@ impl NetworkHandle {
     ///
     /// Returns list of peers with blob locations (DID, size_bytes), sorted by freshness.
     /// Only returns non-expired locations (24-hour TTL).
-    pub async fn get_peers_with_blob(&self, blob_hash: &icn_gossip::types::ContentHash) -> Vec<crate::BlobLocation> {
+    pub async fn get_peers_with_blob(
+        &self,
+        blob_hash: &icn_gossip::types::ContentHash,
+    ) -> Vec<crate::BlobLocation> {
         if let Some(ref registry) = self.blob_registry {
             registry.read().await.get_peers_with_blob(blob_hash)
         } else {
@@ -341,7 +363,10 @@ impl NetworkHandle {
     ///
     /// Returns peers sorted by number of matching blobs (descending).
     /// Useful for placing tasks near their input data.
-    pub async fn find_peers_with_all(&self, blob_hashes: &[icn_gossip::types::ContentHash]) -> Vec<(icn_identity::Did, usize)> {
+    pub async fn find_peers_with_all(
+        &self,
+        blob_hashes: &[icn_gossip::types::ContentHash],
+    ) -> Vec<(icn_identity::Did, usize)> {
         if let Some(ref registry) = self.blob_registry {
             registry.read().await.find_peers_with_all(blob_hashes)
         } else {
@@ -401,7 +426,10 @@ impl NetworkHandle {
     ) {
         // Update local registry
         if let Some(ref registry) = self.blob_registry {
-            registry.write().await.announce_blob(blob_hash, peer_did.clone(), size_bytes);
+            registry
+                .write()
+                .await
+                .announce_blob(blob_hash, peer_did.clone(), size_bytes);
         }
 
         // Broadcast BlobAnnounce message via gossip
@@ -430,7 +458,9 @@ impl NetworkHandle {
     /// Peer addresses are not exported (rediscovered via mDNS).
     pub async fn export_state(&self) -> icn_snapshot::NetworkState {
         let peer_connections = if let Some(ref connections) = self.peer_connections {
-            connections.read().await
+            connections
+                .read()
+                .await
                 .iter()
                 .map(|(did, info)| {
                     let snapshot_info = icn_snapshot::PeerConnectionInfo {
@@ -472,13 +502,15 @@ impl NetworkHandle {
 
             // Restore modern format (peer_connections)
             for (did_str, snapshot_info) in state.peer_connections {
-                let did = Did::from_str(&did_str)
-                    .context("Failed to parse DID from network state")?;
+                let did =
+                    Did::from_str(&did_str).context("Failed to parse DID from network state")?;
 
                 let connection_info = PeerConnectionInfo {
                     did: did.clone(),
                     negotiated_version: snapshot_info.negotiated_version,
-                    peer_capabilities: crate::CapabilityFlags::from_bits_truncate(snapshot_info.peer_capabilities),
+                    peer_capabilities: crate::CapabilityFlags::from_bits_truncate(
+                        snapshot_info.peer_capabilities,
+                    ),
                     peer_software: snapshot_info.peer_software,
                     x25519_key: snapshot_info.x25519_key,
                 };
@@ -493,13 +525,15 @@ impl NetworkHandle {
                     .context("Failed to parse DID from legacy network state")?;
 
                 // Only restore if not already present from modern format
-                connections_write.entry(did.clone()).or_insert_with(|| PeerConnectionInfo {
-                    did,
-                    negotiated_version: 1, // Assume v1 for legacy
-                    peer_capabilities: crate::CapabilityFlags::empty(),
-                    peer_software: "legacy-unknown".to_string(),
-                    x25519_key: key,
-                });
+                connections_write
+                    .entry(did.clone())
+                    .or_insert_with(|| PeerConnectionInfo {
+                        did,
+                        negotiated_version: 1, // Assume v1 for legacy
+                        peer_capabilities: crate::CapabilityFlags::empty(),
+                        peer_software: "legacy-unknown".to_string(),
+                        x25519_key: key,
+                    });
             }
 
             tracing::info!(
@@ -557,10 +591,7 @@ impl NetworkHandle {
     /// # Arguments
     /// * `peer` - KnownPeer information to announce
     pub async fn announce_peer(&self, peer: crate::KnownPeer) -> Result<()> {
-        let announce_msg = NetworkMessage::peer_announce(
-            self.own_did.clone(),
-            peer,
-        );
+        let announce_msg = NetworkMessage::peer_announce(self.own_did.clone(), peer);
 
         // Broadcast to all connected peers
         let result = self.broadcast(announce_msg).await;
@@ -578,10 +609,7 @@ impl NetworkHandle {
     /// # Arguments
     /// * `did` - DID of the peer that disconnected
     pub async fn unannounce_peer(&self, did: &str) -> Result<()> {
-        let unannounce_msg = NetworkMessage::peer_unannounce(
-            self.own_did.clone(),
-            did.to_string(),
-        );
+        let unannounce_msg = NetworkMessage::peer_unannounce(self.own_did.clone(), did.to_string());
 
         // Broadcast to all connected peers
         let result = self.broadcast(unannounce_msg).await;
@@ -645,7 +673,9 @@ impl NetworkActor {
 
         // Start session manager with trust-gated TLS if trust_graph provided
         let mut session_manager = SessionManager::new();
-        let tls_trust_threshold = trust_gated_config.as_ref().map(|cfg| cfg.min_trust_threshold);
+        let tls_trust_threshold = trust_gated_config
+            .as_ref()
+            .map(|cfg| cfg.min_trust_threshold);
         session_manager
             .start(
                 identity_bundle.keypair(),
@@ -702,8 +732,10 @@ impl NetworkActor {
                 cluster_id: topo_cfg.cluster_id.clone(),
                 role: topo_cfg.role,
             };
-            info!("Topology-aware networking enabled: region={}, cluster={}",
-                  topo_cfg.region, topo_cfg.cluster_id);
+            info!(
+                "Topology-aware networking enabled: region={}, cluster={}",
+                topo_cfg.region, topo_cfg.cluster_id
+            );
             Some(Arc::new(RwLock::new(NeighborSets::new(own_topology))))
         } else {
             info!("Topology-aware networking disabled");
@@ -716,7 +748,7 @@ impl NetworkActor {
 
         // Initialize misbehavior detector (Phase 18 Week 1-2)
         let misbehavior_detector = Some(Arc::new(RwLock::new(
-            icn_security::MisbehaviorDetector::new(icn_security::MisbehaviorThresholds::default())
+            icn_security::MisbehaviorDetector::new(icn_security::MisbehaviorThresholds::default()),
         )));
         info!("Byzantine fault detection enabled with default thresholds");
 
@@ -901,7 +933,11 @@ impl NetworkActor {
                 let _ = tx.send(peers);
             }
 
-            NetworkMsg::Dial { addr, did, response } => {
+            NetworkMsg::Dial {
+                addr,
+                did,
+                response,
+            } => {
                 // Timeout for dial operation (30 seconds to allow for slow networks)
                 const DIAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -956,7 +992,9 @@ impl NetworkActor {
                                     misbehavior_detector,
                                     identity_bundle,
                                     own_did,
-                                ).await {
+                                )
+                                .await
+                                {
                                     warn!("Outbound connection handler error: {}", e);
                                 }
                             });
@@ -965,16 +1003,14 @@ impl NetworkActor {
                         // Send Hello message with DID-TLS binding and X25519 public key
                         let binding_info = self.identity_bundle.binding_info();
                         let x25519_public = *self.identity_bundle.x25519_public_bytes();
-                        let version_info = crate::VersionInfo::new(
-                            format!("icnd-{}", env!("CARGO_PKG_VERSION"))
-                        );
-                        let topology_info = self.topology_config.as_ref().map(|topo_cfg| {
-                            TopologyInfo {
+                        let version_info =
+                            crate::VersionInfo::new(format!("icnd-{}", env!("CARGO_PKG_VERSION")));
+                        let topology_info =
+                            self.topology_config.as_ref().map(|topo_cfg| TopologyInfo {
                                 region: topo_cfg.region.clone(),
                                 cluster_id: topo_cfg.cluster_id.clone(),
                                 role: topo_cfg.role,
-                            }
-                        });
+                            });
 
                         let hello_msg = NetworkMessage::hello(
                             self.own_did.clone(),
@@ -987,7 +1023,9 @@ impl NetworkActor {
 
                         let session_mgr = self.session_manager.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = Self::send_handshake_internal(session_mgr, &did, hello_msg).await {
+                            if let Err(e) =
+                                Self::send_handshake_internal(session_mgr, &did, hello_msg).await
+                            {
                                 warn!("Failed to send Hello to {}: {}", did, e);
                             }
                         });
@@ -1047,13 +1085,11 @@ impl NetworkActor {
                 .context("No connection to peer")?;
 
             // Open a new stream (with timeout to prevent hanging on stream open)
-            let (mut send, _recv) = tokio::time::timeout(
-                std::time::Duration::from_secs(5),
-                connection.open_bi(),
-            )
-            .await
-            .context("Timeout opening stream to peer")?
-            .context("Failed to open stream")?;
+            let (mut send, _recv) =
+                tokio::time::timeout(std::time::Duration::from_secs(5), connection.open_bi())
+                    .await
+                    .context("Timeout opening stream to peer")?
+                    .context("Failed to open stream")?;
 
             // Write message (with timeout to prevent hanging on slow writes)
             tokio::time::timeout(
@@ -1099,7 +1135,8 @@ impl NetworkActor {
                 write_message(&mut send, &message).await?;
                 send.finish()?;
                 Ok::<(), anyhow::Error>(())
-            }).await;
+            })
+            .await;
 
             if send_result.is_ok() {
                 sent_count += 1;
@@ -1143,8 +1180,8 @@ impl NetworkActor {
                     info!("Incoming connection handler received shutdown signal");
                     break;
                 }
-                Err(tokio::sync::broadcast::error::TryRecvError::Empty) |
-                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+                | Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
                     // Continue to accept connections
                 }
             }
@@ -1188,7 +1225,9 @@ impl NetworkActor {
                                 misbehavior_detector_clone,
                                 identity_bundle_clone,
                                 own_did_clone,
-                            ).await {
+                            )
+                            .await
+                            {
                                 warn!("Connection handler error: {}", e);
                             }
                         });
@@ -1221,7 +1260,10 @@ impl NetworkActor {
             .map(|(_, conn)| conn.clone())
             .context("No connection to peer")?;
 
-        let (mut send, _recv) = connection.open_bi().await.context("Failed to open stream")?;
+        let (mut send, _recv) = connection
+            .open_bi()
+            .await
+            .context("Failed to open stream")?;
         write_message(&mut send, &handshake_msg).await?;
         send.finish().context("Failed to finish stream")?;
 
@@ -1283,57 +1325,80 @@ impl NetworkActor {
 
                             // Handle handshake messages internally
                             match &message.payload {
-                                MessagePayload::Hello { binding_info: _, version_info, topology_info, x25519_public } => {
+                                MessagePayload::Hello {
+                                    binding_info: _,
+                                    version_info,
+                                    topology_info,
+                                    x25519_public,
+                                } => {
                                     // NOTE: DID-TLS binding was already verified during TLS handshake
                                     // by DidCertificateVerifier. No need to re-verify here.
                                     // The TLS layer guarantees that the peer's DID matches their certificate.
 
                                     // Perform version negotiation
-                                    let local_version_info = crate::VersionInfo::new(
-                                        format!("icnd-{}", env!("CARGO_PKG_VERSION"))
-                                    );
+                                    let local_version_info = crate::VersionInfo::new(format!(
+                                        "icnd-{}",
+                                        env!("CARGO_PKG_VERSION")
+                                    ));
 
                                     // Handle legacy nodes that don't send version_info (pre-version-negotiation)
-                                    let (negotiated_version, common_caps, peer_software) = match version_info {
-                                        Some(remote_info) => {
-                                            // Modern node with version info
-                                            let negotiated = match crate::negotiate_version(&local_version_info, remote_info) {
-                                                Ok(v) => v,
-                                                Err(e) => {
-                                                    warn!(
-                                                        peer_did = %message.from,
-                                                        local_range = format!("[{}-{}]", local_version_info.min_supported, local_version_info.max_supported),
-                                                        peer_range = format!("[{}-{}]", remote_info.min_supported, remote_info.max_supported),
-                                                        "Version negotiation failed: {}",
-                                                        e
-                                                    );
-                                                    // Track failure metric
-                                                    icn_obs::metrics::network::version_negotiation_failure_inc("incompatible_version");
-                                                    // Drop the connection - incompatible versions
-                                                    return Err(anyhow::anyhow!("Incompatible protocol version"));
-                                                }
-                                            };
+                                    let (negotiated_version, common_caps, peer_software) =
+                                        match version_info {
+                                            Some(remote_info) => {
+                                                // Modern node with version info
+                                                let negotiated = match crate::negotiate_version(
+                                                    &local_version_info,
+                                                    remote_info,
+                                                ) {
+                                                    Ok(v) => v,
+                                                    Err(e) => {
+                                                        warn!(
+                                                            peer_did = %message.from,
+                                                            local_range = format!("[{}-{}]", local_version_info.min_supported, local_version_info.max_supported),
+                                                            peer_range = format!("[{}-{}]", remote_info.min_supported, remote_info.max_supported),
+                                                            "Version negotiation failed: {}",
+                                                            e
+                                                        );
+                                                        // Track failure metric
+                                                        icn_obs::metrics::network::version_negotiation_failure_inc("incompatible_version");
+                                                        // Drop the connection - incompatible versions
+                                                        return Err(anyhow::anyhow!(
+                                                            "Incompatible protocol version"
+                                                        ));
+                                                    }
+                                                };
 
-                                            // Track successful negotiation
-                                            icn_obs::metrics::network::version_negotiation_success_inc(negotiated);
+                                                // Track successful negotiation
+                                                icn_obs::metrics::network::version_negotiation_success_inc(negotiated);
 
-                                            // Calculate common capabilities
-                                            let caps = crate::common_capabilities(&local_version_info, remote_info);
-                                            (negotiated, caps, remote_info.software_version.clone())
-                                        }
-                                        None => {
-                                            // Legacy node without version info - treat as v1 with minimal capabilities
-                                            info!(
-                                                peer_did = %message.from,
-                                                "Received Hello from legacy node (no version_info), treating as protocol v1"
-                                            );
-                                            // Track legacy connection (use negotiated_version=1 for metrics)
-                                            icn_obs::metrics::network::version_negotiation_success_inc(1);
+                                                // Calculate common capabilities
+                                                let caps = crate::common_capabilities(
+                                                    &local_version_info,
+                                                    remote_info,
+                                                );
+                                                (
+                                                    negotiated,
+                                                    caps,
+                                                    remote_info.software_version.clone(),
+                                                )
+                                            }
+                                            None => {
+                                                // Legacy node without version info - treat as v1 with minimal capabilities
+                                                info!(
+                                                    peer_did = %message.from,
+                                                    "Received Hello from legacy node (no version_info), treating as protocol v1"
+                                                );
+                                                // Track legacy connection (use negotiated_version=1 for metrics)
+                                                icn_obs::metrics::network::version_negotiation_success_inc(1);
 
-                                            // No capabilities for legacy nodes (empty set)
-                                            (1, crate::CapabilityFlags::empty(), "legacy-node".to_string())
-                                        }
-                                    };
+                                                // No capabilities for legacy nodes (empty set)
+                                                (
+                                                    1,
+                                                    crate::CapabilityFlags::empty(),
+                                                    "legacy-node".to_string(),
+                                                )
+                                            }
+                                        };
 
                                     info!(
                                         peer_did = %message.from,
@@ -1370,7 +1435,8 @@ impl NetworkActor {
                                     // This enables us to send messages back to the peer on this connection
                                     // Get the connections Arc without holding the outer lock across the await
                                     use std::collections::hash_map::Entry;
-                                    let connections_arc = session_manager.read().await.connections_arc();
+                                    let connections_arc =
+                                        session_manager.read().await.connections_arc();
                                     let peer_did = message.from.to_string();
                                     let mut connections = connections_arc.write().await;
                                     match connections.entry(peer_did) {
@@ -1379,7 +1445,11 @@ impl NetworkActor {
                                                   entry.key(), connection.remote_address());
                                         }
                                         Entry::Vacant(entry) => {
-                                            info!("Storing incoming connection from {} at {}", entry.key(), connection.remote_address());
+                                            info!(
+                                                "Storing incoming connection from {} at {}",
+                                                entry.key(),
+                                                connection.remote_address()
+                                            );
                                             entry.insert(connection.clone());
                                         }
                                     }
@@ -1389,13 +1459,18 @@ impl NetworkActor {
                                         if let Some(peer_topology) = topology_info {
                                             // Get trust score if available
                                             let trust_score = if let Some(ref tg) = trust_graph {
-                                                tg.read().await.compute_trust_score(&message.from).unwrap_or(0.0) as f32
+                                                tg.read()
+                                                    .await
+                                                    .compute_trust_score(&message.from)
+                                                    .unwrap_or(0.0)
+                                                    as f32
                                             } else {
                                                 0.5 // Default if no trust graph
                                             };
 
                                             // Add to neighbor sets
-                                            let limits = topology_config.as_ref()
+                                            let limits = topology_config
+                                                .as_ref()
                                                 .map(|cfg| cfg.neighbor_limits.clone())
                                                 .unwrap_or_else(|| NeighborLimitsConfig {
                                                     max_local_cluster: 50,
@@ -1426,16 +1501,16 @@ impl NetworkActor {
                                     // Send Hello response with our X25519 public key directly on this connection
                                     let binding_info = identity_bundle.binding_info();
                                     let x25519_public = *identity_bundle.x25519_public_bytes();
-                                    let version_info = crate::VersionInfo::new(
-                                        format!("icnd-{}", env!("CARGO_PKG_VERSION"))
-                                    );
-                                    let topology_info = topology_config.as_ref().map(|topo_cfg| {
-                                        TopologyInfo {
+                                    let version_info = crate::VersionInfo::new(format!(
+                                        "icnd-{}",
+                                        env!("CARGO_PKG_VERSION")
+                                    ));
+                                    let topology_info =
+                                        topology_config.as_ref().map(|topo_cfg| TopologyInfo {
                                             region: topo_cfg.region.clone(),
                                             cluster_id: topo_cfg.cluster_id.clone(),
                                             role: topo_cfg.role,
-                                        }
-                                    });
+                                        });
 
                                     let hello_response = NetworkMessage::hello(
                                         own_did.clone(),
@@ -1451,23 +1526,37 @@ impl NetworkActor {
                                     tokio::spawn(async move {
                                         match connection_clone.open_bi().await {
                                             Ok((mut send, _recv)) => {
-                                                if let Err(e) = crate::protocol::write_message(&mut send, &hello_response).await {
+                                                if let Err(e) = crate::protocol::write_message(
+                                                    &mut send,
+                                                    &hello_response,
+                                                )
+                                                .await
+                                                {
                                                     warn!("Failed to write Hello response: {}", e);
                                                 } else {
                                                     info!("Sent Hello response with X25519 public key");
                                                 }
                                             }
                                             Err(e) => {
-                                                warn!("Failed to open stream for Hello response: {}", e);
+                                                warn!(
+                                                    "Failed to open stream for Hello response: {}",
+                                                    e
+                                                );
                                             }
                                         }
                                     });
 
                                     info!("Processed Hello from {}", message.from);
                                 }
-                                MessagePayload::Handshake { region, cluster_id, role } => {
-                                    info!("Received handshake from {} (region={}, cluster={})",
-                                          message.from, region, cluster_id);
+                                MessagePayload::Handshake {
+                                    region,
+                                    cluster_id,
+                                    role,
+                                } => {
+                                    info!(
+                                        "Received handshake from {} (region={}, cluster={})",
+                                        message.from, region, cluster_id
+                                    );
 
                                     // Add peer to neighbor sets if topology is enabled
                                     if let Some(ref sets) = neighbor_sets {
@@ -1484,13 +1573,18 @@ impl NetworkActor {
 
                                         // Get trust score if available
                                         let trust_score = if let Some(ref tg) = trust_graph {
-                                            tg.read().await.compute_trust_score(&message.from).unwrap_or(0.0) as f32
+                                            tg.read()
+                                                .await
+                                                .compute_trust_score(&message.from)
+                                                .unwrap_or(0.0)
+                                                as f32
                                         } else {
                                             0.5 // Default if no trust graph
                                         };
 
                                         // Add to neighbor sets
-                                        let limits = topology_config.as_ref()
+                                        let limits = topology_config
+                                            .as_ref()
                                             .map(|cfg| cfg.neighbor_limits.clone())
                                             .unwrap_or_else(|| NeighborLimitsConfig {
                                                 max_local_cluster: 50,
@@ -1527,26 +1621,36 @@ impl NetworkActor {
                                     tokio::spawn(async move {
                                         match connection_clone.open_bi().await {
                                             Ok((mut new_send, _new_recv)) => {
-                                                let response_msg = if let Some(ref topo_cfg) = topo_cfg_clone {
-                                                    // Send full handshake if topology is enabled
-                                                    NetworkMessage::handshake(
-                                                        own_did_clone,
-                                                        from_did.clone(),
-                                                        topo_cfg.region.clone(),
-                                                        topo_cfg.cluster_id.clone(),
-                                                        format!("{:?}", topo_cfg.role),
-                                                    )
-                                                } else {
-                                                    // Send ack if topology is disabled
-                                                    NetworkMessage::handshake_ack(own_did_clone, from_did.clone())
-                                                };
+                                                let response_msg =
+                                                    if let Some(ref topo_cfg) = topo_cfg_clone {
+                                                        // Send full handshake if topology is enabled
+                                                        NetworkMessage::handshake(
+                                                            own_did_clone,
+                                                            from_did.clone(),
+                                                            topo_cfg.region.clone(),
+                                                            topo_cfg.cluster_id.clone(),
+                                                            format!("{:?}", topo_cfg.role),
+                                                        )
+                                                    } else {
+                                                        // Send ack if topology is disabled
+                                                        NetworkMessage::handshake_ack(
+                                                            own_did_clone,
+                                                            from_did.clone(),
+                                                        )
+                                                    };
 
-                                                if let Err(e) = write_message(&mut new_send, &response_msg).await {
+                                                if let Err(e) =
+                                                    write_message(&mut new_send, &response_msg)
+                                                        .await
+                                                {
                                                     warn!("Failed to send handshake response to {}: {}", from_did, e);
                                                 } else if let Err(e) = new_send.finish() {
                                                     warn!("Failed to finish handshake response stream to {}: {}", from_did, e);
                                                 } else {
-                                                    info!("Sent handshake response to {}", from_did);
+                                                    info!(
+                                                        "Sent handshake response to {}",
+                                                        from_did
+                                                    );
                                                 }
                                             }
                                             Err(e) => {
@@ -1560,7 +1664,10 @@ impl NetworkActor {
                                     // Nothing to do, just acknowledgement
                                 }
                                 MessagePayload::Ping { sent_at } => {
-                                    info!("Received Ping from {} (sent_at={}ms)", message.from, sent_at);
+                                    info!(
+                                        "Received Ping from {} (sent_at={}ms)",
+                                        message.from, sent_at
+                                    );
 
                                     // Send Pong response with timestamp echo
                                     let pong_msg = NetworkMessage::pong(
@@ -1574,16 +1681,27 @@ impl NetworkActor {
                                     tokio::spawn(async move {
                                         match connection_clone.open_bi().await {
                                             Ok((mut new_send, _new_recv)) => {
-                                                if let Err(e) = write_message(&mut new_send, &pong_msg).await {
-                                                    warn!("Failed to send Pong to {}: {}", from_did, e);
+                                                if let Err(e) =
+                                                    write_message(&mut new_send, &pong_msg).await
+                                                {
+                                                    warn!(
+                                                        "Failed to send Pong to {}: {}",
+                                                        from_did, e
+                                                    );
                                                 } else if let Err(e) = new_send.finish() {
-                                                    warn!("Failed to finish Pong stream to {}: {}", from_did, e);
+                                                    warn!(
+                                                        "Failed to finish Pong stream to {}: {}",
+                                                        from_did, e
+                                                    );
                                                 } else {
                                                     info!("Sent Pong to {}", from_did);
                                                 }
                                             }
                                             Err(e) => {
-                                                warn!("Failed to open stream for Pong to {}: {}", from_did, e);
+                                                warn!(
+                                                    "Failed to open stream for Pong to {}: {}",
+                                                    from_did, e
+                                                );
                                             }
                                         }
                                     });
@@ -1591,12 +1709,16 @@ impl NetworkActor {
                                     // Forward Ping to external handler for observability
                                     handler(message);
                                 }
-                                MessagePayload::Pong { ping_sent_at, pong_sent_at } => {
+                                MessagePayload::Pong {
+                                    ping_sent_at,
+                                    pong_sent_at,
+                                } => {
                                     // Calculate RTT
                                     let now = std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap()
-                                        .as_millis() as u64;
+                                        .as_millis()
+                                        as u64;
                                     let rtt_ms = now.saturating_sub(*ping_sent_at);
 
                                     info!(
@@ -1609,10 +1731,9 @@ impl NetworkActor {
 
                                     // Record RTT in neighbor sets if available
                                     if let Some(ref sets) = neighbor_sets {
-                                        sets.write().await.record_rtt(
-                                            &PeerId(message.from.clone()),
-                                            rtt_ms,
-                                        );
+                                        sets.write()
+                                            .await
+                                            .record_rtt(&PeerId(message.from.clone()), rtt_ms);
 
                                         // Update metrics
                                         icn_obs::metrics::topology::rtt_observe(rtt_ms as f64);
@@ -1620,7 +1741,12 @@ impl NetworkActor {
                                 }
                                 MessagePayload::Gossip(ref gossip_msg) => {
                                     // Extract BlobAnnounce from gossip messages for data locality tracking
-                                    if let icn_gossip::types::GossipMessage::BlobAnnounce { blob_hash, peer_did, size_bytes } = gossip_msg {
+                                    if let icn_gossip::types::GossipMessage::BlobAnnounce {
+                                        blob_hash,
+                                        peer_did,
+                                        size_bytes,
+                                    } = gossip_msg
+                                    {
                                         debug!(
                                             peer_did = %peer_did,
                                             blob_hash_len = blob_hash.len(),
@@ -1647,7 +1773,10 @@ impl NetworkActor {
                                     let sig_result = envelope.verify(300);
 
                                     if let Err(e) = sig_result {
-                                        warn!("Signature/age verification failed from {}: {}", envelope.from, e);
+                                        warn!(
+                                            "Signature/age verification failed from {}: {}",
+                                            envelope.from, e
+                                        );
 
                                         // Record InvalidSignature violation
                                         if let Some(ref detector) = misbehavior_detector {
@@ -1659,40 +1788,66 @@ impl NetworkActor {
                                                 hasher.finalize().to_vec()
                                             };
 
-                                            let violation = icn_security::Violation::InvalidSignature {
-                                                message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
-                                            };
+                                            let violation =
+                                                icn_security::Violation::InvalidSignature {
+                                                    message_hash: message_hash
+                                                        .clone()
+                                                        .try_into()
+                                                        .unwrap_or([0u8; 32]),
+                                                };
 
-                                            detector.write().await.record_violation(&envelope.from, violation, message_hash);
+                                            detector.write().await.record_violation(
+                                                &envelope.from,
+                                                violation,
+                                                message_hash,
+                                            );
                                         }
                                         // Drop message (don't forward to handler)
                                     } else {
                                         // Signature valid, now check for replay attack
                                         match replay_guard.write().await.check(envelope) {
                                             Ok(()) => {
-                                                info!("Verified signed message from {} (seq={})", envelope.from, envelope.sequence);
+                                                info!(
+                                                    "Verified signed message from {} (seq={})",
+                                                    envelope.from, envelope.sequence
+                                                );
                                                 // Forward verified message to handler
                                                 handler(message);
                                             }
                                             Err(e) => {
-                                                warn!("Replay attack detected from {}: {}", envelope.from, e);
+                                                warn!(
+                                                    "Replay attack detected from {}: {}",
+                                                    envelope.from, e
+                                                );
 
                                                 // Record ReplayAttack violation
                                                 if let Some(ref detector) = misbehavior_detector {
                                                     let message_hash = {
                                                         use sha2::{Digest, Sha256};
                                                         let mut hasher = Sha256::new();
-                                                        hasher.update(envelope.sequence.to_be_bytes());
-                                                        hasher.update(envelope.from.as_str().as_bytes());
+                                                        hasher.update(
+                                                            envelope.sequence.to_be_bytes(),
+                                                        );
+                                                        hasher.update(
+                                                            envelope.from.as_str().as_bytes(),
+                                                        );
                                                         hasher.finalize().to_vec()
                                                     };
 
-                                                    let violation = icn_security::Violation::ReplayAttack {
-                                                        message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
-                                                        sequence: envelope.sequence,
-                                                    };
+                                                    let violation =
+                                                        icn_security::Violation::ReplayAttack {
+                                                            message_hash: message_hash
+                                                                .clone()
+                                                                .try_into()
+                                                                .unwrap_or([0u8; 32]),
+                                                            sequence: envelope.sequence,
+                                                        };
 
-                                                    detector.write().await.record_violation(&envelope.from, violation, message_hash);
+                                                    detector.write().await.record_violation(
+                                                        &envelope.from,
+                                                        violation,
+                                                        message_hash,
+                                                    );
                                                 }
                                                 // Drop message (don't forward to handler)
                                             }
@@ -1701,13 +1856,17 @@ impl NetworkActor {
                                 }
                                 MessagePayload::PeerExchange(ref peer_msg) => {
                                     // Handle peer exchange messages for cross-network discovery
-                                    use crate::protocol::{PeerExchangeMessage, KnownPeer};
+                                    use crate::protocol::{KnownPeer, PeerExchangeMessage};
 
                                     match peer_msg {
-                                        PeerExchangeMessage::Request { max_peers, network_filter } => {
+                                        PeerExchangeMessage::Request {
+                                            max_peers,
+                                            network_filter,
+                                        } => {
                                             info!("Received peer exchange request from {} (max={}, filter={:?})",
                                                   message.from, max_peers, network_filter);
-                                            icn_obs::metrics::peer_exchange::requests_received_inc();
+                                            icn_obs::metrics::peer_exchange::requests_received_inc(
+                                            );
 
                                             // Gather known peers from session manager (currently connected peers)
                                             let sm = session_manager.read().await;
@@ -1730,7 +1889,9 @@ impl NetworkActor {
 
                                                 known_peers.push(KnownPeer {
                                                     did: did_str.to_string(),
-                                                    addresses: vec![conn.remote_address().to_string()],
+                                                    addresses: vec![conn
+                                                        .remote_address()
+                                                        .to_string()],
                                                     version: "0.1.0".to_string(),
                                                     network_name: network_filter.clone(),
                                                     observed_trust: None,
@@ -1759,12 +1920,22 @@ impl NetworkActor {
                                             tokio::spawn(async move {
                                                 match connection_clone.open_bi().await {
                                                     Ok((mut send_stream, _recv)) => {
-                                                        if let Err(e) = crate::protocol::write_message(&mut send_stream, &response).await {
+                                                        if let Err(e) =
+                                                            crate::protocol::write_message(
+                                                                &mut send_stream,
+                                                                &response,
+                                                            )
+                                                            .await
+                                                        {
                                                             warn!("Failed to send peer exchange response: {}", e);
-                                                        } else if let Err(e) = send_stream.finish() {
+                                                        } else if let Err(e) = send_stream.finish()
+                                                        {
                                                             warn!("Failed to finish peer exchange response stream: {}", e);
                                                         } else {
-                                                            info!("Sent {} peers to {}", total_known, from_did);
+                                                            info!(
+                                                                "Sent {} peers to {}",
+                                                                total_known, from_did
+                                                            );
                                                             icn_obs::metrics::peer_exchange::responses_sent_inc();
                                                         }
                                                     }
@@ -1775,18 +1946,29 @@ impl NetworkActor {
                                             });
                                         }
                                         PeerExchangeMessage::Response { peers, total_known } => {
-                                            info!("Received {} peers from {} (total known: {})",
-                                                  peers.len(), message.from, total_known);
-                                            icn_obs::metrics::peer_exchange::responses_received_inc();
-                                            icn_obs::metrics::peer_exchange::peers_discovered_add(peers.len() as u64);
+                                            info!(
+                                                "Received {} peers from {} (total known: {})",
+                                                peers.len(),
+                                                message.from,
+                                                total_known
+                                            );
+                                            icn_obs::metrics::peer_exchange::responses_received_inc(
+                                            );
+                                            icn_obs::metrics::peer_exchange::peers_discovered_add(
+                                                peers.len() as u64,
+                                            );
 
                                             // Forward to handler for processing
                                             // The supervisor can dial these peers if configured for federation
                                             handler(message);
                                         }
                                         PeerExchangeMessage::Announce { peer } => {
-                                            info!("Peer announced: {} at {:?}", peer.did, peer.addresses);
-                                            icn_obs::metrics::peer_exchange::announces_received_inc();
+                                            info!(
+                                                "Peer announced: {} at {:?}",
+                                                peer.did, peer.addresses
+                                            );
+                                            icn_obs::metrics::peer_exchange::announces_received_inc(
+                                            );
                                             // Forward to handler for processing
                                             handler(message);
                                         }
@@ -1849,26 +2031,28 @@ impl NetworkActor {
     /// via discovery and dialing after restart.
     pub async fn export_state(&self) -> icn_snapshot::NetworkState {
         // Export peer connection info (version, capabilities, X25519 keys)
-        let peer_connections: std::collections::HashMap<String, icn_snapshot::PeerConnectionInfo> = self
-            .peer_connections
-            .read()
-            .await
-            .iter()
-            .map(|(did, info)| {
-                let snapshot_info = icn_snapshot::PeerConnectionInfo {
-                    did: did.to_string(),
-                    negotiated_version: info.negotiated_version,
-                    peer_capabilities: info.peer_capabilities.bits(),
-                    peer_software: info.peer_software.clone(),
-                    x25519_key: info.x25519_key,
-                };
-                (did.to_string(), snapshot_info)
-            })
-            .collect();
+        let peer_connections: std::collections::HashMap<String, icn_snapshot::PeerConnectionInfo> =
+            self.peer_connections
+                .read()
+                .await
+                .iter()
+                .map(|(did, info)| {
+                    let snapshot_info = icn_snapshot::PeerConnectionInfo {
+                        did: did.to_string(),
+                        negotiated_version: info.negotiated_version,
+                        peer_capabilities: info.peer_capabilities.bits(),
+                        peer_software: info.peer_software.clone(),
+                        x25519_key: info.x25519_key,
+                    };
+                    (did.to_string(), snapshot_info)
+                })
+                .collect();
 
         // Legacy formats (empty for new deployments)
-        let peer_x25519_keys: std::collections::HashMap<String, [u8; 32]> = std::collections::HashMap::new();
-        let peer_addresses: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let peer_x25519_keys: std::collections::HashMap<String, [u8; 32]> =
+            std::collections::HashMap::new();
+        let peer_addresses: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
 
         icn_snapshot::NetworkState {
             peer_connections,
@@ -1887,21 +2071,27 @@ impl NetworkActor {
     /// Note: Connections are NOT automatically re-established - that happens
     /// through normal discovery and connection management processes.
     pub async fn restore_state(&self, state: icn_snapshot::NetworkState) -> Result<()> {
-        info!("Restoring network state: {} peer connections, {} legacy keys, {} peer addresses",
-              state.peer_connections.len(), state.peer_x25519_keys.len(), state.peer_addresses.len());
+        info!(
+            "Restoring network state: {} peer connections, {} legacy keys, {} peer addresses",
+            state.peer_connections.len(),
+            state.peer_x25519_keys.len(),
+            state.peer_addresses.len()
+        );
 
         // Restore peer connections
         let mut connections = self.peer_connections.write().await;
 
         // Restore modern format (peer_connections)
         for (did_str, snapshot_info) in state.peer_connections {
-            let did = Did::from_str(&did_str)
-                .context("Failed to parse DID from peer connections")?;
+            let did =
+                Did::from_str(&did_str).context("Failed to parse DID from peer connections")?;
 
             let connection_info = PeerConnectionInfo {
                 did: did.clone(),
                 negotiated_version: snapshot_info.negotiated_version,
-                peer_capabilities: crate::CapabilityFlags::from_bits_truncate(snapshot_info.peer_capabilities),
+                peer_capabilities: crate::CapabilityFlags::from_bits_truncate(
+                    snapshot_info.peer_capabilities,
+                ),
                 peer_software: snapshot_info.peer_software,
                 x25519_key: snapshot_info.x25519_key,
             };
@@ -1916,13 +2106,15 @@ impl NetworkActor {
                 .context("Failed to parse DID from legacy peer X25519 keys")?;
 
             // Only restore if not already present from modern format
-            connections.entry(did.clone()).or_insert_with(|| PeerConnectionInfo {
-                did,
-                negotiated_version: 1, // Assume v1 for legacy
-                peer_capabilities: crate::CapabilityFlags::empty(),
-                peer_software: "legacy-unknown".to_string(),
-                x25519_key: key,
-            });
+            connections
+                .entry(did.clone())
+                .or_insert_with(|| PeerConnectionInfo {
+                    did,
+                    negotiated_version: 1, // Assume v1 for legacy
+                    peer_capabilities: crate::CapabilityFlags::empty(),
+                    peer_software: "legacy-unknown".to_string(),
+                    x25519_key: key,
+                });
         }
         drop(connections);
 
@@ -1949,9 +2141,19 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
 
-        let handle = NetworkActor::spawn(identity_bundle, addr, shutdown_tx.clone(), None, None, None, None, None, None)
-            .await
-            .unwrap();
+        let handle = NetworkActor::spawn(
+            identity_bundle,
+            addr,
+            shutdown_tx.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         // Should be able to get stats
         let stats = handle.get_stats().await.unwrap();
@@ -1978,7 +2180,8 @@ mod tests {
             PeerConnectionInfo {
                 did: alice_did.clone(),
                 negotiated_version: 1,
-                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION | CapabilityFlags::SIGNED_MESSAGES,
+                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION
+                    | CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.1.0".to_string(),
                 x25519_key: [1u8; 32],
             },
@@ -2009,17 +2212,41 @@ mod tests {
         };
 
         // Test peer_has_capability
-        assert!(handle.peer_has_capability(alice_did, CapabilityFlags::E2E_ENCRYPTION).await);
-        assert!(handle.peer_has_capability(alice_did, CapabilityFlags::SIGNED_MESSAGES).await);
-        assert!(!handle.peer_has_capability(alice_did, CapabilityFlags::GRACEFUL_RESTART).await);
+        assert!(
+            handle
+                .peer_has_capability(alice_did, CapabilityFlags::E2E_ENCRYPTION)
+                .await
+        );
+        assert!(
+            handle
+                .peer_has_capability(alice_did, CapabilityFlags::SIGNED_MESSAGES)
+                .await
+        );
+        assert!(
+            !handle
+                .peer_has_capability(alice_did, CapabilityFlags::GRACEFUL_RESTART)
+                .await
+        );
 
-        assert!(!handle.peer_has_capability(bob_did, CapabilityFlags::E2E_ENCRYPTION).await);
-        assert!(handle.peer_has_capability(bob_did, CapabilityFlags::SIGNED_MESSAGES).await);
+        assert!(
+            !handle
+                .peer_has_capability(bob_did, CapabilityFlags::E2E_ENCRYPTION)
+                .await
+        );
+        assert!(
+            handle
+                .peer_has_capability(bob_did, CapabilityFlags::SIGNED_MESSAGES)
+                .await
+        );
 
         // Unknown peer
         let charlie_keypair = KeyPair::generate().unwrap();
         let charlie_did = charlie_keypair.did();
-        assert!(!handle.peer_has_capability(charlie_did, CapabilityFlags::E2E_ENCRYPTION).await);
+        assert!(
+            !handle
+                .peer_has_capability(charlie_did, CapabilityFlags::E2E_ENCRYPTION)
+                .await
+        );
     }
 
     #[tokio::test]
@@ -2039,7 +2266,8 @@ mod tests {
             PeerConnectionInfo {
                 did: alice_did.clone(),
                 negotiated_version: 1,
-                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION | CapabilityFlags::SIGNED_MESSAGES,
+                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION
+                    | CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.1.0".to_string(),
                 x25519_key: [1u8; 32],
             },
@@ -2084,22 +2312,30 @@ mod tests {
         };
 
         // Get peers with E2E encryption (should be Alice and Charlie)
-        let encrypted_peers = handle.get_peers_with_capability(CapabilityFlags::E2E_ENCRYPTION).await;
+        let encrypted_peers = handle
+            .get_peers_with_capability(CapabilityFlags::E2E_ENCRYPTION)
+            .await;
         assert_eq!(encrypted_peers.len(), 2);
         assert!(encrypted_peers.contains(alice_did));
         assert!(encrypted_peers.contains(charlie_did));
 
         // Get peers with Signed Messages (should be all three)
-        let signed_peers = handle.get_peers_with_capability(CapabilityFlags::SIGNED_MESSAGES).await;
+        let signed_peers = handle
+            .get_peers_with_capability(CapabilityFlags::SIGNED_MESSAGES)
+            .await;
         assert_eq!(signed_peers.len(), 3);
 
         // Get peers with Graceful Restart (should be only Charlie)
-        let restart_peers = handle.get_peers_with_capability(CapabilityFlags::GRACEFUL_RESTART).await;
+        let restart_peers = handle
+            .get_peers_with_capability(CapabilityFlags::GRACEFUL_RESTART)
+            .await;
         assert_eq!(restart_peers.len(), 1);
         assert!(restart_peers.contains(charlie_did));
 
         // Get peers with capability no one has
-        let quantum_peers = handle.get_peers_with_capability(CapabilityFlags::MULTI_DEVICE).await;
+        let quantum_peers = handle
+            .get_peers_with_capability(CapabilityFlags::MULTI_DEVICE)
+            .await;
         assert_eq!(quantum_peers.len(), 0);
     }
 
@@ -2173,7 +2409,10 @@ mod tests {
             x25519_key: [42u8; 32],
         };
 
-        peer_connections.write().await.insert(alice_did.clone(), alice_info.clone());
+        peer_connections
+            .write()
+            .await
+            .insert(alice_did.clone(), alice_info.clone());
 
         let (tx, _rx) = mpsc::channel(1);
         let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
@@ -2193,8 +2432,12 @@ mod tests {
         assert_eq!(info.negotiated_version, 2);
         assert_eq!(info.peer_software, "icnd-0.2.5");
         assert_eq!(info.x25519_key, [42u8; 32]);
-        assert!(info.peer_capabilities.contains(CapabilityFlags::E2E_ENCRYPTION));
-        assert!(info.peer_capabilities.contains(CapabilityFlags::GRACEFUL_RESTART));
+        assert!(info
+            .peer_capabilities
+            .contains(CapabilityFlags::E2E_ENCRYPTION));
+        assert!(info
+            .peer_capabilities
+            .contains(CapabilityFlags::GRACEFUL_RESTART));
 
         // Unknown peer
         let bob_keypair = KeyPair::generate().unwrap();
@@ -2231,7 +2474,9 @@ mod tests {
         // Announce blob availability
         let blob_hash = [42u8; 32];
         let size_bytes = 1024;
-        handle.announce_blob_availability(blob_hash, own_did.clone(), size_bytes).await;
+        handle
+            .announce_blob_availability(blob_hash, own_did.clone(), size_bytes)
+            .await;
 
         // Verify blob was recorded in local registry
         let peers = blob_registry.read().await.get_peers_with_blob(&blob_hash);

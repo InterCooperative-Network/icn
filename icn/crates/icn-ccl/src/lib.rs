@@ -56,7 +56,9 @@ pub use disputes::{
     DisputeResolutionSystem, DisputeStats, DisputeStatus, MisbehaviorCallback,
 };
 pub use interpreter::Interpreter;
-pub use messages::{ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse};
+pub use messages::{
+    ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse,
+};
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{
     Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult,
@@ -66,14 +68,15 @@ pub use types::{
 #[cfg(test)]
 mod example_contract_tests {
     use super::*;
-    
 
     #[test]
     fn test_timebank_contract_deserializes() {
         let json = include_str!("../../../../examples/contracts/timebank.ccl.json");
-        let contract: Contract = serde_json::from_str(json)
-            .expect("Failed to deserialize timebank.ccl.json");
-        contract.validate().expect("TimeBank contract validation failed");
+        let contract: Contract =
+            serde_json::from_str(json).expect("Failed to deserialize timebank.ccl.json");
+        contract
+            .validate()
+            .expect("TimeBank contract validation failed");
         assert_eq!(contract.name, "TimeBank");
         assert_eq!(contract.participants.len(), 2);
         assert_eq!(contract.rules.len(), 1);
@@ -83,9 +86,11 @@ mod example_contract_tests {
     #[test]
     fn test_simple_agreement_contract_deserializes() {
         let json = include_str!("../../../../examples/contracts/simple-agreement.ccl.json");
-        let contract: Contract = serde_json::from_str(json)
-            .expect("Failed to deserialize simple-agreement.ccl.json");
-        contract.validate().expect("SimpleAgreement contract validation failed");
+        let contract: Contract =
+            serde_json::from_str(json).expect("Failed to deserialize simple-agreement.ccl.json");
+        contract
+            .validate()
+            .expect("SimpleAgreement contract validation failed");
         assert_eq!(contract.name, "SimpleAgreement");
         assert_eq!(contract.participants.len(), 1);
         assert_eq!(contract.rules.len(), 1);
@@ -94,9 +99,11 @@ mod example_contract_tests {
     #[test]
     fn test_calculator_contract_deserializes() {
         let json = include_str!("../../../../examples/contracts/calculator.ccl.json");
-        let contract: Contract = serde_json::from_str(json)
-            .expect("Failed to deserialize calculator.ccl.json");
-        contract.validate().expect("Calculator contract validation failed");
+        let contract: Contract =
+            serde_json::from_str(json).expect("Failed to deserialize calculator.ccl.json");
+        contract
+            .validate()
+            .expect("Calculator contract validation failed");
         assert_eq!(contract.name, "Calculator");
         assert_eq!(contract.participants.len(), 1);
         assert_eq!(contract.rules.len(), 1);

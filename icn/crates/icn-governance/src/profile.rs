@@ -80,8 +80,7 @@ impl GovernanceProfile {
     pub fn cooperative_default() -> Self {
         Self {
             id: GovernanceProfileId::builtin("cooperative_default"),
-            description: "Democratic 1-member-1-vote with quorum and majority approval"
-                .to_string(),
+            description: "Democratic 1-member-1-vote with quorum and majority approval".to_string(),
         }
     }
 }

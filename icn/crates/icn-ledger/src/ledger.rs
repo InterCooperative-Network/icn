@@ -1,7 +1,9 @@
 //! Ledger implementation with storage
 
 use crate::balance::compute_all_balances;
-use crate::fork_resolution::{Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver};
+use crate::fork_resolution::{
+    Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
+};
 use crate::merge::{MergeDecision, QuarantineItem};
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
@@ -14,7 +16,7 @@ use icn_trust::TrustGraph;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::{debug, info, warn, instrument};
+use tracing::{debug, info, instrument, warn};
 
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
@@ -344,10 +346,7 @@ impl Ledger {
             self.fork_detector.index_entry(&entry);
         }
 
-        info!(
-            entry_count = entry_count,
-            "Rebuilt fork detection index"
-        );
+        info!(entry_count = entry_count, "Rebuilt fork detection index");
 
         Ok(())
     }
@@ -412,7 +411,10 @@ impl Ledger {
                         match &resolution {
                             ForkResolution::KeepFirst => {
                                 if let Some(hash) = &fork.entry2.id {
-                                    self.quarantine_forked_entry(&fork.entry2, "Lost fork resolution")?;
+                                    self.quarantine_forked_entry(
+                                        &fork.entry2,
+                                        "Lost fork resolution",
+                                    )?;
                                     icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
                                     debug!(
                                         quarantined = %hash.to_hex(),
@@ -422,7 +424,10 @@ impl Ledger {
                             }
                             ForkResolution::KeepSecond => {
                                 if let Some(hash) = &fork.entry1.id {
-                                    self.quarantine_forked_entry(&fork.entry1, "Lost fork resolution")?;
+                                    self.quarantine_forked_entry(
+                                        &fork.entry1,
+                                        "Lost fork resolution",
+                                    )?;
                                     icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
                                     debug!(
                                         quarantined = %hash.to_hex(),
@@ -436,7 +441,9 @@ impl Ledger {
                                     reason = reason,
                                     "Fork requires manual resolution"
                                 );
-                                icn_obs::metrics::ledger_forks::manual_resolution_required_inc(reason);
+                                icn_obs::metrics::ledger_forks::manual_resolution_required_inc(
+                                    reason,
+                                );
                             }
                         }
 
@@ -604,11 +611,7 @@ impl Ledger {
     /// Save cached balances to storage
     fn save_cached_balances(&self) -> Result<()> {
         for (account_id, balances) in &self.cached_balances {
-            let key = format!(
-                "{}{}",
-                BALANCE_PREFIX,
-                serde_json::to_string(account_id)?
-            );
+            let key = format!("{}{}", BALANCE_PREFIX, serde_json::to_string(account_id)?);
             let value = serde_json::to_vec(balances)?;
             self.store.put(key.as_bytes(), &value)?;
         }
@@ -672,15 +675,15 @@ impl Ledger {
                 // old_did has positive balance (+100 means they have credit)
                 // Transfer it to new_did: reduce old_did's balance, increase new_did's balance
                 JournalEntryBuilder::new(new_did.clone())
-                    .credit(old_did.clone(), currency.clone(), *balance)  // Reduce old_did's balance
-                    .debit(new_did.clone(), currency.clone(), *balance)   // Increase new_did's balance
+                    .credit(old_did.clone(), currency.clone(), *balance) // Reduce old_did's balance
+                    .debit(new_did.clone(), currency.clone(), *balance) // Increase new_did's balance
                     .build()?
             } else {
                 // old_did has negative balance (-100 means they owe credit)
                 // Transfer the debt to new_did: reduce old_did's debt, increase new_did's debt
                 let debt_amount = balance.abs();
                 JournalEntryBuilder::new(new_did.clone())
-                    .debit(old_did.clone(), currency.clone(), debt_amount)  // Reduce old_did's debt
+                    .debit(old_did.clone(), currency.clone(), debt_amount) // Reduce old_did's debt
                     .credit(new_did.clone(), currency.clone(), debt_amount) // Increase new_did's debt
                     .build()?
             };

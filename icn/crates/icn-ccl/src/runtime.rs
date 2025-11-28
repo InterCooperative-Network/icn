@@ -62,11 +62,7 @@ impl ContractRuntime {
     }
 
     /// Install a contract (deprecated - use install_contract_with_metadata)
-    pub fn install_contract(
-        &mut self,
-        code_hash: ContentHash,
-        contract: Contract,
-    ) -> Result<()> {
+    pub fn install_contract(&mut self, code_hash: ContentHash, contract: Contract) -> Result<()> {
         // Create a basic installation for backward compatibility
         let installation = crate::types::ContractInstallation {
             code_hash: code_hash.clone(),
@@ -116,10 +112,7 @@ impl ContractRuntime {
             .context("Contract state not found")?
             .clone();
 
-        debug!(
-            "Executing contract {} rule {}",
-            contract.name, rule_name
-        );
+        debug!("Executing contract {} rule {}", contract.name, rule_name);
 
         // Run interpreter
         let interpreter = Interpreter::new(contract, state, context);
@@ -172,10 +165,7 @@ impl ContractRuntime {
                     currency,
                     limit,
                 } => {
-                    debug!(
-                        "Set credit limit: {} = {} for {}",
-                        account, limit, currency
-                    );
+                    debug!("Set credit limit: {} = {} for {}", account, limit, currency);
                     // Note: Credit limits would be stored separately in a real implementation
                     // For now, we just log it
                 }
@@ -196,7 +186,10 @@ impl ContractRuntime {
     }
 
     /// Get contract installation metadata
-    pub fn get_installation(&self, code_hash: &ContentHash) -> Option<&crate::types::ContractInstallation> {
+    pub fn get_installation(
+        &self,
+        code_hash: &ContentHash,
+    ) -> Option<&crate::types::ContractInstallation> {
         self.installations.get(code_hash)
     }
 
@@ -269,7 +262,9 @@ mod tests {
 
         // Install contract
         let code_hash = LedgerHash::from_bytes([1u8; 32]);
-        runtime.install_contract(code_hash.clone(), contract).unwrap();
+        runtime
+            .install_contract(code_hash.clone(), contract)
+            .unwrap();
 
         // Execute rule
         let context = ExecutionContext::new(

@@ -53,8 +53,8 @@
 //! peer_state.record_response(bytes_received);
 //! ```
 
-use crate::vector_clock::VectorClock;
 use crate::types::BloomFilterData;
+use crate::vector_clock::VectorClock;
 use icn_identity::Did;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

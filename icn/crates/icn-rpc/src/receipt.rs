@@ -147,11 +147,7 @@ pub enum Operation {
     ContractExecute { code_hash: String, rule: String },
 
     /// Ledger transfer
-    LedgerTransfer {
-        from: Did,
-        to: Did,
-        amount: i128,
-    },
+    LedgerTransfer { from: Did, to: Did, amount: i128 },
 
     /// Trust edge modification
     TrustEdgeAdd { from: Did, to: Did, score: f32 },
@@ -406,7 +402,10 @@ mod tests {
         store.insert(new_receipt).await;
 
         // Old receipt should be gone
-        assert!(store.get(&id).await.is_none(), "Expired receipt should be evicted");
+        assert!(
+            store.get(&id).await.is_none(),
+            "Expired receipt should be evicted"
+        );
     }
 
     #[tokio::test]

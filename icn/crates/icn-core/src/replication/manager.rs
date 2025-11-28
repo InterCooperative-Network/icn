@@ -51,7 +51,7 @@ impl Default for ReplicationConfig {
             target_replicas: 3,
             min_trust_class: TrustClass::Partner,
             health_check_interval_secs: 60,
-            stale_threshold_secs: 300,      // 5 minutes
+            stale_threshold_secs: 300,       // 5 minutes
             unreachable_threshold_secs: 900, // 15 minutes
         }
     }
@@ -118,10 +118,7 @@ impl ReplicationManager {
     }
 
     /// Background task: check replication health every N seconds
-    async fn monitor_loop(
-        manager: Arc<RwLock<ReplicationManager>>,
-        interval_secs: u64,
-    ) {
+    async fn monitor_loop(manager: Arc<RwLock<ReplicationManager>>, interval_secs: u64) {
         let mut ticker = interval(Duration::from_secs(interval_secs));
 
         loop {
@@ -149,7 +146,11 @@ impl ReplicationManager {
                 Ok(true) => healthy += 1,
                 Ok(false) => under_replicated += 1,
                 Err(e) => {
-                    warn!("Failed to check replication for {:?}: {}", hex::encode(hash), e);
+                    warn!(
+                        "Failed to check replication for {:?}: {}",
+                        hex::encode(hash),
+                        e
+                    );
                 }
             }
         }
@@ -222,10 +223,7 @@ impl ReplicationManager {
                 if replica.health != new_health {
                     debug!(
                         "Replica {} health changed: {:?} -> {:?} (last seen {}s ago)",
-                        replica.peer_did,
-                        replica.health,
-                        new_health,
-                        elapsed_secs
+                        replica.peer_did, replica.health, new_health, elapsed_secs
                     );
                     replica.health = new_health;
                 }
@@ -392,13 +390,8 @@ mod tests {
         let trust_lookup = Arc::new(|_: &Did| None);
         let gossip = GossipActor::spawn(did.clone(), trust_lookup);
 
-        let manager = ReplicationManager::new(
-            did.clone(),
-            config,
-            store.clone(),
-            trust_graph,
-            gossip,
-        );
+        let manager =
+            ReplicationManager::new(did.clone(), config, store.clone(), trust_graph, gossip);
 
         // Create test metadata with old timestamp
         let hash = [0u8; 32];
@@ -442,13 +435,8 @@ mod tests {
         let trust_lookup = Arc::new(|_: &Did| None);
         let gossip = GossipActor::spawn(did.clone(), trust_lookup);
 
-        let manager = ReplicationManager::new(
-            did.clone(),
-            config,
-            store,
-            trust_graph_handle,
-            gossip,
-        );
+        let manager =
+            ReplicationManager::new(did.clone(), config, store, trust_graph_handle, gossip);
 
         // Create metadata with peer already as replica
         let hash = [0u8; 32];
@@ -482,10 +470,7 @@ mod tests {
         let manager = ReplicationManager::new(did, config.clone(), store, trust_graph, gossip);
 
         assert_eq!(manager.config.target_replicas, 3);
-        assert_eq!(
-            manager.config.min_trust_class,
-            TrustClass::Partner
-        );
+        assert_eq!(manager.config.min_trust_class, TrustClass::Partner);
 
         Ok(())
     }

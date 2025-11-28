@@ -178,7 +178,10 @@ impl BatchVerifier {
                 self.batch.clear();
 
                 if invalid_indices.is_empty() {
-                    BatchVerifyResult::Failed("Batch verification failed but all individual verifications passed".to_string())
+                    BatchVerifyResult::Failed(
+                        "Batch verification failed but all individual verifications passed"
+                            .to_string(),
+                    )
                 } else {
                     BatchVerifyResult::SomeInvalid(invalid_indices)
                 }

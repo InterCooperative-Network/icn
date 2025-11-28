@@ -87,9 +87,7 @@ impl MembershipResolver for TrustMembershipResolver {
                 // 2. Filter peers with trust score >= threshold
                 // 3. Return their DIDs
 
-                anyhow::bail!(
-                    "TrustMembershipResolver trust graph integration not yet implemented"
-                )
+                anyhow::bail!("TrustMembershipResolver trust graph integration not yet implemented")
             }
         }
     }

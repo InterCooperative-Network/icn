@@ -126,7 +126,10 @@ async fn test_successful_did_tls_binding_verification() -> Result<()> {
     info!("Node B received {} messages", msg_count);
 
     // Should receive at least the ping message
-    assert!(msg_count >= 1, "Node B should have received at least the ping message");
+    assert!(
+        msg_count >= 1,
+        "Node B should have received at least the ping message"
+    );
 
     info!("✓ DID-TLS binding verification succeeded");
     Ok(())
@@ -171,8 +174,14 @@ async fn test_bidirectional_hello_exchange() -> Result<()> {
     info!("Node A received {} messages", msg_count_a);
     info!("Node B received {} messages", msg_count_b);
 
-    assert!(msg_count_a >= 1, "Node A should have received ping from Node B");
-    assert!(msg_count_b >= 1, "Node B should have received ping from Node A");
+    assert!(
+        msg_count_a >= 1,
+        "Node A should have received ping from Node B"
+    );
+    assert!(
+        msg_count_b >= 1,
+        "Node B should have received ping from Node A"
+    );
 
     info!("✓ Bidirectional Hello exchange succeeded");
     Ok(())
@@ -282,14 +291,12 @@ async fn test_identity_bundle_uniqueness() -> Result<()> {
     let binding2 = bundle2.binding_info();
 
     assert_ne!(
-        binding1.tls_cert_hash,
-        binding2.tls_cert_hash,
+        binding1.tls_cert_hash, binding2.tls_cert_hash,
         "Different bundles should have different cert hashes"
     );
 
     assert_ne!(
-        binding1.tls_binding_sig,
-        binding2.tls_binding_sig,
+        binding1.tls_binding_sig, binding2.tls_binding_sig,
         "Different bundles should have different binding signatures"
     );
 

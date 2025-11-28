@@ -101,9 +101,7 @@ fn demo_gpu_placement() {
             .first()
             .map(|g| g.device_name.as_str())
             .unwrap_or("None");
-        println!(
-            "  {did}: {gpu_name} | Trust: {trust} | Queue: {queue}"
-        );
+        println!("  {did}: {gpu_name} | Trust: {trust} | Queue: {queue}");
     }
     println!();
 
@@ -126,14 +124,18 @@ fn demo_gpu_placement() {
         let empty_hints: Vec<icn_compute::LocalityHint> = vec![];
         let empty_ctx = icn_compute::LocalityContext::empty();
 
-        match policy.score_task(&task_hash, &task_profile, "did:icn:submitter", &node_state, trust, &empty_hints, &empty_ctx)
-        {
+        match policy.score_task(
+            &task_hash,
+            &task_profile,
+            "did:icn:submitter",
+            &node_state,
+            trust,
+            &empty_hints,
+            &empty_ctx,
+        ) {
             Some(offer) => {
                 println!("  {}: score = {:.3}", did, offer.score);
-                println!(
-                    "    - Trust component: {:.3}",
-                    (trust * 0.25).min(0.25)
-                );
+                println!("    - Trust component: {:.3}", (trust * 0.25).min(0.25));
                 println!(
                     "    - Capacity component: {:.3}",
                     node_state.capacity.available_ratio() * 0.20
@@ -165,7 +167,10 @@ fn demo_gpu_placement() {
         println!("✅ Winner: {winner_did}");
         println!("   Final Score: {:.3}", winner_offer.score);
         println!("   Cost: {} credits/1000 fuel", winner_offer.cost);
-        println!("   Estimated Start: +{} ms", winner_offer.estimated_start - 1000);
+        println!(
+            "   Estimated Start: +{} ms",
+            winner_offer.estimated_start - 1000
+        );
     } else {
         println!("❌ No suitable executor found");
     }

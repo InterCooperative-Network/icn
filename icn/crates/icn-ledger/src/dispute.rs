@@ -80,22 +80,16 @@ impl DisputeManager {
         self.save_dispute(&dispute)?;
 
         // Add to active disputes cache
-        self.active_disputes.insert(entry_hash.clone(), dispute.clone());
+        self.active_disputes
+            .insert(entry_hash.clone(), dispute.clone());
 
-        info!(
-            "Dispute filed against entry {} by {}",
-            entry_hash, filed_by
-        );
+        info!("Dispute filed against entry {} by {}", entry_hash, filed_by);
 
         Ok(dispute)
     }
 
     /// Add evidence to an existing dispute
-    pub fn add_evidence(
-        &mut self,
-        entry_hash: &ContentHash,
-        evidence: String,
-    ) -> Result<()> {
+    pub fn add_evidence(&mut self, entry_hash: &ContentHash, evidence: String) -> Result<()> {
         let dispute = self
             .active_disputes
             .get_mut(entry_hash)
@@ -111,11 +105,7 @@ impl DisputeManager {
     }
 
     /// Assign a mediator to a dispute
-    pub fn assign_mediator(
-        &mut self,
-        entry_hash: &ContentHash,
-        mediator: Did,
-    ) -> Result<()> {
+    pub fn assign_mediator(&mut self, entry_hash: &ContentHash, mediator: Did) -> Result<()> {
         let dispute = self
             .active_disputes
             .get_mut(entry_hash)
@@ -211,12 +201,13 @@ impl DisputeManager {
         let items = self.store.scan(prefix)?;
 
         for (_key, value) in items {
-            let dispute: Dispute = serde_json::from_slice(&value)
-                .context("Failed to deserialize dispute")?;
+            let dispute: Dispute =
+                serde_json::from_slice(&value).context("Failed to deserialize dispute")?;
 
             // Only load active (contested) disputes
             if matches!(dispute.status, DisputeStatus::Contested { .. }) {
-                self.active_disputes.insert(dispute.entry_hash.clone(), dispute);
+                self.active_disputes
+                    .insert(dispute.entry_hash.clone(), dispute);
             }
         }
 
@@ -229,8 +220,8 @@ impl DisputeManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_store::SledStore;
     use icn_identity::KeyPair;
+    use icn_store::SledStore;
 
     fn test_store() -> Arc<dyn Store> {
         Arc::new(SledStore::temporary().unwrap())
@@ -269,7 +260,12 @@ mod tests {
 
         // File first dispute
         manager
-            .file_dispute(entry_hash.clone(), filer.clone(), "Reason 1".to_string(), 1000)
+            .file_dispute(
+                entry_hash.clone(),
+                filer.clone(),
+                "Reason 1".to_string(),
+                1000,
+            )
             .unwrap();
 
         // Try to file duplicate
@@ -297,7 +293,10 @@ mod tests {
             .unwrap();
 
         manager
-            .add_evidence(&entry_hash, "Email confirmation showing different amount".to_string())
+            .add_evidence(
+                &entry_hash,
+                "Email confirmation showing different amount".to_string(),
+            )
             .unwrap();
 
         let dispute = manager.get_dispute(&entry_hash).unwrap();
@@ -317,7 +316,9 @@ mod tests {
             .file_dispute(entry_hash.clone(), filer, "Reason".to_string(), 1000)
             .unwrap();
 
-        manager.assign_mediator(&entry_hash, mediator.clone()).unwrap();
+        manager
+            .assign_mediator(&entry_hash, mediator.clone())
+            .unwrap();
 
         let dispute = manager.get_dispute(&entry_hash).unwrap();
         assert_eq!(dispute.mediator, Some(mediator));

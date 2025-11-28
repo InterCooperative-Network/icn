@@ -45,7 +45,9 @@ pub async fn challenge(
     let client_ip = get_client_ip(&http_req);
     ip_limiter.check_rate_limit(&client_ip)?;
 
-    let did = req.did.parse()
+    let did = req
+        .did
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let nonce = auth.create_challenge(&did)?;
@@ -76,11 +78,10 @@ pub async fn verify(
     // Increment verification attempt metric
     gateway::auth_verifications_inc();
 
-    let did = req.did.parse()
-        .map_err(|e| {
-            gateway::auth_failures_inc("invalid_did");
-            crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}"))
-        })?;
+    let did = req.did.parse().map_err(|e| {
+        gateway::auth_failures_inc("invalid_did");
+        crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}"))
+    })?;
 
     // Validate scopes
     validation::validate_scopes(&req.scopes).inspect_err(|_e| {
@@ -92,31 +93,26 @@ pub async fn verify(
         gateway::auth_failures_inc("invalid_coop_id");
     })?;
 
-    let signature = hex::decode(&req.signature)
-        .map_err(|e| {
-            gateway::auth_failures_inc("invalid_signature_encoding");
-            crate::error::GatewayError::BadRequest(
-                format!("Invalid signature encoding: {e}")
-            )
-        })?;
+    let signature = hex::decode(&req.signature).map_err(|e| {
+        gateway::auth_failures_inc("invalid_signature_encoding");
+        crate::error::GatewayError::BadRequest(format!("Invalid signature encoding: {e}"))
+    })?;
 
     // Validate signature length BEFORE expensive verification
     // Ed25519 signatures are exactly 64 bytes
     if signature.len() != 64 {
         gateway::auth_failures_inc("invalid_signature_length");
-        return Err(crate::error::GatewayError::BadRequest(
-            format!("Invalid signature length: expected 64 bytes, got {}", signature.len())
-        ));
+        return Err(crate::error::GatewayError::BadRequest(format!(
+            "Invalid signature length: expected 64 bytes, got {}",
+            signature.len()
+        )));
     }
 
-    let token = auth.verify_challenge(
-        &did,
-        &signature,
-        &req.coop_id,
-        req.scopes.clone(),
-    ).inspect_err(|_e| {
-        gateway::auth_failures_inc("verification_failed");
-    })?;
+    let token = auth
+        .verify_challenge(&did, &signature, &req.coop_id, req.scopes.clone())
+        .inspect_err(|_e| {
+            gateway::auth_failures_inc("verification_failed");
+        })?;
 
     // Track successful authentication
     gateway::auth_successes_inc();
@@ -143,8 +139,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth))
                 .app_data(web::Data::new(ip_limiter))
-                .service(challenge)
-        ).await;
+                .service(challenge),
+        )
+        .await;
 
         let bundle = IdentityBundle::generate().unwrap();
         let req_body = ChallengeRequest {
@@ -179,8 +176,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth))
                 .app_data(web::Data::new(ip_limiter))
-                .service(verify)
-        ).await;
+                .service(verify),
+        )
+        .await;
 
         let req_body = VerifyRequest {
             did: bundle.did().to_string(),
@@ -212,8 +210,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth))
                 .app_data(web::Data::new(ip_limiter))
-                .service(verify)
-        ).await;
+                .service(verify),
+        )
+        .await;
 
         let req_body = VerifyRequest {
             did: bundle.did().to_string(),
@@ -243,13 +242,14 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth))
                 .app_data(web::Data::new(ip_limiter))
-                .service(verify)
-        ).await;
+                .service(verify),
+        )
+        .await;
 
         // Test with wrong signature length (32 bytes instead of 64)
         let req_body = VerifyRequest {
             did: bundle.did().to_string(),
-            signature: hex::encode([0u8; 32]),  // Wrong length!
+            signature: hex::encode([0u8; 32]), // Wrong length!
             coop_id: "test-coop".to_string(),
             scopes: vec![],
         };
@@ -275,14 +275,15 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth))
                 .app_data(web::Data::new(ip_limiter))
-                .service(verify)
-        ).await;
+                .service(verify),
+        )
+        .await;
 
         // Test with invalid coop_id (contains invalid characters)
         let req_body = VerifyRequest {
             did: bundle.did().to_string(),
             signature: hex::encode([0u8; 64]),
-            coop_id: "invalid@coop#id!".to_string(),  // Invalid characters
+            coop_id: "invalid@coop#id!".to_string(), // Invalid characters
             scopes: vec![],
         };
 
@@ -303,8 +304,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth))
                 .app_data(web::Data::new(ip_limiter))
-                .service(challenge)
-        ).await;
+                .service(challenge),
+        )
+        .await;
 
         let bundle = IdentityBundle::generate().unwrap();
         let req_body = ChallengeRequest {
@@ -318,7 +320,12 @@ mod tests {
                 .set_json(&req_body)
                 .to_request();
             let resp = test::call_service(&app, req).await;
-            assert_eq!(resp.status(), 200, "Request {} should succeed (within burst capacity)", i + 1);
+            assert_eq!(
+                resp.status(),
+                200,
+                "Request {} should succeed (within burst capacity)",
+                i + 1
+            );
         }
 
         // 21st request should be rate limited (exceeds burst capacity of 20)
@@ -327,7 +334,11 @@ mod tests {
             .set_json(&req_body)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 429, "Request 21 should be rate limited (HTTP 429)");
+        assert_eq!(
+            resp.status(),
+            429,
+            "Request 21 should be rate limited (HTTP 429)"
+        );
     }
 
     #[actix_web::test]
@@ -346,8 +357,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(auth.clone()))
                 .app_data(web::Data::new(ip_limiter))
-                .service(verify)
-        ).await;
+                .service(verify),
+        )
+        .await;
 
         let req_body = VerifyRequest {
             did: bundle.did().to_string(),
@@ -367,7 +379,12 @@ mod tests {
                 .to_request();
             let resp = test::call_service(&app, req).await;
             // Note: Some may fail due to signature/nonce mismatch, but they should NOT be rate limited
-            assert_ne!(resp.status(), 429, "Request {} should not be rate limited yet", i + 1);
+            assert_ne!(
+                resp.status(),
+                429,
+                "Request {} should not be rate limited yet",
+                i + 1
+            );
         }
 
         // 21st request should be rate limited (exceeds burst capacity of 20)
@@ -376,6 +393,10 @@ mod tests {
             .set_json(&req_body)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 429, "Request 21 should be rate limited (HTTP 429)");
+        assert_eq!(
+            resp.status(),
+            429,
+            "Request 21 should be rate limited (HTTP 429)"
+        );
     }
 }

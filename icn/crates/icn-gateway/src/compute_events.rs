@@ -33,20 +33,39 @@ use std::sync::Arc;
 /// ```
 pub async fn forward_compute_event(broadcaster: &EventBroadcaster, event: ComputeEvent) {
     match event {
-        ComputeEvent::TaskClaimed { task_hash, executor } => {
-            broadcaster.broadcast("compute", GatewayEvent::ComputeTaskClaimed {
-                task_hash,
-                executor,
-            }).await;
+        ComputeEvent::TaskClaimed {
+            task_hash,
+            executor,
+        } => {
+            broadcaster
+                .broadcast(
+                    "compute",
+                    GatewayEvent::ComputeTaskClaimed {
+                        task_hash,
+                        executor,
+                    },
+                )
+                .await;
         }
-        ComputeEvent::TaskCompleted { task_hash, executor, outcome, fuel_used, duration_ms } => {
-            broadcaster.broadcast("compute", GatewayEvent::ComputeTaskCompleted {
-                task_hash,
-                executor,
-                outcome,
-                fuel_used,
-                duration_ms,
-            }).await;
+        ComputeEvent::TaskCompleted {
+            task_hash,
+            executor,
+            outcome,
+            fuel_used,
+            duration_ms,
+        } => {
+            broadcaster
+                .broadcast(
+                    "compute",
+                    GatewayEvent::ComputeTaskCompleted {
+                        task_hash,
+                        executor,
+                        outcome,
+                        fuel_used,
+                        duration_ms,
+                    },
+                )
+                .await;
         }
     }
 }
@@ -60,7 +79,9 @@ pub async fn forward_compute_event(broadcaster: &EventBroadcaster, event: Comput
 ///
 /// # Returns
 /// An EventCallback that can be passed to `ComputeActor::set_event_callback()`
-pub fn create_forwarding_callback(broadcaster: Arc<EventBroadcaster>) -> icn_compute::EventCallback {
+pub fn create_forwarding_callback(
+    broadcaster: Arc<EventBroadcaster>,
+) -> icn_compute::EventCallback {
     Arc::new(move |event| {
         let b = broadcaster.clone();
         tokio::spawn(async move {
@@ -76,7 +97,10 @@ mod tests {
     #[tokio::test]
     async fn test_forward_task_claimed() {
         let broadcaster = EventBroadcaster::new();
-        let mut rx = broadcaster.subscribe("compute").await.expect("Should subscribe");
+        let mut rx = broadcaster
+            .subscribe("compute")
+            .await
+            .expect("Should subscribe");
 
         let event = ComputeEvent::TaskClaimed {
             task_hash: "abc123".to_string(),
@@ -87,7 +111,10 @@ mod tests {
 
         let received = rx.recv().await.expect("Should receive event");
         match received.event {
-            GatewayEvent::ComputeTaskClaimed { task_hash, executor } => {
+            GatewayEvent::ComputeTaskClaimed {
+                task_hash,
+                executor,
+            } => {
                 assert_eq!(task_hash, "abc123");
                 assert_eq!(executor, "did:icn:executor");
             }
@@ -98,7 +125,10 @@ mod tests {
     #[tokio::test]
     async fn test_forward_task_completed() {
         let broadcaster = EventBroadcaster::new();
-        let mut rx = broadcaster.subscribe("compute").await.expect("Should subscribe");
+        let mut rx = broadcaster
+            .subscribe("compute")
+            .await
+            .expect("Should subscribe");
 
         let event = ComputeEvent::TaskCompleted {
             task_hash: "def456".to_string(),
@@ -112,7 +142,12 @@ mod tests {
 
         let received = rx.recv().await.expect("Should receive event");
         match received.event {
-            GatewayEvent::ComputeTaskCompleted { task_hash, outcome, fuel_used, .. } => {
+            GatewayEvent::ComputeTaskCompleted {
+                task_hash,
+                outcome,
+                fuel_used,
+                ..
+            } => {
                 assert_eq!(task_hash, "def456");
                 assert_eq!(outcome, "success");
                 assert_eq!(fuel_used, 5000);
@@ -124,7 +159,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_forwarding_callback() {
         let broadcaster = Arc::new(EventBroadcaster::new());
-        let mut rx = broadcaster.subscribe("compute").await.expect("Should subscribe");
+        let mut rx = broadcaster
+            .subscribe("compute")
+            .await
+            .expect("Should subscribe");
 
         let callback = create_forwarding_callback(broadcaster);
 

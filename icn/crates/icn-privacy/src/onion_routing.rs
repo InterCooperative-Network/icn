@@ -173,12 +173,15 @@ impl OnionRouter {
             .map_err(|e| PrivacyError::OnionRoutingError(format!("Serialization failed: {e}")))?;
 
         // Get recipient's public key
-        let recipient_pk = self.peer_public_keys.get(&circuit.recipient).ok_or_else(|| {
-            PrivacyError::OnionRoutingError(format!(
-                "Missing public key for recipient {}",
-                circuit.recipient
-            ))
-        })?;
+        let recipient_pk = self
+            .peer_public_keys
+            .get(&circuit.recipient)
+            .ok_or_else(|| {
+                PrivacyError::OnionRoutingError(format!(
+                    "Missing public key for recipient {}",
+                    circuit.recipient
+                ))
+            })?;
 
         let mut current_layer = self.encrypt_layer(&final_bytes, recipient_pk)?;
         current_layer.next_hop = circuit.recipient.clone();
@@ -235,9 +238,8 @@ impl OnionRouter {
         let decrypted = self.decrypt_layer(current_layer)?;
 
         // Deserialize to determine if relay or final
-        let content: LayerContent = bincode::deserialize(&decrypted).map_err(|e| {
-            PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}"))
-        })?;
+        let content: LayerContent = bincode::deserialize(&decrypted)
+            .map_err(|e| PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}")))?;
 
         icn_obs::metrics::privacy::onion_hops_forwarded_inc();
 
@@ -270,9 +272,8 @@ impl OnionRouter {
         let current_layer = &onion.layers[0];
         let decrypted = self.decrypt_layer(current_layer)?;
 
-        let content: LayerContent = bincode::deserialize(&decrypted).map_err(|e| {
-            PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}"))
-        })?;
+        let content: LayerContent = bincode::deserialize(&decrypted)
+            .map_err(|e| PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}")))?;
 
         match content {
             LayerContent::Final { payload } => Ok(payload),
@@ -303,7 +304,13 @@ impl OnionRouter {
 
         // Encrypt
         let ciphertext = cipher
-            .encrypt(&nonce, Payload { msg: plaintext, aad: b"" })
+            .encrypt(
+                &nonce,
+                Payload {
+                    msg: plaintext,
+                    aad: b"",
+                },
+            )
             .map_err(|e| PrivacyError::EncryptionFailed(e.to_string()))?;
 
         Ok(OnionLayer {
@@ -330,7 +337,13 @@ impl OnionRouter {
 
         // Decrypt
         let plaintext = cipher
-            .decrypt(&nonce, Payload { msg: &layer.ciphertext, aad: b"" })
+            .decrypt(
+                &nonce,
+                Payload {
+                    msg: &layer.ciphertext,
+                    aad: b"",
+                },
+            )
             .map_err(|e| PrivacyError::DecryptionFailed(e.to_string()))?;
 
         Ok(plaintext)

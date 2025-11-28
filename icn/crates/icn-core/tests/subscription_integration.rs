@@ -61,7 +61,10 @@ impl TestNode {
                 }
 
                 MessagePayload::Subscribe { topics } => {
-                    info!("Received Subscribe from {} for topics: {:?}", sender_did, topics);
+                    info!(
+                        "Received Subscribe from {} for topics: {:?}",
+                        sender_did, topics
+                    );
 
                     let mut gossip = gossip_handle_clone.blocking_write();
                     let mut acked_topics = Vec::new();
@@ -73,7 +76,10 @@ impl TestNode {
                                 acked_topics.push(topic.clone());
                             }
                             Err(e) => {
-                                warn!("Failed to subscribe {} to topic {}: {}", sender_did, topic, e);
+                                warn!(
+                                    "Failed to subscribe {} to topic {}: {}",
+                                    sender_did, topic, e
+                                );
                             }
                         }
                     }
@@ -88,7 +94,7 @@ impl TestNode {
                                 let ack_msg = NetworkMessage::subscribe_ack(
                                     own_did,
                                     sender_did.clone(),
-                                    acked_topics.clone()
+                                    acked_topics.clone(),
                                 );
                                 if let Err(e) = net_handle.send_message(sender_did, ack_msg).await {
                                     warn!("Failed to send SubscribeAck: {}", e);
@@ -99,7 +105,10 @@ impl TestNode {
                 }
 
                 MessagePayload::Unsubscribe { topics } => {
-                    info!("Received Unsubscribe from {} for topics: {:?}", sender_did, topics);
+                    info!(
+                        "Received Unsubscribe from {} for topics: {:?}",
+                        sender_did, topics
+                    );
 
                     let mut gossip = gossip_handle_clone.blocking_write();
                     for topic in &topics {
@@ -108,14 +117,20 @@ impl TestNode {
                                 info!("Unsubscribed {} from topic: {}", sender_did, topic);
                             }
                             Err(e) => {
-                                warn!("Failed to unsubscribe {} from topic {}: {}", sender_did, topic, e);
+                                warn!(
+                                    "Failed to unsubscribe {} from topic {}: {}",
+                                    sender_did, topic, e
+                                );
                             }
                         }
                     }
                 }
 
                 MessagePayload::SubscribeAck { topics } => {
-                    info!("Received SubscribeAck from {} for topics: {:?}", sender_did, topics);
+                    info!(
+                        "Received SubscribeAck from {} for topics: {:?}",
+                        sender_did, topics
+                    );
                 }
 
                 _ => {}
@@ -180,17 +195,26 @@ async fn test_subscription_end_to_end() -> Result<()> {
     info!("Node 2 DID: {}", node2.did);
 
     // Node 1 dials Node 2
-    node1.network_handle.dial(node2.listen_addr, node2.did.clone()).await?;
+    node1
+        .network_handle
+        .dial(node2.listen_addr, node2.did.clone())
+        .await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Node 1 sends Subscribe message to Node 2
     let subscribe_msg = NetworkMessage::subscribe(
         node1.did.clone(),
         node2.did.clone(),
-        vec!["global:identity".to_string(), "global:rendezvous".to_string()],
+        vec![
+            "global:identity".to_string(),
+            "global:rendezvous".to_string(),
+        ],
     );
 
-    node1.network_handle.send_message(node2.did.clone(), subscribe_msg).await?;
+    node1
+        .network_handle
+        .send_message(node2.did.clone(), subscribe_msg)
+        .await?;
 
     // Wait for subscription processing and ack
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -201,8 +225,14 @@ async fn test_subscription_end_to_end() -> Result<()> {
         let subscribers_identity = gossip2.get_subscribers("global:identity");
         let subscribers_rendezvous = gossip2.get_subscribers("global:rendezvous");
 
-        assert!(subscribers_identity.contains(&node1.did), "Node 1 should be subscribed to global:identity");
-        assert!(subscribers_rendezvous.contains(&node1.did), "Node 1 should be subscribed to global:rendezvous");
+        assert!(
+            subscribers_identity.contains(&node1.did),
+            "Node 1 should be subscribed to global:identity"
+        );
+        assert!(
+            subscribers_rendezvous.contains(&node1.did),
+            "Node 1 should be subscribed to global:rendezvous"
+        );
 
         info!("✓ Node 1 successfully subscribed to topics on Node 2");
     }
@@ -214,7 +244,10 @@ async fn test_subscription_end_to_end() -> Result<()> {
         vec!["global:identity".to_string()],
     );
 
-    node1.network_handle.send_message(node2.did.clone(), unsubscribe_msg).await?;
+    node1
+        .network_handle
+        .send_message(node2.did.clone(), unsubscribe_msg)
+        .await?;
 
     // Wait for unsubscribe processing
     tokio::time::sleep(Duration::from_millis(300)).await;
@@ -225,8 +258,14 @@ async fn test_subscription_end_to_end() -> Result<()> {
         let subscribers_identity = gossip2.get_subscribers("global:identity");
         let subscribers_rendezvous = gossip2.get_subscribers("global:rendezvous");
 
-        assert!(!subscribers_identity.contains(&node1.did), "Node 1 should be unsubscribed from global:identity");
-        assert!(subscribers_rendezvous.contains(&node1.did), "Node 1 should still be subscribed to global:rendezvous");
+        assert!(
+            !subscribers_identity.contains(&node1.did),
+            "Node 1 should be unsubscribed from global:identity"
+        );
+        assert!(
+            subscribers_rendezvous.contains(&node1.did),
+            "Node 1 should still be subscribed to global:rendezvous"
+        );
 
         info!("✓ Node 1 successfully unsubscribed from global:identity");
     }
@@ -243,9 +282,7 @@ async fn test_subscription_end_to_end() -> Result<()> {
 #[tokio::test]
 async fn test_subscription_acl_enforcement() -> Result<()> {
     // Initialize test environment
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .try_init();
+    let _ = tracing_subscriber::fmt().with_env_filter("warn").try_init();
 
     // Spawn node with restrictive trust lookup (denies all)
     let keypair = KeyPair::generate()?;
@@ -273,7 +310,10 @@ async fn test_subscription_acl_enforcement() -> Result<()> {
     {
         let mut gossip = gossip_handle.write().await;
         let result = gossip.subscribe("partner:only", other_did.clone());
-        assert!(result.is_err(), "Should not be able to subscribe to partner:only without trust");
+        assert!(
+            result.is_err(),
+            "Should not be able to subscribe to partner:only without trust"
+        );
         info!("✓ ACL enforcement working correctly");
     }
 

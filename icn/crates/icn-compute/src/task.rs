@@ -98,8 +98,12 @@ impl TaskManager {
         if !self.tasks.contains_key(&hash) {
             return Err(ComputeError::TaskNotFound(hex::encode(hash)));
         }
-        self.status
-            .insert(hash, TaskStatus::Completed { result: Box::new(result) });
+        self.status.insert(
+            hash,
+            TaskStatus::Completed {
+                result: Box::new(result),
+            },
+        );
         Ok(())
     }
 
@@ -113,7 +117,12 @@ impl TaskManager {
     }
 
     /// Cancel a task (only if pending or claimed)
-    pub fn cancel(&mut self, hash: &TaskHash, requester: &str, reason: String) -> Result<(), ComputeError> {
+    pub fn cancel(
+        &mut self,
+        hash: &TaskHash,
+        requester: &str,
+        reason: String,
+    ) -> Result<(), ComputeError> {
         let task = self
             .tasks
             .get(hash)
@@ -147,9 +156,9 @@ impl TaskManager {
                 );
                 Ok(())
             }
-            TaskStatus::Completed { .. } => {
-                Err(ComputeError::Internal("Cannot cancel completed task".into()))
-            }
+            TaskStatus::Completed { .. } => Err(ComputeError::Internal(
+                "Cannot cancel completed task".into(),
+            )),
             TaskStatus::Failed { .. } => {
                 Err(ComputeError::Internal("Cannot cancel failed task".into()))
             }
@@ -161,14 +170,15 @@ impl TaskManager {
 
     /// Get pending tasks
     pub fn pending(&self) -> impl Iterator<Item = (&TaskHash, &ComputeTask)> {
-        self.tasks.iter().filter(|(h, _)| {
-            matches!(self.status.get(*h), Some(TaskStatus::Pending))
-        })
+        self.tasks
+            .iter()
+            .filter(|(h, _)| matches!(self.status.get(*h), Some(TaskStatus::Pending)))
     }
 
     /// Get pending tasks sorted by priority (highest priority first)
     pub fn pending_by_priority(&self) -> Vec<(TaskHash, &ComputeTask)> {
-        let mut pending: Vec<_> = self.tasks
+        let mut pending: Vec<_> = self
+            .tasks
             .iter()
             .filter(|(h, _)| matches!(self.status.get(*h), Some(TaskStatus::Pending)))
             .map(|(h, task)| (*h, task))
@@ -176,11 +186,9 @@ impl TaskManager {
 
         // Sort by priority descending (Critical > High > Normal > Low)
         // Then by created_at ascending (older tasks first) as tiebreaker
-        pending.sort_by(|(_, a), (_, b)| {
-            match b.priority.cmp(&a.priority) {
-                std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at),
-                other => other,
-            }
+        pending.sort_by(|(_, a), (_, b)| match b.priority.cmp(&a.priority) {
+            std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at),
+            other => other,
         });
 
         pending
@@ -342,7 +350,10 @@ mod tests {
         };
 
         mgr.complete(result).unwrap();
-        assert!(matches!(mgr.status(&hash), Some(TaskStatus::Completed { .. })));
+        assert!(matches!(
+            mgr.status(&hash),
+            Some(TaskStatus::Completed { .. })
+        ));
     }
 
     #[test]
@@ -380,7 +391,10 @@ mod tests {
         mgr.cancel(&hash, "did:icn:alice", "Changed my mind".into())
             .unwrap();
 
-        assert!(matches!(mgr.status(&hash), Some(TaskStatus::Cancelled { .. })));
+        assert!(matches!(
+            mgr.status(&hash),
+            Some(TaskStatus::Cancelled { .. })
+        ));
     }
 
     #[test]
@@ -414,7 +428,10 @@ mod tests {
 
         let cancel_result = mgr.cancel(&hash, "did:icn:alice", "Too late".into());
         assert!(cancel_result.is_err());
-        assert!(cancel_result.unwrap_err().to_string().contains("Cannot cancel completed"));
+        assert!(cancel_result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot cancel completed"));
     }
 
     #[test]
@@ -433,7 +450,8 @@ mod tests {
         task.created_at = 1000; // Old task
         let hash = mgr.submit(task).unwrap();
 
-        mgr.cancel(&hash, "did:icn:alice", "Cleanup test".into()).unwrap();
+        mgr.cancel(&hash, "did:icn:alice", "Cleanup test".into())
+            .unwrap();
 
         // Cleanup tasks older than 1000ms
         mgr.cleanup(1000);

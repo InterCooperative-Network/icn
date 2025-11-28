@@ -97,7 +97,8 @@ impl TestNode {
 
     /// Manually add this node as a replica for content
     async fn add_self_as_replica(&self, hash: &[u8; 32]) -> Result<()> {
-        self.store.add_replica(hash, self.did.to_string(), ReplicaHealth::Healthy)
+        self.store
+            .add_replica(hash, self.did.to_string(), ReplicaHealth::Healthy)
     }
 
     /// Subscribe to another node's gossip messages (simulates network connection)
@@ -171,7 +172,9 @@ async fn test_health_status_transitions() -> Result<()> {
     let node = TestNode::new(config).await?;
 
     // Publish content
-    let content_hash = node.publish_content("test:health", b"test data".to_vec()).await?;
+    let content_hash = node
+        .publish_content("test:health", b"test data".to_vec())
+        .await?;
 
     // Add a replica that's old (simulate stale replica)
     let old_time = std::time::SystemTime::now() - Duration::from_secs(600); // 10 minutes ago
@@ -204,10 +207,10 @@ async fn test_trust_weighted_selection() -> Result<()> {
     let node = TestNode::new(config).await?;
 
     // Create 4 peers with different trust scores
-    let low_trust_peer = KeyPair::generate()?.did().clone();   // 0.2 = Known (below Partner)
-    let partner_peer1 = KeyPair::generate()?.did().clone();    // 0.5 = Partner
-    let partner_peer2 = KeyPair::generate()?.did().clone();    // 0.6 = Partner
-    let federated_peer = KeyPair::generate()?.did().clone();   // 0.8 = Federated
+    let low_trust_peer = KeyPair::generate()?.did().clone(); // 0.2 = Known (below Partner)
+    let partner_peer1 = KeyPair::generate()?.did().clone(); // 0.5 = Partner
+    let partner_peer2 = KeyPair::generate()?.did().clone(); // 0.6 = Partner
+    let federated_peer = KeyPair::generate()?.did().clone(); // 0.8 = Federated
 
     // Add trust edges
     node.trust_peer(&low_trust_peer, 0.2).await?;
@@ -216,13 +219,20 @@ async fn test_trust_weighted_selection() -> Result<()> {
     node.trust_peer(&federated_peer, 0.8).await?;
 
     // Connect to all peers (make them known via gossip)
-    for peer_did in &[&low_trust_peer, &partner_peer1, &partner_peer2, &federated_peer] {
+    for peer_did in &[
+        &low_trust_peer,
+        &partner_peer1,
+        &partner_peer2,
+        &federated_peer,
+    ] {
         let mut gossip = node.gossip_handle.write().await;
         let _ = gossip.subscribe("network:presence", (*peer_did).clone());
     }
 
     // Publish content with only node as replica
-    let content_hash = node.publish_content("test:trust", b"trust test".to_vec()).await?;
+    let content_hash = node
+        .publish_content("test:trust", b"trust test".to_vec())
+        .await?;
     node.add_self_as_replica(&content_hash).await?;
 
     // Trigger replication check
@@ -247,7 +257,9 @@ async fn test_no_suitable_candidates() -> Result<()> {
     let node = TestNode::new(config).await?;
 
     // Publish content
-    let content_hash = node.publish_content("test:lonely", b"alone".to_vec()).await?;
+    let content_hash = node
+        .publish_content("test:lonely", b"alone".to_vec())
+        .await?;
     node.add_self_as_replica(&content_hash).await?;
 
     // Trigger health check (should complete without error despite no candidates)

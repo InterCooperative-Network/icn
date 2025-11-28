@@ -79,12 +79,7 @@ impl IdentityHandle {
     }
 
     /// Add a trust edge
-    pub async fn add_trust_edge(
-        &self,
-        target: Did,
-        score: f64,
-        labels: Vec<String>,
-    ) -> Result<()> {
+    pub async fn add_trust_edge(&self, target: Did, score: f64, labels: Vec<String>) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(IdentityMsg::AddTrustEdge {
@@ -203,11 +198,7 @@ impl IdentityActor {
                 labels,
                 response,
             } => {
-                let mut edge = icn_trust::TrustEdge::new(
-                    self.keypair.did().clone(),
-                    target,
-                    score,
-                );
+                let mut edge = icn_trust::TrustEdge::new(self.keypair.did().clone(), target, score);
 
                 for label in labels {
                     edge = edge.with_label(label);

@@ -235,7 +235,15 @@ impl NetworkMessage {
 
     /// Create a handshake message
     pub fn handshake(from: Did, to: Did, region: String, cluster_id: String, role: String) -> Self {
-        Self::new(from, Some(to), MessagePayload::Handshake { region, cluster_id, role })
+        Self::new(
+            from,
+            Some(to),
+            MessagePayload::Handshake {
+                region,
+                cluster_id,
+                role,
+            },
+        )
     }
 
     /// Create a handshake ack message
@@ -252,12 +260,16 @@ impl NetworkMessage {
         topology_info: Option<crate::TopologyInfo>,
         x25519_public: [u8; 32],
     ) -> Self {
-        Self::new(from, Some(to), MessagePayload::Hello {
-            binding_info,
-            version_info: Some(version_info),
-            topology_info,
-            x25519_public,
-        })
+        Self::new(
+            from,
+            Some(to),
+            MessagePayload::Hello {
+                binding_info,
+                version_info: Some(version_info),
+                topology_info,
+                x25519_public,
+            },
+        )
     }
 
     /// Create a signed message (authenticated + replay protected)
@@ -296,10 +308,7 @@ impl NetworkMessage {
         Self::new(
             from,
             Some(to),
-            MessagePayload::PeerExchange(PeerExchangeMessage::Response {
-                peers,
-                total_known,
-            }),
+            MessagePayload::PeerExchange(PeerExchangeMessage::Response { peers, total_known }),
         )
     }
 
@@ -346,8 +355,8 @@ impl NetworkMessage {
             );
         }
 
-        let msg: NetworkMessage = bincode::deserialize(bytes)
-            .context("Failed to deserialize network message")?;
+        let msg: NetworkMessage =
+            bincode::deserialize(bytes).context("Failed to deserialize network message")?;
 
         // Validate protocol version
         Self::validate_version(msg.version)?;
@@ -414,9 +423,7 @@ impl NetworkMessage {
 }
 
 /// Helper for reading length-prefixed messages from QUIC streams
-pub async fn read_message(
-    recv: &mut quinn::RecvStream,
-) -> Result<NetworkMessage> {
+pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<NetworkMessage> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
@@ -429,9 +436,7 @@ pub async fn read_message(
         anyhow::bail!("Invalid message: zero length");
     }
     if len_u32 > MAX_MESSAGE_SIZE as u32 {
-        anyhow::bail!(
-            "Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})"
-        );
+        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
     }
 
     // Safe to cast after validation
@@ -447,10 +452,7 @@ pub async fn read_message(
 }
 
 /// Helper for writing length-prefixed messages to QUIC streams
-pub async fn write_message(
-    send: &mut quinn::SendStream,
-    msg: &NetworkMessage,
-) -> Result<()> {
+pub async fn write_message(send: &mut quinn::SendStream, msg: &NetworkMessage) -> Result<()> {
     use tokio::io::AsyncWriteExt;
 
     let bytes = msg.to_bytes()?;
@@ -519,9 +521,11 @@ mod tests {
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
-        let msg = NetworkMessage::gossip(alice.clone(), None, GossipMessage::Request {
-            hash: [0u8; 32],
-        });
+        let msg = NetworkMessage::gossip(
+            alice.clone(),
+            None,
+            GossipMessage::Request { hash: [0u8; 32] },
+        );
 
         assert!(msg.is_broadcast());
         assert!(msg.is_for(&bob));
@@ -605,7 +609,10 @@ mod tests {
         let bytes = msg.to_bytes().unwrap();
         let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
 
-        if let MessagePayload::Subscribe { topics: decoded_topics } = decoded.payload {
+        if let MessagePayload::Subscribe {
+            topics: decoded_topics,
+        } = decoded.payload
+        {
             assert_eq!(decoded_topics, topics);
         } else {
             panic!("Expected Subscribe payload");
@@ -673,7 +680,11 @@ mod tests {
         assert_eq!(decoded.from, alice);
         assert_eq!(decoded.to, Some(bob));
 
-        if let MessagePayload::PeerExchange(PeerExchangeMessage::Request { max_peers, network_filter }) = decoded.payload {
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Request {
+            max_peers,
+            network_filter,
+        }) = decoded.payload
+        {
             assert_eq!(max_peers, 50);
             assert_eq!(network_filter, Some("my-coop-network".to_string()));
         } else {
@@ -707,17 +718,17 @@ mod tests {
             },
         ];
 
-        let msg = NetworkMessage::peer_exchange_response(
-            alice.clone(),
-            bob.clone(),
-            peers.clone(),
-            10,
-        );
+        let msg =
+            NetworkMessage::peer_exchange_response(alice.clone(), bob.clone(), peers.clone(), 10);
 
         let bytes = msg.to_bytes().unwrap();
         let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
 
-        if let MessagePayload::PeerExchange(PeerExchangeMessage::Response { peers: decoded_peers, total_known }) = decoded.payload {
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Response {
+            peers: decoded_peers,
+            total_known,
+        }) = decoded.payload
+        {
             assert_eq!(decoded_peers.len(), 2);
             assert_eq!(total_known, 10);
             assert_eq!(decoded_peers[0].did, "did:icn:peer1");
@@ -751,7 +762,9 @@ mod tests {
         let bytes = msg.to_bytes().unwrap();
         let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
 
-        if let MessagePayload::PeerExchange(PeerExchangeMessage::Announce { peer: decoded_peer }) = decoded.payload {
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Announce { peer: decoded_peer }) =
+            decoded.payload
+        {
             assert_eq!(decoded_peer.did, "did:icn:newpeer");
             assert_eq!(decoded_peer.addresses.len(), 2);
             assert_eq!(decoded_peer.observed_trust, Some(0.8));
@@ -764,10 +777,7 @@ mod tests {
     fn test_peer_unannounce_roundtrip() {
         let alice = KeyPair::generate().unwrap().did().clone();
 
-        let msg = NetworkMessage::peer_unannounce(
-            alice.clone(),
-            "did:icn:departed".to_string(),
-        );
+        let msg = NetworkMessage::peer_unannounce(alice.clone(), "did:icn:departed".to_string());
 
         // Unannounce is a broadcast (no to field)
         assert!(msg.is_broadcast());
@@ -775,7 +785,9 @@ mod tests {
         let bytes = msg.to_bytes().unwrap();
         let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
 
-        if let MessagePayload::PeerExchange(PeerExchangeMessage::Unannounce { did }) = decoded.payload {
+        if let MessagePayload::PeerExchange(PeerExchangeMessage::Unannounce { did }) =
+            decoded.payload
+        {
             assert_eq!(did, "did:icn:departed");
         } else {
             panic!("Expected PeerExchange::Unannounce payload");

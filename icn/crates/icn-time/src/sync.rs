@@ -73,7 +73,7 @@ impl ClockSync {
     /// Create with custom servers and max skew
     pub fn with_servers(servers: Vec<RoughTimeServer>, max_clock_skew: Duration) -> Self {
         Self {
-            offset_millis: 0, // Start with zero offset
+            offset_millis: 0,                     // Start with zero offset
             uncertainty: Duration::from_secs(10), // Initial high uncertainty
             last_sync: None,
             max_clock_skew,
@@ -105,7 +105,10 @@ impl ClockSync {
     /// Updates internal offset and uncertainty.
     pub async fn sync(&mut self) -> Result<()> {
         let start = Instant::now();
-        info!("Starting clock sync with {} servers", self.trusted_servers.len());
+        info!(
+            "Starting clock sync with {} servers",
+            self.trusted_servers.len()
+        );
 
         // Query all servers concurrently
         let responses = self.query_servers().await?;
@@ -116,7 +119,10 @@ impl ClockSync {
                 responses.len(),
                 MIN_SERVERS
             );
-            return Err(TimeError::InsufficientResponses(responses.len(), MIN_SERVERS));
+            return Err(TimeError::InsufficientResponses(
+                responses.len(),
+                MIN_SERVERS,
+            ));
         }
 
         // Compute median time from responses
@@ -151,9 +157,7 @@ impl ClockSync {
 
         for server in &self.trusted_servers {
             let server = server.clone();
-            let handle = tokio::spawn(async move {
-                Self::query_server(server).await
-            });
+            let handle = tokio::spawn(async move { Self::query_server(server).await });
             handles.push(handle);
         }
 
@@ -266,10 +270,7 @@ impl ClockSync {
 
         if skew > max_skew_millis {
             icn_obs::metrics::scalability::timestamp_validation_rejected_inc();
-            return Err(TimeError::TimestampOutOfRange(
-                skew as i64,
-                max_skew_millis,
-            ));
+            return Err(TimeError::TimestampOutOfRange(skew as i64, max_skew_millis));
         }
 
         icn_obs::metrics::scalability::timestamp_validation_accepted_inc();
@@ -302,7 +303,10 @@ impl Default for ClockSync {
 ///
 /// Periodically syncs clock with time servers (every 10 minutes)
 pub async fn start_clock_sync_task(mut sync: ClockSync, interval: Duration) {
-    info!("Starting clock sync background task (interval: {:?})", interval);
+    info!(
+        "Starting clock sync background task (interval: {:?})",
+        interval
+    );
 
     loop {
         // Perform sync
@@ -325,9 +329,6 @@ mod rand {
         rand::thread_rng().gen()
     }
 
-    
-    
-    
     pub use rand::Rng;
 }
 

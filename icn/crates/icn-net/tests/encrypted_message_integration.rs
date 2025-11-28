@@ -10,7 +10,10 @@
 
 use anyhow::Result;
 use icn_identity::IdentityBundle;
-use icn_net::{EncryptedEnvelope, IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage, PayloadType, SignedEnvelope};
+use icn_net::{
+    EncryptedEnvelope, IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage,
+    PayloadType, SignedEnvelope,
+};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -102,7 +105,10 @@ fn test_encrypt_sign_decrypt_flow() {
 
     // ========== VERIFICATION ==========
     assert_eq!(decrypted_message, message);
-    assert_eq!(decrypted_message.content, "Meet me at the lighthouse at midnight");
+    assert_eq!(
+        decrypted_message.content,
+        "Meet me at the lighthouse at midnight"
+    );
 }
 
 #[test]
@@ -135,7 +141,10 @@ fn test_wrong_recipient_cannot_decrypt() {
         &alice_bundle.x25519_public(),
     );
 
-    assert!(result.is_err(), "Charlie should not be able to decrypt Bob's message");
+    assert!(
+        result.is_err(),
+        "Charlie should not be able to decrypt Bob's message"
+    );
 }
 
 #[test]
@@ -164,10 +173,8 @@ fn test_tampering_detected_after_encryption() {
     encrypted_envelope.ciphertext[0] ^= 0xFF;
 
     // Decryption should fail (Poly1305 authentication fails)
-    let result = encrypted_envelope.decrypt(
-        &bob_bundle.x25519_secret(),
-        &alice_bundle.x25519_public(),
-    );
+    let result =
+        encrypted_envelope.decrypt(&bob_bundle.x25519_secret(), &alice_bundle.x25519_public());
 
     assert!(result.is_err(), "Tampering should be detected");
 }
@@ -378,15 +385,23 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // ========== STEP 2: Verify X25519 keys were exchanged ==========
-    let alice_has_bob_key = alice.network_handle
+    let alice_has_bob_key = alice
+        .network_handle
         .get_peer_x25519_key(bob.identity_bundle.did())
         .await;
-    let bob_has_alice_key = bob.network_handle
+    let bob_has_alice_key = bob
+        .network_handle
         .get_peer_x25519_key(alice.identity_bundle.did())
         .await;
 
-    assert!(alice_has_bob_key.is_some(), "Alice should have Bob's X25519 public key");
-    assert!(bob_has_alice_key.is_some(), "Bob should have Alice's X25519 public key");
+    assert!(
+        alice_has_bob_key.is_some(),
+        "Alice should have Bob's X25519 public key"
+    );
+    assert!(
+        bob_has_alice_key.is_some(),
+        "Bob should have Alice's X25519 public key"
+    );
 
     println!("✓ X25519 keys successfully exchanged during Hello handshake");
 
@@ -438,12 +453,11 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     )?;
 
     // Send over the network
-    let network_msg = NetworkMessage::signed(
-        Some(bob.identity_bundle.did().clone()),
-        signed_envelope,
-    );
+    let network_msg =
+        NetworkMessage::signed(Some(bob.identity_bundle.did().clone()), signed_envelope);
 
-    alice.network_handle
+    alice
+        .network_handle
         .send_message(bob.identity_bundle.did().clone(), network_msg)
         .await?;
 
@@ -455,7 +469,11 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
 
     // ========== STEP 5: Bob decrypts the message ==========
     let received_messages = bob.messages_received.read().await;
-    assert_eq!(received_messages.len(), 1, "Bob should have exactly one message");
+    assert_eq!(
+        received_messages.len(),
+        1,
+        "Bob should have exactly one message"
+    );
 
     let received_msg = &received_messages[0];
 
@@ -473,8 +491,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     assert_eq!(signed_envelope.payload_type, PayloadType::Encrypted);
 
     // Deserialize the encrypted envelope
-    let received_encrypted: EncryptedEnvelope =
-        bincode::deserialize(&signed_envelope.payload)?;
+    let received_encrypted: EncryptedEnvelope = bincode::deserialize(&signed_envelope.payload)?;
 
     // Decrypt using Bob's X25519 secret key and Alice's public key
     let alice_x25519_public = bob_has_alice_key.unwrap();
@@ -488,7 +505,10 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     // Deserialize the plaintext message
     let decrypted_message: SecretMessage = bincode::deserialize(&decrypted_bytes)?;
 
-    println!("✓ Bob decrypted the message: '{}'", decrypted_message.content);
+    println!(
+        "✓ Bob decrypted the message: '{}'",
+        decrypted_message.content
+    );
 
     // ========== VERIFICATION ==========
     assert_eq!(decrypted_message, secret_message);
@@ -525,13 +545,16 @@ async fn test_send_encrypted_message_convenience_api() -> Result<()> {
     let secret_payload = b"This message was encrypted with the convenience API!";
     let sequence = 1;
 
-    alice.network_handle.send_encrypted_message(
-        bob.identity_bundle.did(),
-        alice.identity_bundle.keypair(),
-        &alice.identity_bundle.x25519_secret(),
-        sequence,
-        secret_payload,
-    ).await?;
+    alice
+        .network_handle
+        .send_encrypted_message(
+            bob.identity_bundle.did(),
+            alice.identity_bundle.keypair(),
+            &alice.identity_bundle.x25519_secret(),
+            sequence,
+            secret_payload,
+        )
+        .await?;
 
     println!("✓ Alice sent encrypted message using send_encrypted_message()");
 
@@ -540,7 +563,11 @@ async fn test_send_encrypted_message_convenience_api() -> Result<()> {
 
     // ========== STEP 4: Bob decrypts ==========
     let bob_received = bob.messages_received.read().await;
-    assert_eq!(bob_received.len(), 1, "Bob should have received exactly one message");
+    assert_eq!(
+        bob_received.len(),
+        1,
+        "Bob should have received exactly one message"
+    );
 
     let msg = &bob_received[0];
 
@@ -558,7 +585,10 @@ async fn test_send_encrypted_message_convenience_api() -> Result<()> {
     let encrypted_env: EncryptedEnvelope = bincode::deserialize(&signed_env.payload)?;
 
     // Get Alice's X25519 public key
-    let alice_x25519_public = bob.network_handle.get_peer_x25519_key(alice.identity_bundle.did()).await
+    let alice_x25519_public = bob
+        .network_handle
+        .get_peer_x25519_key(alice.identity_bundle.did())
+        .await
         .expect("Bob should have Alice's X25519 key from Hello exchange");
     let alice_x25519_public_key = x25519_dalek::PublicKey::from(alice_x25519_public);
 

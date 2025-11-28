@@ -7,8 +7,10 @@
 //! 4. Verify audit trail was stored linking proposal to policy update
 
 use anyhow::Result;
+use icn_compute::{
+    ComputeActor, CoopSchedulingPolicy, EnforcementMode, MemberQuota, PolicyManager, UsageTracker,
+};
 use icn_core::{EventBus, SystemEvent};
-use icn_compute::{CoopSchedulingPolicy, EnforcementMode, MemberQuota, PolicyManager, UsageTracker, ComputeActor};
 use icn_governance::{ProposalId, ProposalPayload};
 use icn_identity::KeyPair;
 use icn_store::{SledStore, Store};
@@ -170,14 +172,19 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
         policy_json: policy_json.clone(),
     };
 
-    info!("Firing ProposalAccepted event for proposal {}", proposal_id.0);
+    info!(
+        "Firing ProposalAccepted event for proposal {}",
+        proposal_id.0
+    );
 
-    event_bus.emit(SystemEvent::ProposalAccepted {
-        proposal_id: proposal_id.clone(),
-        domain_id: "test-domain".to_string(),
-        payload,
-        decided_at: now,
-    }).await;
+    event_bus
+        .emit(SystemEvent::ProposalAccepted {
+            proposal_id: proposal_id.clone(),
+            domain_id: "test-domain".to_string(),
+            payload,
+            decided_at: now,
+        })
+        .await;
 
     // 7. Wait for async processing
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -208,15 +215,17 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
     // 10. Test idempotency - fire the same event again
     info!("Testing idempotency - firing duplicate event");
 
-    event_bus.emit(SystemEvent::ProposalAccepted {
-        proposal_id: proposal_id.clone(),
-        domain_id: "test-domain".to_string(),
-        payload: ProposalPayload::SchedulingPolicy {
-            coop_id: "test-coop".to_string(),
-            policy_json: policy_json.clone(),
-        },
-        decided_at: now,
-    }).await;
+    event_bus
+        .emit(SystemEvent::ProposalAccepted {
+            proposal_id: proposal_id.clone(),
+            domain_id: "test-domain".to_string(),
+            payload: ProposalPayload::SchedulingPolicy {
+                coop_id: "test-coop".to_string(),
+                policy_json: policy_json.clone(),
+            },
+            decided_at: now,
+        })
+        .await;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
@@ -269,39 +278,46 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
         let compute = compute_handle.clone();
         let audit_store = gov_store.clone();
 
-        event_bus.subscribe(Arc::new(move |event| {
-            if let SystemEvent::ProposalAccepted {
-                proposal_id,
-                payload: ProposalPayload::SchedulingPolicy { coop_id, policy_json },
-                decided_at,
-                ..
-            } = event {
-                let compute_handle = compute.clone();
-                let prop_id = proposal_id.clone();
-                let store = audit_store.clone();
-                let _coop = coop_id.clone();
-                let policy_str = policy_json.clone();
-                let _decision_time = decided_at;
+        event_bus
+            .subscribe(Arc::new(move |event| {
+                if let SystemEvent::ProposalAccepted {
+                    proposal_id,
+                    payload:
+                        ProposalPayload::SchedulingPolicy {
+                            coop_id,
+                            policy_json,
+                        },
+                    decided_at,
+                    ..
+                } = event
+                {
+                    let compute_handle = compute.clone();
+                    let prop_id = proposal_id.clone();
+                    let store = audit_store.clone();
+                    let _coop = coop_id.clone();
+                    let policy_str = policy_json.clone();
+                    let _decision_time = decided_at;
 
-                tokio::spawn(async move {
-                    let audit_key = format!("gov:audit:policy:{}", prop_id.0);
-                    match store.get(audit_key.as_bytes()) {
-                        Ok(Some(_)) => return,
-                        Ok(None) => {}
-                        Err(_) => return,
-                    }
+                    tokio::spawn(async move {
+                        let audit_key = format!("gov:audit:policy:{}", prop_id.0);
+                        match store.get(audit_key.as_bytes()) {
+                            Ok(Some(_)) => return,
+                            Ok(None) => {}
+                            Err(_) => return,
+                        }
 
-                    match serde_json::from_str::<CoopSchedulingPolicy>(&policy_str) {
-                        Ok(policy) => {
-                            let _ = compute_handle.set_policy(policy.clone()).await;
+                        match serde_json::from_str::<CoopSchedulingPolicy>(&policy_str) {
+                            Ok(policy) => {
+                                let _ = compute_handle.set_policy(policy.clone()).await;
+                            }
+                            Err(_) => {
+                                // Invalid JSON should be logged but not crash
+                            }
                         }
-                        Err(_) => {
-                            // Invalid JSON should be logged but not crash
-                        }
-                    }
-                });
-            }
-        })).await
+                    });
+                }
+            }))
+            .await
     };
 
     // 4. Fire an event with invalid JSON
@@ -310,27 +326,35 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
 
-    event_bus.emit(SystemEvent::ProposalAccepted {
-        proposal_id: proposal_id.clone(),
-        domain_id: "test-domain".to_string(),
-        payload: ProposalPayload::SchedulingPolicy {
-            coop_id: "test-coop".to_string(),
-            policy_json: "{invalid json}".to_string(),
-        },
-        decided_at: now,
-    }).await;
+    event_bus
+        .emit(SystemEvent::ProposalAccepted {
+            proposal_id: proposal_id.clone(),
+            domain_id: "test-domain".to_string(),
+            payload: ProposalPayload::SchedulingPolicy {
+                coop_id: "test-coop".to_string(),
+                policy_json: "{invalid json}".to_string(),
+            },
+            decided_at: now,
+        })
+        .await;
 
     // 5. Wait for processing
     tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
     // 6. Verify policy was NOT applied (due to invalid JSON)
     let policy = policy_manager.get_policy("test-coop").await;
-    assert!(policy.is_none(), "Invalid policy should not have been applied");
+    assert!(
+        policy.is_none(),
+        "Invalid policy should not have been applied"
+    );
 
     // 7. Verify no audit trail was stored (execution failed)
     let audit_key = format!("gov:audit:policy:{}", proposal_id.0);
     let audit_data = gov_store.get(audit_key.as_bytes())?;
-    assert!(audit_data.is_none(), "Audit trail should not exist for failed execution");
+    assert!(
+        audit_data.is_none(),
+        "Audit trail should not exist for failed execution"
+    );
 
     info!("✅ Verified invalid JSON was handled gracefully");
 

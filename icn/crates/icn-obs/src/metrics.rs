@@ -213,10 +213,7 @@ pub fn init_descriptions() {
     );
 
     // Gossip metrics
-    describe_gauge!(
-        "icn_gossip_topics_total",
-        "Total number of gossip topics"
-    );
+    describe_gauge!("icn_gossip_topics_total", "Total number of gossip topics");
     describe_gauge!(
         "icn_gossip_entries_total",
         "Total number of gossip entries across all topics"
@@ -479,10 +476,7 @@ pub fn init_descriptions() {
         "icn_trust_edges_total",
         "Total number of trust edges in the graph"
     );
-    describe_gauge!(
-        "icn_trust_peers_by_class",
-        "Number of peers by trust class"
-    );
+    describe_gauge!("icn_trust_peers_by_class", "Number of peers by trust class");
     describe_counter!(
         "icn_trust_lookups_total",
         "Total number of trust score lookups"
@@ -583,14 +577,8 @@ pub fn init_descriptions() {
     );
 
     // System metrics
-    describe_gauge!(
-        "icn_system_uptime_seconds",
-        "System uptime in seconds"
-    );
-    describe_gauge!(
-        "icn_system_actors_active",
-        "Number of active actors"
-    );
+    describe_gauge!("icn_system_uptime_seconds", "System uptime in seconds");
+    describe_gauge!("icn_system_actors_active", "Number of active actors");
 
     // Snapshot metrics (graceful restart)
     describe_histogram!(
@@ -601,10 +589,7 @@ pub fn init_descriptions() {
         "icn_snapshot_load_duration_seconds",
         "Duration of snapshot load operations in seconds"
     );
-    describe_counter!(
-        "icn_snapshot_save_total",
-        "Total number of snapshots saved"
-    );
+    describe_counter!("icn_snapshot_save_total", "Total number of snapshots saved");
     describe_counter!(
         "icn_snapshot_load_total",
         "Total number of snapshots loaded"
@@ -921,10 +906,7 @@ pub fn init_descriptions() {
     );
 
     // Contract execution dispute metrics (Phase 18 Week 4)
-    describe_counter!(
-        "icn_disputes_filed_total",
-        "Total number of disputes filed"
-    );
+    describe_counter!("icn_disputes_filed_total", "Total number of disputes filed");
     describe_gauge!(
         "icn_disputes_pending",
         "Number of disputes currently pending"
@@ -1094,7 +1076,8 @@ pub mod network {
     }
 
     pub fn active_peers_by_class_set(trust_class: &str, count: u64) {
-        gauge!("icn_network_active_peers_by_class", "class" => trust_class.to_string()).set(count as f64);
+        gauge!("icn_network_active_peers_by_class", "class" => trust_class.to_string())
+            .set(count as f64);
     }
 
     pub fn trust_class_changes_inc() {
@@ -1105,7 +1088,7 @@ pub mod network {
         counter!("icn_network_connections_rejected_untrusted_total",
                  "peer_did" => peer_did.to_string(),
                  "trust_score" => format!("{:.3}", trust_score))
-            .increment(1);
+        .increment(1);
 
         // Also increment by trust class for aggregated metrics
         let trust_class = if trust_score < 0.1 {
@@ -1139,11 +1122,13 @@ pub mod network {
     }
 
     pub fn peer_capability_set(capability: &str, count: u64) {
-        gauge!("icn_network_peer_capabilities", "capability" => capability.to_string()).set(count as f64);
+        gauge!("icn_network_peer_capabilities", "capability" => capability.to_string())
+            .set(count as f64);
     }
 
     pub fn version_negotiation_failure_inc(reason: &str) {
-        counter!("icn_network_version_negotiation_failures_total", "reason" => reason.to_string()).increment(1);
+        counter!("icn_network_version_negotiation_failures_total", "reason" => reason.to_string())
+            .increment(1);
     }
 
     pub fn version_negotiation_success_inc(negotiated_version: u32) {
@@ -1253,7 +1238,8 @@ pub mod gossip {
             "icn_gossip_subscriptions_rejected_total",
             "topic" => topic.to_string(),
             "trust_score" => format!("{:.2}", trust_score)
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn subscribes_received_inc() {
@@ -1301,8 +1287,7 @@ pub mod gossip {
     }
 
     pub fn peer_deficit_bytes_set(peer: &str, deficit: i64) {
-        gauge!("icn_gossip_peer_deficit_bytes", "peer" => peer.to_string())
-            .set(deficit as f64);
+        gauge!("icn_gossip_peer_deficit_bytes", "peer" => peer.to_string()).set(deficit as f64);
     }
 
     pub fn bloom_fp_rate_record(topic: &str, rate: f64) {
@@ -1423,8 +1408,7 @@ pub mod scalability {
     }
 
     pub fn sharded_topic_size_set(topic: &str, size: usize) {
-        gauge!("icn_scalability_sharded_topic_size", "topic" => topic.to_string())
-            .set(size as f64);
+        gauge!("icn_scalability_sharded_topic_size", "topic" => topic.to_string()).set(size as f64);
     }
 
     // Clock sync metrics
@@ -1499,7 +1483,8 @@ pub mod governance {
     }
 
     pub fn execution_failures_inc(reason: &str) {
-        counter!("icn_governance_execution_failures_total", "reason" => reason.to_string()).increment(1);
+        counter!("icn_governance_execution_failures_total", "reason" => reason.to_string())
+            .increment(1);
     }
 
     pub fn execution_duration_record(payload_type: &str, duration: f64) {
@@ -1593,7 +1578,8 @@ pub mod contract {
     }
 
     pub fn deployments_rejected_inc(reason: &str) {
-        counter!("icn_contract_deployments_rejected_total", "reason" => reason.to_string()).increment(1);
+        counter!("icn_contract_deployments_rejected_total", "reason" => reason.to_string())
+            .increment(1);
     }
 
     pub fn deployments_rejected_trust_inc(deployer: &str, trust_score: f64) {
@@ -1601,14 +1587,16 @@ pub mod contract {
             "icn_contract_deployments_rejected_trust_total",
             "deployer" => deployer.to_string(),
             "trust_score" => format!("{:.2}", trust_score)
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn deployments_rejected_signature_inc(signer: &str) {
         counter!(
             "icn_contract_deployments_rejected_signature_total",
             "signer" => signer.to_string()
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn executions_inc(contract_name: &str, rule_name: &str) {
@@ -1616,7 +1604,8 @@ pub mod contract {
             "icn_contract_executions_total",
             "contract" => contract_name.to_string(),
             "rule" => rule_name.to_string()
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn executions_failed_inc(contract_name: &str, rule_name: &str, error: &str) {
@@ -1625,14 +1614,16 @@ pub mod contract {
             "contract" => contract_name.to_string(),
             "rule" => rule_name.to_string(),
             "error" => error.to_string()
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn executions_rejected_unauthorized_inc(caller: &str) {
         counter!(
             "icn_contract_executions_rejected_unauthorized_total",
             "caller" => caller.to_string()
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn execution_fuel_used_record(fuel: u64) {
@@ -1680,8 +1671,7 @@ pub mod topology {
 
     /// Record gossip fanout for a specific scope
     pub fn gossip_fanout_record(scope: &str, count: usize) {
-        histogram!("icn_topology_gossip_fanout", "scope" => scope.to_string())
-            .record(count as f64);
+        histogram!("icn_topology_gossip_fanout", "scope" => scope.to_string()).record(count as f64);
     }
 
     /// Record RTT measurement for a peer
@@ -1752,14 +1742,14 @@ pub mod gateway {
         counter!("icn_gateway_requests_total",
                  "endpoint" => endpoint.to_string(),
                  "method" => method.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn request_duration_record(endpoint: &str, status: u16, duration_secs: f64) {
         histogram!("icn_gateway_request_duration_seconds",
                    "endpoint" => endpoint.to_string(),
                    "status" => status.to_string())
-            .record(duration_secs);
+        .record(duration_secs);
     }
 
     pub fn auth_challenges_inc() {
@@ -1773,7 +1763,7 @@ pub mod gateway {
     pub fn auth_failures_inc(reason: &str) {
         counter!("icn_gateway_auth_failures_total",
                  "reason" => reason.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn auth_successes_inc() {
@@ -1783,13 +1773,13 @@ pub mod gateway {
     pub fn rate_limit_exceeded_inc(did: &str) {
         counter!("icn_gateway_rate_limit_exceeded_total",
                  "did" => did.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn authorization_failures_inc(required_scope: &str) {
         counter!("icn_gateway_authorization_failures_total",
                  "required_scope" => required_scope.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn websocket_connections_active_set(count: u64) {
@@ -1831,7 +1821,7 @@ pub mod gateway {
     pub fn payment_amount_record(currency: &str, amount: i64) {
         histogram!("icn_gateway_payment_amount",
                    "currency" => currency.to_string())
-            .record(amount.abs() as f64);
+        .record(amount.abs() as f64);
     }
 
     pub fn balance_queries_inc() {
@@ -1872,7 +1862,7 @@ pub mod nat_traversal {
         counter!("icn_stun_queries_total",
                  "server" => server.to_string(),
                  "result" => result.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn stun_discovery_duration_record(duration_secs: f64) {
@@ -1884,14 +1874,14 @@ pub mod nat_traversal {
                  "endpoint" => endpoint.to_string(),
                  "votes" => votes.to_string(),
                  "total_servers" => total_servers.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn stun_server_failure_inc(server: &str, reason: &str) {
         counter!("icn_stun_server_failures_total",
                  "server" => server.to_string(),
                  "reason" => reason.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     // Candidate metrics
@@ -1919,19 +1909,19 @@ pub mod nat_traversal {
     pub fn connection_attempt_inc(method: &str) {
         counter!("icn_nat_connection_attempts_total",
                  "method" => method.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn connection_success_inc(method: &str) {
         counter!("icn_nat_connection_success_total",
                  "method" => method.to_string())
-            .increment(1);
+        .increment(1);
     }
 
     pub fn connection_duration_record(method: &str, duration_secs: f64) {
         histogram!("icn_nat_connection_duration_seconds",
                    "method" => method.to_string())
-            .record(duration_secs);
+        .record(duration_secs);
     }
 
     pub fn hole_punch_attempt_inc() {
@@ -1956,7 +1946,8 @@ pub mod compute {
     }
 
     pub fn tasks_completed_inc(outcome: &str) {
-        counter!("icn_compute_tasks_completed_total", "outcome" => outcome.to_string()).increment(1);
+        counter!("icn_compute_tasks_completed_total", "outcome" => outcome.to_string())
+            .increment(1);
     }
 
     pub fn tasks_failed_inc(reason: &str) {
@@ -2000,7 +1991,8 @@ pub mod compute {
             "icn_compute_tasks_rejected_trust_total",
             "submitter" => submitter.to_string(),
             "trust_score" => format!("{:.2}", trust_score)
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     pub fn tasks_timeout_inc() {
@@ -2016,7 +2008,8 @@ pub mod compute {
     }
 
     pub fn signatures_invalid_inc(reason: &str) {
-        counter!("icn_compute_signatures_invalid_total", "reason" => reason.to_string()).increment(1);
+        counter!("icn_compute_signatures_invalid_total", "reason" => reason.to_string())
+            .increment(1);
     }
 
     pub fn executors_available_set(count: f64) {
@@ -2131,7 +2124,8 @@ pub mod compute {
     }
 
     pub fn disputes_resolved_inc(outcome: &str) {
-        counter!("icn_compute_disputes_resolved_total", "outcome" => outcome.to_string()).increment(1);
+        counter!("icn_compute_disputes_resolved_total", "outcome" => outcome.to_string())
+            .increment(1);
     }
 
     pub fn disputes_pending_set(count: u64) {

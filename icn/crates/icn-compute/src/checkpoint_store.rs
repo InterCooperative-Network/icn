@@ -90,9 +90,9 @@ impl CheckpointStore {
 
         if is_newer {
             // Persist to backend
-            self.backend
-                .store(&checkpoint)
-                .map_err(|e| ComputeError::Internal(format!("Failed to persist checkpoint: {e}")))?;
+            self.backend.store(&checkpoint).map_err(|e| {
+                ComputeError::Internal(format!("Failed to persist checkpoint: {e}"))
+            })?;
 
             // Update cache
             cache.insert(actor_id, checkpoint.clone());
@@ -192,9 +192,7 @@ impl CheckpointStore {
         // Verify state hash
         let computed_hash = ActorCheckpoint::compute_state_hash(&checkpoint.state);
         if computed_hash != checkpoint.state_hash {
-            return Err(ComputeError::InvalidSignature(
-                "State hash mismatch".into(),
-            ));
+            return Err(ComputeError::InvalidSignature("State hash mismatch".into()));
         }
 
         Ok(())
@@ -307,7 +305,9 @@ impl CheckpointBackend for SledCheckpointBackend {
             .insert(key, value)
             .map_err(|e| format!("Sled insert error: {e}"))?;
 
-        self.db.flush().map_err(|e| format!("Sled flush error: {e}"))?;
+        self.db
+            .flush()
+            .map_err(|e| format!("Sled flush error: {e}"))?;
 
         Ok(())
     }
@@ -319,8 +319,8 @@ impl CheckpointBackend for SledCheckpointBackend {
             .map_err(|e| format!("Sled get error: {e}"))?;
 
         if let Some(bytes) = value {
-            let checkpoint: ActorCheckpoint = bincode::deserialize(&bytes)
-                .map_err(|e| format!("Deserialization error: {e}"))?;
+            let checkpoint: ActorCheckpoint =
+                bincode::deserialize(&bytes).map_err(|e| format!("Deserialization error: {e}"))?;
             Ok(Some(checkpoint))
         } else {
             Ok(None)
@@ -347,7 +347,9 @@ impl CheckpointBackend for SledCheckpointBackend {
             .remove(actor_id)
             .map_err(|e| format!("Sled remove error: {e}"))?;
 
-        self.db.flush().map_err(|e| format!("Sled flush error: {e}"))?;
+        self.db
+            .flush()
+            .map_err(|e| format!("Sled flush error: {e}"))?;
 
         Ok(())
     }

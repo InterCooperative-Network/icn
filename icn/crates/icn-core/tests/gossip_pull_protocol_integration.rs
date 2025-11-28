@@ -9,7 +9,7 @@
 //! 6. Node 2 stores entries and achieves convergence
 
 use anyhow::Result;
-use icn_gossip::{GossipActor, GossipMessage, Topic, AccessControl};
+use icn_gossip::{AccessControl, GossipActor, GossipMessage, Topic};
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_trust::TrustClass;
@@ -115,24 +115,26 @@ impl TestNode {
             let network_handle_clone = network_handle.clone();
             let from_did = did.clone();
 
-            let send_callback = Arc::new(move |recipient: Option<icn_identity::Did>, gossip_msg: GossipMessage| {
-                let net_handle = network_handle_clone.clone();
-                let from = from_did.clone();
+            let send_callback = Arc::new(
+                move |recipient: Option<icn_identity::Did>, gossip_msg: GossipMessage| {
+                    let net_handle = network_handle_clone.clone();
+                    let from = from_did.clone();
 
-                tokio::spawn(async move {
-                    let net_msg = NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
+                    tokio::spawn(async move {
+                        let net_msg = NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
 
-                    let result = if let Some(to_did) = recipient {
-                        net_handle.send_message(to_did, net_msg).await
-                    } else {
-                        net_handle.broadcast(net_msg).await
-                    };
+                        let result = if let Some(to_did) = recipient {
+                            net_handle.send_message(to_did, net_msg).await
+                        } else {
+                            net_handle.broadcast(net_msg).await
+                        };
 
-                    if let Err(e) = result {
-                        warn!("Failed to send gossip message: {}", e);
-                    }
-                });
-            });
+                        if let Err(e) = result {
+                            warn!("Failed to send gossip message: {}", e);
+                        }
+                    });
+                },
+            );
 
             gossip.set_send_callback(send_callback);
         }
@@ -199,8 +201,14 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     }
 
     // Connect nodes: 1 ↔ 2 (bidirectional)
-    node1.network_handle.dial(node2.listen_addr, node2.did.clone()).await?;
-    node2.network_handle.dial(node1.listen_addr, node1.did.clone()).await?;
+    node1
+        .network_handle
+        .dial(node2.listen_addr, node2.did.clone())
+        .await?;
+    node2
+        .network_handle
+        .dial(node1.listen_addr, node1.did.clone())
+        .await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     info!("✓ Nodes connected (bidirectional)");
@@ -227,7 +235,11 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     {
         let gossip2 = node2.gossip_handle.read().await;
         let entries2 = gossip2.get_entries(topic);
-        assert_eq!(entries2.len(), 0, "Node 2 should have 0 entries before pull");
+        assert_eq!(
+            entries2.len(),
+            0,
+            "Node 2 should have 0 entries before pull"
+        );
     }
 
     info!("✓ Initial state verified (Node 1: 3 entries, Node 2: 0 entries)");
@@ -336,7 +348,10 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
     }
 
     // Connect nodes
-    node1.network_handle.dial(node2.listen_addr, node2.did.clone()).await?;
+    node1
+        .network_handle
+        .dial(node2.listen_addr, node2.did.clone())
+        .await?;
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // Node 1 publishes 100 small entries
@@ -368,7 +383,10 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
         "Node 2 should have pulled at least some entries"
     );
 
-    info!("✓ Node 2 pulled {} entries (backpressure may limit full sync)", pulled_count);
+    info!(
+        "✓ Node 2 pulled {} entries (backpressure may limit full sync)",
+        pulled_count
+    );
 
     // Cleanup
     node1.shutdown().await;

@@ -84,6 +84,8 @@ mod tests {
         let config = MembershipConfig::trust_threshold(0.5);
 
         assert_eq!(config.source.trust_threshold(), Some(0.5));
-        assert!(!config.source.contains_static(KeyPair::generate().unwrap().did()));
+        assert!(!config
+            .source
+            .contains_static(KeyPair::generate().unwrap().did()));
     }
 }

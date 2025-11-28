@@ -1,8 +1,8 @@
 //! Bloom filter for anti-entropy synchronization
 
 use crate::types::{BloomFilterData, ContentHash};
-use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 /// Bloom filter for efficient set membership testing
 #[derive(Clone)]
@@ -315,9 +315,18 @@ mod tests {
         let filter10k = BloomFilter::new_adaptive(10000);
         assert_eq!(filter10k.size, 65536);
 
-        println!("Adaptive filter for 10 entries: size={}, hashes={}", filter10.size, filter10.num_hashes);
-        println!("Adaptive filter for 100 entries: size={}, hashes={}", filter100.size, filter100.num_hashes);
-        println!("Adaptive filter for 10k entries: size={}, hashes={}", filter10k.size, filter10k.num_hashes);
+        println!(
+            "Adaptive filter for 10 entries: size={}, hashes={}",
+            filter10.size, filter10.num_hashes
+        );
+        println!(
+            "Adaptive filter for 100 entries: size={}, hashes={}",
+            filter100.size, filter100.num_hashes
+        );
+        println!(
+            "Adaptive filter for 10k entries: size={}, hashes={}",
+            filter10k.size, filter10k.num_hashes
+        );
     }
 
     #[test]

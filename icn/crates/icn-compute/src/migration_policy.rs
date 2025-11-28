@@ -76,9 +76,7 @@ impl NetworkState {
             }
         }
 
-        blob_counts
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
+        blob_counts.into_iter().max_by_key(|(_, count)| *count)
     }
 
     /// Calculate data locality ratio for executor
@@ -316,8 +314,8 @@ impl MigrationPolicy for LocalityFirstPolicy {
             network_state.data_locality_ratio(current_executor, &actor_state.required_blobs);
 
         // Find executor with best data locality
-        let (best_executor, local_count) =
-            network_state.executor_with_most_blobs(&actor_state.required_blobs, Some(current_executor))?;
+        let (best_executor, local_count) = network_state
+            .executor_with_most_blobs(&actor_state.required_blobs, Some(current_executor))?;
 
         let best_locality = local_count as f64 / actor_state.required_blobs.len() as f64;
         let improvement = best_locality - current_locality;
@@ -425,9 +423,13 @@ mod tests {
             ],
         );
 
-        let decision = policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
+        let decision =
+            policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
 
-        assert!(decision.is_none(), "Should not migrate when load below threshold");
+        assert!(
+            decision.is_none(),
+            "Should not migrate when load below threshold"
+        );
     }
 
     #[test]
@@ -456,7 +458,8 @@ mod tests {
             ],
         );
 
-        let decision = policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
+        let decision =
+            policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
 
         assert!(decision.is_some(), "Should migrate when overloaded");
         let dec = decision.unwrap();
@@ -492,9 +495,13 @@ mod tests {
             ],
         );
 
-        let decision = policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
+        let decision =
+            policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
 
-        assert!(decision.is_none(), "Should not migrate to low-trust executor");
+        assert!(
+            decision.is_none(),
+            "Should not migrate to low-trust executor"
+        );
     }
 
     #[test]
@@ -520,7 +527,13 @@ mod tests {
 
         // Current executor has 1/3 blobs, target has 3/3 blobs
         let mut blob_locations = HashMap::new();
-        blob_locations.insert(blob1, vec!["did:icn:executor-a".to_string(), "did:icn:executor-b".to_string()]);
+        blob_locations.insert(
+            blob1,
+            vec![
+                "did:icn:executor-a".to_string(),
+                "did:icn:executor-b".to_string(),
+            ],
+        );
         blob_locations.insert(blob2, vec!["did:icn:executor-b".to_string()]);
         blob_locations.insert(blob3, vec!["did:icn:executor-b".to_string()]);
 
@@ -535,7 +548,8 @@ mod tests {
             snapshot_at: 1000,
         };
 
-        let decision = policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
+        let decision =
+            policy.should_migrate(&actor_id, current_executor, &actor_state, &network_state);
 
         assert!(decision.is_some(), "Should migrate for better locality");
         let dec = decision.unwrap();
@@ -567,11 +581,13 @@ mod tests {
         };
 
         // Executor A has 2/3 blobs
-        let ratio_a = network_state.data_locality_ratio("did:icn:executor-a", &[blob1, blob2, blob3]);
+        let ratio_a =
+            network_state.data_locality_ratio("did:icn:executor-a", &[blob1, blob2, blob3]);
         assert!((ratio_a - 0.666).abs() < 0.01);
 
         // Executor B has 1/3 blobs
-        let ratio_b = network_state.data_locality_ratio("did:icn:executor-b", &[blob1, blob2, blob3]);
+        let ratio_b =
+            network_state.data_locality_ratio("did:icn:executor-b", &[blob1, blob2, blob3]);
         assert!((ratio_b - 0.333).abs() < 0.01);
 
         // No blobs required = perfect locality

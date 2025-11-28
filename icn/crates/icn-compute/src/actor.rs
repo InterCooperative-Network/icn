@@ -70,10 +70,7 @@ pub type PaymentCallback = Arc<dyn Fn(PaymentRequest) + Send + Sync>;
 #[derive(Debug, Clone)]
 pub enum ComputeEvent {
     /// A task was claimed by an executor
-    TaskClaimed {
-        task_hash: String,
-        executor: String,
-    },
+    TaskClaimed { task_hash: String, executor: String },
     /// A task completed execution
     TaskCompleted {
         task_hash: String,
@@ -98,7 +95,10 @@ impl ComputeHandle {
     pub async fn submit(&self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         self.tx
-            .send(ComputeCommand::Submit { task: Box::new(task), resp: resp_tx })
+            .send(ComputeCommand::Submit {
+                task: Box::new(task),
+                resp: resp_tx,
+            })
             .await
             .map_err(|_| ComputeError::Internal("actor closed".into()))?;
         resp_rx
@@ -110,7 +110,10 @@ impl ComputeHandle {
     pub async fn status(&self, hash: TaskHash) -> Result<Option<TaskStatus>, ComputeError> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         self.tx
-            .send(ComputeCommand::Status { hash, resp: resp_tx })
+            .send(ComputeCommand::Status {
+                hash,
+                resp: resp_tx,
+            })
             .await
             .map_err(|_| ComputeError::Internal("actor closed".into()))?;
         resp_rx
@@ -157,7 +160,10 @@ impl ComputeHandle {
     ) -> Result<(), ComputeError> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         self.tx
-            .send(ComputeCommand::SetPolicy { policy, resp: resp_tx })
+            .send(ComputeCommand::SetPolicy {
+                policy,
+                resp: resp_tx,
+            })
             .await
             .map_err(|_| ComputeError::Internal("actor closed".into()))?;
         resp_rx
@@ -189,7 +195,10 @@ impl ComputeHandle {
     }
 
     /// Remove a policy
-    pub async fn remove_policy(&self, coop_id: &str) -> Option<crate::policy::CoopSchedulingPolicy> {
+    pub async fn remove_policy(
+        &self,
+        coop_id: &str,
+    ) -> Option<crate::policy::CoopSchedulingPolicy> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(ComputeCommand::RemovePolicy {
@@ -420,7 +429,10 @@ impl ComputeActor {
     }
 
     /// Set dispute resolution system (Phase 18 Week 4)
-    pub fn set_dispute_resolution(&mut self, system: Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>) {
+    pub fn set_dispute_resolution(
+        &mut self,
+        system: Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>,
+    ) {
         self.dispute_resolution = Some(system);
     }
 
@@ -477,7 +489,9 @@ impl ComputeActor {
                     &task_manager_clone,
                     &executor_registry_clone,
                     &send_callback_clone,
-                ).await {
+                )
+                .await
+                {
                     tracing::warn!("timeout checker error: {}", e);
                 }
             }
@@ -514,7 +528,12 @@ impl ComputeActor {
                         let status = self.task_manager.lock().await.status(&hash).cloned();
                         let _ = resp.send(status);
                     }
-                    ComputeCommand::Cancel { hash, requester, reason, resp } => {
+                    ComputeCommand::Cancel {
+                        hash,
+                        requester,
+                        reason,
+                        resp,
+                    } => {
                         let result = self.cancel_task(&hash, &requester, reason).await;
                         let _ = resp.send(result);
                     }
@@ -558,7 +577,11 @@ impl ComputeActor {
                             let _ = resp.send(None);
                         }
                     }
-                    ComputeCommand::GetUsage { coop_id, member_did, resp } => {
+                    ComputeCommand::GetUsage {
+                        coop_id,
+                        member_did,
+                        resp,
+                    } => {
                         if let Some(ref pm) = self.policy_manager {
                             let usage_tracker = pm.usage_tracker();
                             match icn_identity::Did::from_str(&member_did) {
@@ -567,9 +590,9 @@ impl ComputeActor {
                                     let _ = resp.send(result);
                                 }
                                 Err(_) => {
-                                    let _ = resp.send(Err(ComputeError::InvalidInput(
-                                        format!("invalid DID: {member_did}"),
-                                    )));
+                                    let _ = resp.send(Err(ComputeError::InvalidInput(format!(
+                                        "invalid DID: {member_did}"
+                                    ))));
                                 }
                             }
                         } else {
@@ -613,9 +636,9 @@ impl ComputeActor {
                             let executor_did: icn_identity::Did = match executor.parse() {
                                 Ok(did) => did,
                                 Err(_) => {
-                                    let _ = resp.send(Err(ComputeError::InvalidInput(
-                                        format!("invalid executor DID: {executor}"),
-                                    )));
+                                    let _ = resp.send(Err(ComputeError::InvalidInput(format!(
+                                        "invalid executor DID: {executor}"
+                                    ))));
                                     continue;
                                 }
                             };
@@ -623,15 +646,18 @@ impl ComputeActor {
                             let challenger_did: icn_identity::Did = match challenger.parse() {
                                 Ok(did) => did,
                                 Err(_) => {
-                                    let _ = resp.send(Err(ComputeError::InvalidInput(
-                                        format!("invalid challenger DID: {challenger}"),
-                                    )));
+                                    let _ = resp.send(Err(ComputeError::InvalidInput(format!(
+                                        "invalid challenger DID: {challenger}"
+                                    ))));
                                     continue;
                                 }
                             };
 
                             let mut system = dispute_system.write().await;
-                            match system.file_dispute(task_hash, executor_did, challenger_did, evidence).await {
+                            match system
+                                .file_dispute(task_hash, executor_did, challenger_did, evidence)
+                                .await
+                            {
                                 Ok(dispute_id) => {
                                     icn_obs::metrics::compute::disputes_filed_inc();
                                     tracing::info!(
@@ -705,7 +731,8 @@ impl ComputeActor {
 
             // Get task info for broadcasting
             let mut mgr = task_manager.lock().await;
-            let task_id = mgr.get(&hash)
+            let task_id = mgr
+                .get(&hash)
                 .map(|t| t.id.clone())
                 .unwrap_or_else(|| "unknown".to_string());
 
@@ -722,7 +749,10 @@ impl ComputeActor {
                 if let Some(info) = registry.get_mut(&executor) {
                     if info.tasks_executing > 0 {
                         info.tasks_executing -= 1;
-                        icn_obs::metrics::compute::executor_load_set(&executor, info.tasks_executing as f64);
+                        icn_obs::metrics::compute::executor_load_set(
+                            &executor,
+                            info.tasks_executing as f64,
+                        );
                     }
                 }
             }
@@ -794,7 +824,10 @@ impl ComputeActor {
             let coop_id = task.coop_id.as_deref().unwrap_or("default");
 
             // Check policy
-            match policy_manager.check_submission(&task, &submitter_did, coop_id).await? {
+            match policy_manager
+                .check_submission(&task, &submitter_did, coop_id)
+                .await?
+            {
                 crate::policy::PolicyDecision::Reject { reason } => {
                     tracing::warn!(
                         task_id = %task.id,
@@ -824,7 +857,11 @@ impl ComputeActor {
         }
 
         // Add to local task manager (use adjusted task)
-        let hash = self.task_manager.lock().await.submit(adjusted_task.clone())?;
+        let hash = self
+            .task_manager
+            .lock()
+            .await
+            .submit(adjusted_task.clone())?;
         icn_obs::metrics::compute::tasks_submitted_inc();
 
         tracing::info!(
@@ -850,13 +887,16 @@ impl ComputeActor {
                 );
 
                 // Store request timestamp for duration metrics
-                self.pending_request_timestamps.lock().await.insert(hash, now);
+                self.pending_request_timestamps
+                    .lock()
+                    .await
+                    .insert(hash, now);
 
                 cb(ComputeMessage::PlacementRequest {
                     task_hash: hash,
                     submitter: task.submitter.clone(),
                     resource_profile: profile.clone(),
-                    locality_hints: vec![], // Future enhancement
+                    locality_hints: vec![],      // Future enhancement
                     max_cost: task.payment_rate, // Use payment_rate as max cost
                     requested_at: now,
                 });
@@ -923,21 +963,25 @@ impl ComputeActor {
     /// Handle incoming compute message
     async fn handle_message(&self, msg: ComputeMessage) -> Result<(), ComputeError> {
         match msg {
-            ComputeMessage::TaskSubmitted(task) => {
-                self.on_task_submitted(*task).await
+            ComputeMessage::TaskSubmitted(task) => self.on_task_submitted(*task).await,
+            ComputeMessage::TaskClaimed {
+                task_hash,
+                executor,
+            } => self.on_task_claimed(task_hash, executor).await,
+            ComputeMessage::TaskResult(result) => self.on_task_result(result).await,
+            ComputeMessage::TaskCancelled {
+                task_hash,
+                submitter,
+                reason,
+                cancelled_at,
+            } => {
+                self.on_task_cancelled(task_hash, submitter, reason, cancelled_at)
+                    .await
             }
-            ComputeMessage::TaskClaimed { task_hash, executor } => {
-                self.on_task_claimed(task_hash, executor).await
-            }
-            ComputeMessage::TaskResult(result) => {
-                self.on_task_result(result).await
-            }
-            ComputeMessage::TaskCancelled { task_hash, submitter, reason, cancelled_at } => {
-                self.on_task_cancelled(task_hash, submitter, reason, cancelled_at).await
-            }
-            ComputeMessage::ExecutorAnnounce { executor, capabilities } => {
-                self.on_executor_announce(executor, capabilities).await
-            }
+            ComputeMessage::ExecutorAnnounce {
+                executor,
+                capabilities,
+            } => self.on_executor_announce(executor, capabilities).await,
             ComputeMessage::PlacementRequest {
                 task_hash,
                 submitter,
@@ -982,12 +1026,14 @@ impl ComputeActor {
             ComputeMessage::CheckpointAnnounce { checkpoint } => {
                 self.on_checkpoint_announce(checkpoint).await
             }
-            ComputeMessage::CheckpointQuery { actor_id, requester } => {
-                self.on_checkpoint_query(actor_id, requester).await
-            }
-            ComputeMessage::CheckpointResponse { actor_id, checkpoint } => {
-                self.on_checkpoint_response(actor_id, checkpoint).await
-            }
+            ComputeMessage::CheckpointQuery {
+                actor_id,
+                requester,
+            } => self.on_checkpoint_query(actor_id, requester).await,
+            ComputeMessage::CheckpointResponse {
+                actor_id,
+                checkpoint,
+            } => self.on_checkpoint_response(actor_id, checkpoint).await,
             ComputeMessage::MigrationRequest {
                 actor_id,
                 from_executor,
@@ -995,13 +1041,20 @@ impl ComputeActor {
                 checkpoint,
                 reason,
             } => {
-                self.on_migration_request(actor_id, from_executor, to_executor, checkpoint, reason).await
+                self.on_migration_request(actor_id, from_executor, to_executor, checkpoint, reason)
+                    .await
             }
-            ComputeMessage::MigrationAccept { actor_id, to_executor } => {
-                self.on_migration_accept(actor_id, to_executor).await
-            }
-            ComputeMessage::MigrationReject { actor_id, to_executor, reason } => {
-                self.on_migration_reject(actor_id, to_executor, reason).await
+            ComputeMessage::MigrationAccept {
+                actor_id,
+                to_executor,
+            } => self.on_migration_accept(actor_id, to_executor).await,
+            ComputeMessage::MigrationReject {
+                actor_id,
+                to_executor,
+                reason,
+            } => {
+                self.on_migration_reject(actor_id, to_executor, reason)
+                    .await
             }
             ComputeMessage::MigrationComplete {
                 actor_id,
@@ -1010,7 +1063,14 @@ impl ComputeActor {
                 final_checkpoint,
                 duration_ms,
             } => {
-                self.on_migration_complete(actor_id, from_executor, to_executor, final_checkpoint, duration_ms).await
+                self.on_migration_complete(
+                    actor_id,
+                    from_executor,
+                    to_executor,
+                    final_checkpoint,
+                    duration_ms,
+                )
+                .await
             }
         }
     }
@@ -1078,7 +1138,8 @@ impl ComputeActor {
                 .claim(&h, self.own_did.clone())?;
 
             let mgr = self.task_manager.lock().await;
-            let t = mgr.get(&h)
+            let t = mgr
+                .get(&h)
                 .ok_or_else(|| ComputeError::TaskNotFound(hex::encode(h)))?
                 .clone();
             drop(mgr);
@@ -1117,7 +1178,10 @@ impl ComputeActor {
         let mut registry = self.executor_registry.lock().await;
         if let Some(info) = registry.get_mut(&self.own_did) {
             info.tasks_executing += 1;
-            icn_obs::metrics::compute::executor_load_set(&self.own_did, info.tasks_executing as f64);
+            icn_obs::metrics::compute::executor_load_set(
+                &self.own_did,
+                info.tasks_executing as f64,
+            );
         }
         drop(registry);
 
@@ -1214,7 +1278,10 @@ impl ComputeActor {
         if let Some(info) = registry.get_mut(&self.own_did) {
             if info.tasks_executing > 0 {
                 info.tasks_executing -= 1;
-                icn_obs::metrics::compute::executor_load_set(&self.own_did, info.tasks_executing as f64);
+                icn_obs::metrics::compute::executor_load_set(
+                    &self.own_did,
+                    info.tasks_executing as f64,
+                );
             }
         }
         drop(registry);
@@ -1262,10 +1329,15 @@ impl ComputeActor {
 
         // Settle payment if configured and execution succeeded
         if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
-            if let (Some(rate), Some(ref payment_cb)) = (claimed_task.payment_rate, &self.payment_callback) {
+            if let (Some(rate), Some(ref payment_cb)) =
+                (claimed_task.payment_rate, &self.payment_callback)
+            {
                 let amount = (result.fuel_used * rate) / 1000; // rate is per 1000 fuel
                 if amount > 0 {
-                    let currency = claimed_task.payment_currency.clone().unwrap_or_else(|| "credits".to_string());
+                    let currency = claimed_task
+                        .payment_currency
+                        .clone()
+                        .unwrap_or_else(|| "credits".to_string());
                     tracing::info!(
                         task_id = %claimed_task.id,
                         from = %claimed_task.submitter,
@@ -1373,7 +1445,9 @@ impl ComputeActor {
             .values()
             .filter(|info| {
                 // Check if executor has all required capabilities
-                required_caps.iter().all(|cap| info.capabilities.contains(cap))
+                required_caps
+                    .iter()
+                    .all(|cap| info.capabilities.contains(cap))
             })
             .map(|info| info.did.clone())
             .collect()
@@ -1391,18 +1465,17 @@ impl ComputeActor {
         );
 
         // Verify signature
-        let executor_did: icn_identity::Did = result.executor.parse()
-            .map_err(|e| {
-                tracing::warn!(
-                    task_id = %result.task_id,
-                    task_hash = %task_hash_str,
-                    executor = %result.executor,
-                    error = %e,
-                    "Invalid executor DID in result"
-                );
-                icn_obs::metrics::compute::signatures_invalid_inc("invalid_did");
-                ComputeError::InvalidSignature(format!("Invalid executor DID: {e}"))
-            })?;
+        let executor_did: icn_identity::Did = result.executor.parse().map_err(|e| {
+            tracing::warn!(
+                task_id = %result.task_id,
+                task_hash = %task_hash_str,
+                executor = %result.executor,
+                error = %e,
+                "Invalid executor DID in result"
+            );
+            icn_obs::metrics::compute::signatures_invalid_inc("invalid_did");
+            ComputeError::InvalidSignature(format!("Invalid executor DID: {e}"))
+        })?;
 
         if let Err(e) = result.verify_signature(&executor_did) {
             tracing::warn!(
@@ -1438,7 +1511,11 @@ impl ComputeActor {
             });
 
         // Add this result if not already present (by executor)
-        if !consensus.results.iter().any(|r| r.executor == result.executor) {
+        if !consensus
+            .results
+            .iter()
+            .any(|r| r.executor == result.executor)
+        {
             consensus.results.push(result.clone());
         }
 
@@ -1470,7 +1547,10 @@ impl ComputeActor {
             if let Some(info) = registry.get_mut(&executor_did) {
                 if info.tasks_executing > 0 {
                     info.tasks_executing -= 1;
-                    icn_obs::metrics::compute::executor_load_set(&executor_did, info.tasks_executing as f64);
+                    icn_obs::metrics::compute::executor_load_set(
+                        &executor_did,
+                        info.tasks_executing as f64,
+                    );
                 }
             }
             drop(registry);
@@ -1537,7 +1617,10 @@ impl ComputeActor {
             if let Some(info) = registry.get_mut(&executor) {
                 if info.tasks_executing > 0 {
                     info.tasks_executing -= 1;
-                    icn_obs::metrics::compute::executor_load_set(&executor, info.tasks_executing as f64);
+                    icn_obs::metrics::compute::executor_load_set(
+                        &executor,
+                        info.tasks_executing as f64,
+                    );
                 }
             }
         }
@@ -2103,17 +2186,22 @@ impl ComputeActor {
 
             // Get current queue depth
             let registry = self.executor_registry.lock().await;
-            let queue_depth = registry.get(&self.own_did).map(|i| i.tasks_executing).unwrap_or(0);
+            let queue_depth = registry
+                .get(&self.own_did)
+                .map(|i| i.tasks_executing)
+                .unwrap_or(0);
             drop(registry);
 
-            manager.handle_migration_request(
-                actor_id,
-                from_executor,
-                checkpoint,
-                reason,
-                &capacity,
-                queue_depth,
-            ).await?;
+            manager
+                .handle_migration_request(
+                    actor_id,
+                    from_executor,
+                    checkpoint,
+                    reason,
+                    &capacity,
+                    queue_depth,
+                )
+                .await?;
         }
 
         Ok(())
@@ -2138,7 +2226,9 @@ impl ComputeActor {
             // Generate signing key for checkpoint
             let signing_key = ed25519_dalek::SigningKey::from_bytes(&[0u8; 32]);
 
-            manager.handle_migration_accept(actor_id, to_executor, &signing_key).await?;
+            manager
+                .handle_migration_accept(actor_id, to_executor, &signing_key)
+                .await?;
         }
 
         Ok(())
@@ -2162,7 +2252,9 @@ impl ComputeActor {
 
         // Delegate to migration manager if available
         if let Some(ref manager) = self.migration_manager {
-            manager.handle_migration_reject(actor_id, to_executor, reason).await?;
+            manager
+                .handle_migration_reject(actor_id, to_executor, reason)
+                .await?;
         }
 
         Ok(())
@@ -2194,7 +2286,9 @@ impl ComputeActor {
 
         // Delegate to migration manager if available
         if let Some(ref manager) = self.migration_manager {
-            manager.handle_migration_complete(actor_id, from_executor, final_checkpoint, duration_ms).await?;
+            manager
+                .handle_migration_complete(actor_id, from_executor, final_checkpoint, duration_ms)
+                .await?;
         }
 
         Ok(())
@@ -2219,7 +2313,8 @@ mod tests {
                 "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
             }],
             "triggers": []
-        }"#.to_string()
+        }"#
+        .to_string()
     }
 
     fn make_task(id: &str, submitter: &str) -> ComputeTask {
@@ -2264,7 +2359,10 @@ mod tests {
         let task = make_task("task-1", "did:icn:untrusted");
         let result = handle.submit(task).await;
 
-        assert!(matches!(result, Err(ComputeError::InsufficientTrust { .. })));
+        assert!(matches!(
+            result,
+            Err(ComputeError::InsufficientTrust { .. })
+        ));
     }
 
     #[tokio::test]
@@ -2382,16 +2480,30 @@ mod tests {
         critical_task.priority = crate::types::TaskPriority::Critical;
 
         // Submit them via gossip (not direct submit which auto-executes)
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(low_task.clone()))).await.unwrap();
+        handle
+            .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(low_task.clone())))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(normal_task.clone()))).await.unwrap();
+        handle
+            .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(normal_task.clone())))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(high_task.clone()))).await.unwrap();
+        handle
+            .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(high_task.clone())))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(critical_task.clone()))).await.unwrap();
+        handle
+            .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(
+                critical_task.clone(),
+            )))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // The critical task should have been claimed and completed first
@@ -2422,7 +2534,8 @@ mod tests {
         use tokio::sync::Mutex as TokioMutex;
 
         // Track all offers from all executors
-        let offers_collected: Arc<TokioMutex<Vec<(String, f64)>>> = Arc::new(TokioMutex::new(vec![]));
+        let offers_collected: Arc<TokioMutex<Vec<(String, f64)>>> =
+            Arc::new(TokioMutex::new(vec![]));
         let claims_collected: Arc<TokioMutex<Vec<String>>> = Arc::new(TokioMutex::new(vec![]));
 
         // Create a compute-heavy task (CPU+RAM, no GPU to simplify test)
@@ -2432,11 +2545,11 @@ mod tests {
 
         // Executor configurations: (did, trust)
         let executor_configs = vec![
-            ("did:icn:executor-a", 0.9),  // Highest trust
-            ("did:icn:executor-b", 0.7),  // Medium trust
-            ("did:icn:executor-c", 0.5),  // Low trust (but above MIN_TRUST_EXECUTE = 0.3)
-            ("did:icn:executor-d", 0.8),  // High trust
-            ("did:icn:executor-e", 0.2),  // Very low trust (below MIN_TRUST_EXECUTE = 0.3, should reject)
+            ("did:icn:executor-a", 0.9), // Highest trust
+            ("did:icn:executor-b", 0.7), // Medium trust
+            ("did:icn:executor-c", 0.5), // Low trust (but above MIN_TRUST_EXECUTE = 0.3)
+            ("did:icn:executor-d", 0.8), // High trust
+            ("did:icn:executor-e", 0.2), // Very low trust (below MIN_TRUST_EXECUTE = 0.3, should reject)
         ];
 
         // Spawn all executors
@@ -2517,7 +2630,10 @@ mod tests {
         tracing::info!("Broadcasting PlacementRequest to all executors");
         for (did, handle) in &executor_handles {
             tracing::debug!(executor = %did, "Sending PlacementRequest");
-            handle.handle_gossip(placement_request.clone()).await.unwrap();
+            handle
+                .handle_gossip(placement_request.clone())
+                .await
+                .unwrap();
         }
 
         // Wait for deliberation window (500ms) + grace period (500ms) + processing time
@@ -2563,9 +2679,9 @@ mod tests {
         );
 
         // Find the highest score
-        let highest = offers.iter().max_by(|a, b| {
-            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        let highest = offers
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
         if let Some((winner_did, winner_score)) = highest {
             tracing::info!(
@@ -2681,19 +2797,51 @@ mod tests {
 
         // Score all executors
         let offer_a = policy
-            .score_task(&task_hash, &profile, "submitter", &node_a, 0.8, &no_hints, &locality_a)
+            .score_task(
+                &task_hash,
+                &profile,
+                "submitter",
+                &node_a,
+                0.8,
+                &no_hints,
+                &locality_a,
+            )
             .unwrap();
 
         let offer_b = policy
-            .score_task(&task_hash, &profile, "submitter", &node_b, 0.6, &no_hints, &locality_b)
+            .score_task(
+                &task_hash,
+                &profile,
+                "submitter",
+                &node_b,
+                0.6,
+                &no_hints,
+                &locality_b,
+            )
             .unwrap();
 
         let offer_c = policy
-            .score_task(&task_hash, &profile, "submitter", &node_c, 0.6, &no_hints, &locality_c)
+            .score_task(
+                &task_hash,
+                &profile,
+                "submitter",
+                &node_c,
+                0.6,
+                &no_hints,
+                &locality_c,
+            )
             .unwrap();
 
         let offer_d = policy
-            .score_task(&task_hash, &profile, "submitter", &node_d, 0.4, &no_hints, &locality_d)
+            .score_task(
+                &task_hash,
+                &profile,
+                "submitter",
+                &node_d,
+                0.4,
+                &no_hints,
+                &locality_d,
+            )
             .unwrap();
 
         tracing::info!("=== Phase 16C Locality-Aware Placement Scoring ===");
@@ -2770,7 +2918,8 @@ mod tests {
         use tokio::sync::Mutex as TokioMutex;
 
         // Track migration messages
-        let messages_collected: Arc<TokioMutex<Vec<ComputeMessage>>> = Arc::new(TokioMutex::new(vec![]));
+        let messages_collected: Arc<TokioMutex<Vec<ComputeMessage>>> =
+            Arc::new(TokioMutex::new(vec![]));
 
         // Create two executors
         let executor_a_keypair = icn_identity::KeyPair::generate().unwrap();
@@ -2852,7 +3001,8 @@ mod tests {
         };
 
         // Sign checkpoint
-        let signing_key_a = ed25519_dalek::SigningKey::from_bytes(&executor_a_keypair.to_signing_key_bytes());
+        let signing_key_a =
+            ed25519_dalek::SigningKey::from_bytes(&executor_a_keypair.to_signing_key_bytes());
         checkpoint.sign(&signing_key_a);
 
         // Store initial checkpoint on A
@@ -2919,7 +3069,9 @@ mod tests {
         };
 
         // Evaluate migration
-        let decision = manager_a.evaluate_migration(actor_runtime_state, &network_state).await;
+        let decision = manager_a
+            .evaluate_migration(actor_runtime_state, &network_state)
+            .await;
 
         assert!(decision.is_some(), "Migration should be recommended");
         let decision = decision.unwrap();
@@ -2935,7 +3087,10 @@ mod tests {
         assert_eq!(decision.target_executor, executor_b_did);
 
         // Initiate migration from A
-        manager_a.initiate_migration(decision, &signing_key_a).await.unwrap();
+        manager_a
+            .initiate_migration(decision, &signing_key_a)
+            .await
+            .unwrap();
 
         // Give time for message to be sent
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -2952,14 +3107,18 @@ mod tests {
                 to_executor,
                 checkpoint: ckpt,
                 reason,
-            } = msg {
+            } = msg
+            {
                 Some((aid, from_executor, to_executor, ckpt, reason))
             } else {
                 None
             }
         });
 
-        assert!(migration_request.is_some(), "Should have MigrationRequest message");
+        assert!(
+            migration_request.is_some(),
+            "Should have MigrationRequest message"
+        );
         let (aid, from, to, ckpt, reason) = migration_request.unwrap();
 
         assert_eq!(aid, &actor_id);
@@ -2991,14 +3150,21 @@ mod tests {
         // Check for MigrationAccept message
         let messages = messages_collected.lock().await;
         let migration_accept = messages.iter().find_map(|msg| {
-            if let ComputeMessage::MigrationAccept { actor_id: aid, to_executor } = msg {
+            if let ComputeMessage::MigrationAccept {
+                actor_id: aid,
+                to_executor,
+            } = msg
+            {
                 Some((aid, to_executor))
             } else {
                 None
             }
         });
 
-        assert!(migration_accept.is_some(), "Should have MigrationAccept message");
+        assert!(
+            migration_accept.is_some(),
+            "Should have MigrationAccept message"
+        );
         let (aid, to) = migration_accept.unwrap();
 
         assert_eq!(aid, &actor_id);

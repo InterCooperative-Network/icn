@@ -217,7 +217,9 @@ impl Discovery {
 
         // Unregister service
         if let Some(daemon) = self.daemon.take() {
-            daemon.shutdown().context("Failed to shutdown mDNS daemon")?;
+            daemon
+                .shutdown()
+                .context("Failed to shutdown mDNS daemon")?;
         }
 
         // Clear peers

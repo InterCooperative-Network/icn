@@ -25,7 +25,8 @@ pub async fn get_balance(
     let (coop_id, did_str) = path.into_inner();
     require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop privacy leaks
 
-    let did = did_str.parse()
+    let did = did_str
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let balances = ledger_mgr.get_all_balances(&coop_id, &did)?;
@@ -55,8 +56,9 @@ pub async fn create_payment(
 
     // CRITICAL: Verify authenticated DID matches payment sender
     // Prevents users from creating payments from other accounts
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
     if claims.sub != req.from {
         return Err(crate::error::GatewayError::AuthorizationFailed(
@@ -65,16 +67,20 @@ pub async fn create_payment(
         ));
     }
 
-    let from = req.from.parse()
+    let from = req
+        .from
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid from DID: {e}")))?;
 
-    let to = req.to.parse()
+    let to = req
+        .to
+        .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid to DID: {e}")))?;
 
     // Prevent self-payments (spam/bloat prevention)
     if from == to {
         return Err(crate::error::GatewayError::BadRequest(
-            "Self-payments not allowed (sender and recipient cannot be the same)".to_string()
+            "Self-payments not allowed (sender and recipient cannot be the same)".to_string(),
         ));
     }
 
@@ -83,13 +89,7 @@ pub async fn create_payment(
     validation::validate_currency(&req.currency)?;
     validation::validate_memo(&req.memo)?;
 
-    let hash = ledger_mgr.create_payment(
-        &coop_id,
-        &from,
-        &to,
-        req.amount,
-        req.currency.clone(),
-    )?;
+    let hash = ledger_mgr.create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())?;
 
     // Track payment creation metrics
     gateway::payments_created_inc();
@@ -117,18 +117,23 @@ pub async fn get_history(
     require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop privacy leaks
 
     let filter_did = if let Some(did_str) = query.get("did") {
-        Some(did_str.parse()
-            .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?)
+        Some(
+            did_str
+                .parse()
+                .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?,
+        )
     } else {
         None
     };
 
     // Parse pagination parameters
-    let offset: usize = query.get("offset")
+    let offset: usize = query
+        .get("offset")
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
 
-    let limit: usize = query.get("limit")
+    let limit: usize = query
+        .get("limit")
         .and_then(|s| s.parse().ok())
         .unwrap_or(validation::DEFAULT_HISTORY_LIMIT);
 
@@ -172,8 +177,8 @@ pub async fn get_history(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App, HttpMessage};
     use crate::auth::TokenClaims;
+    use actix_web::{test, App, HttpMessage};
     use icn_identity::IdentityBundle;
 
     #[actix_web::test]
@@ -188,9 +193,10 @@ mod tests {
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
-                        .service(get_balance)
-                )
-        ).await;
+                        .service(get_balance),
+                ),
+        )
+        .await;
 
         // Create payment with authorization
         let req_body = CreatePaymentRequest {
@@ -228,9 +234,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let req = test::TestRequest::get()
-            .uri(&uri)
-            .to_request();
+        let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims);
 
         let resp: BalanceResponse = test::call_and_read_body_json(&app, req).await;
@@ -244,22 +248,22 @@ mod tests {
         let bob = IdentityBundle::generate().unwrap();
 
         // Create payment directly
-        ledger_mgr.create_payment(
-            &"test-coop".to_string(),
-            alice.did(),
-            bob.did(),
-            10,
-            "hours".to_string(),
-        ).unwrap();
+        ledger_mgr
+            .create_payment(
+                &"test-coop".to_string(),
+                alice.did(),
+                bob.did(),
+                10,
+                "hours".to_string(),
+            )
+            .unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(
-                    web::scope("/ledger")
-                        .service(get_history)
-                )
-        ).await;
+                .service(web::scope("/ledger").service(get_history)),
+        )
+        .await;
 
         // Get history with authorization (uses default pagination)
         let claims = TokenClaims {
@@ -281,9 +285,7 @@ mod tests {
 
         // Get history filtered by Alice with authorization
         let uri = format!("/ledger/test-coop/history?did={}", alice.did());
-        let req = test::TestRequest::get()
-            .uri(&uri)
-            .to_request();
+        let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims.clone());
 
         let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
@@ -291,9 +293,7 @@ mod tests {
 
         // Test pagination parameters
         let uri = "/ledger/test-coop/history?offset=0&limit=10";
-        let req = test::TestRequest::get()
-            .uri(uri)
-            .to_request();
+        let req = test::TestRequest::get().uri(uri).to_request();
         req.extensions_mut().insert(claims.clone());
 
         let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
@@ -301,9 +301,7 @@ mod tests {
 
         // Test offset beyond available entries
         let uri = "/ledger/test-coop/history?offset=100&limit=10";
-        let req = test::TestRequest::get()
-            .uri(uri)
-            .to_request();
+        let req = test::TestRequest::get().uri(uri).to_request();
         req.extensions_mut().insert(claims);
 
         let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
@@ -321,9 +319,10 @@ mod tests {
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
-                        .service(get_balance)
-                )
-        ).await;
+                        .service(get_balance),
+                ),
+        )
+        .await;
 
         // Try to create payment with only "ledger:read" scope (should fail)
         let req_body = CreatePaymentRequest {
@@ -361,9 +360,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let req = test::TestRequest::get()
-            .uri(&uri)
-            .to_request();
+        let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
@@ -380,15 +377,13 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(
-                    web::scope("/ledger")
-                        .service(create_payment)
-                )
-        ).await;
+                .service(web::scope("/ledger").service(create_payment)),
+        )
+        .await;
 
         // Alice tries to create payment from Bob's account (should fail)
         let req_body = CreatePaymentRequest {
-            from: bob.did().to_string(),  // Bob's account
+            from: bob.did().to_string(), // Bob's account
             to: charlie.did().to_string(),
             amount: 10,
             currency: "hours".to_string(),
@@ -420,13 +415,15 @@ mod tests {
         let bob = IdentityBundle::generate().unwrap();
 
         // Create payment in coop-food
-        let _ = ledger_mgr.create_payment(
-            &"coop-food".to_string(),
-            alice.did(),
-            bob.did(),
-            50,
-            "hours".to_string(),
-        ).unwrap();
+        let _ = ledger_mgr
+            .create_payment(
+                &"coop-food".to_string(),
+                alice.did(),
+                bob.did(),
+                50,
+                "hours".to_string(),
+            )
+            .unwrap();
 
         let app = test::init_service(
             App::new()
@@ -435,9 +432,10 @@ mod tests {
                     web::scope("/ledger")
                         .service(create_payment)
                         .service(get_balance)
-                        .service(get_history)
-                )
-        ).await;
+                        .service(get_history),
+                ),
+        )
+        .await;
 
         // Alice tries to create payment in coop-tech using coop-food token (should fail)
         let payment_req = CreatePaymentRequest {
@@ -475,9 +473,7 @@ mod tests {
         };
 
         let uri = format!("/ledger/coop-tech/balance/{}", bob.did()); // Accessing coop-tech
-        let req = test::TestRequest::get()
-            .uri(&uri)
-            .to_request();
+        let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims.clone());
 
         let resp = test::call_service(&app, req).await;
@@ -501,11 +497,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(
-                    web::scope("/ledger")
-                        .service(create_payment)
-                )
-        ).await;
+                .service(web::scope("/ledger").service(create_payment)),
+        )
+        .await;
 
         // Alice tries to pay herself (should fail)
         let req_body = CreatePaymentRequest {

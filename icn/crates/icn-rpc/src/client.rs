@@ -3,7 +3,10 @@
 use anyhow::{Context, Result};
 use std::net::SocketAddr;
 
-use crate::types::{ContractExecutionResponse, ContractInfo, LedgerBalance, LedgerEntry, NetworkStats, NetworkStatus, PeerInfo, RpcRequest, RpcResponse};
+use crate::types::{
+    ContractExecutionResponse, ContractInfo, LedgerBalance, LedgerEntry, NetworkStats,
+    NetworkStatus, PeerInfo, RpcRequest, RpcResponse,
+};
 
 /// RPC client for daemon communication
 pub struct RpcClient {
@@ -55,8 +58,8 @@ impl RpcClient {
     /// Get list of discovered peers
     pub async fn get_peers(&mut self) -> Result<Vec<PeerInfo>> {
         let result = self.call("network.peers", serde_json::json!({})).await?;
-        let peers: Vec<PeerInfo> = serde_json::from_value(result)
-            .context("Failed to deserialize peers")?;
+        let peers: Vec<PeerInfo> =
+            serde_json::from_value(result).context("Failed to deserialize peers")?;
         Ok(peers)
     }
 
@@ -73,16 +76,16 @@ impl RpcClient {
     /// Get network statistics
     pub async fn get_stats(&mut self) -> Result<NetworkStats> {
         let result = self.call("network.stats", serde_json::json!({})).await?;
-        let stats: NetworkStats = serde_json::from_value(result)
-            .context("Failed to deserialize stats")?;
+        let stats: NetworkStats =
+            serde_json::from_value(result).context("Failed to deserialize stats")?;
         Ok(stats)
     }
 
     /// Get network status
     pub async fn get_status(&mut self) -> Result<NetworkStatus> {
         let result = self.call("network.status", serde_json::json!({})).await?;
-        let status: NetworkStatus = serde_json::from_value(result)
-            .context("Failed to deserialize status")?;
+        let status: NetworkStatus =
+            serde_json::from_value(result).context("Failed to deserialize status")?;
         Ok(status)
     }
 
@@ -92,15 +95,19 @@ impl RpcClient {
         if result.is_null() {
             Ok(None)
         } else {
-            let entry: LedgerEntry = serde_json::from_value(result)
-                .context("Failed to deserialize ledger entry")?;
+            let entry: LedgerEntry =
+                serde_json::from_value(result).context("Failed to deserialize ledger entry")?;
             Ok(Some(entry))
         }
     }
 
     /// Get balance for an account
     /// If currency is provided, returns single balance; otherwise returns all balances
-    pub async fn get_ledger_balance(&mut self, account_id: String, currency: Option<String>) -> Result<Vec<LedgerBalance>> {
+    pub async fn get_ledger_balance(
+        &mut self,
+        account_id: String,
+        currency: Option<String>,
+    ) -> Result<Vec<LedgerBalance>> {
         let params = if let Some(curr) = currency {
             serde_json::json!({
                 "account_id": account_id,
@@ -116,12 +123,12 @@ impl RpcClient {
 
         // Result can be a single balance or array of balances
         if result.is_array() {
-            let balances: Vec<LedgerBalance> = serde_json::from_value(result)
-                .context("Failed to deserialize balances")?;
+            let balances: Vec<LedgerBalance> =
+                serde_json::from_value(result).context("Failed to deserialize balances")?;
             Ok(balances)
         } else {
-            let balance: LedgerBalance = serde_json::from_value(result)
-                .context("Failed to deserialize balance")?;
+            let balance: LedgerBalance =
+                serde_json::from_value(result).context("Failed to deserialize balance")?;
             Ok(vec![balance])
         }
     }
@@ -135,14 +142,15 @@ impl RpcClient {
         };
 
         let result = self.call("ledger.history", params).await?;
-        let entries: Vec<LedgerEntry> = serde_json::from_value(result)
-            .context("Failed to deserialize ledger entries")?;
+        let entries: Vec<LedgerEntry> =
+            serde_json::from_value(result).context("Failed to deserialize ledger entries")?;
         Ok(entries)
     }
 
     /// List all quarantined ledger entries
     pub async fn quarantine_list(&mut self) -> Result<serde_json::Value> {
-        self.call("ledger.quarantine.list", serde_json::json!({})).await
+        self.call("ledger.quarantine.list", serde_json::json!({}))
+            .await
     }
 
     /// Get detailed info about a quarantined entry
@@ -171,7 +179,8 @@ impl RpcClient {
 
     /// Purge all expired quarantined entries
     pub async fn quarantine_purge(&mut self) -> Result<serde_json::Value> {
-        self.call("ledger.quarantine.purge", serde_json::json!({})).await
+        self.call("ledger.quarantine.purge", serde_json::json!({}))
+            .await
     }
 
     /// Deploy a contract with signed deployment message
@@ -215,8 +224,8 @@ impl RpcClient {
     /// List deployed contracts
     pub async fn list_contracts(&mut self) -> Result<Vec<ContractInfo>> {
         let result = self.call("contract.list", serde_json::json!({})).await?;
-        let contracts: Vec<ContractInfo> = serde_json::from_value(result)
-            .context("Failed to deserialize contracts")?;
+        let contracts: Vec<ContractInfo> =
+            serde_json::from_value(result).context("Failed to deserialize contracts")?;
         Ok(contracts)
     }
 }

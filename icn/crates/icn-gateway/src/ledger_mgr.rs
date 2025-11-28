@@ -55,7 +55,9 @@ impl LedgerManager {
         // This prevents attacks like coop_id = "../../etc/passwd" from accessing arbitrary files
         crate::validation::validate_coop_id(coop_id)?;
 
-        let ledgers = self.ledgers.read()
+        let ledgers = self
+            .ledgers
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         if let Some(ledger) = ledgers.get(coop_id) {
@@ -65,7 +67,9 @@ impl LedgerManager {
         drop(ledgers); // Release read lock
 
         // Create new ledger
-        let mut ledgers = self.ledgers.write()
+        let mut ledgers = self
+            .ledgers
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         // Double-check pattern (another thread might have created it)
@@ -78,16 +82,13 @@ impl LedgerManager {
             // Use persistent storage with coop-specific subdirectory
             // coop_id has been validated above to only contain alphanumeric, hyphens, underscores
             let coop_ledger_path = data_dir.join("ledgers").join(coop_id);
-            Arc::new(SledStore::open(&coop_ledger_path)
-                .map_err(GatewayError::SubstrateError)?)
+            Arc::new(SledStore::open(&coop_ledger_path).map_err(GatewayError::SubstrateError)?)
         } else {
             // Use temporary storage (for testing)
-            Arc::new(SledStore::temporary()
-                .map_err(GatewayError::SubstrateError)?)
+            Arc::new(SledStore::temporary().map_err(GatewayError::SubstrateError)?)
         };
 
-        let ledger = Ledger::new(store)
-            .map_err(GatewayError::SubstrateError)?;
+        let ledger = Ledger::new(store).map_err(GatewayError::SubstrateError)?;
 
         let ledger_arc = Arc::new(RwLock::new(ledger));
         ledgers.insert(coop_id.clone(), ledger_arc.clone());
@@ -114,10 +115,12 @@ impl LedgerManager {
             .map_err(GatewayError::SubstrateError)?;
 
         // Append to ledger
-        let mut ledger = ledger_arc.write()
+        let mut ledger = ledger_arc
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-        let hash = ledger.append_entry(entry)
+        let hash = ledger
+            .append_entry(entry)
             .map_err(GatewayError::SubstrateError)?;
 
         let hash_str = hash.to_hex();
@@ -145,7 +148,8 @@ impl LedgerManager {
     /// Get balance for an account
     pub fn get_balance(&self, coop_id: &CoopId, did: &Did, currency: &str) -> Result<i64> {
         let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc.read()
+        let ledger = ledger_arc
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         Ok(ledger.get_balance(did, currency))
@@ -154,7 +158,8 @@ impl LedgerManager {
     /// Get all balances for an account
     pub fn get_all_balances(&self, coop_id: &CoopId, did: &Did) -> Result<HashMap<String, i64>> {
         let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc.read()
+        let ledger = ledger_arc
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let account_balances = ledger.get_account_balances(did);
@@ -177,21 +182,21 @@ impl LedgerManager {
         limit: usize,
     ) -> Result<Vec<icn_ledger::JournalEntry>> {
         let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc.read()
+        let ledger = ledger_arc
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         // SECURITY: We still load all entries here because the underlying ledger
         // API doesn't support pagination. This is a known limitation.
         // The pagination happens AFTER loading to at least limit what's returned.
         // A full fix would require updating icn-ledger to support cursor-based queries.
-        let mut entries = ledger.get_all_entries()
+        let mut entries = ledger
+            .get_all_entries()
             .map_err(GatewayError::SubstrateError)?;
 
         // Filter by DID if requested
         if let Some(did) = filter_did {
-            entries.retain(|entry| {
-                entry.accounts.iter().any(|delta| &delta.account_id == did)
-            });
+            entries.retain(|entry| entry.accounts.iter().any(|delta| &delta.account_id == did));
         }
 
         // Apply pagination
@@ -218,22 +223,28 @@ mod tests {
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
-        let hash = mgr.create_payment(
-            &"test-coop".to_string(),
-            alice.did(),
-            bob.did(),
-            10,
-            "hours".to_string(),
-        ).unwrap();
+        let hash = mgr
+            .create_payment(
+                &"test-coop".to_string(),
+                alice.did(),
+                bob.did(),
+                10,
+                "hours".to_string(),
+            )
+            .unwrap();
 
         assert!(!hash.is_empty());
 
         // Check balances
-        let alice_balance = mgr.get_balance(&"test-coop".to_string(), alice.did(), "hours").unwrap();
-        let bob_balance = mgr.get_balance(&"test-coop".to_string(), bob.did(), "hours").unwrap();
+        let alice_balance = mgr
+            .get_balance(&"test-coop".to_string(), alice.did(), "hours")
+            .unwrap();
+        let bob_balance = mgr
+            .get_balance(&"test-coop".to_string(), bob.did(), "hours")
+            .unwrap();
 
-        assert_eq!(alice_balance, 10);  // Alice is owed 10 hours
-        assert_eq!(bob_balance, -10);   // Bob owes 10 hours
+        assert_eq!(alice_balance, 10); // Alice is owed 10 hours
+        assert_eq!(bob_balance, -10); // Bob owes 10 hours
     }
 
     #[test]
@@ -248,9 +259,12 @@ mod tests {
             bob.did(),
             10,
             "hours".to_string(),
-        ).unwrap();
+        )
+        .unwrap();
 
-        let balances = mgr.get_all_balances(&"test-coop".to_string(), alice.did()).unwrap();
+        let balances = mgr
+            .get_all_balances(&"test-coop".to_string(), alice.did())
+            .unwrap();
         assert_eq!(balances.get("hours"), Some(&10));
     }
 
@@ -266,23 +280,32 @@ mod tests {
             bob.did(),
             10,
             "hours".to_string(),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Get all history with pagination
-        let history = mgr.get_history(&"test-coop".to_string(), None, 0, 100).unwrap();
+        let history = mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .unwrap();
         assert_eq!(history.len(), 1);
 
         // Filter by Alice
-        let alice_history = mgr.get_history(&"test-coop".to_string(), Some(alice.did()), 0, 100).unwrap();
+        let alice_history = mgr
+            .get_history(&"test-coop".to_string(), Some(alice.did()), 0, 100)
+            .unwrap();
         assert_eq!(alice_history.len(), 1);
 
         // Filter by random DID (should be empty)
         let other = IdentityBundle::generate().unwrap();
-        let other_history = mgr.get_history(&"test-coop".to_string(), Some(other.did()), 0, 100).unwrap();
+        let other_history = mgr
+            .get_history(&"test-coop".to_string(), Some(other.did()), 0, 100)
+            .unwrap();
         assert_eq!(other_history.len(), 0);
 
         // Test pagination
-        let empty_page = mgr.get_history(&"test-coop".to_string(), None, 10, 100).unwrap();
+        let empty_page = mgr
+            .get_history(&"test-coop".to_string(), None, 10, 100)
+            .unwrap();
         assert_eq!(empty_page.len(), 0); // Offset beyond available entries
     }
 }

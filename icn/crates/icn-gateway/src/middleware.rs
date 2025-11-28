@@ -53,9 +53,9 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
     if !claims.scopes.contains(&required_scope.to_string()) {
         // Track authorization failure
         gateway::authorization_failures_inc(required_scope);
-        return Err(GatewayError::AuthorizationFailed(
-            format!("Missing required scope: {required_scope}")
-        ));
+        return Err(GatewayError::AuthorizationFailed(format!(
+            "Missing required scope: {required_scope}"
+        )));
     }
 
     Ok(())
@@ -68,10 +68,10 @@ pub fn require_coop_access(req: &HttpRequest, coop_id: &str) -> Result<(), Gatew
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
     if claims.coop_id != coop_id {
-        return Err(GatewayError::AuthorizationFailed(
-            format!("Access denied: token is for cooperative '{}', but requested access to '{}'",
-                claims.coop_id, coop_id)
-        ));
+        return Err(GatewayError::AuthorizationFailed(format!(
+            "Access denied: token is for cooperative '{}', but requested access to '{}'",
+            claims.coop_id, coop_id
+        )));
     }
 
     Ok(())
@@ -121,7 +121,8 @@ where
         // Raw path contains user-controlled values (coop_id, did) which could create millions of unique labels
         // Pattern normalizes: /ledger/test-coop/balance/did:icn:abc → /ledger/{coop_id}/balance/{did}
         // This prevents Prometheus OOM from unbounded metric cardinality
-        let path = req.match_pattern()
+        let path = req
+            .match_pattern()
             .unwrap_or_else(|| req.path().to_string());
 
         let fut = self.service.call(req);
@@ -158,12 +159,14 @@ mod tests {
         let nonce_bytes = hex::decode(&nonce).unwrap();
         let signature = bundle.keypair().sign(&nonce_bytes);
 
-        let token = auth.verify_challenge(
-            bundle.did(),
-            &signature.to_bytes(),
-            "test-coop",
-            vec!["ledger:read".to_string()],
-        ).unwrap();
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature.to_bytes(),
+                "test-coop",
+                vec!["ledger:read".to_string()],
+            )
+            .unwrap();
 
         // Verify the token directly
         let claims = auth.verify_token(&token).unwrap();
@@ -191,12 +194,9 @@ mod tests {
         let nonce_bytes = hex::decode(&nonce).unwrap();
         let signature = bundle.keypair().sign(&nonce_bytes);
 
-        let token = auth1.verify_challenge(
-            bundle.did(),
-            &signature.to_bytes(),
-            "test-coop",
-            vec![],
-        ).unwrap();
+        let token = auth1
+            .verify_challenge(bundle.did(), &signature.to_bytes(), "test-coop", vec![])
+            .unwrap();
 
         // Try to verify with different secret
         let result = auth2.verify_token(&token);

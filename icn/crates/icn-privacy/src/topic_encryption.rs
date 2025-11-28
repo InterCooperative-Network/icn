@@ -90,7 +90,13 @@ impl TopicEncryptor {
         let plaintext = topic.as_bytes();
         let ciphertext = self
             .cipher
-            .encrypt(&nonce, Payload { msg: plaintext, aad: b"" })
+            .encrypt(
+                &nonce,
+                Payload {
+                    msg: plaintext,
+                    aad: b"",
+                },
+            )
             .map_err(|e| PrivacyError::EncryptionFailed(e.to_string()))?;
 
         // Generate Bloom filter hint (hash of plaintext)
@@ -118,7 +124,13 @@ impl TopicEncryptor {
 
         let plaintext_bytes = self
             .cipher
-            .decrypt(&nonce, Payload { msg: &encrypted.ciphertext, aad: b"" })
+            .decrypt(
+                &nonce,
+                Payload {
+                    msg: &encrypted.ciphertext,
+                    aad: b"",
+                },
+            )
             .map_err(|e| PrivacyError::DecryptionFailed(e.to_string()))?;
 
         let topic = String::from_utf8(plaintext_bytes)
@@ -333,8 +345,16 @@ mod tests {
         let encryptor = TopicEncryptor::new(key);
 
         // Encrypt multiple topics
-        let topics = ["ledger:sync", "gossip:test", "contracts:deploy", "ledger:sync"];
-        let encrypted: Vec<_> = topics.iter().map(|t| encryptor.encrypt(t).unwrap()).collect();
+        let topics = [
+            "ledger:sync",
+            "gossip:test",
+            "contracts:deploy",
+            "ledger:sync",
+        ];
+        let encrypted: Vec<_> = topics
+            .iter()
+            .map(|t| encryptor.encrypt(t).unwrap())
+            .collect();
 
         // Find matches for "ledger:sync" (should find 2)
         let matches = encryptor.find_matches("ledger:sync", &encrypted);

@@ -100,7 +100,7 @@ impl GlobalRateLimiter {
             if now.duration_since(*start) >= Duration::from_secs(1) {
                 *start = now;
                 self.message_count.store(1, Ordering::Relaxed); // Count this message
-                true// First message in new window always allowed
+                true // First message in new window always allowed
             } else {
                 // Another thread reset the window
                 drop(start);
@@ -157,11 +157,17 @@ mod tests {
 
         // First 10 messages should be allowed
         for _ in 0..10 {
-            assert!(limiter.check().await, "Messages within limit should be allowed");
+            assert!(
+                limiter.check().await,
+                "Messages within limit should be allowed"
+            );
         }
 
         // 11th message should be denied
-        assert!(!limiter.check().await, "Message exceeding limit should be denied");
+        assert!(
+            !limiter.check().await,
+            "Message exceeding limit should be denied"
+        );
     }
 
     #[tokio::test]
@@ -180,7 +186,10 @@ mod tests {
         sleep(Duration::from_secs(1)).await;
 
         // Should be allowed again after window reset
-        assert!(limiter.check().await, "Messages should be allowed after window reset");
+        assert!(
+            limiter.check().await,
+            "Messages should be allowed after window reset"
+        );
     }
 
     #[tokio::test]
@@ -254,7 +263,10 @@ mod tests {
         }
 
         // 11th message should be denied
-        assert!(!limiter.check_sync(), "Message exceeding limit should be denied");
+        assert!(
+            !limiter.check_sync(),
+            "Message exceeding limit should be denied"
+        );
     }
 
     #[tokio::test]

@@ -108,12 +108,7 @@ pub enum RecoveryStatus {
 
 impl RecoveryEvent {
     /// Create a new recovery event
-    pub fn new(
-        old_did: Did,
-        new_did: Did,
-        threshold: usize,
-        delay_period: u64,
-    ) -> Self {
+    pub fn new(old_did: Did, new_did: Did, threshold: usize, delay_period: u64) -> Self {
         let initiated_at = current_timestamp();
 
         // Generate unique ID (hash of key fields)
@@ -171,7 +166,11 @@ impl RecoveryEvent {
         }
 
         // Check for duplicate trustee
-        if self.attestations.iter().any(|a| a.trustee == attestation.trustee) {
+        if self
+            .attestations
+            .iter()
+            .any(|a| a.trustee == attestation.trustee)
+        {
             bail!("Trustee {} has already attested", attestation.trustee);
         }
 
@@ -263,16 +262,17 @@ impl RecoveryEvent {
     /// Get progress summary
     pub fn progress_summary(&self) -> String {
         match &self.status {
-            RecoveryStatus::Pending { collected, needed: _ } => {
+            RecoveryStatus::Pending {
+                collected,
+                needed: _,
+            } => {
                 format!("Collecting attestations: {}/{}", collected, self.threshold)
             }
             RecoveryStatus::Delayed { expires_at } => {
                 let remaining = expires_at.saturating_sub(current_timestamp());
                 format!("Delay period: {remaining} seconds remaining")
             }
-            RecoveryStatus::ReadyToFinalize => {
-                "Ready to finalize".to_string()
-            }
+            RecoveryStatus::ReadyToFinalize => "Ready to finalize".to_string(),
             RecoveryStatus::Finalized => {
                 format!("Finalized at {}", self.finalized_at.unwrap_or(0))
             }
@@ -454,12 +454,7 @@ impl RecoveryMessage {
     }
 
     /// Create a "Cancelled" message from a recovery event
-    pub fn cancelled(
-        id: String,
-        cancelled_by: Did,
-        reason: String,
-        timestamp: u64,
-    ) -> Self {
+    pub fn cancelled(id: String, cancelled_by: Did, reason: String, timestamp: u64) -> Self {
         RecoveryMessage::Cancelled {
             id,
             cancelled_by,
@@ -481,13 +476,27 @@ impl RecoveryMessage {
     /// Get a human-readable summary of this message
     pub fn summary(&self) -> String {
         match self {
-            RecoveryMessage::Initiated { old_did, new_did, threshold, .. } => {
+            RecoveryMessage::Initiated {
+                old_did,
+                new_did,
+                threshold,
+                ..
+            } => {
                 format!("Recovery initiated: {old_did} → {new_did} ({threshold})")
             }
-            RecoveryMessage::Attestation { recovery_id, attestation, .. } => {
-                format!("Attestation from {} for recovery {}", attestation.trustee, recovery_id)
+            RecoveryMessage::Attestation {
+                recovery_id,
+                attestation,
+                ..
+            } => {
+                format!(
+                    "Attestation from {} for recovery {}",
+                    attestation.trustee, recovery_id
+                )
             }
-            RecoveryMessage::Finalized { old_did, new_did, .. } => {
+            RecoveryMessage::Finalized {
+                old_did, new_did, ..
+            } => {
                 format!("Recovery finalized: {old_did} → {new_did}")
             }
             RecoveryMessage::Cancelled { id, reason, .. } => {
@@ -729,13 +738,8 @@ mod tests {
         let old_did = old_kp.did().clone();
         let new_did = new_kp.did().clone();
 
-        let attestation = RecoveryAttestation::new(
-            &trustee,
-            old_did,
-            new_did,
-            "in-person".to_string(),
-        )
-        .unwrap();
+        let attestation =
+            RecoveryAttestation::new(&trustee, old_did, new_did, "in-person".to_string()).unwrap();
 
         // Verify with correct public key
         let result = attestation.verify(trustee.verifying_key());
@@ -821,13 +825,8 @@ mod tests {
 
         // Add one attestation
         let trustee = KeyPair::generate().unwrap();
-        let att = RecoveryAttestation::new(
-            &trustee,
-            old_did.clone(),
-            new_did,
-            "test".to_string(),
-        )
-        .unwrap();
+        let att = RecoveryAttestation::new(&trustee, old_did.clone(), new_did, "test".to_string())
+            .unwrap();
         recovery.add_attestation(att).unwrap();
 
         let summary = recovery.progress_summary();

@@ -2,7 +2,9 @@
 //!
 //! Demonstrates a time banking system where members exchange services measured in hours.
 
-use icn_ccl::{BinOp, Capability, Contract, ContractRuntime, ExecutionContext, Expr, Rule, Stmt, Value};
+use icn_ccl::{
+    BinOp, Capability, Contract, ContractRuntime, ExecutionContext, Expr, Rule, Stmt, Value,
+};
 use icn_identity::KeyPair;
 use icn_ledger::{ContentHash, Ledger};
 use icn_store::SledStore;
@@ -67,10 +69,11 @@ async fn main() -> anyhow::Result<()> {
         )
         // Rule: check_balance (returns sender's balance)
         .add_rule(
-            Rule::new("check_balance".to_string())
-                .add_stmt(Stmt::Return {
-                    value: Expr::Literal(Value::String("Balance check not yet implemented".to_string())),
-                }),
+            Rule::new("check_balance".to_string()).add_stmt(Stmt::Return {
+                value: Expr::Literal(Value::String(
+                    "Balance check not yet implemented".to_string(),
+                )),
+            }),
         );
 
     // Install contract
@@ -107,8 +110,14 @@ async fn main() -> anyhow::Result<()> {
     // Check balances
     let ledger_read = ledger.read().await;
     println!("\n  Balances after transaction:");
-    println!("    Alice: {} hours", ledger_read.get_balance(&alice, "hours"));
-    println!("    Bob:   {} hours\n", ledger_read.get_balance(&bob, "hours"));
+    println!(
+        "    Alice: {} hours",
+        ledger_read.get_balance(&alice, "hours")
+    );
+    println!(
+        "    Bob:   {} hours\n",
+        ledger_read.get_balance(&bob, "hours")
+    );
     drop(ledger_read);
 
     // Scenario: Bob provides 5 hours of carpentry to Charlie
@@ -137,9 +146,18 @@ async fn main() -> anyhow::Result<()> {
     // Check final balances
     let ledger_read = ledger.read().await;
     println!("\n  Final balances:");
-    println!("    Alice:   {} hours (earned 3)", ledger_read.get_balance(&alice, "hours"));
-    println!("    Bob:     {} hours (earned 5, spent 3)", ledger_read.get_balance(&bob, "hours"));
-    println!("    Charlie: {} hours (spent 5)", ledger_read.get_balance(&charlie, "hours"));
+    println!(
+        "    Alice:   {} hours (earned 3)",
+        ledger_read.get_balance(&alice, "hours")
+    );
+    println!(
+        "    Bob:     {} hours (earned 5, spent 3)",
+        ledger_read.get_balance(&bob, "hours")
+    );
+    println!(
+        "    Charlie: {} hours (spent 5)",
+        ledger_read.get_balance(&charlie, "hours")
+    );
 
     println!("\n=== TimeBank demonstration complete ===");
 

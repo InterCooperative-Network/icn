@@ -1,6 +1,9 @@
 //! Integration tests for contract deployment and execution across nodes
 
-use icn_ccl::{BinOp, Capability, Contract, ContractActor, ContractExecutionRequest, ContractInstallation, ContractRuntime, Expr, Rule, Stmt, Value};
+use icn_ccl::{
+    BinOp, Capability, Contract, ContractActor, ContractExecutionRequest, ContractInstallation,
+    ContractRuntime, Expr, Rule, Stmt, Value,
+};
 use icn_gossip::GossipActor;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_ledger::{ContentHash, Ledger};
@@ -95,10 +98,19 @@ impl TestNode {
         let our_did = did.clone();
         let incoming_handler: icn_net::IncomingMessageHandler = Arc::new(move |net_msg| {
             let sender_did = net_msg.from.clone();
-            eprintln!("[{}] Incoming message from {}: {:?}", our_did, sender_did, std::mem::discriminant(&net_msg.payload));
+            eprintln!(
+                "[{}] Incoming message from {}: {:?}",
+                our_did,
+                sender_did,
+                std::mem::discriminant(&net_msg.payload)
+            );
 
             if let icn_net::MessagePayload::Gossip(gossip_msg) = net_msg.payload {
-                eprintln!("[{}] Processing gossip message: {}", our_did, gossip_msg.variant_name());
+                eprintln!(
+                    "[{}] Processing gossip message: {}",
+                    our_did,
+                    gossip_msg.variant_name()
+                );
                 let gossip_handle = gossip_for_incoming.clone();
                 tokio::spawn(async move {
                     let mut gossip = gossip_handle.write().await;
@@ -128,44 +140,55 @@ impl TestNode {
             let network_handle_clone = network_handle.clone();
             let own_did_clone = did.clone();
 
-            let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient, gossip_msg| {
-                let net_handle = network_handle_clone.clone();
-                let from_did = own_did_clone.clone();
+            let send_callback: icn_gossip::SendMessageCallback =
+                Arc::new(move |recipient, gossip_msg| {
+                    let net_handle = network_handle_clone.clone();
+                    let from_did = own_did_clone.clone();
 
-                tokio::spawn(async move {
-                    let msg_type = match &gossip_msg {
-                        icn_gossip::GossipMessage::Announce { .. } => "Announce",
-                        icn_gossip::GossipMessage::Request { .. } => "Request",
-                        icn_gossip::GossipMessage::Response { .. } => "Response",
-                        icn_gossip::GossipMessage::RequestBloomFilter { .. } => "RequestBloomFilter",
-                        icn_gossip::GossipMessage::SendBloomFilter { .. } => "SendBloomFilter",
-                        icn_gossip::GossipMessage::RequestMissing { .. } => "RequestMissing",
-                        icn_gossip::GossipMessage::Digest { .. } => "Digest",
-                        icn_gossip::GossipMessage::PullRequest { .. } => "PullRequest",
-                        icn_gossip::GossipMessage::PullResponse { .. } => "PullResponse",
-                        icn_gossip::GossipMessage::BlobAnnounce { .. } => "BlobAnnounce",
-                        icn_gossip::GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
-                        icn_gossip::GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
-                        icn_gossip::GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
-                        icn_gossip::GossipMessage::PartitionHealRequest { .. } => "PartitionHealRequest",
-                        icn_gossip::GossipMessage::PartitionHealResponse { .. } => "PartitionHealResponse",
-                    };
+                    tokio::spawn(async move {
+                        let msg_type = match &gossip_msg {
+                            icn_gossip::GossipMessage::Announce { .. } => "Announce",
+                            icn_gossip::GossipMessage::Request { .. } => "Request",
+                            icn_gossip::GossipMessage::Response { .. } => "Response",
+                            icn_gossip::GossipMessage::RequestBloomFilter { .. } => {
+                                "RequestBloomFilter"
+                            }
+                            icn_gossip::GossipMessage::SendBloomFilter { .. } => "SendBloomFilter",
+                            icn_gossip::GossipMessage::RequestMissing { .. } => "RequestMissing",
+                            icn_gossip::GossipMessage::Digest { .. } => "Digest",
+                            icn_gossip::GossipMessage::PullRequest { .. } => "PullRequest",
+                            icn_gossip::GossipMessage::PullResponse { .. } => "PullResponse",
+                            icn_gossip::GossipMessage::BlobAnnounce { .. } => "BlobAnnounce",
+                            icn_gossip::GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
+                            icn_gossip::GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
+                            icn_gossip::GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
+                            icn_gossip::GossipMessage::PartitionHealRequest { .. } => {
+                                "PartitionHealRequest"
+                            }
+                            icn_gossip::GossipMessage::PartitionHealResponse { .. } => {
+                                "PartitionHealResponse"
+                            }
+                        };
 
-                    let result = if let Some(target_did) = recipient {
-                        eprintln!("Sending {msg_type} from {from_did} to {target_did}");
-                        let net_msg = icn_net::NetworkMessage::gossip(from_did.clone(), Some(target_did.clone()), gossip_msg);
-                        net_handle.send_message(target_did, net_msg).await
-                    } else {
-                        // Skip broadcast in tests - we don't have peer tracking
-                        eprintln!("Skipping broadcast {msg_type} from {from_did}");
-                        return;
-                    };
-                    match result {
-                        Ok(_) => eprintln!("✓ {msg_type} sent successfully"),
-                        Err(e) => eprintln!("✗ Failed to send {msg_type}: {e}"),
-                    }
+                        let result = if let Some(target_did) = recipient {
+                            eprintln!("Sending {msg_type} from {from_did} to {target_did}");
+                            let net_msg = icn_net::NetworkMessage::gossip(
+                                from_did.clone(),
+                                Some(target_did.clone()),
+                                gossip_msg,
+                            );
+                            net_handle.send_message(target_did, net_msg).await
+                        } else {
+                            // Skip broadcast in tests - we don't have peer tracking
+                            eprintln!("Skipping broadcast {msg_type} from {from_did}");
+                            return;
+                        };
+                        match result {
+                            Ok(_) => eprintln!("✓ {msg_type} sent successfully"),
+                            Err(e) => eprintln!("✗ Failed to send {msg_type}: {e}"),
+                        }
+                    });
                 });
-            });
 
             gossip.set_send_callback(send_callback);
         }
@@ -175,42 +198,55 @@ impl TestNode {
             let mut gossip = gossip_handle.write().await;
             let contract_actor_for_notifications = contract_actor_handle.clone();
             let own_did = did.clone();
-            let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, subscriber_did| {
-                eprintln!("[{own_did}] Notification callback: topic={topic}, subscriber={subscriber_did}");
-                if topic == "contracts:deploy" {
-                    let contract_actor = contract_actor_for_notifications.clone();
-                    // Use get_data() to handle decompression if needed
-                    let entry_data = match entry.get_data() {
-                        Ok(data) => {
-                            eprintln!("[{}] Got entry data: {} bytes", subscriber_did, data.len());
-                            data
-                        }
-                        Err(e) => {
-                            eprintln!("[{subscriber_did}] Failed to get entry data: {e}");
-                            return;
-                        }
-                    };
-
-                    tokio::spawn(async move {
-                        eprintln!("[{subscriber_did}] Spawned task to handle deployment");
-                        match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
-                            Ok(deployment_msg) => {
-                                eprintln!("[{}] Deserialized deployment message for contract: {}", subscriber_did, deployment_msg.contract.name);
-                                let actor = contract_actor.write().await;
-                                eprintln!("[{subscriber_did}] Got contract actor lock, calling handle_deployment_message");
-                                if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
-                                    eprintln!("[{subscriber_did}] ✗ Failed to handle contract deployment: {e}");
-                                } else {
-                                    eprintln!("[{subscriber_did}] ✓ Contract deployment handled successfully");
-                                }
+            let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(
+                move |topic, entry, subscriber_did| {
+                    eprintln!("[{own_did}] Notification callback: topic={topic}, subscriber={subscriber_did}");
+                    if topic == "contracts:deploy" {
+                        let contract_actor = contract_actor_for_notifications.clone();
+                        // Use get_data() to handle decompression if needed
+                        let entry_data = match entry.get_data() {
+                            Ok(data) => {
+                                eprintln!(
+                                    "[{}] Got entry data: {} bytes",
+                                    subscriber_did,
+                                    data.len()
+                                );
+                                data
                             }
                             Err(e) => {
-                                eprintln!("[{subscriber_did}] ✗ Failed to deserialize contract deployment: {e}");
+                                eprintln!("[{subscriber_did}] Failed to get entry data: {e}");
+                                return;
                             }
-                        }
-                    });
-                }
-            });
+                        };
+
+                        tokio::spawn(async move {
+                            eprintln!("[{subscriber_did}] Spawned task to handle deployment");
+                            match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(
+                                &entry_data,
+                            ) {
+                                Ok(deployment_msg) => {
+                                    eprintln!(
+                                        "[{}] Deserialized deployment message for contract: {}",
+                                        subscriber_did, deployment_msg.contract.name
+                                    );
+                                    let actor = contract_actor.write().await;
+                                    eprintln!("[{subscriber_did}] Got contract actor lock, calling handle_deployment_message");
+                                    if let Err(e) =
+                                        actor.handle_deployment_message(deployment_msg).await
+                                    {
+                                        eprintln!("[{subscriber_did}] ✗ Failed to handle contract deployment: {e}");
+                                    } else {
+                                        eprintln!("[{subscriber_did}] ✓ Contract deployment handled successfully");
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("[{subscriber_did}] ✗ Failed to deserialize contract deployment: {e}");
+                                }
+                            }
+                        });
+                    }
+                },
+            );
 
             gossip.set_notification_callback(notification_callback);
 
@@ -248,11 +284,11 @@ impl TestNode {
         &self,
         contract: Contract,
         capabilities: Vec<Capability>,
-        other_participants: Vec<&TestNode>,  // Other participant nodes to collect signatures from
+        other_participants: Vec<&TestNode>, // Other participant nodes to collect signatures from
         announce_to: Vec<&icn_identity::Did>,
     ) -> anyhow::Result<ContentHash> {
         // Compute code hash (must match ContractActor::compute_code_hash)
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -265,10 +301,8 @@ impl TestNode {
             .as_secs();
 
         // Generate deployer signature
-        let signing_bytes = icn_ccl::ContractDeploymentMessage::compute_signing_bytes(
-            &code_hash,
-            installed_at,
-        );
+        let signing_bytes =
+            icn_ccl::ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let deployer_signature = self.keypair.sign(&signing_bytes);
 
         // Collect signatures from all participants (Phase 10C)
@@ -277,7 +311,10 @@ impl TestNode {
         // Add signatures from other participants
         for participant_node in &other_participants {
             let participant_signature = participant_node.keypair.sign(&signing_bytes);
-            signatures.push((participant_node.did.clone(), participant_signature.to_bytes().to_vec()));
+            signatures.push((
+                participant_node.did.clone(),
+                participant_signature.to_bytes().to_vec(),
+            ));
         }
 
         let installation = ContractInstallation {
@@ -285,14 +322,20 @@ impl TestNode {
             installed_by: self.did.clone(),
             capabilities,
             participants: contract.participants.clone(),
-            signatures,  // Now contains all participant signatures
+            signatures, // Now contains all participant signatures
             installed_at,
             min_caller_trust: None,
         };
 
         // Deploy locally first
         let actor = self.contract_actor.read().await;
-        let result_hash = actor.deploy_contract(contract.clone(), installation.clone(), deployer_signature.to_bytes().to_vec()).await?;
+        let result_hash = actor
+            .deploy_contract(
+                contract.clone(),
+                installation.clone(),
+                deployer_signature.to_bytes().to_vec(),
+            )
+            .await?;
 
         // Publish deployment message to gossip for distribution
         let deployment_msg = icn_ccl::ContractDeploymentMessage {
@@ -308,14 +351,22 @@ impl TestNode {
         let (hash, clock) = {
             let mut gossip = self.gossip_handle.write().await;
             let hash = gossip.publish("contracts:deploy", message_bytes)?;
-            let entry = gossip.get_entry("contracts:deploy", &hash)
+            let entry = gossip
+                .get_entry("contracts:deploy", &hash)
                 .ok_or_else(|| anyhow::anyhow!("Published entry not found"))?;
             (hash, entry.clock)
         };
 
         // Send Announce message to each connected peer
         for peer_did in announce_to {
-            eprintln!("Sending Announce for contract {} to {}", hash.iter().take(8).map(|b| format!("{b:02x}")).collect::<String>(), peer_did);
+            eprintln!(
+                "Sending Announce for contract {} to {}",
+                hash.iter()
+                    .take(8)
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>(),
+                peer_did
+            );
             let announce_msg = icn_gossip::GossipMessage::Announce {
                 hash,
                 author: self.did.clone(),
@@ -325,9 +376,13 @@ impl TestNode {
             let net_msg = icn_net::NetworkMessage::gossip(
                 self.did.clone(),
                 Some(peer_did.clone()),
-                announce_msg
+                announce_msg,
             );
-            match self.network_handle.send_message(peer_did.clone(), net_msg).await {
+            match self
+                .network_handle
+                .send_message(peer_did.clone(), net_msg)
+                .await
+            {
                 Ok(_) => eprintln!("✓ Announce sent successfully to {peer_did}"),
                 Err(e) => {
                     eprintln!("✗ Failed to send Announce to {peer_did}: {e}");
@@ -375,20 +430,28 @@ async fn test_two_node_contract_deployment() {
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     // Note: Trust graph applies 70% direct + 30% transitive weighting
-    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+    node_a
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from A");
+    node_b
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from B");
 
     // Connect nodes bidirectionally
     // Node A dials Node B
     let addr_b: std::net::SocketAddr = "127.0.0.1:19002".parse().unwrap();
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
     // Node B dials Node A
     let addr_a: std::net::SocketAddr = "127.0.0.1:19001".parse().unwrap();
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial node A");
@@ -401,12 +464,9 @@ async fn test_two_node_contract_deployment() {
     let contract = Contract::new("TestContract".to_string())
         .add_participant(node_a.did.clone())
         .add_participant(node_b.did.clone())
-        .add_rule(
-            Rule::new("noop".to_string())
-                .add_stmt(Stmt::Return {
-                    value: Expr::Literal(Value::Bool(true)),
-                }),
-        );
+        .add_rule(Rule::new("noop".to_string()).add_stmt(Stmt::Return {
+            value: Expr::Literal(Value::Bool(true)),
+        }));
 
     // Deploy from node A (with node B's signature collected)
     let code_hash = node_a
@@ -428,7 +488,10 @@ async fn test_two_node_contract_deployment() {
         contracts_b = node_b.list_contracts().await;
 
         if !contracts_a.is_empty() && !contracts_b.is_empty() {
-            println!("✓ Contracts propagated after {attempt} attempts (~{}ms)", attempt * 200);
+            println!(
+                "✓ Contracts propagated after {attempt} attempts (~{}ms)",
+                attempt * 200
+            );
             break;
         }
 
@@ -443,7 +506,11 @@ async fn test_two_node_contract_deployment() {
     assert_eq!(contracts_a[0].name, "TestContract");
 
     // Verify node B received the contract
-    assert_eq!(contracts_b.len(), 1, "Node B should have received the contract");
+    assert_eq!(
+        contracts_b.len(),
+        1,
+        "Node B should have received the contract"
+    );
     assert_eq!(contracts_b[0].name, "TestContract");
 
     println!("✓ Contract successfully deployed and replicated to both nodes");
@@ -457,20 +524,28 @@ async fn test_contract_execution_after_deployment() {
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     // Note: Trust graph applies 70% direct + 30% transitive weighting
-    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+    node_a
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from A");
+    node_b
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from B");
 
     // Connect nodes bidirectionally
     // Node A dials Node B
     let addr_b: std::net::SocketAddr = "127.0.0.1:19004".parse().unwrap();
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
     // Node B dials Node A
     let addr_a: std::net::SocketAddr = "127.0.0.1:19003".parse().unwrap();
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial node A");
@@ -515,7 +590,11 @@ async fn test_contract_execution_after_deployment() {
         .await
         .expect("Failed to execute on node A");
 
-    assert_eq!(result_a.value, Value::Int(8), "Node A execution result incorrect");
+    assert_eq!(
+        result_a.value,
+        Value::Int(8),
+        "Node A execution result incorrect"
+    );
 
     // Execute on node B (should also work after receiving deployment)
     let mut args_b = std::collections::HashMap::new();
@@ -527,7 +606,11 @@ async fn test_contract_execution_after_deployment() {
         .await
         .expect("Failed to execute on node B");
 
-    assert_eq!(result_b.value, Value::Int(17), "Node B execution result incorrect");
+    assert_eq!(
+        result_b.value,
+        Value::Int(17),
+        "Node B execution result incorrect"
+    );
 
     println!("✓ Contract executed successfully on both nodes");
 }
@@ -539,11 +622,15 @@ async fn test_untrusted_deployer_rejected() {
     let node_b = TestNode::new(19006).await.expect("Failed to create node B");
 
     // Node B trusts A with LOW score (0.2 < MIN_DEPLOYER_TRUST 0.4)
-    node_b.trust_peer(&node_a.did, 0.2).await.expect("Failed to set low trust");
+    node_b
+        .trust_peer(&node_a.did, 0.2)
+        .await
+        .expect("Failed to set low trust");
 
     // Connect nodes
     let addr_b: std::net::SocketAddr = "127.0.0.1:19006".parse().unwrap();
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
@@ -554,12 +641,9 @@ async fn test_untrusted_deployer_rejected() {
     // Create contract
     let contract = Contract::new("UntrustedContract".to_string())
         .add_participant(node_a.did.clone())
-        .add_rule(
-            Rule::new("test".to_string())
-                .add_stmt(Stmt::Return {
-                    value: Expr::Literal(Value::Bool(true)),
-                }),
-        );
+        .add_rule(Rule::new("test".to_string()).add_stmt(Stmt::Return {
+            value: Expr::Literal(Value::Bool(true)),
+        }));
 
     // Deploy from node A and announce to node B (trust score 0.2 < 0.4, should be rejected by B)
     // Single-participant contract, no other signatures needed
@@ -589,22 +673,46 @@ async fn test_untrusted_deployer_rejected() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_three_participant_contract_deployment() {
     // Create three nodes (Alice, Bob, Carol)
-    let node_a = TestNode::new(19007).await.expect("Failed to create node A (Alice)");
-    let node_b = TestNode::new(19008).await.expect("Failed to create node B (Bob)");
-    let node_c = TestNode::new(19009).await.expect("Failed to create node C (Carol)");
+    let node_a = TestNode::new(19007)
+        .await
+        .expect("Failed to create node A (Alice)");
+    let node_b = TestNode::new(19008)
+        .await
+        .expect("Failed to create node B (Bob)");
+    let node_c = TestNode::new(19009)
+        .await
+        .expect("Failed to create node C (Carol)");
 
     // Establish mutual trust between all pairs (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     // A ↔ B
-    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+    node_a
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from A");
+    node_b
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from B");
 
     // B ↔ C
-    node_b.trust_peer(&node_c.did, 0.6).await.expect("Failed to trust C from B");
-    node_c.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from C");
+    node_b
+        .trust_peer(&node_c.did, 0.6)
+        .await
+        .expect("Failed to trust C from B");
+    node_c
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from C");
 
     // A ↔ C
-    node_a.trust_peer(&node_c.did, 0.6).await.expect("Failed to trust C from A");
-    node_c.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from C");
+    node_a
+        .trust_peer(&node_c.did, 0.6)
+        .await
+        .expect("Failed to trust C from A");
+    node_c
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from C");
 
     // Connect nodes bidirectionally (full mesh)
     // A ↔ B
@@ -612,31 +720,37 @@ async fn test_three_participant_contract_deployment() {
     let addr_b: std::net::SocketAddr = "127.0.0.1:19008".parse().unwrap();
     let addr_c: std::net::SocketAddr = "127.0.0.1:19009".parse().unwrap();
 
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial B from A");
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial A from B");
 
     // B ↔ C
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_c, node_c.did.clone())
         .await
         .expect("Failed to dial C from B");
-    node_c.network_handle
+    node_c
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial B from C");
 
     // A ↔ C
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_c, node_c.did.clone())
         .await
         .expect("Failed to dial C from A");
-    node_c.network_handle
+    node_c
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial A from C");
@@ -669,8 +783,8 @@ async fn test_three_participant_contract_deployment() {
         .deploy_contract(
             contract,
             vec![],
-            vec![&node_b, &node_c],  // Phase 10C: collect all participant signatures
-            vec![&node_b.did, &node_c.did],  // Announce to all other participants
+            vec![&node_b, &node_c], // Phase 10C: collect all participant signatures
+            vec![&node_b.did, &node_c.did], // Announce to all other participants
         )
         .await
         .expect("Failed to deploy 3-participant contract");
@@ -688,7 +802,11 @@ async fn test_three_participant_contract_deployment() {
     assert_eq!(contracts_a[0].name, "TriPartyAgreement");
 
     let contracts_b = node_b.list_contracts().await;
-    assert_eq!(contracts_b.len(), 1, "Node B should have received the contract");
+    assert_eq!(
+        contracts_b.len(),
+        1,
+        "Node B should have received the contract"
+    );
     assert_eq!(
         contracts_b[0].code_hash, code_hash,
         "Node B should have the correct contract hash"
@@ -696,7 +814,11 @@ async fn test_three_participant_contract_deployment() {
     assert_eq!(contracts_b[0].name, "TriPartyAgreement");
 
     let contracts_c = node_c.list_contracts().await;
-    assert_eq!(contracts_c.len(), 1, "Node C should have received the contract");
+    assert_eq!(
+        contracts_c.len(),
+        1,
+        "Node C should have received the contract"
+    );
     assert_eq!(
         contracts_c[0].code_hash, code_hash,
         "Node C should have the correct contract hash"
@@ -715,7 +837,11 @@ async fn test_three_participant_contract_deployment() {
         .await
         .expect("Failed to execute on node A");
 
-    assert_eq!(result_a.value, Value::Int(42), "Node A execution result incorrect");
+    assert_eq!(
+        result_a.value,
+        Value::Int(42),
+        "Node A execution result incorrect"
+    );
 
     // Execute on node B
     let mut args_b = std::collections::HashMap::new();
@@ -727,7 +853,11 @@ async fn test_three_participant_contract_deployment() {
         .await
         .expect("Failed to execute on node B");
 
-    assert_eq!(result_b.value, Value::Int(45), "Node B execution result incorrect");
+    assert_eq!(
+        result_b.value,
+        Value::Int(45),
+        "Node B execution result incorrect"
+    );
 
     // Execute on node C
     let mut args_c = std::collections::HashMap::new();
@@ -739,7 +869,11 @@ async fn test_three_participant_contract_deployment() {
         .await
         .expect("Failed to execute on node C");
 
-    assert_eq!(result_c.value, Value::Int(32), "Node C execution result incorrect");
+    assert_eq!(
+        result_c.value,
+        Value::Int(32),
+        "Node C execution result incorrect"
+    );
 
     println!("✓ Contract executed successfully on all 3 nodes");
 }
@@ -751,18 +885,26 @@ async fn test_contract_with_state_variables() {
     let node_b = TestNode::new(19011).await.expect("Failed to create node B");
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
-    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+    node_a
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from A");
+    node_b
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from B");
 
     // Connect nodes bidirectionally
     let addr_b: std::net::SocketAddr = "127.0.0.1:19011".parse().unwrap();
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
     let addr_a: std::net::SocketAddr = "127.0.0.1:19010".parse().unwrap();
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial node A");
@@ -791,18 +933,12 @@ async fn test_contract_with_state_variables() {
                     value: Expr::Var("counter".to_string()),
                 }),
         )
-        .add_rule(
-            Rule::new("get_counter".to_string())
-                .add_stmt(Stmt::Return {
-                    value: Expr::Var("counter".to_string()),
-                }),
-        )
-        .add_rule(
-            Rule::new("get_owner".to_string())
-                .add_stmt(Stmt::Return {
-                    value: Expr::Var("owner".to_string()),
-                }),
-        );
+        .add_rule(Rule::new("get_counter".to_string()).add_stmt(Stmt::Return {
+            value: Expr::Var("counter".to_string()),
+        }))
+        .add_rule(Rule::new("get_owner".to_string()).add_stmt(Stmt::Return {
+            value: Expr::Var("owner".to_string()),
+        }));
 
     println!("Deploying contract with state variables...");
 
@@ -821,30 +957,54 @@ async fn test_contract_with_state_variables() {
     assert_eq!(contracts_a[0].name, "CounterContract");
 
     let contracts_b = node_b.list_contracts().await;
-    assert_eq!(contracts_b.len(), 1, "Node B should have received the contract");
+    assert_eq!(
+        contracts_b.len(),
+        1,
+        "Node B should have received the contract"
+    );
     assert_eq!(contracts_b[0].name, "CounterContract");
 
     println!("✓ Contract with state variables deployed to both nodes");
 
     // Test 1: Get initial counter value on node A (should be 0)
     let result_a = node_a
-        .execute_contract(code_hash.clone(), "get_counter".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "get_counter".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to get counter on node A");
 
-    assert_eq!(result_a.value, Value::Int(0), "Initial counter should be 0 on node A");
+    assert_eq!(
+        result_a.value,
+        Value::Int(0),
+        "Initial counter should be 0 on node A"
+    );
 
     // Test 2: Get initial counter value on node B (should be 0)
     let result_b = node_b
-        .execute_contract(code_hash.clone(), "get_counter".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "get_counter".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to get counter on node B");
 
-    assert_eq!(result_b.value, Value::Int(0), "Initial counter should be 0 on node B");
+    assert_eq!(
+        result_b.value,
+        Value::Int(0),
+        "Initial counter should be 0 on node B"
+    );
 
     // Test 3: Verify owner state variable (should be node A's DID)
     let owner_result = node_a
-        .execute_contract(code_hash.clone(), "get_owner".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "get_owner".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to get owner on node A");
 
@@ -858,35 +1018,67 @@ async fn test_contract_with_state_variables() {
     // Note: State variables are reinitialized on each execution
     // This is expected behavior in a distributed contract system
     let increment_result_a = node_a
-        .execute_contract(code_hash.clone(), "increment".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "increment".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to increment counter on node A");
 
-    assert_eq!(increment_result_a.value, Value::Int(1), "Counter should be 1 after increment (0 + 1)");
+    assert_eq!(
+        increment_result_a.value,
+        Value::Int(1),
+        "Counter should be 1 after increment (0 + 1)"
+    );
 
     // Test 5: Execute increment again - state resets to initial value (0)
     let increment_result_a2 = node_a
-        .execute_contract(code_hash.clone(), "increment".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "increment".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to increment counter second time on node A");
 
-    assert_eq!(increment_result_a2.value, Value::Int(1), "Counter resets to initial value (0) on each execution, so 0 + 1 = 1");
+    assert_eq!(
+        increment_result_a2.value,
+        Value::Int(1),
+        "Counter resets to initial value (0) on each execution, so 0 + 1 = 1"
+    );
 
     // Test 6: Increment counter on node B (also resets to initial value)
     let increment_result_b = node_b
-        .execute_contract(code_hash.clone(), "increment".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "increment".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to increment counter on node B");
 
-    assert_eq!(increment_result_b.value, Value::Int(1), "Counter on node B also starts at 0, so 0 + 1 = 1");
+    assert_eq!(
+        increment_result_b.value,
+        Value::Int(1),
+        "Counter on node B also starts at 0, so 0 + 1 = 1"
+    );
 
     // Test 7: Verify counter value resets to initial on get_counter
     let final_result_a = node_a
-        .execute_contract(code_hash.clone(), "get_counter".to_string(), std::collections::HashMap::new())
+        .execute_contract(
+            code_hash.clone(),
+            "get_counter".to_string(),
+            std::collections::HashMap::new(),
+        )
         .await
         .expect("Failed to get final counter on node A");
 
-    assert_eq!(final_result_a.value, Value::Int(0), "Counter resets to initial value (0) on each execution");
+    assert_eq!(
+        final_result_a.value,
+        Value::Int(0),
+        "Counter resets to initial value (0) on each execution"
+    );
 
     println!("✓ State variables work correctly:");
     println!("  - Initial values properly set and propagated (counter=0, owner=DID)");
@@ -902,18 +1094,26 @@ async fn test_contract_with_ledger_integration() {
     let node_b = TestNode::new(19013).await.expect("Failed to create node B");
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
-    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+    node_a
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from A");
+    node_b
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from B");
 
     // Connect nodes bidirectionally
     let addr_b: std::net::SocketAddr = "127.0.0.1:19013".parse().unwrap();
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
     let addr_a: std::net::SocketAddr = "127.0.0.1:19012".parse().unwrap();
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial node A");
@@ -983,18 +1183,32 @@ async fn test_contract_with_ledger_integration() {
     assert_eq!(contracts_a[0].name, "ServiceAgreement");
 
     let contracts_b = node_b.list_contracts().await;
-    assert_eq!(contracts_b.len(), 1, "Node B should have received the contract");
+    assert_eq!(
+        contracts_b.len(),
+        1,
+        "Node B should have received the contract"
+    );
     assert_eq!(contracts_b[0].name, "ServiceAgreement");
 
     println!("✓ Contract with ledger capabilities deployed to both nodes");
 
     // Verify contract has currency defined
     assert_eq!(contracts_a[0].name, "ServiceAgreement");
-    assert_eq!(contracts_a[0].currency, Some("HOURS".to_string()), "Contract should have HOURS currency");
+    assert_eq!(
+        contracts_a[0].currency,
+        Some("HOURS".to_string()),
+        "Contract should have HOURS currency"
+    );
 
     // Verify contract has the expected rules
-    assert!(contracts_a[0].rules.contains(&"record_service".to_string()), "Contract should have record_service rule");
-    assert!(contracts_a[0].rules.contains(&"set_limit".to_string()), "Contract should have set_limit rule");
+    assert!(
+        contracts_a[0].rules.contains(&"record_service".to_string()),
+        "Contract should have record_service rule"
+    );
+    assert!(
+        contracts_a[0].rules.contains(&"set_limit".to_string()),
+        "Contract should have set_limit rule"
+    );
 
     println!("✓ Ledger integration test complete:");
     println!("  - Contract with ledger capabilities propagated successfully");
@@ -1013,18 +1227,26 @@ async fn test_large_contract_near_limits() {
     let node_b = TestNode::new(19015).await.expect("Failed to create node B");
 
     // Establish mutual trust
-    node_a.trust_peer(&node_b.did, 0.6).await.expect("Failed to trust B from A");
-    node_b.trust_peer(&node_a.did, 0.6).await.expect("Failed to trust A from B");
+    node_a
+        .trust_peer(&node_b.did, 0.6)
+        .await
+        .expect("Failed to trust B from A");
+    node_b
+        .trust_peer(&node_a.did, 0.6)
+        .await
+        .expect("Failed to trust A from B");
 
     // Connect nodes bidirectionally
     let addr_b: std::net::SocketAddr = "127.0.0.1:19015".parse().unwrap();
-    node_a.network_handle
+    node_a
+        .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial node B");
 
     let addr_a: std::net::SocketAddr = "127.0.0.1:19014".parse().unwrap();
-    node_b.network_handle
+    node_b
+        .network_handle
         .dial(addr_a, node_a.did.clone())
         .await
         .expect("Failed to dial node A");
@@ -1071,27 +1293,52 @@ async fn test_large_contract_near_limits() {
     let contracts_a = node_a.list_contracts().await;
     assert_eq!(contracts_a.len(), 1, "Node A should have 1 contract");
     assert_eq!(contracts_a[0].name, "LargeContract");
-    assert_eq!(contracts_a[0].num_state_vars, 50, "Contract should have 50 state variables");
-    assert_eq!(contracts_a[0].rules.len(), 25, "Contract should have 25 rules");
+    assert_eq!(
+        contracts_a[0].num_state_vars, 50,
+        "Contract should have 50 state variables"
+    );
+    assert_eq!(
+        contracts_a[0].rules.len(),
+        25,
+        "Contract should have 25 rules"
+    );
 
     let contracts_b = node_b.list_contracts().await;
-    assert_eq!(contracts_b.len(), 1, "Node B should have received the contract");
+    assert_eq!(
+        contracts_b.len(),
+        1,
+        "Node B should have received the contract"
+    );
     assert_eq!(contracts_b[0].name, "LargeContract");
-    assert_eq!(contracts_b[0].num_state_vars, 50, "Node B should have 50 state variables");
-    assert_eq!(contracts_b[0].rules.len(), 25, "Node B should have 25 rules");
+    assert_eq!(
+        contracts_b[0].num_state_vars, 50,
+        "Node B should have 50 state variables"
+    );
+    assert_eq!(
+        contracts_b[0].rules.len(),
+        25,
+        "Node B should have 25 rules"
+    );
 
     println!("✓ Large contract propagated to both nodes");
 
     // Test execution of one of the rules
     let mut args = std::collections::HashMap::new();
-    args.insert("param_10".to_string(), Value::String("test_value".to_string()));
+    args.insert(
+        "param_10".to_string(),
+        Value::String("test_value".to_string()),
+    );
 
     let result = node_a
         .execute_contract(code_hash.clone(), "rule_10".to_string(), args)
         .await
         .expect("Failed to execute rule on large contract");
 
-    assert_eq!(result.value, Value::String("test_value".to_string()), "Rule execution should return parameter value");
+    assert_eq!(
+        result.value,
+        Value::String("test_value".to_string()),
+        "Rule execution should return parameter value"
+    );
 
     println!("✓ Large contract test complete:");
     println!("  - Contract with 50 state variables deployed successfully");

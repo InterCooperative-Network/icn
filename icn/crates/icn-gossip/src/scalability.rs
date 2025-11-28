@@ -328,9 +328,7 @@ pub struct ShardedTopic {
 impl ShardedTopic {
     /// Create a new sharded topic
     pub fn new(name: String) -> Self {
-        let shards = (0..SHARD_COUNT)
-            .map(TopicShard::new)
-            .collect();
+        let shards = (0..SHARD_COUNT).map(TopicShard::new).collect();
 
         Self {
             name,
@@ -719,7 +717,10 @@ mod tests {
         // Should achieve excellent compression
         let ratio = compressed.compression_ratio(100);
         println!("Sparse compression ratio: {ratio:.2}x");
-        assert!(ratio > 10.0, "Sparse compression ratio {ratio:.2} is too low");
+        assert!(
+            ratio > 10.0,
+            "Sparse compression ratio {ratio:.2} is too low"
+        );
     }
 
     #[test]

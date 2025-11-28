@@ -144,11 +144,7 @@ impl QuarantineStore {
 
     /// Add an entry to quarantine
     pub fn add(&mut self, entry: JournalEntry, item: QuarantineItem) -> Result<()> {
-        let entry_id = entry
-            .id
-            .as_ref()
-            .context("Entry must have ID")?
-            .clone();
+        let entry_id = entry.id.as_ref().context("Entry must have ID")?.clone();
 
         // Load or create metadata
         let mut meta = self.load_meta()?;
@@ -190,8 +186,8 @@ impl QuarantineStore {
                 continue;
             }
 
-            let record: QuarantineRecord = bincode::deserialize(&value)
-                .context("Failed to deserialize quarantine record")?;
+            let record: QuarantineRecord =
+                bincode::deserialize(&value).context("Failed to deserialize quarantine record")?;
 
             // Skip expired entries
             if record.is_expired() {

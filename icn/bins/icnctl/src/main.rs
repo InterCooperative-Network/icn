@@ -5,8 +5,8 @@ use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::generate;
 // Governance types no longer needed - using RPC instead
 use icn_identity::{
-    AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType, RecoveryAttestation, RecoveryEvent,
-    RecoveryMethod, RecoveryConfig as IdentityRecoveryConfig,
+    AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType, RecoveryAttestation,
+    RecoveryConfig as IdentityRecoveryConfig, RecoveryEvent, RecoveryMethod,
 };
 use icn_store::{SledStore, Store};
 use icn_trust::{TrustEdge, TrustGraph};
@@ -152,7 +152,11 @@ enum AuthCommands {
         coop_id: String,
 
         /// Scopes to request (comma-separated)
-        #[arg(short, long, default_value = "ledger:read,ledger:write,coop:read,gov:read,gov:write")]
+        #[arg(
+            short,
+            long,
+            default_value = "ledger:read,ledger:write,coop:read,gov:read,gov:write"
+        )]
         scopes: String,
     },
 }
@@ -866,11 +870,15 @@ async fn main() -> Result<()> {
 
         Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
 
-        Commands::Contract(contract_cmd) => handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?,
+        Commands::Contract(contract_cmd) => {
+            handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?
+        }
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
 
-        Commands::Federation(fed_cmd) => handle_federation_command(fed_cmd, &data_dir, &args.endpoint).await?,
+        Commands::Federation(fed_cmd) => {
+            handle_federation_command(fed_cmd, &data_dir, &args.endpoint).await?
+        }
 
         Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir, &args.endpoint)?,
 
@@ -880,25 +888,20 @@ async fn main() -> Result<()> {
 
         Commands::Restore { input, force } => handle_restore_command(&data_dir, &input, force)?,
 
-        Commands::InitCoop { name, members, yes, no_start } => {
-            handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
-        }
+        Commands::InitCoop {
+            name,
+            members,
+            yes,
+            no_start,
+        } => handle_init_coop_command(&data_dir, name, members, yes, no_start).await?,
 
-        Commands::Auth(auth_cmd) => {
-            handle_auth_command(auth_cmd, &data_dir).await?
-        }
+        Commands::Auth(auth_cmd) => handle_auth_command(auth_cmd, &data_dir).await?,
 
-        Commands::Compute(compute_cmd) => {
-            handle_compute_command(compute_cmd, &args.endpoint)?
-        }
+        Commands::Compute(compute_cmd) => handle_compute_command(compute_cmd, &args.endpoint)?,
 
-        Commands::Policy(policy_cmd) => {
-            handle_policy_command(policy_cmd, &args.endpoint)?
-        }
+        Commands::Policy(policy_cmd) => handle_policy_command(policy_cmd, &args.endpoint)?,
 
-        Commands::Quota(quota_cmd) => {
-            handle_quota_command(quota_cmd, &args.endpoint)?
-        }
+        Commands::Quota(quota_cmd) => handle_quota_command(quota_cmd, &args.endpoint)?,
 
         Commands::Completions { shell } => {
             let mut cmd = Args::command();
@@ -929,8 +932,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             let passphrase = confirm_passphrase()?;
 
             // Create data directory if needed
-            std::fs::create_dir_all(data_dir)
-                .context("Failed to create data directory")?;
+            std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
             // Initialize keystore (generates keypair internally)
             println!("\nGenerating Ed25519 keypair...");
@@ -939,17 +941,13 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             println!("\n✓ Identity created successfully!");
             println!("  DID: {}", keystore.get_keypair()?.did());
             println!("  Keystore: {}", keystore_path.display());
-            println!(
-                "\nIMPORTANT: Store your passphrase securely. It cannot be recovered."
-            );
+            println!("\nIMPORTANT: Store your passphrase securely. It cannot be recovered.");
         }
 
         IdCommands::Show => {
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!(
-                    "No identity found. Run 'icnctl id init' to create one."
-                );
+                bail!("No identity found. Run 'icnctl id init' to create one.");
             }
 
             // Get passphrase
@@ -968,9 +966,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
         IdCommands::Rotate { reason } => {
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!(
-                    "No identity found. Run 'icnctl id init' to create one."
-                );
+                bail!("No identity found. Run 'icnctl id init' to create one.");
             }
 
             println!("Rotating identity key...\n");
@@ -1000,9 +996,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             } else {
                 println!("  Reason: {:?}", rotation.reason);
             }
-            println!(
-                "\nIMPORTANT: Publish the rotation proof to maintain identity continuity."
-            );
+            println!("\nIMPORTANT: Publish the rotation proof to maintain identity continuity.");
             println!("  Timestamp: {}", rotation.timestamp);
         }
 
@@ -1028,7 +1022,8 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
 
             // Open and unlock keystore to verify ownership
             let mut keystore = AgeKeyStore::open(&keystore_path)?;
-            keystore.unlock(&passphrase)
+            keystore
+                .unlock(&passphrase)
                 .context("Failed to unlock keystore. Incorrect passphrase.")?;
 
             // Get DID for export confirmation
@@ -1036,8 +1031,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
 
             // Create output directory if needed
             if let Some(parent) = output.parent() {
-                std::fs::create_dir_all(parent)
-                    .context("Failed to create output directory")?;
+                std::fs::create_dir_all(parent).context("Failed to create output directory")?;
             }
 
             // Copy the encrypted keystore to output
@@ -1080,8 +1074,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             }
 
             // Create data directory if needed
-            std::fs::create_dir_all(data_dir)
-                .context("Failed to create data directory")?;
+            std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
             // Verify the input file by attempting to load it
             print!("Enter passphrase for imported identity: ");
@@ -1091,14 +1084,16 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
 
             // Test unlock on the input file
             let mut test_keystore = AgeKeyStore::new(&input);
-            test_keystore.unlock(&passphrase)
+            test_keystore
+                .unlock(&passphrase)
                 .context("Failed to unlock imported keystore. Check your passphrase.")?;
 
             let imported_did = test_keystore.get_keypair()?.did().clone();
 
             // Copy the validated keystore to target location
-            std::fs::copy(&input, &keystore_path)
-                .with_context(|| format!("Failed to import keystore to {}", keystore_path.display()))?;
+            std::fs::copy(&input, &keystore_path).with_context(|| {
+                format!("Failed to import keystore to {}", keystore_path.display())
+            })?;
 
             println!("\n✓ Identity imported successfully!");
             println!("  From: {}", input.display());
@@ -1115,7 +1110,11 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
     let store_path = get_store_path(data_dir);
 
     match cmd {
-        RecoveryCommands::Setup { trustees, threshold, delay } => {
+        RecoveryCommands::Setup {
+            trustees,
+            threshold,
+            delay,
+        } => {
             // Check if keystore exists
             if !keystore_path.exists() {
                 bail!("No identity found. Run 'icnctl id init' to create one.");
@@ -1164,7 +1163,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
                     did_doc.recovery = Some(recovery_config.clone());
                     Ok(())
                 },
-                None,  // No rotation event
+                None, // No rotation event
                 &passphrase,
             )?;
 
@@ -1177,8 +1176,12 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             println!("Delay period: {} seconds ({} hours)", delay, delay / 3600);
             println!("\n⚠️  IMPORTANT:");
             println!("  • Choose trustees you trust and who know you well");
-            println!("  • Trustees must verify your identity out-of-band (phone, video, in-person)");
-            println!("  • If you lose all devices, contact {threshold} trustees to initiate recovery");
+            println!(
+                "  • Trustees must verify your identity out-of-band (phone, video, in-person)"
+            );
+            println!(
+                "  • If you lose all devices, contact {threshold} trustees to initiate recovery"
+            );
         }
 
         RecoveryCommands::Config => {
@@ -1203,7 +1206,11 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
                     println!("  {}. {}", i + 1, trustee);
                 }
                 println!("\nThreshold: {}", recovery_config.threshold);
-                println!("Delay period: {} seconds ({} hours)", recovery_config.delay_period, recovery_config.delay_period / 3600);
+                println!(
+                    "Delay period: {} seconds ({} hours)",
+                    recovery_config.delay_period,
+                    recovery_config.delay_period / 3600
+                );
 
                 match &recovery_config.method {
                     RecoveryMethod::Social { m, n } => {
@@ -1250,7 +1257,9 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             io::stdout().flush()?;
             let mut threshold_input = String::new();
             io::stdin().read_line(&mut threshold_input)?;
-            let threshold: usize = threshold_input.trim().parse()
+            let threshold: usize = threshold_input
+                .trim()
+                .parse()
                 .context("Invalid threshold")?;
 
             print!("Enter delay period in seconds (default 86400 = 24 hours): ");
@@ -1280,17 +1289,29 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             println!("  Recovery ID: {}", recovery.id);
             println!("  Status: {}", recovery.progress_summary());
             println!("\nNext steps:");
-            println!("  1. Contact your {threshold} trustees out-of-band (phone, video, in-person)");
-            println!("  2. Ask them to run: icnctl recovery attest {}", recovery.id);
+            println!(
+                "  1. Contact your {threshold} trustees out-of-band (phone, video, in-person)"
+            );
+            println!(
+                "  2. Ask them to run: icnctl recovery attest {}",
+                recovery.id
+            );
             println!("  3. After {threshold} attestations, wait {delay} seconds delay period");
-            println!("  4. Finalize recovery: icnctl recovery finalize {}", recovery.id);
+            println!(
+                "  4. Finalize recovery: icnctl recovery finalize {}",
+                recovery.id
+            );
         }
 
-        RecoveryCommands::Attest { recovery_id, verification } => {
+        RecoveryCommands::Attest {
+            recovery_id,
+            verification,
+        } => {
             // Load recovery event from store
             let store = SledStore::open(&store_path)?;
             let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store.get(recovery_key.as_bytes())?
+            let recovery_data = store
+                .get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
 
@@ -1340,7 +1361,10 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             if threshold_reached {
                 println!("\n🎉 Threshold reached! Recovery entering delay period.");
                 if recovery.delay_period > 0 {
-                    println!("   Wait {} seconds before finalizing.", recovery.delay_period);
+                    println!(
+                        "   Wait {} seconds before finalizing.",
+                        recovery.delay_period
+                    );
                 } else {
                     println!("   No delay configured. Ready to finalize now!");
                 }
@@ -1365,7 +1389,11 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
                     println!("  Old DID: {}", recovery.old_did);
                     println!("  New DID: {}", recovery.new_did);
                     println!("  Status: {}", recovery.progress_summary());
-                    println!("  Attestations: {}/{}", recovery.attestations.len(), recovery.threshold);
+                    println!(
+                        "  Attestations: {}/{}",
+                        recovery.attestations.len(),
+                        recovery.threshold
+                    );
                     println!();
                 }
             }
@@ -1379,7 +1407,8 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             // Load recovery event
             let store = SledStore::open(&store_path)?;
             let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store.get(recovery_key.as_bytes())?
+            let recovery_data = store
+                .get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
 
@@ -1396,7 +1425,11 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             println!();
             println!("Progress: {}", recovery.progress_summary());
             println!();
-            println!("Attestations ({}/{}):", recovery.attestations.len(), recovery.threshold);
+            println!(
+                "Attestations ({}/{}):",
+                recovery.attestations.len(),
+                recovery.threshold
+            );
             for (i, att) in recovery.attestations.iter().enumerate() {
                 println!("  {}. Trustee: {}", i + 1, att.trustee);
                 println!("     Verification: {}", att.verification_method);
@@ -1404,7 +1437,10 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             }
 
             if recovery.is_finalized() {
-                println!("\n✓ Recovery finalized at: {}", recovery.finalized_at.unwrap());
+                println!(
+                    "\n✓ Recovery finalized at: {}",
+                    recovery.finalized_at.unwrap()
+                );
             }
         }
 
@@ -1412,7 +1448,8 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             // Load recovery event
             let store = SledStore::open(&store_path)?;
             let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store.get(recovery_key.as_bytes())?
+            let recovery_data = store
+                .get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
 
@@ -1437,18 +1474,25 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
 
             println!("✓ Recovery finalized successfully!");
-            println!("\nThe new DID ({}) now inherits the old identity.", recovery.new_did);
+            println!(
+                "\nThe new DID ({}) now inherits the old identity.",
+                recovery.new_did
+            );
             println!("\nNext steps:");
             println!("  • Trust graph and ledger will recognize the new DID");
             println!("  • All relationships and balances are preserved");
             println!("  • Old DID is marked as recovered");
         }
 
-        RecoveryCommands::Cancel { recovery_id, reason } => {
+        RecoveryCommands::Cancel {
+            recovery_id,
+            reason,
+        } => {
             // Load recovery event
             let store = SledStore::open(&store_path)?;
             let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store.get(recovery_key.as_bytes())?
+            let recovery_data = store
+                .get(recovery_key.as_bytes())?
                 .context("Recovery not found")?;
             let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
 
@@ -1497,9 +1541,7 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &Path) -> Result<()> {
 
     // Load identity
     if !keystore_path.exists() {
-        bail!(
-            "No identity found. Run 'icnctl id init' to create one first."
-        );
+        bail!("No identity found. Run 'icnctl id init' to create one first.");
     }
 
     let passphrase = read_passphrase("Enter passphrase: ")?;
@@ -1661,7 +1703,11 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
     Ok(())
 }
 
-async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+async fn handle_federation_command(
+    cmd: FederationCommands,
+    data_dir: &Path,
+    endpoint: &str,
+) -> Result<()> {
     use icn_core::config::{Config, FederationConfig};
 
     let config_path = data_dir.join("icn.toml");
@@ -1731,10 +1777,8 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
                 let rpc_addr: std::net::SocketAddr = endpoint.parse()?;
                 let mut client = icn_rpc::RpcClient::new(rpc_addr);
                 let connected_peers = client.get_peers().await.unwrap_or_default();
-                let connected_dids: std::collections::HashSet<String> = connected_peers
-                    .iter()
-                    .map(|p| p.did.clone())
-                    .collect();
+                let connected_dids: std::collections::HashSet<String> =
+                    connected_peers.iter().map(|p| p.did.clone()).collect();
 
                 for peer_url in &config.network.bootstrap_peers {
                     // Extract DID from URL
@@ -1782,7 +1826,9 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
 
             println!("✓ Added bootstrap peer: {peer_url}");
             println!("  Initial trust: {trust:.2}");
-            println!("\nNote: Restart icnd or use 'icnctl federation connect' to connect immediately.");
+            println!(
+                "\nNote: Restart icnd or use 'icnctl federation connect' to connect immediately."
+            );
         }
 
         FederationCommands::Remove { did } => {
@@ -1795,9 +1841,10 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
 
             // Find and remove peer by DID
             let original_len = config.network.bootstrap_peers.len();
-            config.network.bootstrap_peers.retain(|url| {
-                !url.contains(&did)
-            });
+            config
+                .network
+                .bootstrap_peers
+                .retain(|url| !url.contains(&did));
 
             if config.network.bootstrap_peers.len() == original_len {
                 println!("No peer found with DID: {did}");
@@ -1854,9 +1901,15 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
             println!("  max_retries:            {}", fed.retry.max_retries);
             println!("  initial_delay_secs:     {}", fed.retry.initial_delay_secs);
             println!("  max_delay_secs:         {}", fed.retry.max_delay_secs);
-            println!("  reconnect_interval_secs:{}", fed.retry.reconnect_interval_secs);
+            println!(
+                "  reconnect_interval_secs:{}",
+                fed.retry.reconnect_interval_secs
+            );
 
-            println!("\nBootstrap Peers: {}", config.network.bootstrap_peers.len());
+            println!(
+                "\nBootstrap Peers: {}",
+                config.network.bootstrap_peers.len()
+            );
             for peer in &config.network.bootstrap_peers {
                 println!("  • {peer}");
             }
@@ -1875,7 +1928,8 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
 
             match key.as_str() {
                 "enabled" => {
-                    config.federation.enabled = value.parse()
+                    config.federation.enabled = value
+                        .parse()
                         .context("Invalid value for 'enabled'. Use 'true' or 'false'.")?;
                 }
                 "network_name" => {
@@ -1890,24 +1944,28 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
                     config.federation.bootstrap_peer_trust = trust;
                 }
                 "auto_accept_invites" => {
-                    config.federation.auto_accept_invites = value.parse()
-                        .context("Invalid value for 'auto_accept_invites'. Use 'true' or 'false'.")?;
+                    config.federation.auto_accept_invites = value.parse().context(
+                        "Invalid value for 'auto_accept_invites'. Use 'true' or 'false'.",
+                    )?;
                 }
                 "min_invite_trust" => {
-                    let trust: f64 = value.parse()
-                        .context("Invalid value for 'min_invite_trust'. Use a number between 0.0 and 1.0.")?;
+                    let trust: f64 = value.parse().context(
+                        "Invalid value for 'min_invite_trust'. Use a number between 0.0 and 1.0.",
+                    )?;
                     if !(0.0..=1.0).contains(&trust) {
                         bail!("Trust score must be between 0.0 and 1.0");
                     }
                     config.federation.min_invite_trust = trust;
                 }
                 "max_federations" => {
-                    config.federation.max_federations = value.parse()
+                    config.federation.max_federations = value
+                        .parse()
                         .context("Invalid value for 'max_federations'. Use a positive integer.")?;
                 }
                 "announce_public_addr" => {
-                    config.federation.announce_public_addr = value.parse()
-                        .context("Invalid value for 'announce_public_addr'. Use 'true' or 'false'.")?;
+                    config.federation.announce_public_addr = value.parse().context(
+                        "Invalid value for 'announce_public_addr'. Use 'true' or 'false'.",
+                    )?;
                 }
                 _ => {
                     bail!("Unknown configuration key: {key}\n\nValid keys:\n  enabled, network_name, bootstrap_peer_trust, auto_accept_invites,\n  min_invite_trust, max_federations, announce_public_addr");
@@ -1945,7 +2003,9 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, end
                 }
                 Err(_) => {
                     println!("Your DID: {did}\n");
-                    println!("Start icnd to generate a complete invite URL with your network address.");
+                    println!(
+                        "Start icnd to generate a complete invite URL with your network address."
+                    );
                 }
             }
         }
@@ -1967,7 +2027,8 @@ fn extract_did_from_peer_url(url: &str) -> Option<String> {
 
 /// Parse peer URL into (DID, address)
 fn parse_peer_url(url: &str) -> Result<(String, String)> {
-    let url = url.strip_prefix("icn://")
+    let url = url
+        .strip_prefix("icn://")
         .context("URL must start with 'icn://'")?;
 
     let parts: Vec<&str> = url.split('@').collect();
@@ -2077,7 +2138,10 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
     Ok(())
 }
 
-async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc::RpcClient) -> Result<()> {
+async fn handle_quarantine_command(
+    cmd: QuarantineCommands,
+    client: &mut icn_rpc::RpcClient,
+) -> Result<()> {
     match cmd {
         QuarantineCommands::List => {
             let result = client
@@ -2098,7 +2162,10 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 println!("Quarantined entries (showing {}):\n", quarantined.len());
 
                 for item in quarantined {
-                    println!("Entry ID:    {}", item["entry_id"].as_str().unwrap_or("N/A"));
+                    println!(
+                        "Entry ID:    {}",
+                        item["entry_id"].as_str().unwrap_or("N/A")
+                    );
                     println!("Reason:      {}", item["reason"].as_str().unwrap_or("N/A"));
                     println!("Author:      {}", item["author"].as_str().unwrap_or("N/A"));
                     println!("Observed at: {}", item["observed_at"].as_u64().unwrap_or(0));
@@ -2121,18 +2188,39 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
             if let Some(entry) = result.get("entry") {
                 println!("Entry Details:");
                 println!("  ID:          {}", entry["id"].as_str().unwrap_or("None"));
-                println!("  Author:      {}", entry["author"].as_str().unwrap_or("N/A"));
-                println!("  Timestamp:   {}", entry["timestamp"].as_u64().unwrap_or(0));
-                println!("  Parents:     {:?}", entry["parents"].as_array().map(|v| v.len()).unwrap_or(0));
-                println!("  Accounts:    {}", entry["num_accounts"].as_u64().unwrap_or(0));
+                println!(
+                    "  Author:      {}",
+                    entry["author"].as_str().unwrap_or("N/A")
+                );
+                println!(
+                    "  Timestamp:   {}",
+                    entry["timestamp"].as_u64().unwrap_or(0)
+                );
+                println!(
+                    "  Parents:     {:?}",
+                    entry["parents"].as_array().map(|v| v.len()).unwrap_or(0)
+                );
+                println!(
+                    "  Accounts:    {}",
+                    entry["num_accounts"].as_u64().unwrap_or(0)
+                );
                 println!();
             }
 
             if let Some(info) = result.get("quarantine_info") {
                 println!("Quarantine Info:");
-                println!("  Reason:      {}", info["reason"].as_str().unwrap_or("N/A"));
-                println!("  Author:      {}", info["author"].as_str().unwrap_or("N/A"));
-                println!("  Observed:    {}", info["observed_at"].as_u64().unwrap_or(0));
+                println!(
+                    "  Reason:      {}",
+                    info["reason"].as_str().unwrap_or("N/A")
+                );
+                println!(
+                    "  Author:      {}",
+                    info["author"].as_str().unwrap_or("N/A")
+                );
+                println!(
+                    "  Observed:    {}",
+                    info["observed_at"].as_u64().unwrap_or(0)
+                );
                 if let Some(metadata) = info["metadata"].as_str() {
                     println!("  Metadata:    {metadata}");
                 }
@@ -2157,7 +2245,11 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
                 .await
                 .context("Failed to drop entry from daemon. Is icnd running?")?;
 
-            if result.get("dropped").and_then(|v| v.as_bool()).unwrap_or(false) {
+            if result
+                .get("dropped")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
                 println!("✓ Permanently dropped entry: {entry_id}");
             } else {
                 println!("✗ Failed to drop entry (not found in quarantine)");
@@ -2179,7 +2271,11 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
 }
 
 #[tokio::main]
-async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir: &Path) -> Result<()> {
+async fn handle_contract_command(
+    cmd: ContractCommands,
+    endpoint: &str,
+    data_dir: &Path,
+) -> Result<()> {
     // Contract commands communicate with daemon via RPC
     let rpc_addr = endpoint.parse()?;
     let mut client = icn_rpc::RpcClient::new(rpc_addr);
@@ -2187,18 +2283,18 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
     match cmd {
         ContractCommands::Deploy { contract_file } => {
             // Read contract JSON from file
-            let contract_json = std::fs::read_to_string(&contract_file)
-                .with_context(|| format!("Failed to read contract file: {}", contract_file.display()))?;
+            let contract_json = std::fs::read_to_string(&contract_file).with_context(|| {
+                format!("Failed to read contract file: {}", contract_file.display())
+            })?;
 
             println!("Deploying contract from {}...\n", contract_file.display());
 
             // Parse contract to validate
-            let contract: icn_ccl::Contract = serde_json::from_str(&contract_json)
-                .context("Failed to parse contract JSON")?;
+            let contract: icn_ccl::Contract =
+                serde_json::from_str(&contract_json).context("Failed to parse contract JSON")?;
 
             // Validate contract
-            contract.validate()
-                .context("Contract validation failed")?;
+            contract.validate().context("Contract validation failed")?;
 
             println!("✓ Contract validated");
             println!("  Name: {}", contract.name);
@@ -2223,7 +2319,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
 
             // Compute code hash (must match ContractActor::compute_code_hash)
             let code_hash = {
-                use sha2::{Sha256, Digest};
+                use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
                 hasher.update(contract.name.as_bytes());
                 for participant in &contract.participants {
@@ -2238,10 +2334,8 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
                 .as_secs();
 
             // For now, only deployer signs (multi-party signing is future work)
-            let signing_bytes = icn_ccl::ContractDeploymentMessage::compute_signing_bytes(
-                &code_hash,
-                installed_at,
-            );
+            let signing_bytes =
+                icn_ccl::ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
             let deployer_signature = keypair.sign(&signing_bytes);
 
             let installation = icn_ccl::ContractInstallation {
@@ -2287,8 +2381,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
         } => {
             // Parse args JSON (default to empty object)
             let args_value: serde_json::Value = if let Some(args_str) = args {
-                serde_json::from_str(&args_str)
-                    .context("Failed to parse args JSON")?
+                serde_json::from_str(&args_str).context("Failed to parse args JSON")?
             } else {
                 serde_json::json!({})
             };
@@ -2299,7 +2392,12 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             println!("  Args: {args_value}\n");
 
             let response = client
-                .call_contract(code_hash.clone(), rule_name.clone(), caller.clone(), args_value)
+                .call_contract(
+                    code_hash.clone(),
+                    rule_name.clone(),
+                    caller.clone(),
+                    args_value,
+                )
                 .await
                 .context("Failed to call contract. Is icnd running?")?;
             if response.success {
@@ -2311,11 +2409,17 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             }
         }
 
-        ContractCommands::Prepare { contract_file, output } => {
+        ContractCommands::Prepare {
+            contract_file,
+            output,
+        } => {
             handle_contract_prepare(&contract_file, &output, data_dir)?;
         }
 
-        ContractCommands::Sign { deployment_file, output } => {
+        ContractCommands::Sign {
+            deployment_file,
+            output,
+        } => {
             handle_contract_sign(&deployment_file, &output, data_dir)?;
         }
 
@@ -2323,35 +2427,30 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             handle_contract_deploy_signed(&deployment_file, &mut client).await?;
         }
 
-        ContractCommands::List => {
-            match client
-                .list_contracts()
-                .await
-            {
-                Ok(contracts) => {
-                    if contracts.is_empty() {
-                        println!("No contracts deployed.");
-                    } else {
-                        println!("Deployed contracts:\n");
-                        for contract in contracts {
-                            println!("Code Hash: {}", contract.code_hash);
-                            println!("  Name: {}", contract.name);
-                            println!("  Participants: {}", contract.participants.join(", "));
-                            if let Some(currency) = contract.currency {
-                                println!("  Currency: {currency}");
-                            }
-                            println!("  Rules: {}", contract.rules.join(", "));
-                            println!();
+        ContractCommands::List => match client.list_contracts().await {
+            Ok(contracts) => {
+                if contracts.is_empty() {
+                    println!("No contracts deployed.");
+                } else {
+                    println!("Deployed contracts:\n");
+                    for contract in contracts {
+                        println!("Code Hash: {}", contract.code_hash);
+                        println!("  Name: {}", contract.name);
+                        println!("  Participants: {}", contract.participants.join(", "));
+                        if let Some(currency) = contract.currency {
+                            println!("  Currency: {currency}");
                         }
+                        println!("  Rules: {}", contract.rules.join(", "));
+                        println!();
                     }
                 }
-                Err(e) => {
-                    println!("Note: Contract listing not yet fully implemented.");
-                    println!("Error: {e}");
-                    println!("\nYou can still deploy and call contracts by code hash.");
-                }
             }
-        }
+            Err(e) => {
+                println!("Note: Contract listing not yet fully implemented.");
+                println!("Error: {e}");
+                println!("\nYou can still deploy and call contracts by code hash.");
+            }
+        },
     }
 
     Ok(())
@@ -2365,11 +2464,10 @@ fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path)
 
     println!("Preparing contract from {}...\n", contract_file.display());
 
-    let contract: icn_ccl::Contract = serde_json::from_str(&contract_json)
-        .context("Failed to parse contract JSON")?;
+    let contract: icn_ccl::Contract =
+        serde_json::from_str(&contract_json).context("Failed to parse contract JSON")?;
 
-    contract.validate()
-        .context("Contract validation failed")?;
+    contract.validate().context("Contract validation failed")?;
 
     println!("✓ Contract validated");
     println!("  Name: {}", contract.name);
@@ -2398,14 +2496,16 @@ fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path)
         bail!("You ({signer_did}) are not a participant in this contract");
     }
 
-    println!("Signing as {} ({} of {} participants)",
-             signer_did,
-             1,
-             contract.participants.len());
+    println!(
+        "Signing as {} ({} of {} participants)",
+        signer_did,
+        1,
+        contract.participants.len()
+    );
 
     // Compute code hash
     let code_hash = {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -2420,10 +2520,8 @@ fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path)
         .as_secs();
 
     // Generate signature
-    let signing_bytes = icn_ccl::ContractDeploymentMessage::compute_signing_bytes(
-        &code_hash,
-        installed_at,
-    );
+    let signing_bytes =
+        icn_ccl::ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
     let signature = keypair.sign(&signing_bytes);
 
     let installation = icn_ccl::ContractInstallation {
@@ -2459,8 +2557,14 @@ fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path)
     println!("Next steps:");
     if contract.participants.len() > 1 {
         println!("  1. Send {} to other participants", output.display());
-        println!("  2. They run: icnctl contract sign {} -o <output>", output.display());
-        println!("  3. Once all {} signatures collected, deploy with:", contract.participants.len());
+        println!(
+            "  2. They run: icnctl contract sign {} -o <output>",
+            output.display()
+        );
+        println!(
+            "  3. Once all {} signatures collected, deploy with:",
+            contract.participants.len()
+        );
         println!("     icnctl contract deploy-signed <fully-signed.json>");
     } else {
         println!("  This is a single-participant contract. Deploy with:");
@@ -2473,16 +2577,23 @@ fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path)
 /// Handle contract sign command - add your signature to a partial deployment
 fn handle_contract_sign(deployment_file: &Path, output: &Path, data_dir: &Path) -> Result<()> {
     // Read partial deployment
-    let deployment_json = std::fs::read_to_string(deployment_file)
-        .with_context(|| format!("Failed to read deployment file: {}", deployment_file.display()))?;
+    let deployment_json = std::fs::read_to_string(deployment_file).with_context(|| {
+        format!(
+            "Failed to read deployment file: {}",
+            deployment_file.display()
+        )
+    })?;
 
     println!("Adding signature to {}...\n", deployment_file.display());
 
-    let mut deployment_msg: icn_ccl::ContractDeploymentMessage = serde_json::from_str(&deployment_json)
-        .context("Failed to parse deployment JSON")?;
+    let mut deployment_msg: icn_ccl::ContractDeploymentMessage =
+        serde_json::from_str(&deployment_json).context("Failed to parse deployment JSON")?;
 
     println!("Contract: {}", deployment_msg.contract.name);
-    println!("Participants: {}", deployment_msg.contract.participants.len());
+    println!(
+        "Participants: {}",
+        deployment_msg.contract.participants.len()
+    );
     println!();
 
     // Load keystore
@@ -2504,7 +2615,12 @@ fn handle_contract_sign(deployment_file: &Path, output: &Path, data_dir: &Path) 
     }
 
     // Check if already signed
-    if deployment_msg.installation.signatures.iter().any(|(did, _)| did == &signer_did) {
+    if deployment_msg
+        .installation
+        .signatures
+        .iter()
+        .any(|(did, _)| did == &signer_did)
+    {
         bail!("You ({signer_did}) have already signed this deployment");
     }
 
@@ -2513,7 +2629,10 @@ fn handle_contract_sign(deployment_file: &Path, output: &Path, data_dir: &Path) 
     let signature = keypair.sign(&signing_bytes);
 
     // Add signature
-    deployment_msg.installation.signatures.push((signer_did.clone(), signature.to_bytes().to_vec()));
+    deployment_msg
+        .installation
+        .signatures
+        .push((signer_did.clone(), signature.to_bytes().to_vec()));
 
     // Write to output
     let updated_json = serde_json::to_string_pretty(&deployment_msg)
@@ -2537,7 +2656,12 @@ fn handle_contract_sign(deployment_file: &Path, output: &Path, data_dir: &Path) 
         println!();
         println!("Still waiting for signatures from:");
         for participant in &deployment_msg.contract.participants {
-            if !deployment_msg.installation.signatures.iter().any(|(did, _)| did == participant) {
+            if !deployment_msg
+                .installation
+                .signatures
+                .iter()
+                .any(|(did, _)| did == participant)
+            {
                 println!("  ⏳ {participant}");
             }
         }
@@ -2556,31 +2680,56 @@ fn handle_contract_sign(deployment_file: &Path, output: &Path, data_dir: &Path) 
 }
 
 /// Handle deploy-signed command - deploy a fully-signed contract
-async fn handle_contract_deploy_signed(deployment_file: &Path, client: &mut icn_rpc::RpcClient) -> Result<()> {
+async fn handle_contract_deploy_signed(
+    deployment_file: &Path,
+    client: &mut icn_rpc::RpcClient,
+) -> Result<()> {
     // Read deployment
-    let deployment_json = std::fs::read_to_string(deployment_file)
-        .with_context(|| format!("Failed to read deployment file: {}", deployment_file.display()))?;
+    let deployment_json = std::fs::read_to_string(deployment_file).with_context(|| {
+        format!(
+            "Failed to read deployment file: {}",
+            deployment_file.display()
+        )
+    })?;
 
-    println!("Deploying signed contract from {}...\n", deployment_file.display());
+    println!(
+        "Deploying signed contract from {}...\n",
+        deployment_file.display()
+    );
 
-    let deployment_msg: icn_ccl::ContractDeploymentMessage = serde_json::from_str(&deployment_json)
-        .context("Failed to parse deployment JSON")?;
+    let deployment_msg: icn_ccl::ContractDeploymentMessage =
+        serde_json::from_str(&deployment_json).context("Failed to parse deployment JSON")?;
 
     println!("Contract: {}", deployment_msg.contract.name);
-    println!("Participants: {}", deployment_msg.contract.participants.len());
-    println!("Signatures: {}", deployment_msg.installation.signatures.len());
+    println!(
+        "Participants: {}",
+        deployment_msg.contract.participants.len()
+    );
+    println!(
+        "Signatures: {}",
+        deployment_msg.installation.signatures.len()
+    );
     println!();
 
     // Validate all participants have signed
-    let participant_set: std::collections::HashSet<_> = deployment_msg.contract.participants.iter().collect();
-    let signature_set: std::collections::HashSet<_> = deployment_msg.installation.signatures.iter().map(|(did, _)| did).collect();
+    let participant_set: std::collections::HashSet<_> =
+        deployment_msg.contract.participants.iter().collect();
+    let signature_set: std::collections::HashSet<_> = deployment_msg
+        .installation
+        .signatures
+        .iter()
+        .map(|(did, _)| did)
+        .collect();
 
     if participant_set != signature_set {
         let missing: Vec<_> = participant_set.difference(&signature_set).collect();
         bail!("Missing signatures from: {missing:?}");
     }
 
-    println!("✓ All {} participants have signed", deployment_msg.contract.participants.len());
+    println!(
+        "✓ All {} participants have signed",
+        deployment_msg.contract.participants.len()
+    );
     println!();
 
     // Send to daemon
@@ -2655,7 +2804,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!();
 
             // Group verification methods by device (Ed25519 + X25519 pairs)
-            let mut device_map: std::collections::HashMap<String, Vec<&icn_identity::VerificationMethod>> = std::collections::HashMap::new();
+            let mut device_map: std::collections::HashMap<
+                String,
+                Vec<&icn_identity::VerificationMethod>,
+            > = std::collections::HashMap::new();
 
             for vm in &did_doc.verification_method {
                 // Extract device number from id (e.g., "device-1" or "enc-1")
@@ -2681,8 +2833,16 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 let signing_vm = vms.iter().find(|vm| vm.key_type == KeyType::Ed25519);
 
                 if let Some(vm) = signing_vm {
-                    let current_marker = if dev_id == device_id { " (current device)" } else { "" };
-                    let revoked_marker = if vm.revoked_at.is_some() { " [REVOKED]" } else { "" };
+                    let current_marker = if dev_id == device_id {
+                        " (current device)"
+                    } else {
+                        ""
+                    };
+                    let revoked_marker = if vm.revoked_at.is_some() {
+                        " [REVOKED]"
+                    } else {
+                        ""
+                    };
 
                     println!("Device: {}{}{}", vm.id, current_marker, revoked_marker);
                     println!("  Label: {}", vm.label);
@@ -2737,7 +2897,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             let x25519_public = PublicKey::from(&x25519_secret);
 
             println!("✓ Generated keys for new device");
-            println!("  Ed25519 public key: {}", hex::encode(keypair.verifying_key().as_bytes()));
+            println!(
+                "  Ed25519 public key: {}",
+                hex::encode(keypair.verifying_key().as_bytes())
+            );
             println!();
 
             // Create request
@@ -2746,17 +2909,17 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 label: name.clone(),
                 ed25519_public_key: hex::encode(keypair.verifying_key().as_bytes()),
                 x25519_public_key: hex::encode(x25519_public.as_bytes()),
-                capabilities: vec![
-                    Capability::Sign,
-                    Capability::Encrypt,
-                ],
+                capabilities: vec![Capability::Sign, Capability::Encrypt],
                 created_at: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_secs(),
             };
 
             // Save request to file
-            let request_file = data_dir.join(format!("device-add-{}.json", name.replace(" ", "-").to_lowercase()));
+            let request_file = data_dir.join(format!(
+                "device-add-{}.json",
+                name.replace(" ", "-").to_lowercase()
+            ));
             let request_json = serde_json::to_string_pretty(&request)?;
             std::fs::create_dir_all(data_dir)?;
             std::fs::write(&request_file, request_json)?;
@@ -2764,7 +2927,11 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!("✓ Device-add request created: {}", request_file.display());
             println!();
             println!("Next steps:");
-            println!("  1. Transfer {} to an authorized device for identity {}", request_file.display(), target_did);
+            println!(
+                "  1. Transfer {} to an authorized device for identity {}",
+                request_file.display(),
+                target_did
+            );
             println!("  2. On authorized device, run:");
             println!("     icnctl device approve {}", request_file.display());
             println!();
@@ -2781,8 +2948,9 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             }
 
             // Load request
-            let request_json = std::fs::read_to_string(&request_file)
-                .with_context(|| format!("Failed to read request file: {}", request_file.display()))?;
+            let request_json = std::fs::read_to_string(&request_file).with_context(|| {
+                format!("Failed to read request file: {}", request_file.display())
+            })?;
 
             let request: DeviceAddRequest = serde_json::from_str(&request_json)
                 .context("Failed to parse device-add request")?;
@@ -2822,7 +2990,8 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             }
 
             // Determine next device ID
-            let max_device_num = did_doc.verification_method
+            let max_device_num = did_doc
+                .verification_method
                 .iter()
                 .filter_map(|vm| {
                     if vm.id.starts_with("device-") {
@@ -2845,10 +3014,16 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 .context("Invalid X25519 public key encoding")?;
 
             if ed25519_bytes.len() != 32 {
-                bail!("Invalid Ed25519 key length: expected 32 bytes, got {}", ed25519_bytes.len());
+                bail!(
+                    "Invalid Ed25519 key length: expected 32 bytes, got {}",
+                    ed25519_bytes.len()
+                );
             }
             if x25519_bytes.len() != 32 {
-                bail!("Invalid X25519 key length: expected 32 bytes, got {}", x25519_bytes.len());
+                bail!(
+                    "Invalid X25519 key length: expected 32 bytes, got {}",
+                    x25519_bytes.len()
+                );
             }
 
             // Create rotation event for this device add (with both keys)
@@ -2977,10 +3152,14 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!("DID document updated:");
             let updated_doc = keystore.get_did_document()?;
             println!("  Version: {}", updated_doc.version);
-            println!("  Active devices: {}",
-                updated_doc.verification_method.iter()
+            println!(
+                "  Active devices: {}",
+                updated_doc
+                    .verification_method
+                    .iter()
                     .filter(|vm| vm.revoked_at.is_none() && vm.key_type == KeyType::Ed25519)
-                    .count());
+                    .count()
+            );
         }
     }
 
@@ -3197,8 +3376,8 @@ fn extract_backup_metadata(_archive: &mut Archive<File>, input: &Path) -> Result
         if path.to_string_lossy() == "backup_metadata.json" {
             let mut metadata_json = String::new();
             entry.read_to_string(&mut metadata_json)?;
-            let metadata: BackupMetadata = serde_json::from_str(&metadata_json)
-                .context("Failed to parse backup metadata")?;
+            let metadata: BackupMetadata =
+                serde_json::from_str(&metadata_json).context("Failed to parse backup metadata")?;
             return Ok(metadata);
         }
     }
@@ -3317,23 +3496,65 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                 let domain = result.as_object().context("Invalid domain data")?;
 
                 println!("Governance Domain:");
-                println!("  ID: {}", domain.get("id").and_then(|v| v.as_str()).unwrap_or("unknown"));
-                println!("  Name: {}", domain.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed"));
-                println!("  Profile: {}", domain.get("profile").and_then(|v| v.as_str()).unwrap_or("unknown"));
+                println!(
+                    "  ID: {}",
+                    domain
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                );
+                println!(
+                    "  Name: {}",
+                    domain
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unnamed")
+                );
+                println!(
+                    "  Profile: {}",
+                    domain
+                        .get("profile")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                );
 
                 if let Some(params_obj) = domain.get("params").and_then(|v| v.as_object()) {
-                    println!("  Quorum: {}%", params_obj.get("quorum_percentage").and_then(|v| v.as_u64()).unwrap_or(0));
-                    println!("  Approval: {}%", params_obj.get("approval_threshold_percentage").and_then(|v| v.as_u64()).unwrap_or(0));
-                    println!("  Voting period: {} seconds", params_obj.get("voting_period_seconds").and_then(|v| v.as_u64()).unwrap_or(0));
+                    println!(
+                        "  Quorum: {}%",
+                        params_obj
+                            .get("quorum_percentage")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0)
+                    );
+                    println!(
+                        "  Approval: {}%",
+                        params_obj
+                            .get("approval_threshold_percentage")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0)
+                    );
+                    println!(
+                        "  Voting period: {} seconds",
+                        params_obj
+                            .get("voting_period_seconds")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0)
+                    );
                 }
 
-                println!("  Membership: {}", domain.get("membership_type").and_then(|v| v.as_str()).unwrap_or("unknown"));
+                println!(
+                    "  Membership: {}",
+                    domain
+                        .get("membership_type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                );
             }
 
             DomainCommands::List => {
                 let result = rpc_call(endpoint, "governance.domain.list", serde_json::json!({}))?;
-                let domains: Vec<serde_json::Value> = serde_json::from_value(result)
-                    .context("Failed to parse domain list")?;
+                let domains: Vec<serde_json::Value> =
+                    serde_json::from_value(result).context("Failed to parse domain list")?;
 
                 println!("Governance Domains:");
                 for domain in domains {
@@ -3344,23 +3565,24 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
             }
         },
 
-        GovCommands::Proposal(proposal_cmd) => match proposal_cmd {
-            ProposalCommands::Create {
-                domain_id,
-                title,
-                description,
-                kind,
-                body,
-                amount,
-                currency,
-                recipient,
-                purpose,
-                member,
-                action,
-                new_config,
-            } => {
-                // Build payload JSON for RPC (daemon handles proposer DID)
-                let payload_json = match kind.as_str() {
+        GovCommands::Proposal(proposal_cmd) => {
+            match proposal_cmd {
+                ProposalCommands::Create {
+                    domain_id,
+                    title,
+                    description,
+                    kind,
+                    body,
+                    amount,
+                    currency,
+                    recipient,
+                    purpose,
+                    member,
+                    action,
+                    new_config,
+                } => {
+                    // Build payload JSON for RPC (daemon handles proposer DID)
+                    let payload_json = match kind.as_str() {
                     "text" => {
                         let body_text = body.context("--body required for text proposals")?;
                         serde_json::json!({
@@ -3406,117 +3628,138 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                     _ => bail!("Invalid proposal kind. Must be: text, budget, membership, config-change"),
                 };
 
-                // Create proposal via RPC
-                let params = serde_json::json!({
-                    "domain_id": domain_id,
-                    "title": title,
-                    "description": description,
-                    "payload": payload_json
-                });
+                    // Create proposal via RPC
+                    let params = serde_json::json!({
+                        "domain_id": domain_id,
+                        "title": title,
+                        "description": description,
+                        "payload": payload_json
+                    });
 
-                let result = rpc_call(endpoint, "governance.proposal.create", params)?;
-                let proposal_id = result["proposal_id"].as_str().context("Missing proposal_id in response")?;
+                    let result = rpc_call(endpoint, "governance.proposal.create", params)?;
+                    let proposal_id = result["proposal_id"]
+                        .as_str()
+                        .context("Missing proposal_id in response")?;
 
-                println!("✓ Proposal created:");
-                println!("  ID: {proposal_id}");
-                println!("  State: Draft");
-            }
+                    println!("✓ Proposal created:");
+                    println!("  ID: {proposal_id}");
+                    println!("  State: Draft");
+                }
 
-            ProposalCommands::Open {
-                proposal_id,
-                duration,
-            } => {
-                // Get proposal to find its domain
-                let get_params = serde_json::json!({ "proposal_id": proposal_id });
-                let proposal_data = rpc_call(endpoint, "governance.proposal.get", get_params)?;
-                let domain_id = proposal_data["domain_id"].as_str().context("Missing domain_id")?;
+                ProposalCommands::Open {
+                    proposal_id,
+                    duration,
+                } => {
+                    // Get proposal to find its domain
+                    let get_params = serde_json::json!({ "proposal_id": proposal_id });
+                    let proposal_data = rpc_call(endpoint, "governance.proposal.get", get_params)?;
+                    let domain_id = proposal_data["domain_id"]
+                        .as_str()
+                        .context("Missing domain_id")?;
 
-                // Get domain to determine voting period
-                let domain_params = serde_json::json!({ "domain_id": domain_id });
-                let domain_data = rpc_call(endpoint, "governance.domain.get", domain_params)?;
-                let default_period = domain_data["params"]["voting_period_seconds"]
-                    .as_u64()
-                    .unwrap_or(86400);
+                    // Get domain to determine voting period
+                    let domain_params = serde_json::json!({ "domain_id": domain_id });
+                    let domain_data = rpc_call(endpoint, "governance.domain.get", domain_params)?;
+                    let default_period = domain_data["params"]["voting_period_seconds"]
+                        .as_u64()
+                        .unwrap_or(86400);
 
-                let voting_period = duration.unwrap_or(default_period);
+                    let voting_period = duration.unwrap_or(default_period);
 
-                // Open the proposal
-                let open_params = serde_json::json!({
-                    "proposal_id": proposal_id,
-                    "voting_period_seconds": voting_period
-                });
-                rpc_call(endpoint, "governance.proposal.open", open_params)?;
+                    // Open the proposal
+                    let open_params = serde_json::json!({
+                        "proposal_id": proposal_id,
+                        "voting_period_seconds": voting_period
+                    });
+                    rpc_call(endpoint, "governance.proposal.open", open_params)?;
 
-                println!("✓ Proposal opened for voting:");
-                println!("  ID: {proposal_id}");
-                println!("  Duration: {voting_period} seconds");
-            }
+                    println!("✓ Proposal opened for voting:");
+                    println!("  ID: {proposal_id}");
+                    println!("  Duration: {voting_period} seconds");
+                }
 
-            ProposalCommands::List { domain_id, state } => {
-                println!("Proposals in domain '{domain_id}':");
+                ProposalCommands::List { domain_id, state } => {
+                    println!("Proposals in domain '{domain_id}':");
 
-                let result = rpc_call(endpoint, "governance.proposal.list", serde_json::json!({}))?;
-                let proposals: Vec<serde_json::Value> = serde_json::from_value(result)
-                    .context("Failed to parse proposal list")?;
+                    let result =
+                        rpc_call(endpoint, "governance.proposal.list", serde_json::json!({}))?;
+                    let proposals: Vec<serde_json::Value> =
+                        serde_json::from_value(result).context("Failed to parse proposal list")?;
 
-                for proposal in proposals {
-                    let prop_domain_id = proposal["domain_id"].as_str().unwrap_or("");
-                    if prop_domain_id != domain_id {
-                        continue;
-                    }
-
-                    let prop_state = proposal["state"].as_str().unwrap_or("unknown");
-
-                    if let Some(ref state_filter) = state {
-                        if prop_state != *state_filter {
+                    for proposal in proposals {
+                        let prop_domain_id = proposal["domain_id"].as_str().unwrap_or("");
+                        if prop_domain_id != domain_id {
                             continue;
                         }
+
+                        let prop_state = proposal["state"].as_str().unwrap_or("unknown");
+
+                        if let Some(ref state_filter) = state {
+                            if prop_state != *state_filter {
+                                continue;
+                            }
+                        }
+
+                        let state_upper = prop_state.to_uppercase();
+                        let id = proposal["id"].as_str().unwrap_or("unknown");
+                        let title = proposal["title"].as_str().unwrap_or("untitled");
+
+                        println!("  [{state_upper}] {id} - {title}");
                     }
+                }
 
-                    let state_upper = prop_state.to_uppercase();
-                    let id = proposal["id"].as_str().unwrap_or("unknown");
-                    let title = proposal["title"].as_str().unwrap_or("untitled");
+                ProposalCommands::Show { proposal_id } => {
+                    let params = serde_json::json!({ "proposal_id": proposal_id });
+                    let proposal = rpc_call(endpoint, "governance.proposal.get", params)?;
 
-                    println!("  [{state_upper}] {id} - {title}");
+                    println!("Proposal:");
+                    println!("  ID: {}", proposal["id"].as_str().unwrap_or("unknown"));
+                    println!(
+                        "  Title: {}",
+                        proposal["title"].as_str().unwrap_or("untitled")
+                    );
+                    println!(
+                        "  Description: {}",
+                        proposal["description"].as_str().unwrap_or("")
+                    );
+                    println!(
+                        "  State: {}",
+                        proposal["state"].as_str().unwrap_or("unknown")
+                    );
+                    println!(
+                        "  Proposer: {}",
+                        proposal["proposer"].as_str().unwrap_or("unknown")
+                    );
+                    println!(
+                        "  Domain: {}",
+                        proposal["domain_id"].as_str().unwrap_or("unknown")
+                    );
+
+                    if let Some(opened_at) = proposal["opened_at"].as_u64() {
+                        println!("  Opened at: {opened_at} (Unix timestamp)");
+                    }
+                    if let Some(closes_at) = proposal["closes_at"].as_u64() {
+                        println!("  Closes at: {closes_at} (Unix timestamp)");
+                    }
+                    if let Some(closed_at) = proposal["closed_at"].as_u64() {
+                        println!("  Closed at: {closed_at} (Unix timestamp)");
+                    }
+                }
+
+                ProposalCommands::Close { proposal_id } => {
+                    let params = serde_json::json!({ "proposal_id": proposal_id });
+                    rpc_call(endpoint, "governance.proposal.close", params)?;
+
+                    println!("✓ Proposal closed:");
+                    println!("  ID: {proposal_id}");
+                    println!("  The daemon has evaluated votes and determined the outcome.");
+                }
+
+                ProposalCommands::Cancel { proposal_id: _ } => {
+                    bail!("Cancel command not yet supported via RPC. Use 'proposal close' instead, or stop the daemon and modify the store directly.");
                 }
             }
-
-            ProposalCommands::Show { proposal_id } => {
-                let params = serde_json::json!({ "proposal_id": proposal_id });
-                let proposal = rpc_call(endpoint, "governance.proposal.get", params)?;
-
-                println!("Proposal:");
-                println!("  ID: {}", proposal["id"].as_str().unwrap_or("unknown"));
-                println!("  Title: {}", proposal["title"].as_str().unwrap_or("untitled"));
-                println!("  Description: {}", proposal["description"].as_str().unwrap_or(""));
-                println!("  State: {}", proposal["state"].as_str().unwrap_or("unknown"));
-                println!("  Proposer: {}", proposal["proposer"].as_str().unwrap_or("unknown"));
-                println!("  Domain: {}", proposal["domain_id"].as_str().unwrap_or("unknown"));
-
-                if let Some(opened_at) = proposal["opened_at"].as_u64() {
-                    println!("  Opened at: {opened_at} (Unix timestamp)");
-                }
-                if let Some(closes_at) = proposal["closes_at"].as_u64() {
-                    println!("  Closes at: {closes_at} (Unix timestamp)");
-                }
-                if let Some(closed_at) = proposal["closed_at"].as_u64() {
-                    println!("  Closed at: {closed_at} (Unix timestamp)");
-                }
-            }
-
-            ProposalCommands::Close { proposal_id } => {
-                let params = serde_json::json!({ "proposal_id": proposal_id });
-                rpc_call(endpoint, "governance.proposal.close", params)?;
-
-                println!("✓ Proposal closed:");
-                println!("  ID: {proposal_id}");
-                println!("  The daemon has evaluated votes and determined the outcome.");
-            }
-
-            ProposalCommands::Cancel { proposal_id: _ } => {
-                bail!("Cancel command not yet supported via RPC. Use 'proposal close' instead, or stop the daemon and modify the store directly.");
-            }
-        },
+        }
 
         GovCommands::Vote(vote_cmd) => match vote_cmd {
             VoteCommands::Cast {
@@ -3563,7 +3806,10 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 
             // Check if store directory exists
             if !store_dir.exists() {
-                bail!("Store directory does not exist: {}. Has the daemon been run?", store_dir.display());
+                bail!(
+                    "Store directory does not exist: {}. Has the daemon been run?",
+                    store_dir.display()
+                );
             }
 
             // Load current snapshot (if it exists)
@@ -3578,12 +3824,19 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                         .context("Failed to save snapshot with checksum")?;
 
                     println!("✓ Snapshot created successfully");
-                    println!("  Location: {}/state.snapshot.{}",
-                             store_dir.display(), snapshot.created_at);
+                    println!(
+                        "  Location: {}/state.snapshot.{}",
+                        store_dir.display(),
+                        snapshot.created_at
+                    );
 
-                    let gossip_peers = snapshot.gossip_state.as_ref()
+                    let gossip_peers = snapshot
+                        .gossip_state
+                        .as_ref()
                         .map_or(0, |g| g.vector_clock.len());
-                    let network_peers = snapshot.network_state.as_ref()
+                    let network_peers = snapshot
+                        .network_state
+                        .as_ref()
                         .map_or(0, |n| n.peer_x25519_keys.len());
 
                     println!("  Gossip peers: {gossip_peers}");
@@ -3591,7 +3844,9 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                     println!("  SHA256 checksum: generated");
                 }
                 Ok(None) => {
-                    println!("⚠ No snapshot exists yet. Start the daemon to generate initial state.");
+                    println!(
+                        "⚠ No snapshot exists yet. Start the daemon to generate initial state."
+                    );
                 }
                 Err(e) => {
                     bail!("Failed to load snapshot: {e}");
@@ -3613,7 +3868,8 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 
                         for (filename, timestamp, size) in snapshots {
                             // Format timestamp as human-readable date
-                            let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
+                            let datetime =
+                                std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
                             let formatted_date = format!("{datetime:?}");
 
                             // Format size in KB/MB
@@ -3625,10 +3881,12 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                                 format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
                             };
 
-                            println!("{:<30} {:<20} {:<15}",
-                                     filename,
-                                     &formatted_date[..std::cmp::min(19, formatted_date.len())],
-                                     formatted_size);
+                            println!(
+                                "{:<30} {:<20} {:<15}",
+                                filename,
+                                &formatted_date[..std::cmp::min(19, formatted_date.len())],
+                                formatted_size
+                            );
                         }
 
                         println!();
@@ -3663,11 +3921,17 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                         println!("Snapshot details:");
                         println!("  Created: {}", snapshot.created_at);
 
-                        let gossip_peers = snapshot.gossip_state.as_ref()
+                        let gossip_peers = snapshot
+                            .gossip_state
+                            .as_ref()
                             .map_or(0, |g| g.vector_clock.len());
-                        let gossip_topics = snapshot.gossip_state.as_ref()
+                        let gossip_topics = snapshot
+                            .gossip_state
+                            .as_ref()
                             .map_or(0, |g| g.subscriptions.len());
-                        let network_peers = snapshot.network_state.as_ref()
+                        let network_peers = snapshot
+                            .network_state
+                            .as_ref()
                             .map_or(0, |n| n.peer_x25519_keys.len());
 
                         println!("  Gossip peers: {gossip_peers}");
@@ -3693,13 +3957,15 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
             }
 
             // Delete snapshot file
-            std::fs::remove_file(&snapshot_path)
-                .with_context(|| format!("Failed to delete snapshot: {}", snapshot_path.display()))?;
+            std::fs::remove_file(&snapshot_path).with_context(|| {
+                format!("Failed to delete snapshot: {}", snapshot_path.display())
+            })?;
 
             // Delete checksum file if it exists
             if checksum_path.exists() {
-                std::fs::remove_file(&checksum_path)
-                    .with_context(|| format!("Failed to delete checksum: {}", checksum_path.display()))?;
+                std::fs::remove_file(&checksum_path).with_context(|| {
+                    format!("Failed to delete checksum: {}", checksum_path.display())
+                })?;
             }
 
             println!("✓ Snapshot deleted successfully");
@@ -3729,7 +3995,11 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 /// Handle authentication commands
 async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
     match cmd {
-        AuthCommands::Token { gateway, coop_id, scopes } => {
+        AuthCommands::Token {
+            gateway,
+            coop_id,
+            scopes,
+        } => {
             // Get keystore path and unlock
             let keystore_path = get_keystore_path(data_dir);
             if !keystore_path.exists() {
@@ -3743,10 +4013,12 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
             // Unlock keystore
             let mut keystore = icn_identity::keystore::AgeKeyStore::open(&keystore_path)
                 .context("Failed to open keystore")?;
-            keystore.unlock(passphrase.as_bytes())
+            keystore
+                .unlock(passphrase.as_bytes())
                 .context("Failed to unlock keystore")?;
 
-            let bundle = keystore.get_identity_bundle()
+            let bundle = keystore
+                .get_identity_bundle()
                 .context("Keystore is locked")?;
             let did = bundle.did().to_string();
             let keypair = bundle.keypair();
@@ -3826,9 +4098,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 .as_str()
                 .context("Missing token in response")?;
 
-            let expires_at = token_data["expires_at"]
-                .as_i64()
-                .unwrap_or(0);
+            let expires_at = token_data["expires_at"].as_i64().unwrap_or(0);
 
             let expiry_time = chrono::DateTime::from_timestamp(expires_at, 0)
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
@@ -3904,8 +4174,7 @@ async fn handle_init_coop_command(
     } else {
         // Create new identity
         println!("Step 1: Creating new identity");
-        std::fs::create_dir_all(data_dir)
-            .context("Failed to create data directory")?;
+        std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
         print!("Choose a passphrase: ");
         io::stdout().flush()?;
@@ -3944,8 +4213,8 @@ async fn handle_init_coop_command(
             if member_str.is_empty() {
                 continue;
             }
-            let member_did = Did::from_str(member_str)
-                .with_context(|| format!("Invalid DID: {member_str}"))?;
+            let member_did =
+                Did::from_str(member_str).with_context(|| format!("Invalid DID: {member_str}"))?;
             if !member_dids.contains(&member_did) {
                 member_dids.push(member_did);
             }
@@ -3993,7 +4262,8 @@ async fn handle_init_coop_command(
     let config_path = data_dir.join("icn.toml");
     if !config_path.exists() {
         println!("Step 3: Creating configuration");
-        let config_content = format!(r#"# ICN Configuration for {coop_name}
+        let config_content = format!(
+            r#"# ICN Configuration for {coop_name}
 # Generated by icnctl init-coop
 
 data_dir = "{}"
@@ -4033,10 +4303,11 @@ enabled = true
 bind_addr = "127.0.0.1:8080"
 # jwt_secret = "CHANGE_ME"  # Set this before starting!
 token_expiry_hours = 24
-"#, data_dir.display());
+"#,
+            data_dir.display()
+        );
 
-        std::fs::write(&config_path, config_content)
-            .context("Failed to write configuration")?;
+        std::fs::write(&config_path, config_content).context("Failed to write configuration")?;
         println!("  Config: {}", config_path.display());
     } else {
         println!("Step 3: Using existing configuration");
@@ -4106,7 +4377,10 @@ token_expiry_hours = 24
         }
     }
 
-    println!("✓ Trust edges created for {} member(s)", member_dids.len() - 1);
+    println!(
+        "✓ Trust edges created for {} member(s)",
+        member_dids.len() - 1
+    );
     println!();
 
     // Step 8: Final instructions
@@ -4222,7 +4496,10 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             let params = serde_json::json!({ "task_hash": task_hash });
             let result = rpc_call(endpoint, "compute.status", params)?;
 
-            let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let status = result
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
             println!("Task:   {task_hash}");
             println!("Status: {status}");
 
@@ -4231,9 +4508,18 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             }
 
             if let Some(task_result) = result.get("result") {
-                let outcome = task_result.get("outcome").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let fuel_used = task_result.get("fuel_used").and_then(|v| v.as_u64()).unwrap_or(0);
-                let duration_ms = task_result.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+                let outcome = task_result
+                    .get("outcome")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let fuel_used = task_result
+                    .get("fuel_used")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let duration_ms = task_result
+                    .get("duration_ms")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
 
                 println!();
                 println!("Result:");
@@ -4260,7 +4546,10 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             });
             let result = rpc_call(endpoint, "compute.cancel", params)?;
 
-            let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let status = result
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
             println!("Task cancelled successfully!");
             println!("Task hash: {task_hash}");
             println!("Status:    {status}");
@@ -4311,9 +4600,7 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
             let params = serde_json::json!({});
             let result = rpc_call(endpoint, "policy.list", params)?;
 
-            let policies = result
-                .as_array()
-                .context("Expected array of policies")?;
+            let policies = result.as_array().context("Expected array of policies")?;
 
             if policies.is_empty() {
                 println!("No policies configured");
@@ -4322,9 +4609,19 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
 
             println!("Configured Policies:");
             for policy in policies {
-                let coop_id = policy.get("coop_id").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let enforcement_mode = policy.get("enforcement_mode").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let rules_count = policy.get("rules").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                let coop_id = policy
+                    .get("coop_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let enforcement_mode = policy
+                    .get("enforcement_mode")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let rules_count = policy
+                    .get("rules")
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.len())
+                    .unwrap_or(0);
                 println!("  - {coop_id}: {rules_count} rules ({enforcement_mode})");
             }
         }
@@ -4352,11 +4649,26 @@ fn handle_quota_command(cmd: QuotaCommands, endpoint: &str) -> Result<()> {
             println!("Usage for {member} in {coop_id}:");
             println!();
 
-            let cpu_hours_month = result.get("cpu_hours_this_month").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let cpu_hours_total = result.get("cpu_hours_total").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let concurrent = result.get("concurrent_tasks").and_then(|v| v.as_u64()).unwrap_or(0);
-            let completed = result.get("tasks_completed_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
-            let credits_spent = result.get("credits_spent_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+            let cpu_hours_month = result
+                .get("cpu_hours_this_month")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let cpu_hours_total = result
+                .get("cpu_hours_total")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let concurrent = result
+                .get("concurrent_tasks")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let completed = result
+                .get("tasks_completed_this_month")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let credits_spent = result
+                .get("credits_spent_this_month")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
 
             println!("  CPU Hours (this month): {cpu_hours_month:.2}");
             println!("  CPU Hours (total):      {cpu_hours_total:.2}");
@@ -4380,14 +4692,29 @@ fn handle_quota_command(cmd: QuotaCommands, endpoint: &str) -> Result<()> {
 
             println!("Resource Usage for {coop_id}:");
             println!();
-            println!("{:<60} {:>12} {:>10} {:>12}", "Member", "CPU Hours", "Tasks", "Credits");
+            println!(
+                "{:<60} {:>12} {:>10} {:>12}",
+                "Member", "CPU Hours", "Tasks", "Credits"
+            );
             println!("{:-<96}", "");
 
             for record in usage_records {
-                let member = record.get("member_did").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let cpu_hours = record.get("cpu_hours_this_month").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let tasks = record.get("tasks_completed_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
-                let credits = record.get("credits_spent_this_month").and_then(|v| v.as_u64()).unwrap_or(0);
+                let member = record
+                    .get("member_did")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                let cpu_hours = record
+                    .get("cpu_hours_this_month")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let tasks = record
+                    .get("tasks_completed_this_month")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let credits = record
+                    .get("credits_spent_this_month")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
 
                 let short_member = if member.len() > 55 {
                     format!("{}...", &member[0..52])

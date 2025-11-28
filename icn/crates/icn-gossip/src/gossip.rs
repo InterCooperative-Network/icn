@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn, instrument};
+use tracing::{debug, info, instrument, warn};
 
 /// Callback for sending gossip messages to peers
 /// Parameters: (recipient_did, message)
@@ -104,10 +104,7 @@ pub struct GossipActor {
 
 impl GossipActor {
     /// Create a new gossip actor
-    pub fn new(
-        own_did: Did,
-        trust_lookup: TrustLookup,
-    ) -> Self {
+    pub fn new(own_did: Did, trust_lookup: TrustLookup) -> Self {
         Self::new_with_trust_graph(own_did, trust_lookup, None)
     }
 
@@ -132,10 +129,10 @@ impl GossipActor {
             notification_callback: None,
             peer_sampling: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
-            store: None, // Phase 17: Set via set_store()
+            store: None,                                // Phase 17: Set via set_store()
             misbehavior_detector: None, // Phase 18 Week 1-2: Set via set_misbehavior_detector()
-            partition_detector: None, // Phase 18 Week 3: Set via set_partition_detector()
-            partition_healer: None, // Phase 18 Week 3: Set via set_partition_healer()
+            partition_detector: None,   // Phase 18 Week 3: Set via set_partition_detector()
+            partition_healer: None,     // Phase 18 Week 3: Set via set_partition_healer()
             storage_quota_manager: None, // Phase 18 Week 6: Set via set_storage_quota_manager()
         };
 
@@ -197,12 +194,18 @@ impl GossipActor {
     }
 
     /// Set the misbehavior detector for Byzantine fault detection (Phase 18)
-    pub fn set_misbehavior_detector(&mut self, detector: Arc<RwLock<icn_security::MisbehaviorDetector>>) {
+    pub fn set_misbehavior_detector(
+        &mut self,
+        detector: Arc<RwLock<icn_security::MisbehaviorDetector>>,
+    ) {
         self.misbehavior_detector = Some(detector);
     }
 
     /// Set partition detector for network partition detection (Phase 18 Week 3)
-    pub fn set_partition_detector(&mut self, detector: Arc<RwLock<crate::partition::PartitionDetector>>) {
+    pub fn set_partition_detector(
+        &mut self,
+        detector: Arc<RwLock<crate::partition::PartitionDetector>>,
+    ) {
         self.partition_detector = Some(detector);
     }
 
@@ -212,7 +215,10 @@ impl GossipActor {
     }
 
     /// Set storage quota manager for per-DID storage limits (Phase 18 Week 6)
-    pub fn set_storage_quota_manager(&mut self, manager: Arc<RwLock<icn_store::StorageQuotaManager>>) {
+    pub fn set_storage_quota_manager(
+        &mut self,
+        manager: Arc<RwLock<icn_store::StorageQuotaManager>>,
+    ) {
         self.storage_quota_manager = Some(manager);
     }
 
@@ -222,7 +228,8 @@ impl GossipActor {
     /// It will merge vector clocks and resolve any conflicts that arose during the partition.
     pub async fn heal_partition_with_peer(&mut self, peer: &Did) -> Result<()> {
         // Check if we have both detector and healer
-        let (was_partitioned, healer_ref) = match (&self.partition_detector, &self.partition_healer) {
+        let (was_partitioned, healer_ref) = match (&self.partition_detector, &self.partition_healer)
+        {
             (Some(detector), Some(healer)) => {
                 let was_part = detector.read().await.is_partitioned(peer);
                 (was_part, healer.clone())
@@ -307,7 +314,12 @@ impl GossipActor {
 
     /// Send a message with scope-aware peer selection
     /// If peer_sampling is set, samples peers based on scope. Otherwise falls back to broadcast.
-    fn send_message_scoped(&self, scope: crate::types::Scope, fanout: usize, message: GossipMessage) {
+    fn send_message_scoped(
+        &self,
+        scope: crate::types::Scope,
+        fanout: usize,
+        message: GossipMessage,
+    ) {
         if let Some(sampling) = &self.peer_sampling {
             // Use scope-aware peer selection
             let peers = sampling(scope, fanout);
@@ -345,10 +357,7 @@ impl GossipActor {
             self.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
         }
 
-        let topic_obj = self
-            .topics
-            .get(topic)
-            .context("Topic not found")?;
+        let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
         // Check ACL
         let trust_class = (self.trust_lookup)(&self.own_did);
@@ -474,11 +483,19 @@ impl GossipActor {
                             if let Ok(handle) = rt {
                                 handle.block_on(async {
                                     let mut manager = quota_manager.write().await;
-                                    let _ = manager.release_usage(&oldest_author, &oldest_hash, oldest_size);
+                                    let _ = manager.release_usage(
+                                        &oldest_author,
+                                        &oldest_hash,
+                                        oldest_size,
+                                    );
                                 });
                             } else {
                                 let mut manager = quota_manager.blocking_write();
-                                let _ = manager.release_usage(&oldest_author, &oldest_hash, oldest_size);
+                                let _ = manager.release_usage(
+                                    &oldest_author,
+                                    &oldest_hash,
+                                    oldest_size,
+                                );
                             }
                         });
                     }
@@ -517,7 +534,9 @@ impl GossipActor {
                                         evicted_count = evicted.len(),
                                         "Storage quota eviction triggered"
                                     );
-                                    icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
+                                    icn_obs::metrics::storage_quotas::evicted_inc(
+                                        evicted.len() as u64
+                                    );
                                 }
                             }
                         }
@@ -552,7 +571,10 @@ impl GossipActor {
         if let Some(callback) = &self.notification_callback {
             if let Some(subscribers) = self.subscriptions.get(topic) {
                 for subscriber in subscribers {
-                    debug!("Notifying subscriber {} about new entry in topic {}", subscriber, topic);
+                    debug!(
+                        "Notifying subscriber {} about new entry in topic {}",
+                        subscriber, topic
+                    );
                     callback(topic.clone(), entry.clone(), subscriber.clone());
                 }
             }
@@ -624,14 +646,16 @@ impl GossipActor {
                         tokio::task::block_in_place(|| {
                             let rt = tokio::runtime::Handle::current();
                             rt.block_on(async {
-                                detector.write().await.record_violation(&subscriber, violation, evidence);
+                                detector.write().await.record_violation(
+                                    &subscriber,
+                                    violation,
+                                    evidence,
+                                );
                             })
                         });
                     }
 
-                    bail!(
-                        "Insufficient trust: score {trust_score:.3} < required {threshold:.3}"
-                    );
+                    bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
                 }
 
                 info!(
@@ -667,7 +691,10 @@ impl GossipActor {
                 tokio::task::block_in_place(|| {
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(async {
-                        detector.write().await.record_violation(&subscriber, violation, evidence);
+                        detector
+                            .write()
+                            .await
+                            .record_violation(&subscriber, violation, evidence);
                     })
                 });
             }
@@ -676,10 +703,7 @@ impl GossipActor {
         }
 
         // Add subscriber
-        let subscribers = self
-            .subscriptions
-            .entry(topic.to_string())
-            .or_default();
+        let subscribers = self.subscriptions.entry(topic.to_string()).or_default();
 
         if !subscribers.contains(&subscriber) {
             // Check subscriber limit to prevent unbounded growth
@@ -702,7 +726,11 @@ impl GossipActor {
                     tokio::task::block_in_place(|| {
                         let rt = tokio::runtime::Handle::current();
                         rt.block_on(async {
-                            detector.write().await.record_violation(&subscriber, violation, evidence);
+                            detector.write().await.record_violation(
+                                &subscriber,
+                                violation,
+                                evidence,
+                            );
                         })
                     });
                 }
@@ -757,9 +785,7 @@ impl GossipActor {
 
     /// Get all subscribers for a topic
     pub fn get_subscribers(&self, topic: &str) -> Vec<Did> {
-        self.subscriptions
-            .get(topic).cloned()
-            .unwrap_or_default()
+        self.subscriptions.get(topic).cloned().unwrap_or_default()
     }
 
     /// Get all topics a DID is subscribed to
@@ -863,7 +889,12 @@ impl GossipActor {
         }
 
         match message {
-            GossipMessage::Announce { hash, author, clock: _, topic } => {
+            GossipMessage::Announce {
+                hash,
+                author,
+                clock: _,
+                topic,
+            } => {
                 debug!(
                     peer_did = %sender,
                     topic = %topic,
@@ -922,9 +953,12 @@ impl GossipActor {
                         );
 
                         // Send Response back to the requester
-                        self.send_message(Some(sender.clone()), GossipMessage::Response {
-                            entry: entry.clone(),
-                        });
+                        self.send_message(
+                            Some(sender.clone()),
+                            GossipMessage::Response {
+                                entry: entry.clone(),
+                            },
+                        );
 
                         return Ok(());
                     }
@@ -969,13 +1003,19 @@ impl GossipActor {
                 // Get bloom filter for the topic
                 if let Some(filter) = self.bloom_filters.get(&topic) {
                     let filter_data = filter.to_data();
-                    debug!("Sending bloom filter for topic: {} ({} bits) to {}", topic, filter_data.size, sender);
+                    debug!(
+                        "Sending bloom filter for topic: {} ({} bits) to {}",
+                        topic, filter_data.size, sender
+                    );
 
                     // Send bloom filter back to the requester
-                    self.send_message(Some(sender.clone()), GossipMessage::SendBloomFilter {
-                        topic: topic.clone(),
-                        filter: filter_data,
-                    });
+                    self.send_message(
+                        Some(sender.clone()),
+                        GossipMessage::SendBloomFilter {
+                            topic: topic.clone(),
+                            filter: filter_data,
+                        },
+                    );
                 } else {
                     debug!("Topic not found: {}", topic);
                 }
@@ -1010,7 +1050,10 @@ impl GossipActor {
                 // The proper approach is for the sender to also send their entry hashes
                 // or we need a different anti-entropy approach.
 
-                debug!("Remote filter size: {}, hashes: {}", filter.size, filter.num_hashes);
+                debug!(
+                    "Remote filter size: {}, hashes: {}",
+                    filter.size, filter.num_hashes
+                );
                 debug!("Anti-entropy comparison complete for topic: {}", topic);
 
                 Ok(())
@@ -1028,10 +1071,16 @@ impl GossipActor {
                     let mut found = false;
                     for entries in self.entries.values() {
                         if let Some(entry) = entries.get(&hash) {
-                            debug!("Sending requested entry: hash={:?}, topic={}", hash, entry.topic);
-                            self.send_message(None, GossipMessage::Response {
-                                entry: entry.clone(),
-                            });
+                            debug!(
+                                "Sending requested entry: hash={:?}, topic={}",
+                                hash, entry.topic
+                            );
+                            self.send_message(
+                                None,
+                                GossipMessage::Response {
+                                    entry: entry.clone(),
+                                },
+                            );
                             sent_count += 1;
                             found = true;
                             break;
@@ -1044,11 +1093,20 @@ impl GossipActor {
                     }
                 }
 
-                debug!("RequestMissing complete: sent={}, not_found={}", sent_count, not_found_count);
+                debug!(
+                    "RequestMissing complete: sent={}, not_found={}",
+                    sent_count, not_found_count
+                );
                 Ok(())
             }
 
-            GossipMessage::Digest { topic, vector, bloom, hint_count, nonce } => {
+            GossipMessage::Digest {
+                topic,
+                vector,
+                bloom,
+                hint_count,
+                nonce,
+            } => {
                 // Digest Handler: Anti-entropy synchronization flow
                 // 1. Reconstruct remote bloom filter from data
                 // 2. Find entries we have that remote doesn't (bloom intersection)
@@ -1058,7 +1116,10 @@ impl GossipActor {
                 // 6. Update peer sync state (vector, bloom, nonce, deficit)
                 // 7. Send PullRequest with selected entry hashes
                 icn_obs::metrics::gossip::digests_received_inc();
-                debug!("Received Digest: topic={}, hint_count={}, nonce={}", topic, hint_count, nonce);
+                debug!(
+                    "Received Digest: topic={}, hint_count={}, nonce={}",
+                    topic, hint_count, nonce
+                );
 
                 // Check if we have this topic
                 if !self.topics.contains_key(&topic) {
@@ -1078,7 +1139,10 @@ impl GossipActor {
                 for (did, remote_seq) in &vector.clock {
                     let our_seq = self.clock.get(did);
                     if *remote_seq > our_seq {
-                        debug!("We're behind on {}: remote_seq={} > our_seq={}", did, remote_seq, our_seq);
+                        debug!(
+                            "We're behind on {}: remote_seq={} > our_seq={}",
+                            did, remote_seq, our_seq
+                        );
                         are_we_behind = true;
                         break;
                     }
@@ -1087,7 +1151,10 @@ impl GossipActor {
                 // Also check entry count hint
                 let our_entry_count = self.entries.get(&topic).map(|e| e.len()).unwrap_or(0);
                 if hint_count > our_entry_count as u32 {
-                    debug!("Remote has {} entries, we have {} - we're behind", hint_count, our_entry_count);
+                    debug!(
+                        "Remote has {} entries, we have {} - we're behind",
+                        hint_count, our_entry_count
+                    );
                     are_we_behind = true;
                 }
 
@@ -1101,7 +1168,8 @@ impl GossipActor {
                 debug!("Detected we're behind - sending PullRequest for all entries");
 
                 // Get trust class and limits
-                let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
+                let trust_class =
+                    (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
                 let limits = TrustResourceLimits::for_trust_class(trust_class);
                 let max_bytes = limits.max_pull_bytes;
 
@@ -1119,7 +1187,10 @@ impl GossipActor {
 
                     // Check if we can send (backpressure + limits + backoff)
                     if !peer_state.can_send(limits.max_outstanding_reqs, 10000) {
-                        debug!("Cannot send to peer {} - backpressured or at limit", peer_did);
+                        debug!(
+                            "Cannot send to peer {} - backpressured or at limit",
+                            peer_did
+                        );
                         let deficit = peer_state.deficit_bytes;
                         icn_obs::metrics::gossip::peer_deficit_bytes_set(
                             peer_did.as_str(),
@@ -1141,7 +1212,10 @@ impl GossipActor {
 
                 debug!(
                     "Sending PullRequest to {}: {} entries, ~{} bytes, nonce={}",
-                    peer_did, want_ids.len(), estimated_bytes, request_nonce
+                    peer_did,
+                    want_ids.len(),
+                    estimated_bytes,
+                    request_nonce
                 );
 
                 // Send PullRequest (immutable borrow of self)
@@ -1157,18 +1231,25 @@ impl GossipActor {
 
                 // Track metrics
                 icn_obs::metrics::gossip::pull_requests_sent_inc();
-                icn_obs::metrics::gossip::peer_deficit_bytes_set(
-                    peer_did.as_str(),
-                    deficit_after,
-                );
+                icn_obs::metrics::gossip::peer_deficit_bytes_set(peer_did.as_str(), deficit_after);
 
                 Ok(())
             }
 
-            GossipMessage::PullRequest { topic, want_ids, max_bytes, nonce } => {
+            GossipMessage::PullRequest {
+                topic,
+                want_ids,
+                max_bytes,
+                nonce,
+            } => {
                 icn_obs::metrics::gossip::pull_requests_received_inc();
-                debug!("Received PullRequest: topic={}, want_ids={}, max_bytes={}, nonce={}",
-                    topic, want_ids.len(), max_bytes, nonce);
+                debug!(
+                    "Received PullRequest: topic={}, want_ids={}, max_bytes={}, nonce={}",
+                    topic,
+                    want_ids.len(),
+                    max_bytes,
+                    nonce
+                );
 
                 // Get entries for the topic
                 let topic_entries = match self.entries.get(&topic) {
@@ -1210,16 +1291,23 @@ impl GossipActor {
                     }
                 }
 
-                debug!("Sending PullResponse: {} entries, {} bytes, truncated={}",
-                    response_entries.len(), total_bytes, truncated);
+                debug!(
+                    "Sending PullResponse: {} entries, {} bytes, truncated={}",
+                    response_entries.len(),
+                    total_bytes,
+                    truncated
+                );
 
                 // Send pull response
-                self.send_message(None, GossipMessage::PullResponse {
-                    topic: topic.clone(),
-                    entries: response_entries,
-                    truncated,
-                    nonce,
-                });
+                self.send_message(
+                    None,
+                    GossipMessage::PullResponse {
+                        topic: topic.clone(),
+                        entries: response_entries,
+                        truncated,
+                        nonce,
+                    },
+                );
 
                 icn_obs::metrics::gossip::pull_responses_sent_inc();
                 icn_obs::metrics::gossip::bytes_pushed_add(total_bytes as u64);
@@ -1227,10 +1315,20 @@ impl GossipActor {
                 Ok(())
             }
 
-            GossipMessage::PullResponse { topic, entries, truncated, nonce } => {
+            GossipMessage::PullResponse {
+                topic,
+                entries,
+                truncated,
+                nonce,
+            } => {
                 icn_obs::metrics::gossip::pull_responses_received_inc();
-                debug!("Received PullResponse: topic={}, entries={}, truncated={}, nonce={}",
-                    topic, entries.len(), truncated, nonce);
+                debug!(
+                    "Received PullResponse: topic={}, entries={}, truncated={}, nonce={}",
+                    topic,
+                    entries.len(),
+                    truncated,
+                    nonce
+                );
 
                 // Calculate total bytes received and extract peer DID from first entry
                 let mut total_bytes = 0u32;
@@ -1278,11 +1376,18 @@ impl GossipActor {
                 icn_obs::metrics::gossip::entries_received_inc();
                 self.update_gauge_metrics();
 
-                debug!("PullResponse processed: {} bytes received, truncated={}", total_bytes, truncated);
+                debug!(
+                    "PullResponse processed: {} bytes received, truncated={}",
+                    total_bytes, truncated
+                );
                 Ok(())
             }
 
-            GossipMessage::BlobAnnounce { blob_hash, peer_did, size_bytes } => {
+            GossipMessage::BlobAnnounce {
+                blob_hash,
+                peer_did,
+                size_bytes,
+            } => {
                 debug!(
                     peer_did = %peer_did,
                     blob_hash = %hex::encode(blob_hash),
@@ -1297,7 +1402,10 @@ impl GossipActor {
             }
 
             // Phase 17: Replica coordination messages
-            GossipMessage::ReplicaRequest { content_hash, requesting_peer } => {
+            GossipMessage::ReplicaRequest {
+                content_hash,
+                requesting_peer,
+            } => {
                 debug!(
                     peer_did = %requesting_peer,
                     content_hash = %hex::encode(content_hash),
@@ -1355,7 +1463,11 @@ impl GossipActor {
                 Ok(())
             }
 
-            GossipMessage::ReplicaOffer { content_hash, offering_peer, health } => {
+            GossipMessage::ReplicaOffer {
+                content_hash,
+                offering_peer,
+                health,
+            } => {
                 debug!(
                     peer_did = %offering_peer,
                     content_hash = %hex::encode(content_hash),
@@ -1370,10 +1482,13 @@ impl GossipActor {
                     let store_health = match health {
                         crate::types::ReplicaHealth::Healthy => icn_store::ReplicaHealth::Healthy,
                         crate::types::ReplicaHealth::Stale => icn_store::ReplicaHealth::Stale,
-                        crate::types::ReplicaHealth::Unreachable => icn_store::ReplicaHealth::Unreachable,
+                        crate::types::ReplicaHealth::Unreachable => {
+                            icn_store::ReplicaHealth::Unreachable
+                        }
                     };
 
-                    match store.add_replica(&content_hash, offering_peer.to_string(), store_health) {
+                    match store.add_replica(&content_hash, offering_peer.to_string(), store_health)
+                    {
                         Ok(_) => {
                             debug!(
                                 content_hash = %hex::encode(content_hash),
@@ -1406,7 +1521,10 @@ impl GossipActor {
                 Ok(())
             }
 
-            GossipMessage::ReplicaStatus { content_hash, replicas } => {
+            GossipMessage::ReplicaStatus {
+                content_hash,
+                replicas,
+            } => {
                 debug!(
                     content_hash = %hex::encode(content_hash),
                     replica_count = replicas.len(),
@@ -1422,9 +1540,13 @@ impl GossipActor {
                     for (did, health) in replicas {
                         // Convert gossip ReplicaHealth to store ReplicaHealth
                         let store_health = match health {
-                            crate::types::ReplicaHealth::Healthy => icn_store::ReplicaHealth::Healthy,
+                            crate::types::ReplicaHealth::Healthy => {
+                                icn_store::ReplicaHealth::Healthy
+                            }
                             crate::types::ReplicaHealth::Stale => icn_store::ReplicaHealth::Stale,
-                            crate::types::ReplicaHealth::Unreachable => icn_store::ReplicaHealth::Unreachable,
+                            crate::types::ReplicaHealth::Unreachable => {
+                                icn_store::ReplicaHealth::Unreachable
+                            }
                         };
 
                         match store.add_replica(&content_hash, did.to_string(), store_health) {
@@ -1458,7 +1580,11 @@ impl GossipActor {
             }
 
             // Phase 18 Week 3: Partition healing messages
-            GossipMessage::PartitionHealRequest { requesting_peer, vector_clock, last_contact_ms } => {
+            GossipMessage::PartitionHealRequest {
+                requesting_peer,
+                vector_clock,
+                last_contact_ms,
+            } => {
                 info!(
                     peer_did = %requesting_peer,
                     last_contact_ms = last_contact_ms,
@@ -1509,7 +1635,12 @@ impl GossipActor {
                 Ok(())
             }
 
-            GossipMessage::PartitionHealResponse { responding_peer, vector_clock, diverged_topics, entries_behind } => {
+            GossipMessage::PartitionHealResponse {
+                responding_peer,
+                vector_clock,
+                diverged_topics,
+                entries_behind,
+            } => {
                 info!(
                     peer_did = %responding_peer,
                     diverged_topics_count = diverged_topics.len(),
@@ -1548,7 +1679,10 @@ impl GossipActor {
                     for topic in diverged_topics {
                         if self.topics.contains_key(&topic) {
                             // Request all entries (empty want_ids means "send everything")
-                            let nonce = self.peer_sync.get_or_create(responding_peer.clone()).next_nonce();
+                            let nonce = self
+                                .peer_sync
+                                .get_or_create(responding_peer.clone())
+                                .next_nonce();
                             self.send_message(
                                 Some(responding_peer.clone()),
                                 GossipMessage::PullRequest {
@@ -1623,9 +1757,7 @@ impl GossipActor {
         remote_filter_data: &crate::types::BloomFilterData,
     ) -> Result<(crate::types::BloomFilterData, Vec<ContentHash>)> {
         // Get our bloom filter
-        let local_filter = self
-            .get_bloom_filter(topic)
-            .context("Topic not found")?;
+        let local_filter = self.get_bloom_filter(topic).context("Topic not found")?;
 
         // Reconstruct remote bloom filter
         let remote_filter = BloomFilter::from_data(remote_filter_data);
@@ -1666,11 +1798,7 @@ impl GossipActor {
         }
 
         // Get entry count for adaptive bloom sizing
-        let entry_count = self
-            .entries
-            .get(topic)
-            .map(|e| e.len())
-            .unwrap_or(0);
+        let entry_count = self.entries.get(topic).map(|e| e.len()).unwrap_or(0);
 
         if entry_count == 0 {
             debug!("Skipping digest for empty topic: {}", topic);
@@ -1692,7 +1820,10 @@ impl GossipActor {
         let bloom_data = bloom_with_entries.to_data();
 
         // Generate nonce for this digest (using own DID as peer state key)
-        let nonce = self.peer_sync.get_or_create(self.own_did.clone()).next_nonce();
+        let nonce = self
+            .peer_sync
+            .get_or_create(self.own_did.clone())
+            .next_nonce();
 
         // Create Digest message
         let digest = GossipMessage::Digest {
@@ -1707,14 +1838,16 @@ impl GossipActor {
         let topic_obj = self.topics.get(topic).unwrap(); // Safe: checked above
         let scope = topic_obj.scope;
         let fanout = match scope {
-            crate::types::Scope::LocalCluster => 8,  // Default local fanout
-            crate::types::Scope::Regional => 6,       // Default regional fanout
-            crate::types::Scope::Global => 4,         // Default global fanout
+            crate::types::Scope::LocalCluster => 8, // Default local fanout
+            crate::types::Scope::Regional => 6,     // Default regional fanout
+            crate::types::Scope::Global => 4,       // Default global fanout
         };
 
         // Send with scope-aware peer selection
-        debug!("Emitting digest for topic {} ({:?} scope, fanout={}): {} entries, nonce={}",
-               topic, scope, fanout, entry_count, nonce);
+        debug!(
+            "Emitting digest for topic {} ({:?} scope, fanout={}): {} entries, nonce={}",
+            topic, scope, fanout, entry_count, nonce
+        );
         self.send_message_scoped(scope, fanout, digest);
 
         // Track metrics
@@ -1822,14 +1955,17 @@ impl GossipActor {
     /// Note: Gossip entries are NOT restored - they will be fetched from peers
     /// via anti-entropy once the actor reconnects to the network.
     pub fn restore_state(&mut self, state: icn_snapshot::GossipState) -> Result<()> {
-        info!("Restoring gossip state: {} vector clock entries, {} subscriptions, {} topics",
-              state.vector_clock.len(), state.subscriptions.len(), state.topics.len());
+        info!(
+            "Restoring gossip state: {} vector clock entries, {} subscriptions, {} topics",
+            state.vector_clock.len(),
+            state.subscriptions.len(),
+            state.topics.len()
+        );
 
         // Restore vector clock
         self.clock.clock.clear();
         for (did_str, count) in state.vector_clock {
-            let did = Did::from_str(&did_str)
-                .context("Failed to parse DID from vector clock")?;
+            let did = Did::from_str(&did_str).context("Failed to parse DID from vector clock")?;
             self.clock.clock.insert(did, count);
         }
 
@@ -1844,7 +1980,8 @@ impl GossipActor {
                 AccessControl::TrustClass(TrustClass::Known)
             } else if topic_meta.access_control.starts_with("Participants:[") {
                 // Parse participant DIDs from "Participants:[did1,did2,...]" format
-                let dids_part = topic_meta.access_control
+                let dids_part = topic_meta
+                    .access_control
                     .strip_prefix("Participants:[")
                     .and_then(|s| s.strip_suffix("]"))
                     .unwrap_or("");
@@ -1856,21 +1993,29 @@ impl GossipActor {
                     // Parse comma-separated DIDs
                     let dids: Result<Vec<Did>> = dids_part
                         .split(',')
-                        .map(|did_str| Did::from_str(did_str.trim())
-                            .context(format!("Failed to parse participant DID: {did_str}")))
+                        .map(|did_str| {
+                            Did::from_str(did_str.trim())
+                                .context(format!("Failed to parse participant DID: {did_str}"))
+                        })
                         .collect();
 
                     match dids {
                         Ok(dids) => AccessControl::Participants(dids),
                         Err(e) => {
-                            warn!("Failed to parse Participants ACL: {}, defaulting to Public", e);
+                            warn!(
+                                "Failed to parse Participants ACL: {}, defaulting to Public",
+                                e
+                            );
                             AccessControl::Public
                         }
                     }
                 }
             } else {
                 // Default to Public for unknown ACL types
-                warn!("Unknown AccessControl: {}, defaulting to Public", topic_meta.access_control);
+                warn!(
+                    "Unknown AccessControl: {}, defaulting to Public",
+                    topic_meta.access_control
+                );
                 AccessControl::Public
             };
 
@@ -1898,13 +2043,16 @@ impl GossipActor {
         for (topic, subs) in state.subscriptions {
             // Warn if restoring subscriptions for a topic that wasn't in the snapshot
             if !self.topics.contains_key(&topic) {
-                warn!("Restoring subscriptions for topic '{}' which was not in snapshot topics. \
-                       Topic may have been deleted or snapshot may be corrupted.", topic);
+                warn!(
+                    "Restoring subscriptions for topic '{}' which was not in snapshot topics. \
+                       Topic may have been deleted or snapshot may be corrupted.",
+                    topic
+                );
             }
 
             for sub_str in subs {
-                let did = Did::from_str(&sub_str)
-                    .context("Failed to parse DID from subscription")?;
+                let did =
+                    Did::from_str(&sub_str).context("Failed to parse DID from subscription")?;
 
                 // Ensure subscription list exists for this topic (create if missing)
                 let sub_list = self.subscriptions.entry(topic.clone()).or_default();
@@ -1926,10 +2074,7 @@ pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
 impl GossipActor {
     /// Spawn a gossip actor and return a handle
-    pub fn spawn(
-        own_did: Did,
-        trust_lookup: TrustLookup,
-    ) -> GossipHandle {
+    pub fn spawn(own_did: Did, trust_lookup: TrustLookup) -> GossipHandle {
         Self::spawn_with_trust_graph(own_did, trust_lookup, None)
     }
 
@@ -1965,7 +2110,10 @@ pub fn start_digest_emitter(
     mut shutdown: tokio::sync::broadcast::Receiver<()>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        info!("Starting periodic digest emitter: interval={}ms, jitter=±{}ms", interval_ms, jitter_ms);
+        info!(
+            "Starting periodic digest emitter: interval={}ms, jitter=±{}ms",
+            interval_ms, jitter_ms
+        );
 
         loop {
             // Calculate next interval with jitter (thread_rng is recreated each iteration to avoid Send issues)
@@ -2013,7 +2161,10 @@ pub fn start_partition_checker(
     mut shutdown: tokio::sync::broadcast::Receiver<()>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        info!("Starting periodic partition checker: interval={}ms", check_interval_ms);
+        info!(
+            "Starting periodic partition checker: interval={}ms",
+            check_interval_ms
+        );
 
         loop {
             let sleep_duration = tokio::time::Duration::from_millis(check_interval_ms);
@@ -2142,9 +2293,7 @@ mod tests {
         let initial_count = gossip.clock.get(&did1);
 
         // Publish entry (increments clock)
-        gossip
-            .publish("global:identity", b"Test".to_vec())
-            .unwrap();
+        gossip.publish("global:identity", b"Test".to_vec()).unwrap();
 
         // Clock should have incremented
         assert_eq!(gossip.clock.get(&did1), initial_count + 1);
@@ -2217,7 +2366,10 @@ mod tests {
         assert_eq!(messages1.len(), 1);
 
         if let (Some(recipient), GossipMessage::Response { entry: resp_entry }) = &messages1[0] {
-            assert_eq!(recipient, &did2, "Response should be sent directly to requester");
+            assert_eq!(
+                recipient, &did2,
+                "Response should be sent directly to requester"
+            );
             assert_eq!(resp_entry.hash, hash);
             assert_eq!(resp_entry.data, data);
         } else {
@@ -2234,9 +2386,15 @@ mod tests {
         let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
 
         // Publish some entries
-        let hash1 = gossip.publish("global:identity", b"Entry 1".to_vec()).unwrap();
-        let hash2 = gossip.publish("global:identity", b"Entry 2".to_vec()).unwrap();
-        let _hash3 = gossip.publish("global:identity", b"Entry 3".to_vec()).unwrap();
+        let hash1 = gossip
+            .publish("global:identity", b"Entry 1".to_vec())
+            .unwrap();
+        let hash2 = gossip
+            .publish("global:identity", b"Entry 2".to_vec())
+            .unwrap();
+        let _hash3 = gossip
+            .publish("global:identity", b"Entry 3".to_vec())
+            .unwrap();
 
         // Track messages sent via callback
         let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -2442,8 +2600,8 @@ mod tests {
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
         // Create a topic with small max_entries for testing
-        let topic = Topic::new("test:entries".to_string(), AccessControl::Public)
-            .with_max_entries(5); // Small limit for fast testing
+        let topic =
+            Topic::new("test:entries".to_string(), AccessControl::Public).with_max_entries(5); // Small limit for fast testing
         gossip.create_topic(topic);
 
         // Publish more entries than the limit
@@ -2472,15 +2630,36 @@ mod tests {
             .collect();
 
         // Should contain the newest entries (5-9), oldest (0-4) should be evicted
-        assert!(data_values.contains(&"entry_9".to_string()), "Missing entry_9");
-        assert!(data_values.contains(&"entry_8".to_string()), "Missing entry_8");
-        assert!(data_values.contains(&"entry_7".to_string()), "Missing entry_7");
-        assert!(data_values.contains(&"entry_6".to_string()), "Missing entry_6");
-        assert!(data_values.contains(&"entry_5".to_string()), "Missing entry_5");
+        assert!(
+            data_values.contains(&"entry_9".to_string()),
+            "Missing entry_9"
+        );
+        assert!(
+            data_values.contains(&"entry_8".to_string()),
+            "Missing entry_8"
+        );
+        assert!(
+            data_values.contains(&"entry_7".to_string()),
+            "Missing entry_7"
+        );
+        assert!(
+            data_values.contains(&"entry_6".to_string()),
+            "Missing entry_6"
+        );
+        assert!(
+            data_values.contains(&"entry_5".to_string()),
+            "Missing entry_5"
+        );
 
         // Verify old entries were evicted
-        assert!(!data_values.contains(&"entry_0".to_string()), "entry_0 should have been evicted");
-        assert!(!data_values.contains(&"entry_4".to_string()), "entry_4 should have been evicted");
+        assert!(
+            !data_values.contains(&"entry_0".to_string()),
+            "entry_0 should have been evicted"
+        );
+        assert!(
+            !data_values.contains(&"entry_4".to_string()),
+            "entry_4 should have been evicted"
+        );
     }
 
     #[test]
@@ -2494,7 +2673,10 @@ mod tests {
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
         // Create the topic first
-        gossip.create_topic(Topic::new("test:notifications".to_string(), AccessControl::Public));
+        gossip.create_topic(Topic::new(
+            "test:notifications".to_string(),
+            AccessControl::Public,
+        ));
 
         // Track notifications
         let notifications = Arc::new(Mutex::new(Vec::new()));
@@ -2508,8 +2690,12 @@ mod tests {
         gossip.set_notification_callback(callback);
 
         // Subscribe both users to the topic
-        gossip.subscribe("test:notifications", subscriber1.clone()).unwrap();
-        gossip.subscribe("test:notifications", subscriber2.clone()).unwrap();
+        gossip
+            .subscribe("test:notifications", subscriber1.clone())
+            .unwrap();
+        gossip
+            .subscribe("test:notifications", subscriber2.clone())
+            .unwrap();
 
         // Publish an entry
         let data = b"Test notification".to_vec();
@@ -2517,12 +2703,22 @@ mod tests {
 
         // Verify both subscribers were notified
         let notifs = notifications.lock().unwrap();
-        assert_eq!(notifs.len(), 2, "Should have 2 notifications (one per subscriber)");
+        assert_eq!(
+            notifs.len(),
+            2,
+            "Should have 2 notifications (one per subscriber)"
+        );
 
         // Check that both subscribers received the notification
         let subscriber_dids: Vec<_> = notifs.iter().map(|(_, _, did)| did.clone()).collect();
-        assert!(subscriber_dids.contains(&subscriber1), "subscriber1 should be notified");
-        assert!(subscriber_dids.contains(&subscriber2), "subscriber2 should be notified");
+        assert!(
+            subscriber_dids.contains(&subscriber1),
+            "subscriber1 should be notified"
+        );
+        assert!(
+            subscriber_dids.contains(&subscriber2),
+            "subscriber2 should be notified"
+        );
 
         // Verify all notifications are for the correct topic and hash
         for (topic, notif_hash, _) in notifs.iter() {
@@ -2539,14 +2735,22 @@ mod tests {
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
         // Create the topic first
-        gossip.create_topic(Topic::new("test:no-callback".to_string(), AccessControl::Public));
+        gossip.create_topic(Topic::new(
+            "test:no-callback".to_string(),
+            AccessControl::Public,
+        ));
 
         // Subscribe without setting callback
-        gossip.subscribe("test:no-callback", subscriber.clone()).unwrap();
+        gossip
+            .subscribe("test:no-callback", subscriber.clone())
+            .unwrap();
 
         // This should not panic even without a callback set
         let result = gossip.publish("test:no-callback", b"Test".to_vec());
-        assert!(result.is_ok(), "Publishing should succeed even without notification callback");
+        assert!(
+            result.is_ok(),
+            "Publishing should succeed even without notification callback"
+        );
     }
 
     #[test]
@@ -2571,13 +2775,16 @@ mod tests {
 
         // Verify no notifications were sent
         let count = notification_count.lock().unwrap();
-        assert_eq!(*count, 0, "Should have 0 notifications when there are no subscribers");
+        assert_eq!(
+            *count, 0,
+            "Should have 0 notifications when there are no subscribers"
+        );
     }
 
     #[test]
     fn test_response_handler_triggers_notifications() {
-        use std::sync::Mutex;
         use sha2::{Digest, Sha256};
+        use std::sync::Mutex;
 
         let owner = KeyPair::generate().unwrap().did().clone();
         let subscriber = KeyPair::generate().unwrap().did().clone();
@@ -2586,8 +2793,13 @@ mod tests {
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
         // Create topic and subscribe
-        gossip.create_topic(Topic::new("test:response".to_string(), AccessControl::Public));
-        gossip.subscribe("test:response", subscriber.clone()).unwrap();
+        gossip.create_topic(Topic::new(
+            "test:response".to_string(),
+            AccessControl::Public,
+        ));
+        gossip
+            .subscribe("test:response", subscriber.clone())
+            .unwrap();
 
         // Track notifications
         let notifications = Arc::new(Mutex::new(Vec::new()));
@@ -2622,14 +2834,21 @@ mod tests {
         };
 
         // Simulate receiving a Response message from the author
-        let result = gossip.handle_message(&author, GossipMessage::Response {
-            entry: entry.clone(),
-        });
+        let result = gossip.handle_message(
+            &author,
+            GossipMessage::Response {
+                entry: entry.clone(),
+            },
+        );
         assert!(result.is_ok(), "Response handler should succeed");
 
         // Verify notification was sent to subscriber
         let notifs = notifications.lock().unwrap();
-        assert_eq!(notifs.len(), 1, "Should have 1 notification for the subscriber");
+        assert_eq!(
+            notifs.len(),
+            1,
+            "Should have 1 notification for the subscriber"
+        );
         assert_eq!(notifs[0].0, "test:response");
         assert_eq!(notifs[0].1, hash);
         assert_eq!(notifs[0].2, subscriber);
@@ -2645,8 +2864,8 @@ mod tests {
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
         // Create topic with small limit
-        let topic = Topic::new("test:max-entries".to_string(), AccessControl::Public)
-            .with_max_entries(3);
+        let topic =
+            Topic::new("test:max-entries".to_string(), AccessControl::Public).with_max_entries(3);
         gossip.create_topic(topic);
 
         // Send 5 entries via Response messages
@@ -2675,12 +2894,18 @@ mod tests {
             // Small delay to ensure distinct timestamps
             std::thread::sleep(std::time::Duration::from_millis(2));
 
-            gossip.handle_message(&author, GossipMessage::Response { entry }).unwrap();
+            gossip
+                .handle_message(&author, GossipMessage::Response { entry })
+                .unwrap();
         }
 
         // Verify only 3 entries are stored (max_entries enforced)
         let entries = gossip.get_entries("test:max-entries");
-        assert_eq!(entries.len(), 3, "Should enforce max_entries limit for Response messages");
+        assert_eq!(
+            entries.len(),
+            3,
+            "Should enforce max_entries limit for Response messages"
+        );
     }
 
     /// Trust-Gated Subscription Tests
@@ -2716,12 +2941,21 @@ mod tests {
 
         // Alice attempts to subscribe - should be rejected (score 0.05 < 0.1)
         let result = gossip.subscribe("test:trust-gated", alice.clone());
-        assert!(result.is_err(), "Subscription should be rejected due to low trust");
-        assert!(result.unwrap_err().to_string().contains("Insufficient trust"));
+        assert!(
+            result.is_err(),
+            "Subscription should be rejected due to low trust"
+        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Insufficient trust"));
 
         // Bob (unknown, score 0.0) attempts to subscribe - should also be rejected
         let result = gossip.subscribe("test:trust-gated", bob.clone());
-        assert!(result.is_err(), "Subscription should be rejected for unknown peer");
+        assert!(
+            result.is_err(),
+            "Subscription should be rejected for unknown peer"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -2756,7 +2990,10 @@ mod tests {
 
         // Alice attempts to subscribe - should succeed (final score ~0.42 >= 0.4)
         let result = gossip.subscribe("test:trust-gated", alice.clone());
-        assert!(result.is_ok(), "Subscription should be accepted with sufficient trust");
+        assert!(
+            result.is_ok(),
+            "Subscription should be accepted with sufficient trust"
+        );
         assert!(gossip.is_subscribed("test:trust-gated", &alice));
     }
 
@@ -2792,7 +3029,10 @@ mod tests {
 
         // Alice attempts to subscribe - should succeed (score 0.4 >= 0.4)
         let result = gossip.subscribe("test:trust-gated", alice.clone());
-        assert!(result.is_ok(), "Subscription should be accepted at exact threshold");
+        assert!(
+            result.is_ok(),
+            "Subscription should be accepted at exact threshold"
+        );
         assert!(gossip.is_subscribed("test:trust-gated", &alice));
     }
 
@@ -2812,7 +3052,10 @@ mod tests {
 
         // Alice attempts to subscribe - should succeed via fallback to Public ACL
         let result = gossip.subscribe("test:fallback", alice.clone());
-        assert!(result.is_ok(), "Subscription should succeed via ACL fallback");
+        assert!(
+            result.is_ok(),
+            "Subscription should succeed via ACL fallback"
+        );
         assert!(gossip.is_subscribed("test:fallback", &alice));
     }
 
@@ -2851,7 +3094,10 @@ mod tests {
 
         // Alice attempts to subscribe - should succeed (has score 0.8 >= 0.7)
         let result = gossip.subscribe("test:mixed", alice.clone());
-        assert!(result.is_ok(), "Trust score check should pass before ACL check");
+        assert!(
+            result.is_ok(),
+            "Trust score check should pass before ACL check"
+        );
         assert!(gossip.is_subscribed("test:mixed", &alice));
     }
 
@@ -2897,15 +3143,21 @@ mod tests {
             topic_meta.access_control
         );
         assert!(
-            topic_meta.access_control.contains(&participant1.to_string()),
+            topic_meta
+                .access_control
+                .contains(&participant1.to_string()),
             "ACL should contain participant1"
         );
         assert!(
-            topic_meta.access_control.contains(&participant2.to_string()),
+            topic_meta
+                .access_control
+                .contains(&participant2.to_string()),
             "ACL should contain participant2"
         );
         assert!(
-            topic_meta.access_control.contains(&participant3.to_string()),
+            topic_meta
+                .access_control
+                .contains(&participant3.to_string()),
             "ACL should contain participant3"
         );
 
@@ -2933,7 +3185,10 @@ mod tests {
                 "Should contain participant3"
             );
         } else {
-            panic!("Expected AccessControl::Participants, got: {:?}", restored_topic.acl);
+            panic!(
+                "Expected AccessControl::Participants, got: {:?}",
+                restored_topic.acl
+            );
         }
     }
 
@@ -2993,10 +3248,7 @@ mod tests {
 
         // Create state with subscription to a topic that doesn't exist
         let mut subscriptions = HashMap::new();
-        subscriptions.insert(
-            "nonexistent:topic".to_string(),
-            vec![did.to_string()],
-        );
+        subscriptions.insert("nonexistent:topic".to_string(), vec![did.to_string()]);
 
         let state = GossipState {
             vector_clock: HashMap::new(),
@@ -3006,7 +3258,10 @@ mod tests {
 
         // Restore should succeed (with warning logged)
         let result = gossip.restore_state(state);
-        assert!(result.is_ok(), "Restore should succeed despite missing topic");
+        assert!(
+            result.is_ok(),
+            "Restore should succeed despite missing topic"
+        );
 
         // Verify subscription was still created
         assert!(
@@ -3038,7 +3293,10 @@ mod tests {
             requesting_peer: did.clone(),
         };
         let result = gossip.handle_message(&did, request);
-        assert!(result.is_ok(), "ReplicaRequest should be handled successfully");
+        assert!(
+            result.is_ok(),
+            "ReplicaRequest should be handled successfully"
+        );
 
         // Test ReplicaOffer message
         let offer = GossipMessage::ReplicaOffer {
@@ -3047,7 +3305,10 @@ mod tests {
             health: ReplicaHealth::Healthy,
         };
         let result = gossip.handle_message(&did, offer);
-        assert!(result.is_ok(), "ReplicaOffer should be handled successfully");
+        assert!(
+            result.is_ok(),
+            "ReplicaOffer should be handled successfully"
+        );
 
         // Test ReplicaStatus message
         let peer2 = KeyPair::generate().unwrap().did().clone();
@@ -3059,7 +3320,10 @@ mod tests {
             ],
         };
         let result = gossip.handle_message(&did, status);
-        assert!(result.is_ok(), "ReplicaStatus should be handled successfully");
+        assert!(
+            result.is_ok(),
+            "ReplicaStatus should be handled successfully"
+        );
 
         // Verify message variant names
         let request2 = GossipMessage::ReplicaRequest {
@@ -3128,8 +3392,13 @@ mod tests {
         };
 
         // Store the entry in gossip1
-        gossip1.create_topic(Topic::new("test:replication".to_string(), AccessControl::Public));
-        gossip1.entries.entry("test:replication".to_string())
+        gossip1.create_topic(Topic::new(
+            "test:replication".to_string(),
+            AccessControl::Public,
+        ));
+        gossip1
+            .entries
+            .entry("test:replication".to_string())
             .or_default()
             .insert(content_hash, entry.clone());
 
@@ -3154,7 +3423,14 @@ mod tests {
         let messages = sent_messages.lock().unwrap();
         assert_eq!(messages.len(), 1, "Should have sent one message");
         match &messages[0] {
-            (Some(recipient), GossipMessage::ReplicaOffer { content_hash: hash, offering_peer, health }) => {
+            (
+                Some(recipient),
+                GossipMessage::ReplicaOffer {
+                    content_hash: hash,
+                    offering_peer,
+                    health,
+                },
+            ) => {
                 assert_eq!(recipient, &did2, "Offer should be sent to requester");
                 assert_eq!(hash, &content_hash, "Hash should match");
                 assert_eq!(offering_peer, &did1, "Offerer should be gossip1");
@@ -3165,7 +3441,10 @@ mod tests {
 
         // Verify gossip1 recorded itself as a replica in its store
         let replica_count = store1.get_replica_count(&content_hash)?;
-        assert_eq!(replica_count, 1, "Gossip1 should have recorded itself as replica");
+        assert_eq!(
+            replica_count, 1,
+            "Gossip1 should have recorded itself as replica"
+        );
 
         // Test 2: ReplicaOffer from gossip1 to gossip2
         // Gossip2 receives the offer
@@ -3179,12 +3458,18 @@ mod tests {
 
         // Verify gossip2 recorded gossip1 as a replica
         let replica_count = store2.get_replica_count(&content_hash)?;
-        assert_eq!(replica_count, 1, "Gossip2 should have recorded gossip1 as replica");
+        assert_eq!(
+            replica_count, 1,
+            "Gossip2 should have recorded gossip1 as replica"
+        );
 
         let metadata = store2.get_replica_metadata(&content_hash)?.unwrap();
         assert_eq!(metadata.replicas.len(), 1);
         assert_eq!(metadata.replicas[0].peer_did, did1.to_string());
-        assert_eq!(metadata.replicas[0].health, icn_store::ReplicaHealth::Healthy);
+        assert_eq!(
+            metadata.replicas[0].health,
+            icn_store::ReplicaHealth::Healthy
+        );
 
         // Test 3: ReplicaStatus batch update
         // Gossip2 receives a status update with multiple replicas
@@ -3207,7 +3492,9 @@ mod tests {
         assert_eq!(metadata.replicas.len(), 2);
 
         // Find the stale replica
-        let stale_replica = metadata.replicas.iter()
+        let stale_replica = metadata
+            .replicas
+            .iter()
             .find(|r| r.peer_did == did3.to_string())
             .expect("Should have did3 replica");
         assert_eq!(stale_replica.health, icn_store::ReplicaHealth::Stale);
@@ -3253,7 +3540,10 @@ mod tests {
         // Verify quota usage is being tracked
         let manager = quota_handle.read().await;
         let quota = manager.get_quota(&did).unwrap();
-        assert_eq!(quota.current_bytes, 300, "Should have recorded 300 bytes of usage");
+        assert_eq!(
+            quota.current_bytes, 300,
+            "Should have recorded 300 bytes of usage"
+        );
 
         Ok(())
     }
@@ -3286,10 +3576,16 @@ mod tests {
         // Second publish should fail (150 + 100 = 250 > 200 byte quota)
         let data2 = vec![2u8; 100];
         let result = gossip.publish("test:quota", data2);
-        assert!(result.is_err(), "Second publish should fail - quota exceeded");
+        assert!(
+            result.is_err(),
+            "Second publish should fail - quota exceeded"
+        );
 
         let error = result.unwrap_err().to_string();
-        assert!(error.contains("quota exceeded"), "Error should mention quota exceeded: {error}");
+        assert!(
+            error.contains("quota exceeded"),
+            "Error should mention quota exceeded: {error}"
+        );
 
         Ok(())
     }

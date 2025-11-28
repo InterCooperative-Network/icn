@@ -8,8 +8,8 @@
 use anyhow::Result;
 use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceParams, GovernanceProfileId,
-    MembershipConfig, MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState,
-    Vote, VoteChoice, VoteTally,
+    MembershipConfig, MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState, Vote,
+    VoteChoice, VoteTally,
 };
 use icn_identity::Did;
 use std::collections::HashMap;
@@ -49,7 +49,9 @@ impl GovernanceManager {
 
         let domain = GovernanceDomain::new(name, config);
 
-        let mut domains = self.domains.write()
+        let mut domains = self
+            .domains
+            .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         // Check for duplicate domain ID
@@ -63,15 +65,22 @@ impl GovernanceManager {
     }
 
     /// Get a governance domain
-    pub async fn get_domain(&self, domain_id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
-        let domains = self.domains.read()
+    pub async fn get_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+    ) -> Result<Option<GovernanceDomain>> {
+        let domains = self
+            .domains
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(domains.get(domain_id).cloned())
     }
 
     /// List all governance domains
     pub async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
-        let domains = self.domains.read()
+        let domains = self
+            .domains
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(domains.values().cloned().collect())
     }
@@ -87,7 +96,9 @@ impl GovernanceManager {
         payload: ProposalPayload,
     ) -> Result<()> {
         // Validate domain exists
-        let domains = self.domains.read()
+        let domains = self
+            .domains
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         if !domains.contains_key(&domain_id) {
             anyhow::bail!("Domain not found: {}", domain_id.0);
@@ -98,7 +109,9 @@ impl GovernanceManager {
         // Override the generated ID with the one provided
         proposal.id = proposal_id.clone();
 
-        let mut proposals = self.proposals.write()
+        let mut proposals = self
+            .proposals
+            .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         // Check for duplicate proposal ID
@@ -113,21 +126,31 @@ impl GovernanceManager {
 
     /// Get a specific proposal
     pub async fn get_proposal(&self, proposal_id: &ProposalId) -> Result<Option<Proposal>> {
-        let proposals = self.proposals.read()
+        let proposals = self
+            .proposals
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(proposals.get(proposal_id).cloned())
     }
 
     /// List all proposals
     pub async fn list_proposals(&self) -> Result<Vec<Proposal>> {
-        let proposals = self.proposals.read()
+        let proposals = self
+            .proposals
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(proposals.values().cloned().collect())
     }
 
     /// Open a proposal for voting
-    pub async fn open_proposal(&self, proposal_id: ProposalId, voting_period_seconds: u64) -> Result<()> {
-        let mut proposals = self.proposals.write()
+    pub async fn open_proposal(
+        &self,
+        proposal_id: ProposalId,
+        voting_period_seconds: u64,
+    ) -> Result<()> {
+        let mut proposals = self
+            .proposals
+            .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
@@ -140,11 +163,17 @@ impl GovernanceManager {
 
     /// Close a proposal and finalize voting
     pub async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
-        let mut proposals = self.proposals.write()
+        let mut proposals = self
+            .proposals
+            .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let votes = self.votes.read()
+        let votes = self
+            .votes
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let domains = self.domains.read()
+        let domains = self
+            .domains
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
@@ -157,7 +186,8 @@ impl GovernanceManager {
             }
 
             // Get domain to access governance params
-            let domain = domains.get(&proposal.domain_id)
+            let domain = domains
+                .get(&proposal.domain_id)
                 .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
 
             // Calculate vote tally using proper vote tally system
@@ -195,7 +225,9 @@ impl GovernanceManager {
             let final_state = if quorum_percentage < domain.config.params.quorum_percentage {
                 // Quorum not met
                 ProposalState::NoQuorum { closed_at: now }
-            } else if tally.approval_percentage() >= domain.config.params.approval_threshold_percentage {
+            } else if tally.approval_percentage()
+                >= domain.config.params.approval_threshold_percentage
+            {
                 // Quorum met and approval threshold reached
                 ProposalState::Accepted { closed_at: now }
             } else {
@@ -212,7 +244,9 @@ impl GovernanceManager {
 
     /// Get vote tally for a proposal
     pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
-        let votes = self.votes.read()
+        let votes = self
+            .votes
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         let proposal_votes = votes.get(proposal_id).cloned().unwrap_or_default();
         Ok(VoteTally::from(proposal_votes))
@@ -227,9 +261,12 @@ impl GovernanceManager {
         comment: Option<String>,
     ) -> Result<()> {
         // Validate proposal exists and is open for voting
-        let proposals = self.proposals.read()
+        let proposals = self
+            .proposals
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let proposal = proposals.get(&proposal_id)
+        let proposal = proposals
+            .get(&proposal_id)
             .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
 
         if !proposal.state.is_open() {
@@ -240,9 +277,12 @@ impl GovernanceManager {
         }
 
         // Validate voter is a member of the domain
-        let domains = self.domains.read()
+        let domains = self
+            .domains
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let domain = domains.get(&proposal.domain_id)
+        let domain = domains
+            .get(&proposal.domain_id)
             .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
 
         let is_member = match &domain.config.membership.source {
@@ -255,7 +295,11 @@ impl GovernanceManager {
         };
 
         if !is_member {
-            anyhow::bail!("Voter {} is not a member of domain {}", voter, proposal.domain_id.0);
+            anyhow::bail!(
+                "Voter {} is not a member of domain {}",
+                voter,
+                proposal.domain_id.0
+            );
         }
 
         // Drop locks before acquiring votes write lock to avoid holding multiple locks
@@ -263,14 +307,19 @@ impl GovernanceManager {
         drop(proposals);
 
         // Acquire votes write lock
-        let mut votes = self.votes.write()
+        let mut votes = self
+            .votes
+            .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         // CRITICAL: Re-check proposal state after acquiring votes lock to prevent TOCTOU
         // Another thread could have closed the proposal between our initial check and now
-        let proposals_recheck = self.proposals.read()
+        let proposals_recheck = self
+            .proposals
+            .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let proposal_recheck = proposals_recheck.get(&proposal_id)
+        let proposal_recheck = proposals_recheck
+            .get(&proposal_id)
             .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
 
         if !proposal_recheck.state.is_open() {
@@ -285,7 +334,11 @@ impl GovernanceManager {
         let proposal_votes = votes.entry(proposal_id.clone()).or_insert_with(Vec::new);
 
         if proposal_votes.iter().any(|v| v.voter == voter) {
-            anyhow::bail!("Voter {} has already voted on proposal {}", voter, proposal_id.0);
+            anyhow::bail!(
+                "Voter {} has already voted on proposal {}",
+                voter,
+                proposal_id.0
+            );
         }
 
         // Create and store vote record

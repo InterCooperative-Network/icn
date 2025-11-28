@@ -45,14 +45,16 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
             .subscribe(Arc::new(move |event| {
                 if let SystemEvent::ProposalAccepted {
                     proposal_id,
-                    payload: ProposalPayload::Budget {
-                        amount,
-                        recipient,
-                        currency,
-                        ..
-                    },
+                    payload:
+                        ProposalPayload::Budget {
+                            amount,
+                            recipient,
+                            currency,
+                            ..
+                        },
                     ..
-                } = event {
+                } = event
+                {
                     info!(
                         "📊 Executing budget proposal {}: {} {} to {}",
                         proposal_id.0, amount, currency, recipient
@@ -71,7 +73,10 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                         let audit_key = format!("gov:audit:{}", prop_id.0);
                         match store.get(audit_key.as_bytes()) {
                             Ok(Some(_)) => {
-                                info!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+                                info!(
+                                    "Proposal {} already executed, skipping duplicate event",
+                                    prop_id.0
+                                );
                                 return;
                             }
                             Ok(None) => {
@@ -79,8 +84,13 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                             }
                             Err(e) => {
                                 // Store read error: REFUSE to execute (fail-safe)
-                                eprintln!("ERROR: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
-                                eprintln!("       Refusing to execute to prevent potential duplicate");
+                                eprintln!(
+                                    "ERROR: Failed to check audit trail for proposal {}: {}",
+                                    prop_id.0, e
+                                );
+                                eprintln!(
+                                    "       Refusing to execute to prevent potential duplicate"
+                                );
                                 return;
                             }
                         }
@@ -94,10 +104,7 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
 
                         if let Ok(entry) = entry_result {
                             if let Ok(entry_hash) = ledger_guard.append_entry(entry) {
-                                info!(
-                                    "✅ Executed: {} {}",
-                                    amount, currency
-                                );
+                                info!("✅ Executed: {} {}", amount, currency);
 
                                 // Store audit trail
                                 let audit_key = format!("gov:audit:{}", prop_id.0);
@@ -146,9 +153,18 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
         .await
         .get_balance(&recipient_did, "credits");
 
-    info!("After 1st emission - Sender: {}, Recipient: {}", sender_balance_1, recipient_balance_1);
-    assert_eq!(sender_balance_1, -5000, "First execution should deduct 5000");
-    assert_eq!(recipient_balance_1, 5000, "First execution should credit 5000");
+    info!(
+        "After 1st emission - Sender: {}, Recipient: {}",
+        sender_balance_1, recipient_balance_1
+    );
+    assert_eq!(
+        sender_balance_1, -5000,
+        "First execution should deduct 5000"
+    );
+    assert_eq!(
+        recipient_balance_1, 5000,
+        "First execution should credit 5000"
+    );
 
     // Emit SAME event AGAIN (simulating duplicate gossip message or retry)
     info!("Emitting DUPLICATE event...");
@@ -162,7 +178,10 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
         .await
         .get_balance(&recipient_did, "credits");
 
-    info!("After 2nd emission - Sender: {}, Recipient: {}", sender_balance_2, recipient_balance_2);
+    info!(
+        "After 2nd emission - Sender: {}, Recipient: {}",
+        sender_balance_2, recipient_balance_2
+    );
 
     // **IDEMPOTENCY VERIFICATION**: Balances should NOT change after duplicate event
     if sender_balance_2 == -5000 && recipient_balance_2 == 5000 {
@@ -172,12 +191,21 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
     } else {
         info!("❌ IDEMPOTENCY FAILED: Balances changed on duplicate event");
         info!("   Sender balance: {} (expected -5000)", sender_balance_2);
-        info!("   Recipient balance: {} (expected +5000)", recipient_balance_2);
+        info!(
+            "   Recipient balance: {} (expected +5000)",
+            recipient_balance_2
+        );
     }
 
     // Assert that duplicate events are properly ignored
-    assert_eq!(sender_balance_2, -5000, "Duplicate event should not change sender balance");
-    assert_eq!(recipient_balance_2, 5000, "Duplicate event should not change recipient balance");
+    assert_eq!(
+        sender_balance_2, -5000,
+        "Duplicate event should not change sender balance"
+    );
+    assert_eq!(
+        recipient_balance_2, 5000,
+        "Duplicate event should not change recipient balance"
+    );
 
     Ok(())
 }

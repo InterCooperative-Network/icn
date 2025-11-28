@@ -332,7 +332,10 @@ impl App {
         match self.fetch_health().await {
             Ok(health) => {
                 self.network_peers = health.network_peers;
-                self.status = format!("Connected to {} | {} peers", self.gateway_url, health.network_peers);
+                self.status = format!(
+                    "Connected to {} | {} peers",
+                    self.gateway_url, health.network_peers
+                );
             }
             Err(e) => {
                 self.error = Some(format!("Failed to connect: {e}"));
@@ -492,7 +495,10 @@ impl App {
     }
 
     async fn fetch_votes(&self, proposal_id: &str) -> Result<ApiVoteTally> {
-        let url = format!("{}/v1/gov/proposals/{}/votes", self.gateway_url, proposal_id);
+        let url = format!(
+            "{}/v1/gov/proposals/{}/votes",
+            self.gateway_url, proposal_id
+        );
         let mut req = self.client.get(&url);
         if let Some(auth) = self.auth_header() {
             req = req.header("Authorization", auth);
@@ -513,7 +519,6 @@ impl App {
         Ok(Vec::new())
     }
 }
-
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -564,8 +569,7 @@ struct ApiProposal {
     description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Deserialize, Default)]
 struct ApiVoteTally {
     #[serde(default)]
     for_votes: u32,
@@ -696,7 +700,11 @@ fn ui(f: &mut Frame, app: &App) {
         .collect();
 
     let tabs = Tabs::new(tab_titles)
-        .block(Block::default().borders(Borders::ALL).title(" ICN Console "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" ICN Console "),
+        )
         .select(app.current_tab)
         .style(Style::default().fg(Color::Cyan))
         .highlight_style(
@@ -939,10 +947,7 @@ fn render_governance(f: &mut Frame, app: &App, area: Rect) {
                 _ => Style::default(),
             };
 
-            let votes = format!(
-                "{}/{}/{}",
-                p.votes_for, p.votes_against, p.votes_abstain
-            );
+            let votes = format!("{}/{}/{}", p.votes_for, p.votes_against, p.votes_abstain);
 
             Row::new(vec![
                 Cell::from(p.id.clone()),
@@ -967,11 +972,10 @@ fn render_governance(f: &mut Frame, app: &App, area: Rect) {
             .style(Style::default().add_modifier(Modifier::BOLD))
             .bottom_margin(1),
     )
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(format!(" Proposals ({}) - Press Enter to vote ", app.proposals.len())),
-    )
+    .block(Block::default().borders(Borders::ALL).title(format!(
+        " Proposals ({}) - Press Enter to vote ",
+        app.proposals.len()
+    )))
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 

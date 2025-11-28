@@ -223,11 +223,7 @@ mod tests {
         // Add conflict
         let winner_hash = ContentHash::from_bytes([4u8; 32]);
         let loser_hash = ContentHash::from_bytes([5u8; 32]);
-        let conflict = ConflictPair::new(
-            loser_hash,
-            winner_hash,
-            "earlier timestamp".to_string(),
-        );
+        let conflict = ConflictPair::new(loser_hash, winner_hash, "earlier timestamp".to_string());
         decision.add_conflict(conflict);
         assert_eq!(decision.conflicts.len(), 1);
 
@@ -249,10 +245,7 @@ mod tests {
         assert_eq!(item.entry_id, entry_id);
         assert_eq!(item.author, author);
         assert!(item.metadata.is_some());
-        assert_eq!(
-            item.metadata.unwrap(),
-            "balance would be -150, limit -100"
-        );
+        assert_eq!(item.metadata.unwrap(), "balance would be -150, limit -100");
     }
 
     #[test]

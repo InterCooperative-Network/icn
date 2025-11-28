@@ -13,12 +13,12 @@ use crate::api;
 use crate::auth::AuthManager;
 use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
+use crate::error::Result;
 use crate::events::EventBroadcaster;
 use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
-use crate::rate_limit::{RateLimitConfig, RateLimiter, IpRateLimiter};
-use crate::security::{SecurityConfig, SecurityHeaders, configure_cors};
-use crate::error::Result;
+use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
+use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 
 /// Gateway server configuration
 pub struct GatewayServer {
@@ -42,7 +42,11 @@ impl GatewayServer {
     }
 
     /// Create a new gateway server with persistent storage
-    pub fn new_with_storage(bind_addr: SocketAddr, jwt_secret: Vec<u8>, data_dir: std::path::PathBuf) -> Self {
+    pub fn new_with_storage(
+        bind_addr: SocketAddr,
+        jwt_secret: Vec<u8>,
+        data_dir: std::path::PathBuf,
+    ) -> Self {
         GatewayServer {
             bind_addr,
             jwt_secret,
@@ -204,8 +208,10 @@ impl GatewayServer {
                                 .service(api::coops::remove_member)
                                 .service(api::coops::update_member_role)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
-                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                                .wrap(auth.clone())
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         )
                         // Protected ledger endpoints (auth + rate limiting)
                         .service(
@@ -214,8 +220,10 @@ impl GatewayServer {
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
-                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                                .wrap(auth.clone())
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         )
                         // Protected governance endpoints (auth + rate limiting)
                         // NOTE: Requires GovernanceHandle from daemon supervisor
@@ -233,29 +241,33 @@ impl GatewayServer {
                                 .service(api::governance::close_proposal)
                                 .service(api::governance::cast_vote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
-                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                                .wrap(auth.clone())
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         )
                         // Protected compute endpoints (auth + rate limiting)
                         .service(
                             web::scope("/compute")
                                 .service(api::compute::submit_task)
                                 .service(api::compute::get_status)
-                                .wrap(middleware::from_fn(crate::rate_limit::rate_limit_middleware))
-                                .wrap(auth)
-                        )
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth),
+                        ),
                 )
                 // Static files and root route
                 .service(web::redirect("/", "/static/index.html"))
                 .service(
                     fs::Files::new("/static", get_static_dir())
                         .prefer_utf8(true)
-                        .use_last_modified(true)
+                        .use_last_modified(true),
                 )
         })
         // Production-ready HTTP timeout configuration
-        .keep_alive(Duration::from_secs(75))          // HTTP keep-alive timeout (75s is standard)
-        .client_request_timeout(Duration::from_secs(30))  // Max time to read request headers
+        .keep_alive(Duration::from_secs(75)) // HTTP keep-alive timeout (75s is standard)
+        .client_request_timeout(Duration::from_secs(30)) // Max time to read request headers
         .client_disconnect_timeout(Duration::from_secs(5)) // Max time waiting for client to read response
         .bind(self.bind_addr)?
         .run();

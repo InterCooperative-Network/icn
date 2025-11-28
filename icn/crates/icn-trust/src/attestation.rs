@@ -263,31 +263,32 @@ impl TrustAttestation {
 
     /// Create an attestation from a TrustEdge (before signing)
     pub fn from_trust_edge(edge: &TrustEdge) -> Self {
-        let ttl_seconds = edge
-            .expires_at
-            .map(|exp| {
-                // Validate expiration time is in the future
-                // Warn on extreme clock skew (>30 days in the past)
-                if exp < edge.created_at {
-                    tracing::warn!(
+        let ttl_seconds =
+            edge.expires_at
+                .map(|exp| {
+                    // Validate expiration time is in the future
+                    // Warn on extreme clock skew (>30 days in the past)
+                    if exp < edge.created_at {
+                        tracing::warn!(
                         "Trust edge expires_at ({}) is before created_at ({}), treating as expired",
                         exp, edge.created_at
                     );
-                    0 // Already expired
-                } else {
-                    let ttl = exp.saturating_sub(edge.created_at);
-                    // Warn on suspiciously long TTL (>10 years)
-                    const MAX_REASONABLE_TTL: u64 = 10 * 365 * 24 * 60 * 60;
-                    if ttl > MAX_REASONABLE_TTL {
-                        tracing::warn!(
-                            "Trust edge has suspiciously long TTL: {} seconds ({} years)",
-                            ttl, ttl / (365 * 24 * 60 * 60)
-                        );
+                        0 // Already expired
+                    } else {
+                        let ttl = exp.saturating_sub(edge.created_at);
+                        // Warn on suspiciously long TTL (>10 years)
+                        const MAX_REASONABLE_TTL: u64 = 10 * 365 * 24 * 60 * 60;
+                        if ttl > MAX_REASONABLE_TTL {
+                            tracing::warn!(
+                                "Trust edge has suspiciously long TTL: {} seconds ({} years)",
+                                ttl,
+                                ttl / (365 * 24 * 60 * 60)
+                            );
+                        }
+                        ttl
                     }
-                    ttl
-                }
-            })
-            .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
+                })
+                .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
 
         Self {
             issuer: edge.source.clone(),
@@ -315,10 +316,7 @@ impl TrustAttestation {
         let (_base, decoded) = multibase::decode(encoded)?;
 
         if decoded.len() != 32 {
-            anyhow::bail!(
-                "Invalid public key length: {} (expected 32)",
-                decoded.len()
-            );
+            anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
         }
 
         let key_bytes: [u8; 32] = decoded
@@ -356,8 +354,7 @@ mod tests {
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
-        let mut attestation =
-            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
 
         // Sign
         attestation.sign(&alice).unwrap();
@@ -372,8 +369,7 @@ mod tests {
         let bob = KeyPair::generate().unwrap();
         let eve = KeyPair::generate().unwrap();
 
-        let mut attestation =
-            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
 
         // Sign with Eve's key (wrong issuer)
         attestation.issuer = eve.did().clone();
@@ -391,8 +387,7 @@ mod tests {
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
-        let mut attestation =
-            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
 
         attestation.sign(&alice).unwrap();
 
@@ -408,8 +403,8 @@ mod tests {
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
-        let attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
-            .with_ttl(3600); // 1 hour
+        let attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_ttl(3600); // 1 hour
 
         let now = attestation.created_at;
 
@@ -482,8 +477,7 @@ mod tests {
         let bob = KeyPair::generate().unwrap();
         let eve = KeyPair::generate().unwrap();
 
-        let mut attestation =
-            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
 
         // Try to sign with Eve's keypair (should fail)
         let result = attestation.sign(&eve);
@@ -677,4 +671,3 @@ mod tests {
         assert!(!high_trust.should_supersede(low_trust.created_at, low_trust.score));
     }
 }
-

@@ -15,8 +15,7 @@ use crate::models::{
 };
 use crate::validation;
 use icn_governance::{
-    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload,
-    VoteChoice,
+    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, VoteChoice,
 };
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -37,11 +36,13 @@ pub async fn create_domain(
     require_scope(&http_req, "gov:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
-    let creator_did: Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let creator_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     // Validate inputs
     validation::validate_domain_id(&req.id)?;
@@ -54,13 +55,13 @@ pub async fn create_domain(
     const MAX_VOTING_PERIOD_DAYS: u64 = validation::MAX_VOTING_PERIOD_SECONDS / 86400;
     if req.voting_period_days == 0 {
         return Err(crate::error::GatewayError::BadRequest(
-            "Voting period must be greater than 0 days".to_string()
+            "Voting period must be greater than 0 days".to_string(),
         ));
     }
     if req.voting_period_days > MAX_VOTING_PERIOD_DAYS {
-        return Err(crate::error::GatewayError::BadRequest(
-            format!("Voting period exceeds maximum of {MAX_VOTING_PERIOD_DAYS} days (1 year)")
-        ));
+        return Err(crate::error::GatewayError::BadRequest(format!(
+            "Voting period exceeds maximum of {MAX_VOTING_PERIOD_DAYS} days (1 year)"
+        )));
     }
 
     // Safe to multiply now - voting_period_days <= 365
@@ -72,8 +73,14 @@ pub async fn create_domain(
     )?;
 
     // Convert member DIDs
-    let members: Result<Vec<Did>> = req.members.iter()
-        .map(|s| s.parse().map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid member DID: {e}"))))
+    let members: Result<Vec<Did>> = req
+        .members
+        .iter()
+        .map(|s| {
+            s.parse().map_err(|e| {
+                crate::error::GatewayError::BadRequest(format!("Invalid member DID: {e}"))
+            })
+        })
         .collect();
     let members = members?;
 
@@ -89,30 +96,37 @@ pub async fn create_domain(
 
     // Create domain via governance manager
     let domain_id = GovernanceDomainId(req.id.clone());
-    gov_mgr.create_domain(
-        domain_id.clone(),
-        req.name.clone(),
-        req.profile.clone(),
-        params,
-        membership,
-    ).await?;
+    gov_mgr
+        .create_domain(
+            domain_id.clone(),
+            req.name.clone(),
+            req.profile.clone(),
+            params,
+            membership,
+        )
+        .await?;
 
     // Track domain creation
     gateway::governance_domains_created_inc();
 
     // Broadcast event to WebSocket subscribers
-    event_broadcaster.broadcast(
-        &domain_id.0,
-        GatewayEvent::GovernanceDomainCreated {
-            domain_id: domain_id.0.clone(),
-            name: req.name.clone(),
-            creator: creator_did.to_string(),
-        },
-    ).await;
+    event_broadcaster
+        .broadcast(
+            &domain_id.0,
+            GatewayEvent::GovernanceDomainCreated {
+                domain_id: domain_id.0.clone(),
+                name: req.name.clone(),
+                creator: creator_did.to_string(),
+            },
+        )
+        .await;
 
     // Return created domain
-    let domain = gov_mgr.get_domain(&domain_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError("Domain creation succeeded but domain not found".to_string()))?;
+    let domain = gov_mgr.get_domain(&domain_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Domain creation succeeded but domain not found".to_string(),
+        )
+    })?;
 
     Ok(HttpResponse::Created().json(domain))
 }
@@ -131,16 +145,18 @@ pub async fn list_domains(
 
     // Apply pagination
     let limit = if let Some(limit_str) = query.get("limit") {
-        let limit: usize = limit_str.parse()
-            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string()))?;
+        let limit: usize = limit_str.parse().map_err(|_| {
+            crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string())
+        })?;
         validation::validate_history_limit(limit)?
     } else {
         validation::DEFAULT_HISTORY_LIMIT
     };
 
     let offset = if let Some(offset_str) = query.get("offset") {
-        let offset: usize = offset_str.parse()
-            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string()))?;
+        let offset: usize = offset_str.parse().map_err(|_| {
+            crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string())
+        })?;
         validation::validate_history_offset(offset)?
     } else {
         0
@@ -151,11 +167,7 @@ pub async fn list_domains(
 
     // Apply pagination slice
     let total = domains.len();
-    let paginated: Vec<_> = domains
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+    let paginated: Vec<_> = domains.into_iter().skip(offset).take(limit).collect();
 
     // Return with pagination metadata
     let response = serde_json::json!({
@@ -182,8 +194,9 @@ pub async fn get_domain(
     require_scope(&http_req, "gov:read")?;
 
     let domain_id = GovernanceDomainId(id.into_inner());
-    let domain = gov_mgr.get_domain(&domain_id).await?
-        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Domain not found: {}", domain_id.0)))?;
+    let domain = gov_mgr.get_domain(&domain_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Domain not found: {}", domain_id.0))
+    })?;
 
     Ok(HttpResponse::Ok().json(domain))
 }
@@ -204,11 +217,13 @@ pub async fn create_proposal(
     require_scope(&http_req, "gov:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
-    let proposer_did: Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let proposer_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     // Validate inputs
     validation::validate_domain_id(&req.domain_id)?;
@@ -221,18 +236,23 @@ pub async fn create_proposal(
             // Validate text body
             if body.is_empty() || body.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Proposal text body cannot be empty or whitespace-only".to_string()
+                    "Proposal text body cannot be empty or whitespace-only".to_string(),
                 ));
             }
             if body.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
-                return Err(crate::error::GatewayError::BadRequest(
-                    format!("Proposal text body exceeds maximum length of {} characters",
-                        validation::MAX_PROPOSAL_DESCRIPTION_LEN)
-                ));
+                return Err(crate::error::GatewayError::BadRequest(format!(
+                    "Proposal text body exceeds maximum length of {} characters",
+                    validation::MAX_PROPOSAL_DESCRIPTION_LEN
+                )));
             }
             ProposalPayload::Text { body: body.clone() }
-        },
-        ProposalPayloadRequest::Budget { amount, recipient, currency, purpose } => {
+        }
+        ProposalPayloadRequest::Budget {
+            amount,
+            recipient,
+            currency,
+            purpose,
+        } => {
             // Validate budget amount
             validation::validate_payment_amount(*amount)?;
 
@@ -242,89 +262,95 @@ pub async fn create_proposal(
             // Validate purpose
             if purpose.is_empty() || purpose.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Budget purpose cannot be empty or whitespace-only".to_string()
+                    "Budget purpose cannot be empty or whitespace-only".to_string(),
                 ));
             }
             if purpose.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
-                return Err(crate::error::GatewayError::BadRequest(
-                    format!("Budget purpose exceeds maximum length of {} characters",
-                        validation::MAX_PROPOSAL_DESCRIPTION_LEN)
-                ));
+                return Err(crate::error::GatewayError::BadRequest(format!(
+                    "Budget purpose exceeds maximum length of {} characters",
+                    validation::MAX_PROPOSAL_DESCRIPTION_LEN
+                )));
             }
 
-            let recipient_did: Did = recipient.parse()
-                .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid recipient DID: {e}")))?;
+            let recipient_did: Did = recipient.parse().map_err(|e| {
+                crate::error::GatewayError::BadRequest(format!("Invalid recipient DID: {e}"))
+            })?;
             ProposalPayload::Budget {
                 amount: *amount,
                 recipient: recipient_did,
                 currency: currency.clone(),
                 purpose: purpose.clone(),
             }
-        },
+        }
         ProposalPayloadRequest::Membership { action, did } => {
-            let member_did: Did = did.parse()
-                .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid member DID: {e}")))?;
+            let member_did: Did = did.parse().map_err(|e| {
+                crate::error::GatewayError::BadRequest(format!("Invalid member DID: {e}"))
+            })?;
 
             // Parse action string to MembershipAction
             use icn_governance::MembershipAction;
             let membership_action = match action.to_lowercase().as_str() {
                 "add" => MembershipAction::Add,
                 "remove" => MembershipAction::Remove,
-                _ => return Err(crate::error::GatewayError::BadRequest(format!("Invalid action: {action}"))),
+                _ => {
+                    return Err(crate::error::GatewayError::BadRequest(format!(
+                        "Invalid action: {action}"
+                    )))
+                }
             };
 
             ProposalPayload::Membership {
                 action: membership_action,
                 member: member_did,
             }
-        },
+        }
         ProposalPayloadRequest::ConfigChange { key, value } => {
             // Validate config key
             if key.is_empty() || key.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Config key cannot be empty or whitespace-only".to_string()
+                    "Config key cannot be empty or whitespace-only".to_string(),
                 ));
             }
             if key.len() > validation::MAX_GOVERNANCE_MODEL_LEN {
-                return Err(crate::error::GatewayError::BadRequest(
-                    format!("Config key exceeds maximum length of {} characters",
-                        validation::MAX_GOVERNANCE_MODEL_LEN)
-                ));
+                return Err(crate::error::GatewayError::BadRequest(format!(
+                    "Config key exceeds maximum length of {} characters",
+                    validation::MAX_GOVERNANCE_MODEL_LEN
+                )));
             }
 
             // Validate config value
             if value.is_empty() || value.trim().is_empty() {
                 return Err(crate::error::GatewayError::BadRequest(
-                    "Config value cannot be empty or whitespace-only".to_string()
+                    "Config value cannot be empty or whitespace-only".to_string(),
                 ));
             }
             if value.len() > validation::MAX_PROPOSAL_DESCRIPTION_LEN {
-                return Err(crate::error::GatewayError::BadRequest(
-                    format!("Config value exceeds maximum length of {} characters",
-                        validation::MAX_PROPOSAL_DESCRIPTION_LEN)
-                ));
+                return Err(crate::error::GatewayError::BadRequest(format!(
+                    "Config value exceeds maximum length of {} characters",
+                    validation::MAX_PROPOSAL_DESCRIPTION_LEN
+                )));
             }
 
             // Combine key-value into JSON config
             let new_config = serde_json::json!({ key: value }).to_string();
-            ProposalPayload::ConfigChange {
-                new_config,
-            }
-        },
+            ProposalPayload::ConfigChange { new_config }
+        }
     };
 
     // Create proposal via governance actor
     let domain_id = GovernanceDomainId(req.domain_id.clone());
     let proposal_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
 
-    gov_mgr.create_proposal(
-        proposal_id.clone(),
-        domain_id,
-        proposer_did.clone(),
-        req.title.clone(),
-        req.description.clone(),
-        payload,
-    ).await?;
+    gov_mgr
+        .create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            proposer_did.clone(),
+            req.title.clone(),
+            req.description.clone(),
+            payload,
+        )
+        .await?;
 
     // Track proposal creation
     gateway::governance_proposals_created_inc();
@@ -338,20 +364,25 @@ pub async fn create_proposal(
     };
 
     // Broadcast event to WebSocket subscribers
-    event_broadcaster.broadcast(
-        &req.domain_id,
-        GatewayEvent::GovernanceProposalCreated {
-            proposal_id: proposal_id.0.clone(),
-            domain_id: req.domain_id.clone(),
-            proposer: proposer_did.to_string(),
-            title: req.title.clone(),
-            payload_type: payload_type.to_string(),
-        },
-    ).await;
+    event_broadcaster
+        .broadcast(
+            &req.domain_id,
+            GatewayEvent::GovernanceProposalCreated {
+                proposal_id: proposal_id.0.clone(),
+                domain_id: req.domain_id.clone(),
+                proposer: proposer_did.to_string(),
+                title: req.title.clone(),
+                payload_type: payload_type.to_string(),
+            },
+        )
+        .await;
 
     // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError("Proposal creation succeeded but proposal not found".to_string()))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Proposal creation succeeded but proposal not found".to_string(),
+        )
+    })?;
 
     Ok(HttpResponse::Created().json(proposal))
 }
@@ -377,30 +408,42 @@ pub async fn list_proposals(
     // Filter by state if requested
     if let Some(state) = query.get("state") {
         match state.as_str() {
-            "draft" => proposals.retain(|p| matches!(p.state, icn_governance::ProposalState::Draft)),
-            "open" => proposals.retain(|p| matches!(p.state, icn_governance::ProposalState::Open { .. })),
-            "closed" => proposals.retain(|p| matches!(
-                p.state,
-                icn_governance::ProposalState::Accepted { .. }
-                | icn_governance::ProposalState::Rejected { .. }
-                | icn_governance::ProposalState::NoQuorum { .. }
-            )),
-            _ => return Err(crate::error::GatewayError::BadRequest(format!("Invalid state filter: {state}"))),
+            "draft" => {
+                proposals.retain(|p| matches!(p.state, icn_governance::ProposalState::Draft))
+            }
+            "open" => {
+                proposals.retain(|p| matches!(p.state, icn_governance::ProposalState::Open { .. }))
+            }
+            "closed" => proposals.retain(|p| {
+                matches!(
+                    p.state,
+                    icn_governance::ProposalState::Accepted { .. }
+                        | icn_governance::ProposalState::Rejected { .. }
+                        | icn_governance::ProposalState::NoQuorum { .. }
+                )
+            }),
+            _ => {
+                return Err(crate::error::GatewayError::BadRequest(format!(
+                    "Invalid state filter: {state}"
+                )))
+            }
         }
     }
 
     // Apply pagination
     let limit = if let Some(limit_str) = query.get("limit") {
-        let limit: usize = limit_str.parse()
-            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string()))?;
+        let limit: usize = limit_str.parse().map_err(|_| {
+            crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string())
+        })?;
         validation::validate_history_limit(limit)?
     } else {
         validation::DEFAULT_HISTORY_LIMIT
     };
 
     let offset = if let Some(offset_str) = query.get("offset") {
-        let offset: usize = offset_str.parse()
-            .map_err(|_| crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string()))?;
+        let offset: usize = offset_str.parse().map_err(|_| {
+            crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string())
+        })?;
         validation::validate_history_offset(offset)?
     } else {
         0
@@ -411,11 +454,7 @@ pub async fn list_proposals(
 
     // Apply pagination slice
     let total = proposals.len();
-    let paginated: Vec<_> = proposals
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+    let paginated: Vec<_> = proposals.into_iter().skip(offset).take(limit).collect();
 
     // Return with pagination metadata
     let response = serde_json::json!({
@@ -442,8 +481,9 @@ pub async fn get_proposal(
     require_scope(&http_req, "gov:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0))
+    })?;
 
     Ok(HttpResponse::Ok().json(proposal))
 }
@@ -461,8 +501,9 @@ pub async fn get_votes(
     let proposal_id = ProposalId(id.into_inner());
 
     // Verify proposal exists
-    let _ = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+    let _ = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0))
+    })?;
 
     let tally = gov_mgr.get_vote_tally(&proposal_id).await?;
 
@@ -497,22 +538,32 @@ pub async fn open_proposal(
     require_scope(&http_req, "gov:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
-    let requester_did: Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let requester_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     let proposal_id = ProposalId(id.into_inner());
 
     // CRITICAL: Verify requester is a member of the proposal's domain
     // Fetch proposal to get domain_id
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0))
+    })?;
 
     // Fetch domain to check membership
-    let domain = gov_mgr.get_domain(&proposal.domain_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError(format!("Domain not found: {}", proposal.domain_id.0)))?;
+    let domain = gov_mgr
+        .get_domain(&proposal.domain_id)
+        .await?
+        .ok_or_else(|| {
+            crate::error::GatewayError::InternalError(format!(
+                "Domain not found: {}",
+                proposal.domain_id.0
+            ))
+        })?;
 
     // Check if requester is a domain member
     let is_member = match &domain.config.membership.source {
@@ -525,9 +576,10 @@ pub async fn open_proposal(
     };
 
     if !is_member {
-        return Err(crate::error::GatewayError::AuthorizationFailed(
-            format!("Only domain members can open proposals (you are not a member of domain '{}')", proposal.domain_id.0)
-        ));
+        return Err(crate::error::GatewayError::AuthorizationFailed(format!(
+            "Only domain members can open proposals (you are not a member of domain '{}')",
+            proposal.domain_id.0
+        )));
     }
 
     // Use custom voting period or get from domain config
@@ -535,14 +587,14 @@ pub async fn open_proposal(
         // Validate custom voting period
         if period == 0 {
             return Err(crate::error::GatewayError::BadRequest(
-                "Voting period must be greater than 0".to_string()
+                "Voting period must be greater than 0".to_string(),
             ));
         }
         if period > validation::MAX_VOTING_PERIOD_SECONDS {
-            return Err(crate::error::GatewayError::BadRequest(
-                format!("Voting period exceeds maximum of {} seconds (1 year)",
-                    validation::MAX_VOTING_PERIOD_SECONDS)
-            ));
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Voting period exceeds maximum of {} seconds (1 year)",
+                validation::MAX_VOTING_PERIOD_SECONDS
+            )));
         }
         period
     } else {
@@ -550,38 +602,49 @@ pub async fn open_proposal(
         86400 * 7 // Default 7 days if not specified
     };
 
-    gov_mgr.open_proposal(proposal_id.clone(), voting_period_seconds).await?;
+    gov_mgr
+        .open_proposal(proposal_id.clone(), voting_period_seconds)
+        .await?;
 
     // Track proposal opening
     gateway::governance_proposals_opened_inc();
 
     // Return updated proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError("Proposal opening succeeded but proposal not found".to_string()))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Proposal opening succeeded but proposal not found".to_string(),
+        )
+    })?;
 
     // Calculate closes_at timestamp from proposal state
-    let closes_at = if let icn_governance::ProposalState::Open { opened_at: _, closes_at } = proposal.state {
+    let closes_at = if let icn_governance::ProposalState::Open {
+        opened_at: _,
+        closes_at,
+    } = proposal.state
+    {
         closes_at
     } else {
         // Fallback to current time + voting period if state doesn't match
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| crate::error::GatewayError::InternalError(
-                format!("System clock error: {e}")
-            ))?
+            .map_err(|e| {
+                crate::error::GatewayError::InternalError(format!("System clock error: {e}"))
+            })?
             .as_secs();
         now + voting_period_seconds
     };
 
     // Broadcast event to WebSocket subscribers
-    event_broadcaster.broadcast(
-        &proposal.domain_id.0,
-        GatewayEvent::GovernanceProposalOpened {
-            proposal_id: proposal_id.0.clone(),
-            domain_id: proposal.domain_id.0.clone(),
-            closes_at,
-        },
-    ).await;
+    event_broadcaster
+        .broadcast(
+            &proposal.domain_id.0,
+            GatewayEvent::GovernanceProposalOpened {
+                proposal_id: proposal_id.0.clone(),
+                domain_id: proposal.domain_id.0.clone(),
+                closes_at,
+            },
+        )
+        .await;
 
     Ok(HttpResponse::Ok().json(proposal))
 }
@@ -598,22 +661,32 @@ pub async fn close_proposal(
     require_scope(&http_req, "gov:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
-    let requester_did: Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let requester_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     let proposal_id = ProposalId(id.into_inner());
 
     // CRITICAL: Verify requester is a member of the proposal's domain
     // Fetch proposal to get domain_id
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0)))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0))
+    })?;
 
     // Fetch domain to check membership
-    let domain = gov_mgr.get_domain(&proposal.domain_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError(format!("Domain not found: {}", proposal.domain_id.0)))?;
+    let domain = gov_mgr
+        .get_domain(&proposal.domain_id)
+        .await?
+        .ok_or_else(|| {
+            crate::error::GatewayError::InternalError(format!(
+                "Domain not found: {}",
+                proposal.domain_id.0
+            ))
+        })?;
 
     // Check if requester is a domain member
     let is_member = match &domain.config.membership.source {
@@ -626,9 +699,10 @@ pub async fn close_proposal(
     };
 
     if !is_member {
-        return Err(crate::error::GatewayError::AuthorizationFailed(
-            format!("Only domain members can close proposals (you are not a member of domain '{}')", proposal.domain_id.0)
-        ));
+        return Err(crate::error::GatewayError::AuthorizationFailed(format!(
+            "Only domain members can close proposals (you are not a member of domain '{}')",
+            proposal.domain_id.0
+        )));
     }
 
     gov_mgr.close_proposal(proposal_id.clone()).await?;
@@ -637,8 +711,11 @@ pub async fn close_proposal(
     gateway::governance_proposals_closed_inc();
 
     // Return updated proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError("Proposal closing succeeded but proposal not found".to_string()))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Proposal closing succeeded but proposal not found".to_string(),
+        )
+    })?;
 
     // Determine outcome from proposal state
     let outcome = match &proposal.state {
@@ -649,14 +726,16 @@ pub async fn close_proposal(
     };
 
     // Broadcast event to WebSocket subscribers
-    event_broadcaster.broadcast(
-        &proposal.domain_id.0,
-        GatewayEvent::GovernanceProposalClosed {
-            proposal_id: proposal_id.0.clone(),
-            domain_id: proposal.domain_id.0.clone(),
-            outcome: outcome.to_string(),
-        },
-    ).await;
+    event_broadcaster
+        .broadcast(
+            &proposal.domain_id.0,
+            GatewayEvent::GovernanceProposalClosed {
+                proposal_id: proposal_id.0.clone(),
+                domain_id: proposal.domain_id.0.clone(),
+                outcome: outcome.to_string(),
+            },
+        )
+        .await;
 
     Ok(HttpResponse::Ok().json(proposal))
 }
@@ -678,11 +757,13 @@ pub async fn cast_vote(
     require_scope(&http_req, "gov:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
-    let voter_did: Did = claims.sub.parse()
-        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let voter_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     // Validate comment length
     validation::validate_vote_comment(&req.comment)?;
@@ -692,29 +773,46 @@ pub async fn cast_vote(
         "for" => VoteChoice::For,
         "against" => VoteChoice::Against,
         "abstain" => VoteChoice::Abstain,
-        _ => return Err(crate::error::GatewayError::BadRequest(format!("Invalid vote choice: {}", req.choice))),
+        _ => {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Invalid vote choice: {}",
+                req.choice
+            )))
+        }
     };
 
     let proposal_id = ProposalId(id.into_inner());
-    gov_mgr.cast_vote(proposal_id.clone(), voter_did.clone(), choice, req.comment.clone()).await?;
+    gov_mgr
+        .cast_vote(
+            proposal_id.clone(),
+            voter_did.clone(),
+            choice,
+            req.comment.clone(),
+        )
+        .await?;
 
     // Track vote
     gateway::governance_votes_cast_inc();
 
     // Return updated proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?
-        .ok_or_else(|| crate::error::GatewayError::InternalError("Vote cast succeeded but proposal not found".to_string()))?;
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Vote cast succeeded but proposal not found".to_string(),
+        )
+    })?;
 
     // Broadcast event to WebSocket subscribers
-    event_broadcaster.broadcast(
-        &proposal.domain_id.0,
-        GatewayEvent::GovernanceVoteCast {
-            proposal_id: proposal_id.0.clone(),
-            domain_id: proposal.domain_id.0.clone(),
-            voter: voter_did.to_string(),
-            choice: req.choice.clone(),
-        },
-    ).await;
+    event_broadcaster
+        .broadcast(
+            &proposal.domain_id.0,
+            GatewayEvent::GovernanceVoteCast {
+                proposal_id: proposal_id.0.clone(),
+                domain_id: proposal.domain_id.0.clone(),
+                voter: voter_did.to_string(),
+                choice: req.choice.clone(),
+            },
+        )
+        .await;
 
     Ok(HttpResponse::Ok().json(proposal))
 }
@@ -722,11 +820,14 @@ pub async fn cast_vote(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App, HttpMessage};
     use crate::auth::TokenClaims;
     use crate::events::EventBroadcaster;
+    use actix_web::{test, App, HttpMessage};
+    use icn_governance::{
+        GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource,
+        Proposal, ProposalState,
+    };
     use icn_identity::IdentityBundle;
-    use icn_governance::{GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, Proposal, ProposalState};
 
     fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
         TokenClaims {
@@ -751,9 +852,10 @@ mod tests {
                 .service(
                     web::scope("/gov")
                         .service(create_domain)
-                        .service(get_domain)
-                )
-        ).await;
+                        .service(get_domain),
+                ),
+        )
+        .await;
 
         // Create domain
         let req_body = CreateDomainRequest {
@@ -800,9 +902,10 @@ mod tests {
                 .service(
                     web::scope("/gov")
                         .service(create_domain)
-                        .service(list_domains)
-                )
-        ).await;
+                        .service(list_domains),
+                ),
+        )
+        .await;
 
         // Create two domains
         for (id, name) in [("coop:food", "Food Coop"), ("coop:tech", "Tech Coop")] {
@@ -827,9 +930,7 @@ mod tests {
 
         // List all domains
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
-        let req = test::TestRequest::get()
-            .uri("/gov/domains")
-            .to_request();
+        let req = test::TestRequest::get().uri("/gov/domains").to_request();
         req.extensions_mut().insert(claims);
 
         let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
@@ -845,23 +946,24 @@ mod tests {
         let alice = IdentityBundle::generate().unwrap();
 
         // Create domain first
-        gov_mgr.create_domain(
-            GovernanceDomainId("coop:food".to_string()),
-            "Food Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 7 * 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
-                .service(
-                    web::scope("/gov")
-                        .service(create_proposal)
-                )
-        ).await;
+                .service(web::scope("/gov").service(create_proposal)),
+        )
+        .await;
 
         // Create text proposal
         let req_body = CreateProposalRequest {
@@ -893,13 +995,16 @@ mod tests {
         let bob = IdentityBundle::generate().unwrap();
 
         // Create domain
-        gov_mgr.create_domain(
-            GovernanceDomainId("coop:food".to_string()),
-            "Food Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 7 * 86400),
-            MembershipConfig::static_list(vec![alice.did().clone(), bob.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone(), bob.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         let app = test::init_service(
             App::new()
@@ -911,9 +1016,10 @@ mod tests {
                         .service(open_proposal)
                         .service(cast_vote)
                         .service(close_proposal)
-                        .service(get_proposal)
-                )
-        ).await;
+                        .service(get_proposal),
+                ),
+        )
+        .await;
 
         // 1. Create proposal
         let req_body = CreateProposalRequest {
@@ -986,7 +1092,10 @@ mod tests {
         req.extensions_mut().insert(claims);
 
         let final_proposal: Proposal = test::call_and_read_body_json(&app, req).await;
-        assert!(matches!(final_proposal.state, icn_governance::ProposalState::Rejected { .. }));
+        assert!(matches!(
+            final_proposal.state,
+            icn_governance::ProposalState::Rejected { .. }
+        ));
     }
 
     #[actix_web::test]
@@ -997,13 +1106,16 @@ mod tests {
 
         // Create two domains
         for domain_id in ["coop:food", "coop:tech"] {
-            gov_mgr.create_domain(
-                GovernanceDomainId(domain_id.to_string()),
-                format!("{domain_id} Coop"),
-                "cooperative".to_string(),
-                GovernanceParams::new(50, 66, 7 * 86400),
-                MembershipConfig::static_list(vec![alice.did().clone()]),
-            ).await.unwrap();
+            gov_mgr
+                .create_domain(
+                    GovernanceDomainId(domain_id.to_string()),
+                    format!("{domain_id} Coop"),
+                    "cooperative".to_string(),
+                    GovernanceParams::new(50, 66, 7 * 86400),
+                    MembershipConfig::static_list(vec![alice.did().clone()]),
+                )
+                .await
+                .unwrap();
         }
 
         let app = test::init_service(
@@ -1013,17 +1125,24 @@ mod tests {
                 .service(
                     web::scope("/gov")
                         .service(create_proposal)
-                        .service(list_proposals)
-                )
-        ).await;
+                        .service(list_proposals),
+                ),
+        )
+        .await;
 
         // Create proposals in different domains
-        for (domain_id, title) in [("coop:food", "Proposal 1"), ("coop:food", "Proposal 2"), ("coop:tech", "Proposal 3")] {
+        for (domain_id, title) in [
+            ("coop:food", "Proposal 1"),
+            ("coop:food", "Proposal 2"),
+            ("coop:tech", "Proposal 3"),
+        ] {
             let req_body = CreateProposalRequest {
                 domain_id: domain_id.to_string(),
                 title: title.to_string(),
                 description: "Test".to_string(),
-                payload: ProposalPayloadRequest::Text { body: "Test".to_string() },
+                payload: ProposalPayloadRequest::Text {
+                    body: "Test".to_string(),
+                },
             };
 
             let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
@@ -1037,9 +1156,7 @@ mod tests {
 
         // List all proposals
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
-        let req = test::TestRequest::get()
-            .uri("/gov/proposals")
-            .to_request();
+        let req = test::TestRequest::get().uri("/gov/proposals").to_request();
         req.extensions_mut().insert(claims);
 
         let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
@@ -1080,17 +1197,13 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
-                .service(
-                    web::scope("/gov")
-                        .service(list_domains)
-                )
-        ).await;
+                .service(web::scope("/gov").service(list_domains)),
+        )
+        .await;
 
         // Try without gov:read scope (should fail)
         let claims = create_test_claims(&alice.did().to_string(), vec!["ledger:read"]);
-        let req = test::TestRequest::get()
-            .uri("/gov/domains")
-            .to_request();
+        let req = test::TestRequest::get().uri("/gov/domains").to_request();
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
@@ -1107,11 +1220,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
-                .service(
-                    web::scope("/gov")
-                        .service(create_domain)
-                )
-        ).await;
+                .service(web::scope("/gov").service(create_domain)),
+        )
+        .await;
 
         let req_body = CreateDomainRequest {
             id: "coop:food".to_string(),
@@ -1143,11 +1254,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
-                .service(
-                    web::scope("/gov")
-                        .service(get_domain)
-                )
-        ).await;
+                .service(web::scope("/gov").service(get_domain)),
+        )
+        .await;
 
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
         let req = test::TestRequest::get()
@@ -1169,11 +1278,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
-                .service(
-                    web::scope("/gov")
-                        .service(open_proposal)
-                )
-        ).await;
+                .service(web::scope("/gov").service(open_proposal)),
+        )
+        .await;
 
         let req_body = OpenProposalRequest {
             voting_period_seconds: Some(86400),
@@ -1202,63 +1309,81 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain with 5 members and 80% quorum requirement
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams {
-                quorum_percentage: 80, // Need 4 out of 5 members to vote
-                approval_threshold_percentage: 66,
-                voting_period_seconds: 86400,
-            },
-            MembershipConfig {
-                source: MembershipSource::StaticList(vec![
-                    alice.did().clone(),
-                    bob.did().clone(),
-                    carol.did().clone(),
-                    dave.did().clone(),
-                    eve.did().clone(),
-                ]),
-            },
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams {
+                    quorum_percentage: 80, // Need 4 out of 5 members to vote
+                    approval_threshold_percentage: 66,
+                    voting_period_seconds: 86400,
+                },
+                MembershipConfig {
+                    source: MembershipSource::StaticList(vec![
+                        alice.did().clone(),
+                        bob.did().clone(),
+                        carol.did().clone(),
+                        dave.did().clone(),
+                        eve.did().clone(),
+                    ]),
+                },
+            )
+            .await
+            .unwrap();
 
         // Create proposal
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id.clone(),
-            alice.did().clone(),
-            "Test Proposal".to_string(),
-            "A proposal to test quorum".to_string(),
-            ProposalPayload::Text {
-                body: "Should fail due to insufficient quorum".to_string(),
-            },
-        ).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id.clone(),
+                alice.did().clone(),
+                "Test Proposal".to_string(),
+                "A proposal to test quorum".to_string(),
+                ProposalPayload::Text {
+                    body: "Should fail due to insufficient quorum".to_string(),
+                },
+            )
+            .await
+            .unwrap();
 
         // Open the proposal
-        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        gov_mgr
+            .open_proposal(proposal_id.clone(), 86400)
+            .await
+            .unwrap();
 
         // Only 3 out of 5 members vote (60% participation, below 80% quorum)
-        gov_mgr.cast_vote(
-            proposal_id.clone(),
-            alice.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await.unwrap();
+        gov_mgr
+            .cast_vote(
+                proposal_id.clone(),
+                alice.did().clone(),
+                VoteChoice::For,
+                None,
+            )
+            .await
+            .unwrap();
 
-        gov_mgr.cast_vote(
-            proposal_id.clone(),
-            bob.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await.unwrap();
+        gov_mgr
+            .cast_vote(
+                proposal_id.clone(),
+                bob.did().clone(),
+                VoteChoice::For,
+                None,
+            )
+            .await
+            .unwrap();
 
-        gov_mgr.cast_vote(
-            proposal_id.clone(),
-            carol.did().clone(),
-            VoteChoice::Against,
-            None,
-        ).await.unwrap();
+        gov_mgr
+            .cast_vote(
+                proposal_id.clone(),
+                carol.did().clone(),
+                VoteChoice::Against,
+                None,
+            )
+            .await
+            .unwrap();
 
         // Close the proposal
         gov_mgr.close_proposal(proposal_id.clone()).await.unwrap();
@@ -1282,41 +1407,57 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain with Alice as member
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         // Create and open proposal
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Test".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await.unwrap();
-        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Test".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        gov_mgr
+            .open_proposal(proposal_id.clone(), 86400)
+            .await
+            .unwrap();
 
         // First vote succeeds
-        gov_mgr.cast_vote(
-            proposal_id.clone(),
-            alice.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await.unwrap();
+        gov_mgr
+            .cast_vote(
+                proposal_id.clone(),
+                alice.did().clone(),
+                VoteChoice::For,
+                None,
+            )
+            .await
+            .unwrap();
 
         // Second vote from same DID should fail
-        let result = gov_mgr.cast_vote(
-            proposal_id.clone(),
-            alice.did().clone(),
-            VoteChoice::Against,
-            None,
-        ).await;
+        let result = gov_mgr
+            .cast_vote(
+                proposal_id.clone(),
+                alice.did().clone(),
+                VoteChoice::Against,
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already voted"));
@@ -1329,34 +1470,42 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain and proposal (but don't open it)
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Test".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Test".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await
+            .unwrap();
 
         // Try to vote on Draft proposal
-        let result = gov_mgr.cast_vote(
-            proposal_id,
-            alice.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await;
+        let result = gov_mgr
+            .cast_vote(proposal_id, alice.did().clone(), VoteChoice::For, None)
+            .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not open for voting"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("not open for voting"));
     }
 
     #[actix_web::test]
@@ -1366,36 +1515,47 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain, proposal, open, and close it
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Test".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await.unwrap();
-        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Test".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        gov_mgr
+            .open_proposal(proposal_id.clone(), 86400)
+            .await
+            .unwrap();
         gov_mgr.close_proposal(proposal_id.clone()).await.unwrap();
 
         // Try to vote on closed proposal
-        let result = gov_mgr.cast_vote(
-            proposal_id,
-            alice.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await;
+        let result = gov_mgr
+            .cast_vote(proposal_id, alice.did().clone(), VoteChoice::For, None)
+            .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not open for voting"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("not open for voting"));
     }
 
     #[actix_web::test]
@@ -1406,33 +1566,41 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain with only Alice as member
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         // Create and open proposal
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Test".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await.unwrap();
-        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Test".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        gov_mgr
+            .open_proposal(proposal_id.clone(), 86400)
+            .await
+            .unwrap();
 
         // Try to vote as Bob (non-member)
-        let result = gov_mgr.cast_vote(
-            proposal_id,
-            bob.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await;
+        let result = gov_mgr
+            .cast_vote(proposal_id, bob.did().clone(), VoteChoice::For, None)
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not a member"));
@@ -1445,14 +1613,18 @@ mod tests {
         let domain_id = GovernanceDomainId("nonexistent".to_string());
 
         // Try to create proposal for non-existent domain
-        let result = gov_mgr.create_proposal(
-            ProposalId("prop-123".to_string()),
-            domain_id,
-            alice.did().clone(),
-            "Test".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await;
+        let result = gov_mgr
+            .create_proposal(
+                ProposalId("prop-123".to_string()),
+                domain_id,
+                alice.did().clone(),
+                "Test".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Domain not found"));
@@ -1470,33 +1642,47 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain with two members
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone(), bob.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone(), bob.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         // Create and open proposal
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Test".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await.unwrap();
-        gov_mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Test".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        gov_mgr
+            .open_proposal(proposal_id.clone(), 86400)
+            .await
+            .unwrap();
 
         // Alice votes successfully
-        gov_mgr.cast_vote(
-            proposal_id.clone(),
-            alice.did().clone(),
-            VoteChoice::For,
-            None,
-        ).await.unwrap();
+        gov_mgr
+            .cast_vote(
+                proposal_id.clone(),
+                alice.did().clone(),
+                VoteChoice::For,
+                None,
+            )
+            .await
+            .unwrap();
 
         // Spawn concurrent operations to trigger potential race condition
         let gov_mgr_clone = gov_mgr.clone();
@@ -1506,19 +1692,14 @@ mod tests {
         // Use tokio::join! to run close and vote concurrently
         let (close_result, vote_result) = tokio::join!(
             // Thread 1: Close the proposal
-            async move {
-                gov_mgr_clone.close_proposal(proposal_id_clone).await
-            },
+            async move { gov_mgr_clone.close_proposal(proposal_id_clone).await },
             // Thread 2: Bob tries to vote (should fail if close happens first)
             async move {
                 // Add tiny delay to increase chance that close happens first
                 tokio::time::sleep(tokio::time::Duration::from_micros(100)).await;
-                gov_mgr.cast_vote(
-                    proposal_id.clone(),
-                    bob_did,
-                    VoteChoice::Against,
-                    None,
-                ).await
+                gov_mgr
+                    .cast_vote(proposal_id.clone(), bob_did, VoteChoice::Against, None)
+                    .await
             }
         );
 
@@ -1528,10 +1709,14 @@ mod tests {
         // Vote should fail because proposal was closed
         // The TOCTOU fix ensures that even if the vote passed the initial check,
         // it will be rejected when re-checked after acquiring the votes lock
-        assert!(vote_result.is_err(), "Vote should fail when proposal is closed");
+        assert!(
+            vote_result.is_err(),
+            "Vote should fail when proposal is closed"
+        );
         let error_msg = vote_result.unwrap_err().to_string();
         assert!(
-            error_msg.contains("not open for voting") || error_msg.contains("was closed during vote submission"),
+            error_msg.contains("not open for voting")
+                || error_msg.contains("was closed during vote submission"),
             "Error should indicate proposal is not open, got: {error_msg}"
         );
     }
@@ -1543,22 +1728,27 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:food".to_string());
 
         // Create first domain
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Food Coop v1".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Food Coop v1".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         // Try to create domain with same ID but different name
-        let result = gov_mgr.create_domain(
-            domain_id.clone(),
-            "Food Coop v2 (OVERWRITE)".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(60, 75, 172800),
-            MembershipConfig::static_list(vec![]),
-        ).await;
+        let result = gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Food Coop v2 (OVERWRITE)".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(60, 75, 172800),
+                MembershipConfig::static_list(vec![]),
+            )
+            .await;
 
         // Should fail - duplicate domain ID not allowed
         assert!(result.is_err(), "Duplicate domain ID should be rejected");
@@ -1578,35 +1768,47 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:food".to_string());
 
         // Create domain first
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Food Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         let proposal_id = ProposalId("prop-123".to_string());
 
         // Create first proposal
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id.clone(),
-            alice.did().clone(),
-            "Original Proposal".to_string(),
-            "Original description".to_string(),
-            ProposalPayload::Text { body: "Original body".to_string() },
-        ).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id.clone(),
+                alice.did().clone(),
+                "Original Proposal".to_string(),
+                "Original description".to_string(),
+                ProposalPayload::Text {
+                    body: "Original body".to_string(),
+                },
+            )
+            .await
+            .unwrap();
 
         // Try to create proposal with same ID but different content
-        let result = gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Malicious Overwrite".to_string(),
-            "Attempting to overwrite existing proposal".to_string(),
-            ProposalPayload::Text { body: "Malicious content".to_string() },
-        ).await;
+        let result = gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Malicious Overwrite".to_string(),
+                "Attempting to overwrite existing proposal".to_string(),
+                ProposalPayload::Text {
+                    body: "Malicious content".to_string(),
+                },
+            )
+            .await;
 
         // Should fail - duplicate proposal ID not allowed
         assert!(result.is_err(), "Duplicate proposal ID should be rejected");
@@ -1628,11 +1830,9 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
-                .service(
-                    web::scope("/gov")
-                        .service(create_domain)
-                )
-        ).await;
+                .service(web::scope("/gov").service(create_domain)),
+        )
+        .await;
 
         // Try to create domain with voting period that would overflow
         // MAX_VOTING_PERIOD_SECONDS / 86400 = 365 days
@@ -1708,24 +1908,32 @@ mod tests {
         let domain_id = GovernanceDomainId("coop:test".to_string());
 
         // Create domain with only Alice as member
-        gov_mgr.create_domain(
-            domain_id.clone(),
-            "Test Coop".to_string(),
-            "cooperative".to_string(),
-            GovernanceParams::new(50, 66, 86400),
-            MembershipConfig::static_list(vec![alice.did().clone()]),
-        ).await.unwrap();
+        gov_mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
 
         // Alice creates proposal (allowed - she's a member)
         let proposal_id = ProposalId("prop-123".to_string());
-        gov_mgr.create_proposal(
-            proposal_id.clone(),
-            domain_id,
-            alice.did().clone(),
-            "Test Proposal".to_string(),
-            "Test".to_string(),
-            ProposalPayload::Text { body: "Test".to_string() },
-        ).await.unwrap();
+        gov_mgr
+            .create_proposal(
+                proposal_id.clone(),
+                domain_id,
+                alice.did().clone(),
+                "Test Proposal".to_string(),
+                "Test".to_string(),
+                ProposalPayload::Text {
+                    body: "Test".to_string(),
+                },
+            )
+            .await
+            .unwrap();
 
         let app = test::init_service(
             App::new()
@@ -1734,9 +1942,10 @@ mod tests {
                 .service(
                     web::scope("/gov")
                         .service(open_proposal)
-                        .service(close_proposal)
-                )
-        ).await;
+                        .service(close_proposal),
+                ),
+        )
+        .await;
 
         // Bob (non-member) tries to open proposal
         let req_body = OpenProposalRequest {

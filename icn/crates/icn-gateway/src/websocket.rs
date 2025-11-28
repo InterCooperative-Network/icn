@@ -3,8 +3,8 @@
 use actix::{Actor, ActorContext, ActorFutureExt, AsyncContext, StreamHandler, WrapFuture};
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
@@ -36,7 +36,10 @@ enum ServerMessage {
     AuthError { message: String },
     /// Event notification with sequence number
     /// Note: event is nested to avoid tag conflict with GatewayEvent's type field
-    Event { seq: u64, event: crate::events::GatewayEvent },
+    Event {
+        seq: u64,
+        event: crate::events::GatewayEvent,
+    },
     /// Backfill complete with number of events sent
     BackfillComplete { count: usize },
     /// Error message
@@ -117,34 +120,34 @@ impl WsSession {
                         let event_broadcaster = self.event_broadcaster.clone();
                         let coop_id = self.coop_id.clone();
 
-                        let fut = async move {
-                            event_broadcaster.subscribe(&coop_id).await
-                        }
-                        .into_actor(self)
-                        .map(move |rx_opt, act, ctx| {
-                            match rx_opt {
-                                Some(rx) => {
-                                    act.event_rx = Some(rx);
-                                    // Start polling for events
-                                    act.poll_events(ctx);
+                        let fut = async move { event_broadcaster.subscribe(&coop_id).await }
+                            .into_actor(self)
+                            .map(move |rx_opt, act, ctx| {
+                                match rx_opt {
+                                    Some(rx) => {
+                                        act.event_rx = Some(rx);
+                                        // Start polling for events
+                                        act.poll_events(ctx);
 
-                                    // Send success message with current sequence
-                                    let msg = ServerMessage::AuthOk {
-                                        did: act.did.as_ref().unwrap().to_string(),
-                                        current_seq,
-                                    };
-                                    act.send_message(msg, ctx);
+                                        // Send success message with current sequence
+                                        let msg = ServerMessage::AuthOk {
+                                            did: act.did.as_ref().unwrap().to_string(),
+                                            current_seq,
+                                        };
+                                        act.send_message(msg, ctx);
+                                    }
+                                    None => {
+                                        // Subscriber limit reached
+                                        let msg = ServerMessage::AuthError {
+                                            message:
+                                                "Subscriber limit reached for this cooperative"
+                                                    .to_string(),
+                                        };
+                                        act.send_message(msg, ctx);
+                                        ctx.stop();
+                                    }
                                 }
-                                None => {
-                                    // Subscriber limit reached
-                                    let msg = ServerMessage::AuthError {
-                                        message: "Subscriber limit reached for this cooperative".to_string(),
-                                    };
-                                    act.send_message(msg, ctx);
-                                    ctx.stop();
-                                }
-                            }
-                        });
+                            });
 
                         ctx.wait(fut);
                     }
@@ -181,7 +184,10 @@ impl WsSession {
                 match rx.try_recv() {
                     Ok(sequenced_event) => {
                         // Forward sequenced event to client
-                        let msg = ServerMessage::Event { seq: sequenced_event.seq, event: sequenced_event.event };
+                        let msg = ServerMessage::Event {
+                            seq: sequenced_event.seq,
+                            event: sequenced_event.event,
+                        };
                         if let Ok(json) = serde_json::to_string(&msg) {
                             ctx.text(json);
                             // Track message sent
@@ -236,22 +242,23 @@ impl WsSession {
         let event_broadcaster = self.event_broadcaster.clone();
         let coop_id = self.coop_id.clone();
 
-        let fut = async move {
-            event_broadcaster.get_backfill(&coop_id, after_seq).await
-        }
-        .into_actor(self)
-        .map(|events, act, ctx| {
-            let count = events.len();
-            // Send all backfill events
-            for sequenced in events {
-                let msg = ServerMessage::Event { seq: sequenced.seq, event: sequenced.event };
+        let fut = async move { event_broadcaster.get_backfill(&coop_id, after_seq).await }
+            .into_actor(self)
+            .map(|events, act, ctx| {
+                let count = events.len();
+                // Send all backfill events
+                for sequenced in events {
+                    let msg = ServerMessage::Event {
+                        seq: sequenced.seq,
+                        event: sequenced.event,
+                    };
+                    act.send_message(msg, ctx);
+                    gateway::websocket_messages_sent_inc();
+                }
+                // Send completion message
+                let msg = ServerMessage::BackfillComplete { count };
                 act.send_message(msg, ctx);
-                gateway::websocket_messages_sent_inc();
-            }
-            // Send completion message
-            let msg = ServerMessage::BackfillComplete { count };
-            act.send_message(msg, ctx);
-        });
+            });
 
         ctx.spawn(fut);
     }
@@ -312,7 +319,8 @@ impl Actor for WsSession {
                     act.coop_id
                 );
                 let msg = ServerMessage::AuthError {
-                    message: "Authentication timeout (must authenticate within 10 seconds)".to_string(),
+                    message: "Authentication timeout (must authenticate within 10 seconds)"
+                        .to_string(),
                 };
                 act.send_message(msg, ctx);
                 ctx.stop();
@@ -332,7 +340,11 @@ impl Actor for WsSession {
 }
 
 impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for WsSession {
-    fn handle(&mut self, msg: std::result::Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+    fn handle(
+        &mut self,
+        msg: std::result::Result<ws::Message, ws::ProtocolError>,
+        ctx: &mut Self::Context,
+    ) {
         match msg {
             Ok(ws::Message::Ping(msg)) => {
                 self.last_heartbeat = Instant::now();

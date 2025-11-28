@@ -80,7 +80,10 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
     // Bob should now have Federated limits (burst 50)
     let allowed_count = test_peer_rate_limit(&rate_limiter, &bob, 60).await;
     println!("   Result: {allowed_count} messages allowed out of 60");
-    assert_eq!(allowed_count, 50, "Upgraded peer should get Federated limits");
+    assert_eq!(
+        allowed_count, 50,
+        "Upgraded peer should get Federated limits"
+    );
 
     println!("\n=== All tests passed! ===\n");
     println!("Summary:");
@@ -93,7 +96,11 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
     Ok(())
 }
 
-async fn test_peer_rate_limit(rate_limiter: &Arc<RateLimiter>, peer: &Did, attempts: usize) -> usize {
+async fn test_peer_rate_limit(
+    rate_limiter: &Arc<RateLimiter>,
+    peer: &Did,
+    attempts: usize,
+) -> usize {
     let mut allowed = 0;
     for _ in 0..attempts {
         if rate_limiter.check_rate_limit(peer).await {
@@ -134,18 +141,22 @@ async fn test_configuration_support() -> Result<()> {
     };
 
     println!("Custom configuration:");
-    println!("  Isolated: {} msg/sec, burst {}",
-             custom_config.isolated.max_messages_per_second,
-             custom_config.isolated.burst_capacity);
-    println!("  Known: {} msg/sec, burst {}",
-             custom_config.known.max_messages_per_second,
-             custom_config.known.burst_capacity);
-    println!("  Partner: {} msg/sec, burst {}",
-             custom_config.partner.max_messages_per_second,
-             custom_config.partner.burst_capacity);
-    println!("  Federated: {} msg/sec, burst {}",
-             custom_config.federated.max_messages_per_second,
-             custom_config.federated.burst_capacity);
+    println!(
+        "  Isolated: {} msg/sec, burst {}",
+        custom_config.isolated.max_messages_per_second, custom_config.isolated.burst_capacity
+    );
+    println!(
+        "  Known: {} msg/sec, burst {}",
+        custom_config.known.max_messages_per_second, custom_config.known.burst_capacity
+    );
+    println!(
+        "  Partner: {} msg/sec, burst {}",
+        custom_config.partner.max_messages_per_second, custom_config.partner.burst_capacity
+    );
+    println!(
+        "  Federated: {} msg/sec, burst {}",
+        custom_config.federated.max_messages_per_second, custom_config.federated.burst_capacity
+    );
 
     // Create rate limiter with custom config
     let alice = KeyPair::generate()?.did().clone();
@@ -159,7 +170,10 @@ async fn test_configuration_support() -> Result<()> {
 
     // Test that custom config is applied
     let allowed_count = test_peer_rate_limit(&rate_limiter, &bob, 10).await;
-    assert_eq!(allowed_count, 1, "Custom isolated config should allow burst of 1");
+    assert_eq!(
+        allowed_count, 1,
+        "Custom isolated config should allow burst of 1"
+    );
 
     println!("\n✓ Custom configuration applied successfully");
     println!("✓ Operators can tune rate limits via icn.toml");
@@ -191,7 +205,10 @@ async fn test_cache_performance() -> Result<()> {
     println!("Second lookup (cache hit): {duration2:?}");
 
     // Cache hit should be significantly faster
-    assert!(duration2 < duration1, "Cache hit should be faster than cache miss");
+    assert!(
+        duration2 < duration1,
+        "Cache hit should be faster than cache miss"
+    );
     println!("\n✓ Cache optimization working");
     println!("✓ Interior mutability allows concurrent read access");
 

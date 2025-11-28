@@ -8,13 +8,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LedgerSyncMessage {
     /// Announce a new journal entry
-    NewEntry { hash: ContentHash, entry: JournalEntry },
+    NewEntry {
+        hash: ContentHash,
+        entry: JournalEntry,
+    },
 
     /// Request a journal entry by hash
     RequestEntry { hash: ContentHash },
 
     /// Response with requested entry
-    EntryResponse { hash: ContentHash, entry: Option<JournalEntry> },
+    EntryResponse {
+        hash: ContentHash,
+        entry: Option<JournalEntry>,
+    },
 }
 
 /// Get the topic name for a currency's ledger sync
@@ -70,7 +76,10 @@ mod tests {
         let msg2 = deserialize_sync_message(&data).unwrap();
 
         match msg2 {
-            LedgerSyncMessage::NewEntry { hash: h2, entry: e2 } => {
+            LedgerSyncMessage::NewEntry {
+                hash: h2,
+                entry: e2,
+            } => {
                 assert_eq!(h2, hash);
                 assert_eq!(e2.accounts.len(), 2);
             }

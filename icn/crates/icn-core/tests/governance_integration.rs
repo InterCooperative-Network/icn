@@ -7,13 +7,13 @@
 //! 4. Outcome convergence across all nodes
 
 use anyhow::{bail, Result};
+use icn_gossip::GossipActor;
 use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceMessage, GovernanceParams,
     GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipConfig, MembershipResolver,
     Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
     StaticMembershipResolver, TallySnapshot, Vote, VoteChoice, VoteTally,
 };
-use icn_gossip::GossipActor;
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor};
 use icn_trust::TrustClass;
@@ -73,8 +73,11 @@ impl TestNode {
 
             if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
                 // Log the gossip message type for debugging
-                info!("Incoming gossip message: {} from {}",
-                      gossip_msg.variant_name(), sender_did);
+                info!(
+                    "Incoming gossip message: {} from {}",
+                    gossip_msg.variant_name(),
+                    sender_did
+                );
 
                 // Spawn async task to avoid blocking in callback
                 tokio::spawn(async move {
@@ -121,15 +124,18 @@ impl TestNode {
                         GovernanceMessage::DomainCreated { domain } => {
                             let domain_id = domain.id.clone();
                             info!("Storing domain with ID: {:?}", domain_id);
-                            domains_clone.write().await.insert(domain_id.clone(), domain);
-                            info!("Domain stored, total domains: {}", domains_clone.read().await.len());
+                            domains_clone
+                                .write()
+                                .await
+                                .insert(domain_id.clone(), domain);
+                            info!(
+                                "Domain stored, total domains: {}",
+                                domains_clone.read().await.len()
+                            );
                         }
                         GovernanceMessage::ProposalCreated { proposal } => {
                             let proposal_id = proposal.id.clone();
-                            proposals_clone
-                                .write()
-                                .await
-                                .insert(proposal_id, proposal);
+                            proposals_clone.write().await.insert(proposal_id, proposal);
                         }
                         GovernanceMessage::ProposalOpened {
                             id,
@@ -155,9 +161,15 @@ impl TestNode {
                             if let Some(proposal) = proposals_clone.write().await.get_mut(&id) {
                                 // Update proposal state based on outcome
                                 let new_state = match outcome {
-                                    ProposalOutcome::Accepted => ProposalState::Accepted { closed_at },
-                                    ProposalOutcome::Rejected => ProposalState::Rejected { closed_at },
-                                    ProposalOutcome::NoQuorum => ProposalState::NoQuorum { closed_at },
+                                    ProposalOutcome::Accepted => {
+                                        ProposalState::Accepted { closed_at }
+                                    }
+                                    ProposalOutcome::Rejected => {
+                                        ProposalState::Rejected { closed_at }
+                                    }
+                                    ProposalOutcome::NoQuorum => {
+                                        ProposalState::NoQuorum { closed_at }
+                                    }
                                 };
                                 // Use close() method to update state properly
                                 let _ = proposal.close(new_state);
@@ -193,27 +205,31 @@ impl TestNode {
             let network_handle_clone = network_handle.clone();
             let from_did = did.clone();
 
-            let send_callback = Arc::new(move |recipient: Option<icn_identity::Did>, gossip_msg: icn_gossip::GossipMessage| {
-                let net_handle = network_handle_clone.clone();
-                let from = from_did.clone();
-                let msg_type = gossip_msg.variant_name();
+            let send_callback = Arc::new(
+                move |recipient: Option<icn_identity::Did>,
+                      gossip_msg: icn_gossip::GossipMessage| {
+                    let net_handle = network_handle_clone.clone();
+                    let from = from_did.clone();
+                    let msg_type = gossip_msg.variant_name();
 
-                info!("Send callback: sending {} to {:?}", msg_type, recipient);
+                    info!("Send callback: sending {} to {:?}", msg_type, recipient);
 
-                tokio::spawn(async move {
-                    let net_msg = icn_net::NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
+                    tokio::spawn(async move {
+                        let net_msg =
+                            icn_net::NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
 
-                    let result = if let Some(to_did) = recipient {
-                        net_handle.send_message(to_did, net_msg).await
-                    } else {
-                        net_handle.broadcast(net_msg).await
-                    };
+                        let result = if let Some(to_did) = recipient {
+                            net_handle.send_message(to_did, net_msg).await
+                        } else {
+                            net_handle.broadcast(net_msg).await
+                        };
 
-                    if let Err(e) = result {
-                        warn!("Failed to send gossip message: {}", e);
-                    }
-                });
-            });
+                        if let Err(e) = result {
+                            warn!("Failed to send gossip message: {}", e);
+                        }
+                    });
+                },
+            );
 
             gossip.set_send_callback(send_callback);
         }
@@ -254,7 +270,9 @@ impl TestNode {
         let (hash, clock) = {
             let mut gossip = self.gossip_handle.write().await;
             let hash = gossip.publish(GOVERNANCE_TOPIC, bytes)?;
-            let entry = gossip.get_entry(GOVERNANCE_TOPIC, &hash).expect("Entry should exist");
+            let entry = gossip
+                .get_entry(GOVERNANCE_TOPIC, &hash)
+                .expect("Entry should exist");
             (hash, entry.clock.clone())
         };
 
@@ -308,13 +326,7 @@ impl TestNode {
         description: String,
         payload: ProposalPayload,
     ) -> Result<Proposal> {
-        let proposal = Proposal::new(
-            domain_id,
-            self.did.clone(),
-            title,
-            description,
-            payload,
-        );
+        let proposal = Proposal::new(domain_id, self.did.clone(), title, description, payload);
 
         // Store locally
         self.proposals
@@ -352,11 +364,7 @@ impl TestNode {
     }
 
     /// Cast a vote and broadcast it
-    async fn cast_vote(
-        &self,
-        proposal_id: ProposalId,
-        choice: VoteChoice,
-    ) -> Result<Vote> {
+    async fn cast_vote(&self, proposal_id: ProposalId, choice: VoteChoice) -> Result<Vote> {
         let vote = Vote::new(proposal_id.clone(), self.did.clone(), choice);
 
         // Store locally
@@ -437,7 +445,8 @@ impl TestNode {
             eligible_count,
         );
 
-        let msg = GovernanceMessage::proposal_closed(proposal_id, outcome.clone(), now, tally_snapshot);
+        let msg =
+            GovernanceMessage::proposal_closed(proposal_id, outcome.clone(), now, tally_snapshot);
         self.publish_governance(msg).await?;
 
         Ok(outcome)
@@ -556,7 +565,10 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
         .await?;
 
     let domain_id = domain.id.clone();
-    info!("✓ Node 1 created governance domain with ID: {:?}", domain_id);
+    info!(
+        "✓ Node 1 created governance domain with ID: {:?}",
+        domain_id
+    );
 
     // Wait for domain propagation (increase timeout for Request/Response cycle)
     let domain_id_check = domain_id.clone();
@@ -601,8 +613,14 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
     let node3_proposals = node3.proposals.clone();
     wait_for_condition(
         || async {
-            node2_proposals.read().await.contains_key(&proposal_id_check)
-                && node3_proposals.read().await.contains_key(&proposal_id_check)
+            node2_proposals
+                .read()
+                .await
+                .contains_key(&proposal_id_check)
+                && node3_proposals
+                    .read()
+                    .await
+                    .contains_key(&proposal_id_check)
         },
         "Proposal propagated to all nodes",
         20,
@@ -632,9 +650,15 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
     .await?;
 
     // All three nodes cast votes
-    node1.cast_vote(proposal_id.clone(), VoteChoice::For).await?;
-    node2.cast_vote(proposal_id.clone(), VoteChoice::For).await?;
-    node3.cast_vote(proposal_id.clone(), VoteChoice::Against).await?;
+    node1
+        .cast_vote(proposal_id.clone(), VoteChoice::For)
+        .await?;
+    node2
+        .cast_vote(proposal_id.clone(), VoteChoice::For)
+        .await?;
+    node3
+        .cast_vote(proposal_id.clone(), VoteChoice::Against)
+        .await?;
 
     info!("✓ All nodes cast votes (2 For, 1 Against)");
 
@@ -649,9 +673,18 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
             let v2 = node2_votes.read().await;
             let v3 = node3_votes.read().await;
 
-            let count1 = v1.iter().filter(|((pid, _), _)| pid == &proposal_id_votes).count();
-            let count2 = v2.iter().filter(|((pid, _), _)| pid == &proposal_id_votes).count();
-            let count3 = v3.iter().filter(|((pid, _), _)| pid == &proposal_id_votes).count();
+            let count1 = v1
+                .iter()
+                .filter(|((pid, _), _)| pid == &proposal_id_votes)
+                .count();
+            let count2 = v2
+                .iter()
+                .filter(|((pid, _), _)| pid == &proposal_id_votes)
+                .count();
+            let count3 = v3
+                .iter()
+                .filter(|((pid, _), _)| pid == &proposal_id_votes)
+                .count();
 
             count1 == 3 && count2 == 3 && count3 == 3
         },
@@ -677,9 +710,14 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
             let p3 = node3_proposals_outcome.read().await;
 
             // Expected: 2 For, 1 Against = 66% approval = Accepted (>50% threshold)
-            p1.get(&proposal_id_outcome).is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
-                && p2.get(&proposal_id_outcome).is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
-                && p3.get(&proposal_id_outcome).is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
+            p1.get(&proposal_id_outcome)
+                .is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
+                && p2
+                    .get(&proposal_id_outcome)
+                    .is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
+                && p3
+                    .get(&proposal_id_outcome)
+                    .is_some_and(|p| matches!(p.state, ProposalState::Accepted { .. }))
         },
         "All nodes converged on proposal outcome: Accepted",
         20,

@@ -9,8 +9,8 @@ use icn_net::NetworkActor;
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::Duration;
+use tokio::sync::RwLock;
 use tracing::info;
 
 /// Test that connections from trusted peers are accepted
@@ -91,7 +91,9 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     info!("Bob network actor started, attempting to dial Alice...");
 
     // Bob dials Alice
-    let result = bob_handle.dial("127.0.0.1:15400".parse()?, alice_did.clone()).await;
+    let result = bob_handle
+        .dial("127.0.0.1:15400".parse()?, alice_did.clone())
+        .await;
 
     assert!(
         result.is_ok(),
@@ -183,7 +185,9 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
     info!("Mallory network actor started, attempting to dial Alice...");
 
     // Mallory attempts to dial Alice - should be rejected during TLS handshake
-    let result = mallory_handle.dial("127.0.0.1:15500".parse()?, alice_did.clone()).await;
+    let result = mallory_handle
+        .dial("127.0.0.1:15500".parse()?, alice_did.clone())
+        .await;
 
     // The connection should fail because Alice's TLS verifier rejects Mallory
     assert!(
@@ -191,7 +195,10 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         "Connection should be rejected when peer has insufficient trust (score: 0.0 < threshold: 0.1)"
     );
 
-    info!("✓ Untrusted peer connection rejected: {:?}", result.unwrap_err());
+    info!(
+        "✓ Untrusted peer connection rejected: {:?}",
+        result.unwrap_err()
+    );
 
     // Cleanup
     let _ = alice_shutdown_tx.send(());
@@ -270,7 +277,9 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     )
     .await?;
 
-    let result = bob_handle.dial("127.0.0.1:15600".parse()?, alice_did.clone()).await;
+    let result = bob_handle
+        .dial("127.0.0.1:15600".parse()?, alice_did.clone())
+        .await;
 
     assert!(
         result.is_ok(),

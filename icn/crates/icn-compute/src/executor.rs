@@ -3,9 +3,7 @@
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::error::ComputeError;
-use crate::types::{
-    ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, TaskCode,
-};
+use crate::types::{ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, TaskCode};
 
 /// Execution context provided to the executor
 pub struct ExecutionContext {
@@ -101,7 +99,8 @@ impl LocalExecutor {
             .as_millis() as u64;
 
         // Parse signing key and sign the result
-        let signing_key_bytes: [u8; 32] = signing_key.try_into()
+        let signing_key_bytes: [u8; 32] = signing_key
+            .try_into()
             .map_err(|_| ComputeError::InvalidSignature("Invalid signing key length".into()))?;
         let ed25519_key = ed25519_dalek::SigningKey::from_bytes(&signing_key_bytes);
 
@@ -145,13 +144,15 @@ impl Executor for LocalExecutor {
                 }
 
                 // Find the default rule to execute (first rule or "main")
-                let rule_name = contract.rules.first()
+                let rule_name = contract
+                    .rules
+                    .first()
                     .map(|r| r.name.clone())
                     .unwrap_or_else(|| "main".to_string());
 
                 // Parse caller DID
                 let caller_did: icn_identity::Did = match serde_json::from_value(
-                    serde_json::Value::String(ctx.executor_did.clone())
+                    serde_json::Value::String(ctx.executor_did.clone()),
                 ) {
                     Ok(d) => d,
                     Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {e}")),
@@ -187,11 +188,12 @@ impl Executor for LocalExecutor {
                 match interpreter.execute_rule(&rule_name, args) {
                     Ok(result) => {
                         // Update fuel consumed
-                        ctx.fuel_remaining = ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
+                        ctx.fuel_remaining =
+                            ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
 
                         // Serialize result
-                        let output = serde_json::to_vec(&result.value)
-                            .unwrap_or_else(|_| b"null".to_vec());
+                        let output =
+                            serde_json::to_vec(&result.value).unwrap_or_else(|_| b"null".to_vec());
                         ExecutionOutcome::Success(output)
                     }
                     Err(e) => {
@@ -234,7 +236,8 @@ mod tests {
                 "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
             }],
             "triggers": []
-        }"#.to_string()
+        }"#
+        .to_string()
     }
 
     /// CCL contract with addition
@@ -261,7 +264,8 @@ mod tests {
                 }]
             }],
             "triggers": []
-        }"#.to_string()
+        }"#
+        .to_string()
     }
 
     fn make_task(code: &str, fuel: u64) -> ComputeTask {
@@ -295,13 +299,18 @@ mod tests {
         let task = make_task(&simple_contract(), 10_000);
 
         let result = executor
-            .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &test_signing_key())
+            .execute_task(
+                &task,
+                "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+                &test_signing_key(),
+            )
             .unwrap();
 
         // Verify execution succeeded
         assert!(
             matches!(&result.outcome, ExecutionOutcome::Success(_)),
-            "Expected successful execution, got: {:?}", result.outcome
+            "Expected successful execution, got: {:?}",
+            result.outcome
         );
 
         // Verify output is non-empty
@@ -318,13 +327,18 @@ mod tests {
         task.inputs = r#"{"a": {"Int": 5}, "b": {"Int": 3}}"#.as_bytes().to_vec();
 
         let result = executor
-            .execute_task(&task, "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", &test_signing_key())
+            .execute_task(
+                &task,
+                "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+                &test_signing_key(),
+            )
             .unwrap();
 
         // Verify execution succeeded with arguments
         assert!(
             matches!(&result.outcome, ExecutionOutcome::Success(_)),
-            "Expected successful execution with args, got: {:?}", result.outcome
+            "Expected successful execution with args, got: {:?}",
+            result.outcome
         );
     }
 

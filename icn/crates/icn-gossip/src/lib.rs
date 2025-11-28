@@ -38,14 +38,14 @@ pub mod vector_clock;
 
 pub use bloom::BloomFilter;
 pub use gossip::{
-    start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor, GossipHandle, PeerSamplingCallback,
-    SendMessageCallback,
+    start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor,
+    GossipHandle, PeerSamplingCallback, SendMessageCallback,
 };
 pub use partition::{
     Conflict, ConflictResolution, ConflictResolver, DataType, PartitionConfig, PartitionDetector,
     PartitionHealer, ResolutionOutcome, VectorClockMerger,
 };
-pub use scalability::{CompressedVectorClock, ShardedTopic, ShardStats, TopicShard, VarInt};
+pub use scalability::{CompressedVectorClock, ShardStats, ShardedTopic, TopicShard, VarInt};
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
     AccessControl, ContentHash, GossipEntry, GossipMessage, Scope, Subscription, Topic,

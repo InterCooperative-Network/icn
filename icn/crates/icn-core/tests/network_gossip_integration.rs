@@ -138,9 +138,7 @@ async fn test_two_node_gossip_flow() -> Result<()> {
     let clock = {
         let gossip1 = node1.gossip_handle.read().await;
         // Get the entry we just published
-        let entry = gossip1
-            .get_entry(topic, &hash)
-            .expect("Entry should exist");
+        let entry = gossip1.get_entry(topic, &hash).expect("Entry should exist");
         entry.clock
     };
 

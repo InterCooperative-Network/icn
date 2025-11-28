@@ -298,7 +298,7 @@ mod tests {
             None,
         );
         stale.timestamp -= 120; // 2 minutes ago (stale)
-        // Force store by modifying cache directly (for test)
+                                // Force store by modifying cache directly (for test)
         cache.candidates.write().await.insert(did2.clone(), stale);
 
         assert_eq!(cache.len().await, 2);

@@ -8,11 +8,11 @@
 
 use anyhow::Result;
 use icn_core::{EventBus, GovernanceActor, SystemEvent};
-use icn_governance::{
-    GovernanceConfig, GovernanceDomain, GovernanceProfileId, GovernanceParams,
-    MembershipConfig, Proposal, ProposalPayload, StaticMembershipResolver,
-};
 use icn_gossip::GossipActor;
+use icn_governance::{
+    GovernanceConfig, GovernanceDomain, GovernanceParams, GovernanceProfileId, MembershipConfig,
+    Proposal, ProposalPayload, StaticMembershipResolver,
+};
 use icn_identity::{Did, KeyPair};
 use icn_ledger::Ledger;
 use icn_store::{SledStore, Store};
@@ -235,8 +235,14 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
     info!("Sender balance: {}", sender_balance);
     info!("Recipient balance: {}", recipient_balance);
 
-    assert_eq!(sender_balance, -5000, "Sender should have -5000 credits (debit)");
-    assert_eq!(recipient_balance, 5000, "Recipient should have +5000 credits (credit)");
+    assert_eq!(
+        sender_balance, -5000,
+        "Sender should have -5000 credits (debit)"
+    );
+    assert_eq!(
+        recipient_balance, 5000,
+        "Recipient should have +5000 credits (credit)"
+    );
 
     info!("✅ Ledger balances verified");
 
@@ -244,19 +250,29 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
     drop(ledger_guard); // Release lock before accessing store
 
     let audit_key = format!("gov:audit:{}", proposal_id.0);
-    let audit_bytes = gov_store.get(audit_key.as_bytes())?
+    let audit_bytes = gov_store
+        .get(audit_key.as_bytes())?
         .expect("Audit trail should exist");
 
     let audit_record: serde_json::Value = serde_json::from_slice(&audit_bytes)?;
 
-    info!("Audit trail: {}", serde_json::to_string_pretty(&audit_record)?);
+    info!(
+        "Audit trail: {}",
+        serde_json::to_string_pretty(&audit_record)?
+    );
 
     assert_eq!(audit_record["proposal_id"], proposal_id.0);
     assert_eq!(audit_record["amount"], 5000);
     assert_eq!(audit_record["currency"], "credits");
     assert_eq!(audit_record["recipient"], recipient_did.to_string());
-    assert_eq!(audit_record["decided_at"], now, "Audit trail should record governance decision timestamp");
-    assert!(audit_record["executed_at"].is_u64(), "Audit trail should include ledger execution timestamp");
+    assert_eq!(
+        audit_record["decided_at"], now,
+        "Audit trail should record governance decision timestamp"
+    );
+    assert!(
+        audit_record["executed_at"].is_u64(),
+        "Audit trail should include ledger execution timestamp"
+    );
 
     info!("✅ Audit trail verified");
 
@@ -266,7 +282,11 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
         .expect("ledger_entry_hash should be a string");
 
     let expected_hash_bytes = hex::decode(ledger_entry_hash_hex)?;
-    assert_eq!(expected_hash_bytes.len(), 32, "Entry hash should be 32 bytes");
+    assert_eq!(
+        expected_hash_bytes.len(),
+        32,
+        "Entry hash should be 32 bytes"
+    );
 
     info!("✅ Ledger entry hash format verified");
 
@@ -302,15 +322,23 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
         let ledger_clone = ledger_handle.clone();
         let own_did = did.clone();
 
-        event_bus.subscribe(Arc::new(move |event| {
-            match event {
+        event_bus
+            .subscribe(Arc::new(move |event| match event {
                 SystemEvent::ProposalAccepted {
                     proposal_id,
-                    payload: ProposalPayload::Budget { amount, recipient, currency, .. },
+                    payload:
+                        ProposalPayload::Budget {
+                            amount,
+                            recipient,
+                            currency,
+                            ..
+                        },
                     ..
                 } => {
-                    info!("📊 Executing budget proposal {}: {} {} to {}",
-                          proposal_id.0, amount, currency, recipient);
+                    info!(
+                        "📊 Executing budget proposal {}: {} {} to {}",
+                        proposal_id.0, amount, currency, recipient
+                    );
 
                     let ledger = ledger_clone.clone();
                     let from_did = own_did.clone();
@@ -334,8 +362,8 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
                     info!("❌ Proposal {} rejected - no action taken", proposal_id.0);
                 }
                 _ => {}
-            }
-        })).await
+            }))
+            .await
     };
 
     // Create recipient
@@ -389,8 +417,14 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
     let sender_balance = ledger_guard.get_balance(&did, "credits");
     let recipient_balance = ledger_guard.get_balance(&recipient_did, "credits");
 
-    assert_eq!(sender_balance, 0, "Sender balance should be 0 (no transaction)");
-    assert_eq!(recipient_balance, 0, "Recipient balance should be 0 (no transaction)");
+    assert_eq!(
+        sender_balance, 0,
+        "Sender balance should be 0 (no transaction)"
+    );
+    assert_eq!(
+        recipient_balance, 0,
+        "Recipient balance should be 0 (no transaction)"
+    );
 
     info!("✅ Verified rejected proposal did NOT execute ledger transaction");
 
@@ -400,7 +434,10 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
     let audit_key = format!("gov:audit:{}", proposal_id.0);
     let audit_result = gov_store.get(audit_key.as_bytes())?;
 
-    assert!(audit_result.is_none(), "Audit trail should NOT exist for rejected proposal");
+    assert!(
+        audit_result.is_none(),
+        "Audit trail should NOT exist for rejected proposal"
+    );
 
     info!("✅ Verified no audit trail for rejected proposal");
 

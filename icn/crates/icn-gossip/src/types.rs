@@ -16,8 +16,7 @@ const COMPRESSION_THRESHOLD: usize = 1024; // 1 KB
 ///
 /// Determines how far gossip messages should propagate based on
 /// geographic/organizational proximity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Scope {
     /// Local cluster only (same region + cluster)
     LocalCluster,
@@ -27,7 +26,6 @@ pub enum Scope {
     #[default]
     Global,
 }
-
 
 /// Replica health status (Phase 17)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -304,10 +302,10 @@ impl Topic {
         Topic {
             name,
             acl,
-            scope: Scope::Global,                       // Default to global scope
-            min_trust_threshold: None,                  // No fine-grained threshold by default
+            scope: Scope::Global,      // Default to global scope
+            min_trust_threshold: None, // No fine-grained threshold by default
             retention: Duration::from_secs(86400 * 30), // 30 days default
-            max_entries: 10000,                         // Default limit
+            max_entries: 10000,        // Default limit
         }
     }
 
@@ -397,28 +395,28 @@ impl TrustResourceLimits {
     pub fn for_trust_class(trust_class: TrustClass) -> Self {
         match trust_class {
             TrustClass::Isolated => Self {
-                max_pull_bytes: 64 * 1024,      // 64 KB
+                max_pull_bytes: 64 * 1024, // 64 KB
                 max_push_bytes: 64 * 1024,
                 max_outstanding_reqs: 1,
                 retry_min_ms: 1500,
                 retry_max_ms: 5000,
             },
             TrustClass::Known => Self {
-                max_pull_bytes: 256 * 1024,     // 256 KB
+                max_pull_bytes: 256 * 1024, // 256 KB
                 max_push_bytes: 256 * 1024,
                 max_outstanding_reqs: 2,
                 retry_min_ms: 800,
                 retry_max_ms: 2500,
             },
             TrustClass::Partner => Self {
-                max_pull_bytes: 1024 * 1024,    // 1 MB
+                max_pull_bytes: 1024 * 1024, // 1 MB
                 max_push_bytes: 1024 * 1024,
                 max_outstanding_reqs: 3,
                 retry_min_ms: 300,
                 retry_max_ms: 1200,
             },
             TrustClass::Federated => Self {
-                max_pull_bytes: 1024 * 1024,    // 1 MB (same as Partner)
+                max_pull_bytes: 1024 * 1024, // 1 MB (same as Partner)
                 max_push_bytes: 1024 * 1024,
                 max_outstanding_reqs: 3,
                 retry_min_ms: 300,
@@ -507,7 +505,10 @@ mod tests {
 
         // Should not compress (too small)
         entry.compress().unwrap();
-        assert!(!entry.compressed, "Should not compress data below threshold");
+        assert!(
+            !entry.compressed,
+            "Should not compress data below threshold"
+        );
         assert_eq!(entry.data, data);
     }
 
@@ -591,6 +592,9 @@ mod tests {
         let compressed_once = entry.data.clone();
 
         entry.compress().unwrap();
-        assert_eq!(entry.data, compressed_once, "Double compression should be no-op");
+        assert_eq!(
+            entry.data, compressed_once,
+            "Double compression should be no-op"
+        );
     }
 }

@@ -1,6 +1,6 @@
 //! WebSocket API endpoint
 
-use actix_web::{get, web, HttpRequest, HttpResponse, Error};
+use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use std::sync::Arc;
 
@@ -39,12 +39,11 @@ mod tests {
             actix_web::App::new()
                 .app_data(web::Data::new(auth_manager))
                 .app_data(web::Data::new(event_broadcaster))
-                .service(websocket)
-        ).await;
+                .service(websocket),
+        )
+        .await;
 
-        let req = test::TestRequest::get()
-            .uri("/ws/test-coop")
-            .to_request();
+        let req = test::TestRequest::get().uri("/ws/test-coop").to_request();
 
         let resp = test::call_service(&app, req).await;
         // WebSocket upgrade returns 101 Switching Protocols

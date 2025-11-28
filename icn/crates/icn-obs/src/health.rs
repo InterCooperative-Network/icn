@@ -66,12 +66,7 @@ impl HealthService {
     }
 
     /// Update health metrics
-    pub fn update(
-        &self,
-        active_connections: u64,
-        gossip_topics: u64,
-        ledger_quarantine_size: u64,
-    ) {
+    pub fn update(&self, active_connections: u64, gossip_topics: u64, ledger_quarantine_size: u64) {
         let mut status = self.inner.write().unwrap();
 
         status.uptime_seconds = self

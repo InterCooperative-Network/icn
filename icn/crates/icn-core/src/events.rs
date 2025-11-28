@@ -65,7 +65,11 @@ impl Drop for SubscriptionHandle {
             subs.retain(|(id, _)| *id != self.id);
             let removed_count = initial_count - subs.len();
             if removed_count > 0 {
-                debug!("Event bus subscriber {} removed (remaining: {})", self.id, subs.len());
+                debug!(
+                    "Event bus subscriber {} removed (remaining: {})",
+                    self.id,
+                    subs.len()
+                );
             }
         }
         // If we can't get the lock, silently skip cleanup
@@ -104,7 +108,9 @@ impl EventBus {
     /// Returns a SubscriptionHandle that will automatically unsubscribe when dropped.
     /// This prevents memory leaks if subscriptions are dynamically added and removed.
     pub async fn subscribe(&self, callback: EventCallback) -> SubscriptionHandle {
-        let id = self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let id = self
+            .next_id
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut subs = self.subscribers.write().await;
         subs.push((id, callback));
         debug!("Event bus subscriber {} added (total: {})", id, subs.len());
@@ -128,7 +134,11 @@ impl EventBus {
             SystemEvent::ContractExecuted { .. } => "ContractExecuted",
         };
 
-        debug!("Emitting event: {} to {} subscribers", event_type, subs.len());
+        debug!(
+            "Emitting event: {} to {} subscribers",
+            event_type,
+            subs.len()
+        );
 
         for (id, callback) in subs.iter() {
             // Call subscriber, but don't let one subscriber's panic crash everything
@@ -159,10 +169,11 @@ mod tests {
 
         // Subscribe to events
         let counter_clone = counter.clone();
-        let _handle = bus.subscribe(Arc::new(move |_event| {
-            counter_clone.fetch_add(1, Ordering::SeqCst);
-        }))
-        .await;
+        let _handle = bus
+            .subscribe(Arc::new(move |_event| {
+                counter_clone.fetch_add(1, Ordering::SeqCst);
+            }))
+            .await;
 
         // Emit event
         let event = SystemEvent::ProposalAccepted {
@@ -188,16 +199,18 @@ mod tests {
 
         // Subscribe two callbacks
         let c1 = counter1.clone();
-        let _handle1 = bus.subscribe(Arc::new(move |_| {
-            c1.fetch_add(1, Ordering::SeqCst);
-        }))
-        .await;
+        let _handle1 = bus
+            .subscribe(Arc::new(move |_| {
+                c1.fetch_add(1, Ordering::SeqCst);
+            }))
+            .await;
 
         let c2 = counter2.clone();
-        let _handle2 = bus.subscribe(Arc::new(move |_| {
-            c2.fetch_add(10, Ordering::SeqCst);
-        }))
-        .await;
+        let _handle2 = bus
+            .subscribe(Arc::new(move |_| {
+                c2.fetch_add(10, Ordering::SeqCst);
+            }))
+            .await;
 
         // Emit event
         let event = SystemEvent::ProposalRejected {
@@ -222,10 +235,11 @@ mod tests {
         let c = counter.clone();
 
         // Subscribe via bus1
-        let _handle = bus1.subscribe(Arc::new(move |_| {
-            c.fetch_add(1, Ordering::SeqCst);
-        }))
-        .await;
+        let _handle = bus1
+            .subscribe(Arc::new(move |_| {
+                c.fetch_add(1, Ordering::SeqCst);
+            }))
+            .await;
 
         // Emit via bus2
         let event = SystemEvent::ContractExecuted {
@@ -247,10 +261,11 @@ mod tests {
         // Subscribe and immediately drop the handle
         {
             let c = counter.clone();
-            let _handle = bus.subscribe(Arc::new(move |_| {
-                c.fetch_add(1, Ordering::SeqCst);
-            }))
-            .await;
+            let _handle = bus
+                .subscribe(Arc::new(move |_| {
+                    c.fetch_add(1, Ordering::SeqCst);
+                }))
+                .await;
             // Handle dropped here
         }
 
@@ -258,7 +273,9 @@ mod tests {
         let event = SystemEvent::ProposalAccepted {
             proposal_id: ProposalId("test".to_string()),
             domain_id: "test".to_string(),
-            payload: ProposalPayload::Text { body: "test".to_string() },
+            payload: ProposalPayload::Text {
+                body: "test".to_string(),
+            },
             decided_at: 1234567890,
         };
 

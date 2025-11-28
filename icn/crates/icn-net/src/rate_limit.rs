@@ -37,7 +37,7 @@ impl Default for RateLimitConfig {
     fn default() -> Self {
         RateLimitConfig {
             max_messages_per_second: 100, // 100 msgs/sec = reasonable for gossip
-            burst_capacity: 20,            // Allow bursts of 20 messages
+            burst_capacity: 20,           // Allow bursts of 20 messages
             refill_interval: Duration::from_millis(100), // Refill every 100ms
         }
     }
@@ -133,7 +133,12 @@ struct TokenBucket {
 }
 
 impl TokenBucket {
-    fn new(capacity: f64, refill_rate: f64, refill_interval: Duration, trust_class: Option<TrustClass>) -> Self {
+    fn new(
+        capacity: f64,
+        refill_rate: f64,
+        refill_interval: Duration,
+        trust_class: Option<TrustClass>,
+    ) -> Self {
         TokenBucket {
             tokens: capacity, // Start with full bucket
             capacity,
@@ -145,7 +150,12 @@ impl TokenBucket {
     }
 
     /// Update bucket configuration if trust class has changed
-    fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64, new_trust_class: Option<TrustClass>) -> bool {
+    fn update_config(
+        &mut self,
+        new_capacity: f64,
+        new_refill_rate: f64,
+        new_trust_class: Option<TrustClass>,
+    ) -> bool {
         // Only update if trust class actually changed
         if self.trust_class != new_trust_class {
             self.capacity = new_capacity;
@@ -253,9 +263,8 @@ impl RateLimiter {
         let mut buckets = self.buckets.write().await;
 
         // Calculate refill rate: tokens per interval
-        let refill_rate = (config.max_messages_per_second as f64
-            * config.refill_interval.as_secs_f64())
-        .max(1.0);
+        let refill_rate =
+            (config.max_messages_per_second as f64 * config.refill_interval.as_secs_f64()).max(1.0);
 
         let capacity = config.burst_capacity as f64;
         let refill_interval = config.refill_interval;
@@ -276,7 +285,9 @@ impl RateLimiter {
         // Record per-class rate limiting metric (general counter recorded in actor.rs)
         if !allowed {
             if let Some(class) = trust_class {
-                icn_obs::metrics::network::messages_rate_limited_by_class_inc(trust_class_to_str(class));
+                icn_obs::metrics::network::messages_rate_limited_by_class_inc(trust_class_to_str(
+                    class,
+                ));
             }
         }
 
@@ -289,9 +300,7 @@ impl RateLimiter {
         let mut buckets = self.buckets.write().await;
         let now = Instant::now();
 
-        buckets.retain(|_, bucket| {
-            now.duration_since(bucket.last_refill) < max_age
-        });
+        buckets.retain(|_, bucket| now.duration_since(bucket.last_refill) < max_age);
     }
 
     /// Get the number of tracked peers
@@ -400,22 +409,38 @@ mod tests {
         // Create peers with different trust levels
         // Note: TrustGraph computes final score as 70% direct + 30% transitive
         // So we need to adjust direct scores to achieve desired final trust classes:
-        let isolated_peer = KeyPair::generate().unwrap().did().clone();  // No trust edge = Isolated (final < 0.1)
-        let known_peer = KeyPair::generate().unwrap().did().clone();     // Direct 0.3 -> final 0.21 = Known
-        let partner_peer = KeyPair::generate().unwrap().did().clone();   // Direct 0.7 -> final 0.49 = Partner
+        let isolated_peer = KeyPair::generate().unwrap().did().clone(); // No trust edge = Isolated (final < 0.1)
+        let known_peer = KeyPair::generate().unwrap().did().clone(); // Direct 0.3 -> final 0.21 = Known
+        let partner_peer = KeyPair::generate().unwrap().did().clone(); // Direct 0.7 -> final 0.49 = Partner
         let federated_peer = KeyPair::generate().unwrap().did().clone(); // Direct 1.0 -> final 0.7 = Federated
 
         // Add trust edges with adjusted scores
-        graph.add_edge(TrustEdge::new(own_keypair.did().clone(), known_peer.clone(), 0.3)).unwrap();
-        graph.add_edge(TrustEdge::new(own_keypair.did().clone(), partner_peer.clone(), 0.7)).unwrap();
-        graph.add_edge(TrustEdge::new(own_keypair.did().clone(), federated_peer.clone(), 1.0)).unwrap();
+        graph
+            .add_edge(TrustEdge::new(
+                own_keypair.did().clone(),
+                known_peer.clone(),
+                0.3,
+            ))
+            .unwrap();
+        graph
+            .add_edge(TrustEdge::new(
+                own_keypair.did().clone(),
+                partner_peer.clone(),
+                0.7,
+            ))
+            .unwrap();
+        graph
+            .add_edge(TrustEdge::new(
+                own_keypair.did().clone(),
+                federated_peer.clone(),
+                1.0,
+            ))
+            .unwrap();
 
         // Create trust-gated rate limiter
         let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-        let limiter = RateLimiter::new_trust_gated(
-            TrustGatedRateLimitConfig::default(),
-            graph_handle,
-        );
+        let limiter =
+            RateLimiter::new_trust_gated(TrustGatedRateLimitConfig::default(), graph_handle);
 
         // Isolated peer (burst 2) - should be rate limited after 2 messages
         assert!(limiter.check_rate_limit(&isolated_peer).await);
@@ -456,7 +481,9 @@ mod tests {
 
         // Start with low trust (Known = burst 10)
         // Direct score 0.3 -> final 0.21 = Known class
-        graph.add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), 0.3)).unwrap();
+        graph
+            .add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), 0.3))
+            .unwrap();
 
         // Create trust-gated rate limiter
         let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
@@ -475,7 +502,9 @@ mod tests {
         // Direct score 1.0 -> final 0.7 = Federated class
         {
             let mut graph = graph_handle.write().await;
-            graph.add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), 1.0)).unwrap();
+            graph
+                .add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), 1.0))
+                .unwrap();
         }
 
         // After trust upgrade, should get more capacity
@@ -496,9 +525,27 @@ mod tests {
         assert_eq!(config.for_class(TrustClass::Partner).burst_capacity, 20);
         assert_eq!(config.for_class(TrustClass::Federated).burst_capacity, 50);
 
-        assert_eq!(config.for_class(TrustClass::Isolated).max_messages_per_second, 10);
-        assert_eq!(config.for_class(TrustClass::Known).max_messages_per_second, 50);
-        assert_eq!(config.for_class(TrustClass::Partner).max_messages_per_second, 100);
-        assert_eq!(config.for_class(TrustClass::Federated).max_messages_per_second, 200);
+        assert_eq!(
+            config
+                .for_class(TrustClass::Isolated)
+                .max_messages_per_second,
+            10
+        );
+        assert_eq!(
+            config.for_class(TrustClass::Known).max_messages_per_second,
+            50
+        );
+        assert_eq!(
+            config
+                .for_class(TrustClass::Partner)
+                .max_messages_per_second,
+            100
+        );
+        assert_eq!(
+            config
+                .for_class(TrustClass::Federated)
+                .max_messages_per_second,
+            200
+        );
     }
 }

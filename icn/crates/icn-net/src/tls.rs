@@ -174,7 +174,10 @@ impl DidCertificateVerifier {
     }
 
     /// Validate certificate hasn't expired
-    fn check_expiration(cert: &CertificateDer<'_>, now: rustls::pki_types::UnixTime) -> Result<(), rustls::Error> {
+    fn check_expiration(
+        cert: &CertificateDer<'_>,
+        now: rustls::pki_types::UnixTime,
+    ) -> Result<(), rustls::Error> {
         use x509_parser::prelude::*;
 
         let (_, parsed_cert) = X509Certificate::from_der(cert)
@@ -191,9 +194,7 @@ impl DidCertificateVerifier {
         }
 
         if current_time > not_after {
-            return Err(rustls::Error::General(
-                "Certificate expired".to_string(),
-            ));
+            return Err(rustls::Error::General("Certificate expired".to_string()));
         }
 
         Ok(())
@@ -373,7 +374,10 @@ mod tests {
 
         // Create a temporary trust graph for testing
         let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(store, own_did.clone())));
+        let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(
+            store,
+            own_did.clone(),
+        )));
 
         let config = create_client_config(trust_graph, own_did, None).unwrap();
 

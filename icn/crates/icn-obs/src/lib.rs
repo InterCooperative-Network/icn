@@ -8,7 +8,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-pub use health::{HealthService, HealthState, HealthStatus, start_monitoring_server};
+pub use health::{start_monitoring_server, HealthService, HealthState, HealthStatus};
 
 /// Initialize observability stack
 pub fn init() -> Result<()> {

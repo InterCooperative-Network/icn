@@ -146,11 +146,7 @@ impl TestNode {
     }
 
     /// Reconnect with existing node (reusing same keypair after restart)
-    async fn reconnect(
-        keypair: KeyPair,
-        data_dir: PathBuf,
-        port: u16,
-    ) -> Result<Self> {
+    async fn reconnect(keypair: KeyPair, data_dir: PathBuf, port: u16) -> Result<Self> {
         let did = keypair.did().clone();
 
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
@@ -184,7 +180,11 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            None, None, None, None, None,
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         .await?;
 
@@ -225,7 +225,10 @@ async fn test_high_message_volume_restart() -> Result<()> {
     let topic_name = "test:high_volume";
     let message_count = 1000; // 1000 messages
 
-    info!("\n=== Stress Test: High Message Volume ({}  messages) ===", message_count);
+    info!(
+        "\n=== Stress Test: High Message Volume ({}  messages) ===",
+        message_count
+    );
 
     // Phase 1: Create node and publish many messages
     info!("\n=== Phase 1: Publishing {} messages ===", message_count);
@@ -253,8 +256,12 @@ async fn test_high_message_volume_restart() -> Result<()> {
     }
 
     let publish_elapsed = start_publish.elapsed();
-    info!("✅ Published {} messages in {:?} ({:.0} msg/s)",
-          message_count, publish_elapsed, message_count as f64 / publish_elapsed.as_secs_f64());
+    info!(
+        "✅ Published {} messages in {:?} ({:.0} msg/s)",
+        message_count,
+        publish_elapsed,
+        message_count as f64 / publish_elapsed.as_secs_f64()
+    );
 
     // Save snapshot
     let start_save = Instant::now();
@@ -281,7 +288,10 @@ async fn test_high_message_volume_restart() -> Result<()> {
     let node_restart = TestNode::reconnect(keypair, data_dir.clone(), 51000).await?;
 
     let restore_elapsed = node_restart.load_and_restore_snapshot().await?;
-    info!("✅ Restore time: {:?} for {} messages", restore_elapsed, message_count);
+    info!(
+        "✅ Restore time: {:?} for {} messages",
+        restore_elapsed, message_count
+    );
 
     // Verify vector clock was restored
     let post_restart_clock = {
@@ -383,15 +393,19 @@ async fn test_many_peers_restart() -> Result<()> {
     }
     let verify_elapsed = start_verify.elapsed();
 
-    info!("✅ X25519 keys exchanged with {}/{} peers in {:?}",
-          keys_exchanged, peer_count, verify_elapsed);
+    info!(
+        "✅ X25519 keys exchanged with {}/{} peers in {:?}",
+        keys_exchanged, peer_count, verify_elapsed
+    );
 
     // Save snapshot
     let start_save = Instant::now();
     central_node.save_snapshot().await?;
     let save_elapsed = start_save.elapsed();
-    info!("✅ Snapshot saved with {} peer keys in {:?}",
-          keys_exchanged, save_elapsed);
+    info!(
+        "✅ Snapshot saved with {} peer keys in {:?}",
+        keys_exchanged, save_elapsed
+    );
 
     // Get network state before restart
     let pre_restart_state = central_node.export_state().await?;
@@ -410,12 +424,8 @@ async fn test_many_peers_restart() -> Result<()> {
 
     // Phase 2: Restart central node
     info!("\n=== Phase 2: Restarting central node ===");
-    let central_restart = TestNode::reconnect(
-        central_keypair,
-        central_node_dir.clone(),
-        base_port,
-    )
-    .await?;
+    let central_restart =
+        TestNode::reconnect(central_keypair, central_node_dir.clone(), base_port).await?;
 
     let restore_elapsed = central_restart.load_and_restore_snapshot().await?;
     info!("✅ Restored state in {:?}", restore_elapsed);
@@ -432,7 +442,10 @@ async fn test_many_peers_restart() -> Result<()> {
         pre_restart_key_count, post_restart_key_count,
         "Peer X25519 key count should match after restart"
     );
-    info!("✅ All {} peer X25519 keys restored", post_restart_key_count);
+    info!(
+        "✅ All {} peer X25519 keys restored",
+        post_restart_key_count
+    );
 
     // Verify specific keys match
     for (i, peer) in peer_nodes.iter().enumerate().take(10) {
@@ -480,8 +493,10 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
     let topic_count = 100; // 100 topics
     let messages_per_topic = 10;
 
-    info!("\n=== Stress Test: Multi-Topic ({} topics, {} msgs each) ===",
-          topic_count, messages_per_topic);
+    info!(
+        "\n=== Stress Test: Multi-Topic ({} topics, {} msgs each) ===",
+        topic_count, messages_per_topic
+    );
 
     // Phase 1: Create many topics and publish messages
     info!("\n=== Phase 1: Creating {} topics ===", topic_count);
@@ -502,7 +517,10 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
     info!("✅ Created and subscribed to {} topics", topic_count);
 
     // Publish messages to each topic
-    info!("Publishing {} messages to each topic...", messages_per_topic);
+    info!(
+        "Publishing {} messages to each topic...",
+        messages_per_topic
+    );
     for i in 0..topic_count {
         let topic_name = format!("test:topic{i}");
         for j in 0..messages_per_topic {
@@ -514,9 +532,12 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
 
     let setup_elapsed = start.elapsed();
     let total_messages = topic_count * messages_per_topic;
-    info!("✅ Published {} total messages in {:?} ({:.0} msg/s)",
-          total_messages, setup_elapsed,
-          total_messages as f64 / setup_elapsed.as_secs_f64());
+    info!(
+        "✅ Published {} total messages in {:?} ({:.0} msg/s)",
+        total_messages,
+        setup_elapsed,
+        total_messages as f64 / setup_elapsed.as_secs_f64()
+    );
 
     // Save snapshot
     node.save_snapshot().await?;
@@ -528,7 +549,8 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
     };
 
     let pre_restart_topics: HashSet<String> = pre_restart_state.topics.keys().cloned().collect();
-    let pre_restart_subs: HashSet<String> = pre_restart_state.subscriptions.keys().cloned().collect();
+    let pre_restart_subs: HashSet<String> =
+        pre_restart_state.subscriptions.keys().cloned().collect();
 
     let keypair = node.keypair.clone();
 
@@ -553,7 +575,8 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
     };
 
     let post_restart_topics: HashSet<String> = post_restart_state.topics.keys().cloned().collect();
-    let post_restart_subs: HashSet<String> = post_restart_state.subscriptions.keys().cloned().collect();
+    let post_restart_subs: HashSet<String> =
+        post_restart_state.subscriptions.keys().cloned().collect();
 
     assert_eq!(
         pre_restart_topics, post_restart_topics,

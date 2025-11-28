@@ -448,12 +448,7 @@ impl DidDocument {
     }
 
     /// Rotate a key for a device
-    pub fn rotate_key(
-        &mut self,
-        device_id: &str,
-        old_key: &[u8],
-        new_key: Vec<u8>,
-    ) -> Result<()> {
+    pub fn rotate_key(&mut self, device_id: &str, old_key: &[u8], new_key: Vec<u8>) -> Result<()> {
         let now = current_timestamp();
 
         // Find the verification method
@@ -712,19 +707,21 @@ mod tests {
             KeyType::Ed25519,
             vec![Capability::Sign],
             "device-1".to_string(),
-            kp1.sign(&RotationEvent::add_device(
-                kp1.did().clone(),
-                "device-2".to_string(),
-                "Phone".to_string(),
-                kp2.verifying_key().as_bytes().to_vec(),
-                KeyType::Ed25519,
-                vec![Capability::Sign],
-                "device-1".to_string(),
-                Signature::from([0u8; 64]), // Dummy for message construction
-                2,
-            )
-            .signing_message()
-            .unwrap()),
+            kp1.sign(
+                &RotationEvent::add_device(
+                    kp1.did().clone(),
+                    "device-2".to_string(),
+                    "Phone".to_string(),
+                    kp2.verifying_key().as_bytes().to_vec(),
+                    KeyType::Ed25519,
+                    vec![Capability::Sign],
+                    "device-1".to_string(),
+                    Signature::from([0u8; 64]), // Dummy for message construction
+                    2,
+                )
+                .signing_message()
+                .unwrap(),
+            ),
             2,
         );
 

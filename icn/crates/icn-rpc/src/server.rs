@@ -1,25 +1,26 @@
 //! JSON-RPC server for daemon communication
 
 use anyhow::Result;
+use http_body_util::{BodyExt, Full};
+use hyper::body::Bytes;
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use http_body_util::{BodyExt, Full};
-use hyper::body::Bytes;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-use icn_net::NetworkHandle;
-use icn_ledger::Ledger;
 use icn_ccl::ContractRuntime;
-use icn_governance::{GovernanceOps, MembershipAction};
 use icn_compute::ComputeHandle;
+use icn_governance::{GovernanceOps, MembershipAction};
+use icn_ledger::Ledger;
+use icn_net::NetworkHandle;
 
+use crate::receipt::ReceiptStore;
 use crate::types::{
     CastVoteRequest, CloseProposalRequest, ContractExecutionResponse, CreateDomainRequest,
     CreateProposalRequest, CreateProposalResponse, GovernanceDomainInfo, GovernanceParamsInfo,
@@ -27,7 +28,6 @@ use crate::types::{
     NetworkStatus, OpenProposalRequest, PeerInfo, ProposalInfo, ProposalPayloadInfo, RpcRequest,
     RpcResponse, SubmitTaskRequest, SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
 };
-use crate::receipt::ReceiptStore;
 
 use icn_gossip::GossipActor;
 
@@ -171,12 +171,22 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "receipt.get" => handle_receipt_get(req.id, &req.params, state).await,
         "governance.domain.list" => handle_governance_domain_list(req.id, state).await,
         "governance.domain.get" => handle_governance_domain_get(req.id, &req.params, state).await,
-        "governance.domain.create" => handle_governance_domain_create(req.id, &req.params, state).await,
+        "governance.domain.create" => {
+            handle_governance_domain_create(req.id, &req.params, state).await
+        }
         "governance.proposal.list" => handle_governance_proposal_list(req.id, state).await,
-        "governance.proposal.get" => handle_governance_proposal_get(req.id, &req.params, state).await,
-        "governance.proposal.create" => handle_governance_proposal_create(req.id, &req.params, state).await,
-        "governance.proposal.open" => handle_governance_proposal_open(req.id, &req.params, state).await,
-        "governance.proposal.close" => handle_governance_proposal_close(req.id, &req.params, state).await,
+        "governance.proposal.get" => {
+            handle_governance_proposal_get(req.id, &req.params, state).await
+        }
+        "governance.proposal.create" => {
+            handle_governance_proposal_create(req.id, &req.params, state).await
+        }
+        "governance.proposal.open" => {
+            handle_governance_proposal_open(req.id, &req.params, state).await
+        }
+        "governance.proposal.close" => {
+            handle_governance_proposal_close(req.id, &req.params, state).await
+        }
         "governance.vote.cast" => handle_governance_vote_cast(req.id, &req.params, state).await,
         "compute.submit" => handle_compute_submit(req.id, &req.params, state).await,
         "compute.status" => handle_compute_status(req.id, &req.params, state).await,
@@ -196,11 +206,7 @@ async fn handle_network_peers(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     let network_handle = match &state.network_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Network actor not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Network actor not available".to_string());
         }
     };
 
@@ -234,11 +240,7 @@ async fn handle_network_dial(
     let network_handle = match &state.network_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Network actor not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Network actor not available".to_string());
         }
     };
 
@@ -282,11 +284,7 @@ async fn handle_network_stats(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     let network_handle = match &state.network_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Network actor not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Network actor not available".to_string());
         }
     };
 
@@ -333,11 +331,7 @@ async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     let ledger_handle = match &state.ledger_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Ledger not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
         }
     };
 
@@ -345,7 +339,9 @@ async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     match ledger.get_all_entries() {
         Ok(entries) => {
             if let Some(last_entry) = entries.last() {
-                let hash = last_entry.id.as_ref()
+                let hash = last_entry
+                    .id
+                    .as_ref()
                     .map(|h| h.to_hex())
                     .unwrap_or_else(|| "unknown".to_string());
 
@@ -353,14 +349,16 @@ async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
                     hash,
                     timestamp: last_entry.timestamp,
                     author: last_entry.author.as_str().to_string(),
-                    accounts: last_entry.accounts.iter().map(|delta| {
-                        LedgerAccountDelta {
+                    accounts: last_entry
+                        .accounts
+                        .iter()
+                        .map(|delta| LedgerAccountDelta {
                             account_id: delta.account_id.as_str().to_string(),
                             currency: delta.currency.clone(),
                             debit: delta.debit,
                             credit: delta.credit,
-                        }
-                    }).collect(),
+                        })
+                        .collect(),
                 };
 
                 match serde_json::to_value(&rpc_entry) {
@@ -384,11 +382,7 @@ async fn handle_ledger_balance(
     let ledger_handle = match &state.ledger_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Ledger not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
         }
     };
 
@@ -406,7 +400,9 @@ async fn handle_ledger_balance(
         }
     };
 
-    let account_did = match serde_json::from_value(serde_json::Value::String(balance_params.account_id.clone())) {
+    let account_did = match serde_json::from_value(serde_json::Value::String(
+        balance_params.account_id.clone(),
+    )) {
         Ok(d) => d,
         Err(e) => {
             return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
@@ -431,13 +427,15 @@ async fn handle_ledger_balance(
     } else {
         // Get all balances for account
         let account_balances = ledger.get_account_balances(&account_did);
-        let balances: Vec<LedgerBalance> = account_balances.balances.iter().map(|(currency, amount)| {
-            LedgerBalance {
+        let balances: Vec<LedgerBalance> = account_balances
+            .balances
+            .iter()
+            .map(|(currency, amount)| LedgerBalance {
                 account_id: balance_params.account_id.clone(),
                 currency: currency.clone(),
                 amount: *amount,
-            }
-        }).collect();
+            })
+            .collect();
 
         match serde_json::to_value(&balances) {
             Ok(value) => RpcResponse::success(id, value),
@@ -455,16 +453,13 @@ async fn handle_ledger_history(
     let ledger_handle = match &state.ledger_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Ledger not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
         }
     };
 
     // Parse pagination parameters
-    let page_request: crate::PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
+    let page_request: crate::PageRequest =
+        serde_json::from_value(params.clone()).unwrap_or_default();
 
     let ledger = ledger_handle.read().await;
     match ledger.get_all_entries() {
@@ -474,7 +469,9 @@ async fn handle_ledger_history(
                 .iter()
                 .rev()
                 .map(|entry| {
-                    let hash = entry.id.as_ref()
+                    let hash = entry
+                        .id
+                        .as_ref()
                         .map(|h| h.to_hex())
                         .unwrap_or_else(|| "unknown".to_string());
 
@@ -482,14 +479,16 @@ async fn handle_ledger_history(
                         hash,
                         timestamp: entry.timestamp,
                         author: entry.author.as_str().to_string(),
-                        accounts: entry.accounts.iter().map(|delta| {
-                            LedgerAccountDelta {
+                        accounts: entry
+                            .accounts
+                            .iter()
+                            .map(|delta| LedgerAccountDelta {
                                 account_id: delta.account_id.as_str().to_string(),
                                 currency: delta.currency.clone(),
                                 debit: delta.debit,
                                 credit: delta.credit,
-                            }
-                        }).collect(),
+                            })
+                            .collect(),
                     }
                 })
                 .collect();
@@ -515,11 +514,7 @@ async fn handle_contract_deploy(
     let gossip_handle = match &state.gossip_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Gossip not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Gossip not available".to_string());
         }
     };
 
@@ -537,20 +532,21 @@ async fn handle_contract_deploy(
     };
 
     // Parse deployment message from JSON
-    let deployment_msg: icn_ccl::ContractDeploymentMessage = match serde_json::from_str(&deploy_params.deployment_message) {
-        Ok(m) => m,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid deployment message JSON: {e}"));
-        }
-    };
+    let deployment_msg: icn_ccl::ContractDeploymentMessage =
+        match serde_json::from_str(&deploy_params.deployment_message) {
+            Ok(m) => m,
+            Err(e) => {
+                return RpcResponse::error(
+                    id,
+                    -32602,
+                    format!("Invalid deployment message JSON: {e}"),
+                );
+            }
+        };
 
     // Pre-verify signatures before publishing to gossip (early rejection of invalid sigs)
     if let Err(e) = deployment_msg.verify() {
-        return RpcResponse::error(
-            id,
-            -32602,
-            format!("Signature verification failed: {e}")
-        );
+        return RpcResponse::error(id, -32602, format!("Signature verification failed: {e}"));
     }
 
     let code_hash = deployment_msg.installation.code_hash.clone();
@@ -567,7 +563,10 @@ async fn handle_contract_deploy(
     let mut gossip = gossip_handle.write().await;
     match gossip.publish("contracts:deploy", message_bytes) {
         Ok(_) => {
-            info!("Contract deployment published to gossip: {}", code_hash.to_hex());
+            info!(
+                "Contract deployment published to gossip: {}",
+                code_hash.to_hex()
+            );
 
             // Create receipt for successful deployment
             let receipt = crate::receipt::Receipt::new(
@@ -614,11 +613,7 @@ async fn handle_contract_call(
     let contract_runtime = match &state.contract_runtime {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Contract runtime not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Contract runtime not available".to_string());
         }
     };
 
@@ -652,20 +647,22 @@ async fn handle_contract_call(
     let code_hash = icn_ledger::ContentHash::from_bytes(hash_bytes);
 
     // Parse caller DID
-    let caller_did: icn_identity::Did = match serde_json::from_value(serde_json::Value::String(call_params.caller.clone())) {
-        Ok(d) => d,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
-        }
-    };
+    let caller_did: icn_identity::Did =
+        match serde_json::from_value(serde_json::Value::String(call_params.caller.clone())) {
+            Ok(d) => d,
+            Err(e) => {
+                return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
+            }
+        };
 
     // Parse arguments
-    let args: std::collections::HashMap<String, icn_ccl::Value> = match serde_json::from_value(call_params.args) {
-        Ok(a) => a,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid args: {e}"));
-        }
-    };
+    let args: std::collections::HashMap<String, icn_ccl::Value> =
+        match serde_json::from_value(call_params.args) {
+            Ok(a) => a,
+            Err(e) => {
+                return RpcResponse::error(id, -32602, format!("Invalid args: {e}"));
+            }
+        };
 
     // Create execution context with generous fuel
     let context = icn_ccl::ExecutionContext::new(
@@ -674,17 +671,20 @@ async fn handle_contract_call(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        10000, // Generous fuel limit
+        10000,  // Generous fuel limit
         vec![], // No capabilities for now
         vec![], // No participants for now
     );
 
     // Execute rule
     let mut runtime = contract_runtime.write().await;
-    match runtime.execute_rule(&code_hash, &call_params.rule_name, context, args).await {
+    match runtime
+        .execute_rule(&code_hash, &call_params.rule_name, context, args)
+        .await
+    {
         Ok(result) => {
-            let response_value = serde_json::to_value(&result.value)
-                .unwrap_or(serde_json::json!(null));
+            let response_value =
+                serde_json::to_value(&result.value).unwrap_or(serde_json::json!(null));
 
             // Create receipt for successful execution
             let resources = crate::receipt::Resources {
@@ -746,16 +746,13 @@ async fn handle_contract_list(
     let contract_runtime = match &state.contract_runtime {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Contract runtime not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Contract runtime not available".to_string());
         }
     };
 
     // Parse pagination parameters
-    let page_request: crate::PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
+    let page_request: crate::PageRequest =
+        serde_json::from_value(params.clone()).unwrap_or_default();
 
     let runtime = contract_runtime.read().await;
     let contracts = runtime.list_contracts();
@@ -766,7 +763,11 @@ async fn handle_contract_list(
         .map(|info| crate::types::ContractInfo {
             code_hash: info.code_hash.to_hex(),
             name: info.name.clone(),
-            participants: info.participants.iter().map(|did| format!("{did:?}")).collect(),
+            participants: info
+                .participants
+                .iter()
+                .map(|did| format!("{did:?}"))
+                .collect(),
             currency: info.currency.clone(),
             rules: info.rules.clone(),
         })
@@ -795,7 +796,8 @@ async fn handle_quarantine_list(
     };
 
     // Parse pagination parameters
-    let page_request: crate::PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
+    let page_request: crate::PageRequest =
+        serde_json::from_value(params.clone()).unwrap_or_default();
 
     let ledger = ledger_handle.read().await;
     match ledger.quarantine().list() {
@@ -1065,11 +1067,7 @@ async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> RpcRe
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1083,12 +1081,19 @@ async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> RpcRe
                     created_at: d.created_at,
                     profile: d.config.profile.0,
                     membership_type: match &d.config.membership.source {
-                        icn_governance::MembershipSource::StaticList(_) => "static_list".to_string(),
-                        icn_governance::MembershipSource::TrustThreshold(_) => "trust_threshold".to_string(),
+                        icn_governance::MembershipSource::StaticList(_) => {
+                            "static_list".to_string()
+                        }
+                        icn_governance::MembershipSource::TrustThreshold(_) => {
+                            "trust_threshold".to_string()
+                        }
                     },
                     params: GovernanceParamsInfo {
                         quorum_percentage: d.config.params.quorum_percentage,
-                        approval_threshold_percentage: d.config.params.approval_threshold_percentage,
+                        approval_threshold_percentage: d
+                            .config
+                            .params
+                            .approval_threshold_percentage,
                         voting_period_seconds: d.config.params.voting_period_seconds,
                     },
                 })
@@ -1112,11 +1117,7 @@ async fn handle_governance_domain_get(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1144,7 +1145,9 @@ async fn handle_governance_domain_get(
                 profile: d.config.profile.0,
                 membership_type: match &d.config.membership.source {
                     icn_governance::MembershipSource::StaticList(_) => "static_list".to_string(),
-                    icn_governance::MembershipSource::TrustThreshold(_) => "trust_threshold".to_string(),
+                    icn_governance::MembershipSource::TrustThreshold(_) => {
+                        "trust_threshold".to_string()
+                    }
                 },
                 params: GovernanceParamsInfo {
                     quorum_percentage: d.config.params.quorum_percentage,
@@ -1168,11 +1171,7 @@ async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) -> Rpc
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1182,10 +1181,13 @@ async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) -> Rpc
                 .into_iter()
                 .map(|p| {
                     let (state_str, opened_at, closes_at, closed_at) = match &p.state {
-                        icn_governance::ProposalState::Draft => ("draft".to_string(), None, None, None),
-                        icn_governance::ProposalState::Open { opened_at, closes_at } => {
-                            ("open".to_string(), Some(*opened_at), Some(*closes_at), None)
+                        icn_governance::ProposalState::Draft => {
+                            ("draft".to_string(), None, None, None)
                         }
+                        icn_governance::ProposalState::Open {
+                            opened_at,
+                            closes_at,
+                        } => ("open".to_string(), Some(*opened_at), Some(*closes_at), None),
                         icn_governance::ProposalState::Accepted { closed_at } => {
                             ("accepted".to_string(), None, None, Some(*closed_at))
                         }
@@ -1234,11 +1236,7 @@ async fn handle_governance_proposal_get(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1261,9 +1259,10 @@ async fn handle_governance_proposal_get(
         Ok(Some(p)) => {
             let (state_str, opened_at, closes_at, closed_at) = match &p.state {
                 icn_governance::ProposalState::Draft => ("draft".to_string(), None, None, None),
-                icn_governance::ProposalState::Open { opened_at, closes_at } => {
-                    ("open".to_string(), Some(*opened_at), Some(*closes_at), None)
-                }
+                icn_governance::ProposalState::Open {
+                    opened_at,
+                    closes_at,
+                } => ("open".to_string(), Some(*opened_at), Some(*closes_at), None),
                 icn_governance::ProposalState::Accepted { closed_at } => {
                     ("accepted".to_string(), None, None, Some(*closed_at))
                 }
@@ -1311,11 +1310,7 @@ async fn handle_governance_domain_create(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1329,15 +1324,17 @@ async fn handle_governance_domain_create(
     // Convert membership config
     let membership = match request.membership {
         MembershipConfigInfo::StaticList { members } => {
-            let dids: Result<Vec<icn_identity::Did>, _> = members
-                .iter()
-                .map(|s| s.parse())
-                .collect();
+            let dids: Result<Vec<icn_identity::Did>, _> =
+                members.iter().map(|s| s.parse()).collect();
 
             match dids {
                 Ok(dids) => icn_governance::MembershipConfig::static_list(dids),
                 Err(e) => {
-                    return RpcResponse::error(id, -32602, format!("Invalid DID in member list: {e}"));
+                    return RpcResponse::error(
+                        id,
+                        -32602,
+                        format!("Invalid DID in member list: {e}"),
+                    );
                 }
             }
         }
@@ -1354,13 +1351,16 @@ async fn handle_governance_domain_create(
 
     let domain_id = icn_governance::GovernanceDomainId(request.domain_id);
 
-    match governance_handle.create_domain(
-        domain_id.clone(),
-        request.name,
-        request.profile,
-        params,
-        membership,
-    ).await {
+    match governance_handle
+        .create_domain(
+            domain_id.clone(),
+            request.name,
+            request.profile,
+            params,
+            membership,
+        )
+        .await
+    {
         Ok(()) => {
             let result = serde_json::json!({
                 "success": true,
@@ -1381,11 +1381,7 @@ async fn handle_governance_proposal_create(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1398,10 +1394,13 @@ async fn handle_governance_proposal_create(
 
     // Convert payload
     let payload = match request.payload {
-        ProposalPayloadInfo::Text { body } => {
-            icn_governance::ProposalPayload::Text { body }
-        }
-        ProposalPayloadInfo::Budget { amount, currency, recipient, purpose } => {
+        ProposalPayloadInfo::Text { body } => icn_governance::ProposalPayload::Text { body },
+        ProposalPayloadInfo::Budget {
+            amount,
+            currency,
+            recipient,
+            purpose,
+        } => {
             let recipient_did = match recipient.parse::<icn_identity::Did>() {
                 Ok(did) => did,
                 Err(e) => {
@@ -1429,7 +1428,11 @@ async fn handle_governance_proposal_create(
                 "add" => MembershipAction::Add,
                 "remove" => MembershipAction::Remove,
                 _ => {
-                    return RpcResponse::error(id, -32602, "Invalid action (must be 'add' or 'remove')".to_string());
+                    return RpcResponse::error(
+                        id,
+                        -32602,
+                        "Invalid action (must be 'add' or 'remove')".to_string(),
+                    );
                 }
             };
             icn_governance::ProposalPayload::Membership {
@@ -1441,12 +1444,10 @@ async fn handle_governance_proposal_create(
 
     let domain_id = icn_governance::GovernanceDomainId(request.domain_id);
 
-    match governance_handle.create_proposal(
-        domain_id,
-        request.title,
-        request.description,
-        payload,
-    ).await {
+    match governance_handle
+        .create_proposal(domain_id, request.title, request.description, payload)
+        .await
+    {
         Ok(proposal_id) => {
             let response = CreateProposalResponse {
                 proposal_id: proposal_id.0,
@@ -1469,11 +1470,7 @@ async fn handle_governance_proposal_open(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1486,7 +1483,10 @@ async fn handle_governance_proposal_open(
 
     let proposal_id = icn_governance::ProposalId(request.proposal_id);
 
-    match governance_handle.open_proposal(proposal_id, request.voting_period_seconds).await {
+    match governance_handle
+        .open_proposal(proposal_id, request.voting_period_seconds)
+        .await
+    {
         Ok(()) => {
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
@@ -1504,11 +1504,7 @@ async fn handle_governance_vote_cast(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1526,11 +1522,18 @@ async fn handle_governance_vote_cast(
         "against" => icn_governance::VoteChoice::Against,
         "abstain" => icn_governance::VoteChoice::Abstain,
         _ => {
-            return RpcResponse::error(id, -32602, "Invalid vote choice (must be 'for', 'against', or 'abstain')".to_string());
+            return RpcResponse::error(
+                id,
+                -32602,
+                "Invalid vote choice (must be 'for', 'against', or 'abstain')".to_string(),
+            );
         }
     };
 
-    match governance_handle.cast_vote(proposal_id, choice, request.comment).await {
+    match governance_handle
+        .cast_vote(proposal_id, choice, request.comment)
+        .await
+    {
         Ok(()) => {
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
@@ -1548,11 +1551,7 @@ async fn handle_governance_proposal_close(
     let governance_handle = match &state.governance_handle {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(
-                id,
-                -32000,
-                "Governance not available".to_string(),
-            );
+            return RpcResponse::error(id, -32000, "Governance not available".to_string());
         }
     };
 
@@ -1613,7 +1612,7 @@ async fn handle_compute_submit(
     let task = icn_compute::ComputeTask {
         id: request.task_id,
         submitter: "rpc:unknown".to_string(), // TODO: Get from auth context
-        coop_id: None, // TODO: Get from auth context or request
+        coop_id: None,                        // TODO: Get from auth context or request
         code: icn_compute::TaskCode::Ccl(request.code),
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
@@ -1627,7 +1626,7 @@ async fn handle_compute_submit(
         payment_rate: request.payment_rate,
         payment_currency: request.payment_currency,
         resource_profile: None, // TODO: Allow clients to specify resource requirements
-        actor_mode: None, // Not actor mode (Phase 16D)
+        actor_mode: None,       // Not actor mode (Phase 16D)
         placement_constraints: None, // No constraints from RPC (Phase 16E will set from policy)
     };
 
@@ -1675,7 +1674,11 @@ async fn handle_compute_status(
             arr
         }
         _ => {
-            return RpcResponse::error(id, -32602, "Invalid task_hash (expected 32 hex bytes)".to_string());
+            return RpcResponse::error(
+                id,
+                -32602,
+                "Invalid task_hash (expected 32 hex bytes)".to_string(),
+            );
         }
     };
 
@@ -1709,7 +1712,11 @@ async fn handle_compute_status(
                         fuel_used: result.fuel_used,
                         duration_ms: result.duration_ms,
                     };
-                    ("completed".to_string(), Some(result.executor.clone()), Some(result_info))
+                    (
+                        "completed".to_string(),
+                        Some(result.executor.clone()),
+                        Some(result_info),
+                    )
                 }
                 icn_compute::TaskStatus::Failed { reason } => {
                     let result_info = TaskResultInfo {
@@ -1781,14 +1788,23 @@ async fn handle_compute_cancel(
             arr
         }
         _ => {
-            return RpcResponse::error(id, -32602, "Invalid task_hash (expected 32 hex bytes)".to_string());
+            return RpcResponse::error(
+                id,
+                -32602,
+                "Invalid task_hash (expected 32 hex bytes)".to_string(),
+            );
         }
     };
 
-    let reason = params.reason.unwrap_or_else(|| "Cancelled by submitter".to_string());
+    let reason = params
+        .reason
+        .unwrap_or_else(|| "Cancelled by submitter".to_string());
     let caller_did = "rpc:unknown"; // TODO: Get from auth context
 
-    match compute_handle.cancel_task(&hash_bytes, caller_did, reason).await {
+    match compute_handle
+        .cancel_task(&hash_bytes, caller_did, reason)
+        .await
+    {
         Ok(_) => {
             #[derive(serde::Serialize)]
             struct CancelResponse {
@@ -1962,7 +1978,10 @@ async fn handle_quota_usage(
         }
     };
 
-    match compute_handle.get_usage(&params.coop_id, &params.member_did).await {
+    match compute_handle
+        .get_usage(&params.coop_id, &params.member_did)
+        .await
+    {
         Ok(usage) => {
             let result = serde_json::to_value(usage).unwrap();
             RpcResponse::success(id, result)

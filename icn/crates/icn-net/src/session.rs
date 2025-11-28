@@ -108,13 +108,17 @@ impl SessionManager {
 
         // Create client config with trust-gated verification if trust_graph provided
         let client_config = if let Some(trust_graph) = trust_graph {
-            info!("Trust-gated TLS verification enabled (min_threshold: {:?})", min_trust_threshold);
+            info!(
+                "Trust-gated TLS verification enabled (min_threshold: {:?})",
+                min_trust_threshold
+            );
             tls::create_client_config(trust_graph, own_did, min_trust_threshold)?
         } else {
             // Fallback: create a permissive client config (accepts all authenticated DIDs)
             info!("TLS verification in development mode (no trust graph)");
             // Create a temporary trust graph for development mode
-            let temp_store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary()?);
+            let temp_store: Arc<dyn icn_store::Store> =
+                Arc::new(icn_store::SledStore::temporary()?);
             let temp_trust_graph = icn_trust::TrustGraph::new(temp_store, own_did.clone());
             tls::create_client_config(Arc::new(RwLock::new(temp_trust_graph)), own_did, Some(0.0))?
         };
@@ -141,7 +145,10 @@ impl SessionManager {
 
             match stun_client.discover_public_endpoint(&socket).await {
                 Ok(public_addr) => {
-                    info!("✅ Discovered public endpoint: {} (local: {})", public_addr, local_addr);
+                    info!(
+                        "✅ Discovered public endpoint: {} (local: {})",
+                        public_addr, local_addr
+                    );
                     *self.public_endpoint.write().await = Some(public_addr);
                 }
                 Err(e) => {
@@ -245,7 +252,11 @@ impl SessionManager {
                       entry.key(), connection.remote_address());
             }
             Entry::Vacant(entry) => {
-                info!("Storing incoming connection from {} at {}", entry.key(), connection.remote_address());
+                info!(
+                    "Storing incoming connection from {} at {}",
+                    entry.key(),
+                    connection.remote_address()
+                );
                 entry.insert(connection);
             }
         }
@@ -396,9 +407,7 @@ mod tests {
 
         // Spawn accept task
         let server_manager_clone = server_manager.clone_for_test();
-        let accept_task = tokio::spawn(async move {
-            server_manager_clone.accept().await
-        });
+        let accept_task = tokio::spawn(async move { server_manager_clone.accept().await });
 
         // Give server time to start accepting
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;

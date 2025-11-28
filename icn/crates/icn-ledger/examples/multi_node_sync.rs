@@ -94,9 +94,18 @@ fn main() {
     node_alice.ledger.append_entry(entry1).unwrap();
 
     println!("  ✓ Node Alice recorded transaction");
-    println!("    - Alice's balance: {} hours", node_alice.get_balance(&alice_did, "hours"));
-    println!("    - Bob's balance: {} hours", node_alice.get_balance(&bob_did, "hours"));
-    println!("    - Charlie's balance: {} hours\n", node_alice.get_balance(&charlie_did, "hours"));
+    println!(
+        "    - Alice's balance: {} hours",
+        node_alice.get_balance(&alice_did, "hours")
+    );
+    println!(
+        "    - Bob's balance: {} hours",
+        node_alice.get_balance(&bob_did, "hours")
+    );
+    println!(
+        "    - Charlie's balance: {} hours\n",
+        node_alice.get_balance(&charlie_did, "hours")
+    );
 
     // Simulate gossip propagation
     node_bob.receive_from(&node_alice, "ledger:hours");
@@ -104,7 +113,10 @@ fn main() {
 
     println!("  📡 Gossip propagation complete");
     println!("    - Node Bob entries: {}", node_bob.get_entry_count());
-    println!("    - Node Charlie entries: {}\n", node_charlie.get_entry_count());
+    println!(
+        "    - Node Charlie entries: {}\n",
+        node_charlie.get_entry_count()
+    );
 
     // === Scenario 2: Bob provides service to Charlie ===
     println!("Scenario 2: Bob provides 5 hours of work to Charlie");
@@ -118,8 +130,14 @@ fn main() {
     node_bob.ledger.append_entry(entry2).unwrap();
 
     println!("  ✓ Node Bob recorded transaction");
-    println!("    - Bob's balance: {} hours", node_bob.get_balance(&bob_did, "hours"));
-    println!("    - Charlie's balance: {} hours\n", node_bob.get_balance(&charlie_did, "hours"));
+    println!(
+        "    - Bob's balance: {} hours",
+        node_bob.get_balance(&bob_did, "hours")
+    );
+    println!(
+        "    - Charlie's balance: {} hours\n",
+        node_bob.get_balance(&charlie_did, "hours")
+    );
 
     // Simulate gossip propagation
     node_alice.receive_from(&node_bob, "ledger:hours");
@@ -139,8 +157,14 @@ fn main() {
     node_charlie.ledger.append_entry(entry3).unwrap();
 
     println!("  ✓ Node Charlie recorded transaction");
-    println!("    - Charlie's balance: {} hours", node_charlie.get_balance(&charlie_did, "hours"));
-    println!("    - Alice's balance: {} hours\n", node_charlie.get_balance(&alice_did, "hours"));
+    println!(
+        "    - Charlie's balance: {} hours",
+        node_charlie.get_balance(&charlie_did, "hours")
+    );
+    println!(
+        "    - Alice's balance: {} hours\n",
+        node_charlie.get_balance(&alice_did, "hours")
+    );
 
     // Simulate gossip propagation
     node_alice.receive_from(&node_charlie, "ledger:hours");
@@ -153,21 +177,48 @@ fn main() {
 
     println!("Node Alice:");
     println!("  - Total entries: {}", node_alice.get_entry_count());
-    println!("  - Alice's balance: {} hours", node_alice.get_balance(&alice_did, "hours"));
-    println!("  - Bob's balance: {} hours", node_alice.get_balance(&bob_did, "hours"));
-    println!("  - Charlie's balance: {} hours\n", node_alice.get_balance(&charlie_did, "hours"));
+    println!(
+        "  - Alice's balance: {} hours",
+        node_alice.get_balance(&alice_did, "hours")
+    );
+    println!(
+        "  - Bob's balance: {} hours",
+        node_alice.get_balance(&bob_did, "hours")
+    );
+    println!(
+        "  - Charlie's balance: {} hours\n",
+        node_alice.get_balance(&charlie_did, "hours")
+    );
 
     println!("Node Bob:");
     println!("  - Total entries: {}", node_bob.get_entry_count());
-    println!("  - Alice's balance: {} hours", node_bob.get_balance(&alice_did, "hours"));
-    println!("  - Bob's balance: {} hours", node_bob.get_balance(&bob_did, "hours"));
-    println!("  - Charlie's balance: {} hours\n", node_bob.get_balance(&charlie_did, "hours"));
+    println!(
+        "  - Alice's balance: {} hours",
+        node_bob.get_balance(&alice_did, "hours")
+    );
+    println!(
+        "  - Bob's balance: {} hours",
+        node_bob.get_balance(&bob_did, "hours")
+    );
+    println!(
+        "  - Charlie's balance: {} hours\n",
+        node_bob.get_balance(&charlie_did, "hours")
+    );
 
     println!("Node Charlie:");
     println!("  - Total entries: {}", node_charlie.get_entry_count());
-    println!("  - Alice's balance: {} hours", node_charlie.get_balance(&alice_did, "hours"));
-    println!("  - Bob's balance: {} hours", node_charlie.get_balance(&bob_did, "hours"));
-    println!("  - Charlie's balance: {} hours\n", node_charlie.get_balance(&charlie_did, "hours"));
+    println!(
+        "  - Alice's balance: {} hours",
+        node_charlie.get_balance(&alice_did, "hours")
+    );
+    println!(
+        "  - Bob's balance: {} hours",
+        node_charlie.get_balance(&bob_did, "hours")
+    );
+    println!(
+        "  - Charlie's balance: {} hours\n",
+        node_charlie.get_balance(&charlie_did, "hours")
+    );
 
     // === Verification ===
     println!("=== Verification ===\n");

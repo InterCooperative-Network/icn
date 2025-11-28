@@ -21,7 +21,10 @@ fn test_identity_sync_add_device_workflow() {
     let alice_doc_v1 = alice_ks.get_did_document().unwrap().clone();
 
     println!("Alice's DID: {alice_did}");
-    println!("Alice's initial DID Document version: {}", alice_doc_v1.version);
+    println!(
+        "Alice's initial DID Document version: {}",
+        alice_doc_v1.version
+    );
 
     // === Bob's Setup ===
     // Bob creates his own identity and cache
@@ -83,7 +86,10 @@ fn test_identity_sync_add_device_workflow() {
         .unwrap();
 
     let alice_doc_v2 = alice_ks.get_did_document().unwrap();
-    println!("Alice updated her DID Document to version {}", alice_doc_v2.version);
+    println!(
+        "Alice updated her DID Document to version {}",
+        alice_doc_v2.version
+    );
 
     // === Alice broadcasts the update via gossip ===
     println!("\n=== Alice broadcasts identity update ===");
@@ -115,7 +121,9 @@ fn test_identity_sync_add_device_workflow() {
     println!("Event type: AddDevice");
 
     // Apply the rotation event to Bob's cached DID Document
-    let applied = bob_cache.apply_event(&alice_did, &received_msg.event).unwrap();
+    let applied = bob_cache
+        .apply_event(&alice_did, &received_msg.event)
+        .unwrap();
     assert!(applied, "Event should be applied successfully");
 
     println!("Bob applied rotation event to cached DID Document");
@@ -186,7 +194,9 @@ fn test_identity_sync_add_device_workflow() {
 
     // Bob receives and applies
     let received_revoke = IdentityUpdateMessage::from_bytes(&revoke_bytes).unwrap();
-    bob_cache.apply_event(&alice_did, &received_revoke.event).unwrap();
+    bob_cache
+        .apply_event(&alice_did, &received_revoke.event)
+        .unwrap();
 
     // Verify device-2 can no longer sign
     assert!(
@@ -201,7 +211,11 @@ fn test_identity_sync_add_device_workflow() {
         "\nFinal state: Alice's DID Document v{} with {} devices ({} active)",
         final_doc.version,
         final_doc.verification_method.len() / 2,
-        final_doc.verification_method.iter().filter(|vm| vm.revoked_at.is_none() && vm.key_type == KeyType::Ed25519).count()
+        final_doc
+            .verification_method
+            .iter()
+            .filter(|vm| vm.revoked_at.is_none() && vm.key_type == KeyType::Ed25519)
+            .count()
     );
 }
 

@@ -115,6 +115,9 @@ mod tests {
         let hash1 = entry1.compute_hash().unwrap();
         let hash2 = entry2.compute_hash().unwrap();
 
-        assert_ne!(hash1, hash2, "Different content should produce different hash");
+        assert_ne!(
+            hash1, hash2,
+            "Different content should produce different hash"
+        );
     }
 }

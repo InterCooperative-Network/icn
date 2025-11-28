@@ -36,7 +36,11 @@ fn test_backup_and_restore_roundtrip() -> Result<()> {
         .arg("init")
         .output()?;
 
-    assert!(output.status.success(), "Failed to init identity: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "Failed to init identity: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Get the original DID
     let show_output = Command::new(icnctl_bin())
@@ -47,7 +51,11 @@ fn test_backup_and_restore_roundtrip() -> Result<()> {
         .arg("show")
         .output()?;
 
-    assert!(show_output.status.success(), "Failed to show identity: stderr={}", String::from_utf8_lossy(&show_output.stderr));
+    assert!(
+        show_output.status.success(),
+        "Failed to show identity: stderr={}",
+        String::from_utf8_lossy(&show_output.stderr)
+    );
     let original_output = String::from_utf8_lossy(&show_output.stdout);
     let original_did = extract_did(&original_output).expect("Failed to extract DID");
 
@@ -59,22 +67,31 @@ fn test_backup_and_restore_roundtrip() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
-    assert!(backup_output.status.success(), "Failed to create backup: {}", String::from_utf8_lossy(&backup_output.stderr));
+    assert!(
+        backup_output.status.success(),
+        "Failed to create backup: {}",
+        String::from_utf8_lossy(&backup_output.stderr)
+    );
     assert!(backup_file.exists(), "Backup file was not created");
 
     // Verify backup contains expected files
-    let tar_list = Command::new("tar")
-        .arg("-tf")
-        .arg(&backup_file)
-        .output()?;
+    let tar_list = Command::new("tar").arg("-tf").arg(&backup_file).output()?;
 
-    assert!(tar_list.status.success(),
-            "Failed to list backup contents: {}",
-            String::from_utf8_lossy(&tar_list.stderr));
+    assert!(
+        tar_list.status.success(),
+        "Failed to list backup contents: {}",
+        String::from_utf8_lossy(&tar_list.stderr)
+    );
 
     let tar_contents = String::from_utf8_lossy(&tar_list.stdout);
-    assert!(tar_contents.contains("identity.age"), "Backup missing identity.age");
-    assert!(tar_contents.contains("backup_metadata.json"), "Backup missing metadata");
+    assert!(
+        tar_contents.contains("identity.age"),
+        "Backup missing identity.age"
+    );
+    assert!(
+        tar_contents.contains("backup_metadata.json"),
+        "Backup missing metadata"
+    );
 
     // Restore to different directory
     let restore_output = Command::new(icnctl_bin())
@@ -84,8 +101,15 @@ fn test_backup_and_restore_roundtrip() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
-    assert!(restore_output.status.success(), "Failed to restore backup: {}", String::from_utf8_lossy(&restore_output.stderr));
-    assert!(restore_dir.join("identity.age").exists(), "Restored identity.age not found");
+    assert!(
+        restore_output.status.success(),
+        "Failed to restore backup: {}",
+        String::from_utf8_lossy(&restore_output.stderr)
+    );
+    assert!(
+        restore_dir.join("identity.age").exists(),
+        "Restored identity.age not found"
+    );
 
     // Verify restored identity matches
     let restored_show = Command::new(icnctl_bin())
@@ -96,11 +120,17 @@ fn test_backup_and_restore_roundtrip() -> Result<()> {
         .arg("show")
         .output()?;
 
-    assert!(restored_show.status.success(), "Failed to show restored identity");
+    assert!(
+        restored_show.status.success(),
+        "Failed to show restored identity"
+    );
     let restored_output = String::from_utf8_lossy(&restored_show.stdout);
     let restored_did = extract_did(&restored_output).expect("Failed to extract restored DID");
 
-    assert_eq!(original_did, restored_did, "Restored DID does not match original");
+    assert_eq!(
+        original_did, restored_did,
+        "Restored DID does not match original"
+    );
 
     Ok(())
 }
@@ -118,9 +148,15 @@ fn test_backup_nonexistent_directory() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
-    assert!(!output.status.success(), "Backup should fail for nonexistent directory");
+    assert!(
+        !output.status.success(),
+        "Backup should fail for nonexistent directory"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("does not exist"), "Error message should mention directory does not exist");
+    assert!(
+        stderr.contains("does not exist"),
+        "Error message should mention directory does not exist"
+    );
 
     Ok(())
 }
@@ -159,10 +195,15 @@ fn test_restore_without_force_fails() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
-    assert!(!restore_output.status.success(), "Restore should fail without --force");
+    assert!(
+        !restore_output.status.success(),
+        "Restore should fail without --force"
+    );
     let stderr = String::from_utf8_lossy(&restore_output.stderr);
-    assert!(stderr.contains("already exists") || stderr.contains("--force"),
-            "Error should mention directory exists or --force flag");
+    assert!(
+        stderr.contains("already exists") || stderr.contains("--force"),
+        "Error should mention directory exists or --force flag"
+    );
 
     Ok(())
 }
@@ -207,27 +248,32 @@ fn test_restore_with_force_creates_backup() -> Result<()> {
         .arg("--force")
         .output()?;
 
-    assert!(restore_output.status.success(), "Restore with --force should succeed: {}",
-            String::from_utf8_lossy(&restore_output.stderr));
+    assert!(
+        restore_output.status.success(),
+        "Restore with --force should succeed: {}",
+        String::from_utf8_lossy(&restore_output.stderr)
+    );
 
     // Check that a backup directory was created
     let parent_entries_after: Vec<_> = fs::read_dir(temp_dir.path())?
         .filter_map(|e| e.ok())
         .collect();
 
-    assert!(parent_entries_after.len() > parent_entries_before.len(),
-            "A backup directory should have been created");
+    assert!(
+        parent_entries_after.len() > parent_entries_before.len(),
+        "A backup directory should have been created"
+    );
 
     // Verify a .backup-* directory exists
-    let backup_dirs: Vec<_> = parent_entries_after.iter()
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .starts_with("data.backup-")
-        })
+    let backup_dirs: Vec<_> = parent_entries_after
+        .iter()
+        .filter(|e| e.file_name().to_string_lossy().starts_with("data.backup-"))
         .collect();
 
-    assert!(!backup_dirs.is_empty(), "Should have created a .backup-* directory");
+    assert!(
+        !backup_dirs.is_empty(),
+        "Should have created a .backup-* directory"
+    );
 
     Ok(())
 }
@@ -247,7 +293,10 @@ fn test_backup_includes_state_snapshot() -> Result<()> {
 
     // Create a mock state.snapshot file
     let snapshot_path = data_dir.join("state.snapshot");
-    fs::write(&snapshot_path, r#"{"version":1,"created_at":1234567890,"gossip_state":null,"network_state":null}"#)?;
+    fs::write(
+        &snapshot_path,
+        r#"{"version":1,"created_at":1234567890,"gossip_state":null,"network_state":null}"#,
+    )?;
 
     // Also create identity.age so backup doesn't fail
     let identity_path = data_dir.join("identity.age");
@@ -261,23 +310,26 @@ fn test_backup_includes_state_snapshot() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
-    assert!(backup_output.status.success(),
-            "Failed to create backup: {}",
-            String::from_utf8_lossy(&backup_output.stderr));
+    assert!(
+        backup_output.status.success(),
+        "Failed to create backup: {}",
+        String::from_utf8_lossy(&backup_output.stderr)
+    );
 
     // Verify backup contains state.snapshot
-    let tar_list = Command::new("tar")
-        .arg("-tf")
-        .arg(&backup_file)
-        .output()?;
+    let tar_list = Command::new("tar").arg("-tf").arg(&backup_file).output()?;
 
-    assert!(tar_list.status.success(),
-            "Failed to list backup contents: {}",
-            String::from_utf8_lossy(&tar_list.stderr));
+    assert!(
+        tar_list.status.success(),
+        "Failed to list backup contents: {}",
+        String::from_utf8_lossy(&tar_list.stderr)
+    );
 
     let tar_contents = String::from_utf8_lossy(&tar_list.stdout);
-    assert!(tar_contents.contains("state.snapshot"),
-            "Backup missing state.snapshot file. Contents:\n{tar_contents}");
+    assert!(
+        tar_contents.contains("state.snapshot"),
+        "Backup missing state.snapshot file. Contents:\n{tar_contents}"
+    );
 
     // Restore to different directory
     let restore_dir = temp_dir.path().join("restore");
@@ -288,19 +340,25 @@ fn test_backup_includes_state_snapshot() -> Result<()> {
         .arg(&backup_file)
         .output()?;
 
-    assert!(restore_output.status.success(),
-            "Failed to restore backup: {}",
-            String::from_utf8_lossy(&restore_output.stderr));
+    assert!(
+        restore_output.status.success(),
+        "Failed to restore backup: {}",
+        String::from_utf8_lossy(&restore_output.stderr)
+    );
 
     // Verify state.snapshot was restored
     let restored_snapshot = restore_dir.join("state.snapshot");
-    assert!(restored_snapshot.exists(),
-            "state.snapshot was not restored");
+    assert!(
+        restored_snapshot.exists(),
+        "state.snapshot was not restored"
+    );
 
     // Verify content matches
     let restored_content = fs::read_to_string(&restored_snapshot)?;
-    assert!(restored_content.contains("\"version\":1"),
-            "Restored snapshot content doesn't match");
+    assert!(
+        restored_content.contains("\"version\":1"),
+        "Restored snapshot content doesn't match"
+    );
 
     Ok(())
 }

@@ -129,10 +129,7 @@ pub enum ResolutionOutcome {
         kept_version: String, // "local", "remote", or "both"
     },
     /// Conflict requires manual intervention
-    RequiresManual {
-        conflict: Conflict,
-        reason: String,
-    },
+    RequiresManual { conflict: Conflict, reason: String },
 }
 
 /// Merges vector clocks and detects causality violations
@@ -146,7 +143,11 @@ impl VectorClockMerger {
     }
 
     /// Merge remote clock and return conflicts (concurrent updates)
-    pub fn merge(&mut self, _peer: &Did, remote_clock: VectorClock) -> Result<Vec<(Did, u64, u64)>> {
+    pub fn merge(
+        &mut self,
+        _peer: &Did,
+        remote_clock: VectorClock,
+    ) -> Result<Vec<(Did, u64, u64)>> {
         let mut conflicts = Vec::new();
 
         // For each peer in remote clock
@@ -204,10 +205,10 @@ pub struct ConflictResolver {
 impl Default for ConflictResolver {
     fn default() -> Self {
         Self {
-            ledger_policy: ConflictResolution::RequiresManual,   // Ledger conflicts are critical
-            contract_policy: ConflictResolution::LastWriteWins,  // Contracts use timestamps
-            trust_policy: ConflictResolution::LastWriteWins,     // Trust edges use timestamps
-            gossip_policy: ConflictResolution::KeepBoth,         // Gossip is append-only
+            ledger_policy: ConflictResolution::RequiresManual, // Ledger conflicts are critical
+            contract_policy: ConflictResolution::LastWriteWins, // Contracts use timestamps
+            trust_policy: ConflictResolution::LastWriteWins,   // Trust edges use timestamps
+            gossip_policy: ConflictResolution::KeepBoth,       // Gossip is append-only
         }
     }
 }
@@ -236,7 +237,10 @@ impl ConflictResolver {
                 );
                 Ok(ResolutionOutcome::RequiresManual {
                     conflict: conflict.clone(),
-                    reason: format!("Policy requires manual resolution for {:?}", conflict.data_type),
+                    reason: format!(
+                        "Policy requires manual resolution for {:?}",
+                        conflict.data_type
+                    ),
                 })
             }
             ConflictResolution::LastWriteWins => {
@@ -245,10 +249,7 @@ impl ConflictResolver {
                 } else {
                     "local"
                 };
-                info!(
-                    "Resolved conflict using Last-Write-Wins: kept {}",
-                    kept
-                );
+                info!("Resolved conflict using Last-Write-Wins: kept {}", kept);
                 Ok(ResolutionOutcome::Resolved {
                     strategy: ConflictResolution::LastWriteWins,
                     kept_version: kept.to_string(),
@@ -539,7 +540,11 @@ mod tests {
 
         // Gossip should keep both
         let outcome = resolver.resolve(&gossip_conflict).unwrap();
-        if let ResolutionOutcome::Resolved { strategy, kept_version } = outcome {
+        if let ResolutionOutcome::Resolved {
+            strategy,
+            kept_version,
+        } = outcome
+        {
             assert_eq!(strategy, ConflictResolution::KeepBoth);
             assert_eq!(kept_version, "both");
         } else {
@@ -566,7 +571,11 @@ mod tests {
         };
 
         let outcome = resolver.resolve(&conflict_remote_newer).unwrap();
-        if let ResolutionOutcome::Resolved { strategy, kept_version } = outcome {
+        if let ResolutionOutcome::Resolved {
+            strategy,
+            kept_version,
+        } = outcome
+        {
             assert_eq!(strategy, ConflictResolution::LastWriteWins);
             assert_eq!(kept_version, "remote");
         } else {
@@ -585,7 +594,11 @@ mod tests {
         };
 
         let outcome = resolver.resolve(&conflict_local_newer).unwrap();
-        if let ResolutionOutcome::Resolved { strategy, kept_version } = outcome {
+        if let ResolutionOutcome::Resolved {
+            strategy,
+            kept_version,
+        } = outcome
+        {
             assert_eq!(strategy, ConflictResolution::LastWriteWins);
             assert_eq!(kept_version, "local");
         } else {
@@ -664,7 +677,11 @@ mod tests {
         }
 
         // Second conflict (contract) should use Last-Write-Wins (remote newer)
-        if let ResolutionOutcome::Resolved { strategy, kept_version } = &outcomes[1] {
+        if let ResolutionOutcome::Resolved {
+            strategy,
+            kept_version,
+        } = &outcomes[1]
+        {
             assert_eq!(*strategy, ConflictResolution::LastWriteWins);
             assert_eq!(kept_version, "remote");
         } else {

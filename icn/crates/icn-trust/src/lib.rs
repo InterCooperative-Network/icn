@@ -142,7 +142,11 @@ impl TrustGraph {
             edge.source, edge.target, edge.score
         );
 
-        let key = format!("trust/edges/{}:{}", edge.source.as_str(), edge.target.as_str());
+        let key = format!(
+            "trust/edges/{}:{}",
+            edge.source.as_str(),
+            edge.target.as_str()
+        );
         let value = serde_json::to_vec(&edge)?;
 
         self.store.put(key.as_bytes(), &value)?;

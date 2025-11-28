@@ -118,22 +118,14 @@ async fn test_candidate_update_priority() -> Result<()> {
     let cache = CandidateCache::new();
 
     // Store initial candidate
-    let candidate1 = ConnectionCandidate::new(
-        did.clone(),
-        "192.168.1.100:5000".parse()?,
-        None,
-        None,
-    );
+    let candidate1 =
+        ConnectionCandidate::new(did.clone(), "192.168.1.100:5000".parse()?, None, None);
     let timestamp1 = candidate1.timestamp;
     assert!(cache.store(candidate1.clone()).await);
 
     // Try to store older candidate (should be rejected)
-    let mut older_candidate = ConnectionCandidate::new(
-        did.clone(),
-        "192.168.1.100:5001".parse()?,
-        None,
-        None,
-    );
+    let mut older_candidate =
+        ConnectionCandidate::new(did.clone(), "192.168.1.100:5001".parse()?, None, None);
     older_candidate.timestamp = timestamp1 - 10; // 10 seconds older
     assert!(!cache.store(older_candidate).await);
 

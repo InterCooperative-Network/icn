@@ -37,8 +37,8 @@ pub struct CoopMember {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoopSettings {
     pub governance_model: String, // e.g., "consensus", "majority"
-    pub credit_policy: String,     // e.g., "conservative", "permissive"
-    pub currency: String,          // e.g., "hours", "USD"
+    pub credit_policy: String,    // e.g., "conservative", "permissive"
+    pub currency: String,         // e.g., "hours", "USD"
 }
 
 impl Default for CoopSettings {
@@ -107,7 +107,9 @@ impl Coop {
         crate::validation::validate_member_count(self.members.len())?;
 
         if self.is_member(&did) {
-            return Err(GatewayError::BadRequest("Member already exists".to_string()));
+            return Err(GatewayError::BadRequest(
+                "Member already exists".to_string(),
+            ));
         }
 
         self.members.push(CoopMember {
@@ -150,7 +152,11 @@ impl Coop {
 
         // If demoting an owner, ensure at least one owner remains
         if current_role == MemberRole::Owner && new_role != MemberRole::Owner {
-            let owner_count = self.members.iter().filter(|m| m.role == MemberRole::Owner).count();
+            let owner_count = self
+                .members
+                .iter()
+                .filter(|m| m.role == MemberRole::Owner)
+                .count();
             if owner_count <= 1 {
                 return Err(GatewayError::BadRequest(
                     "Cannot demote last owner".to_string(),
@@ -159,11 +165,7 @@ impl Coop {
         }
 
         // Update role
-        let member = self
-            .members
-            .iter_mut()
-            .find(|m| &m.did == did)
-            .unwrap(); // Safe: we already checked it exists
+        let member = self.members.iter_mut().find(|m| &m.did == did).unwrap(); // Safe: we already checked it exists
 
         member.role = new_role;
         Ok(())
@@ -191,7 +193,9 @@ impl CoopManager {
 
     /// Create a new cooperative
     pub fn create_coop(&self, id: CoopId, name: String, owner: Did, timestamp: u64) -> Result<()> {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         // Check global cooperative limit atomically (while holding write lock)
@@ -206,15 +210,17 @@ impl CoopManager {
                 e.insert(coop);
                 Ok(())
             }
-            Entry::Occupied(_) => {
-                Err(GatewayError::BadRequest("Coop ID already exists".to_string()))
-            }
+            Entry::Occupied(_) => Err(GatewayError::BadRequest(
+                "Coop ID already exists".to_string(),
+            )),
         }
     }
 
     /// Get a cooperative
     pub fn get_coop(&self, id: &CoopId) -> Result<Coop> {
-        let coops = self.coops.read()
+        let coops = self
+            .coops
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         coops
@@ -225,7 +231,9 @@ impl CoopManager {
 
     /// Update a cooperative
     pub fn update_coop(&self, id: &CoopId, coop: Coop) -> Result<()> {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         if !coops.contains_key(id) {
@@ -238,7 +246,9 @@ impl CoopManager {
 
     /// Delete a cooperative
     pub fn delete_coop(&self, id: &CoopId) -> Result<()> {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         coops
@@ -250,7 +260,9 @@ impl CoopManager {
 
     /// List all cooperatives (for testing/admin)
     pub fn list_coops(&self) -> Result<Vec<Coop>> {
-        let coops = self.coops.read()
+        let coops = self
+            .coops
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         Ok(coops.values().cloned().collect())
@@ -258,7 +270,9 @@ impl CoopManager {
 
     /// List all cooperative IDs (for cleanup tasks)
     pub fn list_all_coop_ids(&self) -> Result<Vec<CoopId>> {
-        let coops = self.coops.read()
+        let coops = self
+            .coops
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         Ok(coops.keys().cloned().collect())
@@ -266,7 +280,9 @@ impl CoopManager {
 
     /// Get total number of cooperatives
     pub fn count(&self) -> Result<usize> {
-        let coops = self.coops.read()
+        let coops = self
+            .coops
+            .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         Ok(coops.len())
@@ -281,7 +297,9 @@ impl CoopManager {
         role: MemberRole,
         timestamp: u64,
     ) -> Result<Coop> {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let coop = coops
@@ -295,7 +313,9 @@ impl CoopManager {
 
     /// Atomically remove a member from a cooperative
     pub fn remove_member_atomic(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let coop = coops
@@ -314,7 +334,9 @@ impl CoopManager {
         did: &Did,
         new_role: MemberRole,
     ) -> Result<Coop> {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let coop = coops
@@ -331,7 +353,9 @@ impl CoopManager {
     where
         F: FnOnce(&mut Coop) -> Result<()>,
     {
-        let mut coops = self.coops.write()
+        let mut coops = self
+            .coops
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let coop = coops

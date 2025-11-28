@@ -137,8 +137,10 @@ impl TestNode {
     /// Load snapshot from disk and restore
     async fn load_and_restore_snapshot(&self) -> Result<()> {
         if let Some(snapshot) = load_snapshot(&self.data_dir)? {
-            info!("Found snapshot (version {}, created at {})",
-                  snapshot.version, snapshot.created_at);
+            info!(
+                "Found snapshot (version {}, created at {})",
+                snapshot.version, snapshot.created_at
+            );
             self.restore_state(snapshot).await?;
             Ok(())
         } else {
@@ -280,8 +282,14 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     let restored_gossip = restored_state.gossip_state.unwrap();
 
     // Verify vector clock was restored (should have count = num_messages)
-    let restored_clock_count = restored_gossip.vector_clock.get(&did2.to_string()).unwrap_or(&0);
-    info!("Restored vector clock count for {}: {}", did2, restored_clock_count);
+    let restored_clock_count = restored_gossip
+        .vector_clock
+        .get(&did2.to_string())
+        .unwrap_or(&0);
+    info!(
+        "Restored vector clock count for {}: {}",
+        did2, restored_clock_count
+    );
     assert_eq!(
         *restored_clock_count, num_messages,
         "Vector clock should match original value"
@@ -296,7 +304,10 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
 
     // Verify subscription was restored
     let subs = restored_gossip.subscriptions.get(topic_name).unwrap();
-    assert!(subs.contains(&did2.to_string()), "Subscription should be restored");
+    assert!(
+        subs.contains(&did2.to_string()),
+        "Subscription should be restored"
+    );
     info!("✅ Subscription to '{}' was restored", topic_name);
 
     // Publish another message to verify state continuity
@@ -309,8 +320,14 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     // Verify vector clock incremented from restored state
     let final_state = node2.export_state().await?;
     let final_gossip = final_state.gossip_state.unwrap();
-    let final_clock_count = final_gossip.vector_clock.get(&did2.to_string()).unwrap_or(&0);
-    info!("Final vector clock count for {}: {}", did2, final_clock_count);
+    let final_clock_count = final_gossip
+        .vector_clock
+        .get(&did2.to_string())
+        .unwrap_or(&0);
+    info!(
+        "Final vector clock count for {}: {}",
+        did2, final_clock_count
+    );
     assert_eq!(
         *final_clock_count,
         num_messages + 1,
@@ -353,12 +370,23 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
 
     // Dial node2 from node1 to trigger key exchange
     info!("Node1 dialing node2...");
-    node1.network_handle.dial(node2.listen_addr, did2.clone()).await?;
+    node1
+        .network_handle
+        .dial(node2.listen_addr, did2.clone())
+        .await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Verify keys were exchanged (via Hello protocol)
-    let node1_has_node2_key = node1.network_handle.get_peer_x25519_key(&did2).await.is_some();
-    let node2_has_node1_key = node2.network_handle.get_peer_x25519_key(&did1).await.is_some();
+    let node1_has_node2_key = node1
+        .network_handle
+        .get_peer_x25519_key(&did2)
+        .await
+        .is_some();
+    let node2_has_node1_key = node2
+        .network_handle
+        .get_peer_x25519_key(&did1)
+        .await
+        .is_some();
 
     info!("Node1 has Node2's X25519 key: {}", node1_has_node2_key);
     info!("Node2 has Node1's X25519 key: {}", node2_has_node1_key);
@@ -367,8 +395,15 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
     assert!(node2_has_node1_key, "Node2 should have Node1's X25519 key");
 
     // Get the original key for comparison
-    let original_node2_key = node1.network_handle.get_peer_x25519_key(&did2).await.unwrap();
-    info!("Original Node2 X25519 key (first 8 bytes): {:?}", &original_node2_key[..8]);
+    let original_node2_key = node1
+        .network_handle
+        .get_peer_x25519_key(&did2)
+        .await
+        .unwrap();
+    info!(
+        "Original Node2 X25519 key (first 8 bytes): {:?}",
+        &original_node2_key[..8]
+    );
 
     // Save snapshot for node1
     node1.save_snapshot().await?;
@@ -415,7 +450,11 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         listen_addr_restart,
         shutdown_tx_restart.clone(),
         Some(incoming_handler),
-        None, None, None, None, None,
+        None,
+        None,
+        None,
+        None,
+        None,
     )
     .await?;
 
@@ -436,15 +475,23 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
     // ===== Phase 3: Verify X25519 key was restored =====
     info!("\n=== Phase 3: Verifying X25519 key persistence ===");
 
-    let restored_node2_key = node1_restart.network_handle.get_peer_x25519_key(&did2).await;
-    assert!(restored_node2_key.is_some(), "Node2's X25519 key should be restored");
+    let restored_node2_key = node1_restart
+        .network_handle
+        .get_peer_x25519_key(&did2)
+        .await;
+    assert!(
+        restored_node2_key.is_some(),
+        "Node2's X25519 key should be restored"
+    );
 
     let restored_key = restored_node2_key.unwrap();
-    info!("Restored Node2 X25519 key (first 8 bytes): {:?}", &restored_key[..8]);
+    info!(
+        "Restored Node2 X25519 key (first 8 bytes): {:?}",
+        &restored_key[..8]
+    );
 
     assert_eq!(
-        original_node2_key,
-        restored_key,
+        original_node2_key, restored_key,
         "Restored X25519 key should match original"
     );
 

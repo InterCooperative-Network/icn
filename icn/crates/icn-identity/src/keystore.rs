@@ -144,14 +144,15 @@ impl AgeKeyStore {
 
     /// Get the DID document (fails if locked or v2.1 keystore)
     pub fn get_did_document(&self) -> Result<&DidDocument> {
-        self.did_document
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("DID document not available (keystore locked or v2.1 format)"))
+        self.did_document.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("DID document not available (keystore locked or v2.1 format)")
+        })
     }
 
     /// Get this device's ID in the DID document (fails if locked or v2.1 keystore)
     pub fn get_device_id(&self) -> Result<&str> {
-        self.device_id.as_deref()
+        self.device_id
+            .as_deref()
             .ok_or_else(|| anyhow::anyhow!("Device ID not available"))
     }
 
@@ -269,13 +270,15 @@ impl AgeKeyStore {
 
         // Create parent directory
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .context("Failed to create keystore directory")?;
+            std::fs::create_dir_all(parent).context("Failed to create keystore directory")?;
         }
 
         // Generate new identity bundle with DID-TLS binding
         let identity_bundle = IdentityBundle::generate()?;
-        info!("Generated new identity with DID-TLS binding: {}", identity_bundle.did());
+        info!(
+            "Generated new identity with DID-TLS binding: {}",
+            identity_bundle.did()
+        );
 
         // Create DID Document v2
         let did_document = DidDocument::new(
@@ -339,8 +342,7 @@ impl AgeKeyStore {
 
         // Create age encryptor with passphrase
         let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
-            String::from_utf8(passphrase.to_vec())
-                .context("Passphrase must be valid UTF-8")?,
+            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?,
         ));
 
         // Encrypt
@@ -353,7 +355,8 @@ impl AgeKeyStore {
             .context("Failed to encrypt key material")?;
 
         writer
-            .finish().map(|_| ())
+            .finish()
+            .map(|_| ())
             .context("Failed to finalize encryption")?;
 
         // Write to file
@@ -399,8 +402,7 @@ impl AgeKeyStore {
 
         // Create age encryptor with passphrase
         let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
-            String::from_utf8(passphrase.to_vec())
-                .context("Passphrase must be valid UTF-8")?,
+            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?,
         ));
 
         // Encrypt
@@ -413,7 +415,8 @@ impl AgeKeyStore {
             .context("Failed to encrypt key material")?;
 
         writer
-            .finish().map(|_| ())
+            .finish()
+            .map(|_| ())
             .context("Failed to finalize encryption")?;
 
         // Write to file
@@ -463,7 +466,10 @@ impl KeyStore for AgeKeyStore {
         // Try loading as v3 first
         if let Ok(stored_v3) = Self::decrypt_and_load_v3(&self.path, passphrase) {
             // V3 keystore: has multi-device support
-            info!("Unlocked v3 keystore (multi-device) for DID: {}", stored_v3.did);
+            info!(
+                "Unlocked v3 keystore (multi-device) for DID: {}",
+                stored_v3.did
+            );
 
             // Reconstruct keypair
             let keypair = KeyPair::from_bytes(&stored_v3.secret_bytes, &stored_v3.public_bytes)?;
@@ -496,12 +502,21 @@ impl KeyStore for AgeKeyStore {
         let keypair = KeyPair::from_bytes(&stored.secret_bytes, &stored.public_bytes)?;
 
         // Check if we have TLS binding info (v2+ keystore)
-        let identity_bundle = if let (Some(tls_cert_der), Some(tls_key_der), Some(tls_binding_sig), Some(created_at)) =
-            (stored.tls_cert_der.clone(), stored.tls_key_der.clone(), stored.tls_binding_sig.clone(), stored.created_at) {
-
+        let identity_bundle = if let (
+            Some(tls_cert_der),
+            Some(tls_key_der),
+            Some(tls_binding_sig),
+            Some(created_at),
+        ) = (
+            stored.tls_cert_der.clone(),
+            stored.tls_key_der.clone(),
+            stored.tls_binding_sig.clone(),
+            stored.created_at,
+        ) {
             // Check if we have X25519 keys (v2.1+)
             let (x25519_secret, x25519_public) = if let (Some(secret), Some(public)) =
-                (stored.x25519_secret.clone(), stored.x25519_public) {
+                (stored.x25519_secret.clone(), stored.x25519_public)
+            {
                 // V2.1+ keystore: has X25519 keys
                 info!("Unlocked v2.1 keystore, migrating to v3 (multi-device)");
                 (secret, public)
@@ -605,7 +620,12 @@ impl KeyStore for AgeKeyStore {
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
 
-        let message = format!("key-rotation:{}:{}:{}", old_keypair.did(), new_keypair.did(), timestamp);
+        let message = format!(
+            "key-rotation:{}:{}:{}",
+            old_keypair.did(),
+            new_keypair.did(),
+            timestamp
+        );
 
         let rotation = KeyRotation {
             old_did: old_keypair.did().clone(),
@@ -616,10 +636,7 @@ impl KeyStore for AgeKeyStore {
             signature_new: new_keypair.sign(message.as_bytes()).to_vec(),
         };
 
-        info!(
-            "Rotating key: {} -> {}",
-            rotation.old_did, rotation.new_did
-        );
+        info!("Rotating key: {} -> {}", rotation.old_did, rotation.new_did);
 
         // Create new identity bundle with fresh TLS binding
         let new_bundle = IdentityBundle::from_keypair(new_keypair)?;
@@ -732,8 +749,14 @@ mod tests {
         let binding_sig2 = bundle2.binding_info().tls_binding_sig.clone();
 
         // TLS certificates should be IDENTICAL (not regenerated)
-        assert_eq!(cert1_der, cert2_der, "TLS certificate should persist across unlocks");
-        assert_eq!(binding_sig1, binding_sig2, "TLS binding signature should persist across unlocks");
+        assert_eq!(
+            cert1_der, cert2_der,
+            "TLS certificate should persist across unlocks"
+        );
+        assert_eq!(
+            binding_sig1, binding_sig2,
+            "TLS binding signature should persist across unlocks"
+        );
 
         // Open in a new keystore instance to verify disk persistence
         let mut ks3 = AgeKeyStore::open(&path).unwrap();
@@ -741,7 +764,10 @@ mod tests {
         let bundle3 = ks3.get_identity_bundle().unwrap();
         let cert3_der = bundle3.tls_cert().as_ref().to_vec();
 
-        assert_eq!(cert1_der, cert3_der, "TLS certificate should persist to disk");
+        assert_eq!(
+            cert1_der, cert3_der,
+            "TLS certificate should persist to disk"
+        );
     }
 
     #[test]

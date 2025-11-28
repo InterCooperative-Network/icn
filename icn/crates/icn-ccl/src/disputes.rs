@@ -28,19 +28,13 @@ pub type DisputeId = [u8; 32];
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DisputeOutcome {
     /// Original submitter was correct, challenger was wrong
-    SubmitterCorrect {
-        verified_result: Value,
-    },
+    SubmitterCorrect { verified_result: Value },
 
     /// Executor was correct, original submitter made an error
-    ExecutorCorrect {
-        verified_result: Value,
-    },
+    ExecutorCorrect { verified_result: Value },
 
     /// Both were wrong, third-party re-execution found different result
-    BothWrong {
-        correct_result: Value,
-    },
+    BothWrong { correct_result: Value },
 
     /// Cannot determine outcome automatically, requires human arbitration
     Inconclusive {
@@ -53,21 +47,13 @@ pub enum DisputeOutcome {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DisputeReason {
     /// Claimed result doesn't match expected output
-    IncorrectResult {
-        expected: Value,
-        actual: Value,
-    },
+    IncorrectResult { expected: Value, actual: Value },
 
     /// Execution exceeded fuel limit but wasn't reported
-    FuelLimitExceeded {
-        claimed_fuel: u64,
-        actual_fuel: u64,
-    },
+    FuelLimitExceeded { claimed_fuel: u64, actual_fuel: u64 },
 
     /// Contract execution failed but success was claimed
-    ExecutionFailed {
-        error: String,
-    },
+    ExecutionFailed { error: String },
 
     /// Timeout occurred but wasn't reported
     TimeoutNotReported {
@@ -494,7 +480,13 @@ impl DisputeResolutionSystem {
         let mut hasher = Sha256::new();
         hasher.update(task_hash);
         hasher.update(challenger.to_string().as_bytes());
-        hasher.update(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos().to_le_bytes());
+        hasher.update(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+                .to_le_bytes(),
+        );
 
         let result = hasher.finalize();
         let mut id = [0u8; 32];
@@ -544,7 +536,14 @@ mod tests {
         // Simple contract that adds two numbers
         let add_rule = Rule {
             name: "add".to_string(),
-            params: vec![Param { name: "a".to_string() }, Param { name: "b".to_string() }],
+            params: vec![
+                Param {
+                    name: "a".to_string(),
+                },
+                Param {
+                    name: "b".to_string(),
+                },
+            ],
             requires: vec![],
             body: vec![Stmt::Return {
                 value: Expr::BinOp {

@@ -35,11 +35,7 @@ pub struct Interpreter {
 
 impl Interpreter {
     /// Create a new interpreter for a contract
-    pub fn new(
-        contract: Contract,
-        state: ContractState,
-        context: ExecutionContext,
-    ) -> Self {
+    pub fn new(contract: Contract, state: ContractState, context: ExecutionContext) -> Self {
         Interpreter {
             contract,
             state,
@@ -306,8 +302,7 @@ impl Interpreter {
 
             Expr::Call { name, args } => {
                 self.context.consume_fuel(FUEL_CALL)?;
-                let arg_vals: Result<Vec<_>> =
-                    args.iter().map(|arg| self.eval_expr(arg)).collect();
+                let arg_vals: Result<Vec<_>> = args.iter().map(|arg| self.eval_expr(arg)).collect();
                 let arg_vals = arg_vals?;
                 self.eval_call(name, arg_vals)
             }
@@ -444,9 +439,7 @@ mod tests {
             caller,
             1234567890,
             10000,
-            vec![Capability::WriteLedger {
-                accounts: vec![],
-            }],
+            vec![Capability::WriteLedger { accounts: vec![] }],
             vec![],
         )
     }

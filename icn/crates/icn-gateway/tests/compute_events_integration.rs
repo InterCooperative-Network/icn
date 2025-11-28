@@ -5,7 +5,9 @@
 //! 2. Events forwarded to EventBroadcaster
 //! 3. WebSocket subscribers receive events in real-time
 
-use icn_compute::{ComputeActor, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TrustCallback};
+use icn_compute::{
+    ComputeActor, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TrustCallback,
+};
 use icn_gateway::{create_forwarding_callback, EventBroadcaster, GatewayEvent};
 use std::sync::Arc;
 
@@ -23,7 +25,8 @@ fn simple_ccl() -> String {
             "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
         }],
         "triggers": []
-    }"#.to_string()
+    }"#
+    .to_string()
 }
 
 #[tokio::test]
@@ -77,11 +80,15 @@ async fn test_compute_events_to_websocket() {
         placement_constraints: None,
     };
 
-    let task_hash = handle.submit(task.clone()).await.expect("Should submit task");
+    let task_hash = handle
+        .submit(task.clone())
+        .await
+        .expect("Should submit task");
     let expected_hash = hex::encode(task_hash);
 
     // Simulate gossip broadcast loop-back (in real system, gossip would broadcast and come back)
-    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
+    handle
+        .handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
         .await
         .expect("Should handle gossip message");
 
@@ -90,16 +97,16 @@ async fn test_compute_events_to_websocket() {
     tokio::task::yield_now().await; // Allow spawned tasks to run
 
     // 5. Verify we received TaskClaimed event
-    let claimed_event = tokio::time::timeout(
-        tokio::time::Duration::from_secs(1),
-        event_rx.recv()
-    )
-    .await
-    .expect("Should receive event within timeout")
-    .expect("Should receive claimed event");
+    let claimed_event = tokio::time::timeout(tokio::time::Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("Should receive event within timeout")
+        .expect("Should receive claimed event");
 
     match claimed_event.event {
-        GatewayEvent::ComputeTaskClaimed { task_hash, executor } => {
+        GatewayEvent::ComputeTaskClaimed {
+            task_hash,
+            executor,
+        } => {
             assert_eq!(task_hash, expected_hash, "Task hash should match");
             assert_eq!(executor, "did:icn:executor", "Executor should match");
         }
@@ -107,16 +114,19 @@ async fn test_compute_events_to_websocket() {
     }
 
     // 6. Verify we received TaskCompleted event
-    let completed_event = tokio::time::timeout(
-        tokio::time::Duration::from_secs(1),
-        event_rx.recv()
-    )
-    .await
-    .expect("Should receive event within timeout")
-    .expect("Should receive completed event");
+    let completed_event =
+        tokio::time::timeout(tokio::time::Duration::from_secs(1), event_rx.recv())
+            .await
+            .expect("Should receive event within timeout")
+            .expect("Should receive completed event");
 
     match completed_event.event {
-        GatewayEvent::ComputeTaskCompleted { task_hash, executor, outcome, .. } => {
+        GatewayEvent::ComputeTaskCompleted {
+            task_hash,
+            executor,
+            outcome,
+            ..
+        } => {
             assert_eq!(task_hash, expected_hash, "Task hash should match");
             assert_eq!(executor, "did:icn:executor", "Executor should match");
             assert_eq!(outcome, "success", "Outcome should be success");
@@ -178,10 +188,14 @@ async fn test_multiple_subscribers_receive_events() {
         placement_constraints: None,
     };
 
-    handle.submit(task.clone()).await.expect("Should submit task");
+    handle
+        .submit(task.clone())
+        .await
+        .expect("Should submit task");
 
     // Simulate gossip broadcast loop-back
-    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
+    handle
+        .handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
         .await
         .expect("Should handle gossip message");
 
@@ -191,13 +205,10 @@ async fn test_multiple_subscribers_receive_events() {
     // All 3 clients should receive both events
     for (client_num, client) in [(1, &mut client1), (2, &mut client2), (3, &mut client3)] {
         // Claim event
-        let claimed = tokio::time::timeout(
-            tokio::time::Duration::from_secs(1),
-            client.recv()
-        )
-        .await
-        .unwrap_or_else(|_| panic!("Client {client_num} should receive claim within timeout"))
-        .unwrap_or_else(|| panic!("Client {client_num} should receive claim event"));
+        let claimed = tokio::time::timeout(tokio::time::Duration::from_secs(1), client.recv())
+            .await
+            .unwrap_or_else(|_| panic!("Client {client_num} should receive claim within timeout"))
+            .unwrap_or_else(|| panic!("Client {client_num} should receive claim event"));
 
         assert!(
             matches!(claimed.event, GatewayEvent::ComputeTaskClaimed { .. }),
@@ -205,13 +216,12 @@ async fn test_multiple_subscribers_receive_events() {
         );
 
         // Completion event
-        let completed = tokio::time::timeout(
-            tokio::time::Duration::from_secs(1),
-            client.recv()
-        )
-        .await
-        .unwrap_or_else(|_| panic!("Client {client_num} should receive completion within timeout"))
-        .unwrap_or_else(|| panic!("Client {client_num} should receive completion event"));
+        let completed = tokio::time::timeout(tokio::time::Duration::from_secs(1), client.recv())
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Client {client_num} should receive completion within timeout")
+            })
+            .unwrap_or_else(|| panic!("Client {client_num} should receive completion event"));
 
         assert!(
             matches!(completed.event, GatewayEvent::ComputeTaskCompleted { .. }),
@@ -224,7 +234,10 @@ async fn test_multiple_subscribers_receive_events() {
 async fn test_direct_event_forwarding() {
     // Test the forwarding function directly without compute actor
     let broadcaster = Arc::new(EventBroadcaster::new());
-    let mut event_rx = broadcaster.subscribe("compute").await.expect("Should subscribe");
+    let mut event_rx = broadcaster
+        .subscribe("compute")
+        .await
+        .expect("Should subscribe");
 
     // Create and forward event directly
     let event = icn_compute::ComputeEvent::TaskClaimed {
@@ -235,13 +248,10 @@ async fn test_direct_event_forwarding() {
     icn_gateway::forward_compute_event(&broadcaster, event).await;
 
     // Should receive immediately
-    let received = tokio::time::timeout(
-        tokio::time::Duration::from_secs(1),
-        event_rx.recv()
-    )
-    .await
-    .expect("Should receive within timeout")
-    .expect("Should receive event");
+    let received = tokio::time::timeout(tokio::time::Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("Should receive within timeout")
+        .expect("Should receive event");
 
     match received.event {
         GatewayEvent::ComputeTaskClaimed { task_hash, .. } => {
@@ -254,7 +264,10 @@ async fn test_direct_event_forwarding() {
 #[tokio::test]
 async fn test_events_have_sequence_numbers() {
     let broadcaster = Arc::new(EventBroadcaster::new());
-    let mut event_rx = broadcaster.subscribe("compute").await.expect("Should subscribe");
+    let mut event_rx = broadcaster
+        .subscribe("compute")
+        .await
+        .expect("Should subscribe");
 
     let trust_cb: TrustCallback = Arc::new(|_| 0.8);
     let mut compute_actor = ComputeActor::new("did:icn:executor".to_string(), trust_cb);
@@ -287,10 +300,14 @@ async fn test_events_have_sequence_numbers() {
         placement_constraints: None,
     };
 
-    handle.submit(task.clone()).await.expect("Should submit task");
+    handle
+        .submit(task.clone())
+        .await
+        .expect("Should submit task");
 
     // Simulate gossip broadcast loop-back
-    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
+    handle
+        .handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
         .await
         .expect("Should handle gossip message");
 
@@ -298,21 +315,15 @@ async fn test_events_have_sequence_numbers() {
     tokio::task::yield_now().await;
 
     // Receive events and verify sequence numbers are increasing
-    let event1 = tokio::time::timeout(
-        tokio::time::Duration::from_secs(2),
-        event_rx.recv()
-    )
-    .await
-    .expect("Should receive first event within timeout")
-    .expect("Should receive first event");
+    let event1 = tokio::time::timeout(tokio::time::Duration::from_secs(2), event_rx.recv())
+        .await
+        .expect("Should receive first event within timeout")
+        .expect("Should receive first event");
 
-    let event2 = tokio::time::timeout(
-        tokio::time::Duration::from_secs(2),
-        event_rx.recv()
-    )
-    .await
-    .expect("Should receive second event within timeout")
-    .expect("Should receive second event");
+    let event2 = tokio::time::timeout(tokio::time::Duration::from_secs(2), event_rx.recv())
+        .await
+        .expect("Should receive second event within timeout")
+        .expect("Should receive second event");
 
     assert!(
         event2.seq > event1.seq,

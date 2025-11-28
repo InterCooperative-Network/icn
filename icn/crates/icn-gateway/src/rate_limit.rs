@@ -23,7 +23,7 @@ use icn_obs::metrics::gateway;
 struct TokenBucket {
     tokens: f64,
     capacity: f64,
-    refill_rate: f64,  // tokens per second
+    refill_rate: f64, // tokens per second
     last_refill: Instant,
 }
 
@@ -81,9 +81,9 @@ pub struct RateLimitConfig {
 impl Default for RateLimitConfig {
     fn default() -> Self {
         Self {
-            capacity: 100.0,           // Allow burst of 100 requests
-            refill_rate: 10.0,         // Refill 10 tokens/second (600/minute)
-            cost_per_request: 1.0,     // Each request costs 1 token
+            capacity: 100.0,       // Allow burst of 100 requests
+            refill_rate: 10.0,     // Refill 10 tokens/second (600/minute)
+            cost_per_request: 1.0, // Each request costs 1 token
         }
     }
 }
@@ -105,7 +105,9 @@ impl RateLimiter {
 
     /// Check if request should be allowed for a DID
     pub fn check_rate_limit(&self, did: &str) -> Result<(), GatewayError> {
-        let mut buckets = self.buckets.write()
+        let mut buckets = self
+            .buckets
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let bucket = buckets
@@ -163,8 +165,8 @@ impl IpRateLimiter {
     pub fn new_for_auth() -> Self {
         // More aggressive limits for unauthenticated endpoints
         let config = RateLimitConfig {
-            capacity: 20.0,        // Allow burst of 20 requests
-            refill_rate: 2.0,      // Refill 2 tokens/second (120/minute)
+            capacity: 20.0,   // Allow burst of 20 requests
+            refill_rate: 2.0, // Refill 2 tokens/second (120/minute)
             cost_per_request: 1.0,
         };
 
@@ -176,7 +178,9 @@ impl IpRateLimiter {
 
     /// Check if request should be allowed for an IP address
     pub fn check_rate_limit(&self, ip: &str) -> Result<(), GatewayError> {
-        let mut buckets = self.buckets.write()
+        let mut buckets = self
+            .buckets
+            .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let bucket = buckets

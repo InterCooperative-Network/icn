@@ -117,9 +117,8 @@ impl ReplayGuard {
         let max_age = Duration::from_secs(self.max_peer_age_secs);
         let now = Instant::now();
 
-        self.sequences.retain(|_, window| {
-            now.duration_since(window.last_update) < max_age
-        });
+        self.sequences
+            .retain(|_, window| now.duration_since(window.last_update) < max_age);
     }
 
     /// Get the number of tracked peers

@@ -134,7 +134,8 @@ impl StorageQuotaManager {
             "Set quota for {}: {} bytes (priority: {:?})",
             did, max_bytes, priority
         );
-        self.quotas.insert(did, StorageQuota::new(max_bytes, priority));
+        self.quotas
+            .insert(did, StorageQuota::new(max_bytes, priority));
     }
 
     /// Get quota for a DID
@@ -186,7 +187,13 @@ impl StorageQuotaManager {
     ///
     /// This method validates against both per-DID quota (if exists) and global limit
     /// before recording usage, ensuring the storage operation is valid.
-    pub fn record_usage(&mut self, did: &Did, key: Vec<u8>, size: u64, priority: QuotaPriority) -> Result<()> {
+    pub fn record_usage(
+        &mut self,
+        did: &Did,
+        key: Vec<u8>,
+        size: u64,
+        priority: QuotaPriority,
+    ) -> Result<()> {
         // Check global limit first (always enforced)
         if self.global_usage.saturating_add(size) > self.global_limit {
             return Err(anyhow!(
@@ -291,7 +298,8 @@ impl StorageQuotaManager {
         // Sort items by priority (lowest first) and age (oldest first)
         let mut sorted_items = self.items.clone();
         sorted_items.sort_by(|a, b| {
-            a.priority.cmp(&b.priority)
+            a.priority
+                .cmp(&b.priority)
                 .then_with(|| a.created_at.cmp(&b.created_at))
         });
 
@@ -460,7 +468,9 @@ mod tests {
 
         // Record usage
         let key = b"test_key".to_vec();
-        manager.record_usage(&did, key.clone(), 300, QuotaPriority::Normal).unwrap();
+        manager
+            .record_usage(&did, key.clone(), 300, QuotaPriority::Normal)
+            .unwrap();
 
         assert_eq!(manager.global_usage, 300);
         assert_eq!(manager.get_quota(&did).unwrap().current_bytes, 300);
@@ -482,7 +492,9 @@ mod tests {
         manager.set_quota(did2.clone(), 800, QuotaPriority::Normal);
 
         // First DID can use 600 bytes
-        manager.record_usage(&did1, b"key1".to_vec(), 600, QuotaPriority::Normal).unwrap();
+        manager
+            .record_usage(&did1, b"key1".to_vec(), 600, QuotaPriority::Normal)
+            .unwrap();
 
         // Second DID can only use 400 bytes due to global limit
         assert!(manager.can_store(&did2, 400).is_ok());
@@ -499,11 +511,17 @@ mod tests {
         manager.set_quota(did2.clone(), 800, QuotaPriority::Normal);
 
         // Add low-priority data
-        manager.record_usage(&did1, b"low1".to_vec(), 300, QuotaPriority::Low).unwrap();
-        manager.record_usage(&did1, b"low2".to_vec(), 300, QuotaPriority::Low).unwrap();
+        manager
+            .record_usage(&did1, b"low1".to_vec(), 300, QuotaPriority::Low)
+            .unwrap();
+        manager
+            .record_usage(&did1, b"low2".to_vec(), 300, QuotaPriority::Low)
+            .unwrap();
 
         // Add normal-priority data
-        manager.record_usage(&did2, b"normal".to_vec(), 300, QuotaPriority::Normal).unwrap();
+        manager
+            .record_usage(&did2, b"normal".to_vec(), 300, QuotaPriority::Normal)
+            .unwrap();
 
         // Total usage: 900 bytes (90% of 1000)
         assert_eq!(manager.global_usage, 900);
@@ -528,7 +546,9 @@ mod tests {
         manager.set_quota(did.clone(), 1000, QuotaPriority::Critical);
 
         // Fill with critical data
-        manager.record_usage(&did, b"critical".to_vec(), 950, QuotaPriority::Critical).unwrap();
+        manager
+            .record_usage(&did, b"critical".to_vec(), 950, QuotaPriority::Critical)
+            .unwrap();
 
         assert!(manager.needs_eviction());
 
@@ -554,15 +574,25 @@ mod tests {
         manager.set_quota(did1.clone(), 1000, QuotaPriority::High);
         manager.set_quota(did2.clone(), 1000, QuotaPriority::Normal);
 
-        manager.record_usage(&did1, b"key1".to_vec(), 500, QuotaPriority::High).unwrap();
-        manager.record_usage(&did2, b"key2".to_vec(), 300, QuotaPriority::Normal).unwrap();
+        manager
+            .record_usage(&did1, b"key1".to_vec(), 500, QuotaPriority::High)
+            .unwrap();
+        manager
+            .record_usage(&did2, b"key2".to_vec(), 300, QuotaPriority::Normal)
+            .unwrap();
 
         let stats = manager.get_stats();
 
         assert_eq!(stats.total_quotas, 2);
         assert_eq!(stats.global_usage, 800);
         assert_eq!(stats.tracked_items, 2);
-        assert_eq!(*stats.usage_by_priority.get(&QuotaPriority::High).unwrap(), 500);
-        assert_eq!(*stats.usage_by_priority.get(&QuotaPriority::Normal).unwrap(), 300);
+        assert_eq!(
+            *stats.usage_by_priority.get(&QuotaPriority::High).unwrap(),
+            500
+        );
+        assert_eq!(
+            *stats.usage_by_priority.get(&QuotaPriority::Normal).unwrap(),
+            300
+        );
     }
 }

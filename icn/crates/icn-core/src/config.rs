@@ -394,13 +394,17 @@ impl RateLimitingConfig {
     /// Convert to fallback rate limit config for icn-net
     pub fn to_fallback_config(&self) -> icn_net::RateLimitConfig {
         use std::time::Duration;
-        self.fallback.to_rate_limit_config(Duration::from_millis(self.refill_interval_ms))
+        self.fallback
+            .to_rate_limit_config(Duration::from_millis(self.refill_interval_ms))
     }
 }
 
 impl TrustClassRateLimitConfig {
     /// Convert to rate limit config for icn-net
-    pub fn to_rate_limit_config(&self, refill_interval: std::time::Duration) -> icn_net::RateLimitConfig {
+    pub fn to_rate_limit_config(
+        &self,
+        refill_interval: std::time::Duration,
+    ) -> icn_net::RateLimitConfig {
         icn_net::RateLimitConfig {
             max_messages_per_second: self.max_messages_per_second,
             burst_capacity: self.burst_capacity,
@@ -461,15 +465,27 @@ mod tests {
         // Verify rate limiting config
         assert!(deserialized.rate_limiting.enabled);
         assert_eq!(deserialized.rate_limiting.refill_interval_ms, 100);
-        assert_eq!(deserialized.rate_limiting.isolated.max_messages_per_second, 10);
+        assert_eq!(
+            deserialized.rate_limiting.isolated.max_messages_per_second,
+            10
+        );
         assert_eq!(deserialized.rate_limiting.isolated.burst_capacity, 2);
         assert_eq!(deserialized.rate_limiting.known.max_messages_per_second, 50);
         assert_eq!(deserialized.rate_limiting.known.burst_capacity, 10);
-        assert_eq!(deserialized.rate_limiting.partner.max_messages_per_second, 100);
+        assert_eq!(
+            deserialized.rate_limiting.partner.max_messages_per_second,
+            100
+        );
         assert_eq!(deserialized.rate_limiting.partner.burst_capacity, 20);
-        assert_eq!(deserialized.rate_limiting.federated.max_messages_per_second, 200);
+        assert_eq!(
+            deserialized.rate_limiting.federated.max_messages_per_second,
+            200
+        );
         assert_eq!(deserialized.rate_limiting.federated.burst_capacity, 50);
-        assert_eq!(deserialized.rate_limiting.fallback.max_messages_per_second, 100);
+        assert_eq!(
+            deserialized.rate_limiting.fallback.max_messages_per_second,
+            100
+        );
         assert_eq!(deserialized.rate_limiting.fallback.burst_capacity, 20);
     }
 
@@ -507,11 +523,11 @@ mod tests {
 
         // From icn-core crate: icn/crates/icn-core -> icn (workspace root) -> project root
         let workspace_root = std::path::PathBuf::from(manifest_dir)
-            .parent()  // -> crates/
+            .parent() // -> crates/
             .expect("manifest dir should have parent")
-            .parent()  // -> icn/
+            .parent() // -> icn/
             .expect("crates dir should have parent")
-            .parent()  // -> project root
+            .parent() // -> project root
             .expect("workspace should have parent")
             .to_path_buf();
 
@@ -578,7 +594,7 @@ burst_capacity = 3
         assert_eq!(config.rate_limiting.refill_interval_ms, 200); // custom
         assert_eq!(config.rate_limiting.isolated.max_messages_per_second, 5); // custom
         assert_eq!(config.rate_limiting.isolated.burst_capacity, 3); // custom
-        // Other fields should use defaults
+                                                                     // Other fields should use defaults
         assert_eq!(config.rate_limiting.known.max_messages_per_second, 50);
         assert_eq!(config.rate_limiting.known.burst_capacity, 10);
     }

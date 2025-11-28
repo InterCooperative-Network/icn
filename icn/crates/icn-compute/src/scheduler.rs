@@ -784,14 +784,30 @@ mod tests {
 
         // High trust, should get good score
         let offer = policy
-            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8, &no_hints, &empty_locality)
+            .score_task(
+                &task_hash,
+                &profile,
+                "did:icn:alice",
+                &node_state,
+                0.8,
+                &no_hints,
+                &empty_locality,
+            )
             .unwrap();
 
         assert!(offer.score > 0.4); // Trust (0.20) + capacity (0.15) + queue (0.12) + jitter
         assert_eq!(offer.cost, 10); // Base cost
 
         // Low trust, rejected
-        let offer = policy.score_task(&task_hash, &profile, "did:icn:untrusted", &node_state, 0.1, &no_hints, &empty_locality);
+        let offer = policy.score_task(
+            &task_hash,
+            &profile,
+            "did:icn:untrusted",
+            &node_state,
+            0.1,
+            &no_hints,
+            &empty_locality,
+        );
         assert!(offer.is_none());
 
         // High queue, cost multiplier kicks in
@@ -801,7 +817,15 @@ mod tests {
         };
 
         let offer = policy
-            .score_task(&task_hash, &profile, "did:icn:alice", &busy_node, 0.8, &no_hints, &empty_locality)
+            .score_task(
+                &task_hash,
+                &profile,
+                "did:icn:alice",
+                &busy_node,
+                0.8,
+                &no_hints,
+                &empty_locality,
+            )
             .unwrap();
 
         assert_eq!(offer.cost, 15); // base_cost * load_multiplier
@@ -816,7 +840,15 @@ mod tests {
         };
 
         let offer_with_rtt = policy
-            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8, &no_hints, &locality_with_rtt)
+            .score_task(
+                &task_hash,
+                &profile,
+                "did:icn:alice",
+                &node_state,
+                0.8,
+                &no_hints,
+                &locality_with_rtt,
+            )
             .unwrap();
 
         // Should score higher than without RTT info (RTT bonus: 0.9 * 0.15 = 0.135)
@@ -833,7 +865,15 @@ mod tests {
         };
 
         let offer_with_data = policy
-            .score_task(&task_hash, &profile, "did:icn:alice", &node_state, 0.8, &no_hints, &locality_with_data)
+            .score_task(
+                &task_hash,
+                &profile,
+                "did:icn:alice",
+                &node_state,
+                0.8,
+                &no_hints,
+                &locality_with_data,
+            )
             .unwrap();
 
         // Should get full data locality bonus (1.0 * 0.15 = 0.15)

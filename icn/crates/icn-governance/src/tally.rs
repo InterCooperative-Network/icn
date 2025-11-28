@@ -152,10 +152,10 @@ mod tests {
         let kp1 = KeyPair::generate().unwrap();
         let kp2 = KeyPair::generate().unwrap();
 
-        let vote1 = Vote::new(proposal_id.clone(), kp1.did().clone(), VoteChoice::For)
-            .with_weight(3);
-        let vote2 = Vote::new(proposal_id.clone(), kp2.did().clone(), VoteChoice::Against)
-            .with_weight(1);
+        let vote1 =
+            Vote::new(proposal_id.clone(), kp1.did().clone(), VoteChoice::For).with_weight(3);
+        let vote2 =
+            Vote::new(proposal_id.clone(), kp2.did().clone(), VoteChoice::Against).with_weight(1);
 
         tally.add_vote(&vote1);
         tally.add_vote(&vote2);

@@ -177,10 +177,7 @@ mod tests {
             .credit(bob.clone(), "hours".to_string(), 5) // Unbalanced!
             .build();
 
-        assert!(
-            entry.is_err(),
-            "Unbalanced entry should fail validation"
-        );
+        assert!(entry.is_err(), "Unbalanced entry should fail validation");
         assert!(entry
             .unwrap_err()
             .to_string()

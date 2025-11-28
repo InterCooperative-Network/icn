@@ -258,13 +258,13 @@ impl IdentityBundle {
         let key_pair = rcgen::KeyPair::generate().context("Failed to generate key pair")?;
 
         // Create certificate (rcgen 0.13 API)
-        let cert = params.self_signed(&key_pair)
+        let cert = params
+            .self_signed(&key_pair)
             .context("Failed to generate self-signed certificate")?;
 
         // Serialize to PEM, then parse to DER
         let cert_pem = cert.pem();
-        let pem_data = pem::parse(&cert_pem)
-            .context("Failed to parse certificate PEM")?;
+        let pem_data = pem::parse(&cert_pem).context("Failed to parse certificate PEM")?;
         let cert_der = pem_data.contents().to_vec();
 
         // Serialize key to DER

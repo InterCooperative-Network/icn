@@ -98,9 +98,9 @@ pub struct GossipState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TopicMetadata {
     pub name: String,
-    pub access_control: String,  // Serialized AccessControl enum
+    pub access_control: String, // Serialized AccessControl enum
     pub max_entries: usize,
-    pub scope: String,  // Serialized Scope enum
+    pub scope: String, // Serialized Scope enum
 }
 
 /// Serializable peer connection info
@@ -151,8 +151,7 @@ pub fn save_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<Path>) -> Re
     let checksum_path = checksum_path(&data_dir);
 
     // Serialize to JSON
-    let json = serde_json::to_vec_pretty(snapshot)
-        .context("Failed to serialize snapshot")?;
+    let json = serde_json::to_vec_pretty(snapshot).context("Failed to serialize snapshot")?;
 
     // Compute SHA256 checksum
     let checksum = compute_checksum(&json);
@@ -161,15 +160,11 @@ pub fn save_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<Path>) -> Re
     let temp_path = path.with_extension("snapshot.tmp");
     let temp_checksum_path = checksum_path.with_extension("sha256.tmp");
 
-    std::fs::write(&temp_path, &json)
-        .context("Failed to write snapshot")?;
-    std::fs::write(&temp_checksum_path, &checksum)
-        .context("Failed to write checksum")?;
+    std::fs::write(&temp_path, &json).context("Failed to write snapshot")?;
+    std::fs::write(&temp_checksum_path, &checksum).context("Failed to write checksum")?;
 
-    std::fs::rename(&temp_path, &path)
-        .context("Failed to rename snapshot")?;
-    std::fs::rename(&temp_checksum_path, &checksum_path)
-        .context("Failed to rename checksum")?;
+    std::fs::rename(&temp_path, &path).context("Failed to rename snapshot")?;
+    std::fs::rename(&temp_checksum_path, &checksum_path).context("Failed to rename checksum")?;
 
     Ok(())
 }
@@ -186,13 +181,12 @@ pub fn load_snapshot(data_dir: impl AsRef<Path>) -> Result<Option<StateSnapshot>
         return Ok(None);
     }
 
-    let json = std::fs::read(&path)
-        .context("Failed to read snapshot")?;
+    let json = std::fs::read(&path).context("Failed to read snapshot")?;
 
     // Verify checksum if it exists
     if checksum_path.exists() {
-        let expected_checksum = std::fs::read_to_string(&checksum_path)
-            .context("Failed to read checksum")?;
+        let expected_checksum =
+            std::fs::read_to_string(&checksum_path).context("Failed to read checksum")?;
         let actual_checksum = compute_checksum(&json);
 
         if expected_checksum.trim() != actual_checksum {
@@ -207,8 +201,8 @@ pub fn load_snapshot(data_dir: impl AsRef<Path>) -> Result<Option<StateSnapshot>
         // but we should log a warning (caller can do this)
     }
 
-    let snapshot: StateSnapshot = serde_json::from_slice(&json)
-        .context("Failed to deserialize snapshot")?;
+    let snapshot: StateSnapshot =
+        serde_json::from_slice(&json).context("Failed to deserialize snapshot")?;
 
     Ok(Some(snapshot))
 }
@@ -221,13 +215,11 @@ pub fn delete_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
     let checksum_path = checksum_path(&data_dir);
 
     if path.exists() {
-        std::fs::remove_file(&path)
-            .context("Failed to delete snapshot")?;
+        std::fs::remove_file(&path).context("Failed to delete snapshot")?;
     }
 
     if checksum_path.exists() {
-        std::fs::remove_file(&checksum_path)
-            .context("Failed to delete checksum")?;
+        std::fs::remove_file(&checksum_path).context("Failed to delete checksum")?;
     }
 
     Ok(())
@@ -248,10 +240,9 @@ pub fn verify_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
         return Err(anyhow!("Checksum file does not exist (legacy snapshot?)"));
     }
 
-    let json = std::fs::read(&path)
-        .context("Failed to read snapshot")?;
-    let expected_checksum = std::fs::read_to_string(&checksum_path)
-        .context("Failed to read checksum")?;
+    let json = std::fs::read(&path).context("Failed to read snapshot")?;
+    let expected_checksum =
+        std::fs::read_to_string(&checksum_path).context("Failed to read checksum")?;
     let actual_checksum = compute_checksum(&json);
 
     if expected_checksum.trim() != actual_checksum {
@@ -337,7 +328,10 @@ pub fn cleanup_old_snapshots(data_dir: impl AsRef<Path>, keep_count: usize) -> R
 /// Save a timestamped backup snapshot in addition to the primary snapshot
 ///
 /// Creates state.snapshot.{unix_timestamp} for archival purposes
-pub fn save_timestamped_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<Path>) -> Result<()> {
+pub fn save_timestamped_snapshot(
+    snapshot: &StateSnapshot,
+    data_dir: impl AsRef<Path>,
+) -> Result<()> {
     let data_dir = data_dir.as_ref();
     let timestamp = snapshot.created_at;
     let timestamped_filename = format!("state.snapshot.{timestamp}");
@@ -345,15 +339,13 @@ pub fn save_timestamped_snapshot(snapshot: &StateSnapshot, data_dir: impl AsRef<
     let timestamped_checksum_path = data_dir.join(format!("{timestamped_filename}.sha256"));
 
     // Serialize to JSON
-    let json = serde_json::to_vec_pretty(snapshot)
-        .context("Failed to serialize snapshot")?;
+    let json = serde_json::to_vec_pretty(snapshot).context("Failed to serialize snapshot")?;
 
     // Compute SHA256 checksum
     let checksum = compute_checksum(&json);
 
     // Write timestamped snapshot
-    std::fs::write(&timestamped_path, &json)
-        .context("Failed to write timestamped snapshot")?;
+    std::fs::write(&timestamped_path, &json).context("Failed to write timestamped snapshot")?;
     std::fs::write(&timestamped_checksum_path, &checksum)
         .context("Failed to write timestamped checksum")?;
 
@@ -408,11 +400,23 @@ mod tests {
         let loaded = load_snapshot(&temp).unwrap().unwrap();
         assert_eq!(loaded.version, 1);
         assert_eq!(
-            loaded.gossip_state.as_ref().unwrap().vector_clock.get("did:icn:alice"),
+            loaded
+                .gossip_state
+                .as_ref()
+                .unwrap()
+                .vector_clock
+                .get("did:icn:alice"),
             Some(&42)
         );
         assert_eq!(
-            loaded.gossip_state.as_ref().unwrap().subscriptions.get("topic:test").unwrap().len(),
+            loaded
+                .gossip_state
+                .as_ref()
+                .unwrap()
+                .subscriptions
+                .get("topic:test")
+                .unwrap()
+                .len(),
             1
         );
 
@@ -451,27 +455,24 @@ mod tests {
         let mut snapshot = StateSnapshot::new();
         snapshot.network_state = Some(NetworkState {
             peer_connections: HashMap::new(),
-            peer_x25519_keys: [(
-                "did:icn:alice".to_string(),
-                [1u8; 32],
-            )]
-            .iter()
-            .cloned()
-            .collect(),
-            peer_addresses: [(
-                "did:icn:alice".to_string(),
-                "127.0.0.1:5000".to_string(),
-            )]
-            .iter()
-            .cloned()
-            .collect(),
+            peer_x25519_keys: [("did:icn:alice".to_string(), [1u8; 32])]
+                .iter()
+                .cloned()
+                .collect(),
+            peer_addresses: [("did:icn:alice".to_string(), "127.0.0.1:5000".to_string())]
+                .iter()
+                .cloned()
+                .collect(),
         });
 
         save_snapshot(&snapshot, &temp).unwrap();
         let loaded = load_snapshot(&temp).unwrap().unwrap();
 
         let net_state = loaded.network_state.unwrap();
-        assert_eq!(net_state.peer_x25519_keys.get("did:icn:alice"), Some(&[1u8; 32]));
+        assert_eq!(
+            net_state.peer_x25519_keys.get("did:icn:alice"),
+            Some(&[1u8; 32])
+        );
         assert_eq!(
             net_state.peer_addresses.get("did:icn:alice"),
             Some(&"127.0.0.1:5000".to_string())
@@ -495,8 +496,14 @@ mod tests {
 
         // Verify checksum is valid hex SHA256 (64 characters)
         let checksum = std::fs::read_to_string(&checksum_path).unwrap();
-        assert_eq!(checksum.trim().len(), 64, "SHA256 should be 64 hex characters");
-        assert!(checksum.chars().all(|c| c.is_ascii_hexdigit() || c.is_whitespace()));
+        assert_eq!(
+            checksum.trim().len(),
+            64,
+            "SHA256 should be 64 hex characters"
+        );
+        assert!(checksum
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() || c.is_whitespace()));
 
         // Cleanup
         std::fs::remove_dir_all(&temp).unwrap();
@@ -537,13 +544,25 @@ mod tests {
 
         // Verify should fail
         let verify_result = verify_snapshot(&temp);
-        assert!(verify_result.is_err(), "Verification should fail for corrupted snapshot");
-        assert!(verify_result.unwrap_err().to_string().contains("checksum mismatch"));
+        assert!(
+            verify_result.is_err(),
+            "Verification should fail for corrupted snapshot"
+        );
+        assert!(verify_result
+            .unwrap_err()
+            .to_string()
+            .contains("checksum mismatch"));
 
         // Load should fail
         let load_result = load_snapshot(&temp);
-        assert!(load_result.is_err(), "Load should fail for corrupted snapshot");
-        assert!(load_result.unwrap_err().to_string().contains("checksum mismatch"));
+        assert!(
+            load_result.is_err(),
+            "Load should fail for corrupted snapshot"
+        );
+        assert!(load_result
+            .unwrap_err()
+            .to_string()
+            .contains("checksum mismatch"));
 
         // Cleanup
         std::fs::remove_dir_all(&temp).unwrap();
@@ -562,11 +581,17 @@ mod tests {
         // Verify should fail (checksum missing)
         let verify_result = verify_snapshot(&temp);
         assert!(verify_result.is_err());
-        assert!(verify_result.unwrap_err().to_string().contains("Checksum file does not exist"));
+        assert!(verify_result
+            .unwrap_err()
+            .to_string()
+            .contains("Checksum file does not exist"));
 
         // But load should still succeed (backward compatibility)
         let loaded = load_snapshot(&temp).unwrap();
-        assert!(loaded.is_some(), "Legacy snapshots without checksums should still load");
+        assert!(
+            loaded.is_some(),
+            "Legacy snapshots without checksums should still load"
+        );
 
         // Cleanup
         std::fs::remove_dir_all(&temp).unwrap();
@@ -620,7 +645,10 @@ mod tests {
         let expected_checksum_path = temp.join(format!("{expected_filename}.sha256"));
 
         assert!(expected_path.exists(), "Timestamped snapshot should exist");
-        assert!(expected_checksum_path.exists(), "Timestamped checksum should exist");
+        assert!(
+            expected_checksum_path.exists(),
+            "Timestamped checksum should exist"
+        );
 
         // Verify it appears in list
         let snapshots = list_snapshots(&temp).unwrap();
@@ -968,7 +996,10 @@ mod tests {
         // Take only first half
         let truncated = &json[..json.len() / 2];
         let result: Result<StateSnapshot, _> = serde_json::from_str(truncated);
-        assert!(result.is_err(), "Truncated JSON should fail deserialization");
+        assert!(
+            result.is_err(),
+            "Truncated JSON should fail deserialization"
+        );
     }
 
     #[test]
@@ -997,7 +1028,10 @@ mod tests {
 
         // But deserialization should fail (invalid JSON)
         let load_result = load_snapshot(&temp);
-        assert!(load_result.is_err(), "Malicious payload should fail deserialization");
+        assert!(
+            load_result.is_err(),
+            "Malicious payload should fail deserialization"
+        );
 
         std::fs::remove_dir_all(&temp).unwrap();
     }

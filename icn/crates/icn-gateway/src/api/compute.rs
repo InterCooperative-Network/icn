@@ -65,13 +65,16 @@ pub async fn submit_task(
     require_scope(&http_req, "compute:write")?;
 
     // Get submitter DID from JWT
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
 
     let submitter_did = claims.sub.clone();
 
     // Generate task ID if not provided
-    let task_id = req.task_id.clone()
+    let task_id = req
+        .task_id
+        .clone()
         .unwrap_or_else(|| format!("task-{}", uuid::Uuid::new_v4()));
 
     // Convert inputs to bytes
@@ -85,28 +88,35 @@ pub async fn submit_task(
     let priority = req.priority.as_deref().unwrap_or("normal");
 
     // Submit task
-    let task_hash = compute_mgr.submit_task(
-        task_id.clone(),
-        submitter_did.clone(),
-        req.code.clone(),
-        inputs,
-        req.fuel_limit,
-        priority,
-        req.deadline_ms,
-        req.payment_rate,
-        req.payment_currency.clone(),
-    ).await
+    let task_hash = compute_mgr
+        .submit_task(
+            task_id.clone(),
+            submitter_did.clone(),
+            req.code.clone(),
+            inputs,
+            req.fuel_limit,
+            priority,
+            req.deadline_ms,
+            req.payment_rate,
+            req.payment_currency.clone(),
+        )
+        .await
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
 
     let task_hash_hex = hex::encode(task_hash);
 
     // Broadcast event
-    broadcaster.broadcast("compute", GatewayEvent::ComputeTaskSubmitted {
-        task_id: task_id.clone(),
-        task_hash: task_hash_hex.clone(),
-        submitter: submitter_did,
-        fuel_limit: req.fuel_limit,
-    }).await;
+    broadcaster
+        .broadcast(
+            "compute",
+            GatewayEvent::ComputeTaskSubmitted {
+                task_id: task_id.clone(),
+                task_hash: task_hash_hex.clone(),
+                submitter: submitter_did,
+                fuel_limit: req.fuel_limit,
+            },
+        )
+        .await;
 
     Ok(HttpResponse::Ok().json(SubmitTaskResponse {
         task_id,
@@ -132,7 +142,7 @@ pub async fn get_status(
 
     if hash_bytes.len() != 32 {
         return Err(crate::error::GatewayError::BadRequest(
-            "Task hash must be 32 bytes".to_string()
+            "Task hash must be 32 bytes".to_string(),
         ));
     }
 
@@ -142,7 +152,9 @@ pub async fn get_status(
     // Get status
     match compute_mgr.get_status(task_hash).await {
         Ok(Some(status)) => Ok(HttpResponse::Ok().json(status)),
-        Ok(None) => Err(crate::error::GatewayError::NotFound("Task not found".to_string())),
+        Ok(None) => Err(crate::error::GatewayError::NotFound(
+            "Task not found".to_string(),
+        )),
         Err(e) => Err(crate::error::GatewayError::InternalError(e.to_string())),
     }
 }
@@ -172,8 +184,9 @@ pub async fn cancel_task(
     require_scope(&http_req, "compute:write")?;
 
     // Get submitter DID from JWT
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| crate::error::GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
     let requester_did = claims.sub.clone();
 
     let task_hash_hex = path.into_inner();
@@ -184,7 +197,7 @@ pub async fn cancel_task(
 
     if hash_bytes.len() != 32 {
         return Err(crate::error::GatewayError::BadRequest(
-            "Task hash must be 32 bytes".to_string()
+            "Task hash must be 32 bytes".to_string(),
         ));
     }
 
@@ -192,17 +205,24 @@ pub async fn cancel_task(
     task_hash.copy_from_slice(&hash_bytes);
 
     // Cancel task
-    compute_mgr.cancel_task(task_hash, requester_did.clone(), req.reason.clone()).await
+    compute_mgr
+        .cancel_task(task_hash, requester_did.clone(), req.reason.clone())
+        .await
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
 
     icn_obs::metrics::compute::tasks_cancelled_inc();
 
     // Broadcast event
-    broadcaster.broadcast("compute", GatewayEvent::ComputeTaskCancelled {
-        task_hash: task_hash_hex.clone(),
-        submitter: requester_did,
-        reason: req.reason.clone(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "compute",
+            GatewayEvent::ComputeTaskCancelled {
+                task_hash: task_hash_hex.clone(),
+                submitter: requester_did,
+                reason: req.reason.clone(),
+            },
+        )
+        .await;
 
     #[derive(serde::Serialize)]
     struct CancelResponse {
@@ -224,7 +244,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/compute")
             .service(submit_task)
             .service(cancel_task)
-            .service(get_status)
+            .service(get_status),
     );
 }
 

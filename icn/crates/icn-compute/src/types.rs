@@ -102,34 +102,38 @@ impl ComputeTask {
         // Validate task ID
         if self.id.is_empty() {
             return Err(crate::error::ComputeError::InvalidCode(
-                "Task ID cannot be empty".into()
+                "Task ID cannot be empty".into(),
             ));
         }
         if self.id.len() > 256 {
-            return Err(crate::error::ComputeError::InvalidCode(
-                format!("Task ID too long: {} bytes (max 256)", self.id.len())
-            ));
+            return Err(crate::error::ComputeError::InvalidCode(format!(
+                "Task ID too long: {} bytes (max 256)",
+                self.id.len()
+            )));
         }
 
         // Validate submitter DID format
         if !self.submitter.starts_with("did:icn:") {
-            return Err(crate::error::ComputeError::InvalidCode(
-                format!("Invalid submitter DID format: {}", self.submitter)
-            ));
+            return Err(crate::error::ComputeError::InvalidCode(format!(
+                "Invalid submitter DID format: {}",
+                self.submitter
+            )));
         }
 
         // Validate fuel limit
         const MIN_FUEL: u64 = 100;
         const MAX_FUEL: u64 = 10_000_000; // 10M operations max
         if self.fuel_limit.0 < MIN_FUEL {
-            return Err(crate::error::ComputeError::InvalidCode(
-                format!("Fuel limit too low: {} (min {})", self.fuel_limit.0, MIN_FUEL)
-            ));
+            return Err(crate::error::ComputeError::InvalidCode(format!(
+                "Fuel limit too low: {} (min {})",
+                self.fuel_limit.0, MIN_FUEL
+            )));
         }
         if self.fuel_limit.0 > MAX_FUEL {
-            return Err(crate::error::ComputeError::InvalidCode(
-                format!("Fuel limit too high: {} (max {})", self.fuel_limit.0, MAX_FUEL)
-            ));
+            return Err(crate::error::ComputeError::InvalidCode(format!(
+                "Fuel limit too high: {} (max {})",
+                self.fuel_limit.0, MAX_FUEL
+            )));
         }
 
         // Validate task code
@@ -137,25 +141,27 @@ impl ComputeTask {
             TaskCode::Ccl(source) => {
                 if source.is_empty() {
                     return Err(crate::error::ComputeError::InvalidCode(
-                        "CCL source cannot be empty".into()
+                        "CCL source cannot be empty".into(),
                     ));
                 }
                 if source.len() > 1_000_000 {
-                    return Err(crate::error::ComputeError::InvalidCode(
-                        format!("CCL source too large: {} bytes (max 1MB)", source.len())
-                    ));
+                    return Err(crate::error::ComputeError::InvalidCode(format!(
+                        "CCL source too large: {} bytes (max 1MB)",
+                        source.len()
+                    )));
                 }
             }
             TaskCode::WasmInline(bytes) => {
                 if bytes.is_empty() {
                     return Err(crate::error::ComputeError::InvalidCode(
-                        "WASM bytes cannot be empty".into()
+                        "WASM bytes cannot be empty".into(),
                     ));
                 }
                 if bytes.len() > 5_000_000 {
-                    return Err(crate::error::ComputeError::InvalidCode(
-                        format!("WASM module too large: {} bytes (max 5MB)", bytes.len())
-                    ));
+                    return Err(crate::error::ComputeError::InvalidCode(format!(
+                        "WASM module too large: {} bytes (max 5MB)",
+                        bytes.len()
+                    )));
                 }
             }
             TaskCode::WasmRef(_) => {
@@ -166,9 +172,10 @@ impl ComputeTask {
         // Validate input size
         const MAX_INPUT_SIZE: usize = 1_000_000; // 1MB max
         if self.inputs.len() > MAX_INPUT_SIZE {
-            return Err(crate::error::ComputeError::InvalidCode(
-                format!("Input too large: {} bytes (max 1MB)", self.inputs.len())
-            ));
+            return Err(crate::error::ComputeError::InvalidCode(format!(
+                "Input too large: {} bytes (max 1MB)",
+                self.inputs.len()
+            )));
         }
 
         // Validate deadline is in the future if provided
@@ -187,16 +194,16 @@ impl ComputeTask {
         if let Some(rate) = self.payment_rate {
             const MAX_RATE: u64 = 1_000_000; // 1M credits per 1000 fuel max
             if rate > MAX_RATE {
-                return Err(crate::error::ComputeError::InvalidCode(
-                    format!("Payment rate too high: {rate} (max {MAX_RATE})")
-                ));
+                return Err(crate::error::ComputeError::InvalidCode(format!(
+                    "Payment rate too high: {rate} (max {MAX_RATE})"
+                )));
             }
         }
 
         // Validate capabilities
         if self.required_capabilities.is_empty() {
             return Err(crate::error::ComputeError::InvalidCode(
-                "At least one capability required".into()
+                "At least one capability required".into(),
             ));
         }
 
@@ -277,21 +284,30 @@ impl ComputeResult {
     }
 
     /// Verify the signature
-    pub fn verify_signature(&self, executor_did: &icn_identity::Did) -> Result<(), crate::error::ComputeError> {
+    pub fn verify_signature(
+        &self,
+        executor_did: &icn_identity::Did,
+    ) -> Result<(), crate::error::ComputeError> {
         use ed25519_dalek::Verifier;
 
         // Extract public key from DID
-        let verifying_key = executor_did.to_verifying_key()
-            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Cannot extract public key from DID: {e}")))?;
+        let verifying_key = executor_did.to_verifying_key().map_err(|e| {
+            crate::error::ComputeError::InvalidSignature(format!(
+                "Cannot extract public key from DID: {e}"
+            ))
+        })?;
 
-        let signature = ed25519_dalek::Signature::from_bytes(
-            self.signature.as_slice().try_into()
-                .map_err(|_| crate::error::ComputeError::InvalidSignature("Invalid signature length".into()))?
-        );
+        let signature =
+            ed25519_dalek::Signature::from_bytes(self.signature.as_slice().try_into().map_err(
+                |_| crate::error::ComputeError::InvalidSignature("Invalid signature length".into()),
+            )?);
 
         let payload = self.signing_payload();
-        verifying_key.verify(&payload, &signature)
-            .map_err(|e| crate::error::ComputeError::InvalidSignature(format!("Signature verification failed: {e}")))?;
+        verifying_key.verify(&payload, &signature).map_err(|e| {
+            crate::error::ComputeError::InvalidSignature(format!(
+                "Signature verification failed: {e}"
+            ))
+        })?;
 
         Ok(())
     }
@@ -617,7 +633,10 @@ mod tests {
         task.submitter = "not-a-did".into();
         let result = task.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid submitter DID"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid submitter DID"));
     }
 
     #[test]
@@ -671,7 +690,10 @@ mod tests {
         task.payment_rate = Some(2_000_000); // Above MAX_RATE (1M)
         let result = task.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Payment rate too high"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Payment rate too high"));
     }
 
     #[test]
@@ -680,6 +702,9 @@ mod tests {
         task.required_capabilities = vec![];
         let result = task.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("At least one capability"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("At least one capability"));
     }
 }

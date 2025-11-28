@@ -12,7 +12,7 @@
 //! - Max entries limit was not enforced for pulled entries
 
 use anyhow::Result;
-use icn_gossip::{GossipActor, GossipMessage, Topic, AccessControl};
+use icn_gossip::{AccessControl, GossipActor, GossipMessage, Topic};
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_trust::TrustClass;
@@ -58,15 +58,22 @@ impl TestNode {
         // Set up notification callback to track all notifications
         {
             let mut gossip = gossip_handle.write().await;
-            let callback = Arc::new(move |topic: String, entry: icn_gossip::GossipEntry, sub_did: icn_identity::Did| {
-                let hash = entry.hash;
-                let notifs_clone = notifications_clone.clone();
-                tokio::spawn(async move {
-                    let mut notifs = notifs_clone.lock().await;
-                    info!("📬 Notification: topic={}, hash={}, subscriber={}", topic, hex::encode(hash), sub_did);
-                    notifs.push((topic, hash, sub_did));
-                });
-            });
+            let callback = Arc::new(
+                move |topic: String, entry: icn_gossip::GossipEntry, sub_did: icn_identity::Did| {
+                    let hash = entry.hash;
+                    let notifs_clone = notifications_clone.clone();
+                    tokio::spawn(async move {
+                        let mut notifs = notifs_clone.lock().await;
+                        info!(
+                            "📬 Notification: topic={}, hash={}, subscriber={}",
+                            topic,
+                            hex::encode(hash),
+                            sub_did
+                        );
+                        notifs.push((topic, hash, sub_did));
+                    });
+                },
+            );
             gossip.set_notification_callback(callback);
         }
 
@@ -90,7 +97,10 @@ impl TestNode {
                 }
 
                 MessagePayload::Subscribe { topics } => {
-                    info!("Received Subscribe from {} for topics: {:?}", sender_did, topics);
+                    info!(
+                        "Received Subscribe from {} for topics: {:?}",
+                        sender_did, topics
+                    );
 
                     let mut gossip = gossip_handle_clone.blocking_write();
                     let mut acked_topics = Vec::new();
@@ -102,7 +112,10 @@ impl TestNode {
                                 acked_topics.push(topic.clone());
                             }
                             Err(e) => {
-                                warn!("Failed to subscribe {} to topic {}: {}", sender_did, topic, e);
+                                warn!(
+                                    "Failed to subscribe {} to topic {}: {}",
+                                    sender_did, topic, e
+                                );
                             }
                         }
                     }
@@ -117,7 +130,7 @@ impl TestNode {
                                 let ack_msg = NetworkMessage::subscribe_ack(
                                     own_did,
                                     sender_did.clone(),
-                                    acked_topics.clone()
+                                    acked_topics.clone(),
                                 );
                                 if let Err(e) = net_handle.send_message(sender_did, ack_msg).await {
                                     warn!("Failed to send SubscribeAck: {}", e);
@@ -128,18 +141,27 @@ impl TestNode {
                 }
 
                 MessagePayload::Unsubscribe { topics } => {
-                    info!("Received Unsubscribe from {} for topics: {:?}", sender_did, topics);
+                    info!(
+                        "Received Unsubscribe from {} for topics: {:?}",
+                        sender_did, topics
+                    );
 
                     let mut gossip = gossip_handle_clone.blocking_write();
                     for topic in &topics {
                         if let Err(e) = gossip.unsubscribe(topic, &sender_did) {
-                            warn!("Failed to unsubscribe {} from topic {}: {}", sender_did, topic, e);
+                            warn!(
+                                "Failed to unsubscribe {} from topic {}: {}",
+                                sender_did, topic, e
+                            );
                         }
                     }
                 }
 
                 MessagePayload::SubscribeAck { topics } => {
-                    info!("Received SubscribeAck from {} for topics: {:?}", sender_did, topics);
+                    info!(
+                        "Received SubscribeAck from {} for topics: {:?}",
+                        sender_did, topics
+                    );
                 }
 
                 _ => {}
@@ -171,25 +193,27 @@ impl TestNode {
             let network_handle_clone = network_handle.clone();
             let from_did = did.clone();
 
-            let send_callback = Arc::new(move |recipient: Option<icn_identity::Did>, gossip_msg: GossipMessage| {
-                let net_handle = network_handle_clone.clone();
-                let from = from_did.clone();
+            let send_callback = Arc::new(
+                move |recipient: Option<icn_identity::Did>, gossip_msg: GossipMessage| {
+                    let net_handle = network_handle_clone.clone();
+                    let from = from_did.clone();
 
-                // Spawn async task to send message
-                tokio::spawn(async move {
-                    let net_msg = NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
+                    // Spawn async task to send message
+                    tokio::spawn(async move {
+                        let net_msg = NetworkMessage::gossip(from, recipient.clone(), gossip_msg);
 
-                    let result = if let Some(to_did) = recipient {
-                        net_handle.send_message(to_did, net_msg).await
-                    } else {
-                        net_handle.broadcast(net_msg).await
-                    };
+                        let result = if let Some(to_did) = recipient {
+                            net_handle.send_message(to_did, net_msg).await
+                        } else {
+                            net_handle.broadcast(net_msg).await
+                        };
 
-                    if let Err(e) = result {
-                        warn!("Failed to send gossip message: {}", e);
-                    }
-                });
-            });
+                        if let Err(e) = result {
+                            warn!("Failed to send gossip message: {}", e);
+                        }
+                    });
+                },
+            );
 
             gossip.set_send_callback(send_callback);
         }
@@ -257,8 +281,14 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
     }
 
     // Connect nodes: 1 ↔ 2 ↔ 3
-    node1.network_handle.dial(node2.listen_addr, node2.did.clone()).await?;
-    node2.network_handle.dial(node3.listen_addr, node3.did.clone()).await?;
+    node1
+        .network_handle
+        .dial(node2.listen_addr, node2.did.clone())
+        .await?;
+    node2
+        .network_handle
+        .dial(node3.listen_addr, node3.did.clone())
+        .await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     info!("✓ Nodes connected");
@@ -269,7 +299,10 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
         node2.did.clone(),
         vec![topic.to_string()],
     );
-    node1.network_handle.send_message(node2.did.clone(), subscribe_msg).await?;
+    node1
+        .network_handle
+        .send_message(node2.did.clone(), subscribe_msg)
+        .await?;
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     info!("✓ Node 1 subscribed to topic on Node 2");
@@ -278,7 +311,10 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
     {
         let gossip2 = node2.gossip_handle.read().await;
         let subscribers = gossip2.get_subscribers(topic);
-        assert!(subscribers.contains(&node1.did), "Node 1 should be subscribed on Node 2");
+        assert!(
+            subscribers.contains(&node1.did),
+            "Node 1 should be subscribed on Node 2"
+        );
     }
 
     // Node 3 publishes an entry
@@ -305,7 +341,10 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
     };
 
     let net_msg = NetworkMessage::gossip(node3.did.clone(), Some(node2.did.clone()), announce_msg);
-    node2.network_handle.send_message(node2.did.clone(), net_msg).await?;
+    node2
+        .network_handle
+        .send_message(node2.did.clone(), net_msg)
+        .await?;
 
     info!("✓ Node 3 sent Announce to Node 2");
 
@@ -316,7 +355,11 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
     {
         let gossip2 = node2.gossip_handle.read().await;
         let entries = gossip2.get_entries(topic);
-        assert_eq!(entries.len(), 1, "Node 2 should have 1 entry after Response");
+        assert_eq!(
+            entries.len(),
+            1,
+            "Node 2 should have 1 entry after Response"
+        );
         assert_eq!(entries[0].hash, hash);
     }
 
@@ -329,15 +372,21 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
         "Node 1 should have received at least 1 notification via Response handler"
     );
 
-    info!("✓ Node 1 received {} notification(s) - Response handler is working!", notification_count);
+    info!(
+        "✓ Node 1 received {} notification(s) - Response handler is working!",
+        notification_count
+    );
 
     // Verify the notification matches the entry
     {
         let notifications = node1.notifications.lock().await;
-        let notification_exists = notifications.iter().any(|(t, h, _)| {
-            t == topic && h == &hash
-        });
-        assert!(notification_exists, "Notification should match the published entry");
+        let notification_exists = notifications
+            .iter()
+            .any(|(t, h, _)| t == topic && h == &hash);
+        assert!(
+            notification_exists,
+            "Notification should match the published entry"
+        );
     }
 
     info!("✓ Notification matches published entry");
@@ -374,8 +423,7 @@ async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()>
     let topic = "test:bounded";
     {
         let mut gossip2 = node2.gossip_handle.write().await;
-        let topic_obj = Topic::new(topic.to_string(), AccessControl::Public)
-            .with_max_entries(3);
+        let topic_obj = Topic::new(topic.to_string(), AccessControl::Public).with_max_entries(3);
         gossip2.create_topic(topic_obj);
     }
     {
@@ -384,7 +432,10 @@ async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()>
     }
 
     // Connect nodes
-    node1.network_handle.dial(node2.listen_addr, node2.did.clone()).await?;
+    node1
+        .network_handle
+        .dial(node2.listen_addr, node2.did.clone())
+        .await?;
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // Node 1 publishes 5 entries
@@ -409,8 +460,12 @@ async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()>
         };
 
         let response_msg = GossipMessage::Response { entry };
-        let net_msg = NetworkMessage::gossip(node1.did.clone(), Some(node2.did.clone()), response_msg);
-        node2.network_handle.send_message(node2.did.clone(), net_msg).await?;
+        let net_msg =
+            NetworkMessage::gossip(node1.did.clone(), Some(node2.did.clone()), response_msg);
+        node2
+            .network_handle
+            .send_message(node2.did.clone(), net_msg)
+            .await?;
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 

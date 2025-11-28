@@ -73,7 +73,11 @@ impl ContractDeploymentMessage {
             .context("Contract validation failed")?;
 
         // Verify deployer is in participants
-        if !self.contract.participants.contains(&self.installation.installed_by) {
+        if !self
+            .contract
+            .participants
+            .contains(&self.installation.installed_by)
+        {
             bail!(
                 "Deployer {} is not a contract participant",
                 self.installation.installed_by
@@ -109,17 +113,23 @@ impl ContractDeploymentMessage {
         let signing_bytes = self.signing_bytes();
 
         // Verify deployer signature
-        let deployer_key = self.installation.installed_by.to_verifying_key()
+        let deployer_key = self
+            .installation
+            .installed_by
+            .to_verifying_key()
             .context("Failed to extract deployer verifying key")?;
-        let deployer_sig = Signature::from_bytes(
-            self.deployer_signature.as_slice().try_into()
-                .map_err(|_| anyhow::anyhow!("Invalid deployer signature length: expected 64 bytes"))?
-        );
-        deployer_key.verify(&signing_bytes, &deployer_sig)
+        let deployer_sig =
+            Signature::from_bytes(self.deployer_signature.as_slice().try_into().map_err(|_| {
+                anyhow::anyhow!("Invalid deployer signature length: expected 64 bytes")
+            })?);
+        deployer_key
+            .verify(&signing_bytes, &deployer_sig)
             .map_err(|e| anyhow::anyhow!("Deployer signature verification failed: {e}"))?;
 
         // Verify deployer signature matches installation.signatures (M2: Security fix)
-        let deployer_sig_in_installation = self.installation.signatures
+        let deployer_sig_in_installation = self
+            .installation
+            .signatures
             .iter()
             .find(|(did, _)| did == &self.installation.installed_by)
             .map(|(_, sig)| sig)
@@ -131,23 +141,30 @@ impl ContractDeploymentMessage {
 
         // Verify each participant signature
         for (participant_did, sig_bytes) in &self.installation.signatures {
-            let participant_key = participant_did.to_verifying_key()
-                .context(format!("Failed to extract verifying key for {participant_did}"))?;
+            let participant_key = participant_did.to_verifying_key().context(format!(
+                "Failed to extract verifying key for {participant_did}"
+            ))?;
 
             if sig_bytes.len() != 64 {
-                bail!("Invalid signature length for {}: expected 64 bytes, got {}",
-                      participant_did, sig_bytes.len());
+                bail!(
+                    "Invalid signature length for {}: expected 64 bytes, got {}",
+                    participant_did,
+                    sig_bytes.len()
+                );
             }
 
-            let signature = Signature::from_bytes(
-                sig_bytes.as_slice().try_into()
-                    .map_err(|_| anyhow::anyhow!("Failed to parse signature for {participant_did}"))?
-            );
+            let signature =
+                Signature::from_bytes(sig_bytes.as_slice().try_into().map_err(|_| {
+                    anyhow::anyhow!("Failed to parse signature for {participant_did}")
+                })?);
 
-            participant_key.verify(&signing_bytes, &signature)
-                .map_err(|e| anyhow::anyhow!(
-                    "Participant signature verification failed for {participant_did}: {e}"
-                ))?;
+            participant_key
+                .verify(&signing_bytes, &signature)
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Participant signature verification failed for {participant_did}: {e}"
+                    )
+                })?;
         }
 
         Ok(())
@@ -195,8 +212,7 @@ mod tests {
     use std::time::SystemTime;
 
     fn create_test_contract(kp: &KeyPair) -> Contract {
-        Contract::new("TestContract".to_string())
-            .add_participant(kp.did().clone())
+        Contract::new("TestContract".to_string()).add_participant(kp.did().clone())
     }
 
     fn create_valid_deployment() -> (KeyPair, ContractDeploymentMessage) {
@@ -204,7 +220,7 @@ mod tests {
         let contract = create_test_contract(&kp);
 
         // Compute code hash
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -217,7 +233,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let signature = kp.sign(&signing_bytes);
 
         let installation = ContractInstallation {
@@ -256,7 +273,10 @@ mod tests {
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("signature verification failed"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("signature verification failed"));
     }
 
     // Edge case E2: Signature from wrong keypair
@@ -267,7 +287,7 @@ mod tests {
 
         let contract = create_test_contract(&kp_alice);
 
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -280,7 +300,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
 
         // Bob signs, but we claim it's Alice's signature!
         let bob_signature = kp_bob.sign(&signing_bytes);
@@ -304,7 +325,10 @@ mod tests {
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("signature verification failed"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("signature verification failed"));
     }
 
     // Edge case E3: Empty signature bytes
@@ -317,7 +341,10 @@ mod tests {
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("expected 64 bytes"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("expected 64 bytes"));
     }
 
     // Edge case E4: Signature too long
@@ -330,7 +357,10 @@ mod tests {
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("expected 64 bytes"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("expected 64 bytes"));
     }
 
     // Edge case E5: Participant not in contract
@@ -341,7 +371,7 @@ mod tests {
 
         let contract = create_test_contract(&kp_alice);
 
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -354,7 +384,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let alice_sig = kp_alice.sign(&signing_bytes);
         let bob_sig = kp_bob.sign(&signing_bytes);
 
@@ -380,7 +411,10 @@ mod tests {
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("signatures incomplete"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("signatures incomplete"));
     }
 
     // Edge case E6: Missing participant signature
@@ -393,7 +427,7 @@ mod tests {
             .add_participant(kp_alice.did().clone())
             .add_participant(kp_bob.did().clone());
 
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -406,7 +440,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let alice_sig = kp_alice.sign(&signing_bytes);
 
         let installation = ContractInstallation {
@@ -431,7 +466,10 @@ mod tests {
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("signatures incomplete"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("signatures incomplete"));
     }
 
     // Security test H2: Too many signatures DoS
@@ -442,12 +480,18 @@ mod tests {
         // Add 101 signatures (MAX_PARTICIPANTS + 1)
         for _ in 0..=MAX_PARTICIPANTS {
             let fake_kp = KeyPair::generate().unwrap();
-            deployment.installation.signatures.push((fake_kp.did().clone(), vec![0u8; 64]));
+            deployment
+                .installation
+                .signatures
+                .push((fake_kp.did().clone(), vec![0u8; 64]));
         }
 
         let result = deployment.verify();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Too many signatures"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Too many signatures"));
     }
 
     // Security test M2: Deployer signature mismatch
@@ -456,7 +500,7 @@ mod tests {
         let kp = KeyPair::generate().unwrap();
         let contract = create_test_contract(&kp);
 
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(contract.name.as_bytes());
         for participant in &contract.participants {
@@ -469,7 +513,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let signing_bytes = ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let signature1 = kp.sign(&signing_bytes);
         let signature2 = kp.sign(&signing_bytes); // Same data, but regenerate signature
 

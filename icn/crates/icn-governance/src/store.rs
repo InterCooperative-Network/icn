@@ -1,8 +1,6 @@
 //! Governance storage layer
 
-use crate::{
-    GovernanceDomain, GovernanceDomainId, Proposal, ProposalId, Vote, VoteTally,
-};
+use crate::{GovernanceDomain, GovernanceDomainId, Proposal, ProposalId, Vote, VoteTally};
 use anyhow::Result;
 use icn_identity::Did;
 use std::collections::HashMap;

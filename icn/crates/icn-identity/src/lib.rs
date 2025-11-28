@@ -13,8 +13,10 @@ use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-pub use batch_verify::{BatchVerifier, BatchVerifyResult, SignatureToVerify, verify_signatures_batched};
-pub use bundle::{BindingInfo, IdentityBundle, verify_binding_info};
+pub use batch_verify::{
+    verify_signatures_batched, BatchVerifier, BatchVerifyResult, SignatureToVerify,
+};
+pub use bundle::{verify_binding_info, BindingInfo, IdentityBundle};
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
@@ -74,7 +76,8 @@ impl Did {
 
         // Validate it's a valid Ed25519 public key
         VerifyingKey::from_bytes(
-            decoded_bytes.as_slice()
+            decoded_bytes
+                .as_slice()
                 .try_into()
                 .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?,
         )
@@ -250,7 +253,10 @@ mod tests {
     fn test_did_from_str_invalid_prefix() {
         let result = Did::from_str("invalid:prefix:abc123");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("must start with 'did:icn:'"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must start with 'did:icn:'"));
     }
 
     #[test]
@@ -264,7 +270,10 @@ mod tests {
     fn test_did_from_str_invalid_multibase() {
         let result = Did::from_str("did:icn:INVALID!!!BASE58");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("multibase encoding"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("multibase encoding"));
     }
 
     #[test]

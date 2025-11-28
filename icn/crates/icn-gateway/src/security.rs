@@ -6,9 +6,9 @@ use actix_web::{
     http::header::{self, HeaderName, HeaderValue},
     Error,
 };
+use futures_util::Future;
 use std::future::{ready, Ready};
 use std::pin::Pin;
-use futures_util::Future;
 
 /// Security configuration for the gateway
 #[derive(Debug, Clone)]
@@ -72,13 +72,11 @@ pub fn configure_cors(config: &SecurityConfig) -> Cors {
         cors
     } else {
         // Strict CORS - only same origin
-        Cors::default()
-            .allow_any_method()
-            .allowed_headers(vec![
-                header::AUTHORIZATION,
-                header::ACCEPT,
-                header::CONTENT_TYPE,
-            ])
+        Cors::default().allow_any_method().allowed_headers(vec![
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::CONTENT_TYPE,
+        ])
     }
 }
 
@@ -174,7 +172,7 @@ where
                 headers.insert(
                     HeaderName::from_static("permissions-policy"),
                     HeaderValue::from_static(
-                        "geolocation=(), microphone=(), camera=(), payment=()"
+                        "geolocation=(), microphone=(), camera=(), payment=()",
                     ),
                 );
 

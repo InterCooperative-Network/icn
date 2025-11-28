@@ -262,7 +262,11 @@ impl GovernanceActor {
 
                 match GovernanceMessage::from_bytes(&entry.data) {
                     Ok(msg) => {
-                        info!("[{}] Received governance message: {}", did_notify, msg.message_type());
+                        info!(
+                            "[{}] Received governance message: {}",
+                            did_notify,
+                            msg.message_type()
+                        );
                         if let Err(e) = handle_incoming(store_notify.as_ref(), msg) {
                             warn!("Failed to handle incoming governance message: {}", e);
                         }
@@ -336,7 +340,10 @@ impl GovernanceActor {
             }
         });
 
-        info!("✓ Governance scheduler started (checking every {}s)", SCHEDULER_INTERVAL.as_secs());
+        info!(
+            "✓ Governance scheduler started (checking every {}s)",
+            SCHEDULER_INTERVAL.as_secs()
+        );
 
         Ok(handle)
     }
@@ -389,10 +396,8 @@ impl GovernanceActor {
                 proposal.id = proposal_id.clone();
 
                 // Persist locally
-                self.store.put(
-                    &proposal_key(&proposal_id),
-                    &serde_json::to_vec(&proposal)?,
-                )?;
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_created(proposal))
@@ -425,10 +430,8 @@ impl GovernanceActor {
                 };
 
                 // Persist updated state
-                self.store.put(
-                    &proposal_key(&proposal_id),
-                    &serde_json::to_vec(&proposal)?,
-                )?;
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
                 // Schedule auto-close
                 let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
@@ -446,7 +449,10 @@ impl GovernanceActor {
                 ))
                 .await?;
 
-                info!("✓ Proposal opened: {} (auto-close scheduled for {}s)", proposal_id.0, voting_period_seconds);
+                info!(
+                    "✓ Proposal opened: {} (auto-close scheduled for {}s)",
+                    proposal_id.0, voting_period_seconds
+                );
             }
 
             GovernanceCommand::CastVote {
@@ -514,10 +520,8 @@ impl GovernanceActor {
                 proposal.close(new_state)?;
 
                 // Persist updated state
-                self.store.put(
-                    &proposal_key(&proposal_id),
-                    &serde_json::to_vec(&proposal)?,
-                )?;
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
                 // Create tally snapshot for broadcast
                 let tally_snapshot = TallySnapshot::new(
@@ -562,7 +566,10 @@ impl GovernanceActor {
                     event_bus.emit(event).await;
                 }
 
-                info!("✓ Proposal closed: {} ({:?})", proposal_id.0, outcome_result);
+                info!(
+                    "✓ Proposal closed: {} ({:?})",
+                    proposal_id.0, outcome_result
+                );
             }
         }
 
@@ -625,10 +632,7 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
         }
 
         GovernanceMessage::ProposalCreated { proposal } => {
-            store.put(
-                &proposal_key(&proposal.id),
-                &serde_json::to_vec(&proposal)?,
-            )?;
+            store.put(&proposal_key(&proposal.id), &serde_json::to_vec(&proposal)?)?;
         }
 
         GovernanceMessage::ProposalOpened {
