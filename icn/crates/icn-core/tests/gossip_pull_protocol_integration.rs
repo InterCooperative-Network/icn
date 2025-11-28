@@ -167,7 +167,6 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
 async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -307,7 +306,6 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces
 async fn test_pull_request_respects_backpressure() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();

@@ -481,7 +481,6 @@ where
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
 async fn test_governance_proposal_lifecycle() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
