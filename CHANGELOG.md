@@ -55,6 +55,43 @@ const result = await client.submitWasmTask(wasmBytes, {
 });
 ```
 
+### Added - WASM RPC & CLI Support (2025-11-28)
+
+**RPC Server** ([crates/icn-rpc/src/server.rs](icn/crates/icn-rpc/src/server.rs)):
+- `compute.submit` now accepts `code_type: "wasm"` with `wasm_bytes` (base64)
+- Added `CodeType` enum to RPC types
+- Backward compatible: CCL tasks work unchanged
+
+**CLI** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- Added `icnctl compute submit-wasm` command for WASM task submission
+- Reads `.wasm` files directly and encodes to base64
+
+**Usage**:
+```bash
+# Submit WASM module via CLI
+icnctl compute submit-wasm --wasm module.wasm --fuel 10000 --priority high
+
+# Submit via RPC
+curl -X POST http://localhost:7000 \
+  -d '{"jsonrpc":"2.0","method":"compute.submit","params":{"code_type":"wasm","wasm_bytes":"AGFz..."},"id":1}'
+```
+
+### Added - WASM Compute Example (2025-11-28)
+
+**Example** ([examples/wasm-compute/](examples/wasm-compute/)):
+- Rust project that compiles to WASM for ICN compute
+- Demonstrates ICN host functions (`icn::log`, `icn::timestamp`)
+- Includes `run()`, `run_with_input()`, and `fibonacci()` examples
+- Build instructions and submission examples for CLI, REST, and TypeScript SDK
+
+**Build & Run**:
+```bash
+cd examples/wasm-compute
+rustup target add wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown
+icnctl compute submit-wasm --wasm target/.../icn_wasm_example.wasm
+```
+
 ### Added - Federation & Cross-Network Discovery (2025-11-27)
 
 **Federation Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):

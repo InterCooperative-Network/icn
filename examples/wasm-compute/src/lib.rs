@@ -36,16 +36,23 @@
 //! - `icn::timestamp() -> i64` - Get current Unix timestamp in milliseconds
 
 // Declare ICN host functions
+// Note: WASM32 uses 32-bit addresses for linear memory, so i32 is correct.
+// This code only compiles for wasm32-unknown-unknown where pointers are 32-bit.
 #[link(wasm_import_module = "icn")]
 extern "C" {
-    /// Log a message to the ICN runtime
+    /// Log a message to the ICN runtime (ptr/len are WASM32 linear memory addresses)
     fn log(ptr: i32, len: i32);
     /// Get current timestamp in milliseconds
     fn timestamp() -> i64;
 }
 
 /// Helper to log a string
+///
+/// # Safety
+/// Safe to call because on wasm32, usize == u32 and the cast to i32 preserves all bits.
 fn icn_log(msg: &str) {
+    // On wasm32: usize = 32 bits, so as_ptr() returns a 32-bit address
+    // The cast to i32 is a bitwise reinterpretation (no truncation)
     unsafe {
         log(msg.as_ptr() as i32, msg.len() as i32);
     }
