@@ -1371,10 +1371,17 @@ impl NetworkActor {
 
                                     // Store the incoming QUIC connection in session_manager
                                     // This enables us to send messages back to the peer on this connection
-                                    session_manager.read().await.store_incoming_connection(
-                                        message.from.to_string(),
-                                        connection.clone(),
-                                    ).await;
+                                    // Get the connections Arc without holding the outer lock across the await
+                                    let connections_arc = session_manager.read().await.connections_arc();
+                                    let peer_did = message.from.to_string();
+                                    let mut connections = connections_arc.write().await;
+                                    if connections.contains_key(&peer_did) {
+                                        info!("Connection already exists for {}, not overwriting with incoming connection from {}",
+                                              peer_did, connection.remote_address());
+                                    } else {
+                                        info!("Storing incoming connection from {} at {}", peer_did, connection.remote_address());
+                                        connections.insert(peer_did, connection.clone());
+                                    }
 
                                     // Add peer to neighbor sets if topology is enabled
                                     if let Some(ref sets) = neighbor_sets {

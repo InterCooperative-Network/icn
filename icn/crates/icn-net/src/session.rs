@@ -179,15 +179,20 @@ impl SessionManager {
 
         info!("Connected to peer at {}", addr);
 
-        // Store connection (but don't overwrite if we already have one from an incoming connection)
-        {
-            let mut connections = self.connections.write().await;
-            if connections.contains_key(&peer_did) {
-                info!("Connection already exists for {} (from incoming), keeping existing connection", peer_did);
-            } else {
-                connections.insert(peer_did, connection.clone());
-            }
+        // Store connection, or return existing one if we already have it
+        let mut connections = self.connections.write().await;
+        if let Some(existing) = connections.get(&peer_did) {
+            info!(
+                "Connection already exists for {} (from incoming), returning existing connection and closing new one",
+                peer_did
+            );
+            let existing_conn = existing.clone();
+            drop(connections); // Release lock before closing
+            connection.close(0u32.into(), b"duplicate");
+            return Ok(existing_conn);
         }
+        connections.insert(peer_did, connection.clone());
+        drop(connections);
 
         Ok(connection)
     }
@@ -213,6 +218,14 @@ impl SessionManager {
             }
             None => Ok(None),
         }
+    }
+
+    /// Get reference to the connections map for direct access
+    ///
+    /// This is useful when the caller needs to acquire the lock themselves
+    /// to avoid holding locks across await points.
+    pub fn connections_arc(&self) -> Arc<RwLock<HashMap<String, quinn::Connection>>> {
+        self.connections.clone()
     }
 
     /// Store an incoming connection by peer DID
