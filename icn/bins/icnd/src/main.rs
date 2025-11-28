@@ -190,7 +190,7 @@ async fn wait_for_sigterm() -> Result<()> {
 /// Returns a zeroizing container that automatically clears the passphrase
 /// from memory when it goes out of scope, preventing sensitive data leakage.
 ///
-/// Security: Both the String returned by rpassword and the final Vec<u8> are
+/// Security: Both the String returned by rpassword and the final `Vec<u8>` are
 /// wrapped in Zeroizing to ensure complete memory cleanup.
 fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
     // Check for ICN_PASSPHRASE environment variable first

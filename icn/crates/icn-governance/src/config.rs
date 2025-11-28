@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Complete governance configuration for a domain
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceConfig {
-    /// Governance profile ID (e.g., "cooperative_default", "contract:<did>")
+    /// Governance profile ID (e.g., "cooperative_default", "contract:\<did\>")
     pub profile: GovernanceProfileId,
 
     /// Membership configuration (who can vote)

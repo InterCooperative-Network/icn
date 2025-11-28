@@ -27,12 +27,12 @@ pub type SendMessageCallback = Arc<dyn Fn(Option<Did>, GossipMessage) + Send + S
 pub type EntryNotificationCallback = Arc<dyn Fn(String, GossipEntry, Did) + Send + Sync>;
 
 /// Callback for sampling peers based on scope
-/// Parameters: (scope, count) -> Vec<Did>
+/// Parameters: (scope, count) -> `Vec<Did>`
 /// Returns a list of peer DIDs to send messages to
 pub type PeerSamplingCallback = Arc<dyn Fn(crate::types::Scope, usize) -> Vec<Did> + Send + Sync>;
 
 /// Trust lookup function for resource limits
-/// Parameters: (did) -> Option<TrustClass>
+/// Parameters: (did) -> `Option<TrustClass>`
 /// Returns the trust class for a DID to determine resource limits
 pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
 
