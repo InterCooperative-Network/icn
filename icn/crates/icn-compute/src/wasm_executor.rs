@@ -419,6 +419,130 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn test_wasm_with_host_functions() {
+        // WASM module that calls host functions (log, timestamp)
+        let wat_source = r#"
+            (module
+                ;; Import ICN host functions
+                (import "icn" "log" (func $log (param i32 i32)))
+                (import "icn" "timestamp" (func $timestamp (result i64)))
+
+                ;; Memory for log message
+                (memory (export "memory") 1)
+
+                ;; Store "Hi" at offset 0
+                (data (i32.const 0) "Hi")
+
+                (func $run (export "run") (result i32)
+                    ;; Call log("Hi", 2)
+                    (call $log (i32.const 0) (i32.const 2))
+                    ;; Call timestamp (result ignored)
+                    (drop (call $timestamp))
+                    ;; Return 99
+                    (i32.const 99)
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat_source).expect("Failed to parse WAT");
+
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "host-fn-test".into(),
+            submitter: "did:icn:alice".into(),
+            coop_id: None,
+            code: TaskCode::WasmInline(wasm_bytes),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Success(output) => {
+                assert_eq!(output, vec![99, 0, 0, 0]);
+            }
+            other => panic!("Expected success, got: {:?}", other),
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn test_wasm_with_inputs() {
+        // WASM module that reads inputs and sums bytes
+        let wat_source = r#"
+            (module
+                (memory (export "memory") 1)
+
+                ;; run(ptr, len) -> i32: sum bytes from ptr..ptr+len
+                (func $run (export "run") (param $ptr i32) (param $len i32) (result i32)
+                    (local $sum i32)
+                    (local $end i32)
+                    (local.set $end (i32.add (local.get $ptr) (local.get $len)))
+                    (block $done
+                        (loop $loop
+                            (br_if $done (i32.ge_u (local.get $ptr) (local.get $end)))
+                            (local.set $sum
+                                (i32.add (local.get $sum)
+                                    (i32.load8_u (local.get $ptr))))
+                            (local.set $ptr (i32.add (local.get $ptr) (i32.const 1)))
+                            (br $loop)
+                        )
+                    )
+                    (local.get $sum)
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat_source).expect("Failed to parse WAT");
+
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "input-test".into(),
+            submitter: "did:icn:alice".into(),
+            coop_id: None,
+            code: TaskCode::WasmInline(wasm_bytes),
+            inputs: vec![1, 2, 3, 4, 5], // Sum = 15
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Success(output) => {
+                // Sum of [1,2,3,4,5] = 15
+                assert_eq!(output, vec![15, 0, 0, 0]);
+            }
+            other => panic!("Expected success, got: {:?}", other),
+        }
+    }
+
     #[cfg(not(feature = "wasm"))]
     #[test]
     fn test_wasm_disabled_message() {
