@@ -684,7 +684,7 @@ async fn handle_contract_call(
     match runtime.execute_rule(&code_hash, &call_params.rule_name, context, args).await {
         Ok(result) => {
             let response_value = serde_json::to_value(&result.value)
-                .unwrap_or_else(|_| serde_json::json!(null));
+                .unwrap_or(serde_json::json!(null));
 
             // Create receipt for successful execution
             let resources = crate::receipt::Resources {

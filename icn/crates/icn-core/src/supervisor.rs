@@ -1950,14 +1950,11 @@ impl Supervisor {
 
                 // Export gossip state
                 if let Some(ref gossip_handle) = gossip_handle {
-                    match gossip_handle.read().await.export_state() {
-                        gossip_state => {
-                            info!("Exported gossip state: {} vector clock entries, {} subscriptions",
-                                  gossip_state.vector_clock.len(),
-                                  gossip_state.subscriptions.len());
-                            snapshot.gossip_state = Some(gossip_state);
-                        }
-                    }
+                    let gossip_state = gossip_handle.read().await.export_state();
+                    info!("Exported gossip state: {} vector clock entries, {} subscriptions",
+                          gossip_state.vector_clock.len(),
+                          gossip_state.subscriptions.len());
+                    snapshot.gossip_state = Some(gossip_state);
                 }
 
                 // Export network state

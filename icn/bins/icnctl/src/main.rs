@@ -2268,18 +2268,14 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             println!();
 
             // Send to daemon
-            match client
+            let code_hash = client
                 .deploy_contract(deployment_json)
                 .await
-                .context("Failed to deploy contract to daemon. Is icnd running?")?
-            {
-                code_hash => {
-                    println!("✓ Contract deployed successfully!");
-                    println!("  Code Hash: {code_hash}");
-                    println!("\nYou can now call contract rules using:");
-                    println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'");
-                }
-            }
+                .context("Failed to deploy contract to daemon. Is icnd running?")?;
+            println!("✓ Contract deployed successfully!");
+            println!("  Code Hash: {code_hash}");
+            println!("\nYou can now call contract rules using:");
+            println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'")
         }
 
         ContractCommands::Call {
@@ -2301,20 +2297,16 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
             println!("  Caller: {caller}");
             println!("  Args: {args_value}\n");
 
-            match client
+            let response = client
                 .call_contract(code_hash.clone(), rule_name.clone(), caller.clone(), args_value)
                 .await
-                .context("Failed to call contract. Is icnd running?")?
-            {
-                response => {
-                    if response.success {
-                        println!("✓ Contract execution successful!");
-                        println!("  Fuel consumed: {}", response.fuel_consumed);
-                        println!("  Return value: {}", response.return_value);
-                    } else {
-                        println!("✗ Contract execution failed!");
-                    }
-                }
+                .context("Failed to call contract. Is icnd running?")?;
+            if response.success {
+                println!("✓ Contract execution successful!");
+                println!("  Fuel consumed: {}", response.fuel_consumed);
+                println!("  Return value: {}", response.return_value);
+            } else {
+                println!("✗ Contract execution failed!");
             }
         }
 
@@ -2591,18 +2583,14 @@ async fn handle_contract_deploy_signed(deployment_file: &Path, client: &mut icn_
     println!();
 
     // Send to daemon
-    match client
+    let code_hash = client
         .deploy_contract(deployment_json)
         .await
-        .context("Failed to deploy contract to daemon. Is icnd running?")?
-    {
-        code_hash => {
-            println!("✓ Contract deployed successfully!");
-            println!("  Code Hash: {code_hash}");
-            println!("\nYou can now call contract rules using:");
-            println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'");
-        }
-    }
+        .context("Failed to deploy contract to daemon. Is icnd running?")?;
+    println!("✓ Contract deployed successfully!");
+    println!("  Code Hash: {code_hash}");
+    println!("\nYou can now call contract rules using:");
+    println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'");
 
     Ok(())
 }
