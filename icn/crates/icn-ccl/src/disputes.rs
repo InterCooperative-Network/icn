@@ -221,7 +221,6 @@ impl DisputeResolutionSystem {
 
         // Trigger automatic re-execution
         tokio::spawn({
-            let dispute_id = dispute_id;
             let _task_hash = task_hash;
             let _executor = executor.clone();
 

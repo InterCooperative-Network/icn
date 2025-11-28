@@ -1151,10 +1151,9 @@ impl NetworkActor {
             // Accept with timeout to periodically check shutdown
             let conn_result = {
                 let guard = session_manager.read().await;
-                match tokio::time::timeout(tokio::time::Duration::from_millis(100), guard.accept()).await {
-                    Ok(result) => Some(result),
-                    Err(_) => None, // Timeout
-                }
+                tokio::time::timeout(tokio::time::Duration::from_millis(100), guard.accept())
+                    .await
+                    .ok() // Convert timeout error to None
             };
 
             if let Some(conn_result) = conn_result {

@@ -458,8 +458,7 @@ impl NeighborSets {
         let to_evict_count = set_ref.len() - max + 1; // +1 to make room for new peer
 
         // Evict lowest-scoring peers
-        for i in 0..to_evict_count.min(peers_with_scores.len()) {
-            let peer = &peers_with_scores[i].0;
+        for (peer, _score) in peers_with_scores.iter().take(to_evict_count) {
             match target {
                 NeighborSet::LocalCluster => { self.local_cluster.remove(peer); }
                 NeighborSet::Regional => { self.regional.remove(peer); }

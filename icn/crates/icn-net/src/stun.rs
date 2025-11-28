@@ -334,13 +334,13 @@ fn parse_xor_mapped_address(data: &[u8], transaction_id: &[u8; 12]) -> Result<So
             xaddr.copy_from_slice(&data[4..20]);
 
             // XOR with magic cookie
-            for i in 0..4 {
-                xaddr[i] ^= [0x21, 0x12, 0xA4, 0x42][i];
+            for (byte, mask) in xaddr[..4].iter_mut().zip([0x21, 0x12, 0xA4, 0x42]) {
+                *byte ^= mask;
             }
 
             // XOR with transaction ID
-            for i in 0..12 {
-                xaddr[i + 4] ^= transaction_id[i];
+            for (byte, tid_byte) in xaddr[4..16].iter_mut().zip(transaction_id.iter()) {
+                *byte ^= tid_byte;
             }
 
             let ip = std::net::Ipv6Addr::from(xaddr);
