@@ -60,6 +60,8 @@ impl Ord for PeerId {
 struct PeerMetadata {
     topology_info: TopologyInfo,
     trust_score: f32,
+    /// When this peer connected (for future connection age tracking)
+    #[allow(dead_code)]
     connected_at: Instant,
     network_metrics: NetworkMetrics,
 }

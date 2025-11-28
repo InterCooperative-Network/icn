@@ -1829,6 +1829,8 @@ async fn handle_policy_set(
 
     #[derive(serde::Deserialize)]
     struct SetPolicyParams {
+        /// Cooperative ID (reserved for future per-coop policy support)
+        #[allow(dead_code)]
         coop_id: String,
         policy: serde_json::Value,
     }
