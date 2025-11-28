@@ -18,6 +18,9 @@ use std::time::Duration;
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 
+/// Type alias for trust lookup function
+type TrustLookup = Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync>;
+
 /// Test node with full stack
 struct TestNode {
     _keypair: KeyPair,
@@ -56,7 +59,7 @@ impl TestNode {
         )));
 
         // Create gossip actor with trust lookup
-        let trust_lookup: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync> =
+        let trust_lookup: TrustLookup =
             Arc::new(|_| Some(icn_trust::TrustClass::Partner)); // Allow all peers for testing
         let gossip_handle = Arc::new(RwLock::new(GossipActor::new(
             did.clone(),

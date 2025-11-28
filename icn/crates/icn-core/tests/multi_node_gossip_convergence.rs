@@ -22,6 +22,9 @@ use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{info, warn};
 
+/// Type alias for notification records: (topic, hash, subscriber_did)
+type NotificationList = Vec<(String, [u8; 32], icn_identity::Did)>;
+
 /// Helper to create a test node with notification tracking
 struct TestNode {
     _keypair: KeyPair,
@@ -31,7 +34,7 @@ struct TestNode {
     listen_addr: SocketAddr,
     shutdown_tx: tokio::sync::broadcast::Sender<()>,
     /// Track notifications received: (topic, hash, subscriber_did)
-    notifications: Arc<Mutex<Vec<(String, [u8; 32], icn_identity::Did)>>>,
+    notifications: Arc<Mutex<NotificationList>>,
 }
 
 impl TestNode {
