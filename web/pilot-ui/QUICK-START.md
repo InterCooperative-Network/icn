@@ -201,4 +201,4 @@ Welcome to the community! 🎉
 
 **Questions?** Contact your cooperative administrator or check the FAQ.
 
-**Technical Issues?** Report them at https://github.com/anthropics/icn/issues
+**Technical Issues?** Report them at https://github.com/InterCooperative-Network/icn/issues

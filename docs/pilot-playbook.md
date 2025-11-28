@@ -22,7 +22,7 @@ For the fastest path to a working pilot, use Docker:
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/anthropics/icn.git
+git clone https://github.com/InterCooperative-Network/icn.git
 cd icn/deploy
 
 # Configure environment
@@ -662,7 +662,7 @@ Network:
 
 - Documentation: https://icn.coop/docs
 - Community: https://icn.coop/community
-- Issues: https://github.com/anthropics/icn/issues
+- Issues: https://github.com/InterCooperative-Network/icn/issues
 - Security: security@icn.coop
 
 ---

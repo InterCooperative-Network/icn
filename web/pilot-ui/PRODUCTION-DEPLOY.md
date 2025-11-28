@@ -80,7 +80,7 @@ Choose the deployment method that best fits your infrastructure:
 
 ```bash
 cd /opt
-sudo git clone https://github.com/anthropics/icn.git
+sudo git clone https://github.com/InterCooperative-Network/icn.git
 cd icn/deploy
 ```
 
@@ -183,7 +183,7 @@ docker compose exec icnd icnctl coops create \
 
 ```bash
 cd /opt
-git clone https://github.com/anthropics/icn.git
+git clone https://github.com/InterCooperative-Network/icn.git
 cd icn/icn
 
 # Build release binaries
@@ -839,7 +839,7 @@ cache_size = 10000  # Number of transactions to cache
 - **ICN Documentation**: `/opt/icn/docs/`
 - **Admin Guide**: [ADMIN-GUIDE.md](ADMIN-GUIDE.md)
 - **Operations Guide**: `/opt/icn/docs/operations-guide.md`
-- **GitHub Issues**: https://github.com/anthropics/icn/issues
+- **GitHub Issues**: https://github.com/InterCooperative-Network/icn/issues
 
 ---
 

@@ -34,7 +34,7 @@ INSTALL_SERVICE=true
 CREATE_CONFIG=true
 BUILD_FROM_SOURCE=false
 VERSION="latest"
-REPO_URL="https://github.com/anthropics/icn"
+REPO_URL="https://github.com/InterCooperative-Network/icn"
 
 # Detect OS and architecture
 detect_platform() {

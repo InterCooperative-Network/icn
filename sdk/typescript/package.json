@@ -28,7 +28,7 @@
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anthropics/icn.git",
+    "url": "https://github.com/InterCooperative-Network/icn.git",
     "directory": "sdk/typescript"
   },
   "dependencies": {

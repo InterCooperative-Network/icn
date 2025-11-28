@@ -324,8 +324,8 @@ curl http://localhost:8080/v1/health
 3. Review [Troubleshooting](#common-issues) above
 
 **Still stuck?**
-- Open an issue: https://github.com/anthropics/icn/issues
-- Ask in discussions: https://github.com/anthropics/icn/discussions
+- Open an issue: https://github.com/InterCooperative-Network/icn/issues
+- Ask in discussions: https://github.com/InterCooperative-Network/icn/discussions
 
 **Include in your issue**:
 - Operating system and version

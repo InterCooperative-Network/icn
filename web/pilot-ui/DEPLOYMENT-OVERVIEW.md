@@ -96,7 +96,7 @@ newgrp docker
 ```bash
 # Clone repository
 cd /opt
-git clone https://github.com/anthropics/icn.git
+git clone https://github.com/InterCooperative-Network/icn.git
 cd icn/deploy
 
 # Configure environment
@@ -315,7 +315,7 @@ cd deploy && ./quickstart.sh
 
 ```bash
 # On VPS
-cd /opt && git clone https://github.com/anthropics/icn.git
+cd /opt && git clone https://github.com/InterCooperative-Network/icn.git
 cd icn/deploy && docker compose up -d
 ```
 **Docs**: [deploy/README.md](../../deploy/README.md)
@@ -340,10 +340,10 @@ cat web/pilot-ui/DEPLOYMENT-CHECKLIST.md
 **For deployment issues**:
 1. Check [Troubleshooting](PRODUCTION-DEPLOY.md#troubleshooting)
 2. Review [Deployment Checklist](DEPLOYMENT-CHECKLIST.md)
-3. Open issue: https://github.com/anthropics/icn/issues
+3. Open issue: https://github.com/InterCooperative-Network/icn/issues
 
 **For community support**:
-- Discussions: https://github.com/anthropics/icn/discussions
+- Discussions: https://github.com/InterCooperative-Network/icn/discussions
 - IRC: #icn on libera.chat
 
 ---

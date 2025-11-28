@@ -436,7 +436,7 @@ Health check cycle (every 60 seconds):
 ## Support
 
 For operational questions or issues:
-- GitHub Issues: https://github.com/anthropics/icn/issues
+- GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
 - Development journal: `docs/dev-journal/` (detailed implementation notes)
 - Metrics dashboard: `http://localhost:9090/metrics` (Prometheus)
 

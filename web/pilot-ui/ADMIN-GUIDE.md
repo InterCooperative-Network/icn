@@ -1020,8 +1020,8 @@ Thanks for your patience!
 - [README.md](../../README.md) - Project overview
 
 **Community**:
-- GitHub Issues: https://github.com/anthropics/icn/issues
-- Discussions: https://github.com/anthropics/icn/discussions
+- GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
+- Discussions: https://github.com/InterCooperative-Network/icn/discussions
 
 **Training**:
 - [Quick Start Guide](QUICK-START.md) - For new users

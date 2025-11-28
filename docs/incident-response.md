@@ -680,7 +680,7 @@ curl -f http://localhost:8080/health || exit 1
 ## Emergency Contacts
 
 **ICN Development Team**:
-- GitHub Issues: https://github.com/anthropics/icn/issues
+- GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
 - Email: [TBD]
 
 **Cooperative Contacts**:

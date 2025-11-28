@@ -364,9 +364,9 @@ Based on user feedback priorities:
 - [../../docs/api/openapi.yaml](../../docs/api/openapi.yaml) - REST API spec
 
 ### Project Links
-- GitHub: https://github.com/anthropics/icn
-- Issues: https://github.com/anthropics/icn/issues
-- Discussions: https://github.com/anthropics/icn/discussions
+- GitHub: https://github.com/InterCooperative-Network/icn
+- Issues: https://github.com/InterCooperative-Network/icn/issues
+- Discussions: https://github.com/InterCooperative-Network/icn/discussions
 
 ---
 
@@ -411,8 +411,8 @@ MIT OR Apache-2.0
 ## Contact & Support
 
 **For Pilot Deployment Support**:
-- GitHub Issues: https://github.com/anthropics/icn/issues
-- Project Discussions: https://github.com/anthropics/icn/discussions
+- GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
+- Project Discussions: https://github.com/InterCooperative-Network/icn/discussions
 
 **For Cooperative-Specific Questions**:
 - Contact your cooperative administrator

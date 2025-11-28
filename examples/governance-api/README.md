@@ -331,4 +331,4 @@ sudo apt install jq
 ## Contributing
 
 Found a bug or have a suggestion? Please open an issue at:
-https://github.com/anthropics/icn/issues
+https://github.com/InterCooperative-Network/icn/issues

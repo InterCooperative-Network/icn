@@ -611,7 +611,7 @@ For small pilots, a central database might be simpler. ICN is designed for growt
 
 - **Your cooperative**: Contact your admin or treasurer
 - **Technical issues**: Email your administrator
-- **ICN project**: https://github.com/anthropics/icn/issues
+- **ICN project**: https://github.com/InterCooperative-Network/icn/issues
 
 ### Community
 

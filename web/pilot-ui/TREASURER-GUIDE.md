@@ -577,7 +577,7 @@ A: Most timebanks don't charge fees (violates mutual aid principles). If needed,
 
 **Technical Issues**:
 - Check the [Admin Guide](ADMIN-GUIDE.md) for system administration
-- Report bugs at https://github.com/anthropics/icn/issues
+- Report bugs at https://github.com/InterCooperative-Network/icn/issues
 
 **Economic Questions**:
 - Consult your governance body
