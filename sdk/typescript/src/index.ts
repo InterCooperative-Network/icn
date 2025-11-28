@@ -464,10 +464,24 @@ export class ICNClient {
       ? new Uint8Array(wasmBytes)
       : wasmBytes;
 
-    // Convert to base64
-    const base64 = typeof btoa !== 'undefined'
-      ? btoa(String.fromCharCode(...bytes))
-      : Buffer.from(bytes).toString('base64');
+    // Convert to base64 - handle large arrays that exceed JS argument limits
+    let base64: string;
+    if (typeof Buffer !== 'undefined') {
+      // Node.js environment - use Buffer for efficiency
+      base64 = Buffer.from(bytes).toString('base64');
+    } else if (typeof btoa !== 'undefined') {
+      // Browser environment - process in chunks to avoid call stack limits
+      // String.fromCharCode(...bytes) fails for arrays >65KB due to argument limits
+      const CHUNK_SIZE = 32768; // 32KB chunks - safe for all JS engines
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+        binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+      }
+      base64 = btoa(binary);
+    } else {
+      throw new Error('No base64 encoding method available');
+    }
 
     return this.submitTask({
       ...options,

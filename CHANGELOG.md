@@ -44,21 +44,14 @@ let result = executor.execute(&task, &mut ctx);
 **TypeScript SDK** ([sdk/typescript/src/index.ts](sdk/typescript/src/index.ts)):
 - Added `CodeType` type ("ccl" | "wasm")
 - Updated `SubmitTaskRequest` with `code_type` and `wasm_bytes` fields
-- Added `submitWasmTask()` helper method with automatic base64 encoding
+- Added `submitWasmTask()` helper method with chunked base64 encoding (supports modules up to 5MB)
 
 **Usage**:
 ```typescript
-// WASM task submission (helper method)
+// WASM task submission (recommended - handles large modules)
 const result = await client.submitWasmTask(wasmBytes, {
   fuel_limit: 10000,
   inputs: { x: 42 },
-});
-
-// Or directly with submitTask
-const result = await client.submitTask({
-  code_type: 'wasm',
-  wasm_bytes: btoa(String.fromCharCode(...wasmBytes)),
-  fuel_limit: 10000,
 });
 ```
 
