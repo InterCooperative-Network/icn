@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 struct Node {
-    name: String,
+    _name: String,
     ledger: Ledger,
     gossip: Arc<tokio::sync::RwLock<GossipActor>>,
     _temp_dir: TempDir,
@@ -38,7 +38,7 @@ impl Node {
         ledger.set_gossip(gossip.clone());
 
         Node {
-            name: name.to_string(),
+            _name: name.to_string(),
             ledger,
             gossip,
             _temp_dir: temp_dir,
