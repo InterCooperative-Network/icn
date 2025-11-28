@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - TypeScript SDK Improvements (2025-11-28)
+
+**Test Coverage** ([sdk/typescript/src/index.test.ts](sdk/typescript/src/index.test.ts)):
+- Expanded from 13 to 46 tests (254% increase)
+- Full coverage for all SDK methods:
+  - Authentication: `getChallenge`, `verify`, `authenticate`
+  - Cooperatives: `createCoop`, `getCoop`, `updateCoop`, `deleteCoop`, `listMembers`, `addMember`, `updateMember`, `removeMember`
+  - Ledger: `getBalance`, `pay`, `getHistory`
+  - Governance: `createDomain`, `getDomain`, `listDomains`, `createProposal`, `getProposal`, `listProposals`, `openProposal`, `closeProposal`, `vote`, `getVotes`
+  - Compute: `submitTask`, `submitWasmTask`, `getTaskStatus`, `waitForTask`, `cancelTask`
+  - Health: `health`
+
+**Documentation** ([sdk/typescript/README.md](sdk/typescript/README.md)):
+- Added Compute API section with CCL and WASM examples
+- Added `compute:read` and `compute:write` scopes to scopes table
+- Complete API reference for task submission, status, and cancellation
+
+**Examples** ([sdk/typescript/examples/compute.ts](sdk/typescript/examples/compute.ts)):
+- New compute example demonstrating:
+  - CCL contract task submission
+  - WASM task submission
+  - Task status checking and polling
+  - Task cancellation
+  - Batch task processing with Promise.all
+
 ### Fixed - OpenAPI Schema Validation (2025-11-28)
 
 **SubmitTaskRequest Schema** ([docs/api/openapi.yaml](docs/api/openapi.yaml)):
