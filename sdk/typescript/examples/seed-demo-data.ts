@@ -117,7 +117,11 @@ Environment variables:
     console.log(`  Cooperative "${coopId}" already exists`);
   } catch (e) {
     try {
-      await client.createCoop(coopId, `Demo Timebank - ${coopId}`);
+      await client.createCoop({
+        id: coopId,
+        name: `Demo Timebank - ${coopId}`,
+        settings: { currency: 'hours' },
+      });
       console.log(`  Created cooperative "${coopId}"`);
     } catch (createError: any) {
       if (createError.message?.includes('already exists')) {
@@ -134,11 +138,14 @@ Environment variables:
 
   for (const member of DEMO_MEMBERS) {
     try {
-      await client.addMember(coopId, member.did, member.role as 'owner' | 'admin' | 'member');
+      await client.addMember(coopId, {
+        did: member.did,
+        role: member.role as 'owner' | 'admin' | 'member',
+      });
       console.log(`  Added ${member.name} (${member.role})`);
       memberDids[member.name.toLowerCase()] = member.did;
     } catch (e: any) {
-      if (e.message?.includes('already') || e.status === 409) {
+      if (e.message?.includes('already') || e.statusCode === 409) {
         console.log(`  ${member.name} already exists`);
         memberDids[member.name.toLowerCase()] = member.did;
       } else {
@@ -163,7 +170,13 @@ Environment variables:
     try {
       // Note: In a real system, this would need to be signed by the payer
       // For demo purposes, we're using the admin token to create transactions
-      await client.createPayment(coopId, fromDid, toDid, tx.amount, tx.memo);
+      await client.pay(coopId, {
+        from: fromDid,
+        to: toDid,
+        amount: tx.amount,
+        currency: 'hours',
+        memo: tx.memo,
+      });
       console.log(`  ${tx.from} -> ${tx.to}: ${tx.amount}h (${tx.memo.substring(0, 30)}...)`);
       txCount++;
     } catch (e: any) {
@@ -185,7 +198,7 @@ Environment variables:
     });
     console.log(`  Created governance domain "${domainId}"`);
   } catch (e: any) {
-    if (e.message?.includes('already exists') || e.status === 409) {
+    if (e.message?.includes('already exists') || e.statusCode === 409) {
       console.log(`  Governance domain "${domainId}" already exists`);
     } else {
       console.error(`  Failed to create governance domain: ${e.message}`);
