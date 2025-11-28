@@ -1321,11 +1321,6 @@ components:
     # Compute Schemas
     # ============================================
 
-    CodeType:
-      type: string
-      enum: [ccl, wasm]
-      description: Code type for compute tasks
-
     # Base properties shared by all task submissions
     SubmitTaskRequestBase:
       type: object
@@ -1355,17 +1350,16 @@ components:
           type: string
           description: Payment currency (default credits)
 
-    # CCL task submission (code_type: ccl or omitted)
+    # CCL task submission (code_type: ccl)
     CclTaskRequest:
       allOf:
         - $ref: '#/components/schemas/SubmitTaskRequestBase'
         - type: object
-          required: [code]
+          required: [code_type, code]
           properties:
             code_type:
               type: string
               enum: [ccl]
-              default: ccl
             code:
               type: string
               description: CCL contract JSON
