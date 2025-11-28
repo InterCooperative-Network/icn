@@ -344,10 +344,15 @@ export interface paths {
         put?: never;
         /**
          * Submit a compute task
-         * @description Submit a CCL (Cooperative Contract Language) contract for distributed execution.
+         * @description Submit a compute task for distributed execution. Supports two code types:
+         *
+         *     - **CCL** (default): Submit a CCL (Cooperative Contract Language) contract as JSON
+         *     - **WASM**: Submit a WebAssembly module as base64-encoded bytes
          *
          *     The task is broadcast to the network where trusted executors can claim and run it.
          *     Payment is automatically settled based on fuel consumed.
+         *
+         *     **Priority levels**: low, normal (default), high, critical
          */
         post: operations["submitComputeTask"];
         delete?: never;
@@ -607,11 +612,9 @@ export interface components {
             total_votes?: number;
             quorum_reached?: boolean;
         };
-        SubmitTaskRequest: {
+        SubmitTaskRequestBase: {
             /** @description Optional task ID (auto-generated if not provided) */
             task_id?: string;
-            /** @description CCL contract JSON */
-            code: string;
             /** @description Input arguments (JSON) */
             inputs?: Record<string, never>;
             /**
@@ -619,6 +622,12 @@ export interface components {
              * @default 10000
              */
             fuel_limit: number;
+            /**
+             * @description Task priority (default normal)
+             * @default normal
+             * @enum {string}
+             */
+            priority: "low" | "normal" | "high" | "critical";
             /** @description Deadline in milliseconds from now (optional) */
             deadline_ms?: number;
             /** @description Payment rate per 1000 fuel (optional) */
@@ -626,6 +635,45 @@ export interface components {
             /** @description Payment currency (default credits) */
             payment_currency?: string;
         };
+        CclTaskRequest: components["schemas"]["SubmitTaskRequestBase"] & {
+            /**
+             * @description Code type (optional, defaults to "ccl" if omitted)
+             * @default ccl
+             * @enum {string}
+             */
+            code_type: "ccl";
+            /** @description CCL contract JSON */
+            code: string;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code_type: "ccl";
+        };
+        WasmTaskRequest: components["schemas"]["SubmitTaskRequestBase"] & {
+            /** @enum {string} */
+            code_type: "wasm";
+            /**
+             * Format: byte
+             * @description Base64-encoded WASM bytecode
+             */
+            wasm_bytes: string;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code_type: "wasm";
+        };
+        /**
+         * @description Submit a compute task. Two types are supported:
+         *     - CCL (default): Provide `code` field with CCL contract JSON
+         *     - WASM: Set `code_type: wasm` and provide `wasm_bytes` with base64-encoded WASM
+         *
+         *     For backward compatibility, requests without `code_type` are treated as CCL.
+         */
+        SubmitTaskRequest: components["schemas"]["CclTaskRequest"] | components["schemas"]["WasmTaskRequest"];
         SubmitTaskResponse: {
             task_id?: string;
             /** @description 64-character hex hash */
@@ -1472,13 +1520,6 @@ export interface operations {
         };
         requestBody: {
             content: {
-                /**
-                 * @example {
-                 *       "code": "{\"name\":\"SimpleReturn\",\"participants\":[\"did:icn:alice\"],\"rules\":[{\"name\":\"run\",\"body\":[{\"Return\":{\"value\":{\"Literal\":{\"Int\":42}}}}]}]}",
-                 *       "fuel_limit": 10000,
-                 *       "payment_rate": 100
-                 *     }
-                 */
                 "application/json": components["schemas"]["SubmitTaskRequest"];
             };
         };

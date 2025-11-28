@@ -1350,16 +1350,19 @@ components:
           type: string
           description: Payment currency (default credits)
 
-    # CCL task submission (code_type: ccl)
+    # CCL task submission (code_type: ccl or omitted)
+    # Note: Server accepts requests without code_type, defaulting to "ccl"
     CclTaskRequest:
       allOf:
         - $ref: '#/components/schemas/SubmitTaskRequestBase'
         - type: object
-          required: [code_type, code]
+          required: [code]
           properties:
             code_type:
               type: string
               enum: [ccl]
+              default: ccl
+              description: Code type (optional, defaults to "ccl" if omitted)
             code:
               type: string
               description: CCL contract JSON
@@ -1380,7 +1383,16 @@ components:
               description: Base64-encoded WASM bytecode
 
     # Union type: either CCL or WASM task
+    # Discrimination logic:
+    # - If code_type is "wasm" → WasmTaskRequest (wasm_bytes required)
+    # - If code_type is "ccl" or omitted → CclTaskRequest (code required)
     SubmitTaskRequest:
+      description: |
+        Submit a compute task. Two types are supported:
+        - CCL (default): Provide `code` field with CCL contract JSON
+        - WASM: Set `code_type: wasm` and provide `wasm_bytes` with base64-encoded WASM
+
+        For backward compatibility, requests without `code_type` are treated as CCL.
       oneOf:
         - $ref: '#/components/schemas/CclTaskRequest'
         - $ref: '#/components/schemas/WasmTaskRequest'
