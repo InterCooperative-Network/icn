@@ -346,7 +346,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // TODO: Fix DID certificate verification for QUIC handshake
     async fn test_dial_and_accept() {
         setup();
 

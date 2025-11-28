@@ -1945,7 +1945,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[ignore] // Requires network interfaces
     async fn test_network_actor_start() {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 

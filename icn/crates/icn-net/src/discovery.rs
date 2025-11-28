@@ -274,7 +274,6 @@ mod tests {
     use icn_identity::KeyPair;
 
     #[tokio::test]
-    #[ignore] // Requires network interfaces
     async fn test_discovery_start_stop() {
         let mut discovery = Discovery::new();
         let keypair = KeyPair::generate().unwrap();
