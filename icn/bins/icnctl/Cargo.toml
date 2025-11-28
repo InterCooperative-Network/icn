@@ -21,6 +21,7 @@ rpassword = "7.3"
 dirs = "5.0"
 sha2 = "0.10"
 hex = "0.4"
+base64 = "0.22"
 rand.workspace = true
 x25519-dalek.workspace = true
 tar = "0.4"

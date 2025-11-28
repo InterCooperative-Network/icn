@@ -22,11 +22,11 @@ use icn_net::NetworkHandle;
 
 use crate::receipt::ReceiptStore;
 use crate::types::{
-    CastVoteRequest, CloseProposalRequest, ContractExecutionResponse, CreateDomainRequest,
-    CreateProposalRequest, CreateProposalResponse, GovernanceDomainInfo, GovernanceParamsInfo,
-    LedgerAccountDelta, LedgerBalance, LedgerEntry, MembershipConfigInfo, NetworkStats,
-    NetworkStatus, OpenProposalRequest, PeerInfo, ProposalInfo, ProposalPayloadInfo, RpcRequest,
-    RpcResponse, SubmitTaskRequest, SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
+    CastVoteRequest, CloseProposalRequest, CodeType, ContractExecutionResponse,
+    CreateDomainRequest, CreateProposalRequest, CreateProposalResponse, GovernanceDomainInfo,
+    GovernanceParamsInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, MembershipConfigInfo,
+    NetworkStats, NetworkStatus, OpenProposalRequest, PeerInfo, ProposalInfo, ProposalPayloadInfo,
+    RpcRequest, RpcResponse, SubmitTaskRequest, SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
 };
 
 use icn_gossip::GossipActor;
@@ -1579,6 +1579,8 @@ async fn handle_compute_submit(
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
 ) -> RpcResponse {
+    use base64::Engine;
+
     let compute_handle = match &state.compute_handle {
         Some(handle) => handle,
         None => {
@@ -1609,14 +1611,56 @@ async fn handle_compute_submit(
         _ => icn_compute::TaskPriority::Normal, // Default to normal for invalid values
     };
 
+    // Build TaskCode based on code_type
+    let (task_code, required_capabilities) = match request.code_type {
+        CodeType::Ccl => {
+            let code = match request.code {
+                Some(c) => c,
+                None => {
+                    return RpcResponse::error(
+                        id,
+                        -32602,
+                        "Missing 'code' field for CCL task".to_string(),
+                    );
+                }
+            };
+            (
+                icn_compute::TaskCode::Ccl(code),
+                vec![icn_compute::ExecutorCapability::Ccl],
+            )
+        }
+        CodeType::Wasm => {
+            let wasm_b64 = match &request.wasm_bytes {
+                Some(b) => b,
+                None => {
+                    return RpcResponse::error(
+                        id,
+                        -32602,
+                        "Missing 'wasm_bytes' field for WASM task".to_string(),
+                    );
+                }
+            };
+            let wasm_bytes = match base64::engine::general_purpose::STANDARD.decode(wasm_b64) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    return RpcResponse::error(id, -32602, format!("Invalid base64: {e}"));
+                }
+            };
+            (
+                icn_compute::TaskCode::WasmInline(wasm_bytes),
+                vec![icn_compute::ExecutorCapability::Wasm],
+            )
+        }
+    };
+
     let task = icn_compute::ComputeTask {
         id: request.task_id,
         submitter: "rpc:unknown".to_string(), // TODO: Get from auth context
         coop_id: None,                        // TODO: Get from auth context or request
-        code: icn_compute::TaskCode::Ccl(request.code),
+        code: task_code,
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
-        required_capabilities: vec![icn_compute::ExecutorCapability::Ccl],
+        required_capabilities,
         priority,
         created_at: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

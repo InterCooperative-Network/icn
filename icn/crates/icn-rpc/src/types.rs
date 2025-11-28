@@ -225,11 +225,30 @@ pub struct CloseProposalRequest {
 
 // Compute task types
 
+/// Code type for compute tasks
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CodeType {
+    /// CCL contract (default)
+    #[default]
+    Ccl,
+    /// WebAssembly module
+    Wasm,
+}
+
 /// Request to submit a compute task
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmitTaskRequest {
     pub task_id: String,
-    pub code: String, // CCL JSON
+    /// CCL contract JSON (for code_type: ccl)
+    #[serde(default)]
+    pub code: Option<String>,
+    /// WASM bytecode as base64 (for code_type: wasm)
+    #[serde(default)]
+    pub wasm_bytes: Option<String>,
+    /// Code type: "ccl" (default) or "wasm"
+    #[serde(default)]
+    pub code_type: CodeType,
     #[serde(default)]
     pub inputs: serde_json::Value,
     #[serde(default = "default_fuel_limit")]

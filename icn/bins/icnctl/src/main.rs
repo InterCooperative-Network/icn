@@ -194,6 +194,37 @@ enum ComputeCommands {
         payment_currency: Option<String>,
     },
 
+    /// Submit a WebAssembly module for distributed execution
+    SubmitWasm {
+        /// Path to WASM binary file (.wasm)
+        #[arg(short, long)]
+        wasm: PathBuf,
+
+        /// Task ID (auto-generated if not provided)
+        #[arg(short, long)]
+        id: Option<String>,
+
+        /// Fuel limit (default 10000)
+        #[arg(short, long, default_value = "10000")]
+        fuel: u64,
+
+        /// Task priority: low, normal, high, or critical (default: normal)
+        #[arg(short = 'P', long, default_value = "normal")]
+        priority: String,
+
+        /// Path to inputs JSON file
+        #[arg(long)]
+        inputs: Option<PathBuf>,
+
+        /// Payment rate per 1000 fuel (optional)
+        #[arg(short, long)]
+        payment_rate: Option<u64>,
+
+        /// Payment currency (default: credits)
+        #[arg(long)]
+        payment_currency: Option<String>,
+    },
+
     /// Check task status
     Status {
         /// Task hash (hex)
@@ -4487,6 +4518,61 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
             println!("Task submitted successfully!");
             println!("Task ID:   {task_id}");
             println!("Task hash: {task_hash}");
+            println!();
+            println!("Check status with:");
+            println!("  icnctl compute status {task_hash}");
+        }
+
+        ComputeCommands::SubmitWasm {
+            wasm,
+            id,
+            fuel,
+            priority,
+            inputs,
+            payment_rate,
+            payment_currency,
+        } => {
+            use base64::Engine;
+
+            // Read WASM binary
+            let wasm_bytes = std::fs::read(&wasm)
+                .with_context(|| format!("Failed to read WASM file: {wasm:?}"))?;
+
+            // Encode as base64
+            let wasm_b64 = base64::engine::general_purpose::STANDARD.encode(&wasm_bytes);
+
+            // Read inputs if provided
+            let inputs_value: serde_json::Value = if let Some(inputs_path) = inputs {
+                let inputs_json = std::fs::read_to_string(&inputs_path)
+                    .with_context(|| format!("Failed to read inputs file: {inputs_path:?}"))?;
+                serde_json::from_str(&inputs_json)?
+            } else {
+                serde_json::Value::Null
+            };
+
+            let task_id = id.unwrap_or_else(|| format!("task-{}", uuid::Uuid::new_v4()));
+
+            let params = serde_json::json!({
+                "task_id": task_id,
+                "code_type": "wasm",
+                "wasm_bytes": wasm_b64,
+                "inputs": inputs_value,
+                "fuel_limit": fuel,
+                "priority": priority,
+                "payment_rate": payment_rate,
+                "payment_currency": payment_currency,
+            });
+
+            let result = rpc_call(endpoint, "compute.submit", params)?;
+
+            let task_hash = result
+                .get("task_hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            println!("WASM task submitted successfully!");
+            println!("Task ID:   {task_id}");
+            println!("Task hash: {task_hash}");
+            println!("WASM size: {} bytes", wasm_bytes.len());
             println!();
             println!("Check status with:");
             println!("  icnctl compute status {task_hash}");
