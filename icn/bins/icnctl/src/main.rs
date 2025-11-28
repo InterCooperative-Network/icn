@@ -886,9 +886,7 @@ async fn main() -> Result<()> {
 
     match args.command {
         Commands::Status => {
-            println!("ICNd Status: Not implemented yet");
-            println!("Data directory: {}", data_dir.display());
-            // TODO: Connect to daemon via RPC and get status
+            handle_status_command(&data_dir, &args.endpoint).await?;
         }
 
         Commands::Id(id_cmd) => handle_id_command(id_cmd, &data_dir)?,
@@ -1662,6 +1660,102 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &Path) -> Result<()> {
 
             println!("✓ Removed trust edge to {target_did}");
         }
+    }
+
+    Ok(())
+}
+
+/// Handle icnctl status command - show daemon status
+async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Result<()> {
+    println!("ICN Node Status");
+    println!("{}", "=".repeat(60));
+    println!();
+
+    // Show local configuration
+    println!("Local Configuration:");
+    println!("  Data directory: {}", data_dir.display());
+    println!("  RPC endpoint:   {}", endpoint);
+    println!();
+
+    // Try to connect to daemon
+    let rpc_addr: std::net::SocketAddr = match endpoint.parse() {
+        Ok(addr) => addr,
+        Err(e) => {
+            println!("Daemon Connection: FAILED");
+            println!("  Invalid endpoint: {}", e);
+            return Ok(());
+        }
+    };
+
+    let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+    // Get daemon status
+    match client.get_status().await {
+        Ok(status) => {
+            println!("Daemon Status:");
+            println!("  Running:      {}", if status.running { "YES" } else { "NO" });
+            println!("  Listen addr:  {}", status.listen_addr);
+        }
+        Err(e) => {
+            println!("Daemon Status: NOT CONNECTED");
+            println!("  Error: {}", e);
+            println!();
+            println!("Is the ICN daemon running? Start it with:");
+            println!("  icnd");
+            return Ok(());
+        }
+    }
+    println!();
+
+    // Get network stats
+    match client.get_stats().await {
+        Ok(stats) => {
+            println!("Network Statistics:");
+            println!("  Peers discovered:    {}", stats.peers_discovered);
+            println!("  Active connections:  {}", stats.connections_active);
+            println!("  Total connections:   {}", stats.connections_total);
+        }
+        Err(e) => {
+            println!("Network Statistics: unavailable ({})", e);
+        }
+    }
+    println!();
+
+    // Get peers
+    match client.get_peers().await {
+        Ok(peers) => {
+            if peers.is_empty() {
+                println!("Connected Peers: none");
+                println!("  Tip: Other nodes will be discovered via mDNS automatically.");
+            } else {
+                println!("Connected Peers ({}):", peers.len());
+                for peer in peers.iter().take(5) {
+                    let did_short = if peer.did.len() > 20 {
+                        format!("{}...", &peer.did[..20])
+                    } else {
+                        peer.did.clone()
+                    };
+                    println!("  - {} @ {}", did_short, peer.addr);
+                }
+                if peers.len() > 5 {
+                    println!("  ... and {} more (use 'icnctl network peers' for full list)", peers.len() - 5);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Connected Peers: unavailable ({})", e);
+        }
+    }
+    println!();
+
+    // Check for identity
+    let keystore_path = data_dir.join("identity.age");
+    if keystore_path.exists() {
+        println!("Identity: configured");
+        println!("  Keystore: {}", keystore_path.display());
+    } else {
+        println!("Identity: NOT CONFIGURED");
+        println!("  Run 'icnctl id init' to create an identity.");
     }
 
     Ok(())

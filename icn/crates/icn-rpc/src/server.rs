@@ -1,4 +1,14 @@
 //! JSON-RPC server for daemon communication
+//!
+//! ## Authentication
+//!
+//! The RPC server supports JWT-based authentication. When authentication is enabled:
+//! 1. Clients must first call `auth.challenge` to get a nonce
+//! 2. Sign the nonce with their DID keypair
+//! 3. Call `auth.verify` to exchange the signature for a JWT token
+//! 4. Include the token in the `Authorization: Bearer <token>` header
+//!
+//! Methods are protected based on their scope requirements (see `auth::required_scope_for_method`).
 
 use anyhow::Result;
 use http_body_util::{BodyExt, Full};
@@ -17,9 +27,11 @@ use tracing::{debug, error, info, warn};
 use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_governance::{GovernanceOps, MembershipAction};
+use icn_identity::Did;
 use icn_ledger::Ledger;
 use icn_net::NetworkHandle;
 
+use crate::auth::{required_scope_for_method, RpcAuthManager, RpcTokenClaims};
 use crate::receipt::ReceiptStore;
 use crate::types::{
     CastVoteRequest, CloseProposalRequest, CodeType, ContractExecutionResponse,
@@ -40,11 +52,12 @@ pub struct RpcServer {
     governance_handle: Option<Box<dyn GovernanceOps>>,
     compute_handle: Option<ComputeHandle>,
     receipt_store: Arc<ReceiptStore>,
+    auth_manager: Option<Arc<RpcAuthManager>>,
     listen_addr: SocketAddr,
 }
 
 impl RpcServer {
-    /// Create a new RPC server
+    /// Create a new RPC server (without authentication - for backward compatibility/dev mode)
     pub fn new(listen_addr: SocketAddr) -> Self {
         RpcServer {
             network_handle: None,
@@ -54,8 +67,41 @@ impl RpcServer {
             governance_handle: None,
             compute_handle: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
+            auth_manager: None,
             listen_addr,
         }
+    }
+
+    /// Create a new RPC server with authentication enabled
+    ///
+    /// # Arguments
+    /// * `listen_addr` - Address to bind the server
+    /// * `jwt_secret` - Secret for signing JWT tokens (should be at least 32 bytes)
+    pub fn new_with_auth(listen_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
+        RpcServer {
+            network_handle: None,
+            ledger_handle: None,
+            contract_runtime: None,
+            gossip_handle: None,
+            governance_handle: None,
+            compute_handle: None,
+            receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)),
+            auth_manager: Some(Arc::new(RpcAuthManager::new(jwt_secret, true))),
+            listen_addr,
+        }
+    }
+
+    /// Set the authentication manager (for configuring after construction)
+    pub fn set_auth_manager(&mut self, jwt_secret: Vec<u8>) {
+        self.auth_manager = Some(Arc::new(RpcAuthManager::new(jwt_secret, true)));
+    }
+
+    /// Check if authentication is enabled
+    pub fn auth_enabled(&self) -> bool {
+        self.auth_manager
+            .as_ref()
+            .map(|m| m.is_enabled())
+            .unwrap_or(false)
     }
 
     /// Set the network handle (called after NetworkActor spawns)
@@ -125,11 +171,23 @@ impl RpcServer {
     }
 }
 
+/// Extract Bearer token from Authorization header
+fn extract_bearer_token(req: &Request<Incoming>) -> Option<String> {
+    req.headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(|s| s.to_string())
+}
+
 /// Handle a single HTTP request
 async fn handle_request(
     req: Request<Incoming>,
     state: Arc<RpcServer>,
 ) -> Result<Response<Full<Bytes>>, hyper::Error> {
+    // Extract Bearer token before consuming request body
+    let bearer_token = extract_bearer_token(&req);
+
     // Parse JSON-RPC request
     let whole_body = req.collect().await?.to_bytes();
 
@@ -144,19 +202,82 @@ async fn handle_request(
 
     debug!("RPC request: {:?}", rpc_request);
 
-    // Dispatch to handler
-    let response = dispatch_request(&rpc_request, &state).await;
+    // Check authentication if enabled
+    let claims: Option<RpcTokenClaims> = if let Some(auth_manager) = &state.auth_manager {
+        // Check if this method requires authentication
+        if let Some(required_scope) = required_scope_for_method(&rpc_request.method) {
+            // Method requires auth - verify token
+            match bearer_token {
+                Some(token) => match auth_manager.verify_token(&token) {
+                    Ok(claims) => {
+                        // Check scope
+                        if !claims.has_scope(required_scope) {
+                            warn!(
+                                "Insufficient scope for method {}: required {}, has {:?}",
+                                rpc_request.method, required_scope, claims.scopes
+                            );
+                            let response = RpcResponse::error(
+                                rpc_request.id,
+                                -32403,
+                                format!("Insufficient scope: requires {}", required_scope),
+                            );
+                            return Ok(json_response(StatusCode::OK, &response));
+                        }
+                        Some(claims)
+                    }
+                    Err(e) => {
+                        warn!("Token verification failed: {}", e);
+                        let response = RpcResponse::error(
+                            rpc_request.id,
+                            -32401,
+                            "Authentication failed: invalid token".to_string(),
+                        );
+                        return Ok(json_response(StatusCode::OK, &response));
+                    }
+                },
+                None => {
+                    warn!("Missing Authorization header for method {}", rpc_request.method);
+                    let response = RpcResponse::error(
+                        rpc_request.id,
+                        -32401,
+                        "Authentication required: include Authorization: Bearer <token>".to_string(),
+                    );
+                    return Ok(json_response(StatusCode::OK, &response));
+                }
+            }
+        } else {
+            // Method doesn't require auth (e.g., auth.challenge)
+            None
+        }
+    } else {
+        // Auth not enabled - allow all (backward compatibility / dev mode)
+        None
+    };
+
+    // Dispatch to handler with claims
+    let response = dispatch_request(&rpc_request, &state, claims.as_ref()).await;
 
     Ok(json_response(StatusCode::OK, &response))
 }
 
 /// Dispatch RPC request to appropriate handler
-async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcResponse {
+async fn dispatch_request(
+    req: &RpcRequest,
+    state: &Arc<RpcServer>,
+    claims: Option<&RpcTokenClaims>,
+) -> RpcResponse {
     match req.method.as_str() {
+        // Authentication methods (no auth required - bootstrap)
+        "auth.challenge" => handle_auth_challenge(req.id, &req.params, state).await,
+        "auth.verify" => handle_auth_verify(req.id, &req.params, state).await,
+
+        // Network methods
         "network.peers" => handle_network_peers(req.id, state).await,
         "network.dial" => handle_network_dial(req.id, &req.params, state).await,
         "network.stats" => handle_network_stats(req.id, state).await,
         "network.status" => handle_network_status(req.id, state).await,
+
+        // Ledger methods
         "ledger.head" => handle_ledger_head(req.id, state).await,
         "ledger.balance" => handle_ledger_balance(req.id, &req.params, state).await,
         "ledger.history" => handle_ledger_history(req.id, &req.params, state).await,
@@ -165,10 +286,14 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         "ledger.quarantine.release" => handle_quarantine_release(req.id, &req.params, state).await,
         "ledger.quarantine.drop" => handle_quarantine_drop(req.id, &req.params, state).await,
         "ledger.quarantine.purge" => handle_quarantine_purge(req.id, state).await,
+
+        // Contract methods
         "contract.deploy" => handle_contract_deploy(req.id, &req.params, state).await,
         "contract.call" => handle_contract_call(req.id, &req.params, state).await,
         "contract.list" => handle_contract_list(req.id, &req.params, state).await,
         "receipt.get" => handle_receipt_get(req.id, &req.params, state).await,
+
+        // Governance methods
         "governance.domain.list" => handle_governance_domain_list(req.id, state).await,
         "governance.domain.get" => handle_governance_domain_get(req.id, &req.params, state).await,
         "governance.domain.create" => {
@@ -188,9 +313,13 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
             handle_governance_proposal_close(req.id, &req.params, state).await
         }
         "governance.vote.cast" => handle_governance_vote_cast(req.id, &req.params, state).await,
-        "compute.submit" => handle_compute_submit(req.id, &req.params, state).await,
+
+        // Compute methods (pass claims for authenticated submitter)
+        "compute.submit" => handle_compute_submit(req.id, &req.params, state, claims).await,
         "compute.status" => handle_compute_status(req.id, &req.params, state).await,
-        "compute.cancel" => handle_compute_cancel(req.id, &req.params, state).await,
+        "compute.cancel" => handle_compute_cancel(req.id, &req.params, state, claims).await,
+
+        // Policy methods
         "policy.set" => handle_policy_set(req.id, &req.params, state).await,
         "policy.get" => handle_policy_get(req.id, &req.params, state).await,
         "policy.list" => handle_policy_list(req.id, &req.params, state).await,
@@ -200,6 +329,125 @@ async fn dispatch_request(req: &RpcRequest, state: &Arc<RpcServer>) -> RpcRespon
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
+
+// ============================================================================
+// Authentication handlers
+// ============================================================================
+
+/// Handle auth.challenge RPC call - get a challenge nonce for DID authentication
+async fn handle_auth_challenge(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let auth_manager = match &state.auth_manager {
+        Some(am) => am,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Authentication not enabled on this server".to_string(),
+            );
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct ChallengeParams {
+        did: String,
+    }
+
+    let params: ChallengeParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Parse DID
+    let did = match Did::from_str(&params.did) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid DID format: {e}"));
+        }
+    };
+
+    // Create challenge
+    match auth_manager.create_challenge(&did) {
+        Ok(nonce) => {
+            let response = serde_json::json!({
+                "nonce": nonce,
+                "expires_in_seconds": 300
+            });
+            RpcResponse::success(id, response)
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create challenge: {e}")),
+    }
+}
+
+/// Handle auth.verify RPC call - verify signed challenge and get JWT token
+async fn handle_auth_verify(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let auth_manager = match &state.auth_manager {
+        Some(am) => am,
+        None => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                "Authentication not enabled on this server".to_string(),
+            );
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct VerifyParams {
+        did: String,
+        signature: String, // hex-encoded
+        scopes: Vec<String>,
+    }
+
+    let params: VerifyParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Parse DID
+    let did = match Did::from_str(&params.did) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid DID format: {e}"));
+        }
+    };
+
+    // Parse signature
+    let signature_bytes = match hex::decode(&params.signature) {
+        Ok(b) => b,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid signature encoding: {e}"));
+        }
+    };
+
+    // Verify challenge and issue token
+    match auth_manager.verify_challenge(&did, &signature_bytes, params.scopes) {
+        Ok(token) => {
+            let response = serde_json::json!({
+                "token": token,
+                "token_type": "Bearer",
+                "expires_in_seconds": 86400
+            });
+            RpcResponse::success(id, response)
+        }
+        Err(e) => RpcResponse::error(id, -32401, format!("Authentication failed: {e}")),
+    }
+}
+
+// ============================================================================
+// Network handlers
+// ============================================================================
 
 /// Handle network.peers RPC call
 async fn handle_network_peers(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
@@ -1578,6 +1826,7 @@ async fn handle_compute_submit(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    claims: Option<&RpcTokenClaims>,
 ) -> RpcResponse {
     use base64::Engine;
 
@@ -1594,6 +1843,11 @@ async fn handle_compute_submit(
             return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
+
+    // Get authenticated submitter DID (or fallback for unauthenticated dev mode)
+    let submitter = claims
+        .map(|c| c.sub.clone())
+        .unwrap_or_else(|| "rpc:anonymous".to_string());
 
     // Build compute task
     let inputs = if request.inputs.is_null() {
@@ -1655,8 +1909,8 @@ async fn handle_compute_submit(
 
     let task = icn_compute::ComputeTask {
         id: request.task_id,
-        submitter: "rpc:unknown".to_string(), // TODO: Get from auth context
-        coop_id: None,                        // TODO: Get from auth context or request
+        submitter, // Authenticated DID from JWT claims
+        coop_id: None, // TODO: Allow from request or derive from claims
         code: task_code,
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
@@ -1802,6 +2056,7 @@ async fn handle_compute_cancel(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    claims: Option<&RpcTokenClaims>,
 ) -> RpcResponse {
     let compute_handle = match &state.compute_handle {
         Some(handle) => handle,
@@ -1843,7 +2098,11 @@ async fn handle_compute_cancel(
     let reason = params
         .reason
         .unwrap_or_else(|| "Cancelled by submitter".to_string());
-    let caller_did = "rpc:unknown"; // TODO: Get from auth context
+
+    // Get authenticated caller DID (or fallback for unauthenticated dev mode)
+    let caller_did = claims
+        .map(|c| c.sub.as_str())
+        .unwrap_or("rpc:anonymous");
 
     match compute_handle
         .cancel_task(&hash_bytes, caller_did, reason)
