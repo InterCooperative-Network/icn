@@ -1325,23 +1325,14 @@ components:
       type: string
       enum: [ccl, wasm]
       description: Code type for compute tasks
-      default: ccl
 
-    SubmitTaskRequest:
+    # Base properties shared by all task submissions
+    SubmitTaskRequestBase:
       type: object
       properties:
         task_id:
           type: string
           description: Optional task ID (auto-generated if not provided)
-        code:
-          type: string
-          description: CCL contract JSON (required if code_type is "ccl")
-        wasm_bytes:
-          type: string
-          format: byte
-          description: Base64-encoded WASM bytecode (required if code_type is "wasm")
-        code_type:
-          $ref: '#/components/schemas/CodeType'
         inputs:
           type: object
           description: Input arguments (JSON)
@@ -1363,6 +1354,47 @@ components:
         payment_currency:
           type: string
           description: Payment currency (default credits)
+
+    # CCL task submission (code_type: ccl or omitted)
+    CclTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/SubmitTaskRequestBase'
+        - type: object
+          required: [code]
+          properties:
+            code_type:
+              type: string
+              enum: [ccl]
+              default: ccl
+            code:
+              type: string
+              description: CCL contract JSON
+
+    # WASM task submission (code_type: wasm)
+    WasmTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/SubmitTaskRequestBase'
+        - type: object
+          required: [code_type, wasm_bytes]
+          properties:
+            code_type:
+              type: string
+              enum: [wasm]
+            wasm_bytes:
+              type: string
+              format: byte
+              description: Base64-encoded WASM bytecode
+
+    # Union type: either CCL or WASM task
+    SubmitTaskRequest:
+      oneOf:
+        - $ref: '#/components/schemas/CclTaskRequest'
+        - $ref: '#/components/schemas/WasmTaskRequest'
+      discriminator:
+        propertyName: code_type
+        mapping:
+          ccl: '#/components/schemas/CclTaskRequest'
+          wasm: '#/components/schemas/WasmTaskRequest'
 
     SubmitTaskResponse:
       type: object
