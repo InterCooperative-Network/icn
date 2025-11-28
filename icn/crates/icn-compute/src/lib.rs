@@ -93,9 +93,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_topics_defined() {
-        assert!(!TOPIC_SUBMIT.is_empty());
-        assert!(!TOPIC_CLAIM.is_empty());
-        assert!(!TOPIC_RESULT.is_empty());
+    fn test_topics_have_correct_prefix() {
+        // Verify topics follow the expected naming convention
+        assert!(TOPIC_SUBMIT.starts_with("compute:"));
+        assert!(TOPIC_CLAIM.starts_with("compute:"));
+        assert!(TOPIC_RESULT.starts_with("compute:"));
     }
 }

@@ -16,8 +16,8 @@ use tokio::sync::RwLock;
 
 #[tokio::test]
 async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
-    // Initialize metrics
-    icn_obs::init_metrics();
+    // Initialize metrics (ignore result - may already be initialized)
+    let _ = icn_obs::init_metrics();
 
     // Create test identities
     let alice = KeyPair::generate()?.did().clone();

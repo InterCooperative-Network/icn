@@ -571,11 +571,12 @@ mod tests {
         assert!(validate_domain_members(&too_many).is_err()); // Too many
 
         // Duplicate detection
-        assert!(validate_domain_members(&vec![
+        let members_with_dup = vec![
             "did:icn:alice".to_string(),
             "did:icn:bob".to_string(),
-            "did:icn:alice".to_string() // Duplicate!
-        ]).is_err());
+            "did:icn:alice".to_string(), // Duplicate!
+        ];
+        assert!(validate_domain_members(&members_with_dup).is_err());
     }
 
     #[test]
