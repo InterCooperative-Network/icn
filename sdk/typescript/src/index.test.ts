@@ -203,3 +203,436 @@ describe('large WASM handling', () => {
     expect(body.wasm_bytes.length).toBeGreaterThan(90000);
   });
 });
+
+describe('cooperative operations', () => {
+  it('should create cooperative with correct request', async () => {
+    const mockResponse = {
+      id: 'test-coop',
+      name: 'Test Cooperative',
+      owner: 'did:icn:alice',
+      members: [],
+      created_at: '2024-01-01T00:00:00Z',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.createCoop({
+      id: 'test-coop',
+      name: 'Test Cooperative',
+    });
+
+    expect(result).toEqual(mockResponse);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/coops');
+    expect(options.method).toBe('POST');
+    expect(options.headers['Authorization']).toBe('Bearer test-token');
+
+    const body = JSON.parse(options.body);
+    expect(body.id).toBe('test-coop');
+    expect(body.name).toBe('Test Cooperative');
+  });
+
+  it('should get cooperative by ID', async () => {
+    const mockResponse = {
+      id: 'test-coop',
+      name: 'Test Cooperative',
+      owner: 'did:icn:alice',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getCoop('test-coop');
+
+    expect(result).toEqual(mockResponse);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/coops/test-coop');
+  });
+
+  it('should list members', async () => {
+    const mockResponse = [
+      { did: 'did:icn:alice', role: 'owner' },
+      { did: 'did:icn:bob', role: 'member' },
+    ];
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.listMembers('test-coop');
+
+    expect(result).toEqual(mockResponse);
+    expect(result).toHaveLength(2);
+  });
+});
+
+describe('ledger operations', () => {
+  it('should get balance', async () => {
+    const mockResponse = {
+      did: 'did:icn:alice',
+      balance: 100,
+      currency: 'credits',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getBalance('test-coop', 'did:icn:alice');
+
+    expect(result).toEqual(mockResponse);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('/ledger/test-coop/balance/');
+  });
+
+  it('should create payment with correct request', async () => {
+    const mockResponse = {
+      transaction_id: 'tx-123',
+      success: true,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.pay('test-coop', {
+      from: 'did:icn:alice',
+      to: 'did:icn:bob',
+      amount: 50,
+      currency: 'credits',
+      memo: 'Test payment',
+    });
+
+    expect(result).toEqual(mockResponse);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/ledger/test-coop/payment');
+    expect(options.method).toBe('POST');
+
+    const body = JSON.parse(options.body);
+    expect(body.from).toBe('did:icn:alice');
+    expect(body.to).toBe('did:icn:bob');
+    expect(body.amount).toBe(50);
+    expect(body.currency).toBe('credits');
+    expect(body.memo).toBe('Test payment');
+  });
+
+  it('should get history with pagination', async () => {
+    const mockResponse = {
+      transactions: [],
+      total: 0,
+      offset: 10,
+      limit: 20,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.getHistory('test-coop', { offset: 10, limit: 20 });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('offset=10');
+    expect(url).toContain('limit=20');
+  });
+});
+
+describe('governance operations', () => {
+  it('should create domain', async () => {
+    const mockResponse = {
+      id: 'coop:test',
+      name: 'Test Domain',
+      members: ['did:icn:alice', 'did:icn:bob'],
+      created_at: 1704067200,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.createDomain({
+      domain_id: 'coop:test',
+      name: 'Test Domain',
+      members: ['did:icn:alice', 'did:icn:bob'],
+    });
+
+    expect(result).toEqual(mockResponse);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/domains');
+    expect(options.method).toBe('POST');
+  });
+
+  it('should get domain', async () => {
+    const mockResponse = {
+      id: 'coop:test',
+      name: 'Test Domain',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getDomain('coop:test');
+
+    expect(result).toEqual(mockResponse);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('/gov/domains/');
+  });
+
+  it('should create proposal', async () => {
+    const mockResponse = {
+      id: 'prop-123',
+      title: 'Test Proposal',
+      state: 'draft',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.createProposal({
+      domain_id: 'coop:test',
+      title: 'Test Proposal',
+      description: 'A test proposal',
+      kind: 'text',
+    });
+
+    expect(result).toEqual(mockResponse);
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.domain_id).toBe('coop:test');
+    expect(body.title).toBe('Test Proposal');
+    expect(body.kind).toBe('text');
+  });
+
+  it('should cast vote', async () => {
+    const mockResponse = {
+      success: true,
+      tally: { for: 1, against: 0, abstain: 0 },
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.vote('prop-123', { choice: 'for' });
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/proposals/prop-123/vote');
+    expect(options.method).toBe('POST');
+
+    const body = JSON.parse(options.body);
+    expect(body.choice).toBe('for');
+  });
+});
+
+describe('compute task cancellation', () => {
+  it('should cancel task with reason', async () => {
+    const mockResponse = {
+      success: true,
+      task_hash: 'abc123',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.cancelTask('abc123', { reason: 'No longer needed' });
+
+    expect(result).toEqual(mockResponse);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/compute/cancel/abc123');
+    expect(options.method).toBe('POST');
+
+    const body = JSON.parse(options.body);
+    expect(body.reason).toBe('No longer needed');
+  });
+
+  it('should cancel task without reason', async () => {
+    const mockResponse = {
+      success: true,
+      task_hash: 'abc123',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.cancelTask('abc123');
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.reason).toBeUndefined();
+  });
+});
+
+describe('authentication flow', () => {
+  it('should get challenge', async () => {
+    const mockResponse = {
+      challenge: 'random-challenge-string',
+      expires_at: '2024-01-01T01:00:00Z',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getChallenge('did:icn:alice');
+
+    expect(result).toEqual(mockResponse);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/auth/challenge');
+    expect(options.method).toBe('POST');
+
+    const body = JSON.parse(options.body);
+    expect(body.did).toBe('did:icn:alice');
+  });
+
+  it('should verify signature and get token', async () => {
+    const mockResponse = {
+      token: 'jwt-token-here',
+      expires_at: '2024-01-02T00:00:00Z',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.verify(
+      'did:icn:alice',
+      'signature-bytes',
+      'my-coop',
+      ['ledger:read', 'ledger:write']
+    );
+
+    expect(result).toEqual(mockResponse);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/auth/verify');
+
+    const body = JSON.parse(options.body);
+    expect(body.did).toBe('did:icn:alice');
+    expect(body.signature).toBe('signature-bytes');
+    expect(body.coop_id).toBe('my-coop');
+    expect(body.scopes).toEqual(['ledger:read', 'ledger:write']);
+  });
+});
