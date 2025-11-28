@@ -416,16 +416,64 @@ export class ICNClient {
    *
    * @example
    * ```typescript
+   * // Submit CCL contract (default)
    * const result = await client.submitTask({
    *   code: JSON.stringify(cclContract),
    *   fuel_limit: 10000,
    *   payment_rate: 100, // 100 credits per 1000 fuel
    * });
    * console.log('Task submitted:', result.task_hash);
+   *
+   * // Submit WASM module
+   * const wasmResult = await client.submitTask({
+   *   code_type: 'wasm',
+   *   wasm_bytes: btoa(String.fromCharCode(...wasmBytes)), // Base64 encoded
+   *   fuel_limit: 10000,
+   * });
    * ```
    */
   async submitTask(req: SubmitTaskRequest): Promise<SubmitTaskResponse> {
     return this.post<SubmitTaskResponse>('/compute/submit', req);
+  }
+
+  /**
+   * Submit a WASM compute task
+   *
+   * Helper method that handles base64 encoding of WASM bytes.
+   *
+   * @example
+   * ```typescript
+   * // From ArrayBuffer
+   * const wasmBytes = await fetch('/module.wasm').then(r => r.arrayBuffer());
+   * const result = await client.submitWasmTask(new Uint8Array(wasmBytes), {
+   *   fuel_limit: 10000,
+   * });
+   *
+   * // From Uint8Array
+   * const result = await client.submitWasmTask(wasmModule, {
+   *   fuel_limit: 10000,
+   *   inputs: { x: 42 },
+   * });
+   * ```
+   */
+  async submitWasmTask(
+    wasmBytes: Uint8Array | ArrayBuffer,
+    options?: Omit<SubmitTaskRequest, 'code' | 'wasm_bytes' | 'code_type'>
+  ): Promise<SubmitTaskResponse> {
+    const bytes = wasmBytes instanceof ArrayBuffer
+      ? new Uint8Array(wasmBytes)
+      : wasmBytes;
+
+    // Convert to base64
+    const base64 = typeof btoa !== 'undefined'
+      ? btoa(String.fromCharCode(...bytes))
+      : Buffer.from(bytes).toString('base64');
+
+    return this.submitTask({
+      ...options,
+      code_type: 'wasm',
+      wasm_bytes: base64,
+    });
   }
 
   /**

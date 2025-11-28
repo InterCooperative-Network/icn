@@ -33,6 +33,35 @@ let result = executor.execute(&task, &mut ctx);
 
 **Tests**: 4 new tests for WASM execution (feature-enabled and disabled paths)
 
+### Added - WASM Task Submission via Gateway API (2025-11-28)
+
+**Gateway API** ([crates/icn-gateway/src/api/compute.rs](icn/crates/icn-gateway/src/api/compute.rs)):
+- Added `code_type` field to task submission ("ccl" or "wasm")
+- Added `wasm_bytes` field for base64-encoded WASM bytecode
+- Backward compatible: CCL tasks work unchanged (default)
+- Automatic capability detection (Ccl vs Wasm)
+
+**TypeScript SDK** ([sdk/typescript/src/index.ts](sdk/typescript/src/index.ts)):
+- Added `CodeType` type ("ccl" | "wasm")
+- Updated `SubmitTaskRequest` with `code_type` and `wasm_bytes` fields
+- Added `submitWasmTask()` helper method with automatic base64 encoding
+
+**Usage**:
+```typescript
+// WASM task submission (helper method)
+const result = await client.submitWasmTask(wasmBytes, {
+  fuel_limit: 10000,
+  inputs: { x: 42 },
+});
+
+// Or directly with submitTask
+const result = await client.submitTask({
+  code_type: 'wasm',
+  wasm_bytes: btoa(String.fromCharCode(...wasmBytes)),
+  fuel_limit: 10000,
+});
+```
+
 ### Added - Federation & Cross-Network Discovery (2025-11-27)
 
 **Federation Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):

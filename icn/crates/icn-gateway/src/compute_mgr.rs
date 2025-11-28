@@ -55,12 +55,39 @@ impl ComputeManager {
         self.compute_handle = Some(handle);
     }
 
-    /// Submit a compute task
+    /// Submit a compute task (CCL code)
     pub async fn submit_task(
         &self,
         task_id: String,
         submitter: String,
         code: String,
+        inputs: Vec<u8>,
+        fuel_limit: u64,
+        priority: &str,
+        deadline_ms: Option<u64>,
+        payment_rate: Option<u64>,
+        payment_currency: Option<String>,
+    ) -> Result<TaskHash> {
+        self.submit_task_with_code(
+            task_id,
+            submitter,
+            TaskCode::Ccl(code),
+            inputs,
+            fuel_limit,
+            priority,
+            deadline_ms,
+            payment_rate,
+            payment_currency,
+        )
+        .await
+    }
+
+    /// Submit a compute task with explicit TaskCode (CCL or WASM)
+    pub async fn submit_task_with_code(
+        &self,
+        task_id: String,
+        submitter: String,
+        code: TaskCode,
         inputs: Vec<u8>,
         fuel_limit: u64,
         priority: &str,
@@ -85,14 +112,20 @@ impl ComputeManager {
             _ => TaskPriority::Normal, // Default to normal for invalid values
         };
 
+        // Determine required capabilities based on code type
+        let required_capabilities = match &code {
+            TaskCode::Ccl(_) => vec![ExecutorCapability::Ccl],
+            TaskCode::WasmInline(_) | TaskCode::WasmRef(_) => vec![ExecutorCapability::Wasm],
+        };
+
         let task = ComputeTask {
             id: task_id.clone(),
             submitter: submitter.clone(),
             coop_id: None, // TODO: Get from JWT claims or request body
-            code: TaskCode::Ccl(code),
+            code,
             inputs,
             fuel_limit: FuelLimit(fuel_limit),
-            required_capabilities: vec![ExecutorCapability::Ccl],
+            required_capabilities,
             priority: task_priority,
             created_at: now,
             deadline: absolute_deadline,

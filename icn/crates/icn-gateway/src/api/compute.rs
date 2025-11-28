@@ -10,14 +10,32 @@ use crate::error::Result;
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::middleware::{get_claims, require_scope};
 
+/// Code type for compute tasks
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CodeType {
+    /// CCL contract (default)
+    #[default]
+    Ccl,
+    /// WebAssembly module
+    Wasm,
+}
+
 /// Request to submit a compute task
 #[derive(Debug, serde::Deserialize)]
 pub struct SubmitTaskRequest {
     /// Task ID (auto-generated if not provided)
     #[serde(default)]
     pub task_id: Option<String>,
-    /// CCL contract JSON
-    pub code: String,
+    /// CCL contract JSON (for code_type: ccl)
+    #[serde(default)]
+    pub code: Option<String>,
+    /// WASM bytecode as base64 (for code_type: wasm)
+    #[serde(default)]
+    pub wasm_bytes: Option<String>,
+    /// Code type: "ccl" (default) or "wasm"
+    #[serde(default)]
+    pub code_type: CodeType,
     /// Input arguments (JSON)
     #[serde(default)]
     pub inputs: serde_json::Value,
@@ -61,6 +79,9 @@ pub async fn submit_task(
     broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<SubmitTaskRequest>,
 ) -> Result<HttpResponse> {
+    use base64::Engine;
+    use icn_compute::TaskCode;
+
     // Require compute:write scope
     require_scope(&http_req, "compute:write")?;
 
@@ -87,12 +108,37 @@ pub async fn submit_task(
     // Parse priority string (low, normal, high, critical) - case insensitive
     let priority = req.priority.as_deref().unwrap_or("normal");
 
+    // Build TaskCode based on code_type
+    let task_code = match req.code_type {
+        CodeType::Ccl => {
+            let code = req.code.as_ref().ok_or_else(|| {
+                crate::error::GatewayError::BadRequest(
+                    "Missing 'code' field for CCL task".to_string(),
+                )
+            })?;
+            TaskCode::Ccl(code.clone())
+        }
+        CodeType::Wasm => {
+            let wasm_b64 = req.wasm_bytes.as_ref().ok_or_else(|| {
+                crate::error::GatewayError::BadRequest(
+                    "Missing 'wasm_bytes' field for WASM task".to_string(),
+                )
+            })?;
+            let wasm_bytes = base64::engine::general_purpose::STANDARD
+                .decode(wasm_b64)
+                .map_err(|e| {
+                    crate::error::GatewayError::BadRequest(format!("Invalid base64: {e}"))
+                })?;
+            TaskCode::WasmInline(wasm_bytes)
+        }
+    };
+
     // Submit task
     let task_hash = compute_mgr
-        .submit_task(
+        .submit_task_with_code(
             task_id.clone(),
             submitter_did.clone(),
-            req.code.clone(),
+            task_code,
             inputs,
             req.fuel_limit,
             priority,

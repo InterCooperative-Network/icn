@@ -40,6 +40,7 @@ uuid = { version = "1", features = ["v4"] }
 hex = "0.4"
 rand = "0.8"
 ed25519-dalek = "2"
+base64 = "0.22"
 
 # ICN dependencies
 icn-identity = { path = "../icn-identity" }

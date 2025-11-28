@@ -202,11 +202,18 @@ export interface ProposalOutcome {
 // Compute
 // ============================================================================
 
+/** Code type for compute tasks */
+export type CodeType = 'ccl' | 'wasm';
+
 export interface SubmitTaskRequest {
   /** Optional task ID (auto-generated if not provided) */
   task_id?: string;
-  /** CCL contract JSON */
-  code: string;
+  /** CCL contract JSON (for code_type: ccl) */
+  code?: string;
+  /** WASM bytecode as base64 string (for code_type: wasm) */
+  wasm_bytes?: string;
+  /** Code type: "ccl" (default) or "wasm" */
+  code_type?: CodeType;
   /** Input arguments */
   inputs?: Record<string, unknown>;
   /** Maximum fuel for execution (default 10000) */
