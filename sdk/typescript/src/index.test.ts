@@ -570,6 +570,105 @@ describe('compute task cancellation', () => {
   });
 });
 
+describe('compute task status', () => {
+  it('should get task status', async () => {
+    const mockResponse = {
+      task_hash: 'abc123',
+      status: 'completed',
+      result: { output: 42 },
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getTaskStatus('abc123');
+
+    expect(result).toEqual(mockResponse);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/compute/status/abc123');
+  });
+
+  it('should poll for task completion', async () => {
+    let callCount = 0;
+    const mockFetch = jest.fn().mockImplementation(() => {
+      callCount++;
+      const status = callCount < 3 ? 'pending' : 'completed';
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          task_hash: 'abc123',
+          status,
+          result: status === 'completed' ? { output: 42 } : undefined,
+        }),
+      });
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.waitForTask('abc123', 10, 5000);
+
+    expect(result.status).toBe('completed');
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('should handle failed tasks in waitForTask', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        task_hash: 'abc123',
+        status: 'failed',
+        error: 'Out of fuel',
+      }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.waitForTask('abc123', 10, 5000);
+
+    expect(result.status).toBe('failed');
+  });
+
+  it('should handle cancelled tasks in waitForTask', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        task_hash: 'abc123',
+        status: 'cancelled',
+      }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.waitForTask('abc123', 10, 5000);
+
+    expect(result.status).toBe('cancelled');
+  });
+});
+
 describe('authentication flow', () => {
   it('should get challenge', async () => {
     const mockResponse = {
