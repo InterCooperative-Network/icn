@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - OpenAPI Schema Validation (2025-11-28)
+
+**SubmitTaskRequest Schema** ([docs/api/openapi.yaml](docs/api/openapi.yaml)):
+- Fixed discriminator validation: Added `oneOf` with `CclTaskRequest` and `WasmTaskRequest`
+- Restored backward compatibility: `code_type` optional in `CclTaskRequest` (defaults to "ccl")
+- Added comprehensive documentation for discrimination logic
+- Removed unused `CodeType` schema component
+- Updated TypeScript SDK types to match schema
+
 ### Added - WASM Compute Executor (2025-11-28)
 
 **WasmExecutor** ([crates/icn-compute/src/wasm_executor.rs](icn/crates/icn-compute/src/wasm_executor.rs)):
