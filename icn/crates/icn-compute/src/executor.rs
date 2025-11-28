@@ -179,10 +179,7 @@ impl Executor for LocalExecutor {
                     if task.inputs.is_empty() {
                         std::collections::HashMap::new()
                     } else {
-                        match serde_json::from_slice(&task.inputs) {
-                            Ok(a) => a,
-                            Err(_) => std::collections::HashMap::new(),
-                        }
+                        serde_json::from_slice(&task.inputs).unwrap_or_default()
                     };
 
                 // Execute via interpreter

@@ -464,10 +464,7 @@ async fn handle_ledger_history(
     };
 
     // Parse pagination parameters
-    let page_request: crate::PageRequest = match serde_json::from_value(params.clone()) {
-        Ok(p) => p,
-        Err(_) => crate::PageRequest::default(), // Use default if params are empty
-    };
+    let page_request: crate::PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
 
     let ledger = ledger_handle.read().await;
     match ledger.get_all_entries() {
@@ -758,10 +755,7 @@ async fn handle_contract_list(
     };
 
     // Parse pagination parameters
-    let page_request: crate::PageRequest = match serde_json::from_value(params.clone()) {
-        Ok(p) => p,
-        Err(_) => crate::PageRequest::default(), // Use default if params are empty
-    };
+    let page_request: crate::PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
 
     let runtime = contract_runtime.read().await;
     let contracts = runtime.list_contracts();
@@ -801,10 +795,7 @@ async fn handle_quarantine_list(
     };
 
     // Parse pagination parameters
-    let page_request: crate::PageRequest = match serde_json::from_value(params.clone()) {
-        Ok(p) => p,
-        Err(_) => crate::PageRequest::default(), // Use default if params are empty
-    };
+    let page_request: crate::PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
 
     let ledger = ledger_handle.read().await;
     match ledger.quarantine().list() {
