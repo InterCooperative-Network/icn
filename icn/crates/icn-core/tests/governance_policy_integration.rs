@@ -279,7 +279,7 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
                 let compute_handle = compute.clone();
                 let prop_id = proposal_id.clone();
                 let store = audit_store.clone();
-                let coop = coop_id.clone();
+                let _coop = coop_id.clone();
                 let policy_str = policy_json.clone();
                 let _decision_time = decided_at;
 

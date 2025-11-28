@@ -20,7 +20,7 @@ struct TestNode {
     network_handle: icn_net::NetworkHandle,
     gossip_handle: Arc<RwLock<GossipActor>>,
     contract_actor: Arc<RwLock<ContractActor>>,
-    contract_runtime: Arc<RwLock<ContractRuntime>>,
+    _contract_runtime: Arc<RwLock<ContractRuntime>>,
     trust_graph: Arc<RwLock<TrustGraph>>,
     _temp_dir: TempDir,
     _shutdown_tx: tokio::sync::broadcast::Sender<()>,
@@ -228,7 +228,7 @@ impl TestNode {
             network_handle,
             gossip_handle,
             contract_actor: contract_actor_handle,
-            contract_runtime: contract_runtime_handle,
+            _contract_runtime: contract_runtime_handle,
             trust_graph: trust_graph_handle,
             _temp_dir: temp_dir,
             _shutdown_tx: shutdown_tx,
@@ -961,7 +961,7 @@ async fn test_contract_with_ledger_integration() {
 
     // Deploy from node A with ledger capabilities
     // Empty accounts vec means capability applies to all participants
-    let code_hash = node_a
+    let _code_hash = node_a
         .deploy_contract(
             contract,
             vec![

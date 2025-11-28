@@ -44,80 +44,77 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
         event_bus
             .subscribe(Arc::new(move |event| {
                 if let SystemEvent::ProposalAccepted {
-                        proposal_id,
-                        payload,
-                        ..
-                    } = event {
-                    if let ProposalPayload::Budget {
+                    proposal_id,
+                    payload: ProposalPayload::Budget {
                         amount,
                         recipient,
                         currency,
                         ..
-                    } = payload
-                    {
-                        info!(
-                            "📊 Executing budget proposal {}: {} {} to {}",
-                            proposal_id.0, amount, currency, recipient
-                        );
+                    },
+                    ..
+                } = event {
+                    info!(
+                        "📊 Executing budget proposal {}: {} {} to {}",
+                        proposal_id.0, amount, currency, recipient
+                    );
 
-                        let ledger = ledger_clone.clone();
-                        let prop_id = proposal_id.clone();
-                        let from_did = own_did.clone();
-                        let store = audit_store.clone();
+                    let ledger = ledger_clone.clone();
+                    let prop_id = proposal_id.clone();
+                    let from_did = own_did.clone();
+                    let store = audit_store.clone();
 
-                        tokio::spawn(async move {
-                            use icn_ledger::entry::JournalEntryBuilder;
+                    tokio::spawn(async move {
+                        use icn_ledger::entry::JournalEntryBuilder;
 
-                            // IDEMPOTENCY CHECK: Skip if proposal already executed
-                            // Uses fail-safe pattern: refuse execution if cannot verify
-                            let audit_key = format!("gov:audit:{}", prop_id.0);
-                            match store.get(audit_key.as_bytes()) {
-                                Ok(Some(_)) => {
-                                    info!("Proposal {} already executed, skipping duplicate event", prop_id.0);
-                                    return;
-                                }
-                                Ok(None) => {
-                                    // Not executed yet, proceed
-                                }
-                                Err(e) => {
-                                    // Store read error: REFUSE to execute (fail-safe)
-                                    eprintln!("ERROR: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
-                                    eprintln!("       Refusing to execute to prevent potential duplicate");
-                                    return;
+                        // IDEMPOTENCY CHECK: Skip if proposal already executed
+                        // Uses fail-safe pattern: refuse execution if cannot verify
+                        let audit_key = format!("gov:audit:{}", prop_id.0);
+                        match store.get(audit_key.as_bytes()) {
+                            Ok(Some(_)) => {
+                                info!("Proposal {} already executed, skipping duplicate event", prop_id.0);
+                                return;
+                            }
+                            Ok(None) => {
+                                // Not executed yet, proceed
+                            }
+                            Err(e) => {
+                                // Store read error: REFUSE to execute (fail-safe)
+                                eprintln!("ERROR: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
+                                eprintln!("       Refusing to execute to prevent potential duplicate");
+                                return;
+                            }
+                        }
+
+                        let mut ledger_guard = ledger.write().await;
+
+                        let entry_result = JournalEntryBuilder::new(from_did.clone())
+                            .credit(from_did.clone(), currency.clone(), amount)
+                            .debit(recipient.clone(), currency.clone(), amount)
+                            .build();
+
+                        if let Ok(entry) = entry_result {
+                            if let Ok(entry_hash) = ledger_guard.append_entry(entry) {
+                                info!(
+                                    "✅ Executed: {} {}",
+                                    amount, currency
+                                );
+
+                                // Store audit trail
+                                let audit_key = format!("gov:audit:{}", prop_id.0);
+                                let audit_record = serde_json::json!({
+                                    "proposal_id": prop_id.0,
+                                    "ledger_entry_hash": hex::encode(entry_hash.0),
+                                    "amount": amount,
+                                    "currency": currency,
+                                    "recipient": recipient.to_string(),
+                                });
+
+                                if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                                    let _ = store.put(audit_key.as_bytes(), &audit_json);
                                 }
                             }
-
-                            let mut ledger_guard = ledger.write().await;
-
-                            let entry_result = JournalEntryBuilder::new(from_did.clone())
-                                .credit(from_did.clone(), currency.clone(), amount)
-                                .debit(recipient.clone(), currency.clone(), amount)
-                                .build();
-
-                            if let Ok(entry) = entry_result {
-                                if let Ok(entry_hash) = ledger_guard.append_entry(entry) {
-                                    info!(
-                                        "✅ Executed: {} {}",
-                                        amount, currency
-                                    );
-
-                                    // Store audit trail
-                                    let audit_key = format!("gov:audit:{}", prop_id.0);
-                                    let audit_record = serde_json::json!({
-                                        "proposal_id": prop_id.0,
-                                        "ledger_entry_hash": hex::encode(entry_hash.0),
-                                        "amount": amount,
-                                        "currency": currency,
-                                        "recipient": recipient.to_string(),
-                                    });
-
-                                    if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
-                                        let _ = store.put(audit_key.as_bytes(), &audit_json);
-                                    }
-                                }
-                            }
-                        });
-                    }
+                        }
+                    });
                 }
             }))
             .await

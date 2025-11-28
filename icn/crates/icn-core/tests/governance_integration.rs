@@ -28,7 +28,7 @@ const GOVERNANCE_TOPIC: &str = "governance:proposal";
 
 /// Helper to create a test node with governance support
 struct TestNode {
-    keypair: KeyPair,
+    _keypair: KeyPair,
     did: Did,
     network_handle: icn_net::NetworkHandle,
     gossip_handle: Arc<RwLock<GossipActor>>,
@@ -219,7 +219,7 @@ impl TestNode {
         }
 
         Ok(TestNode {
-            keypair,
+            _keypair: keypair,
             did,
             network_handle,
             gossip_handle,
@@ -275,7 +275,7 @@ impl TestNode {
     /// Create a governance domain locally and broadcast it
     async fn create_domain(
         &self,
-        domain_id: String,
+        _domain_id: String,
         name: String,
         members: Vec<Did>,
     ) -> Result<GovernanceDomain> {

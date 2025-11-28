@@ -54,7 +54,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
 
     // Spawn Alice's network actor with trust-gated TLS (min threshold 0.4 = Partner)
-    let alice_handle = NetworkActor::spawn(
+    let _alice_handle = NetworkActor::spawn(
         alice_identity_bundle,
         "127.0.0.1:15400".parse()?,
         alice_shutdown_tx.clone(),
@@ -143,7 +143,7 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
     // Spawn Alice with trust-gated TLS (min threshold 0.1 = Known)
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
     let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
-    let alice_handle = NetworkActor::spawn(
+    let _alice_handle = NetworkActor::spawn(
         alice_identity_bundle,
         "127.0.0.1:15500".parse()?,
         alice_shutdown_tx.clone(),
@@ -236,7 +236,7 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
     let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
-    let alice_handle = NetworkActor::spawn(
+    let _alice_handle = NetworkActor::spawn(
         alice_identity_bundle,
         "127.0.0.1:15600".parse()?,
         alice_shutdown_tx.clone(),

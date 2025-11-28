@@ -104,9 +104,9 @@ impl RecoveryTestNode {
         let ledger_clone = ledger.clone();
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             let gossip_handle = gossip_handle_clone.clone();
-            let recovery_store = recovery_store_clone.clone();
-            let trust_graph = trust_graph_clone.clone();
-            let ledger = ledger_clone.clone();
+            let _recovery_store = recovery_store_clone.clone();
+            let _trust_graph = trust_graph_clone.clone();
+            let _ledger = ledger_clone.clone();
 
             tokio::spawn(async move {
                 if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {

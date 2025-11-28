@@ -20,7 +20,7 @@ use tokio::sync::RwLock;
 /// Test helper to create a node with gossip, trust graph, and replication manager
 struct TestNode {
     did: Did,
-    keypair: KeyPair,
+    _keypair: KeyPair,
     gossip_handle: Arc<RwLock<GossipActor>>,
     trust_graph_handle: Arc<RwLock<TrustGraph>>,
     store: Arc<dyn Store>,
@@ -61,7 +61,7 @@ impl TestNode {
 
         Ok(Self {
             did,
-            keypair,
+            _keypair: keypair,
             gossip_handle,
             trust_graph_handle,
             store,

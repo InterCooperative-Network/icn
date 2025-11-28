@@ -24,8 +24,8 @@ struct TestNode {
     did: Did,
     listen_addr: SocketAddr,
     network_handle: NetworkHandle,
-    gossip_handle: Arc<RwLock<GossipActor>>,
-    trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>,
+    _gossip_handle: Arc<RwLock<GossipActor>>,
+    _trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>,
     _shutdown_tx: broadcast::Sender<()>,
 }
 
@@ -46,7 +46,7 @@ impl TestNode {
     ) -> Result<Self> {
         let keypair = KeyPair::generate()?;
         let did = keypair.did().clone();
-        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+        let (shutdown_tx, _shutdown_rx) = broadcast::channel(1);
 
         // Create trust graph
         let store = Arc::new(icn_store::SledStore::temporary()?);
@@ -171,8 +171,8 @@ impl TestNode {
             did,
             listen_addr,
             network_handle,
-            gossip_handle,
-            trust_graph,
+            _gossip_handle: gossip_handle,
+            _trust_graph: trust_graph,
             _shutdown_tx: shutdown_tx,
         })
     }
