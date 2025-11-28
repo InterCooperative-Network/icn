@@ -84,6 +84,25 @@ icnctl compute submit-wasm \
     --fuel 10000
 ```
 
+### [TypeScript SDK Examples](../sdk/typescript/examples/)
+**Difficulty: Beginner-Intermediate** | **Time: 10 minutes**
+
+Client-side examples using the `@icn/client` TypeScript SDK.
+
+**Available Examples:**
+- `basic-auth.ts` - DID authentication with JWT tokens
+- `timebank.ts` - Timebank transactions and balance checking
+- `governance.ts` - Proposals, voting, and domains
+- `websocket-events.ts` - Real-time event streaming
+- `compute.ts` - Distributed compute task submission and monitoring
+
+**Run them:**
+```bash
+cd sdk/typescript
+npm install
+npx ts-node examples/compute.ts
+```
+
 ### 03-contracts-advanced (Coming Soon)
 **Difficulty: Intermediate** | **Time: 15 minutes**
 
