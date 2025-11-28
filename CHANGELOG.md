@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - WebSocket Compute Event Handlers (2025-11-28)
+
+**WebSocket Example** ([sdk/typescript/examples/websocket-events.ts](sdk/typescript/examples/websocket-events.ts)):
+- Added handlers for compute task lifecycle events:
+  - `ComputeTaskSubmitted` - when tasks are created
+  - `ComputeTaskClaimed` - when executors claim tasks
+  - `ComputeTaskCompleted` - when execution finishes
+  - `ComputeTaskCancelled` - when tasks are cancelled
+- Updated dashboard example to track active compute tasks
+
 ### Added - TypeScript SDK Improvements (2025-11-28)
 
 **Test Coverage** ([sdk/typescript/src/index.test.ts](sdk/typescript/src/index.test.ts)):
