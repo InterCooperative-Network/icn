@@ -61,79 +61,76 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
         let audit_store = gov_store.clone();
 
         event_bus.subscribe(Arc::new(move |event| {
-            match event {
-                SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
-                    if let ProposalPayload::SchedulingPolicy { coop_id, policy_json } = payload {
-                        info!("📋 Executing scheduling policy proposal {}: update policy for {}",
-                              proposal_id.0, coop_id);
+            if let SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } = event {
+                if let ProposalPayload::SchedulingPolicy { coop_id, policy_json } = payload {
+                    info!("📋 Executing scheduling policy proposal {}: update policy for {}",
+                          proposal_id.0, coop_id);
 
-                        // Spawn async task to apply policy update
-                        let compute_handle = compute.clone();
-                        let prop_id = proposal_id.clone();
-                        let store = audit_store.clone();
-                        let coop = coop_id.clone();
-                        let policy_str = policy_json.clone();
-                        let decision_time = decided_at;
+                    // Spawn async task to apply policy update
+                    let compute_handle = compute.clone();
+                    let prop_id = proposal_id.clone();
+                    let store = audit_store.clone();
+                    let coop = coop_id.clone();
+                    let policy_str = policy_json.clone();
+                    let decision_time = decided_at;
 
-                        tokio::spawn(async move {
-                            // IDEMPOTENCY CHECK: Skip if proposal already executed
-                            let audit_key = format!("gov:audit:policy:{}", prop_id.0);
-                            match store.get(audit_key.as_bytes()) {
-                                Ok(Some(_)) => {
-                                    info!("Policy proposal {} already executed, skipping duplicate", prop_id.0);
-                                    return;
-                                }
-                                Ok(None) => {
-                                    // Not executed yet, proceed
-                                }
-                                Err(e) => {
-                                    eprintln!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id.0, e);
-                                    eprintln!("   Refusing to execute to prevent potential duplicate");
-                                    return;
-                                }
+                    tokio::spawn(async move {
+                        // IDEMPOTENCY CHECK: Skip if proposal already executed
+                        let audit_key = format!("gov:audit:policy:{}", prop_id.0);
+                        match store.get(audit_key.as_bytes()) {
+                            Ok(Some(_)) => {
+                                info!("Policy proposal {} already executed, skipping duplicate", prop_id.0);
+                                return;
                             }
+                            Ok(None) => {
+                                // Not executed yet, proceed
+                            }
+                            Err(e) => {
+                                eprintln!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id.0, e);
+                                eprintln!("   Refusing to execute to prevent potential duplicate");
+                                return;
+                            }
+                        }
 
-                            // Parse policy JSON
-                            match serde_json::from_str::<CoopSchedulingPolicy>(&policy_str) {
-                                Ok(policy) => {
-                                    // Apply policy update via ComputeHandle
-                                    match compute_handle.set_policy(policy.clone()).await {
-                                        Ok(_) => {
-                                            info!("✅ Scheduling policy proposal {} executed: policy updated for {}",
-                                                  prop_id.0, coop);
+                        // Parse policy JSON
+                        match serde_json::from_str::<CoopSchedulingPolicy>(&policy_str) {
+                            Ok(policy) => {
+                                // Apply policy update via ComputeHandle
+                                match compute_handle.set_policy(policy.clone()).await {
+                                    Ok(_) => {
+                                        info!("✅ Scheduling policy proposal {} executed: policy updated for {}",
+                                              prop_id.0, coop);
 
-                                            // Store audit trail
-                                            let audit_record = serde_json::json!({
-                                                "proposal_id": prop_id.0,
-                                                "coop_id": coop,
-                                                "decided_at": decision_time,
-                                                "executed_at": std::time::SystemTime::now()
-                                                    .duration_since(std::time::UNIX_EPOCH)
-                                                    .unwrap()
-                                                    .as_secs(),
-                                            });
+                                        // Store audit trail
+                                        let audit_record = serde_json::json!({
+                                            "proposal_id": prop_id.0,
+                                            "coop_id": coop,
+                                            "decided_at": decision_time,
+                                            "executed_at": std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_secs(),
+                                        });
 
-                                            if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
-                                                if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                                    eprintln!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id.0, e);
-                                                } else {
-                                                    info!("📋 Audit trail recorded for policy proposal {}", prop_id.0);
-                                                }
+                                        if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                                            if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                                                eprintln!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id.0, e);
+                                            } else {
+                                                info!("📋 Audit trail recorded for policy proposal {}", prop_id.0);
                                             }
                                         }
-                                        Err(e) => {
-                                            eprintln!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id.0, e);
-                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id.0, e);
                                     }
                                 }
-                                Err(e) => {
-                                    eprintln!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id.0, e);
-                                }
                             }
-                        });
-                    }
+                            Err(e) => {
+                                eprintln!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id.0, e);
+                            }
+                        }
+                    });
                 }
-                _ => {}
             }
         })).await
     };
@@ -270,36 +267,33 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
         let audit_store = gov_store.clone();
 
         event_bus.subscribe(Arc::new(move |event| {
-            match event {
-                SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
-                    if let ProposalPayload::SchedulingPolicy { coop_id, policy_json } = payload {
-                        let compute_handle = compute.clone();
-                        let prop_id = proposal_id.clone();
-                        let store = audit_store.clone();
-                        let coop = coop_id.clone();
-                        let policy_str = policy_json.clone();
-                        let decision_time = decided_at;
+            if let SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } = event {
+                if let ProposalPayload::SchedulingPolicy { coop_id, policy_json } = payload {
+                    let compute_handle = compute.clone();
+                    let prop_id = proposal_id.clone();
+                    let store = audit_store.clone();
+                    let coop = coop_id.clone();
+                    let policy_str = policy_json.clone();
+                    let decision_time = decided_at;
 
-                        tokio::spawn(async move {
-                            let audit_key = format!("gov:audit:policy:{}", prop_id.0);
-                            match store.get(audit_key.as_bytes()) {
-                                Ok(Some(_)) => return,
-                                Ok(None) => {}
-                                Err(_) => return,
-                            }
+                    tokio::spawn(async move {
+                        let audit_key = format!("gov:audit:policy:{}", prop_id.0);
+                        match store.get(audit_key.as_bytes()) {
+                            Ok(Some(_)) => return,
+                            Ok(None) => {}
+                            Err(_) => return,
+                        }
 
-                            match serde_json::from_str::<CoopSchedulingPolicy>(&policy_str) {
-                                Ok(policy) => {
-                                    let _ = compute_handle.set_policy(policy.clone()).await;
-                                }
-                                Err(_) => {
-                                    // Invalid JSON should be logged but not crash
-                                }
+                        match serde_json::from_str::<CoopSchedulingPolicy>(&policy_str) {
+                            Ok(policy) => {
+                                let _ = compute_handle.set_policy(policy.clone()).await;
                             }
-                        });
-                    }
+                            Err(_) => {
+                                // Invalid JSON should be logged but not crash
+                            }
+                        }
+                    });
                 }
-                _ => {}
             }
         })).await
     };

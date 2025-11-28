@@ -201,8 +201,7 @@ pub async fn check_request_size(
                 if size > max_size {
                     return Err((
                         actix_web::error::ErrorPayloadTooLarge(format!(
-                            "Request size {} exceeds limit {}",
-                            size, max_size
+                            "Request size {size} exceeds limit {max_size}"
                         )),
                         req,
                     ));

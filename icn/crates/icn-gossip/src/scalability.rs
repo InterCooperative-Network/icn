@@ -329,7 +329,7 @@ impl ShardedTopic {
     /// Create a new sharded topic
     pub fn new(name: String) -> Self {
         let shards = (0..SHARD_COUNT)
-            .map(|i| TopicShard::new(i))
+            .map(TopicShard::new)
             .collect();
 
         Self {
@@ -503,7 +503,7 @@ mod tests {
             let encoded = varint.encode();
             let (decoded, bytes_read) = VarInt::decode(&encoded).unwrap();
 
-            assert_eq!(decoded.value(), value, "Failed for value {}", value);
+            assert_eq!(decoded.value(), value, "Failed for value {value}");
             assert_eq!(bytes_read, encoded.len());
 
             // Verify size efficiency
@@ -694,10 +694,10 @@ mod tests {
 
         // Estimate compression ratio
         let ratio = compressed.compression_ratio(50);
-        println!("Compression ratio: {:.2}x", ratio);
+        println!("Compression ratio: {ratio:.2}x");
 
         // With 50 peers and only ~10 deltas, should achieve good compression (>5x)
-        assert!(ratio > 5.0, "Compression ratio {:.2} is too low", ratio);
+        assert!(ratio > 5.0, "Compression ratio {ratio:.2} is too low");
     }
 
     #[test]
@@ -718,8 +718,8 @@ mod tests {
 
         // Should achieve excellent compression
         let ratio = compressed.compression_ratio(100);
-        println!("Sparse compression ratio: {:.2}x", ratio);
-        assert!(ratio > 10.0, "Sparse compression ratio {:.2} is too low", ratio);
+        println!("Sparse compression ratio: {ratio:.2}x");
+        assert!(ratio > 10.0, "Sparse compression ratio {ratio:.2} is too low");
     }
 
     #[test]
@@ -737,7 +737,7 @@ mod tests {
 
         // Estimate size
         let estimated_size = compressed.estimate_size();
-        println!("Estimated compressed size: {} bytes", estimated_size);
+        println!("Estimated compressed size: {estimated_size} bytes");
         println!("Uncompressed size: {} bytes", 50 * (50 + 8));
 
         // Compressed size should be significantly smaller

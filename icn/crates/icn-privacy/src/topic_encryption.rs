@@ -122,7 +122,7 @@ impl TopicEncryptor {
             .map_err(|e| PrivacyError::DecryptionFailed(e.to_string()))?;
 
         let topic = String::from_utf8(plaintext_bytes)
-            .map_err(|e| PrivacyError::DecryptionFailed(format!("Invalid UTF-8: {}", e)))?;
+            .map_err(|e| PrivacyError::DecryptionFailed(format!("Invalid UTF-8: {e}")))?;
 
         icn_obs::metrics::privacy::topics_decrypted_inc();
 
@@ -333,7 +333,7 @@ mod tests {
         let encryptor = TopicEncryptor::new(key);
 
         // Encrypt multiple topics
-        let topics = vec!["ledger:sync", "gossip:test", "contracts:deploy", "ledger:sync"];
+        let topics = ["ledger:sync", "gossip:test", "contracts:deploy", "ledger:sync"];
         let encrypted: Vec<_> = topics.iter().map(|t| encryptor.encrypt(t).unwrap()).collect();
 
         // Find matches for "ledger:sync" (should find 2)

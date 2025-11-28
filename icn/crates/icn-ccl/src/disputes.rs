@@ -198,8 +198,8 @@ impl DisputeResolutionSystem {
 
         info!(
             "Filing dispute {} for task {:?} by {}",
-            hex::encode(&dispute_id),
-            hex::encode(&task_hash),
+            hex::encode(dispute_id),
+            hex::encode(task_hash),
             challenger
         );
 
@@ -228,7 +228,7 @@ impl DisputeResolutionSystem {
             async move {
                 debug!(
                     "Spawned re-execution task for dispute {}",
-                    hex::encode(&dispute_id)
+                    hex::encode(dispute_id)
                 );
                 // Re-execution happens in background
                 // In a full implementation, this would call investigate_dispute()
@@ -269,7 +269,7 @@ impl DisputeResolutionSystem {
 
         info!(
             "Investigating dispute {} - re-executing contract",
-            hex::encode(&dispute_id)
+            hex::encode(dispute_id)
         );
 
         // Create execution context for re-execution
@@ -295,7 +295,7 @@ impl DisputeResolutionSystem {
             Err(e) => {
                 warn!(
                     "Re-execution failed for dispute {}: {}",
-                    hex::encode(&dispute_id),
+                    hex::encode(dispute_id),
                     e
                 );
 
@@ -306,7 +306,7 @@ impl DisputeResolutionSystem {
                 };
 
                 let outcome = DisputeOutcome::Inconclusive {
-                    reason: format!("Re-execution failed: {}", e),
+                    reason: format!("Re-execution failed: {e}"),
                     mediator_assigned: mediator,
                 };
 
@@ -344,8 +344,7 @@ impl DisputeResolutionSystem {
                 // Submitter was correct, executor was wrong - record misbehavior
                 if let Some(ref callback) = self.misbehavior_callback {
                     let evidence = format!(
-                        "Executor {} provided incorrect result. Expected: {:?}, Got: {:?}",
-                        executor, re_execution_result, evidence_claimed_result
+                        "Executor {executor} provided incorrect result. Expected: {re_execution_result:?}, Got: {evidence_claimed_result:?}"
                     )
                     .into_bytes();
                     callback(&executor, task_hash, evidence);
@@ -357,8 +356,7 @@ impl DisputeResolutionSystem {
                 // Both were wrong - record misbehavior for executor
                 if let Some(ref callback) = self.misbehavior_callback {
                     let evidence = format!(
-                        "Executor {} provided incorrect result. Expected: {:?}, Got: {:?}",
-                        executor, re_execution_result, evidence_claimed_result
+                        "Executor {executor} provided incorrect result. Expected: {re_execution_result:?}, Got: {evidence_claimed_result:?}"
                     )
                     .into_bytes();
                     callback(&executor, task_hash, evidence);
@@ -371,7 +369,7 @@ impl DisputeResolutionSystem {
 
         info!(
             "Dispute {} resolved: {:?}",
-            hex::encode(&dispute_id),
+            hex::encode(dispute_id),
             outcome
         );
 
@@ -507,7 +505,7 @@ impl DisputeResolutionSystem {
 
     /// Persist a dispute to storage
     fn persist_dispute(&self, dispute: &Dispute) -> Result<()> {
-        let key = format!("dispute:{}", hex::encode(&dispute.dispute_id));
+        let key = format!("dispute:{}", hex::encode(dispute.dispute_id));
         let value = serde_json::to_vec(dispute)?;
         self.dispute_store.put(key.as_bytes(), &value)?;
         Ok(())

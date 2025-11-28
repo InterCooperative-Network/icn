@@ -568,7 +568,7 @@ impl ComputeActor {
                                 }
                                 Err(_) => {
                                     let _ = resp.send(Err(ComputeError::InvalidInput(
-                                        format!("invalid DID: {}", member_did),
+                                        format!("invalid DID: {member_did}"),
                                     )));
                                 }
                             }
@@ -614,7 +614,7 @@ impl ComputeActor {
                                 Ok(did) => did,
                                 Err(_) => {
                                     let _ = resp.send(Err(ComputeError::InvalidInput(
-                                        format!("invalid executor DID: {}", executor),
+                                        format!("invalid executor DID: {executor}"),
                                     )));
                                     continue;
                                 }
@@ -624,7 +624,7 @@ impl ComputeActor {
                                 Ok(did) => did,
                                 Err(_) => {
                                     let _ = resp.send(Err(ComputeError::InvalidInput(
-                                        format!("invalid challenger DID: {}", challenger),
+                                        format!("invalid challenger DID: {challenger}"),
                                     )));
                                     continue;
                                 }
@@ -635,15 +635,15 @@ impl ComputeActor {
                                 Ok(dispute_id) => {
                                     icn_obs::metrics::compute::disputes_filed_inc();
                                     tracing::info!(
-                                        dispute_id = hex::encode(&dispute_id),
-                                        task_hash = hex::encode(&task_hash),
+                                        dispute_id = hex::encode(dispute_id),
+                                        task_hash = hex::encode(task_hash),
                                         "Dispute filed successfully"
                                     );
                                     let _ = resp.send(Ok(dispute_id));
                                 }
                                 Err(e) => {
                                     tracing::warn!(
-                                        task_hash = hex::encode(&task_hash),
+                                        task_hash = hex::encode(task_hash),
                                         error = %e,
                                         "Failed to file dispute"
                                     );
@@ -788,7 +788,7 @@ impl ComputeActor {
         if let Some(ref policy_manager) = self.policy_manager {
             // Parse submitter DID
             let submitter_did = icn_identity::Did::from_str(&task.submitter)
-                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {}", e)))?;
+                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {e}")))?;
 
             // Extract coop_id from task (default to "default" if not specified)
             let coop_id = task.coop_id.as_deref().unwrap_or("default");
@@ -816,7 +816,7 @@ impl ComputeActor {
                         task_id = %task.id,
                         original_priority = ?task.priority,
                         adjusted_priority = ?adjusted_priority,
-                        has_constraints = !placement_constraints.required_region.is_none(),
+                        has_constraints = placement_constraints.required_region.is_some(),
                         "Policy check passed with adjustments"
                     );
                 }
@@ -2586,7 +2586,7 @@ mod tests {
                 winner_did == "did:icn:executor-a"
                     || winner_did == "did:icn:executor-b"
                     || winner_did == "did:icn:executor-d",
-                "Winner should be executor A, B, or D (reasonable trust), got: {}", winner_did
+                "Winner should be executor A, B, or D (reasonable trust), got: {winner_did}"
             );
         } else {
             panic!("No offers received!");

@@ -260,11 +260,7 @@ impl ClockSync {
     pub fn validate_timestamp(&self, timestamp_millis: u64) -> Result<()> {
         let network_time = self.network_time()?;
 
-        let skew = if timestamp_millis > network_time {
-            timestamp_millis - network_time
-        } else {
-            network_time - timestamp_millis
-        };
+        let skew = timestamp_millis.abs_diff(network_time);
 
         let max_skew_millis = self.max_clock_skew.as_millis() as u64;
 

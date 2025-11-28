@@ -446,7 +446,7 @@ impl GossipActor {
                     "Rejecting entry - storage quota exceeded"
                 );
                 icn_obs::metrics::storage_quotas::exceeded_inc();
-                bail!("Storage quota exceeded for author {}: {}", author, e);
+                bail!("Storage quota exceeded for author {author}: {e}");
             }
         }
 
@@ -616,7 +616,7 @@ impl GossipActor {
                         let evidence = hasher.finalize().to_vec();
 
                         let violation = icn_security::Violation::ExcessiveResourceUse {
-                            metric: format!("unauthorized_subscription:{}", topic),
+                            metric: format!("unauthorized_subscription:{topic}"),
                             observed: 1,
                             limit: 0,
                         };
@@ -659,7 +659,7 @@ impl GossipActor {
                 let evidence = hasher.finalize().to_vec();
 
                 let violation = icn_security::Violation::ExcessiveResourceUse {
-                    metric: format!("acl_violation:{}", topic),
+                    metric: format!("acl_violation:{topic}"),
                     observed: 1,
                     limit: 0,
                 };
@@ -694,7 +694,7 @@ impl GossipActor {
                     let evidence = hasher.finalize().to_vec();
 
                     let violation = icn_security::Violation::ExcessiveResourceUse {
-                        metric: format!("topic_subscribers:{}", topic),
+                        metric: format!("topic_subscribers:{topic}"),
                         observed: (subscribers.len() + 1) as u64,
                         limit: MAX_SUBSCRIBERS_PER_TOPIC as u64,
                     };
@@ -1474,7 +1474,7 @@ impl GossipActor {
 
                 for (topic_name, entries) in &self.entries {
                     // Count entries they might be missing
-                    for (_, entry) in entries {
+                    for entry in entries.values() {
                         // Check if our entry clock is ahead of their clock for any peer
                         let our_version = entry.clock.get(&entry.author);
                         let their_version = vector_clock.get(&entry.author);
@@ -3130,7 +3130,7 @@ mod tests {
         // Store the entry in gossip1
         gossip1.create_topic(Topic::new("test:replication".to_string(), AccessControl::Public));
         gossip1.entries.entry("test:replication".to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(content_hash, entry.clone());
 
         // Test 1: ReplicaRequest from gossip2 to gossip1
@@ -3289,7 +3289,7 @@ mod tests {
         assert!(result.is_err(), "Second publish should fail - quota exceeded");
 
         let error = result.unwrap_err().to_string();
-        assert!(error.contains("quota exceeded"), "Error should mention quota exceeded: {}", error);
+        assert!(error.contains("quota exceeded"), "Error should mention quota exceeded: {error}");
 
         Ok(())
     }

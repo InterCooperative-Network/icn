@@ -176,7 +176,7 @@ impl TestNode {
             let contract_actor_for_notifications = contract_actor_handle.clone();
             let own_did = did.clone();
             let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(move |topic, entry, subscriber_did| {
-                eprintln!("[{}] Notification callback: topic={}, subscriber={}", own_did, topic, subscriber_did);
+                eprintln!("[{own_did}] Notification callback: topic={topic}, subscriber={subscriber_did}");
                 if topic == "contracts:deploy" {
                     let contract_actor = contract_actor_for_notifications.clone();
                     // Use get_data() to handle decompression if needed
@@ -186,26 +186,26 @@ impl TestNode {
                             data
                         }
                         Err(e) => {
-                            eprintln!("[{}] Failed to get entry data: {e}", subscriber_did);
+                            eprintln!("[{subscriber_did}] Failed to get entry data: {e}");
                             return;
                         }
                     };
 
                     tokio::spawn(async move {
-                        eprintln!("[{}] Spawned task to handle deployment", subscriber_did);
+                        eprintln!("[{subscriber_did}] Spawned task to handle deployment");
                         match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
                             Ok(deployment_msg) => {
                                 eprintln!("[{}] Deserialized deployment message for contract: {}", subscriber_did, deployment_msg.contract.name);
                                 let actor = contract_actor.write().await;
-                                eprintln!("[{}] Got contract actor lock, calling handle_deployment_message", subscriber_did);
+                                eprintln!("[{subscriber_did}] Got contract actor lock, calling handle_deployment_message");
                                 if let Err(e) = actor.handle_deployment_message(deployment_msg).await {
-                                    eprintln!("[{}] ✗ Failed to handle contract deployment: {e}", subscriber_did);
+                                    eprintln!("[{subscriber_did}] ✗ Failed to handle contract deployment: {e}");
                                 } else {
-                                    eprintln!("[{}] ✓ Contract deployment handled successfully", subscriber_did);
+                                    eprintln!("[{subscriber_did}] ✓ Contract deployment handled successfully");
                                 }
                             }
                             Err(e) => {
-                                eprintln!("[{}] ✗ Failed to deserialize contract deployment: {e}", subscriber_did);
+                                eprintln!("[{subscriber_did}] ✗ Failed to deserialize contract deployment: {e}");
                             }
                         }
                     });

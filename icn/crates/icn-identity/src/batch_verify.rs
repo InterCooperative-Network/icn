@@ -258,7 +258,7 @@ pub fn verify_signatures_batched(
                 invalid_indices.extend(indices.iter().map(|&i| i + offset));
             }
             BatchVerifyResult::Failed(msg) => {
-                return Err(anyhow!("Batch verification failed: {}", msg));
+                return Err(anyhow!("Batch verification failed: {msg}"));
             }
         }
 
@@ -320,7 +320,7 @@ mod tests {
                 assert_eq!(indices.len(), 1);
                 assert_eq!(indices[0], 1);
             }
-            _ => panic!("Expected SomeInvalid, got {:?}", result),
+            _ => panic!("Expected SomeInvalid, got {result:?}"),
         }
     }
 
@@ -330,7 +330,7 @@ mod tests {
 
         for i in 0..10 {
             let kp = make_test_keypair();
-            let msg = format!("message {}", i).into_bytes();
+            let msg = format!("message {i}").into_bytes();
             let sig = SignatureToVerify::from_keypair(msg, &kp);
             verifier.add(sig);
         }
@@ -345,7 +345,7 @@ mod tests {
 
         for i in 0..10 {
             let kp = make_test_keypair();
-            let msg = format!("message {}", i).into_bytes();
+            let msg = format!("message {i}").into_bytes();
 
             if i == 3 || i == 7 {
                 // Create invalid signature (wrong message)
@@ -366,7 +366,7 @@ mod tests {
                 assert!(indices.contains(&3));
                 assert!(indices.contains(&7));
             }
-            _ => panic!("Expected SomeInvalid, got {:?}", result),
+            _ => panic!("Expected SomeInvalid, got {result:?}"),
         }
     }
 
@@ -399,7 +399,7 @@ mod tests {
 
         for i in 0..250 {
             let kp = make_test_keypair();
-            let msg = format!("message {}", i).into_bytes();
+            let msg = format!("message {i}").into_bytes();
 
             if i == 50 || i == 150 {
                 // Create invalid signatures
@@ -438,7 +438,7 @@ mod tests {
         // First batch
         for i in 0..5 {
             let kp = make_test_keypair();
-            let msg = format!("batch1 message {}", i).into_bytes();
+            let msg = format!("batch1 message {i}").into_bytes();
             let sig = SignatureToVerify::from_keypair(msg, &kp);
             verifier.add(sig);
         }
@@ -450,7 +450,7 @@ mod tests {
         // Second batch (reusing verifier)
         for i in 0..5 {
             let kp = make_test_keypair();
-            let msg = format!("batch2 message {}", i).into_bytes();
+            let msg = format!("batch2 message {i}").into_bytes();
             let sig = SignatureToVerify::from_keypair(msg, &kp);
             verifier.add(sig);
         }

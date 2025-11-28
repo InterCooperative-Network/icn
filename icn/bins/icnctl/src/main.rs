@@ -1723,7 +1723,7 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &PathBuf, 
                 println!("Add peers with: icnctl federation add <peer_url>");
             } else {
                 println!("Configured Bootstrap Peers:\n");
-                println!("{:<60} {}", "URL", "Status");
+                println!("{:<60} Status", "URL");
                 println!("{}", "-".repeat(70));
 
                 // Try to check status from daemon
@@ -1746,7 +1746,7 @@ async fn handle_federation_command(cmd: FederationCommands, data_dir: &PathBuf, 
                     } else {
                         "Invalid URL"
                     };
-                    println!("{:<60} {}", peer_url, status);
+                    println!("{peer_url:<60} {status}");
                 }
             }
         }
@@ -4406,7 +4406,7 @@ fn handle_quota_command(cmd: QuotaCommands, endpoint: &str) -> Result<()> {
                     member.to_string()
                 };
 
-                println!("{:<60} {:>12.2} {:>10} {:>12}", short_member, cpu_hours, tasks, credits);
+                println!("{short_member:<60} {cpu_hours:>12.2} {tasks:>10} {credits:>12}");
             }
         }
     }

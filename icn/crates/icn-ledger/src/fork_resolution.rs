@@ -307,7 +307,7 @@ impl ForkDetector {
             for parent in &entry.parents {
                 self.parent_index
                     .entry(parent.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(entry_hash.clone());
             }
         }
@@ -321,7 +321,7 @@ impl ForkDetector {
             if children.len() > 1 {
                 debug!(
                     "Detected fork: parent {} has {} children",
-                    hex::encode(&parent.0),
+                    hex::encode(parent.0),
                     children.len()
                 );
                 forks.push((parent.clone(), children.clone()));

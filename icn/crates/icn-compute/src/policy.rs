@@ -298,8 +298,8 @@ impl PolicyManager {
         if adjusted_priority != original_priority {
             icn_obs::metrics::compute::priority_adjustments_inc(
                 coop_id,
-                &format!("{:?}", original_priority),
-                &format!("{:?}", adjusted_priority),
+                &format!("{original_priority:?}"),
+                &format!("{adjusted_priority:?}"),
             );
         }
 
@@ -346,8 +346,7 @@ impl PolicyManager {
         {
             if credits_spent >= credits_limit {
                 return Ok(Some(format!(
-                    "Monthly credit quota exceeded: {}/{}",
-                    credits_spent, credits_limit
+                    "Monthly credit quota exceeded: {credits_spent}/{credits_limit}"
                 )));
             }
         }

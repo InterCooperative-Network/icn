@@ -98,16 +98,16 @@ impl Violation {
                 format!("Compute verification failed for task {}", hex::encode(task_hash))
             }
             Violation::ExcessiveResourceUse { metric, observed, limit } => {
-                format!("{}: {} (limit: {})", metric, observed, limit)
+                format!("{metric}: {observed} (limit: {limit})")
             }
             Violation::TrustGraphSpam { rate_per_hour, threshold } => {
-                format!("Trust graph spam: {:.1}/hr (threshold: {:.1})", rate_per_hour, threshold)
+                format!("Trust graph spam: {rate_per_hour:.1}/hr (threshold: {threshold:.1})")
             }
             Violation::ConflictingSignedStatements { conflict_type, .. } => {
-                format!("Conflicting signed statements: {}", conflict_type)
+                format!("Conflicting signed statements: {conflict_type}")
             }
             Violation::ReplayAttack { sequence, .. } => {
-                format!("Replay attack detected (sequence: {})", sequence)
+                format!("Replay attack detected (sequence: {sequence})")
             }
         }
     }
@@ -293,7 +293,7 @@ impl MisbehaviorDetector {
         let score = self
             .reputation_scores
             .entry(did.clone())
-            .or_insert_with(ReputationScore::new);
+            .or_default();
 
         score.apply_penalty(&violation, self.thresholds.decay_rate);
 

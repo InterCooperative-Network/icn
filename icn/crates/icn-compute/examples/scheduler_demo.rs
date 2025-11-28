@@ -102,8 +102,7 @@ fn demo_gpu_placement() {
             .map(|g| g.device_name.as_str())
             .unwrap_or("None");
         println!(
-            "  {}: {} | Trust: {} | Queue: {}",
-            did, gpu_name, trust, queue
+            "  {did}: {gpu_name} | Trust: {trust} | Queue: {queue}"
         );
     }
     println!();
@@ -151,7 +150,7 @@ fn demo_gpu_placement() {
                 offers.push((did, offer));
             }
             None => {
-                println!("  {}: REJECTED (capacity or trust)", did);
+                println!("  {did}: REJECTED (capacity or trust)");
             }
         }
         println!();
@@ -163,7 +162,7 @@ fn demo_gpu_placement() {
             .partial_cmp(&b.1.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     }) {
-        println!("✅ Winner: {}", winner_did);
+        println!("✅ Winner: {winner_did}");
         println!("   Final Score: {:.3}", winner_offer.score);
         println!("   Cost: {} credits/1000 fuel", winner_offer.cost);
         println!("   Estimated Start: +{} ms", winner_offer.estimated_start - 1000);

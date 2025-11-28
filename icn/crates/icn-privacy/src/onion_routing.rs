@@ -135,16 +135,14 @@ impl OnionRouter {
         for relay_did in &relays {
             if !self.peer_public_keys.contains_key(relay_did) {
                 return Err(PrivacyError::OnionRoutingError(format!(
-                    "Missing public key for {}",
-                    relay_did
+                    "Missing public key for {relay_did}"
                 )));
             }
         }
 
         if !self.peer_public_keys.contains_key(&recipient) {
             return Err(PrivacyError::OnionRoutingError(format!(
-                "Missing public key for {}",
-                recipient
+                "Missing public key for {recipient}"
             )));
         }
 
@@ -172,7 +170,7 @@ impl OnionRouter {
             payload: payload.to_vec(),
         };
         let final_bytes = bincode::serialize(&final_content)
-            .map_err(|e| PrivacyError::OnionRoutingError(format!("Serialization failed: {}", e)))?;
+            .map_err(|e| PrivacyError::OnionRoutingError(format!("Serialization failed: {e}")))?;
 
         // Get recipient's public key
         let recipient_pk = self.peer_public_keys.get(&circuit.recipient).ok_or_else(|| {
@@ -197,12 +195,12 @@ impl OnionRouter {
             };
 
             let relay_bytes = bincode::serialize(&relay_content).map_err(|e| {
-                PrivacyError::OnionRoutingError(format!("Serialization failed: {}", e))
+                PrivacyError::OnionRoutingError(format!("Serialization failed: {e}"))
             })?;
 
             // Get relay's public key
             let relay_pk = self.peer_public_keys.get(relay_did).ok_or_else(|| {
-                PrivacyError::OnionRoutingError(format!("Missing public key for relay {}", relay_did))
+                PrivacyError::OnionRoutingError(format!("Missing public key for relay {relay_did}"))
             })?;
 
             current_layer = self.encrypt_layer(&relay_bytes, relay_pk)?;
@@ -238,7 +236,7 @@ impl OnionRouter {
 
         // Deserialize to determine if relay or final
         let content: LayerContent = bincode::deserialize(&decrypted).map_err(|e| {
-            PrivacyError::OnionRoutingError(format!("Deserialization failed: {}", e))
+            PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}"))
         })?;
 
         icn_obs::metrics::privacy::onion_hops_forwarded_inc();
@@ -273,7 +271,7 @@ impl OnionRouter {
         let decrypted = self.decrypt_layer(current_layer)?;
 
         let content: LayerContent = bincode::deserialize(&decrypted).map_err(|e| {
-            PrivacyError::OnionRoutingError(format!("Deserialization failed: {}", e))
+            PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}"))
         })?;
 
         match content {
