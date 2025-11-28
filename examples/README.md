@@ -170,4 +170,4 @@ Have an idea for a useful example? Contributions are welcome!
 - Includes cleanup steps
 - Runs in < 30 minutes
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines (coming soon).
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.

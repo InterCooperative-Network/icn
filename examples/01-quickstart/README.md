@@ -251,10 +251,11 @@ The script will:
 Now that you have a working network, try:
 
 1. **Explore gossip:** See [docs/topic-subscriptions-api.md](../../docs/topic-subscriptions-api.md)
-2. **Deploy contracts:** See [examples/03-contracts/](../03-contracts/) (coming soon)
-3. **Use the ledger:** See [examples/04-ledger/](../04-ledger/) (coming soon)
-4. **Docker deployment:** See [docker/](../../docker/)
-5. **Production setup:** See [docs/deployment-guide.md](../../docs/deployment-guide.md)
+2. **CCL contracts:** See [examples/contracts/](../contracts/) for example contracts
+3. **WASM compute:** See [examples/wasm-compute/](../wasm-compute/) for WASM modules
+4. **TypeScript SDK:** See [sdk/typescript/examples/](../../sdk/typescript/examples/) for SDK examples
+5. **Docker deployment:** See [docker/](../../docker/)
+6. **Production setup:** See [docs/deployment-guide.md](../../docs/deployment-guide.md)
 
 ## Key Concepts Demonstrated
 
