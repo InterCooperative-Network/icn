@@ -110,7 +110,7 @@ impl EncryptedEnvelope {
         // Encrypt with AEAD (includes authentication tag)
         let ciphertext = cipher
             .encrypt(&nonce, plaintext)
-            .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
 
         Ok(EncryptedEnvelope {
             from: from.clone(),
@@ -164,7 +164,7 @@ impl EncryptedEnvelope {
         // Decrypt and verify authentication tag
         let plaintext = cipher
             .decrypt(&nonce, self.ciphertext.as_ref())
-            .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
 
         Ok(plaintext)
     }
@@ -222,7 +222,7 @@ fn derive_encryption_key(shared_secret: &[u8]) -> [u8; 32] {
 fn derive_nonce(sequence: u64, from: &Did, to: &Did) -> Result<Nonce> {
     let mut hasher = Sha256::new();
     hasher.update(b"ICN-NONCE-V1");
-    hasher.update(&sequence.to_be_bytes());
+    hasher.update(sequence.to_be_bytes());
     hasher.update(from.as_str().as_bytes());
     hasher.update(to.as_str().as_bytes());
     let hash = hasher.finalize();

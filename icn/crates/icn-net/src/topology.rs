@@ -158,8 +158,10 @@ pub struct TopologyInfo {
 /// Node role in the network topology
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum NodeRole {
     /// Edge node (standard peer)
+    #[default]
     Edge,
     /// Rendezvous server (bootstrap/discovery)
     Rendezvous,
@@ -167,11 +169,6 @@ pub enum NodeRole {
     Archive,
 }
 
-impl Default for NodeRole {
-    fn default() -> Self {
-        NodeRole::Edge
-    }
-}
 
 /// Neighbor set size limits
 #[derive(Debug, Clone, Serialize, Deserialize)]

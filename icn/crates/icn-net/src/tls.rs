@@ -62,7 +62,7 @@ pub fn generate_self_signed_cert(
     // Export certificate and key
     let cert_der = CertificateDer::from(cert.der().to_vec());
     let key_der = PrivateKeyDer::try_from(key_pair.serialize_der())
-        .map_err(|e| anyhow::anyhow!("Failed to serialize private key: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to serialize private key: {e}"))?;
 
     Ok((vec![cert_der], key_der))
 }
@@ -154,7 +154,7 @@ impl DidCertificateVerifier {
 
         // Parse X.509 certificate
         let (_, parsed_cert) = X509Certificate::from_der(cert)
-            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {}", e)))?;
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {e}")))?;
 
         // Look for DID in Subject Alternative Names
         if let Ok(Some(san_ext)) = parsed_cert.subject_alternative_name() {
@@ -178,7 +178,7 @@ impl DidCertificateVerifier {
         use x509_parser::prelude::*;
 
         let (_, parsed_cert) = X509Certificate::from_der(cert)
-            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {}", e)))?;
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {e}")))?;
 
         let current_time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(now.as_secs());
         let not_before = parsed_cert.validity().not_before.to_datetime();
@@ -215,14 +215,13 @@ impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
         // Validate DID format
         if !did_str.starts_with("did:icn:") {
             return Err(rustls::Error::General(format!(
-                "Invalid DID format: {}",
-                did_str
+                "Invalid DID format: {did_str}"
             )));
         }
 
         // Parse DID
         let peer_did = Did::from_str(&did_str)
-            .map_err(|e| rustls::Error::General(format!("Failed to parse DID: {}", e)))?;
+            .map_err(|e| rustls::Error::General(format!("Failed to parse DID: {e}")))?;
 
         // Check certificate expiration
         Self::check_expiration(end_entity, now)?;
@@ -296,7 +295,7 @@ impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
         // Parse the certificate to extract the public key
         use x509_parser::prelude::*;
         let (_, parsed_cert) = X509Certificate::from_der(cert)
-            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {}", e)))?;
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {e}")))?;
 
         // Extract the public key bytes
         let public_key_bytes = parsed_cert.public_key().subject_public_key.data.clone();
@@ -316,16 +315,16 @@ impl rustls::client::danger::ServerCertVerifier for DidCertificateVerifier {
 
         // Create Ed25519 verifying key
         let verifying_key = VerifyingKey::from_bytes(&key_array)
-            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 public key: {}", e)))?;
+            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 public key: {e}")))?;
 
         // Parse signature
-        let signature = Signature::from_slice(&dss.signature())
-            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 signature: {}", e)))?;
+        let signature = Signature::from_slice(dss.signature())
+            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 signature: {e}")))?;
 
         // Verify signature
         verifying_key
             .verify(message, &signature)
-            .map_err(|e| rustls::Error::General(format!("Signature verification failed: {}", e)))?;
+            .map_err(|e| rustls::Error::General(format!("Signature verification failed: {e}")))?;
 
         Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
     }

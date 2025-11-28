@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 /// Hash a sequence number to a 32-byte hash for Bloom filter
 fn hash_sequence(sequence: u64) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(&sequence.to_be_bytes());
+    hasher.update(sequence.to_be_bytes());
     hasher.finalize().into()
 }
 

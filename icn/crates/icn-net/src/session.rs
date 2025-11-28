@@ -237,13 +237,17 @@ impl SessionManager {
     /// we don't overwrite it to avoid connection confusion. Both connections will
     /// have handlers running, but we prefer the connection we dialed.
     pub async fn store_incoming_connection(&self, peer_did: String, connection: quinn::Connection) {
+        use std::collections::hash_map::Entry;
         let mut connections = self.connections.write().await;
-        if connections.contains_key(&peer_did) {
-            info!("Connection already exists for {}, not overwriting with incoming connection from {}",
-                  peer_did, connection.remote_address());
-        } else {
-            info!("Storing incoming connection from {} at {}", peer_did, connection.remote_address());
-            connections.insert(peer_did, connection);
+        match connections.entry(peer_did) {
+            Entry::Occupied(entry) => {
+                info!("Connection already exists for {}, not overwriting with incoming connection from {}",
+                      entry.key(), connection.remote_address());
+            }
+            Entry::Vacant(entry) => {
+                info!("Storing incoming connection from {} at {}", entry.key(), connection.remote_address());
+                entry.insert(connection);
+            }
         }
     }
 

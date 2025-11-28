@@ -56,13 +56,13 @@ impl StunClient {
             // Use tokio's DNS resolver to lookup the hostname
             let addrs: Vec<SocketAddr> = tokio::net::lookup_host(hostname)
                 .await
-                .context(format!("Failed to resolve STUN server: {}", hostname))?
+                .context(format!("Failed to resolve STUN server: {hostname}"))?
                 .collect();
 
             if let Some(addr) = addrs.first() {
                 servers.push(*addr);
             } else {
-                anyhow::bail!("No addresses found for STUN server: {}", hostname);
+                anyhow::bail!("No addresses found for STUN server: {hostname}");
             }
         }
         Ok(servers)
@@ -210,9 +210,7 @@ impl StunClient {
 
         if from != *server {
             anyhow::bail!(
-                "Received response from unexpected source: {} (expected {})",
-                from,
-                server
+                "Received response from unexpected source: {from} (expected {server})"
             );
         }
 
@@ -256,14 +254,13 @@ fn parse_stun_binding_response(
 
     // Check for Binding Success Response (0x0101)
     if msg_type != 0x0101 {
-        anyhow::bail!("Unexpected STUN message type: 0x{:04x}", msg_type);
+        anyhow::bail!("Unexpected STUN message type: 0x{msg_type:04x}");
     }
 
     // Verify magic cookie
     if magic_cookie != 0x2112A442 {
         anyhow::bail!(
-            "Invalid STUN magic cookie: 0x{:08x} (expected 0x2112A442)",
-            magic_cookie
+            "Invalid STUN magic cookie: 0x{magic_cookie:08x} (expected 0x2112A442)"
         );
     }
 
@@ -282,7 +279,7 @@ fn parse_stun_binding_response(
         offset += 4;
 
         if offset + (attr_length as usize) > end {
-            anyhow::bail!("Malformed STUN attribute at offset {}", offset);
+            anyhow::bail!("Malformed STUN attribute at offset {offset}");
         }
 
         // XOR-MAPPED-ADDRESS attribute (0x0020)
@@ -349,7 +346,7 @@ fn parse_xor_mapped_address(data: &[u8], transaction_id: &[u8; 12]) -> Result<So
             let ip = std::net::Ipv6Addr::from(xaddr);
             Ok(SocketAddr::new(ip.into(), port))
         }
-        _ => anyhow::bail!("Unknown address family: 0x{:02x}", family),
+        _ => anyhow::bail!("Unknown address family: 0x{family:02x}"),
     }
 }
 

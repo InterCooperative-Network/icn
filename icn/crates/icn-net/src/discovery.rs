@@ -157,7 +157,7 @@ impl Discovery {
                     };
 
                     // Parse DID
-                    let did = match parse_did(&did_str) {
+                    let did = match parse_did(did_str) {
                         Ok(did) => did,
                         Err(e) => {
                             warn!("Invalid DID {}: {}", did_str, e);

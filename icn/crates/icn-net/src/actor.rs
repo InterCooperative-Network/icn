@@ -158,8 +158,7 @@ impl NetworkHandle {
         // Check if peer supports E2E encryption
         if !self.peer_has_capability(recipient, CapabilityFlags::E2E_ENCRYPTION).await {
             anyhow::bail!(
-                "Peer {} does not support E2E_ENCRYPTION capability (or handshake not complete)",
-                recipient
+                "Peer {recipient} does not support E2E_ENCRYPTION capability (or handshake not complete)"
             );
         }
 
@@ -173,7 +172,7 @@ impl NetworkHandle {
 
         // Create encrypted envelope
         let encrypted = EncryptedEnvelope::encrypt(
-            &sender_keypair.did(),
+            sender_keypair.did(),
             recipient,
             sequence,
             sender_x25519_secret,
@@ -183,7 +182,7 @@ impl NetworkHandle {
 
         // Sign the encrypted envelope
         let signed = SignedEnvelope::new(
-            &sender_keypair.did(),
+            sender_keypair.did(),
             sender_keypair,
             sequence,
             crate::PayloadType::Encrypted,
@@ -494,16 +493,13 @@ impl NetworkHandle {
                     .context("Failed to parse DID from legacy network state")?;
 
                 // Only restore if not already present from modern format
-                if !connections_write.contains_key(&did) {
-                    let connection_info = PeerConnectionInfo {
-                        did: did.clone(),
-                        negotiated_version: 1, // Assume v1 for legacy
-                        peer_capabilities: crate::CapabilityFlags::empty(),
-                        peer_software: "legacy-unknown".to_string(),
-                        x25519_key: key,
-                    };
-                    connections_write.insert(did, connection_info);
-                }
+                connections_write.entry(did.clone()).or_insert_with(|| PeerConnectionInfo {
+                    did,
+                    negotiated_version: 1, // Assume v1 for legacy
+                    peer_capabilities: crate::CapabilityFlags::empty(),
+                    peer_software: "legacy-unknown".to_string(),
+                    x25519_key: key,
+                });
             }
 
             tracing::info!(
@@ -1372,15 +1368,19 @@ impl NetworkActor {
                                     // Store the incoming QUIC connection in session_manager
                                     // This enables us to send messages back to the peer on this connection
                                     // Get the connections Arc without holding the outer lock across the await
+                                    use std::collections::hash_map::Entry;
                                     let connections_arc = session_manager.read().await.connections_arc();
                                     let peer_did = message.from.to_string();
                                     let mut connections = connections_arc.write().await;
-                                    if connections.contains_key(&peer_did) {
-                                        info!("Connection already exists for {}, not overwriting with incoming connection from {}",
-                                              peer_did, connection.remote_address());
-                                    } else {
-                                        info!("Storing incoming connection from {} at {}", peer_did, connection.remote_address());
-                                        connections.insert(peer_did, connection.clone());
+                                    match connections.entry(peer_did) {
+                                        Entry::Occupied(entry) => {
+                                            info!("Connection already exists for {}, not overwriting with incoming connection from {}",
+                                                  entry.key(), connection.remote_address());
+                                        }
+                                        Entry::Vacant(entry) => {
+                                            info!("Storing incoming connection from {} at {}", entry.key(), connection.remote_address());
+                                            entry.insert(connection.clone());
+                                        }
                                     }
 
                                     // Add peer to neighbor sets if topology is enabled
@@ -1542,12 +1542,10 @@ impl NetworkActor {
 
                                                 if let Err(e) = write_message(&mut new_send, &response_msg).await {
                                                     warn!("Failed to send handshake response to {}: {}", from_did, e);
+                                                } else if let Err(e) = new_send.finish() {
+                                                    warn!("Failed to finish handshake response stream to {}: {}", from_did, e);
                                                 } else {
-                                                    if let Err(e) = new_send.finish() {
-                                                        warn!("Failed to finish handshake response stream to {}: {}", from_did, e);
-                                                    } else {
-                                                        info!("Sent handshake response to {}", from_did);
-                                                    }
+                                                    info!("Sent handshake response to {}", from_did);
                                                 }
                                             }
                                             Err(e) => {
@@ -1655,7 +1653,7 @@ impl NetworkActor {
                                             let message_hash = {
                                                 use sha2::{Digest, Sha256};
                                                 let mut hasher = Sha256::new();
-                                                hasher.update(&envelope.sequence.to_be_bytes());
+                                                hasher.update(envelope.sequence.to_be_bytes());
                                                 hasher.update(envelope.from.as_str().as_bytes());
                                                 hasher.finalize().to_vec()
                                             };
@@ -1683,7 +1681,7 @@ impl NetworkActor {
                                                     let message_hash = {
                                                         use sha2::{Digest, Sha256};
                                                         let mut hasher = Sha256::new();
-                                                        hasher.update(&envelope.sequence.to_be_bytes());
+                                                        hasher.update(envelope.sequence.to_be_bytes());
                                                         hasher.update(envelope.from.as_str().as_bytes());
                                                         hasher.finalize().to_vec()
                                                     };
@@ -1917,16 +1915,13 @@ impl NetworkActor {
                 .context("Failed to parse DID from legacy peer X25519 keys")?;
 
             // Only restore if not already present from modern format
-            if !connections.contains_key(&did) {
-                let connection_info = PeerConnectionInfo {
-                    did: did.clone(),
-                    negotiated_version: 1, // Assume v1 for legacy
-                    peer_capabilities: crate::CapabilityFlags::empty(),
-                    peer_software: "legacy-unknown".to_string(),
-                    x25519_key: key,
-                };
-                connections.insert(did, connection_info);
-            }
+            connections.entry(did.clone()).or_insert_with(|| PeerConnectionInfo {
+                did,
+                negotiated_version: 1, // Assume v1 for legacy
+                peer_capabilities: crate::CapabilityFlags::empty(),
+                peer_software: "legacy-unknown".to_string(),
+                x25519_key: key,
+            });
         }
         drop(connections);
 

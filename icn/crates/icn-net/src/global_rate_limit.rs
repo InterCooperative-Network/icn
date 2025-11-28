@@ -100,12 +100,12 @@ impl GlobalRateLimiter {
             if now.duration_since(*start) >= Duration::from_secs(1) {
                 *start = now;
                 self.message_count.store(1, Ordering::Relaxed); // Count this message
-                return true; // First message in new window always allowed
+                true// First message in new window always allowed
             } else {
                 // Another thread reset the window
                 drop(start);
                 let count = self.message_count.fetch_add(1, Ordering::Relaxed);
-                return count < self.max_global_mps as u64;
+                count < self.max_global_mps as u64
             }
         }
     }

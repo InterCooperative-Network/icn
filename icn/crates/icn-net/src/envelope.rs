@@ -129,7 +129,7 @@ impl SignedEnvelope {
         let max_age_ms = max_age_secs * 1000;
 
         if age_ms > max_age_ms {
-            anyhow::bail!("Message too old: {}ms (max {}ms)", age_ms, max_age_ms);
+            anyhow::bail!("Message too old: {age_ms}ms (max {max_age_ms}ms)");
         }
 
         // Also check for messages from the future (clock skew)

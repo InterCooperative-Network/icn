@@ -362,17 +362,13 @@ impl NetworkMessage {
     pub fn validate_version(version: u32) -> Result<()> {
         if version < MIN_SUPPORTED_VERSION {
             anyhow::bail!(
-                "Protocol version {} is too old (minimum supported: {})",
-                version,
-                MIN_SUPPORTED_VERSION
+                "Protocol version {version} is too old (minimum supported: {MIN_SUPPORTED_VERSION})"
             );
         }
 
         if version > MAX_SUPPORTED_VERSION {
             anyhow::bail!(
-                "Protocol version {} is too new (maximum supported: {}). Please upgrade ICNd.",
-                version,
-                MAX_SUPPORTED_VERSION
+                "Protocol version {version} is too new (maximum supported: {MAX_SUPPORTED_VERSION}). Please upgrade ICNd."
             );
         }
 
@@ -434,9 +430,7 @@ pub async fn read_message(
     }
     if len_u32 > MAX_MESSAGE_SIZE as u32 {
         anyhow::bail!(
-            "Message too large: {} bytes (max {})",
-            len_u32,
-            MAX_MESSAGE_SIZE
+            "Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})"
         );
     }
 

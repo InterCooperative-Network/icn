@@ -90,7 +90,7 @@ impl BlobLocationRegistry {
     pub fn announce_blob(&mut self, blob_hash: ContentHash, peer_did: Did, size_bytes: u64) {
         let location = BlobLocation::new(peer_did.clone(), size_bytes);
 
-        let locations = self.locations.entry(blob_hash).or_insert_with(Vec::new);
+        let locations = self.locations.entry(blob_hash).or_default();
 
         // Check if peer already announced this blob
         if let Some(existing) = locations.iter_mut().find(|loc| loc.peer_did == peer_did) {
