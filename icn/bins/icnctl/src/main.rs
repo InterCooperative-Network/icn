@@ -847,6 +847,74 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
+/// Create an RPC client, optionally with authentication
+///
+/// Tries to authenticate if:
+/// 1. The keystore exists
+/// 2. ICN_PASSPHRASE env var is set (non-interactive)
+///
+/// For interactive use, the client starts unauthenticated and will prompt
+/// if needed on auth failure.
+fn create_rpc_client(
+    endpoint: &str,
+    data_dir: &Path,
+    require_auth: bool,
+) -> Result<icn_rpc::RpcClient> {
+    let rpc_addr: std::net::SocketAddr = endpoint
+        .parse()
+        .with_context(|| format!("Invalid RPC endpoint: {}", endpoint))?;
+
+    let keystore_path = get_keystore_path(data_dir);
+
+    // Check if we can/should authenticate
+    let passphrase_available = std::env::var("ICN_PASSPHRASE").is_ok();
+    let keystore_exists = keystore_path.exists();
+
+    if require_auth && !keystore_exists {
+        bail!("Authentication required but no identity found. Run 'icnctl id init' first.");
+    }
+
+    // Use authenticated client if passphrase is available and keystore exists
+    if passphrase_available && keystore_exists {
+        let passphrase = std::env::var("ICN_PASSPHRASE").unwrap();
+        let mut keystore = AgeKeyStore::open(&keystore_path)?;
+        keystore.unlock(passphrase.as_bytes())?;
+        let keypair = keystore.get_keypair()?;
+        Ok(icn_rpc::RpcClient::with_credentials(
+            rpc_addr,
+            std::sync::Arc::new(keypair.clone()),
+        ))
+    } else {
+        // Unauthenticated client - works in dev mode
+        Ok(icn_rpc::RpcClient::new(rpc_addr))
+    }
+}
+
+/// Create an RPC client with authentication (prompts for passphrase)
+fn create_authenticated_rpc_client(
+    endpoint: &str,
+    data_dir: &Path,
+) -> Result<icn_rpc::RpcClient> {
+    let rpc_addr: std::net::SocketAddr = endpoint
+        .parse()
+        .with_context(|| format!("Invalid RPC endpoint: {}", endpoint))?;
+
+    let keystore_path = get_keystore_path(data_dir);
+    if !keystore_path.exists() {
+        bail!("No identity found. Run 'icnctl id init' first.");
+    }
+
+    let passphrase = read_passphrase("Enter passphrase for RPC authentication: ")?;
+    let mut keystore = AgeKeyStore::open(&keystore_path)?;
+    keystore.unlock(&passphrase)?;
+    let keypair = keystore.get_keypair()?;
+
+    Ok(icn_rpc::RpcClient::with_credentials(
+        rpc_addr,
+        std::sync::Arc::new(keypair.clone()),
+    ))
+}
+
 fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
     // Check for ICN_PASSPHRASE environment variable first
     if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
@@ -1677,34 +1745,65 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
     println!("  RPC endpoint:   {}", endpoint);
     println!();
 
-    // Try to connect to daemon
-    let rpc_addr: std::net::SocketAddr = match endpoint.parse() {
-        Ok(addr) => addr,
+    // Try to connect to daemon (auto-authenticate if ICN_PASSPHRASE is set)
+    let mut client = match create_rpc_client(endpoint, data_dir, false) {
+        Ok(c) => c,
         Err(e) => {
             println!("Daemon Connection: FAILED");
-            println!("  Invalid endpoint: {}", e);
+            println!("  Error: {}", e);
             return Ok(());
         }
     };
 
-    let mut client = icn_rpc::RpcClient::new(rpc_addr);
-
-    // Get daemon status
-    match client.get_status().await {
-        Ok(status) => {
-            println!("Daemon Status:");
-            println!("  Running:      {}", if status.running { "YES" } else { "NO" });
-            println!("  Listen addr:  {}", status.listen_addr);
-        }
+    // Get daemon status - may require auth retry
+    let status = match client.get_status().await {
+        Ok(s) => s,
         Err(e) => {
-            println!("Daemon Status: NOT CONNECTED");
-            println!("  Error: {}", e);
-            println!();
-            println!("Is the ICN daemon running? Start it with:");
-            println!("  icnd");
-            return Ok(());
+            let err_str = e.to_string();
+            // Check if this is an auth error
+            if err_str.contains("Authentication required") {
+                println!("Note: Daemon requires authentication.");
+                // Try with credentials
+                let keystore_path = get_keystore_path(data_dir);
+                if keystore_path.exists() {
+                    println!();
+                    client = match create_authenticated_rpc_client(endpoint, data_dir) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            println!("Daemon Status: AUTH FAILED");
+                            println!("  Error: {}", e);
+                            return Ok(());
+                        }
+                    };
+                    // Retry with auth
+                    match client.get_status().await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            println!("Daemon Status: NOT CONNECTED");
+                            println!("  Error: {}", e);
+                            return Ok(());
+                        }
+                    }
+                } else {
+                    println!("Daemon Status: AUTH REQUIRED");
+                    println!("  No identity found. Run 'icnctl id init' first.");
+                    println!("  Or set ICN_PASSPHRASE env var for non-interactive auth.");
+                    return Ok(());
+                }
+            } else {
+                println!("Daemon Status: NOT CONNECTED");
+                println!("  Error: {}", e);
+                println!();
+                println!("Is the ICN daemon running? Start it with:");
+                println!("  icnd");
+                return Ok(());
+            }
         }
-    }
+    };
+
+    println!("Daemon Status:");
+    println!("  Running:      {}", if status.running { "YES" } else { "NO" });
+    println!("  Listen addr:  {}", status.listen_addr);
     println!();
 
     // Get network stats

@@ -100,15 +100,17 @@ ICN is **substrate-complete** (~80% architecturally sound) but **integration-inc
 | Interpreter | ✅ | ✅ | Fuel-metered execution |
 | Capability system | ✅ | ✅ | ReadLedger, WriteLedger, ReadTrust |
 | Compute execution | ✅ | ✅ | LocalExecutor runs CCL |
-| Contract registry | ❌ | ❌ | Contracts are ephemeral |
-| Gossip deployment | ❌ | ❌ | Each task requires full code |
+| Contract registry | ✅ | ⚠️ | Code exists, needs supervisor wiring |
+| CclRef task code | ✅ | ⚠️ | TaskCode::CclRef variant ready |
+| Gossip deployment | ❌ | ❌ | Registry sync not yet implemented |
 
-**Gap**: No persistent contract registry. Every compute task must include the full contract code. Can't "deploy once, invoke many times."
+**Progress (2025-11-28)**: Contract registry implemented with persistent storage and in-memory caching. Deploy once, invoke by hash pattern ready. Executor handles CclRef variant.
 
 **Files**:
 - `icn-ccl/src/ast.rs` - AST types ✅
 - `icn-ccl/src/interpreter.rs` - Execution ✅
-- `icn-ccl/src/actor.rs:125` - Registry stub
+- `icn-ccl/src/registry.rs` - ContractRegistry ✅ NEW
+- `icn-compute/src/types.rs` - TaskCode::CclRef ✅
 
 ---
 

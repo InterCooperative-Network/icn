@@ -1,7 +1,13 @@
 //! JSON-RPC client for CLI communication with daemon
+//!
+//! Supports optional JWT authentication:
+//! - Without credentials: works in dev mode (auth disabled)
+//! - With credentials: performs challenge-response auth and includes JWT token
 
 use anyhow::{Context, Result};
+use icn_identity::KeyPair;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use crate::types::{
     ContractExecutionResponse, ContractInfo, LedgerBalance, LedgerEntry, NetworkStats,
@@ -12,19 +18,136 @@ use crate::types::{
 pub struct RpcClient {
     base_url: String,
     next_id: u64,
+    /// JWT token for authenticated requests
+    token: Option<String>,
+    /// Credentials for authentication (DID + keypair)
+    credentials: Option<Arc<KeyPair>>,
 }
 
 impl RpcClient {
-    /// Create a new RPC client
+    /// Create a new RPC client without authentication
+    ///
+    /// This works only when the daemon has auth disabled (development mode).
     pub fn new(addr: SocketAddr) -> Self {
         RpcClient {
             base_url: format!("http://{addr}"),
             next_id: 1,
+            token: None,
+            credentials: None,
         }
     }
 
-    /// Call an RPC method
+    /// Create a new RPC client with authentication credentials
+    ///
+    /// The client will automatically authenticate when making its first request.
+    pub fn with_credentials(addr: SocketAddr, keypair: Arc<KeyPair>) -> Self {
+        RpcClient {
+            base_url: format!("http://{addr}"),
+            next_id: 1,
+            token: None,
+            credentials: Some(keypair),
+        }
+    }
+
+    /// Authenticate with the RPC server using challenge-response flow
+    ///
+    /// This is called automatically when credentials are provided and a token is needed.
+    /// Can also be called manually to refresh an expired token.
+    pub async fn authenticate(&mut self, scopes: Vec<String>) -> Result<()> {
+        // Clone the keypair to avoid borrow conflicts
+        let keypair = self
+            .credentials
+            .clone()
+            .context("No credentials configured for authentication")?;
+
+        let did = keypair.did();
+        let did_str = did.to_string();
+
+        // Step 1: Request challenge
+        let challenge_result = self
+            .call_raw(
+                "auth.challenge",
+                serde_json::json!({ "did": did_str }),
+            )
+            .await?;
+
+        let nonce = challenge_result["nonce"]
+            .as_str()
+            .context("Missing nonce in challenge response")?;
+
+        // Step 2: Sign the nonce
+        let nonce_bytes = hex::decode(nonce).context("Invalid nonce format")?;
+        let signature = keypair.sign(&nonce_bytes);
+        let signature_hex = hex::encode(signature.to_bytes());
+
+        // Step 3: Verify and get token
+        let verify_result = self
+            .call_raw(
+                "auth.verify",
+                serde_json::json!({
+                    "did": did_str,
+                    "signature": signature_hex,
+                    "scopes": scopes,
+                }),
+            )
+            .await?;
+
+        let token = verify_result["token"]
+            .as_str()
+            .context("Missing token in verify response")?
+            .to_string();
+
+        self.token = Some(token);
+
+        tracing::debug!(did = %did_str, "RPC client authenticated");
+        Ok(())
+    }
+
+    /// Check if the client is authenticated
+    pub fn is_authenticated(&self) -> bool {
+        self.token.is_some()
+    }
+
+    /// Clear the current authentication token
+    pub fn clear_token(&mut self) {
+        self.token = None;
+    }
+
+    /// Call an RPC method (with automatic auth if credentials are set)
     async fn call(&mut self, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
+        // Auto-authenticate if we have credentials but no token
+        // (and this isn't an auth method)
+        if self.credentials.is_some()
+            && self.token.is_none()
+            && !method.starts_with("auth.")
+        {
+            // Request all read scopes for general use
+            self.authenticate(vec![
+                "network:read".to_string(),
+                "network:write".to_string(),
+                "ledger:read".to_string(),
+                "ledger:write".to_string(),
+                "contract:read".to_string(),
+                "contract:write".to_string(),
+                "compute:read".to_string(),
+                "compute:write".to_string(),
+                "governance:read".to_string(),
+                "governance:write".to_string(),
+                "policy:read".to_string(),
+                "policy:write".to_string(),
+            ])
+            .await?;
+        }
+
+        self.call_raw(method, params).await
+    }
+
+    /// Call an RPC method without automatic authentication
+    async fn call_raw(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         let request = RpcRequest {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
@@ -34,9 +157,14 @@ impl RpcClient {
         self.next_id += 1;
 
         let client = reqwest::Client::new();
-        let response = client
-            .post(&self.base_url)
-            .json(&request)
+        let mut req_builder = client.post(&self.base_url).json(&request);
+
+        // Add authorization header if we have a token
+        if let Some(token) = &self.token {
+            req_builder = req_builder.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = req_builder
             .send()
             .await
             .context("Failed to send RPC request")?;
@@ -47,6 +175,16 @@ impl RpcClient {
             .context("Failed to parse RPC response")?;
 
         if let Some(error) = rpc_response.error {
+            // Check for auth errors
+            if error.code == -32001 {
+                anyhow::bail!(
+                    "Authentication required: {}. Use --credentials or run daemon with auth disabled.",
+                    error.message
+                );
+            }
+            if error.code == -32002 {
+                anyhow::bail!("Authorization failed: {}", error.message);
+            }
             anyhow::bail!("RPC error {}: {}", error.code, error.message);
         }
 

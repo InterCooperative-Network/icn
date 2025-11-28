@@ -294,6 +294,19 @@ impl Executor for WasmExecutor {
                     }
                 }
             }
+            TaskCode::CclRef { hash, rule } => {
+                // CclRef requires a contract registry to be set up
+                let hash_hex = hex::encode(hash);
+                tracing::warn!(
+                    hash = %hash_hex,
+                    rule = %rule,
+                    "CclRef requires contract registry (not yet integrated)"
+                );
+                ExecutionOutcome::Failed(format!(
+                    "Contract reference {} not resolved. Registry integration pending.",
+                    hash_hex
+                ))
+            }
             TaskCode::WasmInline(bytes) => self.execute_wasm(bytes, &task.inputs, ctx),
             TaskCode::WasmRef(_hash) => {
                 // TODO: Fetch WASM from blob storage using hash

@@ -167,6 +167,20 @@ impl ComputeTask {
             TaskCode::WasmRef(_) => {
                 // Hash is always valid by type
             }
+            TaskCode::CclRef { rule, .. } => {
+                // Hash is always valid by type, but rule name must be non-empty
+                if rule.is_empty() {
+                    return Err(crate::error::ComputeError::InvalidCode(
+                        "Rule name cannot be empty".into(),
+                    ));
+                }
+                if rule.len() > 256 {
+                    return Err(crate::error::ComputeError::InvalidCode(format!(
+                        "Rule name too long: {} chars (max 256)",
+                        rule.len()
+                    )));
+                }
+            }
         }
 
         // Validate input size
@@ -211,11 +225,21 @@ impl ComputeTask {
     }
 }
 
+/// Content hash for contract/WASM addressing
+pub type ContentHash = [u8; 32];
+
 /// Task code format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskCode {
-    /// CCL source code
+    /// CCL source code (inline)
     Ccl(String),
+    /// Reference to CCL contract by hash (from registry)
+    CclRef {
+        /// Content hash of the contract
+        hash: ContentHash,
+        /// Rule to execute
+        rule: String,
+    },
     /// Reference to WASM module by hash
     WasmRef(TaskHash),
     /// Inline WASM bytes (small modules only)

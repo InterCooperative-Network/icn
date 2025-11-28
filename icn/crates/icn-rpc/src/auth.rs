@@ -14,6 +14,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::broadcast;
 
 use ed25519_dalek::{Signature, Verifier};
 use icn_identity::Did;
@@ -80,6 +81,9 @@ impl RpcTokenClaims {
         false
     }
 }
+
+/// Cleanup interval for expired challenges (5 minutes)
+const CLEANUP_INTERVAL: Duration = Duration::from_secs(300);
 
 /// RPC Authentication Manager
 pub struct RpcAuthManager {
@@ -244,6 +248,47 @@ impl RpcAuthManager {
         challenges.retain(|_, challenge| now.saturating_sub(challenge.created_at) < ttl);
 
         Ok(initial_count - challenges.len())
+    }
+
+    /// Start background task to periodically clean up expired challenges
+    ///
+    /// Returns immediately. The cleanup task runs every 5 minutes until the shutdown
+    /// signal is received. This prevents memory growth from abandoned authentication attempts.
+    pub fn start_cleanup_task(
+        self: &Arc<Self>,
+        mut shutdown: broadcast::Receiver<()>,
+    ) -> tokio::task::JoinHandle<()> {
+        let manager = Arc::clone(self);
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        match manager.cleanup_expired_challenges() {
+                            Ok(0) => {} // No expired challenges
+                            Ok(n) => {
+                                tracing::debug!(cleaned = n, "Cleaned up expired RPC auth challenges");
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Failed to clean up expired challenges");
+                            }
+                        }
+                    }
+                    _ = shutdown.recv() => {
+                        tracing::debug!("RPC auth cleanup task shutting down");
+                        break;
+                    }
+                }
+            }
+        })
+    }
+
+    /// Get the number of pending challenges (for metrics/debugging)
+    pub fn pending_challenge_count(&self) -> usize {
+        self.challenges.read().map(|c| c.len()).unwrap_or(0)
     }
 }
 

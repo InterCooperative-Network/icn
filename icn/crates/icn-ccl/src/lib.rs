@@ -45,12 +45,16 @@ pub mod ast;
 pub mod disputes;
 pub mod interpreter;
 pub mod messages;
+pub mod registry;
 pub mod runtime;
 pub mod types;
 
 // Re-export commonly used types
 pub use actor::ContractActor;
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
+pub use registry::{
+    compute_hash, ContentHash, ContractMetadata, ContractRegistry, RegistryError, RegistryStats,
+};
 pub use disputes::{
     Dispute, DisputeConfig, DisputeEvidence, DisputeId, DisputeOutcome, DisputeReason,
     DisputeResolutionSystem, DisputeStats, DisputeStatus, MisbehaviorCallback,

@@ -206,6 +206,21 @@ impl Executor for LocalExecutor {
                     }
                 }
             }
+            TaskCode::CclRef { hash, rule } => {
+                // CclRef requires a contract registry to be set up
+                // The registry lookup should be handled at a higher level (ComputeActor)
+                // which resolves CclRef to Ccl before calling the executor
+                let hash_hex = hex::encode(hash);
+                tracing::warn!(
+                    hash = %hash_hex,
+                    rule = %rule,
+                    "CclRef requires contract registry (not yet integrated)"
+                );
+                ExecutionOutcome::Failed(format!(
+                    "Contract reference {} not resolved. Registry integration pending.",
+                    hash_hex
+                ))
+            }
             TaskCode::WasmRef(_) | TaskCode::WasmInline(_) => {
                 ExecutionOutcome::Failed("WASM not yet supported".into())
             }

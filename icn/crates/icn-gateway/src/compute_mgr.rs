@@ -114,7 +114,7 @@ impl ComputeManager {
 
         // Determine required capabilities based on code type
         let required_capabilities = match &code {
-            TaskCode::Ccl(_) => vec![ExecutorCapability::Ccl],
+            TaskCode::Ccl(_) | TaskCode::CclRef { .. } => vec![ExecutorCapability::Ccl],
             TaskCode::WasmInline(_) | TaskCode::WasmRef(_) => vec![ExecutorCapability::Wasm],
         };
 
