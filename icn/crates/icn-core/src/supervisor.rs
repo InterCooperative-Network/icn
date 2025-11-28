@@ -1630,86 +1630,89 @@ impl Supervisor {
                 let audit_store = gov_store.clone();
 
                 event_bus.subscribe(Arc::new(move |event| {
-                    if let SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } = event {
-                        if let ProposalPayload::SchedulingPolicy { coop_id, policy_json } = payload {
-                            info!("📋 Executing scheduling policy proposal {}: update policy for {}",
-                                  proposal_id.0, coop_id);
+                    if let SystemEvent::ProposalAccepted {
+                        proposal_id,
+                        payload: ProposalPayload::SchedulingPolicy { coop_id, policy_json },
+                        decided_at,
+                        ..
+                    } = event {
+                        info!("📋 Executing scheduling policy proposal {}: update policy for {}",
+                              proposal_id.0, coop_id);
 
-                            // Spawn async task to apply policy update
-                            let compute_handle = compute.clone();
-                            let prop_id = proposal_id.clone();
-                            let store = audit_store.clone();
-                            let coop = coop_id.clone();
-                            let policy_str = policy_json.clone();
-                            let decision_time = decided_at;
+                        // Spawn async task to apply policy update
+                        let compute_handle = compute.clone();
+                        let prop_id = proposal_id.clone();
+                        let store = audit_store.clone();
+                        let coop = coop_id.clone();
+                        let policy_str = policy_json.clone();
+                        let decision_time = decided_at;
 
-                            tokio::spawn(async move {
-                                // Track execution duration
-                                let start = std::time::Instant::now();
+                        tokio::spawn(async move {
+                            // Track execution duration
+                            let start = std::time::Instant::now();
 
-                                // IDEMPOTENCY CHECK: Skip if proposal already executed
-                                let audit_key = format!("gov:audit:policy:{}", prop_id.0);
-                                match store.get(audit_key.as_bytes()) {
-                                    Ok(Some(_)) => {
-                                        debug!("Policy proposal {} already executed, skipping duplicate", prop_id.0);
-                                        return;
-                                    }
-                                    Ok(None) => {
-                                        // Not executed yet, proceed
-                                    }
-                                    Err(e) => {
-                                        error!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id.0, e);
-                                        error!("   Refusing to execute to prevent potential duplicate");
-                                        return;
-                                    }
+                            // IDEMPOTENCY CHECK: Skip if proposal already executed
+                            let audit_key = format!("gov:audit:policy:{}", prop_id.0);
+                            match store.get(audit_key.as_bytes()) {
+                                Ok(Some(_)) => {
+                                    debug!("Policy proposal {} already executed, skipping duplicate", prop_id.0);
+                                    return;
                                 }
+                                Ok(None) => {
+                                    // Not executed yet, proceed
+                                }
+                                Err(e) => {
+                                    error!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id.0, e);
+                                    error!("   Refusing to execute to prevent potential duplicate");
+                                    return;
+                                }
+                            }
 
-                                // Parse policy JSON
-                                match serde_json::from_str::<icn_compute::CoopSchedulingPolicy>(&policy_str) {
-                                    Ok(policy) => {
-                                        // Apply policy update via ComputeHandle
-                                        match compute_handle.set_policy(policy.clone()).await {
-                                            Ok(_) => {
-                                                info!("✅ Scheduling policy proposal {} executed: policy updated for {}",
-                                                      prop_id.0, coop);
+                            // Parse policy JSON
+                            match serde_json::from_str::<icn_compute::CoopSchedulingPolicy>(&policy_str) {
+                                Ok(policy) => {
+                                    // Apply policy update via ComputeHandle
+                                    match compute_handle.set_policy(policy.clone()).await {
+                                        Ok(_) => {
+                                            info!("✅ Scheduling policy proposal {} executed: policy updated for {}",
+                                                  prop_id.0, coop);
 
-                                                // Store audit trail
-                                                let audit_record = serde_json::json!({
-                                                    "proposal_id": prop_id.0,
-                                                    "coop_id": coop,
-                                                    "decided_at": decision_time,
-                                                    "executed_at": std::time::SystemTime::now()
-                                                        .duration_since(std::time::UNIX_EPOCH)
-                                                        .unwrap()
-                                                        .as_secs(),
-                                                });
+                                            // Store audit trail
+                                            let audit_record = serde_json::json!({
+                                                "proposal_id": prop_id.0,
+                                                "coop_id": coop,
+                                                "decided_at": decision_time,
+                                                "executed_at": std::time::SystemTime::now()
+                                                    .duration_since(std::time::UNIX_EPOCH)
+                                                    .unwrap()
+                                                    .as_secs(),
+                                            });
 
-                                                if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
-                                                    if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                                        error!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id.0, e);
-                                                    } else {
-                                                        info!("📋 Audit trail recorded for policy proposal {}", prop_id.0);
+                                            if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                                                if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                                                    error!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id.0, e);
+                                                } else {
+                                                    info!("📋 Audit trail recorded for policy proposal {}", prop_id.0);
 
-                                                        // Metrics: successful execution
-                                                        let duration = start.elapsed().as_secs_f64();
-                                                        icn_obs::metrics::governance::proposals_executed_inc("scheduling_policy");
-                                                        icn_obs::metrics::governance::execution_duration_record("scheduling_policy", duration);
-                                                    }
+                                                    // Metrics: successful execution
+                                                    let duration = start.elapsed().as_secs_f64();
+                                                    icn_obs::metrics::governance::proposals_executed_inc("scheduling_policy");
+                                                    icn_obs::metrics::governance::execution_duration_record("scheduling_policy", duration);
                                                 }
                                             }
-                                            Err(e) => {
-                                                error!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id.0, e);
-                                                icn_obs::metrics::governance::execution_failures_inc("policy_apply");
-                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id.0, e);
+                                            icn_obs::metrics::governance::execution_failures_inc("policy_apply");
                                         }
                                     }
-                                    Err(e) => {
-                                        error!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id.0, e);
-                                        icn_obs::metrics::governance::execution_failures_inc("policy_parse");
-                                    }
                                 }
-                            });
-                        }
+                                Err(e) => {
+                                    error!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id.0, e);
+                                    icn_obs::metrics::governance::execution_failures_inc("policy_parse");
+                                }
+                            }
+                        });
                     }
                 })).await
             });
