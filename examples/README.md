@@ -49,17 +49,51 @@ Deploy ICN using Docker and Docker Compose with Prometheus monitoring.
 - Monitoring with Prometheus
 - Data persistence with volumes
 
-### 03-contracts (Coming Soon)
+### [contracts](contracts/)
 **Difficulty: Intermediate** | **Time: 15 minutes**
 
-Write, deploy, and invoke Cooperative Contract Language (CCL) contracts.
+Example CCL (Cooperative Contract Language) contracts.
 
 **What you'll learn:**
 - CCL syntax and semantics
+- TimeBank example contract
+- Contract JSON format
+
+### [wasm-compute](wasm-compute/)
+**Difficulty: Intermediate** | **Time: 10 minutes**
+
+Build and deploy WebAssembly modules for ICN distributed compute.
+
+**What you'll learn:**
+- Writing WASM modules in Rust
+- ICN host functions (log, timestamp)
+- Submitting WASM tasks via CLI, REST API, and TypeScript SDK
+- Size optimization for WASM
+
+**Build it:**
+```bash
+cd examples/wasm-compute
+rustup target add wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown
+```
+
+**Run it:**
+```bash
+icnctl compute submit-wasm \
+    --wasm target/wasm32-unknown-unknown/release/icn_wasm_example.wasm \
+    --fuel 10000
+```
+
+### 03-contracts-advanced (Coming Soon)
+**Difficulty: Intermediate** | **Time: 15 minutes**
+
+Write, deploy, and invoke CCL contracts via the distributed compute layer.
+
+**What you'll learn:**
 - Contract deployment
 - Capability system
 - Fuel metering
-- TimeBank example
+- Payment settlement
 
 ### 04-ledger (Coming Soon)
 **Difficulty: Intermediate** | **Time: 15 minutes**
