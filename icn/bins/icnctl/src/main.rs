@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::{Archive, Builder};
 use zeroize::Zeroizing;
@@ -803,11 +803,11 @@ fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-fn get_keystore_path(data_dir: &PathBuf) -> PathBuf {
+fn get_keystore_path(data_dir: &Path) -> PathBuf {
     data_dir.join("identity.age")
 }
 
-fn get_store_path(data_dir: &PathBuf) -> PathBuf {
+fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
@@ -909,7 +909,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
+fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
 
     match cmd {
@@ -1109,7 +1109,7 @@ fn handle_id_command(cmd: IdCommands, data_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<()> {
+fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
     let store_path = get_store_path(data_dir);
 
@@ -1490,7 +1490,7 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &PathBuf) -> Result<
     Ok(())
 }
 
-fn handle_trust_command(cmd: TrustCommands, data_dir: &PathBuf) -> Result<()> {
+fn handle_trust_command(cmd: TrustCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
     let store_path = get_store_path(data_dir);
 
@@ -1660,7 +1660,7 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
     Ok(())
 }
 
-async fn handle_federation_command(cmd: FederationCommands, data_dir: &PathBuf, endpoint: &str) -> Result<()> {
+async fn handle_federation_command(cmd: FederationCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
     use icn_core::config::{Config, FederationConfig};
 
     let config_path = data_dir.join("icn.toml");
@@ -2178,7 +2178,7 @@ async fn handle_quarantine_command(cmd: QuarantineCommands, client: &mut icn_rpc
 }
 
 #[tokio::main]
-async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir: &PathBuf) -> Result<()> {
+async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir: &Path) -> Result<()> {
     // Contract commands communicate with daemon via RPC
     let rpc_addr = endpoint.parse()?;
     let mut client = icn_rpc::RpcClient::new(rpc_addr);
@@ -2365,7 +2365,7 @@ async fn handle_contract_command(cmd: ContractCommands, endpoint: &str, data_dir
 }
 
 /// Handle contract prepare command - create initial deployment message with first signature
-fn handle_contract_prepare(contract_file: &PathBuf, output: &PathBuf, data_dir: &PathBuf) -> Result<()> {
+fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path) -> Result<()> {
     // Read and validate contract
     let contract_json = std::fs::read_to_string(contract_file)
         .with_context(|| format!("Failed to read contract file: {}", contract_file.display()))?;
@@ -2478,7 +2478,7 @@ fn handle_contract_prepare(contract_file: &PathBuf, output: &PathBuf, data_dir: 
 }
 
 /// Handle contract sign command - add your signature to a partial deployment
-fn handle_contract_sign(deployment_file: &PathBuf, output: &PathBuf, data_dir: &PathBuf) -> Result<()> {
+fn handle_contract_sign(deployment_file: &Path, output: &Path, data_dir: &Path) -> Result<()> {
     // Read partial deployment
     let deployment_json = std::fs::read_to_string(deployment_file)
         .with_context(|| format!("Failed to read deployment file: {}", deployment_file.display()))?;
@@ -2563,7 +2563,7 @@ fn handle_contract_sign(deployment_file: &PathBuf, output: &PathBuf, data_dir: &
 }
 
 /// Handle deploy-signed command - deploy a fully-signed contract
-async fn handle_contract_deploy_signed(deployment_file: &PathBuf, client: &mut icn_rpc::RpcClient) -> Result<()> {
+async fn handle_contract_deploy_signed(deployment_file: &Path, client: &mut icn_rpc::RpcClient) -> Result<()> {
     // Read deployment
     let deployment_json = std::fs::read_to_string(deployment_file)
         .with_context(|| format!("Failed to read deployment file: {}", deployment_file.display()))?;
@@ -2640,7 +2640,7 @@ struct DeviceAddRequest {
     created_at: u64,
 }
 
-fn handle_device_command(cmd: DeviceCommands, data_dir: &PathBuf) -> Result<()> {
+fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
 
     match cmd {
@@ -3009,7 +3009,7 @@ struct BackupMetadata {
     checksum: String,
 }
 
-fn handle_backup_command(data_dir: &PathBuf, output: &PathBuf) -> Result<()> {
+fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
     // Check if data directory exists
     if !data_dir.exists() {
         bail!("Data directory does not exist: {}", data_dir.display());
@@ -3067,7 +3067,7 @@ fn handle_backup_command(data_dir: &PathBuf, output: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn handle_restore_command(data_dir: &PathBuf, input: &PathBuf, force: bool) -> Result<()> {
+fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<()> {
     // Check if input backup file exists
     if !input.exists() {
         bail!("Backup file not found: {}", input.display());
@@ -3154,7 +3154,7 @@ fn handle_restore_command(data_dir: &PathBuf, input: &PathBuf, force: bool) -> R
 }
 
 /// Calculate SHA256 checksum of all files in a directory
-fn calculate_dir_checksum(dir: &PathBuf) -> Result<String> {
+fn calculate_dir_checksum(dir: &Path) -> Result<String> {
     use std::collections::BTreeMap;
 
     let mut file_hashes: BTreeMap<String, String> = BTreeMap::new();
@@ -3195,7 +3195,7 @@ fn calculate_dir_checksum(dir: &PathBuf) -> Result<String> {
 }
 
 /// Extract backup metadata from the archive
-fn extract_backup_metadata(_archive: &mut Archive<File>, input: &PathBuf) -> Result<BackupMetadata> {
+fn extract_backup_metadata(_archive: &mut Archive<File>, input: &Path) -> Result<BackupMetadata> {
     // Re-open to read metadata
     let input_file = File::open(input)
         .with_context(|| format!("Failed to reopen backup file: {}", input.display()))?;
@@ -3270,7 +3270,7 @@ fn rpc_call(endpoint: &str, method: &str, params: serde_json::Value) -> Result<s
         .ok_or_else(|| anyhow::anyhow!("RPC response missing result"))
 }
 
-fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> Result<()> {
+fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Result<()> {
     match cmd {
         GovCommands::Domain(domain_cmd) => match domain_cmd {
             DomainCommands::Create {
@@ -3564,7 +3564,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &PathBuf, endpoint: &str) -> 
     Ok(())
 }
 
-fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<()> {
+fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()> {
     // Snapshots are stored in the store subdirectory
     let store_dir = data_dir.join("store");
 
@@ -3738,7 +3738,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &PathBuf) -> Result<
 }
 
 /// Handle authentication commands
-async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()> {
+async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
     match cmd {
         AuthCommands::Token { gateway, coop_id, scopes } => {
             // Get keystore path and unlock
@@ -3861,7 +3861,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &PathBuf) -> Result<()
 
 /// Interactive wizard for setting up a new cooperative
 async fn handle_init_coop_command(
-    data_dir: &PathBuf,
+    data_dir: &Path,
     name: Option<String>,
     members: Option<String>,
     yes: bool,
