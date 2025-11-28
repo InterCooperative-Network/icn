@@ -73,9 +73,11 @@ pub struct ContractMetadata {
 
 impl ContractMetadata {
     /// Create metadata from a contract and deployer info
-    pub fn from_contract(contract: &Contract, owner: &str, version: u32) -> Self {
-        let code_hash = compute_hash(contract);
-        ContractMetadata {
+    ///
+    /// Returns an error if the contract cannot be hashed.
+    pub fn from_contract(contract: &Contract, owner: &str, version: u32) -> Result<Self> {
+        let code_hash = compute_hash(contract)?;
+        Ok(ContractMetadata {
             code_hash,
             name: contract.name.clone(),
             version,
@@ -88,7 +90,7 @@ impl ContractMetadata {
             participants: contract.participants.iter().map(|d| d.to_string()).collect(),
             currency: contract.currency.clone(),
             rules: contract.rules.iter().map(|r| r.name.clone()).collect(),
-        }
+        })
     }
 
     /// Set description
@@ -99,9 +101,12 @@ impl ContractMetadata {
 }
 
 /// Compute content hash for a contract
-pub fn compute_hash(contract: &Contract) -> ContentHash {
-    let bytes = serde_json::to_vec(contract).unwrap_or_default();
-    *blake3::hash(&bytes).as_bytes()
+///
+/// Returns an error if the contract cannot be serialized to JSON.
+pub fn compute_hash(contract: &Contract) -> Result<ContentHash> {
+    let bytes = serde_json::to_vec(contract)
+        .map_err(|e| RegistryError::SerializationError(format!("Failed to serialize contract: {e}")))?;
+    Ok(*blake3::hash(&bytes).as_bytes())
 }
 
 /// Contract Registry - stores contracts with metadata
@@ -157,7 +162,7 @@ impl ContractRegistry {
             .validate()
             .map_err(|e| RegistryError::InvalidContract(e.to_string()))?;
 
-        let hash = compute_hash(&contract);
+        let hash = compute_hash(&contract)?;
         let hash_hex = hex::encode(hash);
 
         // Check if already exists
@@ -182,7 +187,7 @@ impl ContractRegistry {
         };
 
         // Create metadata
-        let metadata = ContractMetadata::from_contract(&contract, owner, version);
+        let metadata = ContractMetadata::from_contract(&contract, owner, version)?;
 
         // Persist to store if available
         if let Some(store) = &self.store {
