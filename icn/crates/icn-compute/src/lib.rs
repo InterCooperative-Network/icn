@@ -32,6 +32,7 @@ mod policy;
 mod scheduler;
 mod task;
 mod types;
+mod wasm_executor;
 
 pub use actor::{
     ComputeActor, ComputeEvent, ComputeHandle, EventCallback, PaymentCallback, PaymentRequest,
@@ -46,6 +47,7 @@ pub use checkpoint_store::{
 };
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
+pub use wasm_executor::WasmExecutor;
 pub use migration_manager::{ActorMigrationManager, MigrationSender};
 pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,

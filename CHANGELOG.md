@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - WASM Compute Executor (2025-11-28)
+
+**WasmExecutor** ([crates/icn-compute/src/wasm_executor.rs](icn/crates/icn-compute/src/wasm_executor.rs)):
+- WebAssembly execution support via Wasmtime runtime (version 27)
+- Feature-gated implementation (`--features wasm` to enable)
+- Memory-limited execution with configurable `max_memory` (default 64MB)
+- Support for both CCL and WASM `TaskCode` variants
+- Host functions for ICN integration (`icn::log`, `icn::timestamp`)
+- Falls back to CCL-only execution when WASM feature disabled
+
+**Usage**:
+```rust
+// Build with WASM support
+cargo build --features wasm
+
+// Create WASM executor
+let executor = WasmExecutor::new()?;
+let task = ComputeTask {
+    code: TaskCode::WasmInline(wasm_bytes),
+    // ...
+};
+let result = executor.execute(&task, &mut ctx);
+```
+
+**Tests**: 4 new tests for WASM execution (feature-enabled and disabled paths)
+
 ### Added - Federation & Cross-Network Discovery (2025-11-27)
 
 **Federation Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):
