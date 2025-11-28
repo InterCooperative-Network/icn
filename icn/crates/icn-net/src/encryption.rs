@@ -429,7 +429,7 @@ mod tests {
 
         // Send multiple messages with increasing sequence numbers
         for seq in 1..=10 {
-            let plaintext = format!("Message #{}", seq);
+            let plaintext = format!("Message #{seq}");
             let envelope = EncryptedEnvelope::encrypt(
                 &alice_did,
                 &bob_did,

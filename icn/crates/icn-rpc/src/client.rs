@@ -15,7 +15,7 @@ impl RpcClient {
     /// Create a new RPC client
     pub fn new(addr: SocketAddr) -> Self {
         RpcClient {
-            base_url: format!("http://{}", addr),
+            base_url: format!("http://{addr}"),
             next_id: 1,
         }
     }

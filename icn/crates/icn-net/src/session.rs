@@ -321,6 +321,18 @@ impl Default for SessionManager {
     }
 }
 
+impl SessionManager {
+    #[cfg(test)]
+    fn clone_for_test(&self) -> Self {
+        SessionManager {
+            endpoint: self.endpoint.clone(),
+            connections: self.connections.clone(),
+            public_endpoint: self.public_endpoint.clone(),
+            _shutdown_rx: mpsc::channel(1).1,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,17 +416,5 @@ mod tests {
         // Cleanup
         client_manager.stop().await.unwrap();
         server_manager.stop().await.unwrap();
-    }
-}
-
-impl SessionManager {
-    #[cfg(test)]
-    fn clone_for_test(&self) -> Self {
-        SessionManager {
-            endpoint: self.endpoint.clone(),
-            connections: self.connections.clone(),
-            public_endpoint: self.public_endpoint.clone(),
-            _shutdown_rx: mpsc::channel(1).1,
-        }
     }
 }

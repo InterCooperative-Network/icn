@@ -234,15 +234,13 @@ mod tests {
         // (might be slightly less due to timing)
         assert!(
             total_allowed <= 1000,
-            "Total allowed ({}) should not exceed limit (1000)",
-            total_allowed
+            "Total allowed ({total_allowed}) should not exceed limit (1000)"
         );
 
         // But should be reasonably close to the limit
         assert!(
             total_allowed >= 950,
-            "Total allowed ({}) should be close to limit (1000)",
-            total_allowed
+            "Total allowed ({total_allowed}) should be close to limit (1000)"
         );
     }
 
@@ -252,7 +250,7 @@ mod tests {
 
         // First 10 messages should be allowed
         for i in 0..10 {
-            assert!(limiter.check_sync(), "Message {} should be allowed", i);
+            assert!(limiter.check_sync(), "Message {i} should be allowed");
         }
 
         // 11th message should be denied

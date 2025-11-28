@@ -218,10 +218,10 @@ async fn handle_network_peers(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
 
             match serde_json::to_value(&peer_infos) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get peers: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get peers: {e}")),
     }
 }
 
@@ -252,28 +252,28 @@ async fn handle_network_dial(
     let dial_params: DialParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
     let addr: SocketAddr = match dial_params.addr.parse() {
         Ok(a) => a,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid address: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid address: {e}"));
         }
     };
 
     let did = match serde_json::from_value(serde_json::Value::String(dial_params.did)) {
         Ok(d) => d,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
         }
     };
 
     let handle = network_handle.read().await;
     match handle.dial(addr, did).await {
         Ok(_) => RpcResponse::success(id, serde_json::json!({"success": true})),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to dial: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to dial: {e}")),
     }
 }
 
@@ -301,10 +301,10 @@ async fn handle_network_stats(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
 
             match serde_json::to_value(&stats_info) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get stats: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get stats: {e}")),
     }
 }
 
@@ -324,7 +324,7 @@ async fn handle_network_status(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
 
     match serde_json::to_value(&status) {
         Ok(value) => RpcResponse::success(id, value),
-        Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+        Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
     }
 }
 
@@ -365,13 +365,13 @@ async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
 
                 match serde_json::to_value(&rpc_entry) {
                     Ok(value) => RpcResponse::success(id, value),
-                    Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                    Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
                 }
             } else {
                 RpcResponse::success(id, serde_json::json!(null))
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {e}")),
     }
 }
 
@@ -402,14 +402,14 @@ async fn handle_ledger_balance(
     let balance_params: BalanceParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
     let account_did = match serde_json::from_value(serde_json::Value::String(balance_params.account_id.clone())) {
         Ok(d) => d,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
         }
     };
 
@@ -426,7 +426,7 @@ async fn handle_ledger_balance(
 
         match serde_json::to_value(&balance) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
         }
     } else {
         // Get all balances for account
@@ -441,7 +441,7 @@ async fn handle_ledger_balance(
 
         match serde_json::to_value(&balances) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
         }
     }
 }
@@ -499,10 +499,10 @@ async fn handle_ledger_history(
 
             match serde_json::to_value(&page) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {e}")),
     }
 }
 
@@ -532,7 +532,7 @@ async fn handle_contract_deploy(
     let deploy_params: DeployParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -540,7 +540,7 @@ async fn handle_contract_deploy(
     let deployment_msg: icn_ccl::ContractDeploymentMessage = match serde_json::from_str(&deploy_params.deployment_message) {
         Ok(m) => m,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid deployment message JSON: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid deployment message JSON: {e}"));
         }
     };
 
@@ -549,7 +549,7 @@ async fn handle_contract_deploy(
         return RpcResponse::error(
             id,
             -32602,
-            format!("Signature verification failed: {}", e)
+            format!("Signature verification failed: {e}")
         );
     }
 
@@ -559,7 +559,7 @@ async fn handle_contract_deploy(
     let message_bytes = match serde_json::to_vec(&deployment_msg) {
         Ok(bytes) => bytes,
         Err(e) => {
-            return RpcResponse::error(id, -32603, format!("Failed to serialize deployment: {}", e));
+            return RpcResponse::error(id, -32603, format!("Failed to serialize deployment: {e}"));
         }
     };
 
@@ -600,7 +600,7 @@ async fn handle_contract_deploy(
             );
             state.receipt_store.insert(receipt).await;
 
-            RpcResponse::error(id, -32000, format!("Failed to publish deployment: {}", e))
+            RpcResponse::error(id, -32000, format!("Failed to publish deployment: {e}"))
         }
     }
 }
@@ -634,7 +634,7 @@ async fn handle_contract_call(
     let call_params: CallParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -655,7 +655,7 @@ async fn handle_contract_call(
     let caller_did: icn_identity::Did = match serde_json::from_value(serde_json::Value::String(call_params.caller.clone())) {
         Ok(d) => d,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
         }
     };
 
@@ -663,7 +663,7 @@ async fn handle_contract_call(
     let args: std::collections::HashMap<String, icn_ccl::Value> = match serde_json::from_value(call_params.args) {
         Ok(a) => a,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid args: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid args: {e}"));
         }
     };
 
@@ -732,7 +732,7 @@ async fn handle_contract_call(
             );
             state.receipt_store.insert(receipt).await;
 
-            RpcResponse::error(id, -32000, format!("Contract execution failed: {}", e))
+            RpcResponse::error(id, -32000, format!("Contract execution failed: {e}"))
         }
     }
 }
@@ -766,7 +766,7 @@ async fn handle_contract_list(
         .map(|info| crate::types::ContractInfo {
             code_hash: info.code_hash.to_hex(),
             name: info.name.clone(),
-            participants: info.participants.iter().map(|did| format!("{:?}", did)).collect(),
+            participants: info.participants.iter().map(|did| format!("{did:?}")).collect(),
             currency: info.currency.clone(),
             rules: info.rules.clone(),
         })
@@ -777,7 +777,7 @@ async fn handle_contract_list(
 
     match serde_json::to_value(&page) {
         Ok(value) => RpcResponse::success(id, value),
-        Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+        Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
     }
 }
 
@@ -818,10 +818,10 @@ async fn handle_quarantine_list(
 
             match serde_json::to_value(&page) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list quarantine: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list quarantine: {e}")),
     }
 }
 
@@ -847,7 +847,7 @@ async fn handle_quarantine_get(
     let get_params: GetParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -886,7 +886,7 @@ async fn handle_quarantine_get(
             RpcResponse::success(id, result)
         }
         Ok(None) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get quarantine entry: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get quarantine entry: {e}")),
     }
 }
 
@@ -912,7 +912,7 @@ async fn handle_quarantine_release(
     let release_params: ReleaseParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -947,12 +947,12 @@ async fn handle_quarantine_release(
                 Err(e) => RpcResponse::error(
                     id,
                     -32000,
-                    format!("Entry released from quarantine but reappend failed: {}", e),
+                    format!("Entry released from quarantine but reappend failed: {e}"),
                 ),
             }
         }
         Ok(None) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to release entry: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to release entry: {e}")),
     }
 }
 
@@ -978,7 +978,7 @@ async fn handle_quarantine_drop(
     let drop_params: DropParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1005,7 +1005,7 @@ async fn handle_quarantine_drop(
             }),
         ),
         Ok(false) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to drop entry: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to drop entry: {e}")),
     }
 }
 
@@ -1026,7 +1026,7 @@ async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResponse
                 "purged": purged
             }),
         ),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to purge expired entries: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to purge expired entries: {e}")),
     }
 }
 
@@ -1045,7 +1045,7 @@ async fn handle_receipt_get(
     let get_params: GetReceiptParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1054,7 +1054,7 @@ async fn handle_receipt_get(
     match state.receipt_store.get(&receipt_id).await {
         Some(receipt) => match serde_json::to_value(&receipt) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
         },
         None => RpcResponse::error(id, -32000, "Receipt not found".to_string()),
     }
@@ -1096,10 +1096,10 @@ async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> RpcRe
 
             match serde_json::to_value(&domain_infos) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list domains: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list domains: {e}")),
     }
 }
 
@@ -1129,7 +1129,7 @@ async fn handle_governance_domain_get(
     let domain_params: DomainGetParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1155,11 +1155,11 @@ async fn handle_governance_domain_get(
 
             match serde_json::to_value(&domain_info) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
         Ok(None) => RpcResponse::error(id, -32000, "Domain not found".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get domain: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get domain: {e}")),
     }
 }
 
@@ -1218,10 +1218,10 @@ async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) -> Rpc
 
             match serde_json::to_value(&proposal_infos) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list proposals: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list proposals: {e}")),
     }
 }
 
@@ -1251,7 +1251,7 @@ async fn handle_governance_proposal_get(
     let proposal_params: ProposalGetParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1294,11 +1294,11 @@ async fn handle_governance_proposal_get(
 
             match serde_json::to_value(&proposal_info) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
         Ok(None) => RpcResponse::error(id, -32000, "Proposal not found".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get proposal: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get proposal: {e}")),
     }
 }
 
@@ -1322,7 +1322,7 @@ async fn handle_governance_domain_create(
     let request: CreateDomainRequest = match serde_json::from_value(params.clone()) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1337,7 +1337,7 @@ async fn handle_governance_domain_create(
             match dids {
                 Ok(dids) => icn_governance::MembershipConfig::static_list(dids),
                 Err(e) => {
-                    return RpcResponse::error(id, -32602, format!("Invalid DID in member list: {}", e));
+                    return RpcResponse::error(id, -32602, format!("Invalid DID in member list: {e}"));
                 }
             }
         }
@@ -1368,7 +1368,7 @@ async fn handle_governance_domain_create(
             });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create domain: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create domain: {e}")),
     }
 }
 
@@ -1392,7 +1392,7 @@ async fn handle_governance_proposal_create(
     let request: CreateProposalRequest = match serde_json::from_value(params.clone()) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1405,7 +1405,7 @@ async fn handle_governance_proposal_create(
             let recipient_did = match recipient.parse::<icn_identity::Did>() {
                 Ok(did) => did,
                 Err(e) => {
-                    return RpcResponse::error(id, -32602, format!("Invalid recipient DID: {}", e));
+                    return RpcResponse::error(id, -32602, format!("Invalid recipient DID: {e}"));
                 }
             };
             icn_governance::ProposalPayload::Budget {
@@ -1422,7 +1422,7 @@ async fn handle_governance_proposal_create(
             let member_did = match member.parse::<icn_identity::Did>() {
                 Ok(d) => d,
                 Err(e) => {
-                    return RpcResponse::error(id, -32602, format!("Invalid DID: {}", e));
+                    return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
                 }
             };
             let action_enum = match action.as_str() {
@@ -1453,10 +1453,10 @@ async fn handle_governance_proposal_create(
             };
             match serde_json::to_value(&response) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {}", e)),
+                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create proposal: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create proposal: {e}")),
     }
 }
 
@@ -1480,7 +1480,7 @@ async fn handle_governance_proposal_open(
     let request: OpenProposalRequest = match serde_json::from_value(params.clone()) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1491,7 +1491,7 @@ async fn handle_governance_proposal_open(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to open proposal: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to open proposal: {e}")),
     }
 }
 
@@ -1515,7 +1515,7 @@ async fn handle_governance_vote_cast(
     let request: CastVoteRequest = match serde_json::from_value(params.clone()) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1535,7 +1535,7 @@ async fn handle_governance_vote_cast(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cast vote: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cast vote: {e}")),
     }
 }
 
@@ -1559,7 +1559,7 @@ async fn handle_governance_proposal_close(
     let request: CloseProposalRequest = match serde_json::from_value(params.clone()) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1570,7 +1570,7 @@ async fn handle_governance_proposal_close(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to close proposal: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to close proposal: {e}")),
     }
 }
 
@@ -1590,7 +1590,7 @@ async fn handle_compute_submit(
     let request: SubmitTaskRequest = match serde_json::from_value(params.clone()) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1638,7 +1638,7 @@ async fn handle_compute_submit(
             };
             RpcResponse::success(id, serde_json::to_value(response).unwrap())
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to submit task: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to submit task: {e}")),
     }
 }
 
@@ -1663,7 +1663,7 @@ async fn handle_compute_status(
     let params: StatusParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1742,7 +1742,7 @@ async fn handle_compute_status(
             RpcResponse::success(id, serde_json::to_value(info).unwrap())
         }
         Ok(None) => RpcResponse::error(id, -32000, "Task not found".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get status: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get status: {e}")),
     }
 }
 
@@ -1769,7 +1769,7 @@ async fn handle_compute_cancel(
     let params: CancelParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1801,7 +1801,7 @@ async fn handle_compute_cancel(
             };
             RpcResponse::success(id, serde_json::to_value(response).unwrap())
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cancel task: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cancel task: {e}")),
     }
 }
 
@@ -1829,7 +1829,7 @@ async fn handle_policy_set(
     let params: SetPolicyParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1837,7 +1837,7 @@ async fn handle_policy_set(
     let policy: icn_compute::CoopSchedulingPolicy = match serde_json::from_value(params.policy) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid policy: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid policy: {e}"));
         }
     };
 
@@ -1846,7 +1846,7 @@ async fn handle_policy_set(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to set policy: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to set policy: {e}")),
     }
 }
 
@@ -1871,7 +1871,7 @@ async fn handle_policy_get(
     let params: GetPolicyParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1923,7 +1923,7 @@ async fn handle_policy_remove(
     let params: RemovePolicyParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1958,7 +1958,7 @@ async fn handle_quota_usage(
     let params: UsageParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -1967,7 +1967,7 @@ async fn handle_quota_usage(
             let result = serde_json::to_value(usage).unwrap();
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get usage: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get usage: {e}")),
     }
 }
 
@@ -1992,7 +1992,7 @@ async fn handle_quota_list(
     let params: ListUsageParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {}", e));
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
         }
     };
 
@@ -2001,7 +2001,7 @@ async fn handle_quota_list(
             let result = serde_json::to_value(usage_records).unwrap();
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list usage: {}", e)),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list usage: {e}")),
     }
 }
 

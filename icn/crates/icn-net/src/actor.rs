@@ -2009,17 +2009,17 @@ mod tests {
         };
 
         // Test peer_has_capability
-        assert!(handle.peer_has_capability(&alice_did, CapabilityFlags::E2E_ENCRYPTION).await);
-        assert!(handle.peer_has_capability(&alice_did, CapabilityFlags::SIGNED_MESSAGES).await);
-        assert!(!handle.peer_has_capability(&alice_did, CapabilityFlags::GRACEFUL_RESTART).await);
+        assert!(handle.peer_has_capability(alice_did, CapabilityFlags::E2E_ENCRYPTION).await);
+        assert!(handle.peer_has_capability(alice_did, CapabilityFlags::SIGNED_MESSAGES).await);
+        assert!(!handle.peer_has_capability(alice_did, CapabilityFlags::GRACEFUL_RESTART).await);
 
-        assert!(!handle.peer_has_capability(&bob_did, CapabilityFlags::E2E_ENCRYPTION).await);
-        assert!(handle.peer_has_capability(&bob_did, CapabilityFlags::SIGNED_MESSAGES).await);
+        assert!(!handle.peer_has_capability(bob_did, CapabilityFlags::E2E_ENCRYPTION).await);
+        assert!(handle.peer_has_capability(bob_did, CapabilityFlags::SIGNED_MESSAGES).await);
 
         // Unknown peer
         let charlie_keypair = KeyPair::generate().unwrap();
         let charlie_did = charlie_keypair.did();
-        assert!(!handle.peer_has_capability(&charlie_did, CapabilityFlags::E2E_ENCRYPTION).await);
+        assert!(!handle.peer_has_capability(charlie_did, CapabilityFlags::E2E_ENCRYPTION).await);
     }
 
     #[tokio::test]
@@ -2086,8 +2086,8 @@ mod tests {
         // Get peers with E2E encryption (should be Alice and Charlie)
         let encrypted_peers = handle.get_peers_with_capability(CapabilityFlags::E2E_ENCRYPTION).await;
         assert_eq!(encrypted_peers.len(), 2);
-        assert!(encrypted_peers.contains(&alice_did));
-        assert!(encrypted_peers.contains(&charlie_did));
+        assert!(encrypted_peers.contains(alice_did));
+        assert!(encrypted_peers.contains(charlie_did));
 
         // Get peers with Signed Messages (should be all three)
         let signed_peers = handle.get_peers_with_capability(CapabilityFlags::SIGNED_MESSAGES).await;
@@ -2096,7 +2096,7 @@ mod tests {
         // Get peers with Graceful Restart (should be only Charlie)
         let restart_peers = handle.get_peers_with_capability(CapabilityFlags::GRACEFUL_RESTART).await;
         assert_eq!(restart_peers.len(), 1);
-        assert!(restart_peers.contains(&charlie_did));
+        assert!(restart_peers.contains(charlie_did));
 
         // Get peers with capability no one has
         let quantum_peers = handle.get_peers_with_capability(CapabilityFlags::MULTI_DEVICE).await;
@@ -2149,13 +2149,13 @@ mod tests {
         };
 
         // Get versions
-        assert_eq!(handle.get_peer_protocol_version(&alice_did).await, Some(1));
-        assert_eq!(handle.get_peer_protocol_version(&bob_did).await, Some(2));
+        assert_eq!(handle.get_peer_protocol_version(alice_did).await, Some(1));
+        assert_eq!(handle.get_peer_protocol_version(bob_did).await, Some(2));
 
         // Unknown peer
         let charlie_keypair = KeyPair::generate().unwrap();
         let charlie_did = charlie_keypair.did();
-        assert_eq!(handle.get_peer_protocol_version(&charlie_did).await, None);
+        assert_eq!(handle.get_peer_protocol_version(charlie_did).await, None);
     }
 
     #[tokio::test]
@@ -2188,7 +2188,7 @@ mod tests {
         };
 
         // Get full connection info
-        let info = handle.get_peer_connection_info(&alice_did).await.unwrap();
+        let info = handle.get_peer_connection_info(alice_did).await.unwrap();
         assert_eq!(info.did, alice_did.clone());
         assert_eq!(info.negotiated_version, 2);
         assert_eq!(info.peer_software, "icnd-0.2.5");
@@ -2199,7 +2199,7 @@ mod tests {
         // Unknown peer
         let bob_keypair = KeyPair::generate().unwrap();
         let bob_did = bob_keypair.did();
-        assert!(handle.get_peer_connection_info(&bob_did).await.is_none());
+        assert!(handle.get_peer_connection_info(bob_did).await.is_none());
     }
 
     #[tokio::test]

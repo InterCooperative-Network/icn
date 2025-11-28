@@ -209,7 +209,7 @@ mod tests {
                 &keypair,
                 seq,
                 PayloadType::Gossip,
-                format!("test {}", seq).as_bytes().to_vec(),
+                format!("test {seq}").as_bytes().to_vec(),
             )
             .unwrap();
 

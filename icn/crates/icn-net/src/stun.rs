@@ -396,13 +396,13 @@ mod tests {
 
         match result {
             Ok(addr) => {
-                println!("Discovered public endpoint: {}", addr);
+                println!("Discovered public endpoint: {addr}");
                 // Verify we got a valid address
                 assert!(addr.port() > 0);
             }
             Err(e) => {
                 // Don't fail test if network is unavailable
-                eprintln!("STUN discovery failed (network may be unavailable): {}", e);
+                eprintln!("STUN discovery failed (network may be unavailable): {e}");
             }
         }
     }
