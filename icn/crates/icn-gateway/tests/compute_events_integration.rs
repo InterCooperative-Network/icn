@@ -81,7 +81,7 @@ async fn test_compute_events_to_websocket() {
     let expected_hash = hex::encode(task_hash);
 
     // Simulate gossip broadcast loop-back (in real system, gossip would broadcast and come back)
-    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(task))
+    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
         .await
         .expect("Should handle gossip message");
 
@@ -181,7 +181,7 @@ async fn test_multiple_subscribers_receive_events() {
     handle.submit(task.clone()).await.expect("Should submit task");
 
     // Simulate gossip broadcast loop-back
-    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(task))
+    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
         .await
         .expect("Should handle gossip message");
 
@@ -290,7 +290,7 @@ async fn test_events_have_sequence_numbers() {
     handle.submit(task.clone()).await.expect("Should submit task");
 
     // Simulate gossip broadcast loop-back
-    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(task))
+    handle.handle_gossip(icn_compute::ComputeMessage::TaskSubmitted(Box::new(task)))
         .await
         .expect("Should handle gossip message");
 

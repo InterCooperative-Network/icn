@@ -98,7 +98,7 @@ impl ComputeHandle {
     pub async fn submit(&self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         self.tx
-            .send(ComputeCommand::Submit { task, resp: resp_tx })
+            .send(ComputeCommand::Submit { task: Box::new(task), resp: resp_tx })
             .await
             .map_err(|_| ComputeError::Internal("actor closed".into()))?;
         resp_rx
@@ -287,7 +287,7 @@ impl ComputeHandle {
 /// Commands sent to the ComputeActor
 enum ComputeCommand {
     Submit {
-        task: ComputeTask,
+        task: Box<ComputeTask>,
         resp: tokio::sync::oneshot::Sender<Result<TaskHash, ComputeError>>,
     },
     Status {
@@ -507,7 +507,7 @@ impl ComputeActor {
             while let Some(cmd) = rx.recv().await {
                 match cmd {
                     ComputeCommand::Submit { task, resp } => {
-                        let result = self.handle_submit(task).await;
+                        let result = self.handle_submit(*task).await;
                         let _ = resp.send(result);
                     }
                     ComputeCommand::Status { hash, resp } => {
@@ -867,7 +867,7 @@ impl ComputeActor {
                     "Using legacy claiming (no resource profile)"
                 );
 
-                cb(ComputeMessage::TaskSubmitted(task));
+                cb(ComputeMessage::TaskSubmitted(Box::new(task)));
             }
         }
 
@@ -924,7 +924,7 @@ impl ComputeActor {
     async fn handle_message(&self, msg: ComputeMessage) -> Result<(), ComputeError> {
         match msg {
             ComputeMessage::TaskSubmitted(task) => {
-                self.on_task_submitted(task).await
+                self.on_task_submitted(*task).await
             }
             ComputeMessage::TaskClaimed { task_hash, executor } => {
                 self.on_task_claimed(task_hash, executor).await
@@ -1517,12 +1517,8 @@ impl ComputeActor {
         // Get the executor if task was claimed
         let executor_did = {
             let mgr = self.task_manager.lock().await;
-            if let Some(status) = mgr.status(&task_hash) {
-                if let TaskStatus::Claimed { executor, .. } = status {
-                    Some(executor.clone())
-                } else {
-                    None
-                }
+            if let Some(TaskStatus::Claimed { executor, .. }) = mgr.status(&task_hash) {
+                Some(executor.clone())
             } else {
                 None
             }
@@ -2280,7 +2276,7 @@ mod tests {
         let handle = actor.spawn();
 
         let task = make_task("task-1", "did:icn:alice");
-        let msg = ComputeMessage::TaskSubmitted(task.clone());
+        let msg = ComputeMessage::TaskSubmitted(Box::new(task.clone()));
 
         handle.handle_gossip(msg).await.unwrap();
 
@@ -2386,16 +2382,16 @@ mod tests {
         critical_task.priority = crate::types::TaskPriority::Critical;
 
         // Submit them via gossip (not direct submit which auto-executes)
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(low_task.clone())).await.unwrap();
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(low_task.clone()))).await.unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(normal_task.clone())).await.unwrap();
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(normal_task.clone()))).await.unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(high_task.clone())).await.unwrap();
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(high_task.clone()))).await.unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        handle.handle_gossip(ComputeMessage::TaskSubmitted(critical_task.clone())).await.unwrap();
+        handle.handle_gossip(ComputeMessage::TaskSubmitted(Box::new(critical_task.clone()))).await.unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // The critical task should have been claimed and completed first

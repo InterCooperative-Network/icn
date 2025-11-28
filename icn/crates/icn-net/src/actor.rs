@@ -1118,6 +1118,7 @@ impl NetworkActor {
     }
 
     /// Handle incoming QUIC connections
+    #[allow(clippy::too_many_arguments)]
     async fn handle_incoming_connections(
         session_manager: Arc<RwLock<SessionManager>>,
         handler: IncomingMessageHandler,
@@ -1229,6 +1230,7 @@ impl NetworkActor {
     }
 
     /// Handle a single QUIC connection (process all incoming streams)
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all, fields(remote_addr = %connection.remote_address()))]
     async fn handle_connection(
         connection: quinn::Connection,

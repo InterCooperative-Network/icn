@@ -644,6 +644,7 @@ enum DomainCommands {
 }
 
 #[derive(Subcommand, Debug)]
+#[allow(clippy::large_enum_variant)]
 enum ProposalCommands {
     /// Create a new proposal
     Create {

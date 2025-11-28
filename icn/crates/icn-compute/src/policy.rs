@@ -363,36 +363,34 @@ impl PolicyManager {
         use chrono::Datelike;
 
         for rule in &policy.rules {
-            match rule {
-                SchedulingRule::TimeWindow {
-                    allowed_hours,
-                    allowed_days,
-                    priorities,
-                } => {
-                    if priorities.contains(&task.priority) {
-                        let now = chrono::Utc::now();
+            if let SchedulingRule::TimeWindow {
+                allowed_hours,
+                allowed_days,
+                priorities,
+            } = rule
+            {
+                if priorities.contains(&task.priority) {
+                    let now = chrono::Utc::now();
 
-                        if !allowed_hours.contains(&(now.hour() as u8)) {
-                            return Ok(Some(format!(
-                                "Task not allowed at hour {} (allowed: {:?})",
-                                now.hour(),
-                                allowed_hours
-                            )));
-                        }
+                    if !allowed_hours.contains(&(now.hour() as u8)) {
+                        return Ok(Some(format!(
+                            "Task not allowed at hour {} (allowed: {:?})",
+                            now.hour(),
+                            allowed_hours
+                        )));
+                    }
 
-                        let weekday = now.weekday().num_days_from_sunday() as u8;
-                        if !allowed_days.contains(&weekday) {
-                            return Ok(Some(format!(
-                                "Task not allowed on {} (allowed days: {:?})",
-                                now.weekday(),
-                                allowed_days
-                            )));
-                        }
+                    let weekday = now.weekday().num_days_from_sunday() as u8;
+                    if !allowed_days.contains(&weekday) {
+                        return Ok(Some(format!(
+                            "Task not allowed on {} (allowed days: {:?})",
+                            now.weekday(),
+                            allowed_days
+                        )));
                     }
                 }
-                // Other rules are placement constraints, not submission rejections
-                _ => {}
             }
+            // Other rules are placement constraints, not submission rejections
         }
 
         Ok(None)

@@ -314,7 +314,7 @@ pub enum ExecutionOutcome {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ComputeMessage {
     /// New task submitted (Phase 15 - legacy)
-    TaskSubmitted(ComputeTask),
+    TaskSubmitted(Box<ComputeTask>),
     /// Executor claims a task
     TaskClaimed {
         task_hash: TaskHash,
