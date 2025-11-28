@@ -38,7 +38,7 @@ icnctl compute status <task_hash>
 ### Via TypeScript SDK
 
 ```typescript
-import { ICNClient } from '@anthropic/icn-sdk';
+import { ICNClient } from '@icn/client';
 import * as fs from 'fs';
 
 const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
