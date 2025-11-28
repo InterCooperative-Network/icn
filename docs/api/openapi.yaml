@@ -763,10 +763,15 @@ paths:
       tags: [Compute]
       summary: Submit a compute task
       description: |
-        Submit a CCL (Cooperative Contract Language) contract for distributed execution.
+        Submit a compute task for distributed execution. Supports two code types:
+
+        - **CCL** (default): Submit a CCL (Cooperative Contract Language) contract as JSON
+        - **WASM**: Submit a WebAssembly module as base64-encoded bytes
 
         The task is broadcast to the network where trusted executors can claim and run it.
         Payment is automatically settled based on fuel consumed.
+
+        **Priority levels**: low, normal (default), high, critical
       operationId: submitComputeTask
       security:
         - bearerAuth: []
@@ -776,10 +781,21 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SubmitTaskRequest'
-            example:
-              code: '{"name":"SimpleReturn","participants":["did:icn:alice"],"rules":[{"name":"run","body":[{"Return":{"value":{"Literal":{"Int":42}}}}]}]}'
-              fuel_limit: 10000
-              payment_rate: 100
+            examples:
+              ccl:
+                summary: CCL contract submission
+                value:
+                  code_type: ccl
+                  code: '{"name":"SimpleReturn","participants":["did:icn:alice"],"rules":[{"name":"run","body":[{"Return":{"value":{"Literal":{"Int":42}}}}]}]}'
+                  fuel_limit: 10000
+                  priority: normal
+              wasm:
+                summary: WASM module submission
+                value:
+                  code_type: wasm
+                  wasm_bytes: AGFzbQEAAAABBAFgAAF/AwIBAAcHAQNydW4AAAoGAQQAQSoL
+                  fuel_limit: 10000
+                  priority: high
       responses:
         '200':
           description: Task submitted successfully
@@ -1305,16 +1321,27 @@ components:
     # Compute Schemas
     # ============================================
 
+    CodeType:
+      type: string
+      enum: [ccl, wasm]
+      description: Code type for compute tasks
+      default: ccl
+
     SubmitTaskRequest:
       type: object
-      required: [code]
       properties:
         task_id:
           type: string
           description: Optional task ID (auto-generated if not provided)
         code:
           type: string
-          description: CCL contract JSON
+          description: CCL contract JSON (required if code_type is "ccl")
+        wasm_bytes:
+          type: string
+          format: byte
+          description: Base64-encoded WASM bytecode (required if code_type is "wasm")
+        code_type:
+          $ref: '#/components/schemas/CodeType'
         inputs:
           type: object
           description: Input arguments (JSON)
@@ -1322,6 +1349,11 @@ components:
           type: integer
           description: Maximum fuel for execution (default 10000)
           default: 10000
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+          description: Task priority (default normal)
+          default: normal
         deadline_ms:
           type: integer
           description: Deadline in milliseconds from now (optional)
