@@ -367,8 +367,7 @@ mod tests {
         let result = executor.execute(&task, &mut ctx);
         assert!(
             matches!(result, ExecutionOutcome::Success(_)),
-            "Expected success, got: {:?}",
-            result
+            "Expected success, got: {result:?}"
         );
     }
 
@@ -575,7 +574,7 @@ mod tests {
             ExecutionOutcome::Failed(msg) => {
                 assert!(msg.contains("WASM support not enabled"));
             }
-            other => panic!("Expected failure message, got: {:?}", other),
+            other => panic!("Expected failure message, got: {other:?}"),
         }
     }
 }
