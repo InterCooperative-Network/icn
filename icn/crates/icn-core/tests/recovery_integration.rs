@@ -367,7 +367,6 @@ impl RecoveryTestNode {
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
 async fn test_full_recovery_flow() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
