@@ -323,6 +323,33 @@ icnctl network status
 - [Deployment Guide](deployment-guide.md) - Production deployment
 
 ### Build on ICN
+
+**Quick TypeScript Example**:
+```typescript
+import { ICNClient } from '@icn/client';
+
+const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
+
+// Authenticate (you provide signing logic)
+await client.authenticate('did:icn:alice', signer, 'my-coop', ['ledger:read']);
+
+// Make a payment
+await client.pay('my-coop', {
+  from: 'did:icn:alice',
+  to: 'did:icn:bob',
+  amount: 5,
+  currency: 'hours',
+});
+
+// Submit a compute task
+const task = await client.submitTask({
+  code: JSON.stringify(cclContract),
+  fuel_limit: 10000,
+});
+const result = await client.waitForTask(task.task_hash);
+```
+
+**More Resources**:
 - [Gateway API Reference](api/openapi.yaml) - REST + WebSocket API
 - [TypeScript SDK](../sdk/typescript/) - `@icn/client` npm package
 - [Platform Layer Design](platform-layer-design.md) - App architecture
