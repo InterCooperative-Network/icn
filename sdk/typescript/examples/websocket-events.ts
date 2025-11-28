@@ -4,7 +4,7 @@
  * Shows how to subscribe to real-time events from ICN:
  * - Connect to WebSocket
  * - Authenticate
- * - Handle different event types
+ * - Handle different event types (ledger, membership, governance, compute)
  * - Reconnection logic
  *
  * Run: npx ts-node examples/websocket-events.ts
@@ -218,6 +218,65 @@ function handleEvent(eventType: CoopEventType, payload: unknown) {
       break;
     }
 
+    // -------------------------------------------------------------------------
+    // Compute Events
+    // -------------------------------------------------------------------------
+    case 'ComputeTaskSubmitted': {
+      const t = payload as {
+        task_id: string;
+        task_hash: string;
+        submitter: string;
+        fuel_limit: number;
+      };
+
+      console.log(`[${timestamp}] COMPUTE TASK SUBMITTED`);
+      console.log(`  Task ID: ${t.task_id}`);
+      console.log(`  Hash: ${t.task_hash}`);
+      console.log(`  Submitter: ${truncate(t.submitter)}`);
+      console.log(`  Fuel Limit: ${t.fuel_limit}`);
+      console.log();
+      break;
+    }
+
+    case 'ComputeTaskClaimed': {
+      const t = payload as { task_hash: string; executor: string };
+
+      console.log(`[${timestamp}] COMPUTE TASK CLAIMED`);
+      console.log(`  Hash: ${t.task_hash}`);
+      console.log(`  Executor: ${truncate(t.executor)}`);
+      console.log();
+      break;
+    }
+
+    case 'ComputeTaskCompleted': {
+      const t = payload as {
+        task_hash: string;
+        executor: string;
+        outcome: string;
+        fuel_used: number;
+        duration_ms: number;
+      };
+
+      console.log(`[${timestamp}] COMPUTE TASK COMPLETED`);
+      console.log(`  Hash: ${t.task_hash}`);
+      console.log(`  Executor: ${truncate(t.executor)}`);
+      console.log(`  Outcome: ${t.outcome}`);
+      console.log(`  Fuel Used: ${t.fuel_used}`);
+      console.log(`  Duration: ${t.duration_ms}ms`);
+      console.log();
+      break;
+    }
+
+    case 'ComputeTaskCancelled': {
+      const t = payload as { task_hash: string; reason?: string };
+
+      console.log(`[${timestamp}] COMPUTE TASK CANCELLED`);
+      console.log(`  Hash: ${t.task_hash}`);
+      if (t.reason) console.log(`  Reason: ${t.reason}`);
+      console.log();
+      break;
+    }
+
     default:
       console.log(`[${timestamp}] ${eventType}`);
       console.log(`  Payload: ${JSON.stringify(payload)}`);
@@ -270,6 +329,7 @@ function dashboardExample() {
   const state = {
     recentTransactions: [] as unknown[],
     activeProposals: [] as unknown[],
+    activeTasks: [] as unknown[],
     memberCount: 0,
   };
 
@@ -307,6 +367,19 @@ function dashboardExample() {
         case 'GovernanceProposalClosed':
           state.activeProposals = state.activeProposals.filter(
             (p: any) => p.proposal_id !== (message.payload as any).proposal_id
+          );
+          // updateUI();
+          break;
+
+        case 'ComputeTaskSubmitted':
+          state.activeTasks.push(message.payload);
+          // updateUI();
+          break;
+
+        case 'ComputeTaskCompleted':
+        case 'ComputeTaskCancelled':
+          state.activeTasks = state.activeTasks.filter(
+            (t: any) => t.task_hash !== (message.payload as any).task_hash
           );
           // updateUI();
           break;
