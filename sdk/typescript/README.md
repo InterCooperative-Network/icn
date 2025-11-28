@@ -165,6 +165,44 @@ const outcome = await client.closeProposal(proposal.id);
 console.log(`Accepted: ${outcome.accepted}`);
 ```
 
+### Compute
+
+```typescript
+// Submit CCL task
+const cclContract = {
+  name: 'calculator',
+  rules: [{ name: 'add', params: ['a', 'b'], body: [] }]
+};
+const task = await client.submitTask({
+  code: JSON.stringify(cclContract),
+  fuel_limit: 10000,
+  priority: 'normal',
+  payment_rate: 100  // credits per 1000 fuel
+});
+console.log('Task hash:', task.task_hash);
+
+// Submit WASM task (helper method handles base64 encoding)
+const wasmBytes = await fetch('/module.wasm').then(r => r.arrayBuffer());
+const wasmTask = await client.submitWasmTask(new Uint8Array(wasmBytes), {
+  fuel_limit: 10000,
+  inputs: { x: 42 }
+});
+
+// Check task status
+const status = await client.getTaskStatus(task.task_hash);
+console.log('Status:', status.status);  // pending, claimed, completed, failed, cancelled
+
+// Wait for task completion (polls until done)
+const result = await client.waitForTask(task.task_hash, 1000, 60000);  // 1s interval, 60s timeout
+if (result.status === 'completed') {
+  console.log('Output:', result.result?.output);
+  console.log('Fuel used:', result.result?.fuel_used);
+}
+
+// Cancel a task
+await client.cancelTask(task.task_hash, { reason: 'No longer needed' });
+```
+
 ### WebSocket Events
 
 ```typescript
@@ -224,6 +262,8 @@ Request specific scopes during authentication:
 | `coop:admin` | Manage members |
 | `gov:read` | Read governance domains/proposals |
 | `gov:write` | Create proposals, cast votes |
+| `compute:read` | Check task status |
+| `compute:write` | Submit and cancel tasks |
 
 ## Browser Usage
 
