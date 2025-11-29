@@ -13,7 +13,9 @@ use std::time::SystemTime;
 use tracing::{debug, info, warn};
 
 /// Priority level for storage quota
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+)]
 pub enum QuotaPriority {
     /// Lowest priority - evicted first (e.g., cached data, temp files)
     Low = 0,
