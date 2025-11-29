@@ -135,6 +135,11 @@ impl TrustGraph {
         }
     }
 
+    /// Get the DID of this node
+    pub fn own_did(&self) -> &Did {
+        &self.own_did
+    }
+
     /// Add or update a trust edge
     pub fn add_edge(&mut self, edge: TrustEdge) -> Result<()> {
         info!(

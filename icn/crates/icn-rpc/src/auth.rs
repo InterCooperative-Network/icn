@@ -301,6 +301,8 @@ pub mod scopes {
     pub const GOVERNANCE_READ: &str = "governance:read";
     pub const COMPUTE_READ: &str = "compute:read";
     pub const POLICY_READ: &str = "policy:read";
+    pub const TRUST_READ: &str = "trust:read";
+    pub const RECOVERY_READ: &str = "recovery:read";
 
     // Write scopes
     pub const NETWORK_WRITE: &str = "network:write";
@@ -309,6 +311,8 @@ pub mod scopes {
     pub const GOVERNANCE_WRITE: &str = "governance:write";
     pub const COMPUTE_WRITE: &str = "compute:write";
     pub const POLICY_WRITE: &str = "policy:write";
+    pub const TRUST_WRITE: &str = "trust:write";
+    pub const RECOVERY_WRITE: &str = "recovery:write";
 
     // Admin scopes
     pub const ADMIN: &str = "admin";
@@ -321,6 +325,8 @@ pub mod scopes {
         GOVERNANCE_READ,
         COMPUTE_READ,
         POLICY_READ,
+        TRUST_READ,
+        RECOVERY_READ,
     ];
 
     /// All write scopes
@@ -331,6 +337,8 @@ pub mod scopes {
         GOVERNANCE_WRITE,
         COMPUTE_WRITE,
         POLICY_WRITE,
+        TRUST_WRITE,
+        RECOVERY_WRITE,
     ];
 }
 
@@ -371,6 +379,16 @@ pub fn required_scope_for_method(method: &str) -> Option<&'static str> {
         // Policy methods
         "policy.get" | "policy.list" | "quota.usage" | "quota.list" => Some(scopes::POLICY_READ),
         "policy.set" | "policy.remove" => Some(scopes::POLICY_WRITE),
+
+        // Trust methods
+        "trust.list" | "trust.compute" => Some(scopes::TRUST_READ),
+        "trust.add" | "trust.remove" => Some(scopes::TRUST_WRITE),
+
+        // Recovery methods
+        "recovery.list" | "recovery.status" => Some(scopes::RECOVERY_READ),
+        "recovery.initiate" | "recovery.attest" | "recovery.finalize" | "recovery.cancel" => {
+            Some(scopes::RECOVERY_WRITE)
+        }
 
         // Unknown methods - require admin
         _ => Some(scopes::ADMIN),

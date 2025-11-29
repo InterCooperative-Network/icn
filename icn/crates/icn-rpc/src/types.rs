@@ -37,6 +37,14 @@ pub struct PeerInfo {
     pub version: String,
 }
 
+/// Trust edge information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustEdgeInfo {
+    pub target_did: String,
+    pub score: f64,
+    pub labels: Vec<String>,
+}
+
 /// Network statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkStats {
@@ -319,4 +327,61 @@ impl RpcResponse {
             id,
         }
     }
+}
+
+// ============================================================================
+// Recovery types (for social recovery of lost identities)
+// ============================================================================
+
+/// Recovery event information (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryEventInfo {
+    pub id: String,
+    pub old_did: String,
+    pub new_did: String,
+    pub initiated_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finalized_at: Option<u64>,
+    pub threshold: usize,
+    pub delay_period: u64,
+    pub status: String, // "pending", "delayed", "ready", "finalized", "cancelled"
+    pub attestations_count: usize,
+    pub progress_summary: String,
+}
+
+/// Recovery attestation information (simplified for RPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryAttestationInfo {
+    pub trustee: String,
+    pub verification_method: String,
+    pub timestamp: u64,
+}
+
+/// Request to initiate recovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitiateRecoveryRequest {
+    pub old_did: String,
+    pub threshold: usize,
+    pub delay_period: u64,
+}
+
+/// Response from initiating recovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitiateRecoveryResponse {
+    pub recovery_id: String,
+    pub status: String,
+}
+
+/// Request to add recovery attestation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryAttestRequest {
+    pub recovery_id: String,
+    pub verification_method: String,
+}
+
+/// Request to cancel recovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelRecoveryRequest {
+    pub recovery_id: String,
+    pub reason: String,
 }

@@ -27,9 +27,12 @@ use tracing::{debug, error, info, warn};
 use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_governance::{GovernanceOps, MembershipAction};
+use icn_identity::recovery::{RecoveryAttestation, RecoveryEvent, RecoveryStatus};
 use icn_identity::Did;
 use icn_ledger::Ledger;
 use icn_net::NetworkHandle;
+use icn_store::Store;
+use icn_trust::{TrustEdge, TrustGraph};
 
 use crate::auth::{required_scope_for_method, RpcAuthManager, RpcTokenClaims};
 use crate::receipt::ReceiptStore;
@@ -38,7 +41,8 @@ use crate::types::{
     CreateDomainRequest, CreateProposalRequest, CreateProposalResponse, GovernanceDomainInfo,
     GovernanceParamsInfo, LedgerAccountDelta, LedgerBalance, LedgerEntry, MembershipConfigInfo,
     NetworkStats, NetworkStatus, OpenProposalRequest, PeerInfo, ProposalInfo, ProposalPayloadInfo,
-    RpcRequest, RpcResponse, SubmitTaskRequest, SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
+    RecoveryAttestationInfo, RecoveryEventInfo, RpcRequest, RpcResponse, SubmitTaskRequest,
+    SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
 };
 
 use icn_gossip::GossipActor;
@@ -51,6 +55,9 @@ pub struct RpcServer {
     gossip_handle: Option<Arc<RwLock<GossipActor>>>,
     governance_handle: Option<Box<dyn GovernanceOps>>,
     compute_handle: Option<ComputeHandle>,
+    trust_handle: Option<Arc<RwLock<TrustGraph>>>,
+    store_handle: Option<Arc<dyn Store>>,
+    own_keypair: Option<Arc<icn_identity::KeyPair>>,
     receipt_store: Arc<ReceiptStore>,
     auth_manager: Option<Arc<RpcAuthManager>>,
     listen_addr: SocketAddr,
@@ -66,6 +73,9 @@ impl RpcServer {
             gossip_handle: None,
             governance_handle: None,
             compute_handle: None,
+            trust_handle: None,
+            store_handle: None,
+            own_keypair: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             auth_manager: None,
             listen_addr,
@@ -85,6 +95,9 @@ impl RpcServer {
             gossip_handle: None,
             governance_handle: None,
             compute_handle: None,
+            trust_handle: None,
+            store_handle: None,
+            own_keypair: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)),
             auth_manager: Some(Arc::new(RpcAuthManager::new(jwt_secret, true))),
             listen_addr,
@@ -132,6 +145,21 @@ impl RpcServer {
     /// Set the compute handle (called after ComputeActor spawns)
     pub fn set_compute_handle(&mut self, handle: ComputeHandle) {
         self.compute_handle = Some(handle);
+    }
+
+    /// Set the trust graph handle (called after TrustGraph initializes)
+    pub fn set_trust_handle(&mut self, handle: Arc<RwLock<TrustGraph>>) {
+        self.trust_handle = Some(handle);
+    }
+
+    /// Set the store handle (for recovery events and other persistent data)
+    pub fn set_store_handle(&mut self, handle: Arc<dyn Store>) {
+        self.store_handle = Some(handle);
+    }
+
+    /// Set the own keypair handle (for signing recovery attestations)
+    pub fn set_own_keypair(&mut self, keypair: Arc<icn_identity::KeyPair>) {
+        self.own_keypair = Some(keypair);
     }
 
     /// Start the RPC server
@@ -330,6 +358,21 @@ async fn dispatch_request(
         "policy.remove" => handle_policy_remove(req.id, &req.params, state).await,
         "quota.usage" => handle_quota_usage(req.id, &req.params, state).await,
         "quota.list" => handle_quota_list(req.id, &req.params, state).await,
+
+        // Trust methods
+        "trust.add" => handle_trust_add(req.id, &req.params, state).await,
+        "trust.remove" => handle_trust_remove(req.id, &req.params, state).await,
+        "trust.list" => handle_trust_list(req.id, state).await,
+        "trust.compute" => handle_trust_compute(req.id, &req.params, state).await,
+
+        // Recovery methods
+        "recovery.initiate" => handle_recovery_initiate(req.id, &req.params, state, claims).await,
+        "recovery.attest" => handle_recovery_attest(req.id, &req.params, state).await,
+        "recovery.list" => handle_recovery_list(req.id, state).await,
+        "recovery.status" => handle_recovery_status(req.id, &req.params, state).await,
+        "recovery.finalize" => handle_recovery_finalize(req.id, &req.params, state).await,
+        "recovery.cancel" => handle_recovery_cancel(req.id, &req.params, state, claims).await,
+
         _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
     }
 }
@@ -2326,6 +2369,665 @@ async fn handle_quota_list(
             RpcResponse::success(id, result)
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to list usage: {e}")),
+    }
+}
+
+// ============================================================================
+// Trust handlers
+// ============================================================================
+
+/// Handle trust.add RPC call - add a trust edge
+async fn handle_trust_add(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let trust_graph = match &state.trust_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct AddTrustParams {
+        target_did: String,
+        score: f64,
+        label: Option<String>,
+    }
+
+    let params: AddTrustParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Validate score
+    if !(0.0..=1.0).contains(&params.score) {
+        return RpcResponse::error(id, -32602, "Score must be between 0.0 and 1.0".to_string());
+    }
+
+    // Parse target DID
+    let target_did = match Did::from_str(&params.target_did) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid target DID: {e}"));
+        }
+    };
+
+    let mut graph = trust_graph.write().await;
+    let own_did = graph.own_did().clone();
+
+    // Create the trust edge
+    let mut edge = TrustEdge::new(own_did, target_did, params.score);
+    if let Some(label) = params.label {
+        edge = edge.with_label(label);
+    }
+
+    match graph.add_edge(edge) {
+        Ok(()) => RpcResponse::success(id, serde_json::json!({"success": true})),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to add trust edge: {e}")),
+    }
+}
+
+/// Handle trust.remove RPC call - remove a trust edge
+async fn handle_trust_remove(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let trust_graph = match &state.trust_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct RemoveTrustParams {
+        target_did: String,
+    }
+
+    let params: RemoveTrustParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Parse target DID
+    let target_did = match Did::from_str(&params.target_did) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid target DID: {e}"));
+        }
+    };
+
+    let mut graph = trust_graph.write().await;
+    let own_did = graph.own_did().clone();
+    match graph.remove_edge(&own_did, &target_did) {
+        Ok(()) => RpcResponse::success(id, serde_json::json!({"success": true})),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to remove trust edge: {e}")),
+    }
+}
+
+/// Handle trust.list RPC call - list outgoing trust edges
+async fn handle_trust_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let trust_graph = match &state.trust_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+        }
+    };
+
+    let graph = trust_graph.read().await;
+    let own_did = graph.own_did().clone();
+    match graph.get_outgoing_edges(&own_did) {
+        Ok(edges) => {
+            let result: Vec<serde_json::Value> = edges
+                .iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "target_did": e.target.to_string(),
+                        "score": e.score,
+                        "labels": e.labels,
+                    })
+                })
+                .collect();
+            RpcResponse::success(id, serde_json::json!(result))
+        }
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list trust edges: {e}")),
+    }
+}
+
+/// Handle trust.compute RPC call - compute trust score for a target DID
+async fn handle_trust_compute(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let trust_graph = match &state.trust_handle {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct ComputeTrustParams {
+        target_did: String,
+    }
+
+    let params: ComputeTrustParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Parse target DID
+    let target_did = match Did::from_str(&params.target_did) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid target DID: {e}"));
+        }
+    };
+
+    let graph = trust_graph.read().await;
+    match graph.compute_trust_score(&target_did) {
+        Ok(score) => RpcResponse::success(id, serde_json::json!({"score": score})),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to compute trust: {e}")),
+    }
+}
+
+// ============================================================================
+// Recovery handlers
+// ============================================================================
+
+/// Handle recovery.initiate RPC call - initiate social recovery for a lost identity
+async fn handle_recovery_initiate(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+    claims: Option<&RpcTokenClaims>,
+) -> RpcResponse {
+    let store = match &state.store_handle {
+        Some(s) => s.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Store not configured".to_string());
+        }
+    };
+
+    // Get the new DID from authenticated claims
+    let new_did_str = match claims {
+        Some(c) => &c.sub,
+        None => {
+            return RpcResponse::error(id, -32001, "Authentication required".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct InitiateParams {
+        old_did: String,
+        threshold: usize,
+        #[serde(default = "default_delay_period")]
+        delay_period: u64,
+    }
+
+    fn default_delay_period() -> u64 {
+        86400 // 24 hours
+    }
+
+    let params: InitiateParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Parse DIDs
+    let old_did = match Did::from_str(&params.old_did) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid old_did: {e}"));
+        }
+    };
+
+    let new_did = match Did::from_str(new_did_str) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid new_did: {e}"));
+        }
+    };
+
+    // Create recovery event
+    let recovery = RecoveryEvent::new(old_did, new_did, params.threshold, params.delay_period);
+
+    // Save to store
+    let recovery_key = format!("recovery:{}", recovery.id);
+    let recovery_json = match serde_json::to_vec(&recovery) {
+        Ok(j) => j,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+        }
+    };
+
+    if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
+        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+    }
+
+    info!(
+        "Recovery initiated: {} -> {} (id: {})",
+        recovery.old_did, recovery.new_did, recovery.id
+    );
+
+    RpcResponse::success(
+        id,
+        serde_json::json!({
+            "recovery_id": recovery.id,
+            "status": recovery.progress_summary(),
+        }),
+    )
+}
+
+/// Handle recovery.attest RPC call - sign a recovery attestation as a trustee
+async fn handle_recovery_attest(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let store = match &state.store_handle {
+        Some(s) => s.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Store not configured".to_string());
+        }
+    };
+
+    let keypair = match &state.own_keypair {
+        Some(kp) => kp.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Keypair not configured".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct AttestParams {
+        recovery_id: String,
+        verification_method: String,
+    }
+
+    let params: AttestParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Load recovery event
+    let recovery_key = format!("recovery:{}", params.recovery_id);
+    let recovery_data = match store.get(recovery_key.as_bytes()) {
+        Ok(Some(d)) => d,
+        Ok(None) => {
+            return RpcResponse::error(id, -32000, "Recovery not found".to_string());
+        }
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+        }
+    };
+
+    let mut recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
+        Ok(r) => r,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+        }
+    };
+
+    // Create attestation
+    let attestation = match RecoveryAttestation::new(
+        &keypair,
+        recovery.old_did.clone(),
+        recovery.new_did.clone(),
+        params.verification_method.clone(),
+    ) {
+        Ok(a) => a,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to create attestation: {e}"));
+        }
+    };
+
+    // Add attestation to recovery
+    let threshold_reached = match recovery.add_attestation(attestation) {
+        Ok(t) => t,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to add attestation: {e}"));
+        }
+    };
+
+    // Save updated recovery
+    let recovery_json = match serde_json::to_vec(&recovery) {
+        Ok(j) => j,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+        }
+    };
+
+    if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
+        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+    }
+
+    info!(
+        "Attestation added to recovery {}: trustee={}",
+        params.recovery_id,
+        keypair.did()
+    );
+
+    RpcResponse::success(
+        id,
+        serde_json::json!({
+            "threshold_reached": threshold_reached,
+            "status": recovery.progress_summary(),
+        }),
+    )
+}
+
+/// Handle recovery.list RPC call - list all recovery events
+async fn handle_recovery_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let store = match &state.store_handle {
+        Some(s) => s.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Store not configured".to_string());
+        }
+    };
+
+    let items = match store.scan(b"recovery:") {
+        Ok(i) => i,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to scan recoveries: {e}"));
+        }
+    };
+
+    let mut recoveries: Vec<RecoveryEventInfo> = Vec::new();
+
+    for (_key, value) in items {
+        let recovery: RecoveryEvent = match serde_json::from_slice(&value) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        recoveries.push(recovery_to_info(&recovery));
+    }
+
+    RpcResponse::success(id, serde_json::to_value(recoveries).unwrap())
+}
+
+/// Handle recovery.status RPC call - get status of a specific recovery
+async fn handle_recovery_status(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let store = match &state.store_handle {
+        Some(s) => s.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Store not configured".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct StatusParams {
+        recovery_id: String,
+    }
+
+    let params: StatusParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Load recovery event
+    let recovery_key = format!("recovery:{}", params.recovery_id);
+    let recovery_data = match store.get(recovery_key.as_bytes()) {
+        Ok(Some(d)) => d,
+        Ok(None) => {
+            return RpcResponse::error(id, -32000, "Recovery not found".to_string());
+        }
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+        }
+    };
+
+    let recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
+        Ok(r) => r,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+        }
+    };
+
+    // Include full attestation info
+    let attestations: Vec<RecoveryAttestationInfo> = recovery
+        .attestations
+        .iter()
+        .map(|a| RecoveryAttestationInfo {
+            trustee: a.trustee.to_string(),
+            verification_method: a.verification_method.clone(),
+            timestamp: a.timestamp,
+        })
+        .collect();
+
+    let info = recovery_to_info(&recovery);
+    let result = serde_json::json!({
+        "id": info.id,
+        "old_did": info.old_did,
+        "new_did": info.new_did,
+        "initiated_at": info.initiated_at,
+        "finalized_at": info.finalized_at,
+        "threshold": info.threshold,
+        "delay_period": info.delay_period,
+        "status": info.status,
+        "attestations_count": info.attestations_count,
+        "progress_summary": info.progress_summary,
+        "attestations": attestations,
+    });
+
+    RpcResponse::success(id, result)
+}
+
+/// Handle recovery.finalize RPC call - finalize a recovery after threshold + delay
+async fn handle_recovery_finalize(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+) -> RpcResponse {
+    let store = match &state.store_handle {
+        Some(s) => s.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Store not configured".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct FinalizeParams {
+        recovery_id: String,
+    }
+
+    let params: FinalizeParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Load recovery event
+    let recovery_key = format!("recovery:{}", params.recovery_id);
+    let recovery_data = match store.get(recovery_key.as_bytes()) {
+        Ok(Some(d)) => d,
+        Ok(None) => {
+            return RpcResponse::error(id, -32000, "Recovery not found".to_string());
+        }
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+        }
+    };
+
+    let mut recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
+        Ok(r) => r,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+        }
+    };
+
+    // Check if delay expired
+    recovery.check_delay_expired();
+
+    // Finalize
+    if let Err(e) = recovery.finalize() {
+        return RpcResponse::error(id, -32000, format!("Failed to finalize: {e}"));
+    }
+
+    // Save updated recovery
+    let recovery_json = match serde_json::to_vec(&recovery) {
+        Ok(j) => j,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+        }
+    };
+
+    if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
+        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+    }
+
+    info!(
+        "Recovery finalized: {} -> {}",
+        recovery.old_did, recovery.new_did
+    );
+
+    RpcResponse::success(
+        id,
+        serde_json::json!({
+            "finalized": true,
+            "old_did": recovery.old_did.to_string(),
+            "new_did": recovery.new_did.to_string(),
+        }),
+    )
+}
+
+/// Handle recovery.cancel RPC call - cancel a recovery (fraud detection)
+async fn handle_recovery_cancel(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+    claims: Option<&RpcTokenClaims>,
+) -> RpcResponse {
+    let store = match &state.store_handle {
+        Some(s) => s.clone(),
+        None => {
+            return RpcResponse::error(id, -32000, "Store not configured".to_string());
+        }
+    };
+
+    // Get the canceller DID from authenticated claims
+    let canceller_did_str = match claims {
+        Some(c) => &c.sub,
+        None => {
+            return RpcResponse::error(id, -32001, "Authentication required".to_string());
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct CancelParams {
+        recovery_id: String,
+        reason: String,
+    }
+
+    let params: CancelParams = match serde_json::from_value(params.clone()) {
+        Ok(p) => p,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+        }
+    };
+
+    // Parse canceller DID
+    let canceller_did = match Did::from_str(canceller_did_str) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid canceller DID: {e}"));
+        }
+    };
+
+    // Load recovery event
+    let recovery_key = format!("recovery:{}", params.recovery_id);
+    let recovery_data = match store.get(recovery_key.as_bytes()) {
+        Ok(Some(d)) => d,
+        Ok(None) => {
+            return RpcResponse::error(id, -32000, "Recovery not found".to_string());
+        }
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+        }
+    };
+
+    let mut recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
+        Ok(r) => r,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+        }
+    };
+
+    // Cancel
+    if let Err(e) = recovery.cancel(canceller_did.clone(), params.reason.clone()) {
+        return RpcResponse::error(id, -32000, format!("Failed to cancel: {e}"));
+    }
+
+    // Save updated recovery
+    let recovery_json = match serde_json::to_vec(&recovery) {
+        Ok(j) => j,
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+        }
+    };
+
+    if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
+        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+    }
+
+    info!(
+        "Recovery cancelled: {} by {} (reason: {})",
+        params.recovery_id, canceller_did, params.reason
+    );
+
+    RpcResponse::success(
+        id,
+        serde_json::json!({
+            "cancelled": true,
+            "cancelled_by": canceller_did.to_string(),
+            "reason": params.reason,
+        }),
+    )
+}
+
+/// Convert RecoveryEvent to RecoveryEventInfo
+fn recovery_to_info(recovery: &RecoveryEvent) -> RecoveryEventInfo {
+    let status = match &recovery.status {
+        RecoveryStatus::Pending { .. } => "pending",
+        RecoveryStatus::Delayed { .. } => "delayed",
+        RecoveryStatus::ReadyToFinalize => "ready",
+        RecoveryStatus::Finalized => "finalized",
+        RecoveryStatus::Cancelled { .. } => "cancelled",
+    };
+
+    RecoveryEventInfo {
+        id: recovery.id.clone(),
+        old_did: recovery.old_did.to_string(),
+        new_did: recovery.new_did.to_string(),
+        initiated_at: recovery.initiated_at,
+        finalized_at: recovery.finalized_at,
+        threshold: recovery.threshold,
+        delay_period: recovery.delay_period,
+        status: status.to_string(),
+        attestations_count: recovery.attestations.len(),
+        progress_summary: recovery.progress_summary(),
     }
 }
 

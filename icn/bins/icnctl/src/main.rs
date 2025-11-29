@@ -5,10 +5,10 @@ use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::generate;
 // Governance types no longer needed - using RPC instead
 use icn_identity::{
-    AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType, RecoveryAttestation,
-    RecoveryConfig as IdentityRecoveryConfig, RecoveryEvent, RecoveryMethod,
+    AgeKeyStore, Capability, Did, KeyPair, KeyStore, KeyType,
+    RecoveryConfig as IdentityRecoveryConfig, RecoveryMethod,
 };
-use icn_store::{SledStore, Store};
+use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1142,9 +1142,13 @@ async fn main() -> Result<()> {
 
         Commands::Device(device_cmd) => handle_device_command(device_cmd, &data_dir)?,
 
-        Commands::Recovery(recovery_cmd) => handle_recovery_command(recovery_cmd, &data_dir)?,
+        Commands::Recovery(recovery_cmd) => {
+            handle_recovery_command(recovery_cmd, &data_dir, &args.endpoint).await?
+        }
 
-        Commands::Trust(trust_cmd) => handle_trust_command(trust_cmd, &data_dir)?,
+        Commands::Trust(trust_cmd) => {
+            handle_trust_command(trust_cmd, &data_dir, &args.endpoint).await?
+        }
 
         Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
 
@@ -1383,11 +1387,11 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()> {
+async fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
-    let store_path = get_store_path(data_dir);
 
     match cmd {
+        // Setup and Config are local-only operations (modify keystore's DID document)
         RecoveryCommands::Setup {
             trustees,
             threshold,
@@ -1508,29 +1512,16 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             }
         }
 
+        // Storage-based commands use RPC
         RecoveryCommands::Initiate { old_did } => {
-            // Parse old DID
-            let old_did = Did::from_str(&old_did).context("Invalid old DID")?;
-
-            // Check if keystore exists (new identity)
-            if !keystore_path.exists() {
-                bail!("No identity found. Create a new identity first with 'icnctl id init'");
-            }
-
-            // Get passphrase and unlock keystore
-            let passphrase = read_passphrase("Enter passphrase for NEW identity: ")?;
-            let mut keystore = AgeKeyStore::open(&keystore_path)?;
-            keystore.unlock(&passphrase)?;
-
-            let new_did = keystore.get_keypair()?.did().clone();
+            // Create authenticated RPC client
+            let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
             println!("Initiating recovery:");
             println!("  Old DID: {old_did}");
-            println!("  New DID: {new_did}");
             println!();
 
-            // TODO: Get recovery config from old DID (would need gossip integration)
-            // For now, prompt user for threshold and delay
+            // Prompt user for threshold and delay
             print!("Enter threshold (M-of-N): ");
             io::stdout().flush()?;
             let mut threshold_input = String::new();
@@ -1550,34 +1541,24 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
                 delay_input.trim().parse().context("Invalid delay")?
             };
 
-            // Create recovery event
-            let recovery = RecoveryEvent::new(old_did.clone(), new_did.clone(), threshold, delay);
-
-            // Save recovery event to store
-            let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{}", recovery.id);
-            let recovery_json = serde_json::to_vec(&recovery)?;
-            store.put(recovery_key.as_bytes(), &recovery_json)?;
-
-            // TODO: Publish to gossip (done by daemon, not CLI)
-            // let msg = RecoveryMessage::initiated(&recovery);
-            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+            // Initiate recovery via RPC
+            let recovery_id = client
+                .initiate_recovery(&old_did, threshold, Some(delay))
+                .await
+                .context("Failed to initiate recovery. Is icnd running?")?;
 
             println!("\n✓ Recovery initiated!");
-            println!("  Recovery ID: {}", recovery.id);
-            println!("  Status: {}", recovery.progress_summary());
+            println!("  Recovery ID: {recovery_id}");
             println!("\nNext steps:");
             println!(
                 "  1. Contact your {threshold} trustees out-of-band (phone, video, in-person)"
             );
             println!(
-                "  2. Ask them to run: icnctl recovery attest {}",
-                recovery.id
+                "  2. Ask them to run: icnctl recovery attest {recovery_id}"
             );
             println!("  3. After {threshold} attestations, wait {delay} seconds delay period");
             println!(
-                "  4. Finalize recovery: icnctl recovery finalize {}",
-                recovery.id
+                "  4. Finalize recovery: icnctl recovery finalize {recovery_id}"
             );
         }
 
@@ -1585,177 +1566,130 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             recovery_id,
             verification,
         } => {
-            // Load recovery event from store
-            let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store
-                .get(recovery_key.as_bytes())?
-                .context("Recovery not found")?;
-            let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+            // Create authenticated RPC client
+            let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
-            println!("Recovery attestation for:");
-            println!("  Old DID: {}", recovery.old_did);
-            println!("  New DID: {}", recovery.new_did);
-            println!("  Status: {}", recovery.progress_summary());
+            println!("Adding attestation to recovery {recovery_id}...");
+            println!("  Verification method: {verification}");
             println!();
 
-            // Get trustee's keystore
-            if !keystore_path.exists() {
-                bail!("No identity found. Trustees must have an ICN identity.");
-            }
-
-            let passphrase = read_passphrase("Enter your passphrase (trustee): ")?;
-            let mut keystore = AgeKeyStore::open(&keystore_path)?;
-            keystore.unlock(&passphrase)?;
-            let keypair = keystore.get_keypair()?;
-
-            println!("Signing attestation as: {}", keypair.did());
-            println!();
-
-            // Create attestation
-            let attestation = RecoveryAttestation::new(
-                keypair,
-                recovery.old_did.clone(),
-                recovery.new_did.clone(),
-                verification.clone(),
-            )?;
-
-            // Add attestation to recovery
-            let threshold_reached = recovery.add_attestation(attestation)?;
-
-            // Save updated recovery
-            let recovery_json = serde_json::to_vec(&recovery)?;
-            store.put(recovery_key.as_bytes(), &recovery_json)?;
-
-            // TODO: Publish attestation to gossip (done by daemon, not CLI)
-            // let msg = RecoveryMessage::attestation(recovery_id.clone(), attestation);
-            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+            // Attest via RPC (daemon uses its own keypair)
+            let threshold_reached = client
+                .attest_recovery(&recovery_id, &verification)
+                .await
+                .context("Failed to add attestation. Is icnd running?")?;
 
             println!("✓ Attestation signed and added!");
-            println!("  Trustee: {}", keypair.did());
             println!("  Verification: {verification}");
-            println!("  Status: {}", recovery.progress_summary());
 
             if threshold_reached {
                 println!("\n🎉 Threshold reached! Recovery entering delay period.");
-                if recovery.delay_period > 0 {
-                    println!(
-                        "   Wait {} seconds before finalizing.",
-                        recovery.delay_period
-                    );
-                } else {
-                    println!("   No delay configured. Ready to finalize now!");
-                }
             }
         }
 
         RecoveryCommands::List => {
-            // List all recovery events from store
-            let store = SledStore::open(&store_path)?;
+            // Create authenticated RPC client
+            let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
-            println!("Active recovery requests:\n");
+            let recoveries = client
+                .list_recoveries()
+                .await
+                .context("Failed to list recoveries. Is icnd running?")?;
 
-            let mut found_any = false;
-            let items = store.scan(b"recovery:")?;
+            let empty_vec = Vec::new();
+            let recoveries = recoveries.as_array().unwrap_or(&empty_vec);
 
-            for (_key, value) in items {
-                let recovery: RecoveryEvent = serde_json::from_slice(&value)?;
+            if recoveries.is_empty() {
+                println!("No recovery requests found.");
+            } else {
+                println!("Recovery requests:\n");
+                for recovery in recoveries {
+                    let id = recovery["id"].as_str().unwrap_or("?");
+                    let old_did = recovery["old_did"].as_str().unwrap_or("?");
+                    let new_did = recovery["new_did"].as_str().unwrap_or("?");
+                    let status = recovery["status"].as_str().unwrap_or("?");
+                    let attestations = recovery["attestations_count"].as_u64().unwrap_or(0);
+                    let threshold = recovery["threshold"].as_u64().unwrap_or(0);
+                    let progress = recovery["progress_summary"].as_str().unwrap_or("?");
 
-                if recovery.is_active() {
-                    found_any = true;
-                    println!("Recovery ID: {}", recovery.id);
-                    println!("  Old DID: {}", recovery.old_did);
-                    println!("  New DID: {}", recovery.new_did);
-                    println!("  Status: {}", recovery.progress_summary());
-                    println!(
-                        "  Attestations: {}/{}",
-                        recovery.attestations.len(),
-                        recovery.threshold
-                    );
+                    println!("Recovery ID: {id}");
+                    println!("  Old DID: {old_did}");
+                    println!("  New DID: {new_did}");
+                    println!("  Status: {status}");
+                    println!("  Attestations: {attestations}/{threshold}");
+                    println!("  Progress: {progress}");
                     println!();
                 }
-            }
-
-            if !found_any {
-                println!("No active recovery requests found.");
             }
         }
 
         RecoveryCommands::Status { recovery_id } => {
-            // Load recovery event
-            let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store
-                .get(recovery_key.as_bytes())?
-                .context("Recovery not found")?;
-            let recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+            // Create authenticated RPC client
+            let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
+
+            let recovery = client
+                .get_recovery_status(&recovery_id)
+                .await
+                .context("Failed to get recovery status. Is icnd running?")?;
+
+            let id = recovery["id"].as_str().unwrap_or("?");
+            let old_did = recovery["old_did"].as_str().unwrap_or("?");
+            let new_did = recovery["new_did"].as_str().unwrap_or("?");
+            let initiated_at = recovery["initiated_at"].as_u64().unwrap_or(0);
+            let threshold = recovery["threshold"].as_u64().unwrap_or(0);
+            let delay_period = recovery["delay_period"].as_u64().unwrap_or(0);
+            let status = recovery["status"].as_str().unwrap_or("?");
+            let progress = recovery["progress_summary"].as_str().unwrap_or("?");
 
             println!("Recovery Status");
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            println!("ID: {}", recovery.id);
-            println!("Old DID: {}", recovery.old_did);
-            println!("New DID: {}", recovery.new_did);
-            println!("Initiated: {}", recovery.initiated_at);
+            println!("ID: {id}");
+            println!("Old DID: {old_did}");
+            println!("New DID: {new_did}");
+            println!("Initiated: {initiated_at}");
             println!();
             println!("Configuration:");
-            println!("  Threshold: {}", recovery.threshold);
-            println!("  Delay: {} seconds", recovery.delay_period);
+            println!("  Threshold: {threshold}");
+            println!("  Delay: {delay_period} seconds");
             println!();
-            println!("Progress: {}", recovery.progress_summary());
+            println!("Status: {status}");
+            println!("Progress: {progress}");
             println!();
-            println!(
-                "Attestations ({}/{}):",
-                recovery.attestations.len(),
-                recovery.threshold
-            );
-            for (i, att) in recovery.attestations.iter().enumerate() {
-                println!("  {}. Trustee: {}", i + 1, att.trustee);
-                println!("     Verification: {}", att.verification_method);
-                println!("     Timestamp: {}", att.timestamp);
+
+            // Show attestations
+            if let Some(attestations) = recovery["attestations"].as_array() {
+                println!("Attestations ({}/{}):", attestations.len(), threshold);
+                for (i, att) in attestations.iter().enumerate() {
+                    let trustee = att["trustee"].as_str().unwrap_or("?");
+                    let verification = att["verification_method"].as_str().unwrap_or("?");
+                    let timestamp = att["timestamp"].as_u64().unwrap_or(0);
+                    println!("  {}. Trustee: {}", i + 1, trustee);
+                    println!("     Verification: {verification}");
+                    println!("     Timestamp: {timestamp}");
+                }
             }
 
-            if recovery.is_finalized() {
-                println!(
-                    "\n✓ Recovery finalized at: {}",
-                    recovery.finalized_at.unwrap()
-                );
+            if status == "finalized" {
+                if let Some(finalized_at) = recovery["finalized_at"].as_u64() {
+                    println!("\n✓ Recovery finalized at: {finalized_at}");
+                }
             }
         }
 
         RecoveryCommands::Finalize { recovery_id } => {
-            // Load recovery event
-            let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store
-                .get(recovery_key.as_bytes())?
-                .context("Recovery not found")?;
-            let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+            // Create authenticated RPC client
+            let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
-            println!("Finalizing recovery:");
-            println!("  Old DID: {}", recovery.old_did);
-            println!("  New DID: {}", recovery.new_did);
-            println!("  Status: {}", recovery.progress_summary());
+            println!("Finalizing recovery {recovery_id}...");
             println!();
 
-            // Check if delay expired
-            recovery.check_delay_expired();
-
-            // Finalize
-            recovery.finalize()?;
-
-            // Save updated recovery
-            let recovery_json = serde_json::to_vec(&recovery)?;
-            store.put(recovery_key.as_bytes(), &recovery_json)?;
-
-            // TODO: Publish finalization to gossip (done by daemon, not CLI)
-            // let msg = RecoveryMessage::finalized(&recovery)?;
-            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+            // Finalize via RPC
+            client
+                .finalize_recovery(&recovery_id)
+                .await
+                .context("Failed to finalize recovery. Is icnd running?")?;
 
             println!("✓ Recovery finalized successfully!");
-            println!(
-                "\nThe new DID ({}) now inherits the old identity.",
-                recovery.new_did
-            );
             println!("\nNext steps:");
             println!("  • Trust graph and ledger will recognize the new DID");
             println!("  • All relationships and balances are preserved");
@@ -1766,46 +1700,21 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
             recovery_id,
             reason,
         } => {
-            // Load recovery event
-            let store = SledStore::open(&store_path)?;
-            let recovery_key = format!("recovery:{recovery_id}");
-            let recovery_data = store
-                .get(recovery_key.as_bytes())?
-                .context("Recovery not found")?;
-            let mut recovery: RecoveryEvent = serde_json::from_slice(&recovery_data)?;
+            // Create authenticated RPC client
+            let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
-            // Get current identity
-            if !keystore_path.exists() {
-                bail!("No identity found.");
-            }
-
-            let passphrase = read_passphrase("Enter passphrase: ")?;
-            let mut keystore = AgeKeyStore::open(&keystore_path)?;
-            keystore.unlock(&passphrase)?;
-            let keypair = keystore.get_keypair()?;
-            let canceller_did = keypair.did().clone();
-
-            println!("Cancelling recovery:");
-            println!("  Recovery ID: {}", recovery.id);
-            println!("  Old DID: {}", recovery.old_did);
-            println!("  New DID: {}", recovery.new_did);
-            println!("  Cancelled by: {canceller_did}");
+            println!("Cancelling recovery {recovery_id}...");
             println!("  Reason: {reason}");
             println!();
 
-            // Cancel recovery
-            recovery.cancel(canceller_did, reason.clone())?;
-
-            // Save updated recovery
-            let recovery_json = serde_json::to_vec(&recovery)?;
-            store.put(recovery_key.as_bytes(), &recovery_json)?;
-
-            // TODO: Publish cancellation to gossip (done by daemon, not CLI)
-            // let msg = RecoveryMessage::cancelled(recovery.id.clone(), canceller_did, reason.clone(), recovery.cancelled_at);
-            // gossip.publish(IDENTITY_RECOVERY_TOPIC, &msg.to_bytes()?)?;
+            // Cancel via RPC
+            client
+                .cancel_recovery(&recovery_id, &reason)
+                .await
+                .context("Failed to cancel recovery. Is icnd running?")?;
 
             println!("✓ Recovery cancelled!");
-            println!("\n⚠️  This recovery attempt has been marked as fraudulent.");
+            println!("\n⚠️  This recovery attempt has been marked as cancelled.");
             println!("   Reason: {reason}");
         }
     }
@@ -1813,25 +1722,9 @@ fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path) -> Result<()>
     Ok(())
 }
 
-fn handle_trust_command(cmd: TrustCommands, data_dir: &Path) -> Result<()> {
-    let keystore_path = get_keystore_path(data_dir);
-    let store_path = get_store_path(data_dir);
-
-    // Load identity
-    if !keystore_path.exists() {
-        bail!("No identity found. Run 'icnctl id init' to create one first.");
-    }
-
-    let passphrase = read_passphrase("Enter passphrase: ")?;
-
-    let mut keystore = AgeKeyStore::open(&keystore_path)?;
-    keystore.unlock(&passphrase)?;
-
-    let own_did = keystore.get_keypair()?.did().clone();
-
-    // Create store and trust graph
-    let store: Arc<dyn Store> = Arc::new(SledStore::open(&store_path)?);
-    let mut graph = TrustGraph::new(store, own_did.clone());
+async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+    // Create authenticated RPC client
+    let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
     match cmd {
         TrustCommands::Add { did, score, label } => {
@@ -1840,39 +1733,35 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &Path) -> Result<()> {
                 bail!("Trust score must be between 0.0 and 1.0");
             }
 
-            // Parse target DID
-            let target_did = parse_did(&did)?;
-
-            // Create edge
-            let mut edge = TrustEdge::new(own_did, target_did.clone(), score);
-
-            if let Some(l) = label {
-                edge = edge.with_label(l);
-            }
-
-            // Add to graph
-            graph.add_edge(edge)?;
+            // Add trust edge via RPC
+            client
+                .add_trust(&did, score, label.as_deref())
+                .await
+                .context("Failed to add trust edge. Is icnd running?")?;
 
             println!("✓ Added trust edge");
-            println!("  Target: {target_did}");
+            println!("  Target: {did}");
             println!("  Score: {score:.2}");
+            if let Some(l) = label {
+                println!("  Label: {l}");
+            }
         }
 
         TrustCommands::List => {
-            let edges = graph.get_outgoing_edges(&own_did)?;
+            let edges = client
+                .list_trust()
+                .await
+                .context("Failed to list trust edges. Is icnd running?")?;
 
             if edges.is_empty() {
                 println!("No trust edges found.");
             } else {
-                println!("Trust edges from {own_did}:\n");
+                println!("Trust edges:\n");
                 for edge in edges {
-                    println!("  → {}", edge.target);
+                    println!("  → {}", edge.target_did);
                     println!("    Score: {:.2}", edge.score);
                     if !edge.labels.is_empty() {
                         println!("    Labels: {}", edge.labels.join(", "));
-                    }
-                    if !edge.evidence.is_empty() {
-                        println!("    Evidence: {} items", edge.evidence.len());
                     }
                     println!();
                 }
@@ -1880,34 +1769,35 @@ fn handle_trust_command(cmd: TrustCommands, data_dir: &Path) -> Result<()> {
         }
 
         TrustCommands::Show { did } => {
-            let target_did = parse_did(&did)?;
+            // Compute trust score via RPC
+            let score = client
+                .compute_trust(&did)
+                .await
+                .context("Failed to compute trust score. Is icnd running?")?;
 
-            // Compute trust score
-            let score = graph.compute_trust_score(&target_did)?;
-            let class = graph.trust_class(&target_did)?;
-
-            println!("Trust score for {target_did}:");
-            println!("  Score: {score:.4}");
-            println!("  Class: {class:?}");
-
-            // Show direct edge if exists
-            if let Some(edge) = graph.get_edge(&own_did, &target_did)? {
-                println!("\nDirect trust edge:");
-                println!("  Score: {:.2}", edge.score);
-                if !edge.labels.is_empty() {
-                    println!("  Labels: {}", edge.labels.join(", "));
-                }
+            // Determine trust class based on score
+            let class = if score < 0.1 {
+                "Isolated"
+            } else if score < 0.4 {
+                "Known"
+            } else if score < 0.7 {
+                "Partner"
             } else {
-                println!("\nNo direct trust edge (score computed transitively)");
-            }
+                "Federated"
+            };
+
+            println!("Trust score for {did}:");
+            println!("  Score: {score:.4}");
+            println!("  Class: {class}");
         }
 
         TrustCommands::Remove { did } => {
-            let target_did = parse_did(&did)?;
+            client
+                .remove_trust(&did)
+                .await
+                .context("Failed to remove trust edge. Is icnd running?")?;
 
-            graph.remove_edge(&own_did, &target_did)?;
-
-            println!("✓ Removed trust edge to {target_did}");
+            println!("✓ Removed trust edge to {did}");
         }
     }
 
@@ -3692,17 +3582,6 @@ async fn handle_contract_deploy_signed(
     println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'");
 
     Ok(())
-}
-
-fn parse_did(s: &str) -> Result<Did> {
-    // For now, just validate format and wrap in Did
-    // TODO: Add proper DID parsing when Did has a parse method
-    if !s.starts_with("did:icn:") {
-        bail!("Invalid DID format. Expected: did:icn:<base58btc-key>");
-    }
-    Ok(serde_json::from_value(serde_json::Value::String(
-        s.to_string(),
-    ))?)
 }
 
 /// Device add request - created on new device, approved on existing device

@@ -10,8 +10,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use crate::types::{
-    ContractExecutionResponse, ContractInfo, LedgerBalance, LedgerEntry, NetworkStats,
-    NetworkStatus, PeerInfo, RpcRequest, RpcResponse,
+    ContractExecutionResponse, ContractInfo, GovernanceDomainInfo, LedgerBalance, LedgerEntry,
+    NetworkStats, NetworkStatus, PeerInfo, ProposalInfo, RpcRequest, RpcResponse, TrustEdgeInfo,
 };
 
 /// RPC client for daemon communication
@@ -115,7 +115,7 @@ impl RpcClient {
         // Auto-authenticate if we have credentials but no token
         // (and this isn't an auth method)
         if self.credentials.is_some() && self.token.is_none() && !method.starts_with("auth.") {
-            // Request all read scopes for general use
+            // Request all read/write scopes for general use
             self.authenticate(vec![
                 "network:read".to_string(),
                 "network:write".to_string(),
@@ -129,6 +129,10 @@ impl RpcClient {
                 "governance:write".to_string(),
                 "policy:read".to_string(),
                 "policy:write".to_string(),
+                "trust:read".to_string(),
+                "trust:write".to_string(),
+                "recovery:read".to_string(),
+                "recovery:write".to_string(),
             ])
             .await?;
         }
@@ -359,5 +363,231 @@ impl RpcClient {
         let contracts: Vec<ContractInfo> =
             serde_json::from_value(result).context("Failed to deserialize contracts")?;
         Ok(contracts)
+    }
+
+    // ========================================================================
+    // Trust methods
+    // ========================================================================
+
+    /// Add a trust edge to another DID
+    pub async fn add_trust(&mut self, target_did: &str, score: f64, label: Option<&str>) -> Result<()> {
+        let params = serde_json::json!({
+            "target_did": target_did,
+            "score": score,
+            "label": label,
+        });
+        self.call("trust.add", params).await?;
+        Ok(())
+    }
+
+    /// Remove a trust edge to another DID
+    pub async fn remove_trust(&mut self, target_did: &str) -> Result<()> {
+        let params = serde_json::json!({
+            "target_did": target_did,
+        });
+        self.call("trust.remove", params).await?;
+        Ok(())
+    }
+
+    /// List outgoing trust edges
+    pub async fn list_trust(&mut self) -> Result<Vec<TrustEdgeInfo>> {
+        let result = self.call("trust.list", serde_json::json!({})).await?;
+        let edges: Vec<TrustEdgeInfo> =
+            serde_json::from_value(result).context("Failed to deserialize trust edges")?;
+        Ok(edges)
+    }
+
+    /// Compute trust score for a target DID
+    pub async fn compute_trust(&mut self, target_did: &str) -> Result<f64> {
+        let params = serde_json::json!({
+            "target_did": target_did,
+        });
+        let result = self.call("trust.compute", params).await?;
+        let score = result["score"]
+            .as_f64()
+            .context("Missing score in response")?;
+        Ok(score)
+    }
+
+    // ========================================================================
+    // Governance methods
+    // ========================================================================
+
+    /// List all governance domains
+    pub async fn list_domains(&mut self) -> Result<Vec<GovernanceDomainInfo>> {
+        let result = self.call("governance.domain.list", serde_json::json!({})).await?;
+        let domains: Vec<GovernanceDomainInfo> =
+            serde_json::from_value(result).context("Failed to deserialize domains")?;
+        Ok(domains)
+    }
+
+    /// Get a governance domain by ID
+    pub async fn get_domain(&mut self, domain_id: &str) -> Result<GovernanceDomainInfo> {
+        let params = serde_json::json!({ "domain_id": domain_id });
+        let result = self.call("governance.domain.get", params).await?;
+        let domain: GovernanceDomainInfo =
+            serde_json::from_value(result).context("Failed to deserialize domain")?;
+        Ok(domain)
+    }
+
+    /// Create a new governance domain
+    pub async fn create_domain(
+        &mut self,
+        domain_id: &str,
+        name: &str,
+        members: Vec<String>,
+    ) -> Result<()> {
+        let params = serde_json::json!({
+            "domain_id": domain_id,
+            "name": name,
+            "members": members,
+        });
+        self.call("governance.domain.create", params).await?;
+        Ok(())
+    }
+
+    /// List all proposals
+    pub async fn list_proposals(&mut self) -> Result<Vec<ProposalInfo>> {
+        let result = self.call("governance.proposal.list", serde_json::json!({})).await?;
+        let proposals: Vec<ProposalInfo> =
+            serde_json::from_value(result).context("Failed to deserialize proposals")?;
+        Ok(proposals)
+    }
+
+    /// Get a proposal by ID
+    pub async fn get_proposal(&mut self, proposal_id: &str) -> Result<ProposalInfo> {
+        let params = serde_json::json!({ "proposal_id": proposal_id });
+        let result = self.call("governance.proposal.get", params).await?;
+        let proposal: ProposalInfo =
+            serde_json::from_value(result).context("Failed to deserialize proposal")?;
+        Ok(proposal)
+    }
+
+    /// Create a new proposal
+    pub async fn create_proposal(
+        &mut self,
+        domain_id: &str,
+        title: &str,
+        description: &str,
+        payload_kind: &str,
+    ) -> Result<String> {
+        let params = serde_json::json!({
+            "domain_id": domain_id,
+            "title": title,
+            "description": description,
+            "payload_kind": payload_kind,
+        });
+        let result = self.call("governance.proposal.create", params).await?;
+        let proposal_id = result["proposal_id"]
+            .as_str()
+            .context("Missing proposal_id in response")?
+            .to_string();
+        Ok(proposal_id)
+    }
+
+    /// Open a proposal for voting
+    pub async fn open_proposal(&mut self, proposal_id: &str) -> Result<()> {
+        let params = serde_json::json!({ "proposal_id": proposal_id });
+        self.call("governance.proposal.open", params).await?;
+        Ok(())
+    }
+
+    /// Close a proposal
+    pub async fn close_proposal(&mut self, proposal_id: &str) -> Result<()> {
+        let params = serde_json::json!({ "proposal_id": proposal_id });
+        self.call("governance.proposal.close", params).await?;
+        Ok(())
+    }
+
+    /// Cast a vote on a proposal
+    pub async fn cast_vote(&mut self, proposal_id: &str, choice: &str) -> Result<()> {
+        let params = serde_json::json!({
+            "proposal_id": proposal_id,
+            "choice": choice,
+        });
+        self.call("governance.vote.cast", params).await?;
+        Ok(())
+    }
+
+    // ========================================================================
+    // Recovery methods
+    // ========================================================================
+
+    /// Initiate social recovery for a lost identity
+    pub async fn initiate_recovery(
+        &mut self,
+        old_did: &str,
+        threshold: usize,
+        delay_period: Option<u64>,
+    ) -> Result<String> {
+        let params = if let Some(delay) = delay_period {
+            serde_json::json!({
+                "old_did": old_did,
+                "threshold": threshold,
+                "delay_period": delay,
+            })
+        } else {
+            serde_json::json!({
+                "old_did": old_did,
+                "threshold": threshold,
+            })
+        };
+
+        let result = self.call("recovery.initiate", params).await?;
+        let recovery_id = result["recovery_id"]
+            .as_str()
+            .context("Missing recovery_id in response")?
+            .to_string();
+        Ok(recovery_id)
+    }
+
+    /// Sign a recovery attestation as a trustee
+    pub async fn attest_recovery(
+        &mut self,
+        recovery_id: &str,
+        verification_method: &str,
+    ) -> Result<bool> {
+        let params = serde_json::json!({
+            "recovery_id": recovery_id,
+            "verification_method": verification_method,
+        });
+
+        let result = self.call("recovery.attest", params).await?;
+        let threshold_reached = result["threshold_reached"]
+            .as_bool()
+            .context("Missing threshold_reached in response")?;
+        Ok(threshold_reached)
+    }
+
+    /// List all recovery events
+    pub async fn list_recoveries(&mut self) -> Result<serde_json::Value> {
+        self.call("recovery.list", serde_json::json!({})).await
+    }
+
+    /// Get status of a specific recovery
+    pub async fn get_recovery_status(&mut self, recovery_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "recovery_id": recovery_id,
+        });
+        self.call("recovery.status", params).await
+    }
+
+    /// Finalize a recovery after threshold + delay
+    pub async fn finalize_recovery(&mut self, recovery_id: &str) -> Result<()> {
+        let params = serde_json::json!({
+            "recovery_id": recovery_id,
+        });
+        self.call("recovery.finalize", params).await?;
+        Ok(())
+    }
+
+    /// Cancel a recovery (fraud detection or device found)
+    pub async fn cancel_recovery(&mut self, recovery_id: &str, reason: &str) -> Result<()> {
+        let params = serde_json::json!({
+            "recovery_id": recovery_id,
+            "reason": reason,
+        });
+        self.call("recovery.cancel", params).await?;
+        Ok(())
     }
 }
