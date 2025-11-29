@@ -3739,7 +3739,7 @@ The **FederatedDidResolver** caches resolutions and queries remote gateways when
 
 ### 14.9 Implementation Status
 
-**Complete (F1-F5):**
+**Complete (F1-F5 + Daemon Integration):**
 - ✅ Types and error handling
 - ✅ Cooperative registry with persistence
 - ✅ Federation gossip handler
@@ -3747,12 +3747,18 @@ The **FederatedDidResolver** caches resolutions and queries remote gateways when
 - ✅ Bilateral clearing agreements
 - ✅ Scoped gossip routing
 - ✅ Federated DID resolution
+- ✅ **Supervisor integration** (2025-11-28)
+  - FederationGossipHandler wired into supervisor
+  - Gossip-based send callback for publishing
+  - Federation topic subscriptions (registry, trust, clearing)
+  - Notification callback routing for incoming messages
+  - Periodic announcement task (5-minute interval)
+  - FederationConfig with coop_id/coop_name fields
 - ✅ 47 tests passing
 
 **Pending:**
 - ⏳ CLI commands (`icnctl federation`)
 - ⏳ Gateway REST API (`/v1/federation/*`)
-- ⏳ Supervisor integration
 
 ---
 
