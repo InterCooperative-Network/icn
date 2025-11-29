@@ -75,6 +75,7 @@ impl TestNode {
             None, // No fallback config for tests
             None, // No topology config
             None, // No STUN servers
+            None, // No misbehavior detector for tests
         )
         .await?;
 
@@ -256,6 +257,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
         None,
         None,
         None,
+        None, // No misbehavior detector for tests
     )
     .await?;
 
@@ -455,6 +457,7 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         None,
         None,
         None,
+        None, // No misbehavior detector for tests
     )
     .await?;
 

@@ -54,9 +54,8 @@ ICN's development follows three parallel tracks:
 **15 Structural Gaps** identified across 4 tiers (see [docs/strategic-gap-analysis.md](docs/strategic-gap-analysis.md)):
 
 **Status Breakdown**:
-- ✅ **Closed** (3): Multi-device identity, protective ledger (partial), economic simulation
+- ✅ **Closed** (4): Multi-device identity, protective ledger (partial), economic simulation, **Federation** (2025-11-28)
 - 🚧 **Partial** (5): Ledger mechanics, security posture, storage sync, observability, NAT traversal (Phases 1-3)
-- ⏸️ **Deferred** (1): Federation (intentional - wait for pilot need)
 - 🔴 **Critical Path** (6): Client SDK, governance, templates, onboarding, observability UX, cooperation UX
 
 **Key Insight**: The substrate is ready. The missing pieces are *social layer*, *usability*, and *real-world workflows* - all discovered through pilot deployment.
@@ -1249,10 +1248,10 @@ impl TrafficObfuscator {
 - Automatic TLS certificate management
 - Monitoring stack templates
 
-**Federation** (if 2+ cooperatives want to interconnect):
-- Cross-cooperative credit settlement
-- Governance bridging protocols
-- Shared resource pools
+**Federation** ✅ **COMPLETE** (2025-11-28):
+- ✅ Cross-cooperative credit settlement (ClearingManager with bilateral agreements)
+- ✅ Governance bridging protocols (scoped gossip, federated attestations)
+- ✅ Shared resource pools (cooperative registry, trust bridging)
 
 **Mobile Apps** (if web-on-phone isn't sufficient):
 - Native iOS/Android clients
@@ -1277,7 +1276,7 @@ impl TrafficObfuscator {
 
 **Post-Pilot Improvements** (4+ weeks):
 7. **Phase 19** (4 weeks): Scalability & clock sync - **AFTER 3-MONTH PILOT**
-8. **Phase 20+**: Privacy, trust hardening, federation - **AS NEEDED**
+8. **Phase 20+**: Privacy, trust hardening - **AS NEEDED**
 
 **Parallelization Opportunities**:
 - Track C1 (pilot selection) can start immediately - **CRITICAL PATH**
@@ -1435,11 +1434,11 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 - Time-based decay
 - *Driven by what communities actually track*
 
-**Phase 16+: Federation Protocols**
-- Cross-cooperative boundaries
-- Inter-coop credit settlement
-- Governance bridging
-- *Scope TBD based on multi-community adoption*
+**Federation Layer** ✅ **COMPLETE** (2025-11-28)
+- ✅ Cross-cooperative boundaries (scoped gossip, DID resolution)
+- ✅ Inter-coop credit settlement (ClearingManager, bilateral agreements)
+- ✅ Governance bridging (federated attestations, trust context)
+- *See lines 1365-1376 for full capabilities*
 
 ---
 
@@ -1761,10 +1760,10 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
   - Driven by actual pilot load patterns
   - Vector clock compression, trust caching, signature batching
   - Rough Time Protocol for clock synchronization
-- **Phase 20+**: Privacy, trust hardening, federation - **AS NEEDED**
+- **Phase 20+**: Privacy, trust hardening - **AS NEEDED**
   - Conditional on pilot feedback and real-world requirements
 - Phase 13 governance scope prioritized by what pilot communities actually need
-- Federation only makes sense when 2+ communities are running ICN
+- **Federation already complete** (2025-11-28) - ready when 2+ communities want to interconnect
 
 ---
 

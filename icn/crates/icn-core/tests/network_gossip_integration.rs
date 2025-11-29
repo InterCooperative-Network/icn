@@ -64,6 +64,7 @@ impl TestNode {
             None, // No fallback config for tests
             None, // No topology config
             None, // No STUN servers
+            None, // No misbehavior detector for tests
         )
         .await?;
 

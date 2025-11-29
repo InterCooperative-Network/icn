@@ -143,6 +143,15 @@ impl Supervisor {
                 recovery_store_path.display()
             );
 
+            // Create shared MisbehaviorDetector for Byzantine fault detection (Phase 18)
+            // This is shared between NetworkActor and GossipActor to ensure unified tracking
+            let misbehavior_detector = Arc::new(tokio::sync::RwLock::new(
+                icn_security::MisbehaviorDetector::new(
+                    icn_security::MisbehaviorThresholds::default(),
+                ),
+            ));
+            info!("Shared Byzantine fault detector created");
+
             // Create trust lookup closure for gossip actor
             let trust_graph_for_gossip = trust_graph_handle.clone();
             let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
@@ -288,6 +297,13 @@ impl Supervisor {
                 partition_config.partition_threshold
             );
 
+            // Set shared misbehavior detector on gossip actor for unified Byzantine fault tracking
+            {
+                let mut gossip = gossip_handle.write().await;
+                gossip.set_misbehavior_detector(misbehavior_detector.clone());
+            }
+            info!("Gossip actor configured with shared Byzantine fault detector");
+
             // Phase 18 Week 6: Initialize StorageQuotaManager for gossip entries
             // Default: 1GB global limit, 90% eviction threshold, 10MB per-DID quota
             let storage_quota_manager = icn_store::StorageQuotaManager::new(
@@ -329,13 +345,14 @@ impl Supervisor {
 
             info!("Contract actor created");
 
-            // TODO: Spawn Identity actor
-            // let identity_handle = IdentityActor::spawn(
-            //     self.config.keystore_path(),
-            //     self.config.store_path(),
-            //     keypair.clone(),
-            //     self.shutdown_tx.clone()
-            // )?;
+            // Spawn Identity actor (provides signing and trust graph access)
+            let identity_handle = crate::identity::IdentityActor::spawn(
+                identity_bundle.keypair().clone(),
+                trust_graph_handle.clone(),
+                self.shutdown_tx.clone(),
+            );
+
+            info!("Identity actor spawned with DID: {}", identity_handle.did());
 
             // Spawn Network actor with gossip bridge
             let listen_addr: std::net::SocketAddr = self.config.network.listen_addr.parse()?;
@@ -710,6 +727,7 @@ impl Supervisor {
                 fallback_config,
                 Some(self.config.topology.clone()),
                 stun_servers,
+                Some(misbehavior_detector.clone()), // Shared Byzantine fault detector
             )
             .await?;
 

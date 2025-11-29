@@ -64,6 +64,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         None,
         None,
         None, // No STUN servers for tests
+        None, // No misbehavior detector for tests
     )
     .await?;
 
@@ -85,6 +86,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         None,
         None,
         None, // No STUN servers for tests
+        None, // No misbehavior detector for tests
     )
     .await?;
 
@@ -158,6 +160,7 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         None,
         None,
         None, // No STUN servers for tests
+        None, // No misbehavior detector for tests
     )
     .await?;
 
@@ -179,6 +182,7 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         None,
         None,
         None, // No STUN servers for tests
+        None, // No misbehavior detector for tests
     )
     .await?;
 
@@ -256,6 +260,7 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         None,
         None,
         None, // No STUN servers for tests
+        None, // No misbehavior detector for tests
     )
     .await?;
 
@@ -274,6 +279,7 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         None,
         None,
         None, // No STUN servers for tests
+        None, // No misbehavior detector for tests
     )
     .await?;
 

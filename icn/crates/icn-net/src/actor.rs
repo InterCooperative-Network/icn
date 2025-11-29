@@ -659,6 +659,7 @@ impl NetworkActor {
         fallback_config: Option<RateLimitConfig>,
         topology_config: Option<TopologyConfig>,
         stun_servers: Option<Vec<SocketAddr>>,
+        misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
 
@@ -746,11 +747,16 @@ impl NetworkActor {
         let blob_registry = Some(Arc::new(RwLock::new(crate::BlobLocationRegistry::new())));
         info!("Blob location registry initialized for data locality tracking");
 
-        // Initialize misbehavior detector (Phase 18 Week 1-2)
-        let misbehavior_detector = Some(Arc::new(RwLock::new(
-            icn_security::MisbehaviorDetector::new(icn_security::MisbehaviorThresholds::default()),
-        )));
-        info!("Byzantine fault detection enabled with default thresholds");
+        // Use provided misbehavior detector or create a new one (Phase 18 Week 1-2)
+        let misbehavior_detector = misbehavior_detector.or_else(|| {
+            info!("Creating local Byzantine fault detector (not shared with other actors)");
+            Some(Arc::new(RwLock::new(
+                icn_security::MisbehaviorDetector::new(
+                    icn_security::MisbehaviorThresholds::default(),
+                ),
+            )))
+        });
+        info!("Byzantine fault detection enabled");
 
         // Spawn incoming connection handler if handler is provided
         if let Some(handler) = incoming_handler.clone() {
@@ -2151,6 +2157,7 @@ mod tests {
             None,
             None,
             None,
+            None, // No misbehavior detector for tests
         )
         .await
         .unwrap();

@@ -34,6 +34,7 @@ icn-time.workspace = true
 icn-gateway.workspace = true
 icn-governance.workspace = true
 icn-compute = { path = "../icn-compute" }
+icn-security.workspace = true
 
 [dev-dependencies]
 rustls.workspace = true
