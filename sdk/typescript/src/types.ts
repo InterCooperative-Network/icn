@@ -377,18 +377,50 @@ export class ICNError extends Error {
 // Client Options
 // ============================================================================
 
+export interface RetryOptions {
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Initial delay in milliseconds (default: 1000) */
+  initialDelayMs?: number;
+  /** Maximum delay in milliseconds (default: 10000) */
+  maxDelayMs?: number;
+  /** Exponential backoff multiplier (default: 2) */
+  backoffMultiplier?: number;
+  /** Jitter factor (0-1) to randomize delay (default: 0.1) */
+  jitterFactor?: number;
+  /** HTTP status codes that should trigger a retry (default: [408, 429, 500, 502, 503, 504]) */
+  retryableStatuses?: number[];
+}
+
 export interface ICNClientOptions {
   /** Gateway API base URL */
   baseUrl: string;
   /** JWT token for authentication */
   token?: string;
-  /** Request timeout in milliseconds */
+  /** Request timeout in milliseconds (default: 30000) */
   timeout?: number;
   /** Custom fetch implementation */
   fetch?: typeof fetch;
+  /** Retry configuration for failed requests */
+  retry?: RetryOptions;
+  /** Enable automatic token refresh (default: false) */
+  autoRefresh?: boolean;
+  /** Refresh token before it expires (in seconds, default: 60) */
+  refreshBeforeExpiry?: number;
 }
 
 export interface SignatureProvider {
   /** Sign a challenge and return the signature as hex string */
   sign(challenge: string): Promise<string>;
+}
+
+export interface WebSocketOptions {
+  /** Auto-reconnect on disconnect (default: true) */
+  autoReconnect?: boolean;
+  /** Maximum reconnection attempts (default: 10) */
+  maxReconnectAttempts?: number;
+  /** Initial reconnect delay in ms (default: 1000) */
+  reconnectDelayMs?: number;
+  /** Maximum reconnect delay in ms (default: 30000) */
+  maxReconnectDelayMs?: number;
 }

@@ -2,7 +2,7 @@
  * ICN TypeScript SDK Tests
  */
 
-import { ICNClient, ICNError } from './index';
+import { ICNClient, ICNError, ICNSubscription } from './index';
 
 describe('ICNClient', () => {
   describe('constructor', () => {
@@ -1145,5 +1145,224 @@ describe('compute task submission - CCL', () => {
     const body = JSON.parse(options.body);
     expect(body.priority).toBe('high');
     expect(body.payment_rate).toBe(100);
+  });
+});
+
+describe('retry logic', () => {
+  it('should retry on 503 Service Unavailable', async () => {
+    let callCount = 0;
+    const mockFetch = jest.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount < 3) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          statusText: 'Service Unavailable',
+          json: async () => ({ error: 'Service Unavailable' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'healthy' }),
+      });
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      retry: { maxRetries: 3, initialDelayMs: 10, maxDelayMs: 100 },
+    });
+
+    const result = await client.health();
+
+    expect(result.status).toBe('healthy');
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('should not retry on 404 Not Found', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: async () => ({ error: 'Not Found' }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      retry: { maxRetries: 3, initialDelayMs: 10 },
+    });
+
+    await expect(client.health()).rejects.toThrow('Not Found');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry on 429 Rate Limited', async () => {
+    let callCount = 0;
+    const mockFetch = jest.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          statusText: 'Too Many Requests',
+          json: async () => ({ error: 'Rate limited' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'healthy' }),
+      });
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      retry: { maxRetries: 2, initialDelayMs: 10, maxDelayMs: 50 },
+    });
+
+    const result = await client.health();
+
+    expect(result.status).toBe('healthy');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('should give up after max retries', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      json: async () => ({ error: 'Service Unavailable' }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      retry: { maxRetries: 2, initialDelayMs: 10, maxDelayMs: 50 },
+    });
+
+    await expect(client.health()).rejects.toThrow('Service Unavailable');
+    // Initial attempt + 2 retries = 3 calls
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('token expiration', () => {
+  it('should track token expiration', () => {
+    const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
+
+    expect(client.isTokenExpired()).toBe(false);
+    expect(client.getTokenExpiresAt()).toBeUndefined();
+
+    const futureTime = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    client.setToken('test-token', futureTime);
+
+    expect(client.getTokenExpiresAt()).toBe(futureTime);
+    expect(client.isTokenExpired()).toBe(false);
+  });
+
+  it('should detect expired token', () => {
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      refreshBeforeExpiry: 60, // Refresh 60 seconds before expiry
+    });
+
+    const pastTime = Math.floor(Date.now() / 1000) - 100; // 100 seconds ago
+    client.setToken('test-token', pastTime);
+
+    expect(client.isTokenExpired()).toBe(true);
+  });
+
+  it('should detect token expiring soon', () => {
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      refreshBeforeExpiry: 120, // Refresh 120 seconds before expiry
+    });
+
+    const soonTime = Math.floor(Date.now() / 1000) + 60; // Expires in 60 seconds
+    client.setToken('test-token', soonTime);
+
+    // Should be considered expired since it expires within refreshBeforeExpiry window
+    expect(client.isTokenExpired()).toBe(true);
+  });
+
+  it('should clear all auth state on clearToken', () => {
+    const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
+
+    const futureTime = Math.floor(Date.now() / 1000) + 3600;
+    client.setToken('test-token', futureTime);
+
+    expect(client.hasToken()).toBe(true);
+    expect(client.getTokenExpiresAt()).toBe(futureTime);
+
+    client.clearToken();
+
+    expect(client.hasToken()).toBe(false);
+    expect(client.getTokenExpiresAt()).toBeUndefined();
+  });
+});
+
+describe('auto-refresh authentication', () => {
+  it('should store credentials for auto-refresh', async () => {
+    const mockChallenge = { challenge: 'test-challenge', expires_at: Date.now() + 60000 };
+    const mockVerify = { token: 'test-token', expires_at: Math.floor(Date.now() / 1000) + 3600 };
+
+    let callIndex = 0;
+    const mockFetch = jest.fn().mockImplementation(async () => {
+      callIndex++;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => (callIndex === 1 ? mockChallenge : mockVerify),
+      };
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      autoRefresh: true,
+    });
+
+    const signer = { sign: async (msg: string) => `signed-${msg}` };
+    await client.authenticate('did:icn:alice', signer, 'my-coop', ['ledger:read']);
+
+    expect(client.hasToken()).toBe(true);
+    expect(client.getTokenExpiresAt()).toBe(mockVerify.expires_at);
+  });
+});
+
+describe('client options', () => {
+  it('should accept custom retry options', () => {
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      retry: {
+        maxRetries: 5,
+        initialDelayMs: 500,
+        maxDelayMs: 20000,
+        backoffMultiplier: 3,
+        jitterFactor: 0.2,
+        retryableStatuses: [500, 502],
+      },
+    });
+
+    expect(client).toBeInstanceOf(ICNClient);
+  });
+
+  it('should accept autoRefresh option', () => {
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      autoRefresh: true,
+      refreshBeforeExpiry: 120,
+    });
+
+    expect(client).toBeInstanceOf(ICNClient);
+  });
+});
+
+describe('ICNSubscription', () => {
+  it('should export ICNSubscription class', () => {
+    expect(ICNSubscription).toBeDefined();
   });
 });

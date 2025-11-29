@@ -55,9 +55,21 @@ import {
   ComputeTaskStatus,
   CancelTaskRequest,
   CancelTaskResponse,
+  RetryOptions,
+  WebSocketOptions,
 } from './types';
 
 export * from './types';
+
+/** Default retry options */
+const DEFAULT_RETRY: Required<RetryOptions> = {
+  maxRetries: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+  jitterFactor: 0.1,
+  retryableStatuses: [408, 429, 500, 502, 503, 504],
+};
 
 /**
  * ICN Gateway API Client
@@ -65,28 +77,45 @@ export * from './types';
 export class ICNClient {
   private baseUrl: string;
   private token?: string;
+  private tokenExpiresAt?: number;
   private timeout: number;
   private fetchImpl: typeof fetch;
+  private retryOptions: Required<RetryOptions>;
+  private autoRefresh: boolean;
+  private refreshBeforeExpiry: number;
+  private signer?: SignatureProvider;
+  private did?: string;
+  private coopId?: string;
+  private scopes?: string[];
 
   constructor(options: ICNClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.token = options.token;
     this.timeout = options.timeout ?? 30000;
     this.fetchImpl = options.fetch ?? globalThis.fetch;
+    this.retryOptions = { ...DEFAULT_RETRY, ...options.retry };
+    this.autoRefresh = options.autoRefresh ?? false;
+    this.refreshBeforeExpiry = options.refreshBeforeExpiry ?? 60;
   }
 
   /**
    * Set the JWT token for authenticated requests
    */
-  setToken(token: string): void {
+  setToken(token: string, expiresAt?: number): void {
     this.token = token;
+    this.tokenExpiresAt = expiresAt;
   }
 
   /**
-   * Clear the JWT token
+   * Clear the JWT token and authentication state
    */
   clearToken(): void {
     this.token = undefined;
+    this.tokenExpiresAt = undefined;
+    this.signer = undefined;
+    this.did = undefined;
+    this.coopId = undefined;
+    this.scopes = undefined;
   }
 
   /**
@@ -94,6 +123,68 @@ export class ICNClient {
    */
   hasToken(): boolean {
     return !!this.token;
+  }
+
+  /**
+   * Check if the token is expired or about to expire
+   */
+  isTokenExpired(): boolean {
+    if (!this.tokenExpiresAt) {
+      return false; // Unknown expiration, assume valid
+    }
+    const now = Math.floor(Date.now() / 1000);
+    return now >= this.tokenExpiresAt - this.refreshBeforeExpiry;
+  }
+
+  /**
+   * Get the token expiration timestamp
+   */
+  getTokenExpiresAt(): number | undefined {
+    return this.tokenExpiresAt;
+  }
+
+  /**
+   * Calculate delay with exponential backoff and jitter
+   */
+  private calculateRetryDelay(attempt: number): number {
+    const { initialDelayMs, maxDelayMs, backoffMultiplier, jitterFactor } = this.retryOptions;
+    const baseDelay = Math.min(
+      initialDelayMs * Math.pow(backoffMultiplier, attempt),
+      maxDelayMs
+    );
+    const jitter = baseDelay * jitterFactor * (Math.random() * 2 - 1);
+    return Math.max(0, baseDelay + jitter);
+  }
+
+  /**
+   * Check if a request should be retried based on error
+   */
+  private shouldRetry(error: ICNError, attempt: number): boolean {
+    if (attempt >= this.retryOptions.maxRetries) {
+      return false;
+    }
+    return this.retryOptions.retryableStatuses.includes(error.statusCode);
+  }
+
+  /**
+   * Sleep for a given duration
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Refresh the authentication token if expired
+   */
+  private async refreshTokenIfNeeded(): Promise<void> {
+    if (!this.autoRefresh || !this.signer || !this.did) {
+      return;
+    }
+    if (!this.isTokenExpired()) {
+      return;
+    }
+    // Re-authenticate with stored credentials
+    await this.authenticate(this.did, this.signer, this.coopId, this.scopes);
   }
 
   // ===========================================================================
@@ -106,7 +197,39 @@ export class ICNClient {
     body?: unknown,
     requireAuth = true
   ): Promise<T> {
+    // Refresh token if needed before making request
+    if (requireAuth) {
+      await this.refreshTokenIfNeeded();
+    }
+
     const url = `${this.baseUrl}/v1${path}`;
+
+    let lastError: ICNError | undefined;
+    for (let attempt = 0; attempt <= this.retryOptions.maxRetries; attempt++) {
+      try {
+        const result = await this.executeRequest<T>(url, method, body, requireAuth);
+        return result;
+      } catch (error) {
+        if (error instanceof ICNError) {
+          lastError = error;
+          if (this.shouldRetry(error, attempt)) {
+            const delay = this.calculateRetryDelay(attempt);
+            await this.sleep(delay);
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
+    throw lastError!;
+  }
+
+  private async executeRequest<T>(
+    url: string,
+    method: string,
+    body?: unknown,
+    requireAuth = true
+  ): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -203,6 +326,9 @@ export class ICNClient {
 
   /**
    * Complete authentication flow with a signature provider
+   *
+   * If autoRefresh is enabled in client options, stores the signer for automatic
+   * token refresh when the token expires.
    */
   async authenticate(
     did: string,
@@ -213,7 +339,16 @@ export class ICNClient {
     const challenge = await this.getChallenge(did);
     const signature = await signer.sign(challenge.challenge);
     const auth = await this.verify(did, signature, coopId, scopes);
-    this.setToken(auth.token);
+    this.setToken(auth.token, auth.expires_at);
+
+    // Store credentials for auto-refresh
+    if (this.autoRefresh) {
+      this.signer = signer;
+      this.did = did;
+      this.coopId = coopId;
+      this.scopes = scopes;
+    }
+
     return auth;
   }
 
@@ -553,7 +688,7 @@ export class ICNClient {
   // ===========================================================================
 
   /**
-   * Connect to WebSocket for real-time events
+   * Connect to WebSocket for real-time events (basic, no auto-reconnect)
    */
   connectWebSocket(
     coopId: string,
@@ -593,6 +728,160 @@ export class ICNClient {
     });
 
     return ws;
+  }
+
+  /**
+   * Create a managed WebSocket subscription with auto-reconnect
+   *
+   * @example
+   * ```typescript
+   * const subscription = client.subscribe('my-coop', {
+   *   onEvent: (event) => console.log('Event:', event),
+   *   onReconnect: (attempt) => console.log('Reconnecting...', attempt),
+   * });
+   *
+   * // Later: close the subscription
+   * subscription.close();
+   * ```
+   */
+  subscribe(
+    coopId: string,
+    handlers: {
+      onEvent?: (event: WsMessage) => void;
+      onAuthOk?: (did: string) => void;
+      onError?: (error: Error) => void;
+      onReconnect?: (attempt: number) => void;
+      onDisconnect?: () => void;
+    },
+    options?: WebSocketOptions
+  ): ICNSubscription {
+    return new ICNSubscription(this, coopId, handlers, options);
+  }
+}
+
+/** Default WebSocket options */
+const DEFAULT_WS_OPTIONS: Required<WebSocketOptions> = {
+  autoReconnect: true,
+  maxReconnectAttempts: 10,
+  reconnectDelayMs: 1000,
+  maxReconnectDelayMs: 30000,
+};
+
+/**
+ * Managed WebSocket subscription with auto-reconnect
+ */
+export class ICNSubscription {
+  private client: ICNClient;
+  private coopId: string;
+  private handlers: {
+    onEvent?: (event: WsMessage) => void;
+    onAuthOk?: (did: string) => void;
+    onError?: (error: Error) => void;
+    onReconnect?: (attempt: number) => void;
+    onDisconnect?: () => void;
+  };
+  private options: Required<WebSocketOptions>;
+  private ws?: WebSocket;
+  private reconnectAttempt = 0;
+  private closed = false;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+
+  constructor(
+    client: ICNClient,
+    coopId: string,
+    handlers: {
+      onEvent?: (event: WsMessage) => void;
+      onAuthOk?: (did: string) => void;
+      onError?: (error: Error) => void;
+      onReconnect?: (attempt: number) => void;
+      onDisconnect?: () => void;
+    },
+    options?: WebSocketOptions
+  ) {
+    this.client = client;
+    this.coopId = coopId;
+    this.handlers = handlers;
+    this.options = { ...DEFAULT_WS_OPTIONS, ...options };
+    this.connect();
+  }
+
+  private connect(): void {
+    if (this.closed) return;
+
+    this.ws = this.client.connectWebSocket(this.coopId, {
+      onOpen: () => {
+        // Reset reconnect counter on successful connection
+        this.reconnectAttempt = 0;
+      },
+      onMessage: (message) => {
+        if (message.type === 'AuthOk') {
+          this.handlers.onAuthOk?.(message.did);
+        } else if (message.type === 'Error') {
+          this.handlers.onError?.(new Error(message.message));
+        } else {
+          this.handlers.onEvent?.(message);
+        }
+      },
+      onError: (error) => {
+        this.handlers.onError?.(error);
+      },
+      onClose: () => {
+        this.handlers.onDisconnect?.();
+        this.scheduleReconnect();
+      },
+    });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.closed || !this.options.autoReconnect) return;
+
+    if (this.reconnectAttempt >= this.options.maxReconnectAttempts) {
+      this.handlers.onError?.(new Error('Max reconnection attempts reached'));
+      return;
+    }
+
+    this.reconnectAttempt++;
+    this.handlers.onReconnect?.(this.reconnectAttempt);
+
+    // Calculate delay with exponential backoff
+    const delay = Math.min(
+      this.options.reconnectDelayMs * Math.pow(2, this.reconnectAttempt - 1),
+      this.options.maxReconnectDelayMs
+    );
+
+    this.reconnectTimer = setTimeout(() => {
+      this.connect();
+    }, delay);
+  }
+
+  /**
+   * Check if the subscription is connected
+   */
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Close the subscription and stop reconnecting
+   */
+  close(): void {
+    this.closed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = undefined;
+    }
+  }
+
+  /**
+   * Send a message through the WebSocket
+   */
+  send(message: WsMessage): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    }
   }
 }
 
