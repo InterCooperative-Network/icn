@@ -322,12 +322,12 @@ impl FederationGossipHandler {
     }
 
     /// Send a vouch for another cooperative
-    pub fn send_vouch(&self, target_coop_id: &str, voucher_did: Did) -> Result<()> {
+    pub fn send_vouch(&self, target_coop_id: &str, voucher_did: Did, trust_score: f64) -> Result<()> {
         let own_coop_id = self
             .own_coop_id()
             .ok_or_else(|| FederationError::NotInitialized("Own coop not set".to_string()))?;
 
-        let vouch = Vouch::new(own_coop_id.clone(), voucher_did, target_coop_id.to_string());
+        let vouch = Vouch::new(own_coop_id.clone(), voucher_did, target_coop_id.to_string(), trust_score);
 
         // TODO: Sign the vouch
 
@@ -335,7 +335,7 @@ impl FederationGossipHandler {
         self.send_message(TOPIC_FEDERATION_REGISTRY, &message)?;
         metrics::registry::vouches_sent_inc(target_coop_id);
 
-        info!("Sent vouch for {} from {}", target_coop_id, own_coop_id);
+        info!("Sent vouch for {} from {} with trust score {:.2}", target_coop_id, own_coop_id, trust_score);
         Ok(())
     }
 

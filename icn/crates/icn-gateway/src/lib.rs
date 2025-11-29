@@ -17,6 +17,7 @@ pub mod compute_mgr;
 pub mod coop;
 pub mod error;
 pub mod events;
+pub mod federation_mgr;
 pub mod governance_mgr;
 pub mod ledger_mgr;
 pub mod middleware;

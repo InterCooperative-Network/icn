@@ -651,11 +651,12 @@ mod tests {
         );
         registry.register(partner).unwrap();
 
-        // Create a vouch
+        // Create a vouch with trust score
         let vouch = Vouch::new(
             "partner-coop".to_string(),
             test_did(),
             "new-coop".to_string(),
+            0.8, // Trust score
         );
 
         registry.add_vouch(&vouch).unwrap();

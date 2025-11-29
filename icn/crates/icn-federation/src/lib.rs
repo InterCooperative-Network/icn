@@ -62,7 +62,7 @@ pub use clearing::{
     BilateralClearingAgreement, ClearingPosition, CrossCoopTransfer,
     SettlementInterval, TransferStatus,
 };
-pub use clearing_manager::ClearingManager;
+pub use clearing_manager::{ClearingManager, SettlementReport};
 pub use channel::FederationChannel;
 pub use router::FederatedGossipRouter;
 pub use resolver::{FederatedDidResolver, CachedDidResolution};

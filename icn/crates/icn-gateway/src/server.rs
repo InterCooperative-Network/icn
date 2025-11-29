@@ -15,6 +15,7 @@ use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
 use crate::error::Result;
 use crate::events::EventBroadcaster;
+use crate::federation_mgr::FederationManager;
 use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
@@ -87,6 +88,7 @@ impl GatewayServer {
         let coop_manager = Arc::new(CoopManager::new());
         let governance_manager = Arc::new(GovernanceManager::new());
         let compute_manager = Arc::new(ComputeManager::new());
+        let federation_manager = Arc::new(FederationManager::new());
 
         // Create ledger manager with persistent storage if data_dir is set
         let ledger_manager = if let Some(data_dir) = self.data_dir {
@@ -176,6 +178,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
                 .app_data(web::Data::new(compute_manager.clone()))
+                .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
@@ -251,6 +254,28 @@ impl GatewayServer {
                             web::scope("/compute")
                                 .service(api::compute::submit_task)
                                 .service(api::compute::get_status)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected federation endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/federation")
+                                .service(api::federation::get_status)
+                                .service(api::federation::init_federation)
+                                .service(api::federation::list_coops)
+                                .service(api::federation::get_coop)
+                                .service(api::federation::register_coop)
+                                .service(api::federation::get_vouches)
+                                .service(api::federation::vouch_for_coop)
+                                .service(api::federation::get_attestations)
+                                .service(api::federation::issue_attestation)
+                                .service(api::federation::list_agreements)
+                                .service(api::federation::get_agreement)
+                                .service(api::federation::create_agreement)
+                                .service(api::federation::get_position)
+                                .service(api::federation::trigger_settlement)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

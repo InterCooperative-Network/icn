@@ -2604,10 +2604,15 @@ async fn handle_vouch_command(cmd: VouchCommands, data_dir: &Path) -> Result<()>
     match cmd {
         VouchCommands::Issue {
             target_coop,
-            trust: _trust,
+            trust,
             days,
         } => {
-            // Create vouch with optional expiry
+            // Validate trust score
+            if trust < 0.0 || trust > 1.0 {
+                anyhow::bail!("Trust score must be between 0.0 and 1.0");
+            }
+
+            // Create vouch with trust score and optional expiry
             let vouch = if days > 0 {
                 let expires_at =
                     std::time::SystemTime::now()
@@ -2615,10 +2620,10 @@ async fn handle_vouch_command(cmd: VouchCommands, data_dir: &Path) -> Result<()>
                         .unwrap()
                         .as_secs()
                         + (days * 24 * 60 * 60);
-                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone())
+                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone(), trust)
                     .with_expiry(expires_at)
             } else {
-                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone())
+                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone(), trust)
             };
 
             registry.add_vouch(&vouch)?;
@@ -2626,6 +2631,7 @@ async fn handle_vouch_command(cmd: VouchCommands, data_dir: &Path) -> Result<()>
             println!("Vouch issued successfully!\n");
             println!("  From:     {}", own_coop_id);
             println!("  Target:   {}", target_coop);
+            println!("  Trust:    {:.2}", trust);
             if days > 0 {
                 println!("  Validity: {} days", days);
             } else {

@@ -218,23 +218,27 @@ pub struct Vouch {
     /// The cooperative being vouched for
     pub target_coop_id: String,
 
+    /// Trust score assigned by the vouching cooperative (0.0-1.0)
+    pub trust_score: f64,
+
     /// Unix timestamp when the vouch was created
     pub timestamp: u64,
 
     /// Optional expiry timestamp (vouches can be time-limited)
     pub expires_at: Option<u64>,
 
-    /// Signature over (voucher_coop_id, target_coop_id, timestamp, expires_at)
+    /// Signature over (voucher_coop_id, target_coop_id, trust_score, timestamp, expires_at)
     pub signature: Vec<u8>,
 }
 
 impl Vouch {
-    /// Create a new Vouch (unsigned)
-    pub fn new(voucher_coop_id: String, voucher_did: Did, target_coop_id: String) -> Self {
+    /// Create a new Vouch with trust score (unsigned)
+    pub fn new(voucher_coop_id: String, voucher_did: Did, target_coop_id: String, trust_score: f64) -> Self {
         Self {
             voucher_coop_id,
             voucher_did,
             target_coop_id,
+            trust_score: trust_score.clamp(0.0, 1.0),
             timestamp: current_timestamp(),
             expires_at: None,
             signature: Vec::new(),
@@ -247,11 +251,18 @@ impl Vouch {
         self
     }
 
+    /// Set the trust score (clamped to 0.0-1.0)
+    pub fn with_trust_score(mut self, trust_score: f64) -> Self {
+        self.trust_score = trust_score.clamp(0.0, 1.0);
+        self
+    }
+
     /// Get bytes to sign
     pub fn signing_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend(self.voucher_coop_id.as_bytes());
         bytes.extend(self.target_coop_id.as_bytes());
+        bytes.extend(self.trust_score.to_le_bytes());
         bytes.extend(self.timestamp.to_le_bytes());
         if let Some(exp) = self.expires_at {
             bytes.extend(exp.to_le_bytes());
@@ -369,12 +380,31 @@ mod tests {
     fn test_vouch_expiry() {
         let did = test_did();
 
-        let vouch = Vouch::new("food-coop".to_string(), did.clone(), "tech-coop".to_string());
+        let vouch = Vouch::new("food-coop".to_string(), did.clone(), "tech-coop".to_string(), 0.7);
         assert!(!vouch.is_expired());
+        assert!((vouch.trust_score - 0.7).abs() < f64::EPSILON);
 
-        let expired_vouch = Vouch::new("food-coop".to_string(), did, "tech-coop".to_string())
+        let expired_vouch = Vouch::new("food-coop".to_string(), did, "tech-coop".to_string(), 0.8)
             .with_expiry(1); // Expired in 1970
         assert!(expired_vouch.is_expired());
+    }
+
+    #[test]
+    fn test_vouch_trust_score_clamping() {
+        let did = test_did();
+
+        // Trust score above 1.0 should be clamped
+        let high_trust = Vouch::new("coop-a".to_string(), did.clone(), "coop-b".to_string(), 1.5);
+        assert!((high_trust.trust_score - 1.0).abs() < f64::EPSILON);
+
+        // Trust score below 0.0 should be clamped
+        let low_trust = Vouch::new("coop-a".to_string(), did.clone(), "coop-b".to_string(), -0.5);
+        assert!(low_trust.trust_score.abs() < f64::EPSILON);
+
+        // with_trust_score builder method
+        let modified = Vouch::new("coop-a".to_string(), did, "coop-b".to_string(), 0.5)
+            .with_trust_score(2.0);
+        assert!((modified.trust_score - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
