@@ -126,8 +126,8 @@ export class ICNMobileClient extends ICNClient {
     // Authenticate
     const result = await this.authenticate(keyPair.did, signer, coopId, scopes);
 
-    // Calculate expiration (default 24 hours)
-    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+    // Use server's expiration time
+    const expiresAt = result.expires_at;
 
     // Persist auth state
     await this.persistAuth(result.token, keyPair.did, coopId || null, expiresAt);
@@ -154,7 +154,8 @@ export class ICNMobileClient extends ICNClient {
   ): Promise<AuthState> {
     const result = await this.authenticate(did, signer, coopId, scopes);
 
-    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+    // Use server's expiration time
+    const expiresAt = result.expires_at;
     await this.persistAuth(result.token, did, coopId || null, expiresAt);
 
     this.updateAuthState({
