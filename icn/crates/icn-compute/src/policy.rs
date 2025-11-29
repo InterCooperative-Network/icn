@@ -112,9 +112,10 @@ pub struct MemberQuota {
 }
 
 /// Policy enforcement strictness
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum EnforcementMode {
     /// Reject tasks that violate policy
+    #[default]
     Strict,
 
     /// Log violations but allow execution
@@ -122,12 +123,6 @@ pub enum EnforcementMode {
 
     /// Only track violations, no enforcement
     Monitoring,
-}
-
-impl Default for EnforcementMode {
-    fn default() -> Self {
-        Self::Strict
-    }
 }
 
 /// Policy evaluation result
