@@ -46,6 +46,16 @@ These principles ensure ICN remains decentralized, resilient, and aligned with c
     - 11.6 [Future Enhancements](#116-future-enhancements)
     - 11.7 [Decision Rationale](#117-decision-rationale)
     - 11.8 [Integration Summary](#118-integration-summary)
+12. [Known Limitations & Future Work](#12-known-limitations--future-work)
+13. [Node Morphogenesis](#13-node-morphogenesis)
+    - 13.1 [Design Philosophy](#131-design-philosophy)
+    - 13.2 [Principal vs Node Identity](#132-principal-vs-node-identity)
+    - 13.3 [ServiceRole & Capabilities](#133-servicerole--capabilities)
+    - 13.4 [NodeProfile Structure](#134-nodeprofile-structure)
+    - 13.5 [Node Lifecycle (NodeStage)](#135-node-lifecycle-nodestage)
+    - 13.6 [Role Inference](#136-role-inference)
+    - 13.7 [Multi-Device & Shared Devices](#137-multi-device--shared-devices)
+    - 13.8 [Integration with Existing Systems](#138-integration-with-existing-systems)
 
 ---
 
@@ -3100,6 +3110,471 @@ pub enum TrustAnomaly {
 10. Privacy & metadata protection (12.9)
 
 **Total estimated time to production-ready:** 14 weeks (Phase 17-18)
+
+---
+
+## 13. Node Morphogenesis
+
+This section describes how ICN nodes adapt to their environment—acquiring capabilities and roles based on available hardware, operator policy, and network needs. Like biological stem cells that differentiate based on environmental signals, ICN nodes start undifferentiated and grow into their roles.
+
+### 13.1 Design Philosophy
+
+**Core Insight:** Nodes are not fixed categories. A device's role emerges from:
+1. **Hardware capabilities** - What can it physically do?
+2. **Operator policy** - What does the operator permit?
+3. **Network needs** - What does the cooperative require?
+
+**Metaphor: Stem Cells**
+
+Biological stem cells start undifferentiated and specialize based on environmental signals. ICN nodes follow the same pattern:
+
+```
+[Fresh Install] → [Sense Environment] → [Acquire Roles] → [Active Participation]
+                        ↓                      ↓
+                  Hardware probe         Policy check
+                  Resource detect        Trust evaluation
+                  Network discovery      Capability match
+```
+
+**Anti-patterns avoided:**
+- ❌ Hard-coded node types ("this is a mobile node")
+- ❌ Static role assignment at install time
+- ❌ One-size-fits-all resource requirements
+- ❌ Admin-configured categories
+
+**Patterns embraced:**
+- ✅ Capabilities emerge from environment sensing
+- ✅ Roles are additive (a node gains roles, not assigned a category)
+- ✅ Policy constrains but doesn't dictate
+- ✅ Dynamic adaptation as conditions change
+
+---
+
+### 13.2 Principal vs Node Identity
+
+**Critical distinction:** ICN separates *who you are* from *what device you're using*.
+
+| Concept | Identity Layer | Network Layer |
+|---------|----------------|---------------|
+| **Principal DID** | User or organization identity | N/A |
+| **Node DID** | N/A | Device identity for network operations |
+| **Purpose** | Authentication, ownership, governance | Routing, task execution, storage |
+| **Lifecycle** | Long-lived (years) | Device-bound (hardware lifecycle) |
+| **Multi-device** | One principal → many node DIDs | Each node has exactly one DID |
+
+**Example:**
+```
+Principal: did:icn:alice (Alice's identity)
+    ├── Node: did:icn:alice-laptop (MacBook, high capacity)
+    ├── Node: did:icn:alice-phone (iPhone, limited capacity)
+    └── Node: did:icn:alice-server (VPS, always-on)
+```
+
+**Why separate?**
+- **Key compromise isolation** - Losing a phone doesn't compromise the principal
+- **Capability scoping** - Phone might only relay, not execute contracts
+- **Trust independence** - Principal trust score ≠ node trust score
+- **Shared devices** - Multiple principals can use one node (kiosk, lab computer)
+
+**Shared device example:**
+```
+Node: did:icn:coop-kiosk (shared terminal)
+    ├── Operator: did:icn:food-coop (owns/maintains)
+    ├── User: did:icn:alice (authenticates, uses services)
+    ├── User: did:icn:bob (authenticates, uses services)
+    └── User: did:icn:charlie (authenticates, uses services)
+```
+
+---
+
+### 13.3 ServiceRole & Capabilities
+
+**ServiceRole** unifies three existing concepts:
+
+| Source | Concept | Unified As |
+|--------|---------|------------|
+| `icn-net/topology.rs` | `NodeRole` (Edge, Rendezvous, Archive) | Network roles |
+| `icn-compute/scheduler.rs` | Executor capabilities (CCL, WASM) | Compute roles |
+| `icn-store` | Storage responsibilities | Storage roles |
+
+**ServiceRole enum:**
+
+```rust
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ServiceRole {
+    // Network roles (from NodeRole)
+    Edge,           // Leaf node, minimal routing
+    Rendezvous,     // NAT traversal helper, connection broker
+    Archive,        // Long-term storage, history queries
+
+    // Compute roles
+    CclExecutor,    // Can execute CCL contracts (low requirements)
+    WasmExecutor,   // Can execute WASM contracts (higher requirements)
+
+    // Storage roles
+    ReplicaHolder,  // Stores replicas for others
+
+    // Platform roles
+    Gateway,        // Runs HTTP/WebSocket gateway for apps
+}
+```
+
+**Role combinations are common:**
+- `{Edge, CclExecutor}` - Typical mobile/laptop node
+- `{Rendezvous, CclExecutor, WasmExecutor, ReplicaHolder}` - Beefy server
+- `{Archive, ReplicaHolder}` - Cold storage node
+- `{Gateway, CclExecutor}` - Application server
+
+---
+
+### 13.4 NodeProfile Structure
+
+**NodeProfile** is the unified view of a node's network participation:
+
+```rust
+use std::collections::HashSet;
+use icn_identity::Did;
+use icn_net::TopologyInfo;
+use icn_compute::NodeCapacity;
+
+/// Complete profile describing a node's network role and capabilities
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeProfile {
+    /// This node's DID (device identity)
+    pub node_did: Did,
+
+    /// Principal DID operating this node
+    pub operator_did: Did,
+
+    /// Network topology information (region, cluster, latency metrics)
+    pub topology: TopologyInfo,
+
+    /// Hardware capacity (CPU, RAM, storage, network)
+    pub capacity: NodeCapacity,
+
+    /// Active service roles (acquired via capability sensing)
+    pub roles: HashSet<ServiceRole>,
+
+    /// Current lifecycle stage
+    pub stage: NodeStage,
+
+    /// Policy constraints from operator
+    pub policy: NodePolicy,
+
+    /// Last profile update timestamp
+    pub updated_at: u64,
+}
+
+/// Operator-defined constraints
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct NodePolicy {
+    /// Roles this node may never acquire (even if capable)
+    pub disallowed_roles: HashSet<ServiceRole>,
+
+    /// Maximum resources to commit (prevent runaway usage)
+    pub resource_caps: Option<ResourceCaps>,
+
+    /// Cooperative memberships this node serves
+    pub coop_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ResourceCaps {
+    pub max_cpu_percent: u8,     // e.g., 50 = use at most 50% CPU
+    pub max_ram_mb: u64,         // e.g., 4096 = cap at 4GB
+    pub max_storage_mb: u64,     // e.g., 10240 = cap at 10GB
+    pub max_bandwidth_mbps: u32, // e.g., 100 = cap at 100Mbps
+}
+```
+
+**Design notes:**
+- **Reuses existing types** - `TopologyInfo` and `NodeCapacity` already exist
+- **Roles are a set** - Additive, not exclusive categories
+- **Policy is negative** - Disallow specific roles, don't enumerate allowed ones
+- **Operator DID** - Links node to its principal for trust computation
+
+---
+
+### 13.5 Node Lifecycle (NodeStage)
+
+Nodes progress through stages as they integrate into the network:
+
+```rust
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NodeStage {
+    /// Just started, probing environment
+    Sensing,
+
+    /// Fully participating in network
+    Active,
+
+    /// Gracefully stepping down (draining tasks, transferring replicas)
+    Retiring,
+}
+```
+
+**Stage transitions:**
+
+```
+[Sensing] ─────────────────────────────────> [Active]
+    │      Completed environment sensing          │
+    │      Acquired initial roles                 │
+    │      Connected to peers                     │
+    │                                             │
+    │                                             ▼
+    │                              Operator initiates shutdown
+    │                              graceful_shutdown() called
+    │                                             │
+    └──────────────────────────────────────> [Retiring]
+                                                  │
+                                                  ▼
+                                           Process exits
+                                           (after drain complete)
+```
+
+**Sensing phase activities:**
+1. Probe hardware (CPU cores, RAM, disk, GPU)
+2. Detect network (bandwidth, NAT type, latency to known peers)
+3. Load operator policy (from config file)
+4. Evaluate role eligibility
+5. Connect to seed peers
+6. Gossip initial profile
+
+**Active phase:**
+- Participate in gossip
+- Accept tasks matching capabilities
+- Store replicas if role includes `ReplicaHolder`
+- Route messages if `Rendezvous`
+- Periodically re-sense (detect hardware changes)
+
+**Retiring phase:**
+- Stop accepting new tasks
+- Complete in-flight tasks
+- Transfer replica responsibilities to other nodes
+- Gossip retirement announcement
+- Save state snapshot
+- Exit cleanly
+
+---
+
+### 13.6 Role Inference
+
+Roles emerge from capability matching, not admin configuration:
+
+```rust
+/// Policy for role inference (configurable thresholds)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RolePolicy {
+    /// Minimum RAM to enable CCL execution (MB)
+    pub ccl_min_ram_mb: u64,        // default: 128
+
+    /// Minimum RAM to enable WASM execution (MB)
+    pub wasm_min_ram_mb: u64,       // default: 512
+
+    /// Minimum storage to enable replica holding (MB)
+    pub replica_min_storage_mb: u64, // default: 1024
+
+    /// Minimum uptime hours to enable Rendezvous role
+    pub rendezvous_min_uptime_hours: u64, // default: 720 (30 days)
+
+    /// Minimum trust score to enable Archive role
+    pub archive_min_trust: f64,     // default: 0.6
+}
+
+impl NodeProfile {
+    /// Infer roles from current capacity and policy
+    pub fn infer_roles(&mut self, policy: &RolePolicy, trust_score: f64) {
+        // Start fresh (re-evaluate all roles)
+        self.roles.clear();
+
+        // All nodes are at least Edge
+        self.roles.insert(ServiceRole::Edge);
+
+        // CCL executor: low bar
+        if self.capacity.available.ram_mb >= policy.ccl_min_ram_mb
+            && !self.policy.disallowed_roles.contains(&ServiceRole::CclExecutor)
+        {
+            self.roles.insert(ServiceRole::CclExecutor);
+        }
+
+        // WASM executor: higher requirements
+        if self.capacity.available.ram_mb >= policy.wasm_min_ram_mb
+            && !self.policy.disallowed_roles.contains(&ServiceRole::WasmExecutor)
+        {
+            self.roles.insert(ServiceRole::WasmExecutor);
+        }
+
+        // Replica holder: needs storage commitment
+        if self.capacity.available.storage_mb >= policy.replica_min_storage_mb
+            && !self.policy.disallowed_roles.contains(&ServiceRole::ReplicaHolder)
+        {
+            self.roles.insert(ServiceRole::ReplicaHolder);
+        }
+
+        // Rendezvous: needs stable presence
+        if self.uptime_hours() >= policy.rendezvous_min_uptime_hours
+            && self.has_public_ip()
+            && !self.policy.disallowed_roles.contains(&ServiceRole::Rendezvous)
+        {
+            self.roles.insert(ServiceRole::Rendezvous);
+        }
+
+        // Archive: needs high trust (community vouches for reliability)
+        if trust_score >= policy.archive_min_trust
+            && self.capacity.available.storage_mb >= 10 * policy.replica_min_storage_mb
+            && !self.policy.disallowed_roles.contains(&ServiceRole::Archive)
+        {
+            self.roles.insert(ServiceRole::Archive);
+        }
+    }
+}
+```
+
+**Key principle:** Roles are *acquired* based on capability, not *assigned* by category. A phone might acquire `CclExecutor` if it has enough RAM. A server might lack `Archive` if its trust score is low.
+
+---
+
+### 13.7 Multi-Device & Shared Devices
+
+The NodeProfile model elegantly handles two common scenarios:
+
+**Scenario A: One Principal, Many Nodes (Multi-Device)**
+
+Alice uses ICN from laptop, phone, and a VPS:
+
+```
+Principal: did:icn:alice
+    │
+    ├── NodeProfile {
+    │       node_did: did:icn:alice-laptop,
+    │       operator_did: did:icn:alice,
+    │       roles: {Edge, CclExecutor, WasmExecutor},
+    │       capacity: { ram: 16GB, storage: 500GB }
+    │   }
+    │
+    ├── NodeProfile {
+    │       node_did: did:icn:alice-phone,
+    │       operator_did: did:icn:alice,
+    │       roles: {Edge},  // Limited by policy & hardware
+    │       capacity: { ram: 4GB, storage: 64GB }
+    │   }
+    │
+    └── NodeProfile {
+            node_did: did:icn:alice-server,
+            operator_did: did:icn:alice,
+            roles: {Rendezvous, CclExecutor, WasmExecutor, ReplicaHolder},
+            capacity: { ram: 32GB, storage: 1TB }
+        }
+```
+
+**Identity layer integration:** Alice's `DidDocument` (from Phase 11) lists all three devices as `VerificationMethod` entries. The NodeProfile's `operator_did` links back to the principal.
+
+**Scenario B: One Node, Many Principals (Shared Device)**
+
+A food coop runs a shared kiosk terminal:
+
+```
+NodeProfile {
+    node_did: did:icn:foodcoop-kiosk,
+    operator_did: did:icn:foodcoop,  // The coop operates the kiosk
+    roles: {Edge, Gateway},           // Serves app UI
+    policy: {
+        disallowed_roles: {WasmExecutor, ReplicaHolder}, // Security
+        coop_ids: ["foodcoop"]  // Only serves food coop
+    }
+}
+```
+
+Users authenticate to the kiosk with their own DIDs, but the *node* identity is the kiosk itself. This separates:
+- **Who operates the hardware** (foodcoop)
+- **Who uses the service** (members authenticating)
+- **What the device can do** (constrained by operator policy)
+
+---
+
+### 13.8 Integration with Existing Systems
+
+NodeProfile bridges three existing subsystems:
+
+**1. Identity Layer (`icn-identity`)**
+
+```rust
+// DidDocument has VerificationMethod per device
+// NodeProfile.operator_did links to the principal's DID
+// Device capabilities (in VerificationMethod) are for key permissions
+// NodeProfile roles are for network participation - orthogonal concerns
+```
+
+**2. Network Layer (`icn-net`)**
+
+```rust
+// TopologyInfo already exists in topology.rs
+// NodeRole (Edge/Rendezvous/Archive) maps to ServiceRole
+// NodeProfile.topology reuses TopologyInfo directly
+// NetworkActor uses NodeProfile for routing decisions
+```
+
+**3. Compute Layer (`icn-compute`)**
+
+```rust
+// NodeCapacity already exists in scheduler.rs
+// ResourceProfile maps to NodeProfile.capacity
+// Scheduler queries NodeProfile.roles for executor capabilities
+// Trust integration via NodeProfile.operator_did → trust graph lookup
+```
+
+**Gossip integration:**
+
+```rust
+// New gossip topic for profile sync
+const TOPIC_NODE_PROFILES: &str = "network:profiles";
+
+// Message types
+pub enum ProfileMessage {
+    Announce(NodeProfile),  // New/updated profile
+    Query(Did),             // Request profile for DID
+    Response(Option<NodeProfile>),
+}
+```
+
+**Profile cache in supervisor:**
+
+```rust
+// Supervisor maintains profile cache
+pub struct ProfileCache {
+    profiles: HashMap<Did, NodeProfile>,
+    updated_at: HashMap<Did, u64>,
+}
+
+impl ProfileCache {
+    pub fn get_executors_for_task(&self, task: &ComputeTask) -> Vec<&NodeProfile> {
+        self.profiles.values()
+            .filter(|p| p.roles.contains(&ServiceRole::CclExecutor))
+            .filter(|p| p.stage == NodeStage::Active)
+            .collect()
+    }
+}
+```
+
+---
+
+### 13.9 Implementation Path
+
+**Phase 17 (Target):**
+1. Add `icn-core/src/node.rs` with NodeProfile, ServiceRole, NodeStage (~200 lines)
+2. Wire into supervisor startup (create profile, sense environment)
+3. Gossip profile to peers on `network:profiles` topic
+4. Basic role inference from hardware capacity
+
+**Phase 18:**
+5. Trust integration (Archive role requires trust threshold)
+6. Policy enforcement (operator constraints)
+7. Scheduler integration (use NodeProfile for executor selection)
+
+**Phase 19+:**
+8. Dynamic re-sensing (adapt to hardware changes)
+9. Reputation tracking (nodes that perform well get better scores)
+10. Load balancing (distribute based on capacity utilization)
 
 ---
 

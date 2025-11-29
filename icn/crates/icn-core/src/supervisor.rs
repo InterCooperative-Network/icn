@@ -108,6 +108,23 @@ impl Supervisor {
 
             let did = identity_bundle.did().clone();
 
+            // Create NodeProfile with hardware sensing (Phase 17)
+            let node_profile = crate::node::create_node_profile(
+                did.clone(),
+                did.clone(), // For now, operator is same as node DID
+                &self.config.topology,
+            );
+            let node_profile_handle = Arc::new(tokio::sync::RwLock::new(node_profile.clone()));
+
+            info!(
+                "Node profile created: {} roles detected ({:?}), stage={:?}, capacity={}MB RAM / {}MB storage",
+                node_profile.roles.len(),
+                node_profile.roles_sorted(),
+                node_profile.stage,
+                node_profile.capacity.memory_mb_available,
+                node_profile.capacity.storage_mb_available,
+            );
+
             // Create trust graph
             let trust_store_path = self.config.store_path().join("trust");
             let trust_store: Arc<dyn icn_store::Store> =
@@ -805,6 +822,11 @@ impl Supervisor {
 
                 let compute_handle_for_notifications = compute_handle_holder.clone();
 
+                // Create profile cache for peer capability discovery
+                let profile_cache: Arc<tokio::sync::RwLock<std::collections::HashMap<Did, crate::node::NodeProfile>>> =
+                    Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+                let profile_cache_for_notifications = profile_cache.clone();
+
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(
                     move |topic, entry, _subscriber_did| {
                         // Handle trust attestations
@@ -1259,6 +1281,46 @@ impl Supervisor {
                                 }
                             }
                         }
+                        // Handle node profile announcements
+                        else if topic == crate::node::TOPIC_NODE_PROFILES {
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get profile entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            let profile_cache = profile_cache_for_notifications.clone();
+                            tokio::spawn(async move {
+                                match serde_json::from_slice::<crate::node::ProfileMessage>(&entry_data) {
+                                    Ok(crate::node::ProfileMessage::Announce(profile)) => {
+                                        let peer_did = profile.node_did.clone();
+                                        let roles_count = profile.roles.len();
+                                        let extended_count = profile.extended.capabilities.len();
+
+                                        // Update profile cache
+                                        let mut cache = profile_cache.write().await;
+                                        cache.insert(peer_did.clone(), profile);
+
+                                        debug!(
+                                            "Cached profile for peer {}: {} roles, {} extended capabilities",
+                                            peer_did, roles_count, extended_count
+                                        );
+                                    }
+                                    Ok(crate::node::ProfileMessage::Query(_)) => {
+                                        // TODO: Respond to profile queries
+                                        debug!("Received profile query (response not implemented)");
+                                    }
+                                    Ok(crate::node::ProfileMessage::Response(_)) => {
+                                        // Profile responses are handled by the requester
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to deserialize profile message: {}", e);
+                                    }
+                                }
+                            });
+                        }
                     },
                 );
 
@@ -1424,6 +1486,37 @@ impl Supervisor {
                         }
                     }
                     Err(e) => warn!("Failed to get connection candidate: {}", e),
+                }
+            }
+
+            // Subscribe to node profiles topic and announce our profile
+            {
+                let mut gossip = gossip_handle.write().await;
+
+                // Subscribe to network:profiles topic for peer capability discovery
+                if let Err(e) = gossip.subscribe(crate::node::TOPIC_NODE_PROFILES, did.clone()) {
+                    warn!("Failed to subscribe to network:profiles topic: {}", e);
+                } else {
+                    info!("Subscribed to network:profiles topic");
+                }
+
+                // Publish our node profile announcement
+                let profile_msg = crate::node::ProfileMessage::Announce(node_profile.clone());
+                match serde_json::to_vec(&profile_msg) {
+                    Ok(profile_bytes) => {
+                        match gossip.publish(crate::node::TOPIC_NODE_PROFILES, profile_bytes) {
+                            Ok(_) => {
+                                info!(
+                                    "✓ Published node profile: {} roles ({:?}), {} extended capabilities",
+                                    node_profile.roles.len(),
+                                    node_profile.roles_sorted(),
+                                    node_profile.extended.capabilities.len(),
+                                );
+                            }
+                            Err(e) => warn!("Failed to publish node profile: {}", e),
+                        }
+                    }
+                    Err(e) => warn!("Failed to serialize node profile: {}", e),
                 }
             }
 
@@ -2100,6 +2193,16 @@ impl Supervisor {
             });
 
             info!("Metrics update task spawned");
+
+            // Activate node profile now that all actors are initialized (Phase 17)
+            {
+                let mut profile = node_profile_handle.write().await;
+                profile.activate();
+                info!(
+                    "Node profile activated: {} ready to accept work",
+                    profile.node_did
+                );
+            }
 
             // Assign broadcaster to outer scope for gateway use
             event_broadcaster = Some(broadcaster);
