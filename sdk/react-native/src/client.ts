@@ -41,6 +41,7 @@ export class ICNMobileClient extends ICNClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private intentionalDisconnect = false;
 
   constructor(options: ICNMobileClientOptions) {
     // Create base client options
@@ -205,6 +206,7 @@ export class ICNMobileClient extends ICNClient {
       throw new Error('No coop ID provided and none in auth state');
     }
 
+    this.intentionalDisconnect = false;
     this.disconnectWebSocket();
     this.createWebSocket(targetCoopId);
   }
@@ -213,6 +215,7 @@ export class ICNMobileClient extends ICNClient {
    * Disconnect WebSocket
    */
   disconnectRealtime(): void {
+    this.intentionalDisconnect = true;
     this.disconnectWebSocket();
   }
 
@@ -319,7 +322,10 @@ export class ICNMobileClient extends ICNClient {
 
       this.wsSocket.onclose = () => {
         this.setWsState('disconnected');
-        this.attemptReconnect(coopId);
+        // Only attempt reconnect if this wasn't an intentional disconnect
+        if (!this.intentionalDisconnect) {
+          this.attemptReconnect(coopId);
+        }
       };
     } catch (error) {
       this.setWsState('error');

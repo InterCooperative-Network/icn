@@ -4,7 +4,7 @@
  * Easy-to-use hooks for common ICN operations.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ICNMobileClient } from './client';
 import {
   AuthState,
@@ -198,7 +198,7 @@ export function useBalance(client: ICNMobileClient, coopId: string, did: string)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchBalance = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -211,20 +211,24 @@ export function useBalance(client: ICNMobileClient, coopId: string, did: string)
     }
   }, [client, coopId, did]);
 
+  // Use ref to avoid dependency cycles
+  const fetchRef = useRef(fetchBalance);
+  fetchRef.current = fetchBalance;
+
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    fetchRef.current();
+  }, [client, coopId, did]);
 
   // Auto-refresh on payment events
   useEvent(client, 'PaymentCreated', () => {
-    fetch();
+    fetchRef.current();
   });
 
   return {
     balance,
     isLoading,
     error,
-    refresh: fetch,
+    refresh: fetchBalance,
   };
 }
 
@@ -253,7 +257,7 @@ export function useCoop(client: ICNMobileClient, coopId: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchCoop = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -270,16 +274,20 @@ export function useCoop(client: ICNMobileClient, coopId: string) {
     }
   }, [client, coopId]);
 
+  // Use ref to avoid dependency cycles
+  const fetchRef = useRef(fetchCoop);
+  fetchRef.current = fetchCoop;
+
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    fetchRef.current();
+  }, [client, coopId]);
 
   return {
     coop,
     members,
     isLoading,
     error,
-    refresh: fetch,
+    refresh: fetchCoop,
   };
 }
 
@@ -310,7 +318,7 @@ export function useProposals(client: ICNMobileClient, domainId?: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchProposals = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -323,28 +331,32 @@ export function useProposals(client: ICNMobileClient, domainId?: string) {
     }
   }, [client, domainId]);
 
+  // Use ref to avoid dependency cycles
+  const fetchRef = useRef(fetchProposals);
+  fetchRef.current = fetchProposals;
+
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    fetchRef.current();
+  }, [client, domainId]);
 
   const vote = useCallback(
     async (proposalId: string, choice: 'for' | 'against' | 'abstain') => {
       await client.vote(proposalId, { choice });
-      await fetch();
+      await fetchRef.current();
     },
-    [client, fetch]
+    [client]
   );
 
   // Auto-refresh on governance events
-  useEvent(client, 'GovernanceProposalCreated', fetch);
-  useEvent(client, 'GovernanceProposalClosed', fetch);
-  useEvent(client, 'GovernanceVoteCast', fetch);
+  useEvent(client, 'GovernanceProposalCreated', () => fetchRef.current());
+  useEvent(client, 'GovernanceProposalClosed', () => fetchRef.current());
+  useEvent(client, 'GovernanceVoteCast', () => fetchRef.current());
 
   return {
     proposals,
     isLoading,
     error,
-    refresh: fetch,
+    refresh: fetchProposals,
     vote,
   };
 }
@@ -357,7 +369,7 @@ export function useDomains(client: ICNMobileClient) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchDomains = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -370,15 +382,19 @@ export function useDomains(client: ICNMobileClient) {
     }
   }, [client]);
 
+  // Use ref to avoid dependency cycles
+  const fetchRef = useRef(fetchDomains);
+  fetchRef.current = fetchDomains;
+
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    fetchRef.current();
+  }, [client]);
 
   return {
     domains,
     isLoading,
     error,
-    refresh: fetch,
+    refresh: fetchDomains,
   };
 }
 
