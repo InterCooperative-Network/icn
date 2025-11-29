@@ -383,6 +383,20 @@ export function useDomains(client: ICNMobileClient) {
 }
 
 /**
+ * Simple payment request (currency defaults to 'hours')
+ */
+export interface SimplePaymentRequest {
+  /** Recipient DID */
+  to: string;
+  /** Amount to pay */
+  amount: number;
+  /** Currency (defaults to 'hours') */
+  currency?: string;
+  /** Optional memo */
+  memo?: string;
+}
+
+/**
  * Hook for making payments
  *
  * @example
@@ -404,16 +418,23 @@ export function useDomains(client: ICNMobileClient) {
  * }
  * ```
  */
-export function usePayment(client: ICNMobileClient, coopId: string) {
+export function usePayment(client: ICNMobileClient, coopId: string, defaultCurrency = 'hours') {
   const [isPaying, setIsPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const pay = useCallback(
-    async (request: { to: string; amount: number; memo?: string }) => {
+    async (request: SimplePaymentRequest) => {
       setIsPaying(true);
       setError(null);
       try {
-        const result = await client.pay(coopId, request);
+        // Build full payment request with required fields
+        const fullRequest = {
+          to: request.to,
+          amount: request.amount,
+          currency: request.currency || defaultCurrency,
+          memo: request.memo,
+        };
+        const result = await client.pay(coopId, fullRequest);
         return result;
       } catch (err) {
         setError((err as Error).message);
@@ -422,7 +443,7 @@ export function usePayment(client: ICNMobileClient, coopId: string) {
         setIsPaying(false);
       }
     },
-    [client, coopId]
+    [client, coopId, defaultCurrency]
   );
 
   return {

@@ -66,6 +66,7 @@ export {
   useProposals,
   useDomains,
   usePayment,
+  SimplePaymentRequest,
 } from './hooks';
 
 // Types

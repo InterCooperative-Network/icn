@@ -358,11 +358,25 @@ export class ICNMobileClient extends ICNClient {
   }
 
   private notifyEventListeners(message: WsMessage): void {
-    // Notify specific event listeners
-    const eventType = message.type;
+    // For Event messages, extract the actual event type from the nested payload
+    // WsEventMessage has { type: 'Event', event: { type: 'PaymentCreated', ... } }
+    let eventType = message.type;
+    if (message.type === 'Event' && 'event' in message && message.event?.type) {
+      eventType = message.event.type;
+    }
+
+    // Notify specific event listeners (e.g., 'PaymentCreated', 'MemberAdded')
     const listeners = this.wsListeners.get(eventType);
     if (listeners) {
       listeners.forEach((listener) => listener(message));
+    }
+
+    // Also notify listeners registered for the wrapper type (e.g., 'Event')
+    if (eventType !== message.type) {
+      const wrapperListeners = this.wsListeners.get(message.type);
+      if (wrapperListeners) {
+        wrapperListeners.forEach((listener) => listener(message));
+      }
     }
 
     // Notify wildcard listeners
