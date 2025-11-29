@@ -56,6 +56,16 @@ These principles ensure ICN remains decentralized, resilient, and aligned with c
     - 13.6 [Role Inference](#136-role-inference)
     - 13.7 [Multi-Device & Shared Devices](#137-multi-device--shared-devices)
     - 13.8 [Integration with Existing Systems](#138-integration-with-existing-systems)
+14. [Federation Layer](#14-federation-layer)
+    - 14.1 [Overview](#141-overview)
+    - 14.2 [Core Types](#142-core-types)
+    - 14.3 [Trust Bridging](#143-trust-bridging-f2)
+    - 14.4 [Credit Settlement](#144-credit-settlement-f3)
+    - 14.5 [Federated DID Resolution](#145-federated-did-resolution-f5)
+    - 14.6 [Gossip Topics](#146-gossip-topics)
+    - 14.7 [Architecture](#147-architecture)
+    - 14.8 [Metrics](#148-metrics)
+    - 14.9 [Implementation Status](#149-implementation-status)
 
 ---
 
@@ -3575,6 +3585,174 @@ impl ProfileCache {
 8. Dynamic re-sensing (adapt to hardware changes)
 9. Reputation tracking (nodes that perform well get better scores)
 10. Load balancing (distribute based on capacity utilization)
+
+---
+
+## 14. Federation Layer
+
+The federation layer (`icn-federation` crate) enables multiple cooperatives to discover each other, bridge trust relationships, settle inter-cooperative credits, and coordinate via scoped gossip routing.
+
+### 14.1 Overview
+
+Federation addresses the challenge of **inter-cooperative coordination** without centralized authorities. Key capabilities:
+
+| Feature | Description |
+|---------|-------------|
+| **Discovery** | Cooperatives announce presence via `federation:registry` gossip topic |
+| **Trust Bridging** | Attestations from home coop travel with members to foreign coops |
+| **Credit Settlement** | Bilateral clearing agreements with configurable exchange rates |
+| **Scoped Gossip** | Control message routing (local, federation partners, or public) |
+| **DID Resolution** | Federated DID format: `did:icn:coop-id:z6Mk...` |
+
+### 14.2 Core Types
+
+**CooperativeInfo** - Public identity and metadata:
+```rust
+pub struct CooperativeInfo {
+    pub coop_id: String,           // e.g., "food-coop"
+    pub name: String,              // Human-readable name
+    pub public_did: Did,           // Institutional DID
+    pub gateway_endpoints: Vec<String>,
+    pub federation_policy: FederationPolicy,
+    pub currencies: Vec<CurrencyInfo>,
+    pub capabilities: Vec<String>, // "clearing", "attestations", "compute"
+    pub last_seen: u64,
+    pub signature: Vec<u8>,
+}
+```
+
+**FederationPolicy** - Controls who can join:
+- `Open` - Any cooperative can federate
+- `Vouched { min_vouches }` - Requires N vouches from existing partners
+- `Closed` - No new federations accepted
+
+**GossipScope** - Message routing control:
+- `Local` - Stays within cooperative
+- `Federation { partners }` - Goes to specific partners
+- `Public` - Broadcast to all federated cooperatives
+
+### 14.3 Trust Bridging (F2)
+
+**FederatedTrustAttestation** allows cooperatives to vouch for their members:
+
+```rust
+pub struct FederatedTrustAttestation {
+    pub source_coop_id: String,
+    pub source_coop_did: Did,
+    pub member_did: Did,
+    pub trust_score: f64,          // 0.0 to 1.0
+    pub trust_context: TrustContext, // Economic, Social, Governance, General
+    pub evidence_summary: Vec<EvidenceSummary>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub signature: Vec<u8>,
+}
+```
+
+Foreign cooperatives can request attestations about visiting members, enabling trust to travel across federation boundaries.
+
+### 14.4 Credit Settlement (F3)
+
+**BilateralClearingAgreement** defines exchange terms between two cooperatives:
+
+```rust
+pub struct BilateralClearingAgreement {
+    pub agreement_id: String,
+    pub coop_a: String,
+    pub coop_a_did: Did,
+    pub coop_b: String,
+    pub coop_b_did: Did,
+    pub exchange_rates: HashMap<String, f64>, // "hours:USD" -> 25.0
+    pub settlement_interval: SettlementInterval,
+    pub max_imbalance: i64,
+    pub signatures: Vec<(Did, Vec<u8>)>,
+}
+```
+
+**CrossCoopTransfer** tracks inter-cooperative payments through the clearing system.
+
+### 14.5 Federated DID Resolution (F5)
+
+DIDs can optionally include a cooperative prefix for cross-federation resolution:
+
+| Format | Example | Resolution |
+|--------|---------|------------|
+| Standard | `did:icn:z6Mk...` | Local resolution |
+| Federated | `did:icn:food-coop:z6Mk...` | Route to food-coop's gateway |
+
+The **FederatedDidResolver** caches resolutions and queries remote gateways when needed.
+
+### 14.6 Gossip Topics
+
+| Topic | Purpose |
+|-------|---------|
+| `federation:registry` | Cooperative announcements, queries, vouches |
+| `federation:trust` | Trust attestation exchange |
+| `federation:clearing` | Settlement coordination |
+
+### 14.7 Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Federation Layer                          │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │   Registry   │  │  Attestation │  │   Clearing   │       │
+│  │              │  │    Store     │  │   Manager    │       │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
+│         │                 │                 │               │
+│  ┌──────┴─────────────────┴─────────────────┴───────┐       │
+│  │              FederationGossipHandler             │       │
+│  └──────────────────────────────────────────────────┘       │
+│                           │                                  │
+│  ┌────────────────────────┴─────────────────────────┐       │
+│  │           FederatedGossipRouter                  │       │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐          │       │
+│  │  │Channel A│  │Channel B│  │Channel C│          │       │
+│  │  └─────────┘  └─────────┘  └─────────┘          │       │
+│  └──────────────────────────────────────────────────┘       │
+│                           │                                  │
+│  ┌────────────────────────┴─────────────────────────┐       │
+│  │            FederatedDidResolver                  │       │
+│  └──────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                    ┌───────┴───────┐
+                    │ icn-gossip    │
+                    │ icn-store     │
+                    └───────────────┘
+```
+
+### 14.8 Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `icn_federation_coops_known` | Gauge | Known cooperatives |
+| `icn_federation_coops_registered` | Counter | New registrations |
+| `icn_federation_announcements_sent` | Counter | Announcements broadcast |
+| `icn_federation_vouches_received` | Counter | Vouches received (by voucher) |
+| `icn_federation_attestations_stored` | Counter | Attestations stored |
+| `icn_federation_channels_active` | Gauge | Active federation channels |
+| `icn_federation_clearing_agreements_active` | Gauge | Active clearing agreements |
+| `icn_federation_transfers_confirmed` | Counter | Transfers confirmed |
+| `icn_federation_did_cache_hits` | Counter | DID resolution cache hits |
+
+### 14.9 Implementation Status
+
+**Complete (F1-F5):**
+- ✅ Types and error handling
+- ✅ Cooperative registry with persistence
+- ✅ Federation gossip handler
+- ✅ Trust attestation storage
+- ✅ Bilateral clearing agreements
+- ✅ Scoped gossip routing
+- ✅ Federated DID resolution
+- ✅ 47 tests passing
+
+**Pending:**
+- ⏳ CLI commands (`icnctl federation`)
+- ⏳ Gateway REST API (`/v1/federation/*`)
+- ⏳ Supervisor integration
 
 ---
 

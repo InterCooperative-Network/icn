@@ -1,0 +1,46 @@
+[package]
+name = "icn-federation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Federation layer for inter-cooperative coordination in ICN"
+
+[dependencies]
+# Internal crates
+icn-identity.workspace = true
+icn-trust.workspace = true
+icn-gossip.workspace = true
+icn-ledger.workspace = true
+icn-store.workspace = true
+icn-obs.workspace = true
+
+# Async runtime
+tokio.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Utilities
+lru.workspace = true
+
+# Metrics
+metrics.workspace = true
+
+# Crypto
+ed25519-dalek.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+icn-testkit.workspace = true
+tokio = { workspace = true, features = ["test-util", "rt-multi-thread", "macros"] }
+tempfile = "3.8"
+rand.workspace = true
