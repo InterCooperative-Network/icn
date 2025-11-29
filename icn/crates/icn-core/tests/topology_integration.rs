@@ -386,7 +386,29 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
     node_a.dial(&node_c).await?;
     node_a.dial(&node_d).await?;
 
-    tokio::time::sleep(Duration::from_millis(1500)).await;
+    // Wait for connections to be established with retry logic for CI environments
+    // CI is slower, so we poll with fixed delays until all peers connect
+    let mut global_peers = Vec::new();
+    for attempt in 1..=20 {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        global_peers = node_a.network_handle.sample_peers(Scope::Global, 10).await;
+        if global_peers.len() >= 3 {
+            info!("All 3 peers connected after {} attempts", attempt);
+            break;
+        }
+        if attempt % 5 == 0 {
+            info!(
+                "Attempt {}: {} peers connected, waiting...",
+                attempt,
+                global_peers.len()
+            );
+        }
+    }
+    assert_eq!(
+        global_peers.len(),
+        3,
+        "Failed to connect to all 3 peers after retries"
+    );
 
     // Test LocalCluster scope sampling
     let local_peers = node_a
@@ -409,8 +431,7 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
         "Should sample 2 regional peers (local + regional)"
     );
 
-    // Test Global scope sampling
-    let global_peers = node_a.network_handle.sample_peers(Scope::Global, 10).await;
+    // Test Global scope sampling (already fetched above)
     info!("Global sampled peers: {:?}", global_peers);
     assert_eq!(global_peers.len(), 3, "Should sample 3 global peers (all)");
 
