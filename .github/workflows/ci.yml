@@ -107,8 +107,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/pilot-ui/package-lock.json
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
       - name: Run tests
-        run: npm test || echo "No test script configured"
-        continue-on-error: true
+        run: npm test
