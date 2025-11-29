@@ -996,10 +996,11 @@ See [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) for com
 - `icn_network_connections_total` - Connection monitoring
 - `icn_gossip_*_received_total` - Protocol health
 
-**Known limitations:**
-- ⚠️ TLS verifier does NOT integrate with trust graph yet
-- Currently in "development mode" - accepts all valid DID certificates
-- Trust graph integration required before production deployment
+**Trust-gated TLS verification:**
+- ✅ TLS verifier integrates with trust graph for access control
+- Configurable `min_trust_threshold` (default: 0.0 = accept all authenticated DIDs)
+- Production recommendation: Set threshold ≥ 0.1 to reject isolated peers
+- Metric: `icn_network_connections_rejected_untrusted_total`
 
 See [docs/production-hardening.md](docs/production-hardening.md) for complete details.
 
