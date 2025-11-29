@@ -82,19 +82,23 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
    cd icn
    ```
 
-3. **Build the project**:
+3. **Use DevContainer (recommended)**: Open in VS Code and select "Reopen in Container"
+   - Pre-configured Rust, Node.js, and extensions
+   - See [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)
+
+4. **Build the project** (manual setup):
    ```bash
    cd icn  # Workspace is in icn/ subdirectory
    cargo build
    ```
 
-4. **Run tests**:
+5. **Run tests**:
    ```bash
    cargo test
    cargo test --test '*'  # Integration tests only
    ```
 
-5. **Check code quality**:
+6. **Check code quality**:
    ```bash
    cargo clippy --workspace -- -D warnings
    cargo fmt --check
