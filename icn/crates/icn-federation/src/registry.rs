@@ -5,13 +5,11 @@
 
 use crate::error::{FederationError, Result};
 use crate::metrics;
-use crate::types::{
-    current_timestamp, CooperativeInfo, FederationPolicy, PolicyResult, Vouch,
-};
+use crate::types::{current_timestamp, CooperativeInfo, FederationPolicy, PolicyResult, Vouch};
 use icn_store::Store;
-use std::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Storage key prefixes
@@ -223,7 +221,10 @@ impl CooperativeRegistry {
         if let Some(value) = self.store.get(&key)? {
             let info: CooperativeInfo = serde_json::from_slice(&value)?;
             // Update cache
-            self.cache.write().unwrap().insert(coop_id.to_string(), info.clone());
+            self.cache
+                .write()
+                .unwrap()
+                .insert(coop_id.to_string(), info.clone());
             return Ok(Some(info));
         }
 
@@ -355,8 +356,7 @@ impl CooperativeRegistry {
         // Voucher must be federated with us
         if !self.is_federated(voucher) && voucher != &self.own_coop_id {
             return Err(FederationError::VouchNotAllowed(format!(
-                "Voucher {} is not a federation partner",
-                voucher
+                "Voucher {voucher} is not a federation partner"
             )));
         }
 
@@ -369,7 +369,9 @@ impl CooperativeRegistry {
 
         // Check if vouch has expired
         if vouch.is_expired() {
-            return Err(FederationError::VouchNotAllowed("Vouch has expired".to_string()));
+            return Err(FederationError::VouchNotAllowed(
+                "Vouch has expired".to_string(),
+            ));
         }
 
         // Get current vouches
@@ -389,7 +391,10 @@ impl CooperativeRegistry {
         self.store.put(&key, &value)?;
 
         // Update cache
-        self.vouches.write().unwrap().insert(target.clone(), vouches);
+        self.vouches
+            .write()
+            .unwrap()
+            .insert(target.clone(), vouches);
 
         // Update metrics
         metrics::registry::vouches_received_inc(voucher);
@@ -422,7 +427,10 @@ impl CooperativeRegistry {
         if vouches.is_empty() {
             self.vouches.write().unwrap().remove(target);
         } else {
-            self.vouches.write().unwrap().insert(target.to_string(), vouches);
+            self.vouches
+                .write()
+                .unwrap()
+                .insert(target.to_string(), vouches);
         }
 
         info!("Removed vouch from {} for {}", voucher, target);

@@ -65,10 +65,7 @@ impl RpcClient {
 
         // Step 1: Request challenge
         let challenge_result = self
-            .call_raw(
-                "auth.challenge",
-                serde_json::json!({ "did": did_str }),
-            )
+            .call_raw("auth.challenge", serde_json::json!({ "did": did_str }))
             .await?;
 
         let nonce = challenge_result["nonce"]
@@ -117,10 +114,7 @@ impl RpcClient {
     async fn call(&mut self, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
         // Auto-authenticate if we have credentials but no token
         // (and this isn't an auth method)
-        if self.credentials.is_some()
-            && self.token.is_none()
-            && !method.starts_with("auth.")
-        {
+        if self.credentials.is_some() && self.token.is_none() && !method.starts_with("auth.") {
             // Request all read scopes for general use
             self.authenticate(vec![
                 "network:read".to_string(),
@@ -161,7 +155,7 @@ impl RpcClient {
 
         // Add authorization header if we have a token
         if let Some(token) = &self.token {
-            req_builder = req_builder.header("Authorization", format!("Bearer {}", token));
+            req_builder = req_builder.header("Authorization", format!("Bearer {token}"));
         }
 
         let response = req_builder

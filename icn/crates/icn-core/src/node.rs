@@ -362,7 +362,12 @@ pub struct NodeProfile {
 
 impl NodeProfile {
     /// Create a new node profile in Sensing stage
-    pub fn new(node_did: Did, operator_did: Did, topology: TopologyInfo, capacity: NodeCapacity) -> Self {
+    pub fn new(
+        node_did: Did,
+        operator_did: Did,
+        topology: TopologyInfo,
+        capacity: NodeCapacity,
+    ) -> Self {
         Self {
             node_did,
             operator_did,
@@ -405,31 +410,45 @@ impl NodeProfile {
 
         // CCL executor: low bar (128MB default)
         if self.capacity.memory_mb_available >= role_policy.ccl_min_ram_mb
-            && !self.policy.disallowed_roles.contains(&ServiceRole::CclExecutor)
+            && !self
+                .policy
+                .disallowed_roles
+                .contains(&ServiceRole::CclExecutor)
         {
             self.roles.insert(ServiceRole::CclExecutor);
         }
 
         // WASM executor: higher requirements (512MB default)
         if self.capacity.memory_mb_available >= role_policy.wasm_min_ram_mb
-            && !self.policy.disallowed_roles.contains(&ServiceRole::WasmExecutor)
+            && !self
+                .policy
+                .disallowed_roles
+                .contains(&ServiceRole::WasmExecutor)
         {
             self.roles.insert(ServiceRole::WasmExecutor);
         }
 
         // GPU executor: requires GPU with sufficient VRAM and operator opt-in
-        let has_gpu = self.extended.meets(capability_keys::GPU_MEMORY_GB, role_policy.gpu_min_vram_gb);
+        let has_gpu = self
+            .extended
+            .meets(capability_keys::GPU_MEMORY_GB, role_policy.gpu_min_vram_gb);
         let gpu_offered = self.extended.has(capability_keys::GPU_COMPUTE_OFFERED);
         if has_gpu
             && gpu_offered
-            && !self.policy.disallowed_roles.contains(&ServiceRole::GpuExecutor)
+            && !self
+                .policy
+                .disallowed_roles
+                .contains(&ServiceRole::GpuExecutor)
         {
             self.roles.insert(ServiceRole::GpuExecutor);
         }
 
         // Replica holder: needs storage commitment (1GB default)
         if self.capacity.storage_mb_available >= role_policy.replica_min_storage_mb
-            && !self.policy.disallowed_roles.contains(&ServiceRole::ReplicaHolder)
+            && !self
+                .policy
+                .disallowed_roles
+                .contains(&ServiceRole::ReplicaHolder)
         {
             self.roles.insert(ServiceRole::ReplicaHolder);
         }
@@ -492,7 +511,7 @@ impl NodeProfile {
     /// Get roles as a sorted vector (for consistent serialization)
     pub fn roles_sorted(&self) -> Vec<ServiceRole> {
         let mut roles: Vec<_> = self.roles.iter().copied().collect();
-        roles.sort_by_key(|r| format!("{:?}", r));
+        roles.sort_by_key(|r| format!("{r:?}"));
         roles
     }
 }
@@ -580,11 +599,11 @@ pub struct RolePolicy {
 impl Default for RolePolicy {
     fn default() -> Self {
         Self {
-            ccl_min_ram_mb: 128,           // 128 MB for CCL
-            wasm_min_ram_mb: 512,          // 512 MB for WASM
-            replica_min_storage_mb: 1024,  // 1 GB for replicas
-            archive_min_trust: 0.6,        // High trust for Archive
-            gpu_min_vram_gb: 4.0,          // 4 GB VRAM for GPU compute
+            ccl_min_ram_mb: 128,          // 128 MB for CCL
+            wasm_min_ram_mb: 512,         // 512 MB for WASM
+            replica_min_storage_mb: 1024, // 1 GB for replicas
+            archive_min_trust: 0.6,       // High trust for Archive
+            gpu_min_vram_gb: 4.0,         // 4 GB VRAM for GPU compute
         }
     }
 }
@@ -597,7 +616,7 @@ impl RolePolicy {
             wasm_min_ram_mb: 1024,
             replica_min_storage_mb: 10240, // 10 GB
             archive_min_trust: 0.8,
-            gpu_min_vram_gb: 8.0,          // 8 GB VRAM
+            gpu_min_vram_gb: 8.0, // 8 GB VRAM
         }
     }
 
@@ -608,7 +627,7 @@ impl RolePolicy {
             wasm_min_ram_mb: 256,
             replica_min_storage_mb: 512,
             archive_min_trust: 0.4,
-            gpu_min_vram_gb: 2.0,          // 2 GB VRAM
+            gpu_min_vram_gb: 2.0, // 2 GB VRAM
         }
     }
 }
@@ -662,7 +681,7 @@ pub fn sense_hardware() -> NodeCapacity {
         memory_mb_available: memory_available,
         storage_mb_available: storage_available,
         network_mbps: 100.0, // Assume reasonable network
-        gpu_devices: vec![],  // GPU detection not implemented yet
+        gpu_devices: vec![], // GPU detection not implemented yet
         updated_at: current_timestamp(),
     }
 }
@@ -677,15 +696,9 @@ fn read_memory_info() -> Option<(u64, u64)> {
 
         for line in content.lines() {
             if line.starts_with("MemTotal:") {
-                total_kb = line
-                    .split_whitespace()
-                    .nth(1)
-                    .and_then(|s| s.parse().ok());
+                total_kb = line.split_whitespace().nth(1).and_then(|s| s.parse().ok());
             } else if line.starts_with("MemAvailable:") {
-                available_kb = line
-                    .split_whitespace()
-                    .nth(1)
-                    .and_then(|s| s.parse().ok());
+                available_kb = line.split_whitespace().nth(1).and_then(|s| s.parse().ok());
             }
         }
 
@@ -741,11 +754,11 @@ pub fn sense_extended_capabilities() -> ExtendedCapabilities {
         }
 
         // Check for AMD GPU
-        if std::path::Path::new("/dev/dri/renderD128").exists() {
-            if !caps.has(capability_keys::GPU_AVAILABLE) {
-                caps.set(capability_keys::GPU_AVAILABLE, CapabilityValue::present());
-                caps.set(capability_keys::GPU_VENDOR, CapabilityValue::text("amd"));
-            }
+        if std::path::Path::new("/dev/dri/renderD128").exists()
+            && !caps.has(capability_keys::GPU_AVAILABLE)
+        {
+            caps.set(capability_keys::GPU_AVAILABLE, CapabilityValue::present());
+            caps.set(capability_keys::GPU_VENDOR, CapabilityValue::text("amd"));
         }
     }
 
@@ -804,7 +817,8 @@ pub fn create_node_profile(
     };
 
     // Create profile in Sensing stage with extended capabilities
-    let mut profile = NodeProfile::with_extended(node_did, operator_did, topology, capacity, extended);
+    let mut profile =
+        NodeProfile::with_extended(node_did, operator_did, topology, capacity, extended);
 
     // Infer initial roles based on detected capacity
     // Use default role policy and assume no trust score yet (0.0)
@@ -930,7 +944,10 @@ mod tests {
             test_topology(),
             test_capacity(1024, 10240),
         );
-        profile.policy.disallowed_roles.insert(ServiceRole::WasmExecutor);
+        profile
+            .policy
+            .disallowed_roles
+            .insert(ServiceRole::WasmExecutor);
 
         profile.infer_roles(&RolePolicy::default(), 0.5);
 
@@ -964,7 +981,9 @@ mod tests {
         let policy = NodePolicy::kiosk();
 
         assert!(policy.disallowed_roles.contains(&ServiceRole::WasmExecutor));
-        assert!(policy.disallowed_roles.contains(&ServiceRole::ReplicaHolder));
+        assert!(policy
+            .disallowed_roles
+            .contains(&ServiceRole::ReplicaHolder));
         assert!(policy.disallowed_roles.contains(&ServiceRole::Archive));
         assert!(policy.resource_caps.is_some());
     }
@@ -996,7 +1015,10 @@ mod tests {
         let mut caps = ExtendedCapabilities::new();
 
         // Test setting and getting capabilities
-        caps.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric_with_unit(8.0, "GB"));
+        caps.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric_with_unit(8.0, "GB"),
+        );
         caps.set(capability_keys::GPU_VENDOR, CapabilityValue::text("nvidia"));
         caps.set(capability_keys::SENSOR_GPS, CapabilityValue::present());
 
@@ -1015,8 +1037,14 @@ mod tests {
         let mut caps = ExtendedCapabilities::new();
 
         caps.set(capability_keys::SENSOR_GPS, CapabilityValue::present());
-        caps.set(capability_keys::SENSOR_TEMPERATURE, CapabilityValue::numeric_with_unit(25.0, "C"));
-        caps.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(8.0));
+        caps.set(
+            capability_keys::SENSOR_TEMPERATURE,
+            CapabilityValue::numeric_with_unit(25.0, "C"),
+        );
+        caps.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(8.0),
+        );
 
         let sensors = caps.with_prefix("sensor.");
         assert_eq!(sensors.len(), 2);
@@ -1027,7 +1055,10 @@ mod tests {
     #[test]
     fn test_gpu_role_requires_opt_in() {
         let mut extended = ExtendedCapabilities::new();
-        extended.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(8.0));
+        extended.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(8.0),
+        );
         // Note: NOT setting GPU_COMPUTE_OFFERED
 
         let mut profile = NodeProfile::with_extended(
@@ -1047,8 +1078,14 @@ mod tests {
     #[test]
     fn test_gpu_role_with_opt_in() {
         let mut extended = ExtendedCapabilities::new();
-        extended.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(8.0));
-        extended.set(capability_keys::GPU_COMPUTE_OFFERED, CapabilityValue::present());
+        extended.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(8.0),
+        );
+        extended.set(
+            capability_keys::GPU_COMPUTE_OFFERED,
+            CapabilityValue::present(),
+        );
 
         let mut profile = NodeProfile::with_extended(
             make_test_did(),
@@ -1067,8 +1104,14 @@ mod tests {
     #[test]
     fn test_gpu_role_insufficient_vram() {
         let mut extended = ExtendedCapabilities::new();
-        extended.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(2.0)); // Only 2GB
-        extended.set(capability_keys::GPU_COMPUTE_OFFERED, CapabilityValue::present());
+        extended.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(2.0),
+        ); // Only 2GB
+        extended.set(
+            capability_keys::GPU_COMPUTE_OFFERED,
+            CapabilityValue::present(),
+        );
 
         let mut profile = NodeProfile::with_extended(
             make_test_did(),
@@ -1087,7 +1130,10 @@ mod tests {
     #[test]
     fn test_capability_verification() {
         let mut caps = ExtendedCapabilities::new();
-        caps.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(8.0));
+        caps.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(8.0),
+        );
 
         assert!(!caps.is_verified(capability_keys::GPU_MEMORY_GB));
 
@@ -1100,7 +1146,10 @@ mod tests {
     #[test]
     fn test_capability_merge() {
         let mut caps1 = ExtendedCapabilities::new();
-        caps1.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(8.0));
+        caps1.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(8.0),
+        );
 
         let mut caps2 = ExtendedCapabilities::new();
         caps2.set(capability_keys::SENSOR_GPS, CapabilityValue::present());
@@ -1117,8 +1166,14 @@ mod tests {
     #[test]
     fn test_can_execute_gpu_requires_active() {
         let mut extended = ExtendedCapabilities::new();
-        extended.set(capability_keys::GPU_MEMORY_GB, CapabilityValue::numeric(8.0));
-        extended.set(capability_keys::GPU_COMPUTE_OFFERED, CapabilityValue::present());
+        extended.set(
+            capability_keys::GPU_MEMORY_GB,
+            CapabilityValue::numeric(8.0),
+        );
+        extended.set(
+            capability_keys::GPU_COMPUTE_OFFERED,
+            CapabilityValue::present(),
+        );
 
         let mut profile = NodeProfile::with_extended(
             make_test_did(),

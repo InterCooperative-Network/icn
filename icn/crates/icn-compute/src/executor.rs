@@ -217,8 +217,7 @@ impl Executor for LocalExecutor {
                     "CclRef requires contract registry (not yet integrated)"
                 );
                 ExecutionOutcome::Failed(format!(
-                    "Contract reference {} not resolved. Registry integration pending.",
-                    hash_hex
+                    "Contract reference {hash_hex} not resolved. Registry integration pending."
                 ))
             }
             TaskCode::WasmRef(_) | TaskCode::WasmInline(_) => {

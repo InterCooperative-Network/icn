@@ -47,7 +47,6 @@ pub use checkpoint_store::{
 };
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
-pub use wasm_executor::WasmExecutor;
 pub use migration_manager::{ActorMigrationManager, MigrationSender};
 pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
@@ -65,6 +64,7 @@ pub use types::{
     ComputeMessage, ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, FuelLimit,
     TaskCode, TaskHash, TaskId, TaskPriority,
 };
+pub use wasm_executor::WasmExecutor;
 
 /// Gossip topic for task submission
 pub const TOPIC_SUBMIT: &str = "compute:submit";

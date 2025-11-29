@@ -146,9 +146,9 @@ impl FederatedTrustAttestation {
         }
 
         let bytes = self.signing_bytes();
-        let sig_bytes: [u8; 64] = self.signature[..64]
-            .try_into()
-            .map_err(|_| FederationError::InvalidSignature("Invalid signature format".to_string()))?;
+        let sig_bytes: [u8; 64] = self.signature[..64].try_into().map_err(|_| {
+            FederationError::InvalidSignature("Invalid signature format".to_string())
+        })?;
 
         let signature = Signature::from_bytes(&sig_bytes);
         match verifying_key.verify(&bytes, &signature) {
@@ -170,11 +170,7 @@ impl FederatedTrustAttestation {
     /// Get the remaining validity time in seconds
     pub fn remaining_validity(&self) -> u64 {
         let now = current_timestamp();
-        if now >= self.expires_at {
-            0
-        } else {
-            self.expires_at - now
-        }
+        self.expires_at.saturating_sub(now)
     }
 }
 

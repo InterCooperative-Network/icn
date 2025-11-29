@@ -15,13 +15,13 @@ pub mod trust_propagation;
 pub use anti_entropy::{spawn_anti_entropy_task, AntiEntropyConfig};
 pub use config::Config;
 pub use events::{EventBus, EventCallback, SystemEvent};
+pub use governance::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use identity::{IdentityActor, IdentityHandle, IdentityMsg};
 pub use node::{
     capability_keys, create_node_profile, sense_extended_capabilities, sense_hardware,
     CapabilityValue, ExtendedCapabilities, NodePolicy, NodeProfile, NodeStage, ProfileMessage,
     ResourceCaps, RolePolicy, ServiceRole, TOPIC_NODE_PROFILES,
 };
-pub use governance::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
-pub use identity::{IdentityActor, IdentityHandle, IdentityMsg};
 pub use policy::{Capability, DefaultPolicySource, PolicySource, TrustPolicy};
 pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
 pub use runtime::Runtime;

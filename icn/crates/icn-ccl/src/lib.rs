@@ -52,9 +52,6 @@ pub mod types;
 // Re-export commonly used types
 pub use actor::ContractActor;
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
-pub use registry::{
-    compute_hash, ContentHash, ContractMetadata, ContractRegistry, RegistryError, RegistryStats,
-};
 pub use disputes::{
     Dispute, DisputeConfig, DisputeEvidence, DisputeId, DisputeOutcome, DisputeReason,
     DisputeResolutionSystem, DisputeStats, DisputeStatus, MisbehaviorCallback,
@@ -62,6 +59,9 @@ pub use disputes::{
 pub use interpreter::Interpreter;
 pub use messages::{
     ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse,
+};
+pub use registry::{
+    compute_hash, ContentHash, ContractMetadata, ContractRegistry, RegistryError, RegistryStats,
 };
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{

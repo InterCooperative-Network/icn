@@ -666,17 +666,23 @@ impl NetworkHandle {
             // Add relay keys
             for relay_did in &relay_dids {
                 if let Some(info) = conns.get(relay_did) {
-                    router.add_peer_key(relay_did.clone(), x25519_dalek::PublicKey::from(info.x25519_key));
+                    router.add_peer_key(
+                        relay_did.clone(),
+                        x25519_dalek::PublicKey::from(info.x25519_key),
+                    );
                 } else {
-                    anyhow::bail!("Missing X25519 key for relay {}", relay_did);
+                    anyhow::bail!("Missing X25519 key for relay {relay_did}");
                 }
             }
 
             // Add recipient key
             if let Some(info) = conns.get(&recipient) {
-                router.add_peer_key(recipient.clone(), x25519_dalek::PublicKey::from(info.x25519_key));
+                router.add_peer_key(
+                    recipient.clone(),
+                    x25519_dalek::PublicKey::from(info.x25519_key),
+                );
             } else {
-                anyhow::bail!("Missing X25519 key for recipient {}", recipient);
+                anyhow::bail!("Missing X25519 key for recipient {recipient}");
             }
         } else {
             anyhow::bail!("No peer connections available for onion routing");
@@ -685,16 +691,16 @@ impl NetworkHandle {
         // Create circuit
         let circuit = router
             .create_circuit(relay_dids.clone(), recipient.clone())
-            .map_err(|e| anyhow::anyhow!("Failed to create onion circuit: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create onion circuit: {e}"))?;
 
         // Serialize the payload
-        let payload_bytes = bincode::serialize(payload)
-            .context("Failed to serialize onion payload")?;
+        let payload_bytes =
+            bincode::serialize(payload).context("Failed to serialize onion payload")?;
 
         // Wrap message in onion layers
         let onion_msg = router
             .wrap_message(&circuit, &payload_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to wrap onion message: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to wrap onion message: {e}"))?;
 
         // Get first hop to send to
         let first_hop = if !relay_dids.is_empty() {
@@ -2120,8 +2126,10 @@ impl NetworkActor {
                                     // Handle onion-routed messages
                                     use icn_privacy::OnionRouter;
 
-                                    debug!("Received onion-routed message (hop_index={})",
-                                           onion_msg.hop_index);
+                                    debug!(
+                                        "Received onion-routed message (hop_index={})",
+                                        onion_msg.hop_index
+                                    );
                                     icn_obs::metrics::privacy::onion_messages_received_inc();
 
                                     // Create temporary OnionRouter for this node
@@ -2140,7 +2148,10 @@ impl NetworkActor {
 
                                             // Get connection to next hop
                                             let sm = session_manager.read().await;
-                                            if let Some(conn) = sm.connections().await.iter()
+                                            if let Some(conn) = sm
+                                                .connections()
+                                                .await
+                                                .iter()
                                                 .find(|(did, _)| *did == next_hop.as_str())
                                                 .map(|(_, conn)| conn.clone())
                                             {
@@ -2154,10 +2165,13 @@ impl NetworkActor {
 
                                                 match conn.open_bi().await {
                                                     Ok((mut send, _recv)) => {
-                                                        if let Err(e) = crate::protocol::write_message(
-                                                            &mut send,
-                                                            &forward_msg,
-                                                        ).await {
+                                                        if let Err(e) =
+                                                            crate::protocol::write_message(
+                                                                &mut send,
+                                                                &forward_msg,
+                                                            )
+                                                            .await
+                                                        {
                                                             warn!(
                                                                 "Failed to forward onion to {}: {}",
                                                                 next_hop, e
@@ -2168,7 +2182,10 @@ impl NetworkActor {
                                                                 next_hop, e
                                                             );
                                                         } else {
-                                                            debug!("Forwarded onion to next hop: {}", next_hop);
+                                                            debug!(
+                                                                "Forwarded onion to next hop: {}",
+                                                                next_hop
+                                                            );
                                                         }
                                                     }
                                                     Err(e) => {
@@ -2197,7 +2214,9 @@ impl NetworkActor {
                                                     icn_obs::metrics::privacy::onion_messages_delivered_inc();
 
                                                     // Attempt to deserialize as NetworkMessage and forward
-                                                    match bincode::deserialize::<NetworkMessage>(&payload) {
+                                                    match bincode::deserialize::<NetworkMessage>(
+                                                        &payload,
+                                                    ) {
                                                         Ok(inner_msg) => {
                                                             debug!(
                                                                 "Extracted inner message: {:?}",

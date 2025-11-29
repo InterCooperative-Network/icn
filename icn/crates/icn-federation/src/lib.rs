@@ -28,10 +28,10 @@
 //! Where `food-coop` is the cooperative ID and the rest is the base58-encoded public key.
 
 pub mod error;
-pub mod types;
-pub mod registry;
 pub mod gossip;
 pub mod metrics;
+pub mod registry;
+pub mod types;
 
 // Phase F2: Trust Bridging
 pub mod attestation;
@@ -49,24 +49,23 @@ pub mod router;
 pub mod resolver;
 
 // Re-exports
-pub use error::{FederationError, Result};
-pub use types::{
-    CooperativeInfo, CurrencyInfo, FederationPolicy, FederationMessage,
-    PolicyResult, Vouch,
-};
-pub use registry::CooperativeRegistry;
-pub use gossip::FederationGossipHandler;
-pub use attestation::{FederatedTrustAttestation, TrustContext, EvidenceSummary};
+pub use attestation::{EvidenceSummary, FederatedTrustAttestation, TrustContext};
 pub use attestation_store::AttestationStore;
+pub use channel::FederationChannel;
 pub use clearing::{
-    BilateralClearingAgreement, ClearingPosition, CrossCoopTransfer,
-    SettlementInterval, TransferStatus,
+    BilateralClearingAgreement, ClearingPosition, CrossCoopTransfer, SettlementInterval,
+    TransferStatus,
 };
 pub use clearing_manager::{ClearingManager, SettlementReport};
-pub use channel::FederationChannel;
+pub use error::{FederationError, Result};
+pub use gossip::FederationGossipHandler;
+pub use registry::CooperativeRegistry;
+pub use resolver::{CachedDidResolution, FederatedDidResolver};
 pub use router::FederatedGossipRouter;
-pub use resolver::{FederatedDidResolver, CachedDidResolution};
 pub use router::GossipScope;
+pub use types::{
+    CooperativeInfo, CurrencyInfo, FederationMessage, FederationPolicy, PolicyResult, Vouch,
+};
 
 /// Topic constants for federation gossip (re-exported at crate level)
 pub const TOPIC_FEDERATION_REGISTRY: &str = "federation:registry";

@@ -121,7 +121,9 @@ impl WasmExecutor {
                                 if err_str.contains("fuel") || err_str.contains("out of fuel") {
                                     return ExecutionOutcome::OutOfFuel;
                                 }
-                                return ExecutionOutcome::Failed(format!("Execution failed: {err_str}"));
+                                return ExecutionOutcome::Failed(format!(
+                                    "Execution failed: {err_str}"
+                                ));
                             }
                         }
                     }
@@ -179,19 +181,29 @@ impl WasmExecutor {
     fn add_host_functions(&self, linker: &mut Linker<WasmState>) -> Result<(), ComputeError> {
         // Add logging function
         linker
-            .func_wrap("icn", "log", |_caller: wasmtime::Caller<'_, WasmState>, ptr: i32, len: i32| {
-                tracing::debug!(ptr, len, "WASM log call");
-            })
-            .map_err(|e| ComputeError::ExecutionFailed(format!("Failed to add log function: {e}")))?;
+            .func_wrap(
+                "icn",
+                "log",
+                |_caller: wasmtime::Caller<'_, WasmState>, ptr: i32, len: i32| {
+                    tracing::debug!(ptr, len, "WASM log call");
+                },
+            )
+            .map_err(|e| {
+                ComputeError::ExecutionFailed(format!("Failed to add log function: {e}"))
+            })?;
 
         // Add timestamp function
         linker
-            .func_wrap("icn", "timestamp", |_caller: wasmtime::Caller<'_, WasmState>| -> i64 {
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as i64
-            })
+            .func_wrap(
+                "icn",
+                "timestamp",
+                |_caller: wasmtime::Caller<'_, WasmState>| -> i64 {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as i64
+                },
+            )
             .map_err(|e| {
                 ComputeError::ExecutionFailed(format!("Failed to add timestamp function: {e}"))
             })?;
@@ -207,9 +219,7 @@ impl WasmExecutor {
         _inputs: &[u8],
         _ctx: &mut ExecutionContext,
     ) -> ExecutionOutcome {
-        ExecutionOutcome::Failed(
-            "WASM support not enabled. Rebuild with --features wasm".into(),
-        )
+        ExecutionOutcome::Failed("WASM support not enabled. Rebuild with --features wasm".into())
     }
 }
 
@@ -303,8 +313,7 @@ impl Executor for WasmExecutor {
                     "CclRef requires contract registry (not yet integrated)"
                 );
                 ExecutionOutcome::Failed(format!(
-                    "Contract reference {} not resolved. Registry integration pending.",
-                    hash_hex
+                    "Contract reference {hash_hex} not resolved. Registry integration pending."
                 ))
             }
             TaskCode::WasmInline(bytes) => self.execute_wasm(bytes, &task.inputs, ctx),

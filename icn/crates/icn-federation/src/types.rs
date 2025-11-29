@@ -233,7 +233,12 @@ pub struct Vouch {
 
 impl Vouch {
     /// Create a new Vouch with trust score (unsigned)
-    pub fn new(voucher_coop_id: String, voucher_did: Did, target_coop_id: String, trust_score: f64) -> Self {
+    pub fn new(
+        voucher_coop_id: String,
+        voucher_did: Did,
+        target_coop_id: String,
+        trust_score: f64,
+    ) -> Self {
         Self {
             voucher_coop_id,
             voucher_did,
@@ -287,10 +292,7 @@ pub enum PolicyResult {
     Allowed,
 
     /// Requires vouches - returns how many more are needed
-    NeedsVouches {
-        required: u8,
-        current: u8,
-    },
+    NeedsVouches { required: u8, current: u8 },
 
     /// Federation is closed
     Closed,
@@ -380,12 +382,17 @@ mod tests {
     fn test_vouch_expiry() {
         let did = test_did();
 
-        let vouch = Vouch::new("food-coop".to_string(), did.clone(), "tech-coop".to_string(), 0.7);
+        let vouch = Vouch::new(
+            "food-coop".to_string(),
+            did.clone(),
+            "tech-coop".to_string(),
+            0.7,
+        );
         assert!(!vouch.is_expired());
         assert!((vouch.trust_score - 0.7).abs() < f64::EPSILON);
 
-        let expired_vouch = Vouch::new("food-coop".to_string(), did, "tech-coop".to_string(), 0.8)
-            .with_expiry(1); // Expired in 1970
+        let expired_vouch =
+            Vouch::new("food-coop".to_string(), did, "tech-coop".to_string(), 0.8).with_expiry(1); // Expired in 1970
         assert!(expired_vouch.is_expired());
     }
 
@@ -398,19 +405,28 @@ mod tests {
         assert!((high_trust.trust_score - 1.0).abs() < f64::EPSILON);
 
         // Trust score below 0.0 should be clamped
-        let low_trust = Vouch::new("coop-a".to_string(), did.clone(), "coop-b".to_string(), -0.5);
+        let low_trust = Vouch::new(
+            "coop-a".to_string(),
+            did.clone(),
+            "coop-b".to_string(),
+            -0.5,
+        );
         assert!(low_trust.trust_score.abs() < f64::EPSILON);
 
         // with_trust_score builder method
-        let modified = Vouch::new("coop-a".to_string(), did, "coop-b".to_string(), 0.5)
-            .with_trust_score(2.0);
+        let modified =
+            Vouch::new("coop-a".to_string(), did, "coop-b".to_string(), 0.5).with_trust_score(2.0);
         assert!((modified.trust_score - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_policy_result() {
         assert!(PolicyResult::Allowed.is_allowed());
-        assert!(!PolicyResult::NeedsVouches { required: 3, current: 1 }.is_allowed());
+        assert!(!PolicyResult::NeedsVouches {
+            required: 3,
+            current: 1
+        }
+        .is_allowed());
         assert!(!PolicyResult::Closed.is_allowed());
         assert!(!PolicyResult::Denied("test".to_string()).is_allowed());
     }

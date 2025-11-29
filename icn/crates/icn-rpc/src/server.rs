@@ -219,7 +219,7 @@ async fn handle_request(
                             let response = RpcResponse::error(
                                 rpc_request.id,
                                 -32403,
-                                format!("Insufficient scope: requires {}", required_scope),
+                                format!("Insufficient scope: requires {required_scope}"),
                             );
                             return Ok(json_response(StatusCode::OK, &response));
                         }
@@ -236,11 +236,15 @@ async fn handle_request(
                     }
                 },
                 None => {
-                    warn!("Missing Authorization header for method {}", rpc_request.method);
+                    warn!(
+                        "Missing Authorization header for method {}",
+                        rpc_request.method
+                    );
                     let response = RpcResponse::error(
                         rpc_request.id,
                         -32401,
-                        "Authentication required: include Authorization: Bearer <token>".to_string(),
+                        "Authentication required: include Authorization: Bearer <token>"
+                            .to_string(),
                     );
                     return Ok(json_response(StatusCode::OK, &response));
                 }
@@ -1909,7 +1913,7 @@ async fn handle_compute_submit(
 
     let task = icn_compute::ComputeTask {
         id: request.task_id,
-        submitter, // Authenticated DID from JWT claims
+        submitter,     // Authenticated DID from JWT claims
         coop_id: None, // TODO: Allow from request or derive from claims
         code: task_code,
         inputs,
@@ -2100,9 +2104,7 @@ async fn handle_compute_cancel(
         .unwrap_or_else(|| "Cancelled by submitter".to_string());
 
     // Get authenticated caller DID (or fallback for unauthenticated dev mode)
-    let caller_did = claims
-        .map(|c| c.sub.as_str())
-        .unwrap_or("rpc:anonymous");
+    let caller_did = claims.map(|c| c.sub.as_str()).unwrap_or("rpc:anonymous");
 
     match compute_handle
         .cancel_task(&hash_bytes, caller_did, reason)

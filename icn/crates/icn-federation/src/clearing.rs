@@ -68,7 +68,7 @@ impl BilateralClearingAgreement {
 
     /// Set an exchange rate
     pub fn with_rate(mut self, from: &str, to: &str, rate: f64) -> Self {
-        let key = format!("{}:{}", from, to);
+        let key = format!("{from}:{to}");
         self.exchange_rates.insert(key, rate);
         self
     }
@@ -87,7 +87,7 @@ impl BilateralClearingAgreement {
 
     /// Get exchange rate for a currency pair
     pub fn get_rate(&self, from: &str, to: &str) -> Option<f64> {
-        let key = format!("{}:{}", from, to);
+        let key = format!("{from}:{to}");
         self.exchange_rates.get(&key).copied()
     }
 

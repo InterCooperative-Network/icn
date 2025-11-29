@@ -71,6 +71,7 @@ jobs:
           path: |
             icn/target/release/icnd
             icn/target/release/icnctl
+            icn/target/release/icn-console
 
   # TypeScript SDK
   sdk:
