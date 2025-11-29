@@ -12,6 +12,7 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth, useBalance, useRealtime } from '@icn/react-native';
@@ -232,6 +233,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-// Add Platform import
-import { Platform } from 'react-native';
