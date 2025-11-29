@@ -13,7 +13,6 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "jest",
-    "lint": "eslint src --ext .ts,.tsx",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },

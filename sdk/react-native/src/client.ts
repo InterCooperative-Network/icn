@@ -42,6 +42,7 @@ export class ICNMobileClient extends ICNClient {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private intentionalDisconnect = false;
+  private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: ICNMobileClientOptions) {
     // Create base client options
@@ -334,7 +335,18 @@ export class ICNMobileClient extends ICNClient {
   }
 
   private disconnectWebSocket(): void {
+    // Clear any pending reconnect timeout
+    if (this.reconnectTimeoutId !== null) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = null;
+    }
+
     if (this.wsSocket) {
+      // Clear event handlers before closing to prevent callbacks
+      this.wsSocket.onopen = null;
+      this.wsSocket.onmessage = null;
+      this.wsSocket.onerror = null;
+      this.wsSocket.onclose = null;
       this.wsSocket.close();
       this.wsSocket = null;
     }
@@ -356,7 +368,8 @@ export class ICNMobileClient extends ICNClient {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
 
-    setTimeout(() => {
+    this.reconnectTimeoutId = setTimeout(() => {
+      this.reconnectTimeoutId = null;
       if (this.wsState === 'disconnected') {
         this.createWebSocket(coopId);
       }

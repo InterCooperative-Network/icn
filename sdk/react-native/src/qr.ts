@@ -93,7 +93,7 @@ export function parsePaymentQR(qrData: string): PaymentQRData | null {
     }
 
     // Extract optional fields
-    const memo = params.get('memo') || undefined;
+    const memo = params.get('memo') ?? undefined;
 
     return {
       to,
