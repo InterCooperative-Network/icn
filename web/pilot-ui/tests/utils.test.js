@@ -40,14 +40,16 @@ describe('Utility Functions', () => {
     };
 
     test('should format Unix timestamp to date string', () => {
-      const timestamp = 1704067200; // Jan 1, 2024
+      const timestamp = 1704067200; // Jan 1, 2024 UTC
       const result = formatDate(timestamp);
-      expect(result).toMatch(/1\/1\/2024|2024-01-01/); // Different locales
+      // Allow for timezone differences - could be Dec 31 or Jan 1 depending on local TZ
+      expect(result).toMatch(/12\/31\/2023|1\/1\/2024|2023-12-31|2024-01-01/);
     });
 
     test('should handle zero timestamp', () => {
       const result = formatDate(0);
-      expect(result).toMatch(/1\/1\/1970|1970-01-01/);
+      // Allow for timezone differences
+      expect(result).toMatch(/12\/31\/1969|1\/1\/1970|1969-12-31|1970-01-01/);
     });
   });
 
@@ -59,7 +61,8 @@ describe('Utility Functions', () => {
     test('should format Unix timestamp to datetime string', () => {
       const timestamp = 1704067200;
       const result = formatDateTime(timestamp);
-      expect(result).toContain('2024');
+      // Allow for timezone differences - could be Dec 31, 2023 or Jan 1, 2024
+      expect(result).toMatch(/2023|2024/);
     });
   });
 
