@@ -97,6 +97,10 @@ pub enum MessagePayload {
     /// Peer exchange for cross-network discovery
     /// Nodes share their known peers to enable discovery beyond local network
     PeerExchange(PeerExchangeMessage),
+
+    /// Onion-routed message for privacy-preserving communication
+    /// Multi-hop routing hides sender/receiver relationships
+    Onion(icn_privacy::OnionMessage),
 }
 
 /// Peer exchange message for cross-network discovery
@@ -173,6 +177,7 @@ impl MessagePayload {
             MessagePayload::HandshakeAck => "HandshakeAck",
             MessagePayload::Signed(_) => "Signed",
             MessagePayload::PeerExchange(_) => "PeerExchange",
+            MessagePayload::Onion(_) => "Onion",
         }
     }
 }
@@ -327,6 +332,21 @@ impl NetworkMessage {
             from,
             None,
             MessagePayload::PeerExchange(PeerExchangeMessage::Unannounce { did }),
+        )
+    }
+
+    /// Create an onion-routed message
+    ///
+    /// The `from` field is set to a placeholder DID since the sender is anonymous.
+    /// The actual sender identity is hidden within the onion layers.
+    pub fn onion(first_hop: Did, onion_msg: icn_privacy::OnionMessage) -> Self {
+        // Use the first hop as the routing target
+        // The 'from' field uses the first_hop as a placeholder since
+        // onion routing hides the true sender
+        Self::new(
+            first_hop.clone(), // Placeholder - true sender is hidden
+            Some(first_hop),   // Route to first hop
+            MessagePayload::Onion(onion_msg),
         )
     }
 

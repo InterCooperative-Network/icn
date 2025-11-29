@@ -668,6 +668,13 @@ impl Supervisor {
                             }
                         }
                     }
+
+                    icn_net::MessagePayload::Onion(_) => {
+                        // Onion messages are handled directly by NetworkActor
+                        // They should not reach this handler as they are processed
+                        // at the network layer (peel layer, forward, or extract)
+                        debug!("Received Onion message in supervisor handler - this should not happen");
+                    }
                 }
             });
 

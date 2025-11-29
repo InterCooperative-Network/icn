@@ -1033,6 +1033,18 @@ pub fn init_descriptions() {
         "icn_privacy_messages_padded_total",
         "Total number of messages padded for size obfuscation"
     );
+    describe_counter!(
+        "icn_privacy_onion_messages_received_total",
+        "Total number of onion-routed messages received"
+    );
+    describe_counter!(
+        "icn_privacy_onion_messages_delivered_total",
+        "Total number of onion-routed messages delivered to final destination"
+    );
+    describe_counter!(
+        "icn_privacy_onion_routing_errors_total",
+        "Total number of onion routing errors (decryption failures, etc.)"
+    );
 }
 
 /// Network metrics
@@ -2426,5 +2438,17 @@ pub mod privacy {
 
     pub fn messages_padded_inc() {
         counter!("icn_privacy_messages_padded_total").increment(1);
+    }
+
+    pub fn onion_messages_received_inc() {
+        counter!("icn_privacy_onion_messages_received_total").increment(1);
+    }
+
+    pub fn onion_messages_delivered_inc() {
+        counter!("icn_privacy_onion_messages_delivered_total").increment(1);
+    }
+
+    pub fn onion_routing_errors_inc() {
+        counter!("icn_privacy_onion_routing_errors_total").increment(1);
     }
 }

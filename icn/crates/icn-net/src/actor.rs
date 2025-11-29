@@ -618,6 +618,136 @@ impl NetworkHandle {
         }
         result
     }
+
+    /// Send a message via onion routing for privacy-preserving communication
+    ///
+    /// Wraps the message in multiple layers of encryption and routes it through
+    /// relay nodes to hide the sender/receiver relationship.
+    ///
+    /// # Arguments
+    /// * `x25519_secret` - This node's X25519 secret key for creating the onion
+    /// * `relay_dids` - DIDs of relay nodes (in order)
+    /// * `recipient` - Final recipient DID
+    /// * `payload` - Message payload to send (will be serialized)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// // Send a message through 2 relays for privacy
+    /// let relays = vec![relay1_did.clone(), relay2_did.clone()];
+    /// network_handle.send_onion_message(
+    ///     &x25519_secret,
+    ///     relays,
+    ///     recipient_did.clone(),
+    ///     &my_message,
+    /// ).await?;
+    /// ```
+    ///
+    /// # Security Properties
+    /// - Sender anonymity: Recipient doesn't know original sender
+    /// - Receiver anonymity: Relays don't know final destination
+    /// - Unlinkability: Can't correlate sender → recipient
+    /// - Traffic analysis resistance: Multiple hops hide patterns
+    pub async fn send_onion_message(
+        &self,
+        x25519_secret: x25519_dalek::StaticSecret,
+        relay_dids: Vec<Did>,
+        recipient: Did,
+        payload: &NetworkMessage,
+    ) -> Result<()> {
+        use icn_privacy::OnionRouter;
+
+        // Create OnionRouter with our identity
+        let mut router = OnionRouter::new(self.own_did.clone(), x25519_secret);
+
+        // Add peer public keys from our connection info
+        if let Some(ref connections) = self.peer_connections {
+            let conns = connections.read().await;
+
+            // Add relay keys
+            for relay_did in &relay_dids {
+                if let Some(info) = conns.get(relay_did) {
+                    router.add_peer_key(relay_did.clone(), x25519_dalek::PublicKey::from(info.x25519_key));
+                } else {
+                    anyhow::bail!("Missing X25519 key for relay {}", relay_did);
+                }
+            }
+
+            // Add recipient key
+            if let Some(info) = conns.get(&recipient) {
+                router.add_peer_key(recipient.clone(), x25519_dalek::PublicKey::from(info.x25519_key));
+            } else {
+                anyhow::bail!("Missing X25519 key for recipient {}", recipient);
+            }
+        } else {
+            anyhow::bail!("No peer connections available for onion routing");
+        }
+
+        // Create circuit
+        let circuit = router
+            .create_circuit(relay_dids.clone(), recipient.clone())
+            .map_err(|e| anyhow::anyhow!("Failed to create onion circuit: {}", e))?;
+
+        // Serialize the payload
+        let payload_bytes = bincode::serialize(payload)
+            .context("Failed to serialize onion payload")?;
+
+        // Wrap message in onion layers
+        let onion_msg = router
+            .wrap_message(&circuit, &payload_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to wrap onion message: {}", e))?;
+
+        // Get first hop to send to
+        let first_hop = if !relay_dids.is_empty() {
+            relay_dids[0].clone()
+        } else {
+            recipient.clone() // Direct send if no relays
+        };
+
+        // Create network message
+        let net_msg = NetworkMessage::onion(first_hop.clone(), onion_msg);
+
+        // Send to first hop
+        self.send_message(first_hop, net_msg).await
+    }
+
+    /// Select relay nodes for onion routing based on trust scores
+    ///
+    /// Returns an ordered list of relay DIDs suitable for creating an onion circuit.
+    /// Uses the trust graph to select nodes with sufficient trust.
+    ///
+    /// # Arguments
+    /// * `trust_graph` - Trust graph for scoring peers
+    /// * `num_hops` - Number of relay hops desired (typically 2-3)
+    /// * `min_trust` - Minimum trust score for relay selection (e.g., 0.3)
+    ///
+    /// # Returns
+    /// Empty vec if insufficient trusted relays are available.
+    pub async fn select_onion_relays(
+        &self,
+        trust_graph: &Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
+        num_hops: usize,
+        min_trust: f64,
+    ) -> Vec<Did> {
+        // Get connected peers as candidates
+        let candidates: Vec<Did> = if let Some(ref connections) = self.peer_connections {
+            connections.read().await.keys().cloned().collect()
+        } else {
+            return vec![];
+        };
+
+        // Get trust scores
+        let graph = trust_graph.read().await;
+        let mut trust_scores = std::collections::HashMap::new();
+
+        for did in &candidates {
+            if let Ok(score) = graph.compute_trust_score(did) {
+                trust_scores.insert(did.clone(), score);
+            }
+        }
+
+        // Use icn_privacy's relay selection
+        icn_privacy::select_relays(&candidates, &trust_scores, num_hops, min_trust)
+    }
 }
 
 /// Network actor state
@@ -1983,6 +2113,115 @@ impl NetworkActor {
                                             icn_obs::metrics::peer_exchange::unannounces_received_inc();
                                             // Forward to handler for processing
                                             handler(message);
+                                        }
+                                    }
+                                }
+                                MessagePayload::Onion(ref onion_msg) => {
+                                    // Handle onion-routed messages
+                                    use icn_privacy::OnionRouter;
+
+                                    debug!("Received onion-routed message (hop_index={})",
+                                           onion_msg.hop_index);
+                                    icn_obs::metrics::privacy::onion_messages_received_inc();
+
+                                    // Create temporary OnionRouter for this node
+                                    let x25519_secret = identity_bundle.x25519_secret();
+                                    let router = OnionRouter::new(own_did.clone(), x25519_secret);
+
+                                    // Peel one layer off the onion
+                                    match router.peel_layer(onion_msg.clone()) {
+                                        Ok(Some((next_hop, peeled_onion))) => {
+                                            // We are a relay - forward to next hop
+                                            info!(
+                                                "Onion relay: forwarding to {} (hop_index={})",
+                                                next_hop, peeled_onion.hop_index
+                                            );
+                                            icn_obs::metrics::privacy::onion_hops_forwarded_inc();
+
+                                            // Get connection to next hop
+                                            let sm = session_manager.read().await;
+                                            if let Some(conn) = sm.connections().await.iter()
+                                                .find(|(did, _)| *did == next_hop.as_str())
+                                                .map(|(_, conn)| conn.clone())
+                                            {
+                                                drop(sm); // Release lock
+
+                                                // Forward the peeled onion
+                                                let forward_msg = NetworkMessage::onion(
+                                                    next_hop.clone(),
+                                                    peeled_onion,
+                                                );
+
+                                                match conn.open_bi().await {
+                                                    Ok((mut send, _recv)) => {
+                                                        if let Err(e) = crate::protocol::write_message(
+                                                            &mut send,
+                                                            &forward_msg,
+                                                        ).await {
+                                                            warn!(
+                                                                "Failed to forward onion to {}: {}",
+                                                                next_hop, e
+                                                            );
+                                                        } else if let Err(e) = send.finish() {
+                                                            warn!(
+                                                                "Failed to finish onion stream to {}: {}",
+                                                                next_hop, e
+                                                            );
+                                                        } else {
+                                                            debug!("Forwarded onion to next hop: {}", next_hop);
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        warn!(
+                                                            "Failed to open stream for onion forward to {}: {}",
+                                                            next_hop, e
+                                                        );
+                                                    }
+                                                }
+                                            } else {
+                                                drop(sm);
+                                                warn!(
+                                                    "No connection to next hop {} for onion relay",
+                                                    next_hop
+                                                );
+                                            }
+                                        }
+                                        Ok(None) => {
+                                            // We are the final destination - extract payload
+                                            match router.extract_payload(onion_msg) {
+                                                Ok(payload) => {
+                                                    info!(
+                                                        "Onion message arrived at destination ({} bytes)",
+                                                        payload.len()
+                                                    );
+                                                    icn_obs::metrics::privacy::onion_messages_delivered_inc();
+
+                                                    // Attempt to deserialize as NetworkMessage and forward
+                                                    match bincode::deserialize::<NetworkMessage>(&payload) {
+                                                        Ok(inner_msg) => {
+                                                            debug!(
+                                                                "Extracted inner message: {:?}",
+                                                                inner_msg.payload.variant_name()
+                                                            );
+                                                            // Forward the inner message to handler
+                                                            handler(inner_msg);
+                                                        }
+                                                        Err(e) => {
+                                                            warn!(
+                                                                "Failed to deserialize onion payload: {}",
+                                                                e
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    warn!("Failed to extract onion payload: {}", e);
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            warn!("Failed to peel onion layer: {}", e);
+                                            icn_obs::metrics::privacy::onion_routing_errors_inc();
                                         }
                                     }
                                 }
