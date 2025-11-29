@@ -3036,24 +3036,58 @@ clock_drift_alert_threshold_seconds = 60
 
 ### 12.9 Privacy & Metadata Leakage
 
-**Current State:** TLS encryption protects content but metadata is observable.
+**Current State:** TLS encryption protects content, and privacy layer provides optional metadata protection.
 
-**Observable by Network Observer:**
+**Observable by Network Observer (without privacy enabled):**
 - Connection graph (who connects to whom)
 - Gossip topic subscriptions (interest patterns)
 - Message timing and sizes (traffic analysis)
 - Compute task submission patterns
 
-**Out of Scope (v1):**
-- Traffic analysis resistance
-- Timing attack mitigation
-- Subscription privacy
+**Privacy Layer (Phase 20 - Integrated 2025-11-28):**
 
-**Future (Phase 20+):**
-- Onion routing for gossip (Tor-like)
-- Private topic subscriptions (Bloom filter interests)
-- Timing obfuscation (random delays)
-- Cover traffic (decoy messages)
+The `icn-privacy` crate provides metadata protection, integrated into `icn-net`:
+
+1. **Onion Routing** (Implemented ✅):
+   - Multi-hop message routing (Tor-like architecture)
+   - X25519/ChaCha20-Poly1305 layer encryption
+   - Trust-based relay selection (`select_onion_relays()`)
+   - Configurable hop count (2-5 recommended)
+   - `NetworkHandle::send_onion_message()` for privacy sends
+
+2. **Topic Encryption** (Implemented ✅):
+   - ChaCha20-Poly1305 AEAD topic name encryption
+   - Bloom filter-based topic discovery (plausible deniability)
+   - `TopicEncryptor` and `TopicBloomFilter` types
+
+3. **Traffic Obfuscation** (Implemented ✅):
+   - Message padding to hide content sizes
+   - Random delays for timing attack resistance
+   - Cover traffic generation (decoy messages)
+   - `TrafficObfuscator` with configurable parameters
+
+**Configuration** (`privacy` section in config):
+```toml
+[privacy]
+enabled = true
+onion_routing_enabled = true
+onion_hops = 2
+min_relay_trust = 0.3
+topic_encryption_enabled = true
+traffic_obfuscation_enabled = true
+padding_target = 1024
+max_delay_ms = 100
+cover_traffic_rate = 5
+```
+
+**Prometheus Metrics:**
+- `icn_privacy_onion_routes_created_total`
+- `icn_privacy_onion_hops_forwarded_total`
+- `icn_privacy_onion_messages_received_total`
+- `icn_privacy_onion_messages_delivered_total`
+- `icn_privacy_onion_routing_errors_total`
+- `icn_privacy_topics_encrypted_total`
+- `icn_privacy_cover_traffic_sent_total`
 
 ---
 
@@ -3116,8 +3150,8 @@ pub enum TrustAnomaly {
 8. Scalability testing & documentation (12.7)
 9. Trust graph gaming detection (12.10)
 
-**Phase 20+ (Future Enhancements):**
-10. Privacy & metadata protection (12.9)
+**Phase 20 (Complete ✅):**
+10. Privacy & metadata protection (12.9) - Onion routing, topic encryption, traffic obfuscation integrated
 
 **Total estimated time to production-ready:** 14 weeks (Phase 17-18)
 
