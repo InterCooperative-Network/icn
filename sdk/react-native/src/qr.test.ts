@@ -100,9 +100,16 @@ describe('parsePaymentQR', () => {
     expect(parsePaymentQR(qr)).toBeNull();
   });
 
-  it('should return null for zero or negative amount', () => {
-    expect(parsePaymentQR('icn://pay?v=1&to=alice&amount=0&coop=test')).toBeNull();
+  it('should return null for negative amount', () => {
     expect(parsePaymentQR('icn://pay?v=1&to=alice&amount=-5&coop=test')).toBeNull();
+  });
+
+  it('should accept zero amount (receive QR without suggested amount)', () => {
+    const qr = 'icn://pay?v=1&to=did:icn:alice&amount=0&coop=test';
+    const result = parsePaymentQR(qr);
+
+    expect(result).not.toBeNull();
+    expect(result?.amount).toBe(0);
   });
 
   it('should handle decimal amounts', () => {
@@ -182,5 +189,29 @@ describe('generateReceiveQR', () => {
 
     expect(qr).toContain('amount=25');
     expect(qr).toContain('memo=Monthly+dues');
+  });
+
+  it('should roundtrip with parsePaymentQR (no amount)', () => {
+    const qr = generateReceiveQR('did:icn:bob', 'my-timebank');
+    const parsed = parsePaymentQR(qr);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.to).toBe('did:icn:bob');
+    expect(parsed?.coopId).toBe('my-timebank');
+    expect(parsed?.amount).toBe(0);
+  });
+
+  it('should roundtrip with parsePaymentQR (with amount)', () => {
+    const qr = generateReceiveQR('did:icn:bob', 'my-timebank', {
+      suggestedAmount: 15,
+      memo: 'Service fee',
+    });
+    const parsed = parsePaymentQR(qr);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.to).toBe('did:icn:bob');
+    expect(parsed?.coopId).toBe('my-timebank');
+    expect(parsed?.amount).toBe(15);
+    expect(parsed?.memo).toBe('Service fee');
   });
 });

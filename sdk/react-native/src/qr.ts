@@ -88,7 +88,7 @@ export function parsePaymentQR(qrData: string): PaymentQRData | null {
     }
 
     const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
+    if (isNaN(amount) || amount < 0) {
       return null;
     }
 
