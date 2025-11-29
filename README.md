@@ -1,5 +1,7 @@
 # ICN - Intercooperative Network
 
+[![CI](https://github.com/InterCooperative-Network/icn/actions/workflows/ci.yml/badge.svg)](https://github.com/InterCooperative-Network/icn/actions/workflows/ci.yml)
+
 A substrate daemon for the cooperative internet.
 
 ## Quick Start
@@ -84,6 +86,8 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 
 ## Project Status
 
+**Status: PILOT-READY** ✅ - All infrastructure complete (Phases 1-20, 929+ tests passing)
+
 **Core Substrate: Complete ✓**
 - [x] Phases 0-7: Identity, trust graph, networking, ledger, contracts, gossip, production hardening
 - [x] Phase 8: DID-TLS binding with persistent certificates
@@ -94,6 +98,12 @@ ICNd is built on Tokio with an actor-based runtime. The daemon manages:
 - [x] Phase 13: Governance primitives v1 (domains, proposals, voting with gossip coordination)
 - [x] Phase 14: Gateway REST API (JWT auth, WebSocket events, per-DID rate limiting)
 - [x] Phase 15: Distributed compute layer (trust-gated CCL execution with task prioritization)
+- [x] Phase 16: Intelligent scheduler (resource profiles, locality awareness, cooperative policies)
+- [x] Phase 17: Storage hardening & replication (99.9% durability target)
+- [x] Phase 18: Pre-pilot hardening (Byzantine detection, partition healing, conflict resolution)
+- [x] Phase 19: Scalability optimizations (vector clock compression, trust caching)
+- [x] Phase 20: Privacy enhancements (encrypted topics, onion routing, traffic obfuscation)
+- [x] Federation layer: Inter-cooperative coordination (registry, trust bridging, credit settlement)
 
 **Operational Readiness: Complete ✓**
 - [x] Track B1: Operational hardening (backup/restore, monitoring dashboard, graceful restart)
@@ -289,12 +299,29 @@ Access health: `curl http://localhost:8080/health`
 - `icn-store` - Persistent KV storage
 - `icn-rpc` - gRPC API
 - `icn-obs` - Metrics, tracing, logging
+- `icn-gateway` - REST API & WebSocket gateway
+- `icn-governance` - Governance primitives
+- `icn-compute` - Distributed compute layer
+- `icn-federation` - Inter-cooperative coordination
+- `icn-privacy` - Privacy enhancements (encrypted topics, onion routing)
+- `icn-security` - Byzantine fault detection
+- `icn-time` - Clock synchronization
+- `icn-snapshot` - State persistence
 - `icn-testkit` - Test utilities
 
 ### Binaries
 
 - `icnd` - The ICN daemon
 - `icnctl` - CLI management tool
+- `icn-console` - Interactive TUI for cooperative management
+
+### Development Environment
+
+**Using VS Code Dev Containers (Recommended):**
+1. Install [VS Code](https://code.visualstudio.com/) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open the repository in VS Code
+3. Click "Reopen in Container" when prompted
+4. Development environment will be ready with Rust, Node.js, and all extensions pre-configured
 
 ## Community & Contributing
 
