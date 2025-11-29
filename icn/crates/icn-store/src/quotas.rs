@@ -13,12 +13,13 @@ use std::time::SystemTime;
 use tracing::{debug, info, warn};
 
 /// Priority level for storage quota
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum QuotaPriority {
     /// Lowest priority - evicted first (e.g., cached data, temp files)
     Low = 0,
 
     /// Normal priority - evicted second (e.g., gossip entries, routine data)
+    #[default]
     Normal = 1,
 
     /// High priority - evicted third (e.g., contracts, trust edges)
@@ -26,12 +27,6 @@ pub enum QuotaPriority {
 
     /// Critical priority - never auto-evicted (e.g., keystore, ledger, governance)
     Critical = 3,
-}
-
-impl Default for QuotaPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Storage quota for a single DID
