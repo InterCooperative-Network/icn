@@ -209,6 +209,16 @@ pub struct FederationConfig {
     #[serde(default)]
     pub enabled: bool,
 
+    /// Cooperative ID (unique identifier for this cooperative in the federation)
+    /// If empty, derived from the network_name
+    #[serde(default)]
+    pub coop_id: String,
+
+    /// Cooperative name (human-readable name for this cooperative)
+    /// If empty, uses the network_name
+    #[serde(default)]
+    pub coop_name: String,
+
     /// Federation network name (used for network identification)
     /// Nodes with the same network name will preferentially connect
     #[serde(default = "default_network_name")]
@@ -299,6 +309,8 @@ impl Default for FederationConfig {
     fn default() -> Self {
         FederationConfig {
             enabled: false,
+            coop_id: String::new(),
+            coop_name: String::new(),
             network_name: default_network_name(),
             bootstrap_peer_trust: default_bootstrap_trust(),
             auto_accept_invites: false,

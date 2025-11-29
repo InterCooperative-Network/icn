@@ -845,6 +845,83 @@ impl Supervisor {
                     Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
                 let profile_cache_for_notifications = profile_cache.clone();
 
+                // Create FederationGossipHandler if federation is enabled
+                let federation_handler_for_notifications: Option<Arc<icn_federation::FederationGossipHandler>> =
+                    if federation_enabled {
+                        // Derive coop_id and coop_name from config or defaults
+                        let coop_id = if self.config.federation.coop_id.is_empty() {
+                            // Use network_name as default coop_id
+                            self.config.federation.network_name.clone()
+                        } else {
+                            self.config.federation.coop_id.clone()
+                        };
+
+                        let coop_name = if self.config.federation.coop_name.is_empty() {
+                            // Use network_name as default coop_name
+                            self.config.federation.network_name.clone()
+                        } else {
+                            self.config.federation.coop_name.clone()
+                        };
+
+                        // Create own cooperative info
+                        let own_coop_info = icn_federation::CooperativeInfo::new(
+                            coop_id.clone(),
+                            coop_name.clone(),
+                            did.clone(),
+                            icn_federation::FederationPolicy::default(), // Open by default
+                        );
+
+                        // Create federation store
+                        let federation_store_path = self.config.store_path().join("federation");
+                        let federation_store: Arc<dyn icn_store::Store> =
+                            Arc::new(SledStore::open(&federation_store_path)?);
+
+                        // Create cooperative registry
+                        let federation_registry = Arc::new(
+                            icn_federation::CooperativeRegistry::new(federation_store, own_coop_info.clone())
+                                .map_err(|e| anyhow::anyhow!("Failed to create federation registry: {}", e))?
+                        );
+
+                        // Create federation gossip handler
+                        let federation_handler = Arc::new(
+                            icn_federation::FederationGossipHandler::new(federation_registry)
+                        );
+
+                        // Set own coop info on handler
+                        federation_handler.set_own_coop(own_coop_info);
+
+                        // Set up send callback for federation messages (using gossip)
+                        let gossip_for_federation = gossip_handle.clone();
+                        let federation_send_callback: icn_federation::gossip::GossipSendCallback =
+                            Arc::new(move |topic: &str, data: Vec<u8>| {
+                                let gossip = gossip_for_federation.clone();
+                                let topic_owned = topic.to_string();
+                                // Use a sync approach since we're in a sync callback
+                                tokio::task::block_in_place(|| {
+                                    tokio::runtime::Handle::current().block_on(async {
+                                        let mut gossip = gossip.write().await;
+                                        gossip
+                                            .publish(&topic_owned, data)
+                                            .map(|_| ()) // Discard the hash, just return ()
+                                            .map_err(|e| icn_federation::FederationError::GossipPublishFailed(e.to_string()))
+                                    })
+                                })
+                            });
+                        federation_handler.set_send_callback(federation_send_callback);
+
+                        info!(
+                            "✓ Federation enabled: coop_id={}, coop_name={}, store={}",
+                            coop_id, coop_name, federation_store_path.display()
+                        );
+
+                        Some(federation_handler)
+                    } else {
+                        None
+                    };
+
+                // Clone federation handler for announcement task (before it's moved into notification callback)
+                let federation_handler_for_announce = federation_handler_for_notifications.clone();
+
                 let notification_callback: icn_gossip::EntryNotificationCallback = Arc::new(
                     move |topic, entry, _subscriber_did| {
                         // Handle trust attestations
@@ -1339,6 +1416,29 @@ impl Supervisor {
                                 }
                             });
                         }
+                        // Handle federation topics
+                        else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY
+                            || topic == icn_federation::TOPIC_FEDERATION_TRUST
+                            || topic == icn_federation::TOPIC_FEDERATION_CLEARING
+                        {
+                            if let Some(ref handler) = federation_handler_for_notifications {
+                                let entry_data = match entry.get_data() {
+                                    Ok(data) => data,
+                                    Err(e) => {
+                                        warn!("Failed to get federation entry data: {}", e);
+                                        return;
+                                    }
+                                };
+
+                                let handler_clone = handler.clone();
+                                let topic_owned = topic.to_string();
+                                tokio::spawn(async move {
+                                    if let Err(e) = handler_clone.handle_message(&topic_owned, &entry_data) {
+                                        warn!("Failed to handle federation message on {}: {}", topic_owned, e);
+                                    }
+                                });
+                            }
+                        }
                     },
                 );
 
@@ -1388,6 +1488,67 @@ impl Supervisor {
                     warn!("Failed to subscribe to network:candidates topic: {}", e);
                 } else {
                     info!("Subscribed to network:candidates topic");
+                }
+
+                // Subscribe to federation topics if federation is enabled
+                if federation_enabled {
+                    if let Err(e) = gossip.subscribe(icn_federation::TOPIC_FEDERATION_REGISTRY, did.clone()) {
+                        warn!("Failed to subscribe to federation:registry topic: {}", e);
+                    } else {
+                        info!("Subscribed to federation:registry topic");
+                    }
+
+                    if let Err(e) = gossip.subscribe(icn_federation::TOPIC_FEDERATION_TRUST, did.clone()) {
+                        warn!("Failed to subscribe to federation:trust topic: {}", e);
+                    } else {
+                        info!("Subscribed to federation:trust topic");
+                    }
+
+                    if let Err(e) = gossip.subscribe(icn_federation::TOPIC_FEDERATION_CLEARING, did.clone()) {
+                        warn!("Failed to subscribe to federation:clearing topic: {}", e);
+                    } else {
+                        info!("Subscribed to federation:clearing topic");
+                    }
+
+                    // Spawn periodic federation announcement task (every 5 minutes)
+                    if let Some(ref handler) = federation_handler_for_announce {
+                        let handler_clone = handler.clone();
+                        let mut federation_shutdown = self.shutdown_tx.subscribe();
+
+                        // Announce immediately on startup
+                        if let Err(e) = handler_clone.announce() {
+                            warn!("Failed to send initial federation announcement: {}", e);
+                        } else {
+                            info!("✓ Sent initial federation announcement");
+                        }
+
+                        // Spawn periodic announcement task
+                        let handler_for_task = handler_clone.clone();
+                        background_tasks.spawn(async move {
+                            // Use icn_federation::defaults::ANNOUNCEMENT_INTERVAL (5 minutes)
+                            let mut interval = tokio::time::interval(icn_federation::defaults::ANNOUNCEMENT_INTERVAL);
+                            interval.tick().await; // Skip first tick (already announced above)
+
+                            loop {
+                                tokio::select! {
+                                    _ = interval.tick() => {
+                                        if let Err(e) = handler_for_task.announce() {
+                                            warn!("Failed to send periodic federation announcement: {}", e);
+                                        } else {
+                                            debug!("Sent periodic federation announcement");
+                                        }
+                                    }
+                                    _ = federation_shutdown.recv() => {
+                                        info!("Federation announcement task shutting down");
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+
+                        info!("Federation announcement task spawned (interval: {:?})",
+                              icn_federation::defaults::ANNOUNCEMENT_INTERVAL);
+                    }
                 }
 
                 // Spawn candidate cache cleanup task (every 5 minutes)
