@@ -174,16 +174,17 @@ impl ClearingManager {
                 transfer.dest_currency.clone(),
             ));
         }
+
+        // Capture max_imbalance before dropping the lock
+        let max_imbalance = agreement.max_imbalance;
         drop(agreements);
 
         // Check imbalance limit
         let positions = self.positions.read().unwrap();
         if let Some(position) = positions.get(&agreement_id) {
-            let agreement = self.agreements.read().unwrap();
-            let max = agreement.get(&agreement_id).map(|a| a.max_imbalance).unwrap_or(i64::MAX);
-            if position.exceeds_limit(max) {
+            if position.exceeds_limit(max_imbalance) {
                 return Err(FederationError::ImbalanceLimitExceeded {
-                    max,
+                    max: max_imbalance,
                     current: position.net_position(),
                 });
             }

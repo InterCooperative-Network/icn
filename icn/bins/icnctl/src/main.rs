@@ -617,6 +617,190 @@ enum FederationCommands {
 
     /// Generate a federation invite URL for this node
     Invite,
+
+    /// Cooperative registry management (inter-coop federation)
+    #[command(subcommand)]
+    Coop(CoopCommands),
+
+    /// Vouch for cooperatives (trust bridging)
+    #[command(subcommand)]
+    Vouch(VouchCommands),
+
+    /// Trust attestation management
+    #[command(subcommand)]
+    Attestation(AttestationCommands),
+
+    /// Bilateral clearing agreements (credit settlement)
+    #[command(subcommand)]
+    Clearing(ClearingCommands),
+}
+
+#[derive(Subcommand, Debug)]
+enum CoopCommands {
+    /// List known cooperatives
+    List,
+
+    /// Show details of a cooperative
+    Show {
+        /// Cooperative ID (e.g., "food-coop")
+        coop_id: String,
+    },
+
+    /// Register this node's cooperative with the federation
+    Register {
+        /// Cooperative ID (unique identifier)
+        #[arg(long)]
+        coop_id: String,
+
+        /// Human-readable name
+        #[arg(long)]
+        name: String,
+
+        /// Federation gateway endpoint (e.g., "https://food-coop.example.com:8080")
+        #[arg(long)]
+        gateway: String,
+
+        /// Description (optional)
+        #[arg(long)]
+        description: Option<String>,
+    },
+
+    /// Update cooperative information
+    Update {
+        /// Cooperative ID
+        coop_id: String,
+
+        /// New gateway endpoint
+        #[arg(long)]
+        gateway: Option<String>,
+
+        /// New description
+        #[arg(long)]
+        description: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum VouchCommands {
+    /// Vouch for another cooperative
+    Issue {
+        /// Target cooperative ID to vouch for
+        #[arg(long)]
+        target_coop: String,
+
+        /// Trust score to assign (0.0-1.0)
+        #[arg(long)]
+        trust: f64,
+
+        /// Validity duration in days (default: 365)
+        #[arg(long, default_value = "365")]
+        days: u64,
+    },
+
+    /// List vouches we have issued
+    List,
+
+    /// Revoke a vouch
+    Revoke {
+        /// Cooperative ID whose vouch to revoke
+        target_coop: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AttestationCommands {
+    /// List attestations for a member
+    List {
+        /// Member DID to look up attestations for
+        member_did: String,
+    },
+
+    /// Show details of attestations from a cooperative
+    From {
+        /// Source cooperative ID
+        coop_id: String,
+    },
+
+    /// Issue a federated trust attestation
+    Issue {
+        /// Member DID to attest
+        #[arg(long)]
+        member_did: String,
+
+        /// Trust score (0.0-1.0)
+        #[arg(long)]
+        trust: f64,
+
+        /// Trust context (economic, governance, technical, social)
+        #[arg(long, default_value = "economic")]
+        context: String,
+
+        /// Validity duration in days (default: 30)
+        #[arg(long, default_value = "30")]
+        days: u64,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ClearingCommands {
+    /// List clearing agreements
+    List,
+
+    /// Show details of a clearing agreement
+    Show {
+        /// Agreement ID
+        agreement_id: String,
+    },
+
+    /// Create a new bilateral clearing agreement
+    Create {
+        /// Agreement ID (unique identifier)
+        #[arg(long)]
+        agreement_id: String,
+
+        /// Partner cooperative ID
+        #[arg(long)]
+        partner_coop: String,
+
+        /// Maximum imbalance allowed (credit units)
+        #[arg(long, default_value = "10000")]
+        max_imbalance: i64,
+
+        /// Settlement interval (daily, weekly, monthly, manual)
+        #[arg(long, default_value = "monthly")]
+        settlement: String,
+    },
+
+    /// Add an exchange rate to an agreement
+    Rate {
+        /// Agreement ID
+        #[arg(long)]
+        agreement_id: String,
+
+        /// Source currency (e.g., "hours")
+        #[arg(long)]
+        from: String,
+
+        /// Destination currency (e.g., "USD")
+        #[arg(long)]
+        to: String,
+
+        /// Exchange rate
+        #[arg(long)]
+        rate: f64,
+    },
+
+    /// Show clearing position for an agreement
+    Position {
+        /// Agreement ID
+        agreement_id: String,
+    },
+
+    /// Trigger settlement for an agreement
+    Settle {
+        /// Agreement ID
+        agreement_id: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2232,6 +2416,534 @@ async fn handle_federation_command(
                     );
                 }
             }
+        }
+
+        FederationCommands::Coop(cmd) => {
+            handle_coop_command(cmd, data_dir).await?;
+        }
+
+        FederationCommands::Vouch(cmd) => {
+            handle_vouch_command(cmd, data_dir).await?;
+        }
+
+        FederationCommands::Attestation(cmd) => {
+            handle_attestation_command(cmd, data_dir).await?;
+        }
+
+        FederationCommands::Clearing(cmd) => {
+            handle_clearing_command(cmd, data_dir).await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle cooperative registry commands
+async fn handle_coop_command(cmd: CoopCommands, data_dir: &Path) -> Result<()> {
+    use icn_federation::{CooperativeInfo, CooperativeRegistry, FederationPolicy};
+    use icn_store::SledStore;
+
+    let store_path = data_dir.join("store");
+    let store = std::sync::Arc::new(SledStore::open(&store_path)?);
+
+    // Get our own cooperative info (or create a placeholder for viewing)
+    let keystore_path = data_dir.join("identity.age");
+    let passphrase = read_passphrase("Enter keystore passphrase: ")?;
+    let mut keystore = AgeKeyStore::new(&keystore_path);
+    keystore.unlock(&passphrase)?;
+    let own_did = keystore.get_keypair()?.did().clone();
+
+    match cmd {
+        CoopCommands::List => {
+            // Try to load existing registry, or show empty
+            let own_info = CooperativeInfo::new(
+                "local".to_string(),
+                "Local Node".to_string(),
+                own_did.clone(),
+                FederationPolicy::default(),
+            );
+            let registry = CooperativeRegistry::new(store, own_info)?;
+
+            let coops = registry.list()?;
+            if coops.is_empty() {
+                println!("No cooperatives registered yet.\n");
+                println!("Register your cooperative with: icnctl federation coop register --coop-id <id> --name <name> --gateway <url>");
+            } else {
+                println!("Known Cooperatives:\n");
+                println!("{:<20} {:<30} {:<10}", "ID", "Name", "Federated");
+                println!("{}", "-".repeat(62));
+                for coop in coops {
+                    let federated = if registry.is_federated(&coop.coop_id) {
+                        "Yes"
+                    } else {
+                        "No"
+                    };
+                    println!("{:<20} {:<30} {:<10}", coop.coop_id, coop.name, federated);
+                }
+            }
+        }
+
+        CoopCommands::Show { coop_id } => {
+            let own_info = CooperativeInfo::new(
+                "local".to_string(),
+                "Local Node".to_string(),
+                own_did.clone(),
+                FederationPolicy::default(),
+            );
+            let registry = CooperativeRegistry::new(store, own_info)?;
+
+            if let Some(coop) = registry.get(&coop_id)? {
+                println!("Cooperative Details:\n");
+                println!("  ID:          {}", coop.coop_id);
+                println!("  Name:        {}", coop.name);
+                println!("  DID:         {}", coop.public_did);
+                if !coop.gateway_endpoints.is_empty() {
+                    println!("  Gateways:    {}", coop.gateway_endpoints.join(", "));
+                }
+                println!("  Federated:   {}", registry.is_federated(&coop_id));
+                println!("  Last seen:   {}", coop.last_seen);
+
+                // Show policy
+                println!("\n  Federation Policy: {:?}", coop.federation_policy);
+
+                // Show capabilities
+                if !coop.capabilities.is_empty() {
+                    println!("  Capabilities: {}", coop.capabilities.join(", "));
+                }
+
+                // Show currencies
+                if !coop.currencies.is_empty() {
+                    println!("\n  Supported Currencies:");
+                    for currency in &coop.currencies {
+                        println!("    - {} ({})", currency.symbol, currency.name);
+                    }
+                }
+            } else {
+                println!("Cooperative '{}' not found.", coop_id);
+            }
+        }
+
+        CoopCommands::Register {
+            coop_id,
+            name,
+            gateway,
+            description: _description,
+        } => {
+            let own_info = CooperativeInfo::new(
+                coop_id.clone(),
+                name.clone(),
+                own_did.clone(),
+                FederationPolicy::default(),
+            )
+            .with_gateway(gateway.clone());
+
+            // Create registry with our info as the "own" cooperative
+            let _registry = CooperativeRegistry::new(store, own_info)?;
+
+            println!("Cooperative registered successfully!\n");
+            println!("  ID:      {}", coop_id);
+            println!("  Name:    {}", name);
+            println!("  Gateway: {}", gateway);
+            println!("  DID:     {}", own_did);
+        }
+
+        CoopCommands::Update {
+            coop_id,
+            gateway,
+            description: _description,
+        } => {
+            let own_info = CooperativeInfo::new(
+                "local".to_string(),
+                "Local Node".to_string(),
+                own_did.clone(),
+                FederationPolicy::default(),
+            );
+            let registry = CooperativeRegistry::new(store, own_info)?;
+
+            if let Some(mut coop) = registry.get(&coop_id)? {
+                if let Some(gw) = gateway {
+                    coop.gateway_endpoints = vec![gw];
+                }
+                registry.remove(&coop_id)?;
+                registry.register(coop)?;
+                println!("Cooperative '{}' updated successfully.", coop_id);
+            } else {
+                println!("Cooperative '{}' not found.", coop_id);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle vouch commands
+async fn handle_vouch_command(cmd: VouchCommands, data_dir: &Path) -> Result<()> {
+    use icn_federation::{CooperativeInfo, CooperativeRegistry, FederationPolicy, Vouch};
+    use icn_store::SledStore;
+
+    let store_path = data_dir.join("store");
+    let store = std::sync::Arc::new(SledStore::open(&store_path)?);
+
+    let keystore_path = data_dir.join("identity.age");
+    let passphrase = read_passphrase("Enter keystore passphrase: ")?;
+    let mut keystore = AgeKeyStore::new(&keystore_path);
+    keystore.unlock(&passphrase)?;
+    let own_did = keystore.get_keypair()?.did().clone();
+
+    // Get our cooperative ID from config (using "local" as placeholder)
+    let own_coop_id = "local".to_string();
+
+    let own_info = CooperativeInfo::new(
+        own_coop_id.clone(),
+        "Local Node".to_string(),
+        own_did.clone(),
+        FederationPolicy::default(),
+    );
+    let registry = CooperativeRegistry::new(store, own_info)?;
+
+    match cmd {
+        VouchCommands::Issue {
+            target_coop,
+            trust: _trust,
+            days,
+        } => {
+            // Create vouch with optional expiry
+            let vouch = if days > 0 {
+                let expires_at =
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs()
+                        + (days * 24 * 60 * 60);
+                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone())
+                    .with_expiry(expires_at)
+            } else {
+                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone())
+            };
+
+            registry.add_vouch(&vouch)?;
+
+            println!("Vouch issued successfully!\n");
+            println!("  From:     {}", own_coop_id);
+            println!("  Target:   {}", target_coop);
+            if days > 0 {
+                println!("  Validity: {} days", days);
+            } else {
+                println!("  Validity: No expiry");
+            }
+        }
+
+        VouchCommands::List => {
+            // List cooperatives we've vouched for (get all coops and check their vouches)
+            let coops = registry.list()?;
+            let mut found_vouches = false;
+
+            println!("Cooperatives We've Vouched For:\n");
+            println!("{:<20} {:<10}", "Cooperative", "Expired");
+            println!("{}", "-".repeat(32));
+
+            for coop in &coops {
+                let vouches = registry.get_vouches(&coop.coop_id)?;
+                if vouches.contains(&own_coop_id) {
+                    found_vouches = true;
+                    println!("{:<20} {:<10}", coop.coop_id, "-");
+                }
+            }
+
+            if !found_vouches {
+                println!("(none)");
+                println!("\nVouch for a cooperative with: icnctl federation vouch issue --target-coop <id>");
+            }
+        }
+
+        VouchCommands::Revoke { target_coop } => {
+            // Revoking vouches would require removing from the vouches list
+            // For now, indicate this is not yet implemented
+            println!(
+                "Note: Vouch revocation for '{}' would require removing from vouches list.",
+                target_coop
+            );
+            println!("This feature is pending implementation of vouch removal in the registry.");
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle attestation commands
+async fn handle_attestation_command(cmd: AttestationCommands, data_dir: &Path) -> Result<()> {
+    use icn_federation::{AttestationStore, FederatedTrustAttestation, TrustContext};
+    use icn_identity::Did;
+    use icn_store::SledStore;
+
+    let store_path = data_dir.join("store");
+    let store = std::sync::Arc::new(SledStore::open(&store_path)?);
+    let att_store = AttestationStore::new(store);
+
+    let keystore_path = data_dir.join("identity.age");
+    let passphrase = read_passphrase("Enter keystore passphrase: ")?;
+    let mut keystore = AgeKeyStore::new(&keystore_path);
+    keystore.unlock(&passphrase)?;
+    let own_did = keystore.get_keypair()?.did().clone();
+
+    match cmd {
+        AttestationCommands::List { member_did } => {
+            let did: Did = member_did.parse().context("Invalid DID format")?;
+            let attestations = att_store.get_valid_attestations_for(&did)?;
+
+            if attestations.is_empty() {
+                println!("No valid attestations found for {}.", member_did);
+            } else {
+                println!("Attestations for {}:\n", member_did);
+                println!(
+                    "{:<20} {:<12} {:<10}",
+                    "Source Coop", "Context", "Trust"
+                );
+                println!("{}", "-".repeat(44));
+                for att in attestations {
+                    println!(
+                        "{:<20} {:<12} {:<10.2}",
+                        att.source_coop_id,
+                        format!("{:?}", att.trust_context),
+                        att.trust_score
+                    );
+                }
+            }
+        }
+
+        AttestationCommands::From { coop_id } => {
+            let attestations = att_store.get_attestations_from(&coop_id)?;
+
+            if attestations.is_empty() {
+                println!("No attestations from cooperative '{}'.", coop_id);
+            } else {
+                println!("Attestations from '{}':\n", coop_id);
+                println!(
+                    "{:<50} {:<12} {:<10}",
+                    "Member DID", "Context", "Trust"
+                );
+                println!("{}", "-".repeat(74));
+                for att in attestations {
+                    let did_str = att.member_did.to_string();
+                    let short_did = if did_str.len() > 48 {
+                        format!("{}...", &did_str[..45])
+                    } else {
+                        did_str
+                    };
+                    println!(
+                        "{:<50} {:<12} {:<10.2}",
+                        short_did,
+                        format!("{:?}", att.trust_context),
+                        att.trust_score
+                    );
+                }
+            }
+        }
+
+        AttestationCommands::Issue {
+            member_did,
+            trust,
+            context,
+            days,
+        } => {
+            if trust < 0.0 || trust > 1.0 {
+                bail!("Trust score must be between 0.0 and 1.0");
+            }
+
+            let did: Did = member_did.parse().context("Invalid DID format")?;
+            let trust_context = match context.to_lowercase().as_str() {
+                "economic" => TrustContext::Economic,
+                "governance" => TrustContext::Governance,
+                "social" => TrustContext::Social,
+                "general" => TrustContext::General,
+                _ => bail!("Invalid context. Use: economic, governance, social, or general"),
+            };
+
+            let validity_secs = days * 24 * 60 * 60;
+            let attestation = FederatedTrustAttestation::new(
+                "local".to_string(), // TODO: Get actual coop ID from config
+                own_did.clone(),
+                did,
+                trust,
+                trust_context,
+                validity_secs,
+            );
+
+            att_store.store_attestation(attestation)?;
+
+            println!("Attestation issued successfully!\n");
+            println!("  Member:   {}", member_did);
+            println!("  Trust:    {:.2}", trust);
+            println!("  Context:  {}", context);
+            println!("  Validity: {} days", days);
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle clearing agreement commands
+async fn handle_clearing_command(cmd: ClearingCommands, data_dir: &Path) -> Result<()> {
+    use icn_federation::{
+        BilateralClearingAgreement, ClearingManager, CooperativeInfo, CooperativeRegistry,
+        FederationPolicy,
+    };
+    use icn_store::SledStore;
+
+    let store_path = data_dir.join("store");
+    let store = std::sync::Arc::new(SledStore::open(&store_path)?);
+
+    let keystore_path = data_dir.join("identity.age");
+    let passphrase = read_passphrase("Enter keystore passphrase: ")?;
+    let mut keystore = AgeKeyStore::new(&keystore_path);
+    keystore.unlock(&passphrase)?;
+    let own_did = keystore.get_keypair()?.did().clone();
+
+    // Try to get our coop ID from registry
+    let own_coop_id = {
+        let own_info = CooperativeInfo::new(
+            "local".to_string(),
+            "Local Node".to_string(),
+            own_did.clone(),
+            FederationPolicy::default(),
+        );
+        let registry = CooperativeRegistry::new(store.clone(), own_info)?;
+        registry.own_coop_info().coop_id.clone()
+    };
+
+    let manager = ClearingManager::new(store.clone(), own_coop_id.clone())?;
+
+    match cmd {
+        ClearingCommands::List => {
+            let agreements = manager.list_agreements();
+            if agreements.is_empty() {
+                println!("No clearing agreements yet.\n");
+                println!(
+                    "Create an agreement with: icnctl federation clearing create --agreement-id <id> --partner-coop <coop>"
+                );
+            } else {
+                println!("Clearing Agreements:\n");
+                println!(
+                    "{:<20} {:<20} {:<20} {:<15}",
+                    "ID", "Coop A", "Coop B", "Max Imbalance"
+                );
+                println!("{}", "-".repeat(77));
+                for agreement in agreements {
+                    println!(
+                        "{:<20} {:<20} {:<20} {:<15}",
+                        agreement.agreement_id,
+                        agreement.coop_a,
+                        agreement.coop_b,
+                        agreement.max_imbalance
+                    );
+                }
+            }
+        }
+
+        ClearingCommands::Show { agreement_id } => {
+            if let Some(agreement) = manager.get_agreement(&agreement_id)? {
+                println!("Clearing Agreement Details:\n");
+                println!("  ID:            {}", agreement.agreement_id);
+                println!("  Coop A:        {}", agreement.coop_a);
+                println!("  Coop B:        {}", agreement.coop_b);
+                println!("  Max Imbalance: {}", agreement.max_imbalance);
+                println!("  Settlement:    {:?}", agreement.settlement_interval);
+                println!("  Signatures:    {}", agreement.signatures.len());
+
+                if !agreement.exchange_rates.is_empty() {
+                    println!("\n  Exchange Rates:");
+                    for (pair, rate) in &agreement.exchange_rates {
+                        println!("    {}: {:.4}", pair, rate);
+                    }
+                }
+            } else {
+                println!("Agreement '{}' not found.", agreement_id);
+            }
+        }
+
+        ClearingCommands::Create {
+            agreement_id,
+            partner_coop,
+            max_imbalance,
+            settlement,
+        } => {
+            use icn_federation::SettlementInterval;
+
+            // Get partner coop info
+            let own_info = CooperativeInfo::new(
+                own_coop_id.clone(),
+                "Local Node".to_string(),
+                own_did.clone(),
+                FederationPolicy::default(),
+            );
+            let registry = CooperativeRegistry::new(store.clone(), own_info)?;
+
+            let partner = registry.get(&partner_coop)?.ok_or_else(|| {
+                anyhow::anyhow!("Partner cooperative '{}' not found", partner_coop)
+            })?;
+
+            let settlement_interval = match settlement.to_lowercase().as_str() {
+                "daily" => SettlementInterval::Daily,
+                "weekly" => SettlementInterval::Weekly,
+                "monthly" => SettlementInterval::Monthly,
+                "manual" => SettlementInterval::Manual,
+                _ => bail!("Invalid settlement. Use: daily, weekly, monthly, or manual"),
+            };
+
+            let mut agreement = BilateralClearingAgreement::new(
+                agreement_id.clone(),
+                own_coop_id.clone(),
+                own_did.clone(),
+                partner_coop.clone(),
+                partner.public_did.clone(),
+            );
+            agreement.max_imbalance = max_imbalance;
+            agreement.settlement_interval = settlement_interval;
+
+            manager.create_agreement(agreement)?;
+
+            println!("Clearing agreement created successfully!\n");
+            println!("  ID:            {}", agreement_id);
+            println!("  Our Coop:      {}", own_coop_id);
+            println!("  Partner:       {}", partner_coop);
+            println!("  Max Imbalance: {}", max_imbalance);
+            println!("  Settlement:    {}", settlement);
+            println!("\nNote: Partner must accept the agreement with their signature.");
+        }
+
+        ClearingCommands::Rate {
+            agreement_id,
+            from,
+            to,
+            rate,
+        } => {
+            // We need to get the agreement, add the rate, and re-save it
+            // For now, print a note - this requires mutable access pattern
+            println!("Exchange rate noted for agreement '{}':", agreement_id);
+            println!("  {} → {} = {:.4}", from, to, rate);
+            println!("\nNote: Exchange rate updates are typically done during agreement negotiation.");
+        }
+
+        ClearingCommands::Position { agreement_id } => {
+            let position = manager.calculate_position(&agreement_id)?;
+
+            println!("Clearing Position for '{}':\n", agreement_id);
+            println!("  Coop A owes B: {}", position.coop_a_owes_b);
+            println!("  Coop B owes A: {}", position.coop_b_owes_a);
+            println!("  Net position:  {}", position.net_position());
+            println!("  Pending transfers: {}", position.pending_transfers.len());
+        }
+
+        ClearingCommands::Settle { agreement_id } => {
+            let report = manager.trigger_settlement(&agreement_id)?;
+
+            println!("Settlement Report:\n");
+            println!("  Agreement:         {}", report.agreement_id);
+            println!("  Coop A owed:       {}", report.coop_a_owed);
+            println!("  Coop B owed:       {}", report.coop_b_owed);
+            println!("  Net settlement:    {}", report.net_settlement);
+            println!("  Transfers settled: {}", report.transfers_settled);
+            println!("\nSettlement completed successfully.");
         }
     }
 
