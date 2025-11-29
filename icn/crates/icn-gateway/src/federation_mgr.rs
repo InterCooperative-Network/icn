@@ -2,12 +2,12 @@
 //!
 //! Wraps federation-related operations for the gateway API.
 
+#[cfg(test)]
+use icn_federation::FederationPolicy;
 use icn_federation::{
     AttestationStore, BilateralClearingAgreement, ClearingManager, ClearingPosition,
     CooperativeInfo, CooperativeRegistry, FederatedTrustAttestation, SettlementReport, Vouch,
 };
-#[cfg(test)]
-use icn_federation::FederationPolicy;
 use icn_identity::Did;
 use icn_store::SledStore;
 use std::sync::Arc;
@@ -41,9 +41,8 @@ impl FederationManager {
     /// Create a new federation manager with persistent storage
     pub fn new_with_storage(data_dir: std::path::PathBuf) -> Self {
         let store_path = data_dir.join("federation_store");
-        let store = Arc::new(
-            SledStore::open(&store_path).expect("Failed to open federation store"),
-        );
+        let store =
+            Arc::new(SledStore::open(&store_path).expect("Failed to open federation store"));
         let attestation_store = AttestationStore::new(store.clone());
 
         Self {
@@ -66,7 +65,10 @@ impl FederationManager {
         *self.registry.write().await = Some(registry);
         *self.clearing_manager.write().await = Some(clearing);
 
-        info!("Federation manager initialized for cooperative: {}", coop_id);
+        info!(
+            "Federation manager initialized for cooperative: {}",
+            coop_id
+        );
         Ok(())
     }
 
@@ -77,9 +79,9 @@ impl FederationManager {
     /// List all known cooperatives
     pub async fn list_cooperatives(&self) -> Result<Vec<CooperativeInfo>> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         registry
             .list()
@@ -89,9 +91,9 @@ impl FederationManager {
     /// Get a specific cooperative
     pub async fn get_cooperative(&self, coop_id: &str) -> Result<Option<CooperativeInfo>> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         registry
             .get(coop_id)
@@ -101,9 +103,9 @@ impl FederationManager {
     /// Register a new cooperative
     pub async fn register_cooperative(&self, info: CooperativeInfo) -> Result<()> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         registry
             .register(info)
@@ -113,9 +115,9 @@ impl FederationManager {
     /// Get our own cooperative info
     pub async fn get_own_info(&self) -> Result<CooperativeInfo> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         Ok(registry.own_coop_info())
     }
@@ -123,9 +125,9 @@ impl FederationManager {
     /// Check if a cooperative is federated
     pub async fn is_federated(&self, coop_id: &str) -> Result<bool> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         Ok(registry.is_federated(coop_id))
     }
@@ -137,9 +139,9 @@ impl FederationManager {
     /// Add a vouch for a cooperative
     pub async fn add_vouch(&self, vouch: &Vouch) -> Result<()> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         registry
             .add_vouch(vouch)
@@ -149,9 +151,9 @@ impl FederationManager {
     /// Get vouches for a cooperative
     pub async fn get_vouches(&self, coop_id: &str) -> Result<Vec<String>> {
         let registry = self.registry.read().await;
-        let registry = registry.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let registry = registry
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         registry
             .get_vouches(coop_id)
@@ -170,14 +172,20 @@ impl FederationManager {
     }
 
     /// Get attestations for a member
-    pub async fn get_attestations_for(&self, member: &Did) -> Result<Vec<FederatedTrustAttestation>> {
+    pub async fn get_attestations_for(
+        &self,
+        member: &Did,
+    ) -> Result<Vec<FederatedTrustAttestation>> {
         self.attestation_store
             .get_valid_attestations_for(member)
             .map_err(|e| GatewayError::InternalError(e.to_string()))
     }
 
     /// Get attestations from a cooperative
-    pub async fn get_attestations_from(&self, coop_id: &str) -> Result<Vec<FederatedTrustAttestation>> {
+    pub async fn get_attestations_from(
+        &self,
+        coop_id: &str,
+    ) -> Result<Vec<FederatedTrustAttestation>> {
         self.attestation_store
             .get_attestations_from(coop_id)
             .map_err(|e| GatewayError::InternalError(e.to_string()))
@@ -190,19 +198,22 @@ impl FederationManager {
     /// List clearing agreements
     pub async fn list_agreements(&self) -> Result<Vec<BilateralClearingAgreement>> {
         let clearing = self.clearing_manager.read().await;
-        let clearing = clearing.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let clearing = clearing
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         Ok(clearing.list_agreements())
     }
 
     /// Get a clearing agreement
-    pub async fn get_agreement(&self, agreement_id: &str) -> Result<Option<BilateralClearingAgreement>> {
+    pub async fn get_agreement(
+        &self,
+        agreement_id: &str,
+    ) -> Result<Option<BilateralClearingAgreement>> {
         let clearing = self.clearing_manager.read().await;
-        let clearing = clearing.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let clearing = clearing
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         clearing
             .get_agreement(agreement_id)
@@ -212,9 +223,9 @@ impl FederationManager {
     /// Create a clearing agreement
     pub async fn create_agreement(&self, agreement: BilateralClearingAgreement) -> Result<String> {
         let clearing = self.clearing_manager.read().await;
-        let clearing = clearing.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let clearing = clearing
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         clearing
             .create_agreement(agreement)
@@ -224,9 +235,9 @@ impl FederationManager {
     /// Get clearing position
     pub async fn get_position(&self, agreement_id: &str) -> Result<ClearingPosition> {
         let clearing = self.clearing_manager.read().await;
-        let clearing = clearing.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let clearing = clearing
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         clearing
             .calculate_position(agreement_id)
@@ -236,9 +247,9 @@ impl FederationManager {
     /// Trigger settlement
     pub async fn settle(&self, agreement_id: &str) -> Result<SettlementReport> {
         let clearing = self.clearing_manager.read().await;
-        let clearing = clearing.as_ref().ok_or_else(|| {
-            GatewayError::BadRequest("Federation not initialized".to_string())
-        })?;
+        let clearing = clearing
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
 
         clearing
             .trigger_settlement(agreement_id)

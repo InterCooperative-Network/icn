@@ -130,7 +130,10 @@ impl IdentityHandle {
     pub async fn remove_trust_edge(&self, target: Did) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
-            .send(IdentityMsg::RemoveTrustEdge { target, response: tx })
+            .send(IdentityMsg::RemoveTrustEdge {
+                target,
+                response: tx,
+            })
             .await
             .context("Identity actor closed")?;
         rx.await.context("Response channel closed")?
@@ -237,8 +240,7 @@ impl IdentityActor {
                 labels,
                 response,
             } => {
-                let mut edge =
-                    icn_trust::TrustEdge::new(self.keypair.did().clone(), target, score);
+                let mut edge = icn_trust::TrustEdge::new(self.keypair.did().clone(), target, score);
 
                 for label in labels {
                     edge = edge.with_label(label);
@@ -330,11 +332,7 @@ mod tests {
         // Note: TrustGraph uses weighted average (70% direct, 30% transitive)
         // With direct=0.8 and transitive=0.0, expected score = 0.8 * 0.7 = 0.56
         let score = handle.get_trust_score(target_did.clone()).await.unwrap();
-        assert!(
-            (score - 0.56).abs() < 0.01,
-            "Expected 0.56, got {}",
-            score
-        );
+        assert!((score - 0.56).abs() < 0.01, "Expected 0.56, got {score}");
 
         // Get trust class (0.56 is in Partner range: 0.4-0.7)
         let class = handle.get_trust_class(target_did.clone()).await.unwrap();

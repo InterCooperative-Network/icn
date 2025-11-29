@@ -17,7 +17,7 @@ use std::time::SystemTime;
 use tracing::{debug, info};
 
 /// Strategy for resolving ledger forks
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum ForkResolutionStrategy {
     /// Prefer entry with earlier timestamp (first-write-wins)
     /// Best for: Simple coordination, low-trust environments
@@ -33,13 +33,8 @@ pub enum ForkResolutionStrategy {
 
     /// Combination strategy (trust-weighted + timestamp + signatures)
     /// Best for: Production deployments needing robust resolution
+    #[default]
     Hybrid,
-}
-
-impl Default for ForkResolutionStrategy {
-    fn default() -> Self {
-        Self::Hybrid
-    }
 }
 
 /// Detected fork with conflicting entries

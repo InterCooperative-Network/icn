@@ -193,7 +193,10 @@ impl FederationGossipHandler {
                 let policy_result = self.registry.check_policy(&coop_info)?;
                 if policy_result.is_allowed() {
                     self.registry.register(coop_info.clone())?;
-                    debug!("Registered cooperative from response: {}", coop_info.coop_id);
+                    debug!(
+                        "Registered cooperative from response: {}",
+                        coop_info.coop_id
+                    );
                 }
             }
         }
@@ -322,12 +325,22 @@ impl FederationGossipHandler {
     }
 
     /// Send a vouch for another cooperative
-    pub fn send_vouch(&self, target_coop_id: &str, voucher_did: Did, trust_score: f64) -> Result<()> {
+    pub fn send_vouch(
+        &self,
+        target_coop_id: &str,
+        voucher_did: Did,
+        trust_score: f64,
+    ) -> Result<()> {
         let own_coop_id = self
             .own_coop_id()
             .ok_or_else(|| FederationError::NotInitialized("Own coop not set".to_string()))?;
 
-        let vouch = Vouch::new(own_coop_id.clone(), voucher_did, target_coop_id.to_string(), trust_score);
+        let vouch = Vouch::new(
+            own_coop_id.clone(),
+            voucher_did,
+            target_coop_id.to_string(),
+            trust_score,
+        );
 
         // TODO: Sign the vouch
 
@@ -335,7 +348,10 @@ impl FederationGossipHandler {
         self.send_message(TOPIC_FEDERATION_REGISTRY, &message)?;
         metrics::registry::vouches_sent_inc(target_coop_id);
 
-        info!("Sent vouch for {} from {} with trust score {:.2}", target_coop_id, own_coop_id, trust_score);
+        info!(
+            "Sent vouch for {} from {} with trust score {:.2}",
+            target_coop_id, own_coop_id, trust_score
+        );
         Ok(())
     }
 
@@ -344,7 +360,9 @@ impl FederationGossipHandler {
         let coop = self.own_coop.read().unwrap().clone();
 
         if let Some(coop_info) = coop {
-            let message = FederationMessage::FederationRequest { requester: coop_info };
+            let message = FederationMessage::FederationRequest {
+                requester: coop_info,
+            };
             self.send_message(TOPIC_FEDERATION_REGISTRY, &message)?;
             debug!("Sent federation request");
         } else {
@@ -426,7 +444,7 @@ mod tests {
     fn create_test_coop(id: &str) -> CooperativeInfo {
         CooperativeInfo::new(
             id.to_string(),
-            format!("{} Cooperative", id),
+            format!("{id} Cooperative"),
             test_did(),
             FederationPolicy::Open,
         )
@@ -472,7 +490,9 @@ mod tests {
         let message = FederationMessage::CoopAnnounce(other_coop);
         let data = serde_json::to_vec(&message).unwrap();
 
-        handler.handle_message("federation:registry", &data).unwrap();
+        handler
+            .handle_message("federation:registry", &data)
+            .unwrap();
 
         // Should be registered
         let registered = registry.get("other-coop").unwrap();
@@ -492,7 +512,9 @@ mod tests {
         let message = FederationMessage::CoopAnnounce(my_coop);
         let data = serde_json::to_vec(&message).unwrap();
 
-        handler.handle_message("federation:registry", &data).unwrap();
+        handler
+            .handle_message("federation:registry", &data)
+            .unwrap();
 
         // Should NOT be registered (it's our own)
         let registered = registry.get("my-coop").unwrap();

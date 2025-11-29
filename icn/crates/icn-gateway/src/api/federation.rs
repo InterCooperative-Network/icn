@@ -87,13 +87,21 @@ pub async fn get_status(
     };
 
     let federated_coops = if initialized {
-        fed_mgr.list_cooperatives().await.map(|c| c.len()).unwrap_or(0)
+        fed_mgr
+            .list_cooperatives()
+            .await
+            .map(|c| c.len())
+            .unwrap_or(0)
     } else {
         0
     };
 
     let clearing_agreements = if initialized {
-        fed_mgr.list_agreements().await.map(|a| a.len()).unwrap_or(0)
+        fed_mgr
+            .list_agreements()
+            .await
+            .map(|a| a.len())
+            .unwrap_or(0)
     } else {
         0
     };
@@ -116,13 +124,13 @@ pub async fn init_federation(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:admin")?;
 
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let own_did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
+    let own_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let mut own_info = CooperativeInfo::new(
         req.coop_id.clone(),
@@ -171,7 +179,9 @@ pub async fn get_coop(
     let coop_id = path.into_inner();
     match fed_mgr.get_cooperative(&coop_id).await? {
         Some(coop) => Ok(HttpResponse::Ok().json(coop)),
-        None => Err(GatewayError::NotFound(format!("Cooperative not found: {coop_id}"))),
+        None => Err(GatewayError::NotFound(format!(
+            "Cooperative not found: {coop_id}"
+        ))),
     }
 }
 
@@ -184,9 +194,10 @@ pub async fn register_coop(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:write")?;
 
-    let public_did: Did = req.public_did.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID: {e}"))
-    })?;
+    let public_did: Did = req
+        .public_did
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let mut info = CooperativeInfo::new(
         req.coop_id.clone(),
@@ -243,13 +254,13 @@ pub async fn vouch_for_coop(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:write")?;
 
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let voucher_did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
+    let voucher_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     // Validate trust score
     if req.trust_score < 0.0 || req.trust_score > 1.0 {
@@ -267,10 +278,20 @@ pub async fn vouch_for_coop(
             .unwrap()
             .as_secs()
             + (days * 24 * 60 * 60);
-        Vouch::new(own_info.coop_id.clone(), voucher_did, target_coop_id.clone(), req.trust_score)
-            .with_expiry(expires_at)
+        Vouch::new(
+            own_info.coop_id.clone(),
+            voucher_did,
+            target_coop_id.clone(),
+            req.trust_score,
+        )
+        .with_expiry(expires_at)
     } else {
-        Vouch::new(own_info.coop_id.clone(), voucher_did, target_coop_id.clone(), req.trust_score)
+        Vouch::new(
+            own_info.coop_id.clone(),
+            voucher_did,
+            target_coop_id.clone(),
+            req.trust_score,
+        )
     };
 
     fed_mgr.add_vouch(&vouch).await?;
@@ -296,9 +317,9 @@ pub async fn get_attestations(
     require_scope(&http_req, "federation:read")?;
 
     let member_did_str = path.into_inner();
-    let member_did: Did = member_did_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID: {e}"))
-    })?;
+    let member_did: Did = member_did_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let attestations = fed_mgr.get_attestations_for(&member_did).await?;
     Ok(HttpResponse::Ok().json(attestations))
@@ -313,17 +334,18 @@ pub async fn issue_attestation(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:write")?;
 
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let source_did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
+    let source_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
-    let member_did: Did = req.member_did.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid member DID: {e}"))
-    })?;
+    let member_did: Did = req
+        .member_did
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid member DID: {e}")))?;
 
     if req.trust_score < 0.0 || req.trust_score > 1.0 {
         return Err(GatewayError::BadRequest(
@@ -391,7 +413,9 @@ pub async fn get_agreement(
     let agreement_id = path.into_inner();
     match fed_mgr.get_agreement(&agreement_id).await? {
         Some(agreement) => Ok(HttpResponse::Ok().json(agreement)),
-        None => Err(GatewayError::NotFound(format!("Agreement not found: {agreement_id}"))),
+        None => Err(GatewayError::NotFound(format!(
+            "Agreement not found: {agreement_id}"
+        ))),
     }
 }
 
@@ -406,9 +430,10 @@ pub async fn create_agreement(
 
     let own_info = fed_mgr.get_own_info().await?;
 
-    let partner_did: Did = req.partner_did.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid partner DID: {e}"))
-    })?;
+    let partner_did: Did = req
+        .partner_did
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid partner DID: {e}")))?;
 
     let settlement_interval = match req.settlement.to_lowercase().as_str() {
         "daily" => SettlementInterval::Daily,

@@ -9,9 +9,9 @@ use crate::error::{FederationError, Result};
 use crate::metrics;
 use crate::types::current_timestamp;
 use icn_store::Store;
-use std::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::RwLock;
 use tracing::{debug, info};
 
 /// Storage key prefixes
@@ -63,7 +63,10 @@ impl ClearingManager {
         drop(positions);
 
         metrics::clearing::agreements_active_set(self.agreements.read().unwrap().len());
-        info!("Loaded {} clearing agreements", self.agreements.read().unwrap().len());
+        info!(
+            "Loaded {} clearing agreements",
+            self.agreements.read().unwrap().len()
+        );
         Ok(())
     }
 
@@ -113,7 +116,10 @@ impl ClearingManager {
             .write()
             .unwrap()
             .insert(agreement_id.clone(), agreement.clone());
-        self.positions.write().unwrap().insert(agreement_id.clone(), position);
+        self.positions
+            .write()
+            .unwrap()
+            .insert(agreement_id.clone(), position);
 
         // Metrics
         metrics::clearing::agreements_created_inc(&agreement.coop_a, &agreement.coop_b);
@@ -124,7 +130,12 @@ impl ClearingManager {
     }
 
     /// Accept an agreement by adding signature
-    pub fn accept_agreement(&self, agreement_id: &str, signer_did: icn_identity::Did, signature: Vec<u8>) -> Result<()> {
+    pub fn accept_agreement(
+        &self,
+        agreement_id: &str,
+        signer_did: icn_identity::Did,
+        signature: Vec<u8>,
+    ) -> Result<()> {
         let mut agreements = self.agreements.write().unwrap();
         let agreement = agreements
             .get_mut(agreement_id)
@@ -161,9 +172,9 @@ impl ClearingManager {
 
         // Validate exchange rate exists
         let agreements = self.agreements.read().unwrap();
-        let agreement = agreements.get(&agreement_id).ok_or_else(|| {
-            FederationError::ClearingAgreementNotFound(agreement_id.clone())
-        })?;
+        let agreement = agreements
+            .get(&agreement_id)
+            .ok_or_else(|| FederationError::ClearingAgreementNotFound(agreement_id.clone()))?;
 
         if agreement
             .get_rate(&transfer.source_currency, &transfer.dest_currency)
@@ -207,7 +218,10 @@ impl ClearingManager {
         }
 
         // Metrics
-        metrics::clearing::transfer_amount_record(transfer.source_amount, &transfer.source_currency);
+        metrics::clearing::transfer_amount_record(
+            transfer.source_amount,
+            &transfer.source_currency,
+        );
 
         debug!("Proposed transfer: {}", transfer_id);
         Ok(transfer_id)
@@ -334,8 +348,7 @@ impl ClearingManager {
             }
         }
         Err(FederationError::ClearingAgreementNotFound(format!(
-            "{} <-> {}",
-            coop_a, coop_b
+            "{coop_a} <-> {coop_b}"
         )))
     }
 }

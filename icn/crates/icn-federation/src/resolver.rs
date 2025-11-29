@@ -8,9 +8,9 @@ use crate::metrics;
 use crate::registry::CooperativeRegistry;
 use icn_identity::Did;
 use lru::LruCache;
-use std::sync::RwLock;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
@@ -135,10 +135,10 @@ impl FederatedDidResolver {
         // Extract the key part from the DID
         let did_str = did.to_string();
         if let Some(key) = did_str.strip_prefix("did:icn:") {
-            format!("did:icn:{}:{}", coop_id, key)
+            format!("did:icn:{coop_id}:{key}")
         } else {
             // Fallback - just append
-            format!("did:icn:{}:{}", coop_id, did_str)
+            format!("did:icn:{coop_id}:{did_str}")
         }
     }
 
@@ -179,8 +179,8 @@ impl FederatedDidResolver {
     async fn resolve_local(&self, did_str: &str) -> Result<CachedDidResolution> {
         metrics::did_resolution::total_inc(None);
 
-        let did = Did::from_str(did_str)
-            .map_err(|e| FederationError::InvalidDidFormat(e.to_string()))?;
+        let did =
+            Did::from_str(did_str).map_err(|e| FederationError::InvalidDidFormat(e.to_string()))?;
 
         Ok(CachedDidResolution::new(
             did,
@@ -198,7 +198,7 @@ impl FederatedDidResolver {
             if own_coop == coop_id {
                 // Extract the key from federated format and resolve locally
                 let local_did_str = if let Some((_, key)) = Self::parse_federated_did(did_str) {
-                    format!("did:icn:{}", key)
+                    format!("did:icn:{key}")
                 } else {
                     did_str.to_string()
                 };
@@ -214,8 +214,7 @@ impl FederatedDidResolver {
 
         if coop_info.gateway_endpoints.is_empty() {
             return Err(FederationError::DidResolutionFailed(format!(
-                "No gateway endpoints for cooperative: {}",
-                coop_id
+                "No gateway endpoints for cooperative: {coop_id}"
             )));
         }
 
@@ -234,10 +233,7 @@ impl FederatedDidResolver {
                     ));
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to resolve DID via gateway {}: {}",
-                        endpoint, e
-                    );
+                    warn!("Failed to resolve DID via gateway {}: {}", endpoint, e);
                     continue;
                 }
             }
@@ -245,8 +241,7 @@ impl FederatedDidResolver {
 
         metrics::did_resolution::failures_inc("no_gateway_available");
         Err(FederationError::DidResolutionFailed(format!(
-            "Failed to resolve DID {} via any gateway",
-            did_str
+            "Failed to resolve DID {did_str} via any gateway"
         )))
     }
 
@@ -258,7 +253,7 @@ impl FederatedDidResolver {
 
         // Extract the key from federated format
         let key = if let Some((_, key)) = Self::parse_federated_did(did_str) {
-            format!("did:icn:{}", key)
+            format!("did:icn:{key}")
         } else {
             did_str.to_string()
         };
@@ -311,7 +306,7 @@ mod tests {
     fn create_test_coop(id: &str) -> CooperativeInfo {
         CooperativeInfo::new(
             id.to_string(),
-            format!("{} Cooperative", id),
+            format!("{id} Cooperative"),
             test_did(),
             FederationPolicy::Open,
         )

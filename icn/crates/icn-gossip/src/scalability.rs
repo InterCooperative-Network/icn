@@ -771,7 +771,7 @@ mod tests {
         compressed.set(peer.clone(), 0);
 
         // Decompress
-        let decompressed = compressed.to_vector_clock(&[peer.clone()]);
+        let decompressed = compressed.to_vector_clock(std::slice::from_ref(&peer));
 
         // Should handle zero version correctly
         assert_eq!(decompressed.get(&peer), 0);

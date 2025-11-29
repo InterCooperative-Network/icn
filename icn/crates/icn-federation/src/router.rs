@@ -5,16 +5,18 @@
 use crate::channel::FederationChannel;
 use crate::error::{FederationError, Result};
 use crate::metrics;
-use std::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::RwLock;
 use tracing::{debug, warn};
 
 /// Scope for gossip message routing
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type")]
+#[derive(Default)]
 pub enum GossipScope {
     /// Message stays within this cooperative only
+    #[default]
     Local,
 
     /// Message goes to specific partner cooperatives
@@ -25,12 +27,6 @@ pub enum GossipScope {
 
     /// Message goes to all federated cooperatives
     Public,
-}
-
-impl Default for GossipScope {
-    fn default() -> Self {
-        GossipScope::Local
-    }
 }
 
 impl GossipScope {
@@ -103,7 +99,11 @@ impl FederatedGossipRouter {
 
     /// Get a reference to a channel
     pub fn get_channel(&self, coop_id: &str) -> Option<bool> {
-        self.channels.read().unwrap().get(coop_id).map(|c| c.is_connected())
+        self.channels
+            .read()
+            .unwrap()
+            .get(coop_id)
+            .map(|c| c.is_connected())
     }
 
     /// List all channel IDs
@@ -112,12 +112,8 @@ impl FederatedGossipRouter {
     }
 
     /// Publish a message with the given scope
-    pub async fn publish(
-        &self,
-        topic: &str,
-        data: Vec<u8>,
-        scope: GossipScope,
-    ) -> Result<usize> {
+    #[allow(clippy::await_holding_lock)]
+    pub async fn publish(&self, topic: &str, data: Vec<u8>, scope: GossipScope) -> Result<usize> {
         if !scope.is_federated() {
             return Ok(0);
         }
@@ -207,10 +203,8 @@ mod tests {
         let public = GossipScope::Public;
         assert!(public.allows("any-coop"));
 
-        let federation = GossipScope::federation(vec![
-            "food-coop".to_string(),
-            "tech-coop".to_string(),
-        ]);
+        let federation =
+            GossipScope::federation(vec!["food-coop".to_string(), "tech-coop".to_string()]);
         assert!(federation.allows("food-coop"));
         assert!(federation.allows("tech-coop"));
         assert!(!federation.allows("other-coop"));
@@ -241,12 +235,12 @@ mod tests {
 
         for i in 0..2 {
             let channel = FederationChannel::new(
-                format!("coop-{}", i),
+                format!("coop-{i}"),
                 test_did(),
-                format!("https://coop-{}.example.com:8080", i),
+                format!("https://coop-{i}.example.com:8080"),
             );
             router
-                .add_channel(format!("coop-{}", i), channel)
+                .add_channel(format!("coop-{i}"), channel)
                 .await
                 .unwrap();
         }

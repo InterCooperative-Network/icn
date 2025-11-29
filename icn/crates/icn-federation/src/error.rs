@@ -158,9 +158,6 @@ mod tests {
             required: 3,
             actual: 1,
         };
-        assert_eq!(
-            err.to_string(),
-            "Insufficient vouches: required 3, got 1"
-        );
+        assert_eq!(err.to_string(), "Insufficient vouches: required 3, got 1");
     }
 }

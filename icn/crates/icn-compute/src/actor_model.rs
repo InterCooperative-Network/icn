@@ -23,9 +23,10 @@ pub type ActorId = [u8; 32];
 /// Actor execution mode.
 ///
 /// Determines whether task is ephemeral (current behavior) or stateful (Phase 16D).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ActorMode {
     /// Ephemeral task - no state persistence, single execution (Phase 15 behavior)
+    #[default]
     Ephemeral,
 
     /// Long-running actor with persistent state
@@ -35,12 +36,6 @@ pub enum ActorMode {
         /// Maximum state size in bytes (prevents unbounded growth)
         max_state_size_bytes: u64,
     },
-}
-
-impl Default for ActorMode {
-    fn default() -> Self {
-        Self::Ephemeral
-    }
 }
 
 /// Actor state snapshot for checkpointing.

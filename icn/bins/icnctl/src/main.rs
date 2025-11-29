@@ -1046,7 +1046,7 @@ fn create_rpc_client(
 ) -> Result<icn_rpc::RpcClient> {
     let rpc_addr: std::net::SocketAddr = endpoint
         .parse()
-        .with_context(|| format!("Invalid RPC endpoint: {}", endpoint))?;
+        .with_context(|| format!("Invalid RPC endpoint: {endpoint}"))?;
 
     let keystore_path = get_keystore_path(data_dir);
 
@@ -1075,13 +1075,10 @@ fn create_rpc_client(
 }
 
 /// Create an RPC client with authentication (prompts for passphrase)
-fn create_authenticated_rpc_client(
-    endpoint: &str,
-    data_dir: &Path,
-) -> Result<icn_rpc::RpcClient> {
+fn create_authenticated_rpc_client(endpoint: &str, data_dir: &Path) -> Result<icn_rpc::RpcClient> {
     let rpc_addr: std::net::SocketAddr = endpoint
         .parse()
-        .with_context(|| format!("Invalid RPC endpoint: {}", endpoint))?;
+        .with_context(|| format!("Invalid RPC endpoint: {endpoint}"))?;
 
     let keystore_path = get_keystore_path(data_dir);
     if !keystore_path.exists() {
@@ -1926,7 +1923,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
     // Show local configuration
     println!("Local Configuration:");
     println!("  Data directory: {}", data_dir.display());
-    println!("  RPC endpoint:   {}", endpoint);
+    println!("  RPC endpoint:   {endpoint}");
     println!();
 
     // Try to connect to daemon (auto-authenticate if ICN_PASSPHRASE is set)
@@ -1934,7 +1931,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
         Ok(c) => c,
         Err(e) => {
             println!("Daemon Connection: FAILED");
-            println!("  Error: {}", e);
+            println!("  Error: {e}");
             return Ok(());
         }
     };
@@ -1955,7 +1952,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
                         Ok(c) => c,
                         Err(e) => {
                             println!("Daemon Status: AUTH FAILED");
-                            println!("  Error: {}", e);
+                            println!("  Error: {e}");
                             return Ok(());
                         }
                     };
@@ -1964,7 +1961,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
                         Ok(s) => s,
                         Err(e) => {
                             println!("Daemon Status: NOT CONNECTED");
-                            println!("  Error: {}", e);
+                            println!("  Error: {e}");
                             return Ok(());
                         }
                     }
@@ -1976,7 +1973,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
                 }
             } else {
                 println!("Daemon Status: NOT CONNECTED");
-                println!("  Error: {}", e);
+                println!("  Error: {e}");
                 println!();
                 println!("Is the ICN daemon running? Start it with:");
                 println!("  icnd");
@@ -1986,7 +1983,10 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
     };
 
     println!("Daemon Status:");
-    println!("  Running:      {}", if status.running { "YES" } else { "NO" });
+    println!(
+        "  Running:      {}",
+        if status.running { "YES" } else { "NO" }
+    );
     println!("  Listen addr:  {}", status.listen_addr);
     println!();
 
@@ -1999,7 +1999,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
             println!("  Total connections:   {}", stats.connections_total);
         }
         Err(e) => {
-            println!("Network Statistics: unavailable ({})", e);
+            println!("Network Statistics: unavailable ({e})");
         }
     }
     println!();
@@ -2021,12 +2021,15 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
                     println!("  - {} @ {}", did_short, peer.addr);
                 }
                 if peers.len() > 5 {
-                    println!("  ... and {} more (use 'icnctl network peers' for full list)", peers.len() - 5);
+                    println!(
+                        "  ... and {} more (use 'icnctl network peers' for full list)",
+                        peers.len() - 5
+                    );
                 }
             }
         }
         Err(e) => {
-            println!("Connected Peers: unavailable ({})", e);
+            println!("Connected Peers: unavailable ({e})");
         }
     }
     println!();
@@ -2519,7 +2522,7 @@ async fn handle_coop_command(cmd: CoopCommands, data_dir: &Path) -> Result<()> {
                     }
                 }
             } else {
-                println!("Cooperative '{}' not found.", coop_id);
+                println!("Cooperative '{coop_id}' not found.");
             }
         }
 
@@ -2541,10 +2544,10 @@ async fn handle_coop_command(cmd: CoopCommands, data_dir: &Path) -> Result<()> {
             let _registry = CooperativeRegistry::new(store, own_info)?;
 
             println!("Cooperative registered successfully!\n");
-            println!("  ID:      {}", coop_id);
-            println!("  Name:    {}", name);
-            println!("  Gateway: {}", gateway);
-            println!("  DID:     {}", own_did);
+            println!("  ID:      {coop_id}");
+            println!("  Name:    {name}");
+            println!("  Gateway: {gateway}");
+            println!("  DID:     {own_did}");
         }
 
         CoopCommands::Update {
@@ -2566,9 +2569,9 @@ async fn handle_coop_command(cmd: CoopCommands, data_dir: &Path) -> Result<()> {
                 }
                 registry.remove(&coop_id)?;
                 registry.register(coop)?;
-                println!("Cooperative '{}' updated successfully.", coop_id);
+                println!("Cooperative '{coop_id}' updated successfully.");
             } else {
-                println!("Cooperative '{}' not found.", coop_id);
+                println!("Cooperative '{coop_id}' not found.");
             }
         }
     }
@@ -2608,32 +2611,41 @@ async fn handle_vouch_command(cmd: VouchCommands, data_dir: &Path) -> Result<()>
             days,
         } => {
             // Validate trust score
-            if trust < 0.0 || trust > 1.0 {
+            if !(0.0..=1.0).contains(&trust) {
                 anyhow::bail!("Trust score must be between 0.0 and 1.0");
             }
 
             // Create vouch with trust score and optional expiry
             let vouch = if days > 0 {
-                let expires_at =
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs()
-                        + (days * 24 * 60 * 60);
-                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone(), trust)
-                    .with_expiry(expires_at)
+                let expires_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+                    + (days * 24 * 60 * 60);
+                Vouch::new(
+                    own_coop_id.clone(),
+                    own_did.clone(),
+                    target_coop.clone(),
+                    trust,
+                )
+                .with_expiry(expires_at)
             } else {
-                Vouch::new(own_coop_id.clone(), own_did.clone(), target_coop.clone(), trust)
+                Vouch::new(
+                    own_coop_id.clone(),
+                    own_did.clone(),
+                    target_coop.clone(),
+                    trust,
+                )
             };
 
             registry.add_vouch(&vouch)?;
 
             println!("Vouch issued successfully!\n");
-            println!("  From:     {}", own_coop_id);
-            println!("  Target:   {}", target_coop);
-            println!("  Trust:    {:.2}", trust);
+            println!("  From:     {own_coop_id}");
+            println!("  Target:   {target_coop}");
+            println!("  Trust:    {trust:.2}");
             if days > 0 {
-                println!("  Validity: {} days", days);
+                println!("  Validity: {days} days");
             } else {
                 println!("  Validity: No expiry");
             }
@@ -2666,8 +2678,7 @@ async fn handle_vouch_command(cmd: VouchCommands, data_dir: &Path) -> Result<()>
             // Revoking vouches would require removing from the vouches list
             // For now, indicate this is not yet implemented
             println!(
-                "Note: Vouch revocation for '{}' would require removing from vouches list.",
-                target_coop
+                "Note: Vouch revocation for '{target_coop}' would require removing from vouches list."
             );
             println!("This feature is pending implementation of vouch removal in the registry.");
         }
@@ -2698,13 +2709,10 @@ async fn handle_attestation_command(cmd: AttestationCommands, data_dir: &Path) -
             let attestations = att_store.get_valid_attestations_for(&did)?;
 
             if attestations.is_empty() {
-                println!("No valid attestations found for {}.", member_did);
+                println!("No valid attestations found for {member_did}.");
             } else {
-                println!("Attestations for {}:\n", member_did);
-                println!(
-                    "{:<20} {:<12} {:<10}",
-                    "Source Coop", "Context", "Trust"
-                );
+                println!("Attestations for {member_did}:\n");
+                println!("{:<20} {:<12} {:<10}", "Source Coop", "Context", "Trust");
                 println!("{}", "-".repeat(44));
                 for att in attestations {
                     println!(
@@ -2721,13 +2729,10 @@ async fn handle_attestation_command(cmd: AttestationCommands, data_dir: &Path) -
             let attestations = att_store.get_attestations_from(&coop_id)?;
 
             if attestations.is_empty() {
-                println!("No attestations from cooperative '{}'.", coop_id);
+                println!("No attestations from cooperative '{coop_id}'.");
             } else {
-                println!("Attestations from '{}':\n", coop_id);
-                println!(
-                    "{:<50} {:<12} {:<10}",
-                    "Member DID", "Context", "Trust"
-                );
+                println!("Attestations from '{coop_id}':\n");
+                println!("{:<50} {:<12} {:<10}", "Member DID", "Context", "Trust");
                 println!("{}", "-".repeat(74));
                 for att in attestations {
                     let did_str = att.member_did.to_string();
@@ -2752,7 +2757,7 @@ async fn handle_attestation_command(cmd: AttestationCommands, data_dir: &Path) -
             context,
             days,
         } => {
-            if trust < 0.0 || trust > 1.0 {
+            if !(0.0..=1.0).contains(&trust) {
                 bail!("Trust score must be between 0.0 and 1.0");
             }
 
@@ -2778,10 +2783,10 @@ async fn handle_attestation_command(cmd: AttestationCommands, data_dir: &Path) -
             att_store.store_attestation(attestation)?;
 
             println!("Attestation issued successfully!\n");
-            println!("  Member:   {}", member_did);
-            println!("  Trust:    {:.2}", trust);
-            println!("  Context:  {}", context);
-            println!("  Validity: {} days", days);
+            println!("  Member:   {member_did}");
+            println!("  Trust:    {trust:.2}");
+            println!("  Context:  {context}");
+            println!("  Validity: {days} days");
         }
     }
 
@@ -2859,11 +2864,11 @@ async fn handle_clearing_command(cmd: ClearingCommands, data_dir: &Path) -> Resu
                 if !agreement.exchange_rates.is_empty() {
                     println!("\n  Exchange Rates:");
                     for (pair, rate) in &agreement.exchange_rates {
-                        println!("    {}: {:.4}", pair, rate);
+                        println!("    {pair}: {rate:.4}");
                     }
                 }
             } else {
-                println!("Agreement '{}' not found.", agreement_id);
+                println!("Agreement '{agreement_id}' not found.");
             }
         }
 
@@ -2884,9 +2889,9 @@ async fn handle_clearing_command(cmd: ClearingCommands, data_dir: &Path) -> Resu
             );
             let registry = CooperativeRegistry::new(store.clone(), own_info)?;
 
-            let partner = registry.get(&partner_coop)?.ok_or_else(|| {
-                anyhow::anyhow!("Partner cooperative '{}' not found", partner_coop)
-            })?;
+            let partner = registry
+                .get(&partner_coop)?
+                .ok_or_else(|| anyhow::anyhow!("Partner cooperative '{partner_coop}' not found"))?;
 
             let settlement_interval = match settlement.to_lowercase().as_str() {
                 "daily" => SettlementInterval::Daily,
@@ -2909,11 +2914,11 @@ async fn handle_clearing_command(cmd: ClearingCommands, data_dir: &Path) -> Resu
             manager.create_agreement(agreement)?;
 
             println!("Clearing agreement created successfully!\n");
-            println!("  ID:            {}", agreement_id);
-            println!("  Our Coop:      {}", own_coop_id);
-            println!("  Partner:       {}", partner_coop);
-            println!("  Max Imbalance: {}", max_imbalance);
-            println!("  Settlement:    {}", settlement);
+            println!("  ID:            {agreement_id}");
+            println!("  Our Coop:      {own_coop_id}");
+            println!("  Partner:       {partner_coop}");
+            println!("  Max Imbalance: {max_imbalance}");
+            println!("  Settlement:    {settlement}");
             println!("\nNote: Partner must accept the agreement with their signature.");
         }
 
@@ -2925,15 +2930,17 @@ async fn handle_clearing_command(cmd: ClearingCommands, data_dir: &Path) -> Resu
         } => {
             // We need to get the agreement, add the rate, and re-save it
             // For now, print a note - this requires mutable access pattern
-            println!("Exchange rate noted for agreement '{}':", agreement_id);
-            println!("  {} → {} = {:.4}", from, to, rate);
-            println!("\nNote: Exchange rate updates are typically done during agreement negotiation.");
+            println!("Exchange rate noted for agreement '{agreement_id}':");
+            println!("  {from} → {to} = {rate:.4}");
+            println!(
+                "\nNote: Exchange rate updates are typically done during agreement negotiation."
+            );
         }
 
         ClearingCommands::Position { agreement_id } => {
             let position = manager.calculate_position(&agreement_id)?;
 
-            println!("Clearing Position for '{}':\n", agreement_id);
+            println!("Clearing Position for '{agreement_id}':\n");
             println!("  Coop A owes B: {}", position.coop_a_owes_b);
             println!("  Coop B owes A: {}", position.coop_b_owes_a);
             println!("  Net position:  {}", position.net_position());

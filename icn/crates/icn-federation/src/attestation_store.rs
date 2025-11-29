@@ -8,9 +8,9 @@ use crate::metrics;
 use icn_identity::Did;
 use icn_store::Store;
 use lru::LruCache;
-use std::sync::RwLock;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use std::sync::RwLock;
 use tracing::{debug, info};
 
 /// Storage key prefix
@@ -136,9 +136,15 @@ impl AttestationStore {
     }
 
     /// Get valid (non-expired) attestations for a member
-    pub fn get_valid_attestations_for(&self, member: &Did) -> Result<Vec<FederatedTrustAttestation>> {
+    pub fn get_valid_attestations_for(
+        &self,
+        member: &Did,
+    ) -> Result<Vec<FederatedTrustAttestation>> {
         let attestations = self.get_attestations_for(member)?;
-        Ok(attestations.into_iter().filter(|a| !a.is_expired()).collect())
+        Ok(attestations
+            .into_iter()
+            .filter(|a| !a.is_expired())
+            .collect())
     }
 
     /// Remove a specific attestation

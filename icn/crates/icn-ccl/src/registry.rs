@@ -87,7 +87,11 @@ impl ContractMetadata {
                 .unwrap()
                 .as_millis() as u64,
             description: None,
-            participants: contract.participants.iter().map(|d| d.to_string()).collect(),
+            participants: contract
+                .participants
+                .iter()
+                .map(|d| d.to_string())
+                .collect(),
             currency: contract.currency.clone(),
             rules: contract.rules.iter().map(|r| r.name.clone()).collect(),
         })
@@ -104,14 +108,16 @@ impl ContractMetadata {
 ///
 /// Returns an error if the contract cannot be serialized to JSON.
 pub fn compute_hash(contract: &Contract) -> Result<ContentHash> {
-    let bytes = serde_json::to_vec(contract)
-        .map_err(|e| RegistryError::SerializationError(format!("Failed to serialize contract: {e}")))?;
+    let bytes = serde_json::to_vec(contract).map_err(|e| {
+        RegistryError::SerializationError(format!("Failed to serialize contract: {e}"))
+    })?;
     Ok(*blake3::hash(&bytes).as_bytes())
 }
 
 /// Contract Registry - stores contracts with metadata
 ///
 /// Thread-safe with in-memory caching and optional persistent storage.
+#[allow(clippy::type_complexity)]
 pub struct ContractRegistry {
     /// In-memory contract cache
     contracts: Arc<RwLock<HashMap<ContentHash, Contract>>>,
@@ -191,14 +197,14 @@ impl ContractRegistry {
 
         // Persist to store if available
         if let Some(store) = &self.store {
-            let contract_key = format!("contract:{}", hash_hex);
+            let contract_key = format!("contract:{hash_hex}");
             let contract_bytes = bincode::serialize(&contract)
                 .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
             store
                 .put(contract_key.as_bytes(), &contract_bytes)
                 .map_err(|e| RegistryError::StorageError(e.to_string()))?;
 
-            let metadata_key = format!("metadata:{}", hash_hex);
+            let metadata_key = format!("metadata:{hash_hex}");
             let metadata_bytes = bincode::serialize(&metadata)
                 .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
             store
@@ -224,10 +230,7 @@ impl ContractRegistry {
         }
         {
             let mut owner_index = self.owner_index.write().await;
-            owner_index
-                .entry(owner.to_string())
-                .or_default()
-                .push(hash);
+            owner_index.entry(owner.to_string()).or_default().push(hash);
         }
 
         tracing::info!(
@@ -403,7 +406,7 @@ impl ContractRegistry {
                                 contracts.insert(hash, contract.clone());
 
                                 // Also load metadata
-                                let meta_key = format!("metadata:{}", hash_hex);
+                                let meta_key = format!("metadata:{hash_hex}");
                                 if let Ok(Some(meta_bytes)) = store.get(meta_key.as_bytes()) {
                                     if let Ok(meta) =
                                         bincode::deserialize::<ContractMetadata>(&meta_bytes)
@@ -461,11 +464,9 @@ mod tests {
     fn create_test_contract(name: &str) -> Contract {
         Contract::new(name.to_string())
             .add_participant(icn_identity::KeyPair::generate().unwrap().did().clone())
-            .add_rule(
-                Rule::new("test_rule".to_string()).add_stmt(Stmt::Return {
-                    value: Expr::Literal(Value::String("ok".to_string())),
-                }),
-            )
+            .add_rule(Rule::new("test_rule".to_string()).add_stmt(Stmt::Return {
+                value: Expr::Literal(Value::String("ok".to_string())),
+            }))
     }
 
     #[tokio::test]

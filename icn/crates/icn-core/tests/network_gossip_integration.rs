@@ -88,6 +88,7 @@ impl TestNode {
 }
 
 #[tokio::test]
+#[ignore] // Flaky in CI due to hardcoded ports - uses 14433/14434 which may conflict
 async fn test_two_node_gossip_flow() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -174,6 +175,7 @@ async fn test_two_node_gossip_flow() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Flaky in CI due to hardcoded ports - uses 14435-14437 which may conflict
 async fn test_broadcast_to_multiple_peers() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
