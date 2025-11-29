@@ -291,6 +291,59 @@ impl TrustGraph {
         Ok(())
     }
 
+    /// Get all known DIDs from the trust graph
+    ///
+    /// This scans all edges and extracts unique DIDs (both sources and targets).
+    /// Useful for trust-based membership resolution in governance.
+    pub fn get_all_known_dids(&self) -> Result<Vec<Did>> {
+        use std::collections::HashSet;
+
+        let mut dids: HashSet<Did> = HashSet::new();
+
+        // Scan all edges
+        let results = self.store.scan(b"trust/edges/")?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+
+        for (_key, value) in results {
+            let edge: TrustEdge = serde_json::from_slice(&value)?;
+
+            // Skip expired edges
+            if edge.is_expired(now) {
+                continue;
+            }
+
+            dids.insert(edge.source);
+            dids.insert(edge.target);
+        }
+
+        Ok(dids.into_iter().collect())
+    }
+
+    /// Get all DIDs that meet a minimum trust threshold
+    ///
+    /// Returns DIDs whose computed trust score (from this node's perspective)
+    /// is greater than or equal to the threshold.
+    pub fn get_dids_above_threshold(&self, threshold: f64) -> Result<Vec<Did>> {
+        let all_dids = self.get_all_known_dids()?;
+        let mut trusted_dids = Vec::new();
+
+        for did in all_dids {
+            // Skip self
+            if did == self.own_did {
+                continue;
+            }
+
+            let score = self.compute_trust_score(&did)?;
+            if score >= threshold {
+                trusted_dids.push(did);
+            }
+        }
+
+        Ok(trusted_dids)
+    }
+
     /// Clear the trust score cache
     pub fn clear_cache(&self) {
         self.cache.clear();
@@ -462,5 +515,71 @@ mod tests {
         let edge = TrustEdge::new(alice, bob, 0.5).with_expiry(now - 100);
 
         assert!(edge.is_expired(now));
+    }
+
+    #[test]
+    fn test_get_all_known_dids() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        // Alice trusts Bob
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .unwrap();
+
+        // Bob trusts Carol
+        graph
+            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), 0.6))
+            .unwrap();
+
+        let all_dids = graph.get_all_known_dids().unwrap();
+
+        // Should have Alice, Bob, and Carol
+        assert_eq!(all_dids.len(), 3);
+        assert!(all_dids.contains(&alice));
+        assert!(all_dids.contains(&bob));
+        assert!(all_dids.contains(&carol));
+    }
+
+    #[test]
+    fn test_get_dids_above_threshold() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+        let dave = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        // Alice trusts Bob highly (0.8 direct = 0.56 score)
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .unwrap();
+
+        // Alice trusts Carol moderately (0.5 direct = 0.35 score)
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), 0.5))
+            .unwrap();
+
+        // Alice has low trust in Dave (0.2 direct = 0.14 score)
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), dave.clone(), 0.2))
+            .unwrap();
+
+        // Threshold 0.3: should include Bob (0.56) and Carol (0.35), exclude Dave (0.14)
+        let trusted = graph.get_dids_above_threshold(0.3).unwrap();
+        assert_eq!(trusted.len(), 2);
+        assert!(trusted.contains(&bob));
+        assert!(trusted.contains(&carol));
+        assert!(!trusted.contains(&dave));
+
+        // Threshold 0.5: should only include Bob (0.56)
+        let highly_trusted = graph.get_dids_above_threshold(0.5).unwrap();
+        assert_eq!(highly_trusted.len(), 1);
+        assert!(highly_trusted.contains(&bob));
     }
 }

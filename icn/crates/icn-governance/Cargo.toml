@@ -14,6 +14,9 @@ async-trait = "0.1"
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 icn-identity = { path = "../icn-identity" }
+icn-trust = { path = "../icn-trust" }
+tokio = { workspace = true }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
+icn-store = { path = "../icn-store" }
