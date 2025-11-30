@@ -4,6 +4,7 @@ use crate::balance::compute_all_balances;
 use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
+use crate::freeze::{FreezeManager, FrozenMember};
 use crate::merge::{MergeDecision, QuarantineItem};
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
@@ -55,12 +56,16 @@ pub struct Ledger {
 
     /// Fork resolver for resolving detected forks (Phase 18 Week 5)
     fork_resolver: ForkResolver,
+
+    /// Freeze manager for emergency member freezes (Issue #25)
+    freeze_manager: FreezeManager,
 }
 
 impl Ledger {
     /// Create a new ledger with the given storage backend
     pub fn new(store: Arc<dyn Store>) -> Result<Self> {
         let quarantine = QuarantineStore::new(store.clone());
+        let freeze_manager = FreezeManager::with_store(store.clone())?;
 
         let mut ledger = Ledger {
             store,
@@ -70,6 +75,7 @@ impl Ledger {
             last_merge: None,
             fork_detector: ForkDetector::new(),
             fork_resolver: ForkResolver::new(ForkResolutionStrategy::default()), // Hybrid strategy
+            freeze_manager,
         };
 
         // Load cached balances from storage
@@ -634,6 +640,107 @@ impl Ledger {
         &mut self.quarantine
     }
 
+    // === Member Freeze Methods (Issue #25) ===
+
+    /// Freeze a member account - blocks all ledger transactions involving them
+    ///
+    /// This is an emergency action that should only be invoked after a governance
+    /// proposal passes with super-majority approval.
+    ///
+    /// # Arguments
+    /// * `did` - The member DID to freeze
+    /// * `reason` - Reason for freezing (for audit trail)
+    /// * `duration_seconds` - Optional duration (None = indefinite)
+    pub fn freeze_member(&mut self, did: Did, reason: String, duration_seconds: Option<u64>) {
+        info!(
+            did = %did,
+            reason = %reason,
+            duration = ?duration_seconds,
+            "Freezing member account"
+        );
+        self.freeze_manager.freeze(did, reason, duration_seconds);
+    }
+
+    /// Freeze a member with full metadata (for governance integration)
+    pub fn freeze_member_with_metadata(
+        &mut self,
+        did: Did,
+        reason: String,
+        duration_seconds: Option<u64>,
+        proposal_id: Option<String>,
+        frozen_by: Option<Did>,
+    ) {
+        info!(
+            did = %did,
+            reason = %reason,
+            proposal = ?proposal_id,
+            "Freezing member account via governance"
+        );
+        self.freeze_manager.freeze_with_metadata(
+            did,
+            reason,
+            duration_seconds,
+            proposal_id,
+            frozen_by,
+        );
+    }
+
+    /// Unfreeze a member account
+    ///
+    /// This is also an emergency action requiring super-majority approval,
+    /// unless the freeze has expired.
+    pub fn unfreeze_member(&mut self, did: &Did, reason: String) -> Option<FrozenMember> {
+        info!(
+            did = %did,
+            reason = %reason,
+            "Unfreezing member account"
+        );
+        self.freeze_manager.unfreeze(did, reason)
+    }
+
+    /// Unfreeze a member with full metadata (for governance integration)
+    pub fn unfreeze_member_with_metadata(
+        &mut self,
+        did: &Did,
+        reason: String,
+        proposal_id: Option<String>,
+        unfrozen_by: Option<Did>,
+    ) -> Option<FrozenMember> {
+        info!(
+            did = %did,
+            reason = %reason,
+            proposal = ?proposal_id,
+            "Unfreezing member account via governance"
+        );
+        self.freeze_manager
+            .unfreeze_with_metadata(did, reason, proposal_id, unfrozen_by)
+    }
+
+    /// Check if a member is currently frozen
+    pub fn is_member_frozen(&mut self, did: &Did) -> bool {
+        self.freeze_manager.is_frozen(did)
+    }
+
+    /// Get the freeze record for a member if frozen
+    pub fn get_freeze_record(&mut self, did: &Did) -> Option<&FrozenMember> {
+        self.freeze_manager.get_frozen(did)
+    }
+
+    /// List all currently frozen members
+    pub fn list_frozen_members(&mut self) -> Vec<&FrozenMember> {
+        self.freeze_manager.list_frozen()
+    }
+
+    /// Get count of frozen members
+    pub fn frozen_member_count(&mut self) -> usize {
+        self.freeze_manager.frozen_count()
+    }
+
+    /// Clean up expired freezes
+    pub fn cleanup_expired_freezes(&mut self) -> usize {
+        self.freeze_manager.cleanup_expired()
+    }
+
     /// Transfer balances from old_did to new_did during recovery
     ///
     /// Creates journal entries transferring all balances from the old DID
@@ -813,10 +920,29 @@ impl Ledger {
     /// - Check double-entry invariants (Σ debits == Σ credits per currency)
     /// - Enforce credit limits
     /// - Validate parent links in Merkle-DAG
-    fn validate_entry(&self, entry: &JournalEntry) -> Result<()> {
+    /// - Check for frozen members (Issue #25)
+    fn validate_entry(&mut self, entry: &JournalEntry) -> Result<()> {
         // Check that entry has at least one account delta
         if entry.accounts.is_empty() {
             anyhow::bail!("Entry has no account deltas");
+        }
+
+        // Check for frozen members (Issue #25)
+        // Both the author and all affected accounts must not be frozen
+        if self.freeze_manager.is_frozen(&entry.author) {
+            anyhow::bail!(
+                "Entry author {} is frozen and cannot create transactions",
+                entry.author
+            );
+        }
+
+        for delta in &entry.accounts {
+            if self.freeze_manager.is_frozen(&delta.account_id) {
+                anyhow::bail!(
+                    "Account {} is frozen and cannot participate in transactions",
+                    delta.account_id
+                );
+            }
         }
 
         // Check double-entry invariant per currency
@@ -1071,5 +1197,204 @@ mod tests {
 
         let decision = last_decision.unwrap();
         assert_eq!(decision.accepted_count, 1);
+    }
+
+    // === Emergency Flow Tests (Issue #25) ===
+
+    #[test]
+    fn test_freeze_member_blocks_transactions_as_author() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Alice creates a successful entry before being frozen
+        let entry1 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let decision1 = ledger.merge_batch(vec![entry1]).unwrap();
+        assert_eq!(decision1.accepted_count, 1);
+
+        // Freeze Alice
+        ledger.freeze_member(alice.clone(), "Suspected fraud".to_string(), None);
+        assert!(ledger.is_member_frozen(&alice));
+
+        // Alice tries to create another entry - should be quarantined
+        let entry2 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 5)
+            .credit(bob.clone(), "hours".to_string(), 5)
+            .build()
+            .unwrap();
+
+        let decision2 = ledger.merge_batch(vec![entry2]).unwrap();
+        assert_eq!(decision2.accepted_count, 0);
+        assert_eq!(decision2.quarantined.len(), 1);
+
+        // Original balance should be unchanged
+        assert_eq!(ledger.get_balance(&alice, "hours"), 10);
+    }
+
+    #[test]
+    fn test_freeze_member_blocks_transactions_as_participant() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let charlie = KeyPair::generate().unwrap().did().clone();
+
+        // First transaction is fine
+        let entry1 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        ledger.merge_batch(vec![entry1]).unwrap();
+
+        // Freeze Bob (not the author, but a participant)
+        ledger.freeze_member(bob.clone(), "Account compromised".to_string(), None);
+        assert!(ledger.is_member_frozen(&bob));
+
+        // Charlie (not frozen) tries to transact with Bob (frozen) - should fail
+        let entry2 = JournalEntryBuilder::new(charlie.clone())
+            .debit(charlie.clone(), "hours".to_string(), 5)
+            .credit(bob.clone(), "hours".to_string(), 5)
+            .build()
+            .unwrap();
+
+        let decision = ledger.merge_batch(vec![entry2]).unwrap();
+        assert_eq!(decision.accepted_count, 0);
+        assert_eq!(decision.quarantined.len(), 1);
+
+        // Bob's balance should be unchanged
+        assert_eq!(ledger.get_balance(&bob, "hours"), -10);
+    }
+
+    #[test]
+    fn test_unfreeze_member_allows_transactions() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Freeze Alice
+        ledger.freeze_member(alice.clone(), "Investigation".to_string(), None);
+        assert!(ledger.is_member_frozen(&alice));
+
+        // Alice tries to transact - should fail
+        let entry1 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let decision1 = ledger.merge_batch(vec![entry1]).unwrap();
+        assert_eq!(decision1.quarantined.len(), 1);
+
+        // Unfreeze Alice
+        let removed = ledger.unfreeze_member(&alice, "Investigation complete".to_string());
+        assert!(removed.is_some());
+        assert!(!ledger.is_member_frozen(&alice));
+
+        // Alice should be able to transact now
+        let entry2 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let decision2 = ledger.merge_batch(vec![entry2]).unwrap();
+        assert_eq!(decision2.accepted_count, 1);
+        assert_eq!(ledger.get_balance(&alice, "hours"), 10);
+    }
+
+    #[test]
+    fn test_freeze_with_metadata() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let admin = KeyPair::generate().unwrap().did().clone();
+
+        // Freeze with full metadata
+        ledger.freeze_member_with_metadata(
+            alice.clone(),
+            "Fraud detected".to_string(),
+            Some(86400), // 24 hours
+            Some("proposal-freeze-123".to_string()),
+            Some(admin.clone()),
+        );
+
+        // Verify frozen
+        assert!(ledger.is_member_frozen(&alice));
+
+        // Get freeze record
+        let record = ledger.get_freeze_record(&alice).unwrap();
+        assert_eq!(record.reason, "Fraud detected");
+        assert_eq!(record.proposal_id, Some("proposal-freeze-123".to_string()));
+        assert_eq!(record.frozen_by, Some(admin));
+    }
+
+    #[test]
+    fn test_list_frozen_members() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let charlie = KeyPair::generate().unwrap().did().clone();
+
+        // Freeze two members
+        ledger.freeze_member(alice.clone(), "Reason A".to_string(), None);
+        ledger.freeze_member(bob.clone(), "Reason B".to_string(), Some(3600));
+
+        // List should have 2
+        assert_eq!(ledger.frozen_member_count(), 2);
+
+        // Charlie is not frozen
+        assert!(!ledger.is_member_frozen(&charlie));
+
+        // Unfreeze one
+        ledger.unfreeze_member(&alice, "Cleared".to_string());
+        assert_eq!(ledger.frozen_member_count(), 1);
+    }
+
+    #[test]
+    fn test_freeze_preserves_balance() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create some transactions first
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 50)
+            .credit(bob.clone(), "hours".to_string(), 50)
+            .build()
+            .unwrap();
+
+        ledger.merge_batch(vec![entry]).unwrap();
+        assert_eq!(ledger.get_balance(&alice, "hours"), 50);
+        assert_eq!(ledger.get_balance(&bob, "hours"), -50);
+
+        // Freeze both
+        ledger.freeze_member(alice.clone(), "Investigation".to_string(), None);
+        ledger.freeze_member(bob.clone(), "Investigation".to_string(), None);
+
+        // Balances should remain unchanged
+        assert_eq!(ledger.get_balance(&alice, "hours"), 50);
+        assert_eq!(ledger.get_balance(&bob, "hours"), -50);
+
+        // Unfreeze and verify still correct
+        ledger.unfreeze_member(&alice, "Clear".to_string());
+        ledger.unfreeze_member(&bob, "Clear".to_string());
+        assert_eq!(ledger.get_balance(&alice, "hours"), 50);
+        assert_eq!(ledger.get_balance(&bob, "hours"), -50);
     }
 }

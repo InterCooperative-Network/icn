@@ -1930,6 +1930,84 @@ impl Supervisor {
                                     info!("📋 Scheduling policy proposal {} accepted for {} (will be handled after compute initialization)",
                                           proposal_id.0, coop_id);
                                 }
+
+                                // === Emergency Proposals (Issue #25) ===
+
+                                ProposalPayload::FreezeMember { member, reason, duration_seconds } => {
+                                    info!("🔒 EMERGENCY: Freeze member proposal {} accepted - freezing {}",
+                                          proposal_id.0, member);
+
+                                    let ledger = ledger_clone.clone();
+                                    let prop_id = proposal_id.clone();
+
+                                    tokio::spawn(async move {
+                                        let mut ledger_guard = ledger.write().await;
+                                        ledger_guard.freeze_member_with_metadata(
+                                            member.clone(),
+                                            reason,
+                                            duration_seconds,
+                                            Some(prop_id.0.clone()),
+                                            None, // frozen_by is the governance system
+                                        );
+                                        info!("✅ Member {} frozen via proposal {}", member, prop_id.0);
+                                    });
+                                }
+
+                                ProposalPayload::UnfreezeMember { member, reason } => {
+                                    info!("🔓 EMERGENCY: Unfreeze member proposal {} accepted - unfreezing {}",
+                                          proposal_id.0, member);
+
+                                    let ledger = ledger_clone.clone();
+                                    let prop_id = proposal_id.clone();
+
+                                    tokio::spawn(async move {
+                                        let mut ledger_guard = ledger.write().await;
+                                        if let Some(_record) = ledger_guard.unfreeze_member_with_metadata(
+                                            &member,
+                                            reason,
+                                            Some(prop_id.0.clone()),
+                                            None,
+                                        ) {
+                                            info!("✅ Member {} unfrozen via proposal {}", member, prop_id.0);
+                                        } else {
+                                            warn!("⚠️ Member {} was not frozen, unfreeze proposal {} had no effect",
+                                                  member, prop_id.0);
+                                        }
+                                    });
+                                }
+
+                                ProposalPayload::VetoProposal { target_proposal_id, reason } => {
+                                    info!("🚫 EMERGENCY: Veto proposal {} accepted - vetoing proposal {}",
+                                          proposal_id.0, target_proposal_id);
+                                    info!("   Reason: {}", reason);
+                                    // TODO: Implement veto logic - mark target proposal as vetoed
+                                    // This requires governance store integration to update proposal state
+                                    warn!("⚠️ Veto proposal execution not yet implemented");
+                                }
+
+                                ProposalPayload::ForceCloseProposal { target_proposal_id, reason, forced_outcome } => {
+                                    info!("⚡ EMERGENCY: Force close proposal {} accepted - closing proposal {} as {:?}",
+                                          proposal_id.0, target_proposal_id, forced_outcome);
+                                    info!("   Reason: {}", reason);
+                                    // TODO: Implement force close logic
+                                    // This requires governance store integration to close proposal early
+                                    warn!("⚠️ Force close proposal execution not yet implemented");
+                                }
+
+                                ProposalPayload::RollbackLedger { target_hash, reason, ref affected_accounts } => {
+                                    error!("🚨 CRITICAL EMERGENCY: Ledger rollback proposal {} accepted",
+                                           proposal_id.0);
+                                    error!("   Target hash: {}", target_hash);
+                                    error!("   Reason: {}", reason);
+                                    error!("   Affected accounts: {:?}", affected_accounts);
+                                    // TODO: Implement ledger rollback logic
+                                    // This is a very dangerous operation that requires:
+                                    // 1. Verify target_hash exists in ledger
+                                    // 2. Archive entries after target_hash
+                                    // 3. Recompute balances from genesis to target_hash
+                                    // 4. Broadcast rollback notification to network
+                                    warn!("⚠️ Ledger rollback execution not yet implemented - MANUAL INTERVENTION REQUIRED");
+                                }
                             }
                         }
 

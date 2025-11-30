@@ -36,13 +36,13 @@ pub mod store;
 pub mod tally;
 pub mod vote;
 
-pub use config::{GovernanceConfig, GovernanceParams};
+pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
 pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use handle::GovernanceOps;
 pub use membership::{MembershipConfig, MembershipSource};
 pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
-pub use proposal::{MembershipAction, Proposal, ProposalId, ProposalPayload, ProposalState};
+pub use proposal::{ForcedOutcome, MembershipAction, Proposal, ProposalId, ProposalPayload, ProposalState};
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
 pub use store::{GovernanceStore, InMemoryGovernanceStore};
 pub use tally::VoteTally;

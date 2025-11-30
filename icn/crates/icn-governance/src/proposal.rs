@@ -135,6 +135,75 @@ pub enum ProposalPayload {
         /// New policy (JSON-encoded CoopSchedulingPolicy)
         policy_json: String,
     },
+
+    // === Emergency Proposals (Issue #25) ===
+
+    /// Freeze a member - blocks all ledger transactions for the member
+    ///
+    /// This is an emergency action requiring super-majority approval.
+    /// Used when a member's account may be compromised or they're acting maliciously.
+    FreezeMember {
+        /// Member DID to freeze
+        member: Did,
+        /// Reason for freezing
+        reason: String,
+        /// Duration in seconds (None = indefinite until unfrozen)
+        duration_seconds: Option<u64>,
+    },
+
+    /// Unfreeze a previously frozen member
+    UnfreezeMember {
+        /// Member DID to unfreeze
+        member: Did,
+        /// Reason for unfreezing
+        reason: String,
+    },
+
+    /// Veto an existing proposal before it closes
+    ///
+    /// Requires super-majority to override normal governance process.
+    VetoProposal {
+        /// ID of proposal to veto
+        target_proposal_id: String,
+        /// Reason for veto
+        reason: String,
+    },
+
+    /// Force close an open proposal immediately
+    ///
+    /// Used in emergencies when a proposal must be halted.
+    ForceCloseProposal {
+        /// ID of proposal to force close
+        target_proposal_id: String,
+        /// Reason for force closing
+        reason: String,
+        /// Outcome to set (Accepted, Rejected, or NoQuorum)
+        forced_outcome: ForcedOutcome,
+    },
+
+    /// Rollback ledger to a specific state
+    ///
+    /// This is the most severe emergency action - requires highest threshold.
+    /// Should only be used when ledger corruption or fraud is detected.
+    RollbackLedger {
+        /// Hash of the entry to roll back to
+        target_hash: String,
+        /// Reason for rollback
+        reason: String,
+        /// List of affected accounts (for notification)
+        affected_accounts: Vec<Did>,
+    },
+}
+
+/// Forced outcome for emergency proposal closure
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ForcedOutcome {
+    /// Force accept the proposal
+    Accept,
+    /// Force reject the proposal
+    Reject,
+    /// Cancel without outcome
+    Cancel,
 }
 
 /// Membership action
