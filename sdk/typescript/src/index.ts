@@ -368,6 +368,13 @@ export class ICNClient {
   // ===========================================================================
 
   /**
+   * List all cooperatives the authenticated user has access to
+   */
+  async listCoops(): Promise<Cooperative[]> {
+    return this.get<Cooperative[]>('/coops');
+  }
+
+  /**
    * Create a new cooperative
    */
   async createCoop(req: CreateCoopRequest): Promise<Cooperative> {

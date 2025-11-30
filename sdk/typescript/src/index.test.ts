@@ -1366,3 +1366,205 @@ describe('ICNSubscription', () => {
     expect(ICNSubscription).toBeDefined();
   });
 });
+
+describe('listCoops', () => {
+  it('should list all cooperatives', async () => {
+    const mockResponse = [
+      { id: 'coop-1', name: 'Coop 1', owner: 'did:icn:alice' },
+      { id: 'coop-2', name: 'Coop 2', owner: 'did:icn:bob' },
+    ];
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.listCoops();
+
+    expect(result).toEqual(mockResponse);
+    expect(result).toHaveLength(2);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/coops');
+  });
+});
+
+describe('waitForTask timeout', () => {
+  it('should throw timeout error when task never completes', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        task_hash: 'abc123',
+        status: 'pending',
+      }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    // Very short timeout to trigger the timeout path
+    await expect(client.waitForTask('abc123', 10, 50)).rejects.toThrow('Task polling timeout');
+  });
+});
+
+describe('auto-refresh - token refresh flow', () => {
+  it('should auto-refresh expired token before request', async () => {
+    // First two calls are for authentication (challenge + verify)
+    // Third call is for the actual request that triggers refresh
+    // Fourth and fifth calls are for re-authentication
+    // Sixth call is for the retried request
+    let callCount = 0;
+    const mockFetch = jest.fn().mockImplementation(async (url: string) => {
+      callCount++;
+      if (url.includes('/auth/challenge')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ challenge: 'test-challenge', expires_at: Date.now() + 60000 }),
+        };
+      }
+      if (url.includes('/auth/verify')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ token: `token-${callCount}`, expires_at: Math.floor(Date.now() / 1000) + 3600 }),
+        };
+      }
+      // Any other request (e.g., /coops)
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 'coop-1', name: 'Test Coop' }],
+      };
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      autoRefresh: true,
+      refreshBeforeExpiry: 120, // Refresh 2 minutes before expiry
+    });
+
+    const signer = { sign: async (msg: string) => `signed-${msg}` };
+
+    // First authenticate - this sets up the token and stores signer for auto-refresh
+    await client.authenticate('did:icn:alice', signer, 'my-coop', ['coop:read']);
+    expect(client.hasToken()).toBe(true);
+
+    // Now manually set the token to be "expired" (within refresh window)
+    const almostExpired = Math.floor(Date.now() / 1000) + 60; // Expires in 60s, but refresh window is 120s
+    client.setToken('old-token', almostExpired);
+    expect(client.isTokenExpired()).toBe(true);
+
+    // Make a request - should trigger auto-refresh
+    await client.listCoops();
+
+    // Should have called authenticate again (challenge + verify) + the actual request
+    // Total: 2 (initial auth) + 2 (refresh auth) + 1 (listCoops) = 5 calls
+    expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('should not refresh if autoRefresh is disabled', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 'coop-1', name: 'Test Coop' }],
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+      autoRefresh: false, // Disabled
+    });
+
+    // Set expired token
+    const expiredTime = Math.floor(Date.now() / 1000) - 100;
+    client.setToken('expired-token', expiredTime);
+
+    // Should proceed without refresh attempt
+    await client.listCoops();
+
+    // Only 1 call (the actual request), no refresh
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createClient helper', () => {
+  it('should create client using createClient function', () => {
+    const { createClient } = require('./index');
+    const client = createClient({ baseUrl: 'http://localhost:8080' });
+    expect(client).toBeInstanceOf(ICNClient);
+  });
+});
+
+describe('edge cases', () => {
+  it('should handle 204 No Content response', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => undefined,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    // deleteCoop returns void (204)
+    const result = await client.deleteCoop('my-coop');
+    expect(result).toBeUndefined();
+  });
+
+  it('should require auth for protected endpoints', async () => {
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      // No token set
+    });
+
+    await expect(client.listCoops()).rejects.toThrow('Authentication required');
+  });
+
+  it('should handle abort error as timeout', async () => {
+    // Create a proper DOMException-like error for AbortError
+    const abortError = new DOMException('The operation was aborted', 'AbortError');
+
+    const mockFetch = jest.fn().mockRejectedValue(abortError);
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      retry: { maxRetries: 0 }, // Disable retries
+    });
+
+    await expect(client.health()).rejects.toThrow('Request timeout');
+  }, 10000);
+
+  it('should handle error response without json body', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: async () => { throw new Error('No JSON'); },
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      retry: { maxRetries: 0 }, // Disable retries for this test
+    });
+
+    await expect(client.health()).rejects.toThrow('Internal Server Error');
+  });
+});
