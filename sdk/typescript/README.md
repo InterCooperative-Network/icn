@@ -79,6 +79,44 @@ const auth = await client.authenticate('did:icn:alice', signer, 'my-coop');
 // Token is automatically set
 ```
 
+### Automatic Token Refresh
+
+Enable `autoRefresh` to automatically re-authenticate when the token expires:
+
+```typescript
+const client = new ICNClient({
+  baseUrl: 'http://localhost:8080',
+  autoRefresh: true,
+  refreshBeforeExpiry: 60,  // Refresh 60 seconds before expiry
+});
+
+// Authenticate once - credentials are stored for auto-refresh
+await client.authenticate('did:icn:alice', signer, 'my-coop');
+
+// Token will be automatically refreshed before expiring
+// No need to handle 401 errors manually
+```
+
+## Retry Logic
+
+The SDK includes built-in retry logic with exponential backoff:
+
+```typescript
+const client = new ICNClient({
+  baseUrl: 'http://localhost:8080',
+  retry: {
+    maxRetries: 3,           // Default: 3
+    initialDelayMs: 1000,    // Default: 1000ms
+    maxDelayMs: 10000,       // Default: 10000ms
+    backoffMultiplier: 2,    // Default: 2
+    jitterFactor: 0.1,       // Default: 0.1 (10%)
+    retryableStatuses: [408, 429, 500, 502, 503, 504],  // Default
+  }
+});
+```
+
+Retries are automatic for transient errors (5xx, 429 rate limiting).
+
 ## API Reference
 
 ### Cooperatives
@@ -205,6 +243,8 @@ await client.cancelTask(task.task_hash, { reason: 'No longer needed' });
 
 ### WebSocket Events
 
+#### Basic Connection
+
 ```typescript
 const ws = client.connectWebSocket('food-coop', {
   onOpen: () => {
@@ -225,6 +265,46 @@ const ws = client.connectWebSocket('food-coop', {
 
 // Close when done
 ws.close();
+```
+
+#### Managed Subscription with Auto-Reconnect
+
+Use `ICNSubscription` for production apps that need resilient connections:
+
+```typescript
+import { ICNClient, ICNSubscription } from '@icn/client';
+
+const subscription = client.subscribe('food-coop', {
+  onEvent: (event) => {
+    console.log('Event received:', event);
+  },
+  onAuthOk: (did) => {
+    console.log('Authenticated as:', did);
+  },
+  onReconnect: (attempt) => {
+    console.log(`Reconnecting... attempt ${attempt}`);
+  },
+  onError: (error) => {
+    console.error('Error:', error);
+  },
+  onDisconnect: () => {
+    console.log('Disconnected');
+  }
+}, {
+  autoReconnect: true,           // Default: true
+  maxReconnectAttempts: 10,      // Default: 10
+  reconnectDelayMs: 1000,        // Default: 1000ms
+  maxReconnectDelayMs: 30000,    // Default: 30000ms
+});
+
+// Check connection status
+console.log('Connected:', subscription.isConnected());
+
+// Send a message
+subscription.send({ type: 'Ping' });
+
+// Close the subscription (stops auto-reconnect)
+subscription.close();
 ```
 
 ## Error Handling
