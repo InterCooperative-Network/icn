@@ -687,7 +687,8 @@
                         <h2>Community Members</h2>
                         <div class="member-controls">
                             <input type="text" id="member-search" placeholder="Search members..." />
-                            <button id="import-members-btn" class="btn btn-primary">Import CSV</button>
+                            <button id="add-member-btn" class="btn btn-primary admin-only hidden">+ Add Member</button>
+                            <button id="import-members-btn" class="btn btn-secondary">Import CSV</button>
                         </div>
                     </div>
                     <div id="member-list" class="member-list">
@@ -817,6 +818,90 @@ did:icn:charlie789,member,0</code></pre>
                             <button id="import-next-btn" class="btn btn-primary" disabled>Next</button>
                             <button id="import-confirm-btn" class="btn btn-primary hidden" disabled>Import Members</button>
                             <button id="import-close-btn" class="btn btn-primary hidden">Close</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Member Modal -->
+                <div id="add-member-modal" class="modal hidden" role="dialog" aria-labelledby="add-member-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="add-member-title">Add Member</h2>
+                            <button id="close-add-member" class="modal-close" aria-label="Close add member dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="add-member-form">
+                                <div class="form-group">
+                                    <label for="new-member-did">Member DID</label>
+                                    <input type="text" id="new-member-did" placeholder="did:icn:..." required />
+                                    <p class="help-text">The decentralized identifier of the member to add</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="new-member-role">Role</label>
+                                    <select id="new-member-role" required>
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                    <p class="help-text">Admins can manage members and settings</p>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="add-member-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="add-member-submit-btn" class="btn btn-primary">Add Member</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Member Role Modal -->
+                <div id="edit-member-modal" class="modal hidden" role="dialog" aria-labelledby="edit-member-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="edit-member-title">Edit Member Role</h2>
+                            <button id="close-edit-member" class="modal-close" aria-label="Close edit member dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <p id="edit-member-did-display" class="member-did-display"></p>
+                            <input type="hidden" id="edit-member-did" />
+
+                            <div class="form-group">
+                                <label for="edit-member-role">New Role</label>
+                                <select id="edit-member-role" required>
+                                    <option value="member">Member</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="edit-member-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="edit-member-submit-btn" class="btn btn-primary">Update Role</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remove Member Confirmation Modal -->
+                <div id="remove-member-modal" class="modal hidden" role="dialog" aria-labelledby="remove-member-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="remove-member-title">Remove Member</h2>
+                            <button id="close-remove-member" class="modal-close" aria-label="Close remove member dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <p class="warning-text">Are you sure you want to remove this member?</p>
+                            <p id="remove-member-did-display" class="member-did-display"></p>
+                            <input type="hidden" id="remove-member-did" />
+                            <p class="help-text">This action cannot be undone. The member will lose access to the cooperative.</p>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="remove-member-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="remove-member-submit-btn" class="btn btn-danger">Remove Member</button>
                         </div>
                     </div>
                 </div>

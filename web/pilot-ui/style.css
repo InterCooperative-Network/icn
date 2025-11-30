@@ -569,6 +569,24 @@ code {
     background: var(--primary-dark);
 }
 
+.btn-secondary {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.btn-secondary:hover {
+    background: var(--gray-300);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c53030;
+}
+
 .btn-small {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
@@ -952,6 +970,65 @@ main {
     color: white;
 }
 
+/* Member Actions (Admin Only) */
+.member-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+    padding-left: 1rem;
+}
+
+.member-actions .btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.member-actions .btn-edit {
+    background: var(--primary);
+    color: white;
+}
+
+.member-actions .btn-edit:hover {
+    background: var(--primary-dark);
+}
+
+.member-actions .btn-remove {
+    background: var(--danger);
+    color: white;
+}
+
+.member-actions .btn-remove:hover {
+    background: #c53030;
+}
+
+/* Admin-only elements */
+.admin-only {
+    display: none;
+}
+
+.is-admin .admin-only,
+.is-owner .admin-only {
+    display: inline-flex;
+}
+
+/* Member DID display in modals */
+.member-did-display {
+    font-family: monospace;
+    font-size: 0.875rem;
+    background: var(--gray-100);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    word-break: break-all;
+}
+
+/* Warning text in modals */
+.warning-text {
+    color: var(--danger);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
 /* Proposal List */
 .proposal-list {
     max-height: 500px;
@@ -1207,6 +1284,10 @@ footer {
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content.modal-small {
+    max-width: 400px;
 }
 
 .modal-header {

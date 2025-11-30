@@ -9,6 +9,7 @@ const state = {
     did: '',
     token: '',
     tokenExpiry: null,  // Track when token expires
+    userRole: null,     // Track current user's role (owner, admin, member)
     members: [],
     transactions: [],
     proposals: [],
@@ -469,6 +470,28 @@ async function loadMembers() {
     try {
         const members = await apiRequest('GET', `/coops/${state.coopId}/members`);
         state.members = members;
+
+        // Determine current user's role
+        const currentUser = members.find(m => m.did === state.did);
+        state.userRole = currentUser?.role || 'member';
+
+        // Update body class for admin-only elements
+        document.body.classList.remove('is-owner', 'is-admin');
+        if (state.userRole === 'owner') {
+            document.body.classList.add('is-owner');
+        } else if (state.userRole === 'admin') {
+            document.body.classList.add('is-admin');
+        }
+
+        // Show/hide add member button
+        const addMemberBtn = document.getElementById('add-member-btn');
+        if (addMemberBtn) {
+            if (state.userRole === 'owner' || state.userRole === 'admin') {
+                addMemberBtn.classList.remove('hidden');
+            } else {
+                addMemberBtn.classList.add('hidden');
+            }
+        }
 
         elements.totalMembers.textContent = members.length;
 
@@ -2870,6 +2893,12 @@ function initializeMemberPagination() {
         renderItem: (member) => {
             const balance = parseFloat(member.balance || 0);
             const balanceClass = balance >= 0 ? 'positive' : 'negative';
+            const isCurrentUser = member.did === state.did;
+            const isOwner = member.role === 'owner';
+            const canManage = state.userRole === 'owner' || state.userRole === 'admin';
+
+            // Only show action buttons for non-owners and non-self
+            const showActions = canManage && !isOwner && !isCurrentUser;
 
             return `
                 <div class="member-item">
@@ -2878,7 +2907,7 @@ function initializeMemberPagination() {
                     </div>
                     <div class="member-info">
                         <div class="member-did">${truncateDid(member.did)}</div>
-                        <div class="member-role">${member.role || 'Member'}</div>
+                        <div class="member-role ${member.role || ''}">${member.role || 'Member'}</div>
                     </div>
                     <div class="member-balance ${balanceClass}">
                         ${balance.toFixed(1)} hours
@@ -2891,6 +2920,25 @@ function initializeMemberPagination() {
                     >
                         📋 Copy
                     </button>
+                    ${showActions ? `
+                    <div class="member-actions">
+                        <button
+                            class="btn btn-small btn-edit"
+                            data-did="${member.did}"
+                            data-role="${member.role || 'member'}"
+                            title="Edit role"
+                        >
+                            ✏️
+                        </button>
+                        <button
+                            class="btn btn-small btn-remove"
+                            data-did="${member.did}"
+                            title="Remove member"
+                        >
+                            🗑️
+                        </button>
+                    </div>
+                    ` : ''}
                 </div>
             `;
         }
@@ -3857,3 +3905,215 @@ function initializeLanguageSwitcher() {
 
 // Initialize language switcher after DOM loads
 document.addEventListener('DOMContentLoaded', initializeLanguageSwitcher);
+
+// ============================================================================
+// Phase 10: Admin Member Management
+// ============================================================================
+
+/**
+ * Add a new member to the cooperative
+ */
+async function addMember(did, role) {
+    try {
+        await apiRequest('POST', `/coops/${state.coopId}/members`, { did, role });
+        showToast(`Member ${truncateDid(did)} added successfully`, 'success');
+        await loadMembers(); // Reload member list
+    } catch (error) {
+        console.error('Failed to add member:', error);
+        showToast(getUserFriendlyError(error), 'error');
+        throw error;
+    }
+}
+
+/**
+ * Remove a member from the cooperative
+ */
+async function removeMember(did) {
+    try {
+        await apiRequest('DELETE', `/coops/${state.coopId}/members/${encodeURIComponent(did)}`);
+        showToast(`Member ${truncateDid(did)} removed`, 'success');
+        await loadMembers(); // Reload member list
+    } catch (error) {
+        console.error('Failed to remove member:', error);
+        showToast(getUserFriendlyError(error), 'error');
+        throw error;
+    }
+}
+
+/**
+ * Update a member's role
+ */
+async function updateMemberRole(did, newRole) {
+    try {
+        await apiRequest('PUT', `/coops/${state.coopId}/members/${encodeURIComponent(did)}/role`, { role: newRole });
+        showToast(`Updated ${truncateDid(did)} to ${newRole}`, 'success');
+        await loadMembers(); // Reload member list
+    } catch (error) {
+        console.error('Failed to update member role:', error);
+        showToast(getUserFriendlyError(error), 'error');
+        throw error;
+    }
+}
+
+/**
+ * Initialize member management modals and event listeners
+ */
+function initializeMemberManagement() {
+    // Add Member Modal
+    const addMemberBtn = document.getElementById('add-member-btn');
+    const addMemberModal = document.getElementById('add-member-modal');
+    const closeAddMember = document.getElementById('close-add-member');
+    const addMemberCancel = document.getElementById('add-member-cancel-btn');
+    const addMemberSubmit = document.getElementById('add-member-submit-btn');
+    const newMemberDid = document.getElementById('new-member-did');
+    const newMemberRole = document.getElementById('new-member-role');
+
+    if (addMemberBtn && addMemberModal) {
+        addMemberBtn.addEventListener('click', () => {
+            addMemberModal.classList.remove('hidden');
+            newMemberDid.value = '';
+            newMemberRole.value = 'member';
+            newMemberDid.focus();
+        });
+
+        closeAddMember?.addEventListener('click', () => {
+            addMemberModal.classList.add('hidden');
+        });
+
+        addMemberCancel?.addEventListener('click', () => {
+            addMemberModal.classList.add('hidden');
+        });
+
+        addMemberSubmit?.addEventListener('click', async () => {
+            const did = newMemberDid.value.trim();
+            const role = newMemberRole.value;
+
+            if (!did) {
+                showToast('Please enter a DID', 'error');
+                return;
+            }
+
+            if (!did.startsWith('did:icn:')) {
+                showToast('DID must start with "did:icn:"', 'error');
+                return;
+            }
+
+            addMemberSubmit.disabled = true;
+            addMemberSubmit.textContent = 'Adding...';
+
+            try {
+                await addMember(did, role);
+                addMemberModal.classList.add('hidden');
+            } catch (e) {
+                // Error already shown via toast
+            } finally {
+                addMemberSubmit.disabled = false;
+                addMemberSubmit.textContent = 'Add Member';
+            }
+        });
+    }
+
+    // Edit Member Modal
+    const editMemberModal = document.getElementById('edit-member-modal');
+    const closeEditMember = document.getElementById('close-edit-member');
+    const editMemberCancel = document.getElementById('edit-member-cancel-btn');
+    const editMemberSubmit = document.getElementById('edit-member-submit-btn');
+    const editMemberDid = document.getElementById('edit-member-did');
+    const editMemberDidDisplay = document.getElementById('edit-member-did-display');
+    const editMemberRole = document.getElementById('edit-member-role');
+
+    if (editMemberModal) {
+        closeEditMember?.addEventListener('click', () => {
+            editMemberModal.classList.add('hidden');
+        });
+
+        editMemberCancel?.addEventListener('click', () => {
+            editMemberModal.classList.add('hidden');
+        });
+
+        editMemberSubmit?.addEventListener('click', async () => {
+            const did = editMemberDid.value;
+            const newRole = editMemberRole.value;
+
+            editMemberSubmit.disabled = true;
+            editMemberSubmit.textContent = 'Updating...';
+
+            try {
+                await updateMemberRole(did, newRole);
+                editMemberModal.classList.add('hidden');
+            } catch (e) {
+                // Error already shown via toast
+            } finally {
+                editMemberSubmit.disabled = false;
+                editMemberSubmit.textContent = 'Update Role';
+            }
+        });
+    }
+
+    // Remove Member Modal
+    const removeMemberModal = document.getElementById('remove-member-modal');
+    const closeRemoveMember = document.getElementById('close-remove-member');
+    const removeMemberCancel = document.getElementById('remove-member-cancel-btn');
+    const removeMemberSubmit = document.getElementById('remove-member-submit-btn');
+    const removeMemberDid = document.getElementById('remove-member-did');
+    const removeMemberDidDisplay = document.getElementById('remove-member-did-display');
+
+    if (removeMemberModal) {
+        closeRemoveMember?.addEventListener('click', () => {
+            removeMemberModal.classList.add('hidden');
+        });
+
+        removeMemberCancel?.addEventListener('click', () => {
+            removeMemberModal.classList.add('hidden');
+        });
+
+        removeMemberSubmit?.addEventListener('click', async () => {
+            const did = removeMemberDid.value;
+
+            removeMemberSubmit.disabled = true;
+            removeMemberSubmit.textContent = 'Removing...';
+
+            try {
+                await removeMember(did);
+                removeMemberModal.classList.add('hidden');
+            } catch (e) {
+                // Error already shown via toast
+            } finally {
+                removeMemberSubmit.disabled = false;
+                removeMemberSubmit.textContent = 'Remove Member';
+            }
+        });
+    }
+
+    // Delegate event handlers for edit/remove buttons in member list
+    document.addEventListener('click', (e) => {
+        // Edit button
+        if (e.target.closest('.btn-edit')) {
+            const btn = e.target.closest('.btn-edit');
+            const did = btn.dataset.did;
+            const currentRole = btn.dataset.role;
+
+            if (editMemberModal && editMemberDid && editMemberDidDisplay && editMemberRole) {
+                editMemberDid.value = did;
+                editMemberDidDisplay.textContent = did;
+                editMemberRole.value = currentRole || 'member';
+                editMemberModal.classList.remove('hidden');
+            }
+        }
+
+        // Remove button
+        if (e.target.closest('.btn-remove')) {
+            const btn = e.target.closest('.btn-remove');
+            const did = btn.dataset.did;
+
+            if (removeMemberModal && removeMemberDid && removeMemberDidDisplay) {
+                removeMemberDid.value = did;
+                removeMemberDidDisplay.textContent = did;
+                removeMemberModal.classList.remove('hidden');
+            }
+        }
+    });
+}
+
+// Initialize member management after DOM loads
+document.addEventListener('DOMContentLoaded', initializeMemberManagement);
