@@ -2,7 +2,7 @@
 # Multi-stage build for minimal image size
 
 # Stage 1: Builder
-FROM rust:1.75-slim as builder
+FROM rust:slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -22,8 +22,8 @@ COPY bins ./bins
 # Build release binaries
 RUN cargo build --release --bins
 
-# Stage 2: Runtime
-FROM debian:bookworm-slim
+# Stage 2: Runtime (must match builder's glibc version)
+FROM debian:trixie-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \

@@ -13,8 +13,6 @@
 #   docker compose -f docker-compose.test.yml logs -f node1
 #   docker compose -f docker-compose.test.yml down
 
-version: '3.8'
-
 services:
   # Honest Node 1
   node1:
@@ -30,16 +28,16 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=info
-    command: ["--data-dir", "/data"]
+    command: ["--config", "/config/node1.toml"]
     ports:
       - "5001:5001"    # P2P
-      - "9091:9090"    # Metrics
+      - "9091:9100"    # Metrics (daemon runs on 9100)
       - "8081:8080"    # Gateway (if enabled)
     networks:
       - icn_test
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -58,16 +56,16 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=info
-    command: ["--data-dir", "/data"]
+    command: ["--config", "/config/node2.toml"]
     ports:
       - "5002:5002"
-      - "9092:9090"
+      - "9092:9100"    # Metrics (daemon runs on 9100)
       - "8082:8080"
     networks:
       - icn_test
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -86,16 +84,16 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=info
-    command: ["--data-dir", "/data"]
+    command: ["--config", "/config/node3.toml"]
     ports:
       - "5003:5003"
-      - "9093:9090"
+      - "9093:9100"    # Metrics (daemon runs on 9100)
       - "8083:8080"
     networks:
       - icn_test
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -117,7 +115,7 @@ services:
     command: ["--data-dir", "/data"]
     ports:
       - "5004:5004"
-      - "9094:9090"
+      - "9094:9100"    # Metrics (daemon runs on 9100)
       - "8084:8080"
     networks:
       - icn_test
@@ -125,7 +123,7 @@ services:
     profiles:
       - byzantine  # Only start with: --profile byzantine
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -147,7 +145,7 @@ services:
       - '--web.enable-lifecycle'
       - '--storage.tsdb.retention.time=7d'
     ports:
-      - "9090:9090"
+      - "9095:9090"  # Host port 9095 to avoid conflict with VS Code
     networks:
       - icn_test
     restart: unless-stopped
