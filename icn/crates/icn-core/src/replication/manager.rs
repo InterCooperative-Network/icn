@@ -133,16 +133,23 @@ impl ReplicationManager {
 
     /// Check replication health for all content hashes
     async fn check_all_content(&mut self) -> Result<()> {
+        use std::time::Instant;
+
         debug!("Running replication health check");
+        let start = Instant::now();
 
         // Get all content hashes with replica metadata
         let content_hashes = self.store.list_replica_hashes()?;
 
         let mut under_replicated = 0;
         let mut healthy = 0;
+        let mut total_replicas = 0;
+        let mut healthy_replicas = 0;
+        let mut stale_replicas = 0;
+        let mut unreachable_replicas = 0;
 
-        for hash in content_hashes {
-            match self.check_content_replication(&hash).await {
+        for hash in &content_hashes {
+            match self.check_content_replication(hash).await {
                 Ok(true) => healthy += 1,
                 Ok(false) => under_replicated += 1,
                 Err(e) => {
@@ -153,11 +160,36 @@ impl ReplicationManager {
                     );
                 }
             }
+
+            // Count replicas by health status
+            if let Ok(Some(metadata)) = self.store.get_replica_metadata(hash) {
+                total_replicas += metadata.replicas.len();
+                for replica in &metadata.replicas {
+                    match replica.health {
+                        ReplicaHealth::Healthy => healthy_replicas += 1,
+                        ReplicaHealth::Stale => stale_replicas += 1,
+                        ReplicaHealth::Unreachable => unreachable_replicas += 1,
+                    }
+                }
+            }
         }
 
+        // Emit metrics
+        icn_obs::metrics::replication::content_total_set(content_hashes.len());
+        icn_obs::metrics::replication::content_healthy_set(healthy);
+        icn_obs::metrics::replication::content_under_replicated_set(under_replicated);
+        icn_obs::metrics::replication::replicas_total_set(total_replicas);
+        icn_obs::metrics::replication::replicas_healthy_set(healthy_replicas);
+        icn_obs::metrics::replication::replicas_stale_set(stale_replicas);
+        icn_obs::metrics::replication::replicas_unreachable_set(unreachable_replicas);
+        icn_obs::metrics::replication::health_checks_inc();
+        icn_obs::metrics::replication::health_check_duration_record(start.elapsed().as_secs_f64());
+
         info!(
-            "Replication health check complete: {} healthy, {} under-replicated",
-            healthy, under_replicated
+            "Replication health check complete: {} healthy, {} under-replicated (duration: {:?})",
+            healthy,
+            under_replicated,
+            start.elapsed()
         );
 
         Ok(())
@@ -251,6 +283,7 @@ impl ReplicationManager {
 
         // Get trusted peers who could serve as replicas
         let candidate_peers = self.select_replica_candidates(metadata).await?;
+        icn_obs::metrics::replication::candidates_evaluated_inc(candidate_peers.len() as u64);
 
         if candidate_peers.is_empty() {
             warn!(
@@ -266,6 +299,8 @@ impl ReplicationManager {
         if !peers_to_request.is_empty() {
             let gossip = self.gossip.read().await;
             gossip.request_replicas(hash, &peers_to_request);
+
+            icn_obs::metrics::replication::requests_sent_inc(peers_to_request.len() as u64);
 
             for peer_did in &peers_to_request {
                 debug!(

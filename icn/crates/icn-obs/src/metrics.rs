@@ -623,6 +623,76 @@ pub fn init_descriptions() {
         "Number of peer X25519 keys in last snapshot"
     );
 
+    // Replication metrics (Phase 17)
+    describe_gauge!(
+        "icn_replication_content_total",
+        "Total number of content hashes being replicated"
+    );
+    describe_gauge!(
+        "icn_replication_content_healthy",
+        "Number of content hashes with sufficient healthy replicas"
+    );
+    describe_gauge!(
+        "icn_replication_content_under_replicated",
+        "Number of content hashes below target replica count"
+    );
+    describe_gauge!(
+        "icn_replication_replicas_total",
+        "Total number of replicas across all content"
+    );
+    describe_gauge!(
+        "icn_replication_replicas_healthy",
+        "Number of replicas with Healthy status"
+    );
+    describe_gauge!(
+        "icn_replication_replicas_stale",
+        "Number of replicas with Stale status"
+    );
+    describe_gauge!(
+        "icn_replication_replicas_unreachable",
+        "Number of replicas with Unreachable status"
+    );
+    describe_counter!(
+        "icn_replication_requests_sent_total",
+        "Total number of replica requests sent to peers"
+    );
+    describe_counter!(
+        "icn_replication_requests_received_total",
+        "Total number of replica requests received from peers"
+    );
+    describe_counter!(
+        "icn_replication_offers_sent_total",
+        "Total number of replica offers sent"
+    );
+    describe_counter!(
+        "icn_replication_offers_received_total",
+        "Total number of replica offers received"
+    );
+    describe_counter!(
+        "icn_replication_health_checks_total",
+        "Total number of replication health checks performed"
+    );
+    describe_histogram!(
+        "icn_replication_health_check_duration_seconds",
+        "Duration of replication health checks in seconds"
+    );
+    describe_counter!(
+        "icn_replication_candidates_evaluated_total",
+        "Total number of replica candidates evaluated"
+    );
+    describe_counter!(
+        "icn_replication_candidates_rejected_trust_total",
+        "Total number of replica candidates rejected due to insufficient trust"
+    );
+    describe_counter!(
+        "icn_replication_status_transitions_total",
+        "Total number of replica status transitions by from/to status"
+    );
+    describe_histogram!(
+        "icn_replication_replica_age_seconds",
+        "Age of replicas by health status (last_seen)"
+    );
+
     // Gateway API metrics
     describe_counter!(
         "icn_gateway_requests_total",
@@ -1743,6 +1813,55 @@ pub mod snapshot {
 
     pub fn network_x25519_keys_set(count: usize) {
         gauge!("icn_snapshot_network_x25519_keys").set(count as f64);
+    }
+}
+
+/// Replication metrics (Phase 17)
+pub mod replication {
+    use metrics::{counter, gauge, histogram};
+
+    pub fn content_total_set(count: usize) {
+        gauge!("icn_replication_content_total").set(count as f64);
+    }
+
+    pub fn content_healthy_set(count: usize) {
+        gauge!("icn_replication_content_healthy").set(count as f64);
+    }
+
+    pub fn content_under_replicated_set(count: usize) {
+        gauge!("icn_replication_content_under_replicated").set(count as f64);
+    }
+
+    pub fn replicas_total_set(count: usize) {
+        gauge!("icn_replication_replicas_total").set(count as f64);
+    }
+
+    pub fn replicas_healthy_set(count: usize) {
+        gauge!("icn_replication_replicas_healthy").set(count as f64);
+    }
+
+    pub fn replicas_stale_set(count: usize) {
+        gauge!("icn_replication_replicas_stale").set(count as f64);
+    }
+
+    pub fn replicas_unreachable_set(count: usize) {
+        gauge!("icn_replication_replicas_unreachable").set(count as f64);
+    }
+
+    pub fn requests_sent_inc(count: u64) {
+        counter!("icn_replication_requests_sent_total").increment(count);
+    }
+
+    pub fn health_checks_inc() {
+        counter!("icn_replication_health_checks_total").increment(1);
+    }
+
+    pub fn health_check_duration_record(duration_secs: f64) {
+        histogram!("icn_replication_health_check_duration_seconds").record(duration_secs);
+    }
+
+    pub fn candidates_evaluated_inc(count: u64) {
+        counter!("icn_replication_candidates_evaluated_total").increment(count);
     }
 }
 
