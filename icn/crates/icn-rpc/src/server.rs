@@ -18,8 +18,10 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use metrics::{counter, gauge, histogram};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -223,12 +225,18 @@ async fn handle_request(
         Ok(req) => req,
         Err(e) => {
             warn!("Failed to parse RPC request: {}", e);
+            counter!("icn_rpc_errors_total", "method" => "unknown", "error_code" => "-32700").increment(1);
             let response = RpcResponse::error(0, -32700, "Parse error".to_string());
             return Ok(json_response(StatusCode::OK, &response));
         }
     };
 
+    let method = rpc_request.method.clone();
     debug!("RPC request: {:?}", rpc_request);
+
+    // Track active requests
+    gauge!("icn_rpc_active_requests").increment(1.0);
+    let start_time = Instant::now();
 
     // Check authentication if enabled
     let claims: Option<RpcTokenClaims> = if let Some(auth_manager) = &state.auth_manager {
@@ -244,6 +252,8 @@ async fn handle_request(
                                 "Insufficient scope for method {}: required {}, has {:?}",
                                 rpc_request.method, required_scope, claims.scopes
                             );
+                            counter!("icn_rpc_auth_failures_total", "reason" => "insufficient_scope").increment(1);
+                            gauge!("icn_rpc_active_requests").decrement(1.0);
                             let response = RpcResponse::error(
                                 rpc_request.id,
                                 -32403,
@@ -255,6 +265,8 @@ async fn handle_request(
                     }
                     Err(e) => {
                         warn!("Token verification failed: {}", e);
+                        counter!("icn_rpc_auth_failures_total", "reason" => "invalid_token").increment(1);
+                        gauge!("icn_rpc_active_requests").decrement(1.0);
                         let response = RpcResponse::error(
                             rpc_request.id,
                             -32401,
@@ -268,6 +280,8 @@ async fn handle_request(
                         "Missing Authorization header for method {}",
                         rpc_request.method
                     );
+                    counter!("icn_rpc_auth_failures_total", "reason" => "missing_token").increment(1);
+                    gauge!("icn_rpc_active_requests").decrement(1.0);
                     let response = RpcResponse::error(
                         rpc_request.id,
                         -32401,
@@ -286,8 +300,26 @@ async fn handle_request(
         None
     };
 
+    // Increment request counter
+    counter!("icn_rpc_requests_total", "method" => method.clone()).increment(1);
+
     // Dispatch to handler with claims
     let response = dispatch_request(&rpc_request, &state, claims.as_ref()).await;
+
+    // Record duration and decrement active requests
+    let duration = start_time.elapsed().as_secs_f64();
+    histogram!("icn_rpc_request_duration_seconds", "method" => method.clone()).record(duration);
+    gauge!("icn_rpc_active_requests").decrement(1.0);
+
+    // Track errors
+    if response.error.is_some() {
+        let error_code = response
+            .error
+            .as_ref()
+            .map(|e| e.code.to_string())
+            .unwrap_or_default();
+        counter!("icn_rpc_errors_total", "method" => method, "error_code" => error_code).increment(1);
+    }
 
     Ok(json_response(StatusCode::OK, &response))
 }
@@ -373,7 +405,10 @@ async fn dispatch_request(
         "recovery.finalize" => handle_recovery_finalize(req.id, &req.params, state).await,
         "recovery.cancel" => handle_recovery_cancel(req.id, &req.params, state, claims).await,
 
-        _ => RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method)),
+        _ => {
+            counter!("icn_rpc_method_not_found_total").increment(1);
+            RpcResponse::error(req.id, -32601, format!("Method not found: {}", req.method))
+        }
     }
 }
 
@@ -421,6 +456,7 @@ async fn handle_auth_challenge(
     // Create challenge
     match auth_manager.create_challenge(&did) {
         Ok(nonce) => {
+            counter!("icn_rpc_auth_challenges_total").increment(1);
             let response = serde_json::json!({
                 "nonce": nonce,
                 "expires_in_seconds": 300
@@ -479,8 +515,10 @@ async fn handle_auth_verify(
     };
 
     // Verify challenge and issue token
+    counter!("icn_rpc_auth_verifications_total").increment(1);
     match auth_manager.verify_challenge(&did, &signature_bytes, params.scopes) {
         Ok(token) => {
+            counter!("icn_rpc_auth_successes_total").increment(1);
             let response = serde_json::json!({
                 "token": token,
                 "token_type": "Bearer",
@@ -488,7 +526,10 @@ async fn handle_auth_verify(
             });
             RpcResponse::success(id, response)
         }
-        Err(e) => RpcResponse::error(id, -32401, format!("Authentication failed: {e}")),
+        Err(e) => {
+            counter!("icn_rpc_auth_failures_total", "reason" => "verification_failed").increment(1);
+            RpcResponse::error(id, -32401, format!("Authentication failed: {e}"))
+        }
     }
 }
 

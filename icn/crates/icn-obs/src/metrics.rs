@@ -795,6 +795,44 @@ pub fn init_descriptions() {
         "Total number of governance votes cast"
     );
 
+    // RPC metrics
+    describe_counter!(
+        "icn_rpc_requests_total",
+        "Total number of RPC requests by method"
+    );
+    describe_counter!(
+        "icn_rpc_errors_total",
+        "Total number of RPC errors by method and error code"
+    );
+    describe_histogram!(
+        "icn_rpc_request_duration_seconds",
+        "RPC request duration in seconds by method"
+    );
+    describe_counter!(
+        "icn_rpc_auth_challenges_total",
+        "Total number of RPC auth challenges issued"
+    );
+    describe_counter!(
+        "icn_rpc_auth_verifications_total",
+        "Total number of RPC auth verification attempts"
+    );
+    describe_counter!(
+        "icn_rpc_auth_failures_total",
+        "Total number of RPC authentication failures"
+    );
+    describe_counter!(
+        "icn_rpc_auth_successes_total",
+        "Total number of successful RPC authentications"
+    );
+    describe_counter!(
+        "icn_rpc_method_not_found_total",
+        "Total number of method not found errors"
+    );
+    describe_gauge!(
+        "icn_rpc_active_requests",
+        "Current number of active RPC requests"
+    );
+
     // Compute metrics
     describe_counter!(
         "icn_compute_tasks_submitted_total",
