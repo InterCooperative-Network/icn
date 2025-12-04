@@ -11,16 +11,16 @@
 
 Comprehensive analysis of the ICN codebase identified **23 gaps** across test coverage, documentation, feature completeness, monitoring, and configuration. Of these, **9 are high severity** and should be addressed before or during early pilot.
 
-**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! Additional TODOs addressed. Gap #12 (WASM Executor) fixed on 2025-12-04.
+**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! RPC tests complete (Gap #3), Compute tests complete (Gap #10). **22/23 gaps fixed (96%)**.
 
 | Category | High | Medium | Low | Total | Fixed |
 |----------|------|--------|-----|-------|-------|
-| Test Coverage | 4 | 2 | 1 | 7 | 5 |
+| Test Coverage | 4 | 2 | 1 | 7 | 7 |
 | Documentation | 2 | 2 | 0 | 4 | 2 |
 | Feature Completeness | 2 | 2 | 4 | 8 | 8 |
 | Monitoring | 1 | 1 | 0 | 2 | 2 |
 | Config/Deployment | 0 | 2 | 0 | 2 | 2 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **20** |
+| **TOTAL** | **9** | **9** | **5** | **23** | **22** |
 
 ---
 
@@ -44,16 +44,18 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 - **Fix**: Add `/v1/compute/*` endpoints to OpenAPI spec
 - **Resolution**: Added cancel endpoint, schemas, status enum - commit `49c2e04` (2025-12-04)
 
-### 3. RPC Integration Tests Missing (Substantial Progress)
+### 3. ~~RPC Integration Tests Missing~~ ✅ FIXED
 
 **Impact**: Public API surface untested end-to-end
 
 - **Location**: `icn/crates/icn-rpc/tests/`
 - **Issue**: 47 handlers have unit tests but limited integration tests
 - **Fix**: Create integration test suite (20-30 tests)
-- **Progress (2025-12-04)**:
+- **Resolution (2025-12-04)**:
   - Initial suite: 8 tests (auth flow, server startup, error handling, token validation). Commit `1893e51`.
-  - Extended suite: 12 additional tests (scope enforcement, multiple scopes, network/ledger/trust actor errors, missing params, batch handling, JSON-RPC version, compute auth, empty method, policy/recovery actors). Total: **20 tests**.
+  - Extended suite: 12 additional tests (scope enforcement, multiple scopes, network/ledger/trust actor errors, missing params, batch handling, JSON-RPC version, compute auth, empty method, policy/recovery actors).
+  - Compute tests: 12 new tests (submit validation, status edge cases, cancel scenarios, priority, coop_id). Commit `7d976fb`.
+  - **Total: 32 tests** (target was 20-30). ✅
 
 ### 4. ~~Privacy Crate Lacks Integration Tests~~ ✅ FIXED
 
@@ -163,12 +165,15 @@ Key TODOs and their status:
 - **Fix**: Create example config, document all options
 - **Resolution**: Added gateway and privacy sections to `config/icn.toml.example` (155 lines) - commit `dd6486a` (2025-12-04)
 
-### 10. Compute Endpoints Need More Test Coverage (Partial Progress)
+### 10. ~~Compute Endpoints Need More Test Coverage~~ ✅ FIXED
 
 - **Location**: `icn-gateway/tests/`, `icn-rpc/`
 - **Issue**: Limited error scenario testing for compute API
 - **Fix**: Add priority validation, cancellation edge cases
-- **Progress (2025-12-04)**: Added 6 new compute_mgr tests (fuel limit max, task ID length, empty code, priority variants, status fallback, cancel without daemon). Gateway tests now at 112. RPC tests still needed.
+- **Resolution (2025-12-04)**:
+  - Gateway: Added 6 new compute_mgr tests (fuel limit max, task ID length, empty code, priority variants, status fallback, cancel without daemon). Gateway tests now at 112.
+  - RPC: Added 12 new compute integration tests (submit validation, status edge cases, cancel auth, priority, coop_id). RPC integration tests now at 32.
+  - **Total: 18 new compute tests across gateway and RPC layers.** Commit `7d976fb`.
 
 ### 11. ~~Governance Architecture Unclear~~ ✅ FIXED
 
