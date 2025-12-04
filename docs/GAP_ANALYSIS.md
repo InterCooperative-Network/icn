@@ -11,7 +11,7 @@
 
 Comprehensive analysis of the ICN codebase identified **23 gaps** across test coverage, documentation, feature completeness, monitoring, and configuration. Of these, **9 are high severity** and should be addressed before or during early pilot.
 
-**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! RPC tests complete (Gap #3), Compute tests complete (Gap #10). **22/23 gaps fixed (96%)**.
+**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! Contract gossip complete (Gap #18/Issue #40). **23/23 gaps fixed (100%)**.
 
 | Category | High | Medium | Low | Total | Fixed |
 |----------|------|--------|-----|-------|-------|
@@ -20,7 +20,7 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 | Feature Completeness | 2 | 2 | 4 | 8 | 8 |
 | Monitoring | 1 | 1 | 0 | 2 | 2 |
 | Config/Deployment | 0 | 2 | 0 | 2 | 2 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **22** |
+| **TOTAL** | **9** | **9** | **5** | **23** | **23** |
 
 ---
 
@@ -104,7 +104,7 @@ Key TODOs and their status:
 | ~~`icn-rpc/src/server.rs`~~ | ~~1032-1033~~ | ~~bytes_processed, wall_time_ms~~ | ✅ FIXED |
 | ~~`icn-rpc/src/server.rs`~~ | ~~2005,2018~~ | ~~coop_id, resource_profile~~ | ✅ FIXED |
 | ~~`icn-federation/src/resolver.rs`~~ | ~~250~~ | ~~Federated DID HTTP/RPC call~~ | ✅ FIXED |
-| `icn-ccl/src/actor.rs` | 125 | Contract deployment gossip | Issue #40 |
+| ~~`icn-ccl/src/actor.rs`~~ | ~~125~~ | ~~Contract deployment gossip~~ | ✅ FIXED |
 | ~~`icn-core/src/supervisor.rs`~~ | ~~2033,2042,2053~~ | ~~Governance operations (veto, force-close)~~ | ✅ FIXED |
 
 **Resolved (2025-12-04)**:
@@ -119,6 +119,7 @@ Key TODOs and their status:
 - **Cooperative treasury DID** - Added `[cooperative]` config section with `treasury_did` option; governance budget payouts now use treasury DID (Issue #38)
 - **Federated DID Resolution** - Implemented HTTP-based DID resolution via remote gateway endpoints; added `/v1/identity/resolve/{did}` public endpoint to gateway; resolver uses reqwest for HTTP calls with 10s timeout; 4 identity tests + 3 resolver HTTP tests added (Issue #39)
 - **Governance Operations** - Implemented veto and force-close proposal operations; added `Vetoed` and `ForceClosed` states to ProposalState; added `VetoProposal` and `ForceCloseProposal` commands to GovernanceActor; supervisor now executes veto/force-close via governance handle; 3 new proposal tests added; 2 new governance metrics added (Issue #41). Note: Ledger rollback remains unimplemented (requires manual intervention for security)
+- **Contract Deployment Gossip** - Added `GossipCallback` to ContractActor for publishing deployments to `contracts:deploy` topic; added `set_gossip_callback()` method; `handle_deployment_message()` for receiving remote deployments; metrics tracked via `contract::deployments_inc()` and `contract::deployments_received_inc()`; 2 new tests added (Issue #40)
 
 ### 7. CCL Contract Crate Has No Integration Tests ✅ FIXED
 
@@ -227,7 +228,7 @@ Key TODOs and their status:
 |---|-----|----------|-------|
 | 16 | Federation not in supervisor | `supervisor.rs` | 19+ |
 | 17 | Privacy not integrated | `supervisor.rs` | 19+ |
-| 18 | Contract gossip incomplete | `icn-ccl/src/actor.rs:125` | 16+ |
+| ~~18~~ | ~~Contract gossip incomplete~~ | ~~`icn-ccl/src/actor.rs:125`~~ | ✅ FIXED |
 | 19 | N-way fork resolution | `ledger.rs:411` | Future |
 | 20 | Task migration incomplete | `migration_manager.rs` | 16D |
 

@@ -50,7 +50,7 @@ pub mod runtime;
 pub mod types;
 
 // Re-export commonly used types
-pub use actor::ContractActor;
+pub use actor::{ContractActor, GossipCallback, CONTRACTS_DEPLOY_TOPIC};
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
 pub use disputes::{
     Dispute, DisputeConfig, DisputeEvidence, DisputeId, DisputeOutcome, DisputeReason,

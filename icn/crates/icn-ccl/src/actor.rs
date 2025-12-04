@@ -12,6 +12,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+/// Gossip topic for contract deployment announcements
+pub const CONTRACTS_DEPLOY_TOPIC: &str = "contracts:deploy";
+
+/// Callback for publishing contract deployment messages via gossip
+pub type GossipCallback = Arc<dyn Fn(ContractDeploymentMessage) + Send + Sync>;
+
 /// Minimum trust score required to deploy contracts to the network
 pub const MIN_DEPLOYER_TRUST: f64 = 0.4;
 
@@ -32,6 +38,9 @@ pub struct ContractActor {
 
     /// Trust graph for authorization
     trust_graph: Option<Arc<RwLock<TrustGraph>>>,
+
+    /// Gossip callback for publishing contract deployments
+    gossip_callback: Option<GossipCallback>,
 }
 
 impl ContractActor {
@@ -46,7 +55,17 @@ impl ContractActor {
             did,
             runtime,
             trust_graph,
+            gossip_callback: None,
         }
+    }
+
+    /// Set the gossip callback for publishing contract deployments
+    ///
+    /// When set, deployed contracts will be broadcast to the network via the
+    /// `contracts:deploy` gossip topic.
+    pub fn set_gossip_callback(&mut self, callback: GossipCallback) {
+        self.gossip_callback = Some(callback);
+        debug!("Gossip callback configured for contract deployments");
     }
 
     /// Deploy a contract to the network
@@ -122,9 +141,20 @@ impl ContractActor {
             .verify()
             .context("Deployment message verification failed")?;
 
-        // TODO: Publish to gossip topic `contracts:deploy`
-        // This will be wired up when integrating with Supervisor
-        debug!("Contract deployment message ready for gossip publication");
+        // Publish to gossip topic `contracts:deploy` if callback is configured
+        if let Some(ref callback) = self.gossip_callback {
+            info!(
+                "Publishing contract deployment to gossip: {} ({})",
+                deployment_msg.contract.name, code_hash
+            );
+            callback(deployment_msg);
+            icn_obs::metrics::contract::deployments_inc();
+        } else {
+            debug!(
+                "No gossip callback configured; contract {} deployed locally only",
+                code_hash
+            );
+        }
 
         Ok(code_hash)
     }
@@ -226,6 +256,7 @@ impl ContractActor {
         )?;
 
         info!("Contract installed: {}", msg.code_hash);
+        icn_obs::metrics::contract::deployments_received_inc();
 
         Ok(())
     }
@@ -581,5 +612,111 @@ mod tests {
         assert_eq!(contracts.len(), 2);
         assert!(contracts.iter().any(|c| c.name == "contract1"));
         assert!(contracts.iter().any(|c| c.name == "contract2"));
+    }
+
+    #[tokio::test]
+    async fn test_gossip_callback_invoked_on_deploy() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Mutex;
+
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+        let ledger = Arc::new(RwLock::new(Ledger::new(store).unwrap()));
+        let runtime = Arc::new(RwLock::new(ContractRuntime::new(ledger)));
+
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+
+        let mut actor = ContractActor::new(alice.clone(), runtime.clone(), None);
+
+        // Set up callback to track invocations (use std Mutex to avoid blocking issues)
+        let callback_count = Arc::new(AtomicUsize::new(0));
+        let callback_count_clone = callback_count.clone();
+        let received_msg = Arc::new(Mutex::new(None::<ContractDeploymentMessage>));
+        let received_msg_clone = received_msg.clone();
+
+        actor.set_gossip_callback(Arc::new(move |msg| {
+            callback_count_clone.fetch_add(1, Ordering::SeqCst);
+            *received_msg_clone.lock().unwrap() = Some(msg);
+        }));
+
+        // Deploy a contract
+        let contract = Contract::new("gossip_test".to_string()).add_participant(alice.clone());
+
+        let code_hash = compute_code_hash(&contract);
+        let installed_at = 1234567890u64;
+        let signatures = create_signatures(&code_hash, installed_at, &[&alice_kp]);
+
+        let installation = ContractInstallation {
+            code_hash: code_hash.clone(),
+            installed_by: alice.clone(),
+            capabilities: vec![],
+            participants: vec![alice.clone()],
+            signatures,
+            installed_at,
+            min_caller_trust: None,
+        };
+
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
+
+        actor
+            .deploy_contract(contract, installation, deployer_signature)
+            .await
+            .unwrap();
+
+        // Verify callback was invoked
+        assert_eq!(callback_count.load(Ordering::SeqCst), 1);
+
+        // Verify message content
+        let msg = received_msg.lock().unwrap().clone().unwrap();
+        assert_eq!(msg.contract.name, "gossip_test");
+        assert_eq!(msg.code_hash, code_hash);
+    }
+
+    #[tokio::test]
+    async fn test_handle_deployment_message() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+        let ledger = Arc::new(RwLock::new(Ledger::new(store).unwrap()));
+        let runtime = Arc::new(RwLock::new(ContractRuntime::new(ledger)));
+
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+
+        let actor = ContractActor::new(alice.clone(), runtime.clone(), None);
+
+        // Create a deployment message
+        let contract = Contract::new("remote_deploy".to_string()).add_participant(alice.clone());
+
+        let code_hash = compute_code_hash(&contract);
+        let installed_at = 1234567890u64;
+        let signatures = create_signatures(&code_hash, installed_at, &[&alice_kp]);
+
+        let installation = ContractInstallation {
+            code_hash: code_hash.clone(),
+            installed_by: alice.clone(),
+            capabilities: vec![],
+            participants: vec![alice.clone()],
+            signatures,
+            installed_at,
+            min_caller_trust: None,
+        };
+
+        let signing_bytes =
+            ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
+        let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
+
+        let msg =
+            ContractDeploymentMessage::new(code_hash.clone(), contract, installation, deployer_signature);
+
+        // Handle the message
+        actor.handle_deployment_message(msg).await.unwrap();
+
+        // Verify contract was installed
+        let contracts = actor.list_contracts().await;
+        assert_eq!(contracts.len(), 1);
+        assert_eq!(contracts[0].name, "remote_deploy");
     }
 }
