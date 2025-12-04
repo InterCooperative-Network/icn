@@ -1814,8 +1814,23 @@ impl Supervisor {
                 use icn_governance::ProposalPayload;
 
                 let ledger_clone = ledger_handle.clone();
-                let own_did = did.clone();
                 let audit_store = gov_store.clone();
+
+                // Get treasury DID from config, falling back to node DID if not configured
+                let treasury_did = self
+                    .config
+                    .cooperative
+                    .treasury_did
+                    .as_ref()
+                    .and_then(|s| {
+                        serde_json::from_value::<Did>(serde_json::Value::String(s.clone())).ok()
+                    })
+                    .unwrap_or_else(|| {
+                        debug!(
+                            "No treasury_did configured, using node DID for budget payouts"
+                        );
+                        did.clone()
+                    });
 
                 event_bus.subscribe(Arc::new(move |event| {
                     match event {
@@ -1828,7 +1843,8 @@ impl Supervisor {
                                     // Spawn async task to execute ledger transaction
                                     let ledger = ledger_clone.clone();
                                     let prop_id = proposal_id.clone();
-                                    let from_did = own_did.clone();
+                                    // Use treasury DID for budget payouts (or node DID if not configured)
+                                    let from_did = treasury_did.clone();
                                     let store = audit_store.clone();
                                     let decision_time = decided_at;
 
@@ -1865,9 +1881,8 @@ impl Supervisor {
 
                                         let mut ledger_guard = ledger.write().await;
 
-                                        // TODO: Use cooperative treasury DID instead of node DID
-                                        // For now, use the node's DID as the source
-                                        // Create double-entry: credit cooperative (decrease balance), debit recipient (increase balance)
+                                        // Create double-entry: credit cooperative treasury (decrease balance), debit recipient (increase balance)
+                                        // Uses treasury_did from config (or falls back to node DID if not configured)
                                         let entry_result = JournalEntryBuilder::new(from_did.clone())
                                             .credit(from_did.clone(), currency.clone(), amount)
                                             .debit(recipient.clone(), currency.clone(), amount)

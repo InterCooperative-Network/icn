@@ -96,7 +96,7 @@ Key TODOs and their status:
 |------|------|-------|--------|
 | `icn-ledger/src/ledger.rs` | 411 | N-way fork handling incomplete | Issue #36 |
 | `icn-core/src/supervisor.rs` | 1396 | TURN relay unimplemented | Issue #37 |
-| `icn-core/src/supervisor.rs` | 1867 | Cooperative treasury DID | Issue #38 |
+| ~~`icn-core/src/supervisor.rs`~~ | ~~1867~~ | ~~Cooperative treasury DID~~ | ✅ FIXED |
 | ~~`icn-federation/src/gossip.rs`~~ | ~~132,226,345,383~~ | ~~Signature verification stubs~~ | ✅ FIXED |
 | ~~`icn-compute/src/actor.rs`~~ | ~~2023~~ | ~~Placement metrics~~ | ✅ FIXED |
 | ~~`icn-gateway/src/compute_mgr.rs`~~ | ~~124~~ | ~~coop_id not set from JWT~~ | ✅ FIXED |
@@ -116,6 +116,7 @@ Key TODOs and their status:
 - Compute submit supports coop_id (from request or JWT claims)
 - Compute submit supports resource_profile specification
 - Placement wins/losses metrics now tracked
+- **Cooperative treasury DID** - Added `[cooperative]` config section with `treasury_did` option; governance budget payouts now use treasury DID (Issue #38)
 
 ### 7. CCL Contract Crate Has No Integration Tests ✅ FIXED
 

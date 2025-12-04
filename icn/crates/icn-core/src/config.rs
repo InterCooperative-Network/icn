@@ -34,6 +34,10 @@ pub struct Config {
     /// Privacy configuration for metadata protection and onion routing
     #[serde(default)]
     pub privacy: PrivacyConfig,
+
+    /// Cooperative configuration for cooperative-specific settings
+    #[serde(default)]
+    pub cooperative: CooperativeConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -412,6 +416,35 @@ impl Default for PrivacyConfig {
     }
 }
 
+/// Cooperative configuration for cooperative-specific settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CooperativeConfig {
+    /// Treasury DID for the cooperative
+    /// This DID is used as the source for budget payouts and other financial operations.
+    /// If not set, the node's own DID will be used as a fallback.
+    /// Format: "did:icn:<base58-pubkey>"
+    #[serde(default)]
+    pub treasury_did: Option<String>,
+
+    /// Cooperative display name (human-readable)
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// Cooperative description
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+impl Default for CooperativeConfig {
+    fn default() -> Self {
+        CooperativeConfig {
+            treasury_did: None,
+            name: None,
+            description: None,
+        }
+    }
+}
+
 fn default_gateway_bind_addr() -> String {
     "127.0.0.1:8080".to_string()
 }
@@ -462,6 +495,7 @@ impl Default for Config {
             gateway: GatewayConfig::default(),
             federation: FederationConfig::default(),
             privacy: PrivacyConfig::default(),
+            cooperative: CooperativeConfig::default(),
         }
     }
 }

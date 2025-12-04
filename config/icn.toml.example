@@ -497,6 +497,50 @@ cover_traffic_rate = 0
 # # No traffic obfuscation for better performance
 
 # ============================================================================
+# Cooperative Configuration
+# ============================================================================
+# Cooperative-specific settings for identity and financial operations.
+
+[cooperative]
+
+# Treasury DID for the cooperative
+# This DID is used as the source for governance budget payouts and other
+# financial operations that should come from the cooperative's shared funds.
+# If not set, the node's own DID will be used as a fallback.
+# Format: "did:icn:<base58-pubkey>"
+# Default: not set (uses node DID)
+# treasury_did = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+
+# Cooperative display name (human-readable)
+# Default: not set
+# name = "Food Cooperative"
+
+# Cooperative description
+# Default: not set
+# description = "A community food cooperative serving the local area"
+
+# ============================================================================
+# Cooperative Configuration Examples
+# ============================================================================
+#
+# Example 1: Cooperative with dedicated treasury
+# [cooperative]
+# treasury_did = "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+# name = "Worker-Owned Tech Coop"
+# description = "Employee-owned software development cooperative"
+#
+# Example 2: Simple setup (uses node DID for treasury)
+# [cooperative]
+# name = "Local Time Bank"
+# # treasury_did not set - budget payouts use node DID
+#
+# Example 3: Federated cooperative
+# [cooperative]
+# treasury_did = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+# name = "Regional Food Network"
+# description = "Federation of local food cooperatives"
+
+# ============================================================================
 # PLANNED FEATURES (Not Yet Implemented)
 # ============================================================================
 # The following sections are shown for completeness but are not yet supported.
