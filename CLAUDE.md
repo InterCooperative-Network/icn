@@ -1011,7 +1011,7 @@ Phase 18 completion triggered creation of comprehensive internal testing infrast
 **Docker Services**:
 - **node1, node2, node3**: Honest ICN nodes
 - **node4**: Byzantine node (optional, `--profile byzantine`)
-- **prometheus**: Metrics collection (port 9090)
+- **prometheus**: Metrics collection (port 9095)
 - **grafana**: Visualization (port 3000)
 
 **Monitoring**:

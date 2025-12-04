@@ -62,10 +62,10 @@ docker compose -f docker-compose.test.yml ps
 ```
 NAME                COMMAND                  SERVICE      STATUS       PORTS
 icn-grafana         "/run.sh"                grafana      Up           0.0.0.0:3000->3000/tcp
-icn-node1           "icnd --data-dir /da…"   node1        Up (healthy) 0.0.0.0:5001->5001/tcp, 0.0.0.0:8081->8080/tcp, 0.0.0.0:9091->9090/tcp
-icn-node2           "icnd --data-dir /da…"   node2        Up (healthy) 0.0.0.0:5002->5002/tcp, 0.0.0.0:8082->8080/tcp, 0.0.0.0:9092->9090/tcp
-icn-node3           "icnd --data-dir /da…"   node3        Up (healthy) 0.0.0.0:5003->5003/tcp, 0.0.0.0:8083->8080/tcp, 0.0.0.0:9093->9090/tcp
-icn-prometheus      "/bin/prometheus --c…"   prometheus   Up (healthy) 0.0.0.0:9090->9090/tcp
+icn-node1           "icnd --config /conf…"   node1        Up (healthy) 0.0.0.0:5001->5001/tcp, 0.0.0.0:8081->8080/tcp, 0.0.0.0:9091->9100/tcp
+icn-node2           "icnd --config /conf…"   node2        Up (healthy) 0.0.0.0:5002->5002/tcp, 0.0.0.0:8082->8080/tcp, 0.0.0.0:9092->9100/tcp
+icn-node3           "icnd --config /conf…"   node3        Up (healthy) 0.0.0.0:5003->5003/tcp, 0.0.0.0:8083->8080/tcp, 0.0.0.0:9093->9100/tcp
+icn-prometheus      "/bin/prometheus --c…"   prometheus   Up (healthy) 0.0.0.0:9095->9090/tcp
 ```
 
 ---
@@ -361,7 +361,7 @@ Once the network is running successfully:
 | node2      | 5002 | 9092    | 8082    | -         |
 | node3      | 5003 | 9093    | 8083    | -         |
 | node4      | 5004 | 9094    | 8084    | -         |
-| prometheus | -    | 9090    | -       | -         |
+| prometheus | -    | 9095    | -       | -         |
 | grafana    | -    | -       | -       | 3000      |
 
 ### Monitoring
