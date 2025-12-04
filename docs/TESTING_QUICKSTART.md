@@ -46,7 +46,7 @@ docker compose -f docker-compose.test.yml up -d
 This starts:
 - **node1, node2, node3**: Honest ICN nodes
 - **prometheus**: Metrics collection at [http://localhost:9090](http://localhost:9090)
-- **grafana**: Dashboard at [http://localhost:3000](http://localhost:3000) (user: admin, pass: admin)
+- **grafana**: Dashboard at [http://localhost:3000](http://localhost:3000) (default dev creds below)
 
 **Expected time**: 30 seconds
 
@@ -70,7 +70,7 @@ curl http://localhost:9091/metrics | grep icn_network_connections_active
 Open in browser:
 - **Grafana**: [http://localhost:3000](http://localhost:3000)
   - Username: `admin`
-  - Password: `admin`
+  - Password: `admin` (development only - use secrets management for production)
   - Navigate to: Dashboards → ICN Dashboard
 
 - **Prometheus**: [http://localhost:9090](http://localhost:9090)

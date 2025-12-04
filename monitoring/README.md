@@ -45,7 +45,7 @@ docker run -d \
   -p 3000:3000 \
   grafana/grafana-oss
 
-# Default login: admin/admin
+# Default login: admin/admin (change immediately for production)
 ```
 
 ### 3. Import Dashboard

@@ -1038,7 +1038,7 @@ curl http://localhost:9091/metrics | grep icn_network_connections_active
 # Expected: icn_network_connections_active 2
 
 # Access monitoring
-# Grafana: http://localhost:3000 (admin/admin)
+# Grafana: http://localhost:3000 (dev default creds - change for prod)
 # Prometheus: http://localhost:9090
 ```
 
