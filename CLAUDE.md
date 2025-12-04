@@ -15,7 +15,7 @@ ICN (Intercooperative Network) is a substrate daemon for the cooperative interne
 
 ## Live Deployment (Faherty Homelab)
 
-**Status**: ICN daemon is running on a K3s cluster deployed 2025-12-03.
+**Status**: ICN daemon is running on a K3s cluster deployed 2025-12-03. Automated deployment system set up 2025-12-04.
 
 | Component | Details |
 |-----------|---------|
@@ -25,15 +25,40 @@ ICN (Intercooperative Network) is a substrate daemon for the cooperative interne
 | **Storage** | NFS from Atlas (10.8.10.25) via `atlas-nfs` StorageClass |
 | **Ports** | 7777/UDP (QUIC), 5601/TCP (RPC), 9100/TCP (Prometheus) |
 
+### Automated Deployment
+
+**New**: Full deployment automation is now available! Deploy from local machine to cluster with one command.
+
+```bash
+cd deploy/k8s
+make full-deploy-dev  # Build, sync, and deploy in one command
+```
+
+See [deploy/k8s/README.md](deploy/k8s/README.md) for complete deployment documentation.
+
+**Deployment System Features**:
+- ✅ Version-controlled Kubernetes manifests
+- ✅ Automated Docker image building
+- ✅ Image sync to all cluster nodes
+- ✅ One-command deployment
+- ✅ Git hash tagging for tracking
+
 ### Quick Access Commands
 
 ```bash
+# Deploy new version (from local machine)
+cd /home/matt/projects/icn/deploy/k8s
+make full-deploy-dev
+
 # Check cluster and pod status
-ssh ubuntu@10.8.10.40 "sudo kubectl get nodes"
+make status
+# OR
 ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods"
 
 # View ICN daemon logs
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -l app=icn"
+make logs
+# OR
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
 
 # Show identity
 ssh ubuntu@10.8.10.40 "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
@@ -58,6 +83,8 @@ ssh ubuntu@10.8.10.40 "kubectl -n icn port-forward svc/icn 9100:9100 &" && curl 
 
 ### Deployment History
 
+**Initial Deployment (2025-12-03)**: Manual deployment to K3s cluster.
+
 The K3s deployment required fixes for several issues discovered during initial bringup:
 1. **GLIBC compatibility** - Required Ubuntu 24.04 base image (not Debian)
 2. **STUN port conflict** - Disabled STUN to avoid binding same port as QUIC
@@ -66,6 +93,17 @@ The K3s deployment required fixes for several issues discovered during initial b
 5. **Health probe** - Changed to use port 9100 (metrics port)
 
 The governance topic fix has been merged upstream (commit `01009e5`).
+
+**Automated Deployment System (2025-12-04)**: Complete deployment automation added.
+
+Created full deployment pipeline with version-controlled manifests and one-command deployment:
+- Kubernetes manifests in `deploy/k8s/` (namespace, configmap, deployment, services, PVC, monitoring)
+- Build scripts with `.dockerignore` optimization (374GB → 15.79KB build context)
+- Image sync automation to all cluster nodes
+- Makefile for easy deployment commands
+- Comprehensive documentation (README, DEPLOYMENT_GUIDE, QUICKSTART, WORKFLOW)
+
+See [deploy/k8s/README.md](deploy/k8s/README.md) for details.
 
 ### Monitoring Stack (deployed 2025-12-04)
 

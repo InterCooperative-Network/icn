@@ -9,6 +9,8 @@ use wasmtime::{Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder};
 use crate::error::ComputeError;
 use crate::executor::{ExecutionContext, Executor};
 use crate::types::{ComputeTask, ExecutionOutcome, ExecutorCapability, TaskCode};
+use crate::wasm_registry::WasmRegistry;
+use std::sync::Arc;
 
 /// WASM execution state for memory limits
 #[cfg(feature = "wasm")]
@@ -38,6 +40,8 @@ pub struct WasmExecutor {
     engine: Engine,
     /// Maximum memory per WASM instance (bytes)
     max_memory: usize,
+    /// Optional WASM registry for WasmRef resolution
+    registry: Option<Arc<WasmRegistry>>,
 }
 
 impl WasmExecutor {
@@ -51,6 +55,7 @@ impl WasmExecutor {
             capabilities: vec![ExecutorCapability::Wasm, ExecutorCapability::Ccl],
             engine,
             max_memory: 64 * 1024 * 1024, // 64MB default
+            registry: None,
         })
     }
 
@@ -60,6 +65,7 @@ impl WasmExecutor {
         Ok(Self {
             capabilities: vec![ExecutorCapability::Ccl],
             max_memory: 64 * 1024 * 1024,
+            registry: None,
         })
     }
 
@@ -67,6 +73,22 @@ impl WasmExecutor {
     pub fn with_max_memory(mut self, bytes: usize) -> Self {
         self.max_memory = bytes;
         self
+    }
+
+    /// Set the WASM registry for WasmRef resolution
+    pub fn with_registry(mut self, registry: Arc<WasmRegistry>) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
+    /// Set the WASM registry (mutable reference version)
+    pub fn set_registry(&mut self, registry: Arc<WasmRegistry>) {
+        self.registry = Some(registry);
+    }
+
+    /// Get the WASM registry if set
+    pub fn registry(&self) -> Option<&Arc<WasmRegistry>> {
+        self.registry.as_ref()
     }
 
     /// Execute a WASM module
@@ -317,9 +339,50 @@ impl Executor for WasmExecutor {
                 ))
             }
             TaskCode::WasmInline(bytes) => self.execute_wasm(bytes, &task.inputs, ctx),
-            TaskCode::WasmRef(_hash) => {
-                // TODO: Fetch WASM from blob storage using hash
-                ExecutionOutcome::Failed("WASM reference execution not yet implemented".into())
+            TaskCode::WasmRef(hash) => {
+                // Fetch WASM from registry using hash
+                let hash_hex = hex::encode(hash);
+
+                let Some(registry) = &self.registry else {
+                    tracing::warn!(
+                        hash = %hash_hex,
+                        "WasmRef requires registry but none configured"
+                    );
+                    return ExecutionOutcome::Failed(
+                        "WASM registry not configured. Cannot resolve WasmRef.".into(),
+                    );
+                };
+
+                // Use the blocking version since Executor::execute is synchronous
+                // The get_blocking() method uses blocking_read/blocking_write on
+                // tokio RwLocks which is designed for this use case.
+                let wasm_bytes = registry.get_blocking(hash);
+
+                match wasm_bytes {
+                    Ok(Some(bytes)) => {
+                        tracing::debug!(
+                            hash = %hash_hex,
+                            size = bytes.len(),
+                            "Resolved WasmRef from registry"
+                        );
+                        self.execute_wasm(&bytes, &task.inputs, ctx)
+                    }
+                    Ok(None) => {
+                        tracing::warn!(
+                            hash = %hash_hex,
+                            "WASM module not found in registry"
+                        );
+                        ExecutionOutcome::Failed(format!("WASM module not found: {hash_hex}"))
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            hash = %hash_hex,
+                            error = %e,
+                            "Failed to fetch WASM from registry"
+                        );
+                        ExecutionOutcome::Failed(format!("Registry error: {e}"))
+                    }
+                }
             }
         }
     }
@@ -597,6 +660,151 @@ mod tests {
                 assert!(msg.contains("WASM support not enabled"));
             }
             other => panic!("Expected failure message, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_wasm_ref_without_registry() {
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "wasm-ref-test".into(),
+            submitter: "did:icn:alice".into(),
+            coop_id: None,
+            code: TaskCode::WasmRef([0xAA; 32]),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(msg.contains("registry not configured"));
+            }
+            other => panic!("Expected 'registry not configured' error, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wasm_ref_not_found_in_registry() {
+        let registry = Arc::new(WasmRegistry::new());
+        let executor = WasmExecutor::new().unwrap().with_registry(registry);
+
+        let fake_hash = [0xBB; 32];
+        let task = ComputeTask {
+            id: "wasm-ref-missing".into(),
+            submitter: "did:icn:alice".into(),
+            coop_id: None,
+            code: TaskCode::WasmRef(fake_hash),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("not found"),
+                    "Expected 'not found', got: {msg}"
+                );
+            }
+            other => panic!("Expected 'not found' error, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wasm_ref_with_registry() {
+        // Minimal valid WASM module
+        let wasm_bytes = vec![
+            0x00, 0x61, 0x73, 0x6D, // magic: \0asm
+            0x01, 0x00, 0x00, 0x00, // version: 1
+        ];
+
+        let registry = Arc::new(WasmRegistry::new());
+
+        // Deploy the WASM module
+        let hash = registry
+            .deploy(wasm_bytes.clone(), "did:icn:deployer", |m| m)
+            .await
+            .unwrap();
+
+        let executor = WasmExecutor::new().unwrap().with_registry(registry);
+
+        let task = ComputeTask {
+            id: "wasm-ref-valid".into(),
+            submitter: "did:icn:alice".into(),
+            coop_id: None,
+            code: TaskCode::WasmRef(hash),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        // This will attempt to execute the minimal WASM module
+        // It will fail because the module has no 'run' function, but it proves
+        // the registry lookup worked
+        let result = executor.execute(&task, &mut ctx);
+
+        // Without the wasm feature, we expect "WASM support not enabled"
+        // With the wasm feature, we expect "No 'run' function found" (because we're using a minimal module)
+        #[cfg(not(feature = "wasm"))]
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(msg.contains("WASM support not enabled"));
+            }
+            other => panic!("Expected WASM disabled message, got: {other:?}"),
+        }
+
+        #[cfg(feature = "wasm")]
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                // Module loaded but no 'run' function - proves registry lookup worked
+                assert!(
+                    msg.contains("run") || msg.contains("function"),
+                    "Expected function-related error, got: {msg}"
+                );
+            }
+            other => panic!("Expected function error, got: {other:?}"),
         }
     }
 }

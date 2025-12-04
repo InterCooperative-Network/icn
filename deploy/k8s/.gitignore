@@ -1,0 +1,8 @@
+# Secrets - NEVER commit these!
+secret.yaml
+
+# Temporary files
+*.tmp
+*.tar
+*.bak
+

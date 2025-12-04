@@ -62,5 +62,5 @@ sims/mutual-credit/results/
 sims/mutual-credit/*.csv
 sims/mutual-credit/*.png
 
-# Kubernetes deployment (not used in current testing setup)
-deploy/k8s/
+# Kubernetes deployment - now tracked in git
+# deploy/k8s/ is tracked, but secret.yaml is ignored via deploy/k8s/.gitignore

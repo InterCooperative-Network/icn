@@ -33,6 +33,7 @@ mod scheduler;
 mod task;
 mod types;
 mod wasm_executor;
+mod wasm_registry;
 
 pub use actor::{
     ComputeActor, ComputeEvent, ComputeHandle, EventCallback, PaymentCallback, PaymentRequest,
@@ -65,6 +66,10 @@ pub use types::{
     TaskCode, TaskHash, TaskId, TaskPriority,
 };
 pub use wasm_executor::WasmExecutor;
+pub use wasm_registry::{
+    compute_hash as compute_wasm_hash, WasmHash, WasmMetadata, WasmRegistry, WasmRegistryError,
+    WasmRegistryStats,
+};
 
 /// Gossip topic for task submission
 pub const TOPIC_SUBMIT: &str = "compute:submit";
