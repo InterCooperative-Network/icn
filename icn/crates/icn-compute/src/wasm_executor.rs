@@ -372,9 +372,7 @@ impl Executor for WasmExecutor {
                             hash = %hash_hex,
                             "WASM module not found in registry"
                         );
-                        ExecutionOutcome::Failed(format!(
-                            "WASM module not found: {hash_hex}"
-                        ))
+                        ExecutionOutcome::Failed(format!("WASM module not found: {hash_hex}"))
                     }
                     Err(e) => {
                         tracing::error!(
@@ -382,9 +380,7 @@ impl Executor for WasmExecutor {
                             error = %e,
                             "Failed to fetch WASM from registry"
                         );
-                        ExecutionOutcome::Failed(format!(
-                            "Registry error: {e}"
-                        ))
+                        ExecutionOutcome::Failed(format!("Registry error: {e}"))
                     }
                 }
             }
@@ -734,7 +730,10 @@ mod tests {
         let result = executor.execute(&task, &mut ctx);
         match result {
             ExecutionOutcome::Failed(msg) => {
-                assert!(msg.contains("not found"), "Expected 'not found', got: {msg}");
+                assert!(
+                    msg.contains("not found"),
+                    "Expected 'not found', got: {msg}"
+                );
             }
             other => panic!("Expected 'not found' error, got: {other:?}"),
         }

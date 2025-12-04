@@ -114,7 +114,7 @@ fn validate_wasm(wasm_bytes: &[u8]) -> Result<()> {
         ));
     }
 
-    if &wasm_bytes[0..4] != &WASM_MAGIC {
+    if wasm_bytes[0..4] != WASM_MAGIC {
         return Err(WasmRegistryError::InvalidModule(
             "Invalid WASM magic bytes".into(),
         ));
@@ -202,9 +202,10 @@ impl WasmRegistry {
 
         // Check if already exists
         {
-            let modules = self.modules.read().map_err(|e| {
-                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-            })?;
+            let modules = self
+                .modules
+                .read()
+                .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
             if modules.contains_key(&hash) {
                 return Err(WasmRegistryError::AlreadyExists(hash_hex));
             }
@@ -241,21 +242,24 @@ impl WasmRegistry {
 
         // Update in-memory caches
         {
-            let mut modules = self.modules.write().map_err(|e| {
-                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-            })?;
+            let mut modules = self
+                .modules
+                .write()
+                .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
             modules.insert(hash, wasm_bytes);
         }
         {
-            let mut meta_cache = self.metadata.write().map_err(|e| {
-                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-            })?;
+            let mut meta_cache = self
+                .metadata
+                .write()
+                .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
             meta_cache.insert(hash, metadata);
         }
         {
-            let mut owner_index = self.owner_index.write().map_err(|e| {
-                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-            })?;
+            let mut owner_index = self
+                .owner_index
+                .write()
+                .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
             owner_index.entry(owner.to_string()).or_default().push(hash);
         }
 
@@ -279,9 +283,10 @@ impl WasmRegistry {
     pub fn get_blocking(&self, hash: &WasmHash) -> Result<Option<Vec<u8>>> {
         // Check cache first
         {
-            let modules = self.modules.read().map_err(|e| {
-                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-            })?;
+            let modules = self
+                .modules
+                .read()
+                .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
             if let Some(wasm) = modules.get(hash) {
                 return Ok(Some(wasm.clone()));
             }
@@ -297,9 +302,10 @@ impl WasmRegistry {
                 let wasm_bytes = bytes.to_vec();
 
                 // Populate cache
-                let mut modules = self.modules.write().map_err(|e| {
-                    WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-                })?;
+                let mut modules = self
+                    .modules
+                    .write()
+                    .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
                 modules.insert(*hash, wasm_bytes.clone());
 
                 return Ok(Some(wasm_bytes));
@@ -318,9 +324,10 @@ impl WasmRegistry {
     pub fn get_metadata_sync(&self, hash: &WasmHash) -> Result<Option<WasmMetadata>> {
         // Check cache first
         {
-            let metadata = self.metadata.read().map_err(|e| {
-                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-            })?;
+            let metadata = self
+                .metadata
+                .read()
+                .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
             if let Some(meta) = metadata.get(hash) {
                 return Ok(Some(meta.clone()));
             }
@@ -337,9 +344,10 @@ impl WasmRegistry {
                     .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
 
                 // Populate cache
-                let mut metadata = self.metadata.write().map_err(|e| {
-                    WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-                })?;
+                let mut metadata = self
+                    .metadata
+                    .write()
+                    .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
                 metadata.insert(*hash, meta.clone());
 
                 return Ok(Some(meta));
@@ -378,12 +386,14 @@ impl WasmRegistry {
 
     /// List modules by owner (sync version)
     pub fn list_by_owner_sync(&self, owner: &str) -> Result<Vec<WasmMetadata>> {
-        let owner_index = self.owner_index.read().map_err(|e| {
-            WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-        })?;
-        let metadata = self.metadata.read().map_err(|e| {
-            WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-        })?;
+        let owner_index = self
+            .owner_index
+            .read()
+            .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
+        let metadata = self
+            .metadata
+            .read()
+            .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
 
         if let Some(hashes) = owner_index.get(owner) {
             Ok(hashes
@@ -470,7 +480,10 @@ impl WasmRegistry {
                                 let mut owner_index = self.owner_index.write().map_err(|e| {
                                     WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
                                 })?;
-                                owner_index.entry(meta.owner.clone()).or_default().push(hash);
+                                owner_index
+                                    .entry(meta.owner.clone())
+                                    .or_default()
+                                    .push(hash);
                             }
                         }
 
@@ -549,7 +562,10 @@ mod tests {
         let wasm = sample_wasm();
 
         // First deploy succeeds
-        registry.deploy(wasm.clone(), "did:icn:owner", |m| m).await.unwrap();
+        registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
 
         // Second deploy fails
         let result = registry.deploy(wasm, "did:icn:owner", |m| m).await;
@@ -592,12 +608,18 @@ mod tests {
 
         // Deploy from owner1
         let wasm1 = sample_wasm();
-        registry.deploy(wasm1, "did:icn:owner1", |m| m.with_name("mod1")).await.unwrap();
+        registry
+            .deploy(wasm1, "did:icn:owner1", |m| m.with_name("mod1"))
+            .await
+            .unwrap();
 
         // Deploy from owner2 (different WASM to get different hash)
         let mut wasm2 = sample_wasm();
         wasm2.push(0x00); // Make it different
-        registry.deploy(wasm2, "did:icn:owner2", |m| m.with_name("mod2")).await.unwrap();
+        registry
+            .deploy(wasm2, "did:icn:owner2", |m| m.with_name("mod2"))
+            .await
+            .unwrap();
 
         // List owner1's modules
         let owner1_mods = registry.list_by_owner("did:icn:owner1").await.unwrap();
@@ -629,7 +651,10 @@ mod tests {
         let registry = WasmRegistry::temporary().unwrap();
         let wasm = sample_wasm();
 
-        let hash = registry.deploy(wasm.clone(), "did:icn:owner", |m| m).await.unwrap();
+        let hash = registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
 
         // Clear in-memory cache
         {
