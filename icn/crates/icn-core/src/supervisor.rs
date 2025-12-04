@@ -1746,6 +1746,16 @@ impl Supervisor {
             let gov_resolver: Arc<dyn icn_governance::MembershipResolver + Send + Sync> =
                 Arc::new(icn_governance::StaticMembershipResolver::new());
 
+            // Create governance topic before spawning GovernanceActor
+            // (subscribe does not auto-create topics like publish does)
+            {
+                let mut gossip = gossip_handle.write().await;
+                gossip.create_topic(icn_gossip::Topic::new(
+                    "governance:proposal".to_string(),
+                    icn_gossip::AccessControl::Public,
+                ));
+            }
+
             let governance_handle = crate::governance::GovernanceActor::spawn(
                 did.clone(),
                 gov_store.clone(),
