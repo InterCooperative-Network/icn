@@ -59,6 +59,9 @@ pub struct Ledger {
 
     /// Freeze manager for emergency member freezes (Issue #25)
     freeze_manager: FreezeManager,
+
+    /// Byzantine fault detector (Phase 18)
+    misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 }
 
 impl Ledger {
@@ -75,6 +78,7 @@ impl Ledger {
             last_merge: None,
             fork_detector: ForkDetector::new(),
             fork_resolver: ForkResolver::new(ForkResolutionStrategy::default()), // Hybrid strategy
+            misbehavior_detector: None, // Set via set_misbehavior_detector()
             freeze_manager,
         };
 
@@ -100,6 +104,14 @@ impl Ledger {
     /// Set the gossip handle for distributed synchronization
     pub fn set_gossip(&mut self, gossip: GossipHandle) {
         self.gossip = Some(gossip);
+    }
+
+    /// Set the misbehavior detector for Byzantine fault detection (Phase 18)
+    pub fn set_misbehavior_detector(
+        &mut self,
+        detector: Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>,
+    ) {
+        self.misbehavior_detector = Some(detector);
     }
 
     /// Append a journal entry to the ledger
@@ -484,6 +496,34 @@ impl Ledger {
             entry.author.clone(),
         );
         self.quarantine.add(entry.clone(), item)?;
+
+        // Record Byzantine violation for conflicting ledger entries (Phase 18)
+        if let Some(ref detector) = self.misbehavior_detector {
+            // Find the conflicting entry hash from the first parent
+            let conflicting_hash = entry
+                .parents
+                .first()
+                .cloned()
+                .unwrap_or_else(|| hash.clone());
+
+            let violation = icn_security::Violation::ConflictingLedgerEntries {
+                entry1: hash.as_bytes().try_into().unwrap_or([0u8; 32]),
+                entry2: conflicting_hash.as_bytes().try_into().unwrap_or([0u8; 32]),
+            };
+
+            // Report violation asynchronously (block_in_place for sync context)
+            let detector_clone = detector.clone();
+            let author = entry.author.clone();
+            tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(async {
+                    detector_clone
+                        .write()
+                        .await
+                        .record_violation(&author, violation, vec![]);
+                })
+            });
+        }
 
         // Recompute balances (expensive but necessary for correctness)
         self.recompute_balances()?;

@@ -387,6 +387,8 @@ pub struct ComputeActor {
     policy_manager: Option<Arc<crate::policy::PolicyManager>>,
     /// Dispute resolution system for contract execution (Phase 18 Week 4)
     dispute_resolution: Option<Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>>,
+    /// Byzantine fault detector for compute verification failures (Phase 18)
+    misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 }
 
 impl ComputeActor {
@@ -410,6 +412,7 @@ impl ComputeActor {
             migration_manager: None,
             policy_manager: None,
             dispute_resolution: None, // Phase 18 Week 4
+            misbehavior_detector: None, // Set via set_misbehavior_detector()
         }
     }
 
@@ -434,6 +437,14 @@ impl ComputeActor {
         system: Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>,
     ) {
         self.dispute_resolution = Some(system);
+    }
+
+    /// Set misbehavior detector for Byzantine fault detection (Phase 18)
+    pub fn set_misbehavior_detector(
+        &mut self,
+        detector: Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>,
+    ) {
+        self.misbehavior_detector = Some(detector);
     }
 
     /// Set maximum concurrent tasks this executor will claim
@@ -1486,6 +1497,31 @@ impl ComputeActor {
                 "Signature verification failed"
             );
             icn_obs::metrics::compute::signatures_invalid_inc("verification_failed");
+
+            // Record Byzantine violation for invalid signature (Phase 18)
+            if let Some(ref detector) = self.misbehavior_detector {
+                let message_hash = {
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(&result.task_hash);
+                    hasher.update(result.task_id.as_bytes());
+                    hasher.finalize().to_vec()
+                };
+
+                let violation = icn_security::Violation::InvalidSignature {
+                    message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
+                };
+
+                let detector_clone = detector.clone();
+                let executor_clone = executor_did.clone();
+                tokio::spawn(async move {
+                    detector_clone
+                        .write()
+                        .await
+                        .record_violation(&executor_clone, violation, message_hash);
+                });
+            }
+
             return Err(e);
         }
 

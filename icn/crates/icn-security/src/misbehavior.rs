@@ -244,6 +244,9 @@ impl Default for MisbehaviorThresholds {
 }
 
 /// Byzantine fault detector
+/// Callback to update trust graph when reputation changes
+pub type TrustPenaltyCallback = std::sync::Arc<dyn Fn(&Did, f64) + Send + Sync>;
+
 pub struct MisbehaviorDetector {
     /// Violation records per DID
     violations: HashMap<Did, Vec<ViolationRecord>>,
@@ -259,6 +262,9 @@ pub struct MisbehaviorDetector {
 
     /// Banned DIDs
     banned: HashMap<Did, SystemTime>,
+
+    /// Callback to update trust graph when reputation changes (Phase 18)
+    trust_penalty_callback: Option<TrustPenaltyCallback>,
 }
 
 impl MisbehaviorDetector {
@@ -270,7 +276,13 @@ impl MisbehaviorDetector {
             thresholds,
             quarantined: HashMap::new(),
             banned: HashMap::new(),
+            trust_penalty_callback: None,
         }
+    }
+
+    /// Set callback to update trust graph when reputation changes (Phase 18)
+    pub fn set_trust_penalty_callback(&mut self, callback: TrustPenaltyCallback) {
+        self.trust_penalty_callback = Some(callback);
     }
 
     /// Record a violation for a DID
@@ -298,6 +310,11 @@ impl MisbehaviorDetector {
 
         // Emit metrics
         metrics::violations_inc(&did.to_string(), &violation.description());
+
+        // Update trust graph if callback is set (Phase 18)
+        if let Some(ref callback) = self.trust_penalty_callback {
+            callback(did, score.score);
+        }
 
         // Check for auto-quarantine/ban
         if violation.is_auto_ban() || score.is_banned(self.thresholds.ban_threshold) {

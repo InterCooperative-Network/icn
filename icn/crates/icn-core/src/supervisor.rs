@@ -145,12 +145,50 @@ impl Supervisor {
 
             // Create shared MisbehaviorDetector for Byzantine fault detection (Phase 18)
             // This is shared between NetworkActor and GossipActor to ensure unified tracking
-            let misbehavior_detector = Arc::new(tokio::sync::RwLock::new(
-                icn_security::MisbehaviorDetector::new(
-                    icn_security::MisbehaviorThresholds::default(),
-                ),
-            ));
-            info!("Shared Byzantine fault detector created");
+            let mut detector = icn_security::MisbehaviorDetector::new(
+                icn_security::MisbehaviorThresholds::default(),
+            );
+
+            // Set up trust penalty callback to update trust graph (Phase 18)
+            let trust_graph_for_penalty = trust_graph_handle.clone();
+            let own_did_for_penalty = did.clone();
+            let trust_penalty_callback: icn_security::TrustPenaltyCallback =
+                Arc::new(move |peer_did: &icn_identity::Did, reputation_score: f64| {
+                    let graph = trust_graph_for_penalty.clone();
+                    let peer = peer_did.clone();
+                    let own = own_did_for_penalty.clone();
+
+                    // Spawn async task to update trust graph
+                    tokio::spawn(async move {
+                        // Map reputation (0.0-1.0) to trust score (0.0-1.0)
+                        // Reputation below 0.5 becomes untrusted (<0.1)
+                        let trust_score = if reputation_score < 0.5 {
+                            reputation_score * 0.2 // 0.5 → 0.1, 0.0 → 0.0
+                        } else {
+                            reputation_score // Keep 0.5-1.0 range
+                        };
+
+                        let mut graph = graph.write().await;
+                        let edge = icn_trust::TrustEdge::new(own.clone(), peer.clone(), trust_score);
+
+                        if let Err(e) = graph.add_edge(edge) {
+                            warn!(
+                                "Failed to update trust graph for {} (reputation: {:.2}): {}",
+                                peer, reputation_score, e
+                            );
+                        } else {
+                            debug!(
+                                "Updated trust for {} to {:.2} (reputation: {:.2})",
+                                peer, trust_score, reputation_score
+                            );
+                        }
+                    });
+                });
+
+            detector.set_trust_penalty_callback(trust_penalty_callback);
+
+            let misbehavior_detector = Arc::new(tokio::sync::RwLock::new(detector));
+            info!("Shared Byzantine fault detector created with trust graph integration");
 
             // Create trust lookup closure for gossip actor
             let trust_graph_for_gossip = trust_graph_handle.clone();
@@ -325,6 +363,7 @@ impl Supervisor {
             let store = Arc::new(SledStore::open(&store_path)?);
             let mut ledger = Ledger::new(store)?;
             ledger.set_gossip(gossip_handle.clone());
+            ledger.set_misbehavior_detector(misbehavior_detector.clone());
             let ledger_handle = Arc::new(tokio::sync::RwLock::new(ledger));
 
             info!("Ledger initialized at {}", store_path.display());
@@ -2269,6 +2308,9 @@ impl Supervisor {
             // Set signing key for result signatures
             let signing_key_bytes = identity_bundle.keypair().to_signing_key_bytes();
             compute_actor.set_signing_key(signing_key_bytes.to_vec());
+
+            // Set misbehavior detector for Byzantine fault detection (Phase 18)
+            compute_actor.set_misbehavior_detector(misbehavior_detector.clone());
 
             let compute_handle = compute_actor.spawn();
 
