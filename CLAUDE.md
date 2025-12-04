@@ -726,7 +726,7 @@ wscat -c ws://localhost:8080/ws/my-coop
 
 **Architecture**:
 - **AuthManager**: DID-based challenge/verify with JWT capability tokens
-- **CoopManager**: In-memory namespace storage (Owner/Admin/Member roles)
+- **CoopManager**: In-memory namespace storage (Steward/Facilitator/Participant roles)
 - **LedgerManager**: Per-coop mutual credit ledgers with SledStore backend
 - **ComputeManager**: Distributed task submission and status tracking
 - **EventBroadcaster**: Pub/sub event distribution with per-coop isolation
