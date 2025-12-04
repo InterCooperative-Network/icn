@@ -357,6 +357,24 @@ challenge_ttl_minutes = 5
 # Default: "" (gateway fails to start if empty)
 jwt_secret = ""
 
+# Gateway rate limiting configuration
+# Per-DID token bucket algorithm prevents API abuse
+[gateway.rate_limiting]
+
+# Maximum tokens in bucket (burst capacity)
+# Higher values allow larger request bursts
+# Default: 100
+capacity = 100
+
+# Tokens refilled per second (sustained rate)
+# 10 tokens/sec = 600 requests/minute sustained
+# Default: 10
+refill_rate = 10
+
+# Tokens consumed per request
+# Default: 1
+cost_per_request = 1
+
 # ============================================================================
 # Gateway Configuration Examples
 # ============================================================================
@@ -380,6 +398,12 @@ jwt_secret = ""
 # bind_addr = "127.0.0.1:8080"  # Local only, accessed via Unix socket proxy
 # token_expiry_hours = 1        # Very short token lifetime
 # challenge_ttl_minutes = 2     # Fast challenge expiry
+#
+# Example 4: Custom rate limiting
+# [gateway.rate_limiting]
+# capacity = 50           # Lower burst for stricter control
+# refill_rate = 5         # 300 requests/minute sustained
+# cost_per_request = 1
 
 # ============================================================================
 # Privacy Configuration (Metadata Protection)

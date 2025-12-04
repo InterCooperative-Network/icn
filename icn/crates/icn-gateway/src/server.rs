@@ -28,6 +28,7 @@ pub struct GatewayServer {
     data_dir: Option<std::path::PathBuf>,
     event_broadcaster: Option<Arc<EventBroadcaster>>,
     security_config: SecurityConfig,
+    rate_limit_config: Option<RateLimitConfig>,
 }
 
 impl GatewayServer {
@@ -39,6 +40,7 @@ impl GatewayServer {
             data_dir: None,
             event_broadcaster: None,
             security_config: SecurityConfig::development(), // Permissive for tests
+            rate_limit_config: None,
         }
     }
 
@@ -54,6 +56,7 @@ impl GatewayServer {
             data_dir: Some(data_dir),
             event_broadcaster: None,
             security_config: SecurityConfig::production(), // Strict for production
+            rate_limit_config: None,
         }
     }
 
@@ -70,12 +73,19 @@ impl GatewayServer {
             data_dir,
             event_broadcaster: Some(event_broadcaster),
             security_config: SecurityConfig::production(),
+            rate_limit_config: None,
         }
     }
 
     /// Set custom security configuration
     pub fn with_security_config(mut self, config: SecurityConfig) -> Self {
         self.security_config = config;
+        self
+    }
+
+    /// Set custom rate limiting configuration
+    pub fn with_rate_limit_config(mut self, config: RateLimitConfig) -> Self {
+        self.rate_limit_config = Some(config);
         self
     }
 
@@ -103,8 +113,13 @@ impl GatewayServer {
             Arc::new(EventBroadcaster::new())
         });
 
-        // Create rate limiter with default config
-        let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+        // Create rate limiter with configured or default config
+        let rate_limit_config = self.rate_limit_config.unwrap_or_default();
+        info!(
+            "Rate limiter: capacity={}, refill_rate={}/sec",
+            rate_limit_config.capacity, rate_limit_config.refill_rate
+        );
+        let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
 
         // Create IP-based rate limiter for auth endpoints (more aggressive limits)
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());

@@ -19,8 +19,8 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 | Documentation | 2 | 2 | 0 | 4 | 1 |
 | Feature Completeness | 2 | 2 | 4 | 8 | 4 |
 | Monitoring | 1 | 1 | 0 | 2 | 2 |
-| Config/Deployment | 0 | 2 | 0 | 2 | 1 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **8** |
+| Config/Deployment | 0 | 2 | 0 | 2 | 2 |
+| **TOTAL** | **9** | **9** | **5** | **23** | **9** |
 
 ---
 
@@ -145,11 +145,12 @@ Key TODOs requiring attention:
 - **Fix**: Add `ICN_KEYSTORE_PASSPHRASE` env var support
 - **Resolution**: Added ICN_KEYSTORE_PASSPHRASE env var (preferred) with ICN_PASSPHRASE fallback - commit `4b4f530` (2025-12-04)
 
-### 15. Rate Limits Hardcoded
+### 15. ~~Rate Limits Hardcoded~~ ✅ FIXED
 
 - **Location**: `icn-net/src/rate_limit.rs`, `icn-gateway/src/rate_limit.rs`
 - **Issue**: No config file options for rate limit tuning
 - **Fix**: Make configurable via TOML
+- **Resolution**: Added `[gateway.rate_limiting]` config section with capacity, refill_rate, cost_per_request options. GatewayServer now accepts RateLimitConfig via `.with_rate_limit_config()` builder method.
 
 ---
 
