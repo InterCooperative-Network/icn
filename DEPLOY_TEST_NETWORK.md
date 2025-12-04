@@ -23,6 +23,21 @@ docker system info | grep -E "CPUs:|Total Memory"
 # Required: 4 GB RAM minimum (8 GB recommended)
 ```
 
+### Optional: Validate Configuration
+
+Before deploying, you can run the validation script to check all configuration files:
+
+```bash
+./scripts/validate-test-config.sh
+```
+
+This script verifies:
+- All required files exist
+- Port configurations are correct (9100 for metrics, 9095 for Prometheus)
+- Config files use proper settings
+- Documentation is consistent
+- Prerequisites are installed
+
 ---
 
 ## Step 1: Build ICN Docker Image
