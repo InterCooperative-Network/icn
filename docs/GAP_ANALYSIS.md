@@ -113,11 +113,12 @@ Key TODOs requiring attention:
 - **Fix**: Create example config, document all options
 - **Resolution**: Added gateway and privacy sections to `config/icn.toml.example` (155 lines) - commit `dd6486a` (2025-12-04)
 
-### 10. Compute Endpoints Need More Test Coverage
+### 10. Compute Endpoints Need More Test Coverage (Partial Progress)
 
 - **Location**: `icn-gateway/tests/`, `icn-rpc/`
 - **Issue**: Limited error scenario testing for compute API
 - **Fix**: Add priority validation, cancellation edge cases
+- **Progress (2025-12-04)**: Added 6 new compute_mgr tests (fuel limit max, task ID length, empty code, priority variants, status fallback, cancel without daemon). Gateway tests now at 112. RPC tests still needed.
 
 ### 11. ~~Governance Architecture Unclear~~ ✅ FIXED
 
