@@ -99,8 +99,8 @@ impl FederationGossipHandler {
             FederationMessage::FederationAccept {
                 accepter_coop_id,
                 requester_coop_id,
-                ..
-            } => self.handle_federation_accept(&accepter_coop_id, &requester_coop_id),
+                signature,
+            } => self.handle_federation_accept(&accepter_coop_id, &requester_coop_id, &signature),
             FederationMessage::FederationReject {
                 rejecter_coop_id,
                 requester_coop_id,
@@ -295,7 +295,82 @@ impl FederationGossipHandler {
         &self,
         accepter_coop_id: &str,
         requester_coop_id: &str,
+        signature: &[u8],
     ) -> Result<()> {
+        // Verify signature before accepting
+        // Look up accepter's DID from registry
+        let accepter_coop = self.registry.get(accepter_coop_id)?;
+        let accepter_did = match accepter_coop {
+            Some(coop) => coop.public_did.clone(),
+            None => {
+                warn!(
+                    "Rejected federation accept from unknown cooperative: {}",
+                    accepter_coop_id
+                );
+                return Ok(()); // Silently reject unknown accepters
+            }
+        };
+
+        // Verify signature
+        if signature.is_empty() {
+            warn!(
+                "Rejected federation accept from {} - missing signature",
+                accepter_coop_id
+            );
+            metrics::registry::signature_verification_failed_inc("federation_accept");
+            return Ok(());
+        }
+
+        // Recreate signing bytes
+        let signing_bytes = {
+            let mut bytes = Vec::new();
+            bytes.extend(b"federation_accept:");
+            bytes.extend(accepter_coop_id.as_bytes());
+            bytes.extend(b":");
+            bytes.extend(requester_coop_id.as_bytes());
+            bytes
+        };
+
+        // Verify signature using accepter's DID
+        let verifying_key = match accepter_did.to_verifying_key() {
+            Ok(key) => key,
+            Err(e) => {
+                warn!(
+                    "Rejected federation accept from {} - invalid DID: {}",
+                    accepter_coop_id, e
+                );
+                metrics::registry::signature_verification_failed_inc("federation_accept");
+                return Ok(());
+            }
+        };
+
+        let sig = match ed25519_dalek::Signature::from_slice(signature) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(
+                    "Rejected federation accept from {} - invalid signature format: {}",
+                    accepter_coop_id, e
+                );
+                metrics::registry::signature_verification_failed_inc("federation_accept");
+                return Ok(());
+            }
+        };
+
+        use ed25519_dalek::Verifier;
+        if let Err(e) = verifying_key.verify(&signing_bytes, &sig) {
+            warn!(
+                "Rejected federation accept from {} - signature verification failed: {}",
+                accepter_coop_id, e
+            );
+            metrics::registry::signature_verification_failed_inc("federation_accept");
+            return Ok(());
+        }
+
+        debug!(
+            "Verified signature for federation accept from {}",
+            accepter_coop_id
+        );
+
         info!(
             "Federation accepted: {} accepted {}",
             accepter_coop_id, requester_coop_id
@@ -651,5 +726,110 @@ mod tests {
 
         // Verify signature
         assert!(signed_vouch.verify_signature().is_ok());
+    }
+
+    #[test]
+    fn test_handler_federation_accept_requires_signature() {
+        let registry = create_test_registry();
+        let handler = FederationGossipHandler::new(registry.clone());
+
+        // Set up our own coop as the requester
+        let (my_coop, my_keypair) = create_test_coop_with_keypair("requester-coop");
+        handler.set_own_coop(my_coop);
+        handler.set_keypair(my_keypair);
+
+        // Register an accepter coop first (so we can look up their DID)
+        let (accepter_coop, accepter_keypair) = create_test_coop_with_keypair("accepter-coop");
+        let signed_accepter = accepter_coop.clone().sign(&accepter_keypair);
+        let announce_msg = FederationMessage::CoopAnnounce(signed_accepter);
+        let announce_data = serde_json::to_vec(&announce_msg).unwrap();
+        handler
+            .handle_message("federation:registry", &announce_data)
+            .unwrap();
+
+        // Verify accepter is registered
+        assert!(registry.get("accepter-coop").unwrap().is_some());
+
+        // Now send an UNSIGNED federation accept - should be rejected
+        let unsigned_accept = FederationMessage::FederationAccept {
+            accepter_coop_id: "accepter-coop".to_string(),
+            requester_coop_id: "requester-coop".to_string(),
+            signature: vec![], // Empty signature
+        };
+        let unsigned_data = serde_json::to_vec(&unsigned_accept).unwrap();
+        handler
+            .handle_message("federation:registry", &unsigned_data)
+            .unwrap();
+        // The unsigned accept should be silently rejected (no error, but no action)
+
+        // Now send a SIGNED federation accept - should be accepted
+        let signing_bytes = {
+            let mut bytes = Vec::new();
+            bytes.extend(b"federation_accept:");
+            bytes.extend(b"accepter-coop");
+            bytes.extend(b":");
+            bytes.extend(b"requester-coop");
+            bytes
+        };
+        let signature = accepter_keypair.sign(&signing_bytes).to_vec();
+
+        let signed_accept = FederationMessage::FederationAccept {
+            accepter_coop_id: "accepter-coop".to_string(),
+            requester_coop_id: "requester-coop".to_string(),
+            signature,
+        };
+        let signed_data = serde_json::to_vec(&signed_accept).unwrap();
+
+        // Should succeed without error
+        handler
+            .handle_message("federation:registry", &signed_data)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_handler_rejects_forged_federation_accept() {
+        let registry = create_test_registry();
+        let handler = FederationGossipHandler::new(registry.clone());
+
+        // Set up our own coop as the requester
+        let (my_coop, my_keypair) = create_test_coop_with_keypair("requester-coop");
+        handler.set_own_coop(my_coop);
+        handler.set_keypair(my_keypair);
+
+        // Register the real accepter coop
+        let (accepter_coop, _accepter_keypair) = create_test_coop_with_keypair("accepter-coop");
+        let (_, attacker_keypair) = create_test_coop_with_keypair("attacker-coop");
+
+        // Register accepter so we can look up their DID
+        let signed_accepter = accepter_coop.clone().sign(&_accepter_keypair);
+        let announce_msg = FederationMessage::CoopAnnounce(signed_accepter);
+        let announce_data = serde_json::to_vec(&announce_msg).unwrap();
+        handler
+            .handle_message("federation:registry", &announce_data)
+            .unwrap();
+
+        // Attacker tries to forge an accept message claiming to be from accepter-coop
+        // but signs with their own key
+        let signing_bytes = {
+            let mut bytes = Vec::new();
+            bytes.extend(b"federation_accept:");
+            bytes.extend(b"accepter-coop");
+            bytes.extend(b":");
+            bytes.extend(b"requester-coop");
+            bytes
+        };
+        let forged_signature = attacker_keypair.sign(&signing_bytes).to_vec();
+
+        let forged_accept = FederationMessage::FederationAccept {
+            accepter_coop_id: "accepter-coop".to_string(), // Claims to be accepter
+            requester_coop_id: "requester-coop".to_string(),
+            signature: forged_signature, // But signed by attacker
+        };
+        let forged_data = serde_json::to_vec(&forged_accept).unwrap();
+
+        // Should be silently rejected (signature won't verify against accepter's DID)
+        handler
+            .handle_message("federation:registry", &forged_data)
+            .unwrap();
     }
 }

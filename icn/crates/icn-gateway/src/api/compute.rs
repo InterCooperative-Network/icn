@@ -133,11 +133,13 @@ pub async fn submit_task(
         }
     };
 
-    // Submit task
+    // Submit task with coop_id from JWT claims
+    let coop_id = Some(claims.coop_id.clone());
     let task_hash = compute_mgr
         .submit_task_with_code(
             task_id.clone(),
             submitter_did.clone(),
+            coop_id,
             task_code,
             inputs,
             req.fuel_limit,

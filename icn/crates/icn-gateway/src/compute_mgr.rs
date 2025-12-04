@@ -60,6 +60,7 @@ impl ComputeManager {
         &self,
         task_id: String,
         submitter: String,
+        coop_id: Option<String>,
         code: String,
         inputs: Vec<u8>,
         fuel_limit: u64,
@@ -71,6 +72,7 @@ impl ComputeManager {
         self.submit_task_with_code(
             task_id,
             submitter,
+            coop_id,
             TaskCode::Ccl(code),
             inputs,
             fuel_limit,
@@ -87,6 +89,7 @@ impl ComputeManager {
         &self,
         task_id: String,
         submitter: String,
+        coop_id: Option<String>,
         code: TaskCode,
         inputs: Vec<u8>,
         fuel_limit: u64,
@@ -121,7 +124,7 @@ impl ComputeManager {
         let task = ComputeTask {
             id: task_id.clone(),
             submitter: submitter.clone(),
-            coop_id: None, // TODO: Get from JWT claims or request body
+            coop_id,
             code,
             inputs,
             fuel_limit: FuelLimit(fuel_limit),
@@ -331,6 +334,7 @@ mod tests {
             .submit_task(
                 "task-1".to_string(),
                 "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
                 r#"{"name": "Test"}"#.to_string(),
                 vec![],
                 10_000,
@@ -352,6 +356,7 @@ mod tests {
             .submit_task(
                 "task-1".to_string(),
                 "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
                 r#"{"name": "Test"}"#.to_string(),
                 vec![],
                 50, // Below minimum (100)
@@ -373,6 +378,7 @@ mod tests {
             .submit_task(
                 "task-1".to_string(),
                 "not-a-did".to_string(), // Invalid DID format
+                Some("test-coop".to_string()),
                 r#"{"name": "Test"}"#.to_string(),
                 vec![],
                 10_000,
@@ -397,6 +403,7 @@ mod tests {
             .submit_task(
                 "".to_string(), // Empty ID
                 "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
                 r#"{"name": "Test"}"#.to_string(),
                 vec![],
                 10_000,
@@ -418,6 +425,7 @@ mod tests {
             .submit_task(
                 "task-1".to_string(),
                 "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
                 r#"{"name": "Test"}"#.to_string(),
                 vec![],
                 10_000,

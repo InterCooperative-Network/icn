@@ -17,10 +17,10 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 |----------|------|--------|-----|-------|-------|
 | Test Coverage | 4 | 2 | 1 | 7 | 0 |
 | Documentation | 2 | 2 | 0 | 4 | 1 |
-| Feature Completeness | 2 | 2 | 4 | 8 | 2 |
+| Feature Completeness | 2 | 2 | 4 | 8 | 4 |
 | Monitoring | 1 | 1 | 0 | 2 | 1 |
 | Config/Deployment | 0 | 2 | 0 | 2 | 1 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **5** |
+| **TOTAL** | **9** | **9** | **5** | **23** | **7** |
 
 ---
 
@@ -81,9 +81,12 @@ Key TODOs requiring attention:
 | `icn-core/src/supervisor.rs` | 1867 | Cooperative treasury DID | Open |
 | ~~`icn-federation/src/gossip.rs`~~ | ~~132,226,345,383~~ | ~~Signature verification stubs~~ | ✅ FIXED |
 | `icn-compute/src/actor.rs` | 1744,2022 | Placement tracking incomplete | Open |
-| `icn-gateway/src/compute_mgr.rs` | 124 | coop_id not set from JWT | Open |
+| ~~`icn-gateway/src/compute_mgr.rs`~~ | ~~124~~ | ~~coop_id not set from JWT~~ | ✅ FIXED |
 
-**Resolved (2025-12-04)**: Federation signature verification implemented - commit `b411487`
+**Resolved (2025-12-04)**:
+- Federation signature verification implemented - commit `b411487`
+- Federation accept signature verification added (security fix)
+- coop_id now populated from JWT claims in compute_mgr
 
 ### 7. CCL Contract Crate Has No Integration Tests
 
