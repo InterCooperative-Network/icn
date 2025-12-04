@@ -39,6 +39,10 @@ pub fn init_descriptions() {
         "icn_federation_policy_violations_total",
         "Total number of federation policy violations"
     );
+    describe_counter!(
+        "icn_federation_signature_verification_failed_total",
+        "Total number of signature verification failures by message type"
+    );
 
     // Attestation metrics
     describe_counter!(
@@ -212,6 +216,14 @@ pub mod registry {
             "icn_federation_policy_violations_total",
             "policy" => policy.to_string(),
             "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn signature_verification_failed_inc(message_type: &str) {
+        counter!(
+            "icn_federation_signature_verification_failed_total",
+            "message_type" => message_type.to_string()
         )
         .increment(1);
     }

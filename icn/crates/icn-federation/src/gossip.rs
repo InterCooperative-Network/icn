@@ -10,7 +10,7 @@ use crate::metrics;
 use crate::registry::CooperativeRegistry;
 use crate::types::{current_timestamp, CooperativeInfo, FederationMessage, Vouch};
 use crate::{TOPIC_FEDERATION_CLEARING, TOPIC_FEDERATION_REGISTRY, TOPIC_FEDERATION_TRUST};
-use icn_identity::Did;
+use icn_identity::{Did, KeyPair};
 use std::sync::Arc;
 use std::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -26,6 +26,9 @@ pub struct FederationGossipHandler {
     /// Our cooperative info
     own_coop: RwLock<Option<CooperativeInfo>>,
 
+    /// Keypair for signing outgoing messages
+    keypair: RwLock<Option<KeyPair>>,
+
     /// Callback to send messages via gossip
     send_callback: RwLock<Option<GossipSendCallback>>,
 }
@@ -36,6 +39,7 @@ impl FederationGossipHandler {
         Self {
             registry,
             own_coop: RwLock::new(None),
+            keypair: RwLock::new(None),
             send_callback: RwLock::new(None),
         }
     }
@@ -43,6 +47,11 @@ impl FederationGossipHandler {
     /// Set the send callback for gossip messages
     pub fn set_send_callback(&self, callback: GossipSendCallback) {
         *self.send_callback.write().unwrap() = Some(callback);
+    }
+
+    /// Set the keypair for signing outgoing messages
+    pub fn set_keypair(&self, keypair: KeyPair) {
+        *self.keypair.write().unwrap() = Some(keypair);
     }
 
     /// Set our own cooperative info
@@ -129,7 +138,18 @@ impl FederationGossipHandler {
         }
 
         // Verify signature before accepting
-        // TODO: Verify signature using coop_info.public_did
+        if let Err(e) = coop_info.verify_signature() {
+            warn!(
+                "Rejected announcement from {} - invalid signature: {}",
+                coop_info.coop_id, e
+            );
+            metrics::registry::signature_verification_failed_inc("coop_announce");
+            return Ok(()); // Don't propagate error, just reject silently
+        }
+        debug!(
+            "Verified signature for cooperative announcement: {}",
+            coop_info.coop_id
+        );
 
         // Check if already registered
         if self.registry.get(&coop_info.coop_id)?.is_some() {
@@ -223,7 +243,19 @@ impl FederationGossipHandler {
             return Ok(());
         }
 
-        // TODO: Verify vouch signature using voucher's DID
+        // Verify vouch signature using voucher's DID
+        if let Err(e) = vouch.verify_signature() {
+            warn!(
+                "Rejected vouch from {} - invalid signature: {}",
+                vouch.voucher_coop_id, e
+            );
+            metrics::registry::signature_verification_failed_inc("vouch");
+            return Ok(()); // Don't propagate error, just reject silently
+        }
+        debug!(
+            "Verified signature for vouch from {} for {}",
+            vouch.voucher_coop_id, vouch.target_coop_id
+        );
 
         // Store the vouch
         let target = vouch.target_coop_id.clone();
@@ -302,9 +334,18 @@ impl FederationGossipHandler {
     /// Announce our cooperative to the network
     pub fn announce(&self) -> Result<()> {
         let coop = self.own_coop.read().unwrap().clone();
+        let keypair = self.keypair.read().unwrap();
 
         if let Some(coop_info) = coop {
-            let message = FederationMessage::CoopAnnounce(coop_info);
+            // Sign the announcement if keypair is available
+            let signed_coop = if let Some(ref kp) = *keypair {
+                coop_info.sign(kp)
+            } else {
+                warn!("No keypair set - sending unsigned announcement");
+                coop_info
+            };
+
+            let message = FederationMessage::CoopAnnounce(signed_coop);
             self.send_message(TOPIC_FEDERATION_REGISTRY, &message)?;
             metrics::registry::announcements_sent_inc();
             debug!("Announced cooperative to federation");
@@ -335,6 +376,8 @@ impl FederationGossipHandler {
             .own_coop_id()
             .ok_or_else(|| FederationError::NotInitialized("Own coop not set".to_string()))?;
 
+        let keypair = self.keypair.read().unwrap();
+
         let vouch = Vouch::new(
             own_coop_id.clone(),
             voucher_did,
@@ -342,9 +385,15 @@ impl FederationGossipHandler {
             trust_score,
         );
 
-        // TODO: Sign the vouch
+        // Sign the vouch if keypair is available
+        let signed_vouch = if let Some(ref kp) = *keypair {
+            vouch.sign(kp)
+        } else {
+            warn!("No keypair set - sending unsigned vouch");
+            vouch
+        };
 
-        let message = FederationMessage::Vouch(vouch);
+        let message = FederationMessage::Vouch(signed_vouch);
         self.send_message(TOPIC_FEDERATION_REGISTRY, &message)?;
         metrics::registry::vouches_sent_inc(target_coop_id);
 
@@ -380,12 +429,30 @@ impl FederationGossipHandler {
             .own_coop_id()
             .ok_or_else(|| FederationError::NotInitialized("Own coop not set".to_string()))?;
 
-        // TODO: Sign the acceptance
+        let keypair = self.keypair.read().unwrap();
+
+        // Create signing bytes for the acceptance
+        let signing_bytes = {
+            let mut bytes = Vec::new();
+            bytes.extend(b"federation_accept:");
+            bytes.extend(own_coop_id.as_bytes());
+            bytes.extend(b":");
+            bytes.extend(requester_coop_id.as_bytes());
+            bytes
+        };
+
+        // Sign the acceptance if keypair is available
+        let signature = if let Some(ref kp) = *keypair {
+            kp.sign(&signing_bytes).to_vec()
+        } else {
+            warn!("No keypair set - sending unsigned acceptance");
+            Vec::new()
+        };
 
         let message = FederationMessage::FederationAccept {
             accepter_coop_id: own_coop_id,
             requester_coop_id: requester_coop_id.to_string(),
-            signature: Vec::new(),
+            signature,
         };
         self.send_message(TOPIC_FEDERATION_REGISTRY, &message)?;
 
@@ -437,17 +504,26 @@ mod tests {
     use icn_store::{SledStore, Store};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    fn test_did() -> Did {
-        KeyPair::generate().unwrap().did().clone()
+    fn test_keypair() -> KeyPair {
+        KeyPair::generate().unwrap()
     }
 
-    fn create_test_coop(id: &str) -> CooperativeInfo {
-        CooperativeInfo::new(
+    /// Create a test coop with an associated keypair for signing
+    fn create_test_coop_with_keypair(id: &str) -> (CooperativeInfo, KeyPair) {
+        let keypair = test_keypair();
+        let coop = CooperativeInfo::new(
             id.to_string(),
             format!("{id} Cooperative"),
-            test_did(),
+            keypair.did().clone(),
             FederationPolicy::Open,
-        )
+        );
+        (coop, keypair)
+    }
+
+    /// Create a test coop without keypair (for non-signing tests)
+    fn create_test_coop(id: &str) -> CooperativeInfo {
+        let (coop, _) = create_test_coop_with_keypair(id);
+        coop
     }
 
     fn create_test_registry() -> Arc<CooperativeRegistry> {
@@ -461,8 +537,10 @@ mod tests {
         let registry = create_test_registry();
         let handler = FederationGossipHandler::new(registry.clone());
 
-        // Set up our own coop
-        handler.set_own_coop(create_test_coop("my-coop"));
+        // Set up our own coop with keypair for signing
+        let (my_coop, keypair) = create_test_coop_with_keypair("my-coop");
+        handler.set_own_coop(my_coop);
+        handler.set_keypair(keypair);
 
         // Set up send callback
         let send_count = Arc::new(AtomicUsize::new(0));
@@ -472,7 +550,7 @@ mod tests {
             Ok(())
         }));
 
-        // Announce
+        // Announce (should be signed now)
         handler.announce().unwrap();
         assert_eq!(send_count.load(Ordering::SeqCst), 1);
     }
@@ -485,8 +563,31 @@ mod tests {
         // Set up our own coop
         handler.set_own_coop(create_test_coop("my-coop"));
 
-        // Receive announcement from another coop
-        let other_coop = create_test_coop("other-coop");
+        // Create and sign announcement from another coop
+        let (other_coop, other_keypair) = create_test_coop_with_keypair("other-coop");
+        let signed_coop = other_coop.sign(&other_keypair);
+        let message = FederationMessage::CoopAnnounce(signed_coop);
+        let data = serde_json::to_vec(&message).unwrap();
+
+        handler
+            .handle_message("federation:registry", &data)
+            .unwrap();
+
+        // Should be registered (signature is valid)
+        let registered = registry.get("other-coop").unwrap();
+        assert!(registered.is_some());
+    }
+
+    #[test]
+    fn test_handler_rejects_unsigned_announcement() {
+        let registry = create_test_registry();
+        let handler = FederationGossipHandler::new(registry.clone());
+
+        // Set up our own coop
+        handler.set_own_coop(create_test_coop("my-coop"));
+
+        // Send unsigned announcement from another coop
+        let other_coop = create_test_coop("unsigned-coop");
         let message = FederationMessage::CoopAnnounce(other_coop);
         let data = serde_json::to_vec(&message).unwrap();
 
@@ -494,9 +595,9 @@ mod tests {
             .handle_message("federation:registry", &data)
             .unwrap();
 
-        // Should be registered
-        let registered = registry.get("other-coop").unwrap();
-        assert!(registered.is_some());
+        // Should NOT be registered (signature is missing)
+        let registered = registry.get("unsigned-coop").unwrap();
+        assert!(registered.is_none());
     }
 
     #[test]
@@ -504,12 +605,13 @@ mod tests {
         let registry = create_test_registry();
         let handler = FederationGossipHandler::new(registry.clone());
 
-        // Set up our own coop
-        let my_coop = create_test_coop("my-coop");
+        // Set up our own coop with keypair
+        let (my_coop, my_keypair) = create_test_coop_with_keypair("my-coop");
         handler.set_own_coop(my_coop.clone());
 
-        // Receive our own announcement (shouldn't register)
-        let message = FederationMessage::CoopAnnounce(my_coop);
+        // Receive our own (signed) announcement - shouldn't register
+        let signed_coop = my_coop.sign(&my_keypair);
+        let message = FederationMessage::CoopAnnounce(signed_coop);
         let data = serde_json::to_vec(&message).unwrap();
 
         handler
@@ -519,5 +621,35 @@ mod tests {
         // Should NOT be registered (it's our own)
         let registered = registry.get("my-coop").unwrap();
         assert!(registered.is_none());
+    }
+
+    #[test]
+    fn test_coop_info_signature_roundtrip() {
+        let (coop, keypair) = create_test_coop_with_keypair("test-coop");
+
+        // Sign the coop info
+        let signed_coop = coop.sign(&keypair);
+        assert!(!signed_coop.signature.is_empty());
+
+        // Verify signature
+        assert!(signed_coop.verify_signature().is_ok());
+    }
+
+    #[test]
+    fn test_vouch_signature_roundtrip() {
+        let keypair = test_keypair();
+        let vouch = Vouch::new(
+            "voucher-coop".to_string(),
+            keypair.did().clone(),
+            "target-coop".to_string(),
+            0.7,
+        );
+
+        // Sign the vouch
+        let signed_vouch = vouch.sign(&keypair);
+        assert!(!signed_vouch.signature.is_empty());
+
+        // Verify signature
+        assert!(signed_vouch.verify_signature().is_ok());
     }
 }

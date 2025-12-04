@@ -87,6 +87,38 @@ impl CooperativeInfo {
         serde_json::to_vec(&signable).unwrap_or_default()
     }
 
+    /// Sign this cooperative info using the provided keypair
+    ///
+    /// Returns a new CooperativeInfo with the signature field populated.
+    pub fn sign(mut self, keypair: &icn_identity::KeyPair) -> Self {
+        let bytes = self.signing_bytes();
+        let signature = keypair.sign(&bytes);
+        self.signature = signature.to_vec();
+        self
+    }
+
+    /// Verify the signature on this cooperative info
+    ///
+    /// Returns Ok(()) if the signature is valid, Err if invalid or missing.
+    pub fn verify_signature(&self) -> Result<(), String> {
+        if self.signature.is_empty() {
+            return Err("Missing signature".to_string());
+        }
+
+        let verifying_key = self
+            .public_did
+            .to_verifying_key()
+            .map_err(|e| format!("Failed to extract public key from DID: {}", e))?;
+
+        let signature = ed25519_dalek::Signature::from_slice(&self.signature)
+            .map_err(|e| format!("Invalid signature format: {}", e))?;
+
+        use ed25519_dalek::Verifier;
+        verifying_key
+            .verify(&self.signing_bytes(), &signature)
+            .map_err(|e| format!("Signature verification failed: {}", e))
+    }
+
     /// Check if this cooperative supports a specific capability
     pub fn has_capability(&self, capability: &str) -> bool {
         self.capabilities.iter().any(|c| c == capability)
@@ -273,6 +305,38 @@ impl Vouch {
             bytes.extend(exp.to_le_bytes());
         }
         bytes
+    }
+
+    /// Sign this vouch using the provided keypair
+    ///
+    /// Returns a new Vouch with the signature field populated.
+    pub fn sign(mut self, keypair: &icn_identity::KeyPair) -> Self {
+        let bytes = self.signing_bytes();
+        let signature = keypair.sign(&bytes);
+        self.signature = signature.to_vec();
+        self
+    }
+
+    /// Verify the signature on this vouch
+    ///
+    /// Returns Ok(()) if the signature is valid, Err if invalid or missing.
+    pub fn verify_signature(&self) -> Result<(), String> {
+        if self.signature.is_empty() {
+            return Err("Missing signature".to_string());
+        }
+
+        let verifying_key = self
+            .voucher_did
+            .to_verifying_key()
+            .map_err(|e| format!("Failed to extract public key from DID: {}", e))?;
+
+        let signature = ed25519_dalek::Signature::from_slice(&self.signature)
+            .map_err(|e| format!("Invalid signature format: {}", e))?;
+
+        use ed25519_dalek::Verifier;
+        verifying_key
+            .verify(&self.signing_bytes(), &signature)
+            .map_err(|e| format!("Signature verification failed: {}", e))
     }
 
     /// Check if the vouch has expired
