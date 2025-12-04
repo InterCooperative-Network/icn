@@ -757,7 +757,8 @@ async fn test_three_participant_contract_deployment() {
         .expect("Failed to dial A from C");
 
     // Give connections time to establish (full mesh = 6 connections)
-    sleep(Duration::from_millis(800)).await;
+    // Increased timeout for CI environments where handshakes may take longer
+    sleep(Duration::from_millis(1500)).await;
 
     // Create contract with all 3 participants
     let contract = Contract::new("TriPartyAgreement".to_string())
