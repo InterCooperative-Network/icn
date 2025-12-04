@@ -908,14 +908,13 @@ See [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) for com
 
 **What's Next**: See [ROADMAP.md](/ROADMAP.md) (ICN-DEP-ROADMAP-01) for complete strategic roadmap. Critical path:
 - **Phase 16**: ✅ Scheduler Evolution (16A-E) COMPLETE - Intelligent placement, locality awareness, cooperative policies (2025-11-24)
-- **Phase 17**: Storage Hardening & Replication (4 weeks) - **NEXT PRIORITY**
-  - Trust-weighted replica selection, ReplicationManager actor, 99.9% durability target
-- **Phase 18**: Pre-Pilot Hardening (6 weeks) - **PRE-PILOT CRITICAL**
+- **Phase 17**: ✅ Storage Hardening & Replication COMPLETE - Trust-weighted replica selection, ReplicationManager actor, 16 Prometheus metrics, 99.9% durability (2025-12-04)
+- **Phase 18**: Pre-Pilot Hardening (6 weeks) - **NEXT PRIORITY**
   - Byzantine fault detection, partition healing, conflict resolution, storage quotas
-- **Track C1**: Pilot Community Selection - **CAN START IN PARALLEL** with Phase 17
+- **Track C1**: Pilot Community Selection - **CAN START IN PARALLEL**
 - **Phase 19+**: Post-pilot scalability & privacy improvements (driven by pilot feedback)
 
-**Pre-Pilot Timeline**: 10 weeks (Phase 17 + 18) → pilot-ready infrastructure with fault tolerance and Byzantine resistance
+**Pre-Pilot Timeline**: 6 weeks (Phase 18) → pilot-ready infrastructure with fault tolerance and Byzantine resistance
 
 **Three-Layer Security Architecture (Production Ready ✅)**:
 1. **Transport Layer**: QUIC/TLS with DID-TLS binding
