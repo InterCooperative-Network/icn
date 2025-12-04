@@ -33,3 +33,6 @@ icn-governance.workspace = true
 icn-compute.workspace = true
 icn-trust.workspace = true
 icn-store.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
