@@ -11,7 +11,7 @@
 
 Comprehensive analysis of the ICN codebase identified **23 gaps** across test coverage, documentation, feature completeness, monitoring, and configuration. Of these, **9 are high severity** and should be addressed before or during early pilot.
 
-**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! Additional TODOs addressed.
+**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! Additional TODOs addressed. Gap #12 (WASM Executor) fixed on 2025-12-04.
 
 | Category | High | Medium | Low | Total | Fixed |
 |----------|------|--------|-----|-------|-------|
@@ -20,7 +20,7 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 | Feature Completeness | 2 | 2 | 4 | 8 | 8 |
 | Monitoring | 1 | 1 | 0 | 2 | 2 |
 | Config/Deployment | 0 | 2 | 0 | 2 | 2 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **19** |
+| **TOTAL** | **9** | **9** | **5** | **23** | **20** |
 
 ---
 
@@ -177,11 +177,18 @@ Key TODOs and their status:
 - **Fix**: Document architecture, add RPC→gossip integration tests
 - **Resolution**: Added "Runtime Architecture" section to `docs/governance.md` with component diagram, deployment modes, data flows, and source of truth documentation (2025-12-04)
 
-### 12. WASM Executor Incomplete
+### 12. ~~WASM Executor Incomplete~~ ✅ FIXED
 
 - **Location**: `icn-compute/src/wasm_executor.rs:321`
 - **Issue**: TODO for blob storage fetch
 - **Fix**: Complete blob integration, add WASM execution tests
+- **Resolution (2025-12-04)**: Added `WasmRegistry` for content-addressed WASM module storage:
+  - `deploy()` stores WASM with blake3 hash as key
+  - `get_blocking()` fetches WASM for sync executor context
+  - Validates WASM magic bytes, supports sled persistence
+  - Updated `WasmExecutor` to resolve WasmRef from registry
+  - 17 new tests (13 registry + 3 executor WasmRef + 1 validation)
+  - PR #43, commit `822a2be`
 
 ### 13. ~~Trust Metrics Missing from Grafana Dashboard~~ ✅ FIXED
 
