@@ -87,7 +87,8 @@ sudo kubectl -n icn get servicemonitor
 ### Quick Start
 
 ```bash
-cd /home/matt/projects/icn
+# Navigate to ICN repository root
+cd /path/to/icn
 
 # Build and start (first time takes 5-10 min)
 docker compose -f docker-compose.test.yml up -d --build
@@ -361,9 +362,9 @@ docker exec icn-node2 icnctl gossip list test:messages
 curl -s http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
 
 # Expected output (all "up"):
-# {"instance": "node1:9090", "health": "up"}
-# {"instance": "node2:9090", "health": "up"}
-# {"instance": "node3:9090", "health": "up"}
+# {"instance": "node1:9100", "health": "up"}
+# {"instance": "node2:9100", "health": "up"}
+# {"instance": "node3:9100", "health": "up"}
 ```
 
 ---
