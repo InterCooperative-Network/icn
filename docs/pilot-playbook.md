@@ -53,7 +53,7 @@ docker-compose exec icnd icnctl id show
 |---------|-----|
 | Web UI | http://localhost:3000 |
 | API | http://localhost:8080 |
-| Grafana | http://localhost:3001 (admin/admin) |
+| Grafana | http://localhost:3001 (default: admin/admin - change for prod) |
 
 ### 5. Get a Token
 

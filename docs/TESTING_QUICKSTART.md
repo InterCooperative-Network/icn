@@ -296,7 +296,7 @@ icn_governance_proposals_total
 ### Grafana Dashboards
 
 1. Open [http://localhost:3000](http://localhost:3000)
-2. Login (admin/admin)
+2. Login ( default creds - change for prod)
 3. Navigate: Dashboards → ICN Dashboard
 
 **Panels to watch**:

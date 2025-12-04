@@ -185,7 +185,7 @@ npm run seed -- --gateway http://localhost:8080 --token <your-token>
 |---------|-----|-------------|
 | Web UI | http://localhost:3000 | Timebank interface |
 | Gateway API | http://localhost:8080 | REST/WebSocket API |
-| Grafana | http://localhost:3001 | Monitoring (admin/admin) |
+| Grafana | http://localhost:3001 | Monitoring (default: admin/admin - change for prod) |
 | Prometheus | http://localhost:9091 | Metrics |
 
 ## Configuration
