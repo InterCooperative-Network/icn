@@ -8,12 +8,12 @@
 //! 5. Federation gossip protocol
 
 use ed25519_dalek::SigningKey;
+use icn_federation::types::{CooperativeInfo, CurrencyInfo, Vouch};
 use icn_federation::{
     AttestationStore, BilateralClearingAgreement, ClearingManager, CooperativeRegistry,
     EvidenceSummary, FederatedDidResolver, FederatedTrustAttestation, FederationPolicy,
     SettlementInterval, TrustContext,
 };
-use icn_federation::types::{CooperativeInfo, CurrencyInfo, Vouch};
 use icn_identity::{Did, KeyPair};
 use icn_store::{SledStore, Store};
 use rand::rngs::OsRng;
@@ -119,19 +119,31 @@ fn test_find_coops_by_capability_and_currency() {
     let registry = CooperativeRegistry::new(store, own_info).unwrap();
 
     // Register coops with different capabilities
-    let compute_coop = create_coop_info("compute-coop", "Compute Cooperative", FederationPolicy::Open)
-        .with_capability("compute")
-        .with_capability("storage");
+    let compute_coop = create_coop_info(
+        "compute-coop",
+        "Compute Cooperative",
+        FederationPolicy::Open,
+    )
+    .with_capability("compute")
+    .with_capability("storage");
 
-    let clearing_coop = create_coop_info("clearing-coop", "Clearing Cooperative", FederationPolicy::Open)
-        .with_capability("clearing")
-        .with_currency(CurrencyInfo::new("hours", "Hours", 2));
+    let clearing_coop = create_coop_info(
+        "clearing-coop",
+        "Clearing Cooperative",
+        FederationPolicy::Open,
+    )
+    .with_capability("clearing")
+    .with_currency(CurrencyInfo::new("hours", "Hours", 2));
 
-    let full_coop = create_coop_info("full-coop", "Full Service Cooperative", FederationPolicy::Open)
-        .with_capability("compute")
-        .with_capability("clearing")
-        .with_currency(CurrencyInfo::new("hours", "Hours", 2))
-        .with_currency(CurrencyInfo::new("credits", "Credits", 2));
+    let full_coop = create_coop_info(
+        "full-coop",
+        "Full Service Cooperative",
+        FederationPolicy::Open,
+    )
+    .with_capability("compute")
+    .with_capability("clearing")
+    .with_currency(CurrencyInfo::new("hours", "Hours", 2))
+    .with_currency(CurrencyInfo::new("credits", "Credits", 2));
 
     registry.register(compute_coop).unwrap();
     registry.register(clearing_coop).unwrap();
@@ -194,9 +206,13 @@ fn test_attestation_signing_and_verification() {
         TrustContext::Economic,
         30 * 24 * 60 * 60, // 30 days expiry
     )
-    .with_evidence(EvidenceSummary::new("transactions", "Total successful transactions").with_count(150))
+    .with_evidence(
+        EvidenceSummary::new("transactions", "Total successful transactions").with_count(150),
+    )
     .with_evidence(EvidenceSummary::new("disputes", "Open disputes").with_count(0))
-    .with_evidence(EvidenceSummary::new("membership_days", "Days as active member").with_count(365));
+    .with_evidence(
+        EvidenceSummary::new("membership_days", "Days as active member").with_count(365),
+    );
 
     // Sign the attestation
     attestation.sign(&signing_key).unwrap();
@@ -235,7 +251,9 @@ fn test_attestation_store_operations() {
     attestation.sign(&signing_key).unwrap();
 
     // Store attestation
-    attestation_store.store_attestation(attestation.clone()).unwrap();
+    attestation_store
+        .store_attestation(attestation.clone())
+        .unwrap();
 
     // Retrieve by member
     let retrieved = attestation_store.get_attestations_for(&member_did).unwrap();
@@ -243,7 +261,9 @@ fn test_attestation_store_operations() {
     assert_eq!(retrieved[0].trust_score, 0.9);
 
     // Retrieve by source cooperative
-    let by_coop = attestation_store.get_attestations_from("food-coop").unwrap();
+    let by_coop = attestation_store
+        .get_attestations_from("food-coop")
+        .unwrap();
     assert_eq!(by_coop.len(), 1);
 
     // Store another attestation for same member from different coop
@@ -255,7 +275,9 @@ fn test_attestation_store_operations() {
         TrustContext::Economic,
         30 * 24 * 60 * 60,
     );
-    attestation2.sign(&SigningKey::generate(&mut OsRng)).unwrap();
+    attestation2
+        .sign(&SigningKey::generate(&mut OsRng))
+        .unwrap();
     attestation_store.store_attestation(attestation2).unwrap();
 
     // Member should now have 2 attestations
@@ -303,7 +325,7 @@ fn test_clearing_agreement_creation_and_rates() {
         coop_b_did.clone(),
     )
     .with_rate("hours", "credits", 10.0) // 1 hour = 10 credits
-    .with_rate("credits", "hours", 0.1)   // 10 credits = 1 hour
+    .with_rate("credits", "hours", 0.1) // 10 credits = 1 hour
     .with_interval(SettlementInterval::Weekly)
     .with_max_imbalance(5000);
 
@@ -361,7 +383,10 @@ fn test_clearing_manager_agreement_lifecycle() {
 fn test_settlement_interval_durations() {
     assert_eq!(SettlementInterval::Daily.seconds(), Some(24 * 60 * 60));
     assert_eq!(SettlementInterval::Weekly.seconds(), Some(7 * 24 * 60 * 60));
-    assert_eq!(SettlementInterval::Monthly.seconds(), Some(30 * 24 * 60 * 60));
+    assert_eq!(
+        SettlementInterval::Monthly.seconds(),
+        Some(30 * 24 * 60 * 60)
+    );
     assert_eq!(SettlementInterval::Manual.seconds(), None);
 }
 
@@ -374,8 +399,12 @@ async fn test_federated_did_resolution_workflow() {
     let registry = Arc::new(CooperativeRegistry::new(store, own_info).unwrap());
 
     // Register a partner cooperative with gateway
-    let partner = create_coop_info("partner-coop", "Partner Cooperative", FederationPolicy::Open)
-        .with_gateway("https://partner.example.com:8080".to_string());
+    let partner = create_coop_info(
+        "partner-coop",
+        "Partner Cooperative",
+        FederationPolicy::Open,
+    )
+    .with_gateway("https://partner.example.com:8080".to_string());
     registry.register(partner).unwrap();
 
     let mut resolver = FederatedDidResolver::new(registry);
@@ -397,13 +426,15 @@ async fn test_federated_did_resolution_workflow() {
 
     // Resolve partner coop's federated DID
     let partner_did = test_did();
-    let partner_federated = FederatedDidResolver::construct_federated_did(&partner_did, "partner-coop");
+    let partner_federated =
+        FederatedDidResolver::construct_federated_did(&partner_did, "partner-coop");
     let partner_result = resolver.resolve(&partner_federated).await.unwrap();
     assert_eq!(partner_result.coop_id, Some("partner-coop".to_string()));
     assert!(partner_result.resolved_via.is_some()); // Resolved via gateway
 
     // Unknown coop should fail
-    let unknown_federated = FederatedDidResolver::construct_federated_did(&test_did(), "unknown-coop");
+    let unknown_federated =
+        FederatedDidResolver::construct_federated_did(&test_did(), "unknown-coop");
     let unknown_result = resolver.resolve(&unknown_federated).await;
     assert!(unknown_result.is_err());
 }
@@ -466,7 +497,8 @@ async fn test_full_federation_onboarding_workflow() {
     // 1. Create federation anchor
     let anchor_store = create_test_store();
     let anchor_info = create_coop_info("anchor", "Anchor Coop", FederationPolicy::Open);
-    let anchor_registry = Arc::new(CooperativeRegistry::new(anchor_store.clone(), anchor_info).unwrap());
+    let anchor_registry =
+        Arc::new(CooperativeRegistry::new(anchor_store.clone(), anchor_info).unwrap());
 
     // 2. New coop applies to join
     let new_coop_did = test_did();
@@ -487,14 +519,18 @@ async fn test_full_federation_onboarding_workflow() {
         TrustContext::General,
         90 * 24 * 60 * 60, // 90 days
     )
-    .with_evidence(EvidenceSummary::new("verification", "Identity verified through documentation"));
+    .with_evidence(EvidenceSummary::new(
+        "verification",
+        "Identity verified through documentation",
+    ));
     attestation.sign(&anchor_key).unwrap();
 
     let attestation_store = AttestationStore::new(anchor_store.clone());
     attestation_store.store_attestation(attestation).unwrap();
 
     // 4. Setup clearing agreement
-    let clearing_manager = ClearingManager::new(anchor_store.clone(), "anchor".to_string()).unwrap();
+    let clearing_manager =
+        ClearingManager::new(anchor_store.clone(), "anchor".to_string()).unwrap();
     let agreement = BilateralClearingAgreement::new(
         "anchor-new-clearing".to_string(),
         "anchor".to_string(),
@@ -530,8 +566,10 @@ fn test_vouch_chain_federation() {
     // Scenario: Cooperative C joins via vouches from A and B (who are already federated)
 
     let store = create_test_store();
-    let own_info = create_coop_info("federation-hub", "Federation Hub",
-        FederationPolicy::Vouched { min_vouches: 2 }
+    let own_info = create_coop_info(
+        "federation-hub",
+        "Federation Hub",
+        FederationPolicy::Vouched { min_vouches: 2 },
     );
     let registry = CooperativeRegistry::new(store, own_info).unwrap();
 
@@ -653,7 +691,9 @@ fn test_attestation_removal() {
     assert_eq!(retrieved.len(), 1);
 
     // Remove attestation
-    attestation_store.remove_attestation(&member_did, "food-coop").unwrap();
+    attestation_store
+        .remove_attestation(&member_did, "food-coop")
+        .unwrap();
 
     // Verify it's gone
     let after_removal = attestation_store.get_attestations_for(&member_did).unwrap();
@@ -700,12 +740,18 @@ fn test_registry_update_last_seen() {
     let registry = CooperativeRegistry::new(store, own_info).unwrap();
 
     // Register a partner
-    let partner = create_coop_info("partner-coop", "Partner Cooperative", FederationPolicy::Open);
+    let partner = create_coop_info(
+        "partner-coop",
+        "Partner Cooperative",
+        FederationPolicy::Open,
+    );
     registry.register(partner).unwrap();
 
     // Update last_seen
     let new_timestamp = 9999999999u64;
-    registry.update_last_seen("partner-coop", new_timestamp).unwrap();
+    registry
+        .update_last_seen("partner-coop", new_timestamp)
+        .unwrap();
 
     // Verify update
     let retrieved = registry.get("partner-coop").unwrap().unwrap();
@@ -751,7 +797,9 @@ fn test_valid_attestations_filter() {
     assert_eq!(all.len(), 2);
 
     // Get valid attestations only - should be 1
-    let valid = attestation_store.get_valid_attestations_for(&member_did).unwrap();
+    let valid = attestation_store
+        .get_valid_attestations_for(&member_did)
+        .unwrap();
     assert_eq!(valid.len(), 1);
     assert_eq!(valid[0].source_coop_id, "food-coop");
 }

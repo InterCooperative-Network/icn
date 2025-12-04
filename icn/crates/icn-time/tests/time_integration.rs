@@ -263,11 +263,7 @@ fn test_network_time_synchronized() {
     let local_time = now_millis();
 
     // Should be close to current time (within a few milliseconds)
-    let diff = if network_time > local_time {
-        network_time - local_time
-    } else {
-        local_time - network_time
-    };
+    let diff = network_time.abs_diff(local_time);
     assert!(
         diff < 1000,
         "Network time should be within 1 second of local time"
