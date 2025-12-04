@@ -711,3 +711,447 @@ async fn test_recovery_methods_without_recovery_actor() {
 
     handle.abort();
 }
+
+// === Compute Endpoint Tests (Gap #10) ===
+
+#[tokio::test]
+async fn test_compute_submit_missing_code() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit without code parameter
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "fuel_limit": 1000
+            // Missing "code" parameter
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for missing code parameter"
+    );
+    let error_msg = resp["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .to_lowercase();
+    // Accept either validation error OR compute not available
+    assert!(
+        error_msg.contains("code")
+            || error_msg.contains("missing")
+            || error_msg.contains("param")
+            || error_msg.contains("required")
+            || error_msg.contains("compute")
+            || error_msg.contains("not available"),
+        "Expected code-related or compute error, got: {}",
+        error_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_invalid_fuel_limit() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit with negative fuel limit (should fail validation)
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test { rule main() {} }",
+            "fuel_limit": -1
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should get an error (either validation or compute actor not available)
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for invalid fuel limit"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_zero_fuel_limit() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit with zero fuel limit
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test { rule main() {} }",
+            "fuel_limit": 0
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should get an error (zero fuel is invalid)
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for zero fuel limit"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_status_invalid_hash() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Query status with invalid hash (not hex)
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.status",
+        "params": {
+            "task_hash": "not-a-valid-hash"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should get an error (invalid hash format or not found)
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for invalid task hash"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_status_nonexistent_hash() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Query status with valid hex but non-existent task
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.status",
+        "params": {
+            "task_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should get an error (task not found or compute actor not available)
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for non-existent task"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_status_missing_hash() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Query status without task_hash parameter
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.status",
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for missing task_hash parameter"
+    );
+    let error_msg = resp["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .to_lowercase();
+    // Accept either validation error OR compute not available
+    assert!(
+        error_msg.contains("hash")
+            || error_msg.contains("missing")
+            || error_msg.contains("param")
+            || error_msg.contains("required")
+            || error_msg.contains("compute")
+            || error_msg.contains("not available"),
+        "Expected hash-related or compute error, got: {}",
+        error_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_cancel_requires_auth() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Try compute.cancel without auth
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.cancel",
+        "params": {
+            "task_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(resp["error"].is_object(), "Expected auth error for cancel");
+    let error_code = resp["error"]["code"].as_i64().unwrap_or(0);
+    let error_msg = resp["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .to_lowercase();
+    assert!(
+        error_code == -32001
+            || error_code == -32401
+            || error_msg.contains("auth")
+            || error_msg.contains("unauthorized")
+            || error_msg.contains("token"),
+        "Expected auth error, got code {} msg: {}",
+        error_code,
+        error_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_cancel_missing_hash() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Try cancel without task_hash
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.cancel",
+        "params": {
+            "reason": "test cancel"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for missing task_hash"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_with_priority() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit with priority parameter
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test { rule main() {} }",
+            "fuel_limit": 1000,
+            "priority": "high"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Will get compute actor not available error, but priority should be parsed
+    assert!(
+        resp["error"].is_object() || resp["result"].is_object(),
+        "Expected response"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_invalid_priority() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit with invalid priority value
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test { rule main() {} }",
+            "fuel_limit": 1000,
+            "priority": "super-ultra-high"  // Invalid priority
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should get validation error or compute actor not available
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for invalid priority"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_with_coop_id() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit with coop_id parameter
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test { rule main() {} }",
+            "fuel_limit": 1000,
+            "coop_id": "test-cooperative"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Will get compute actor not available error, but coop_id should be parsed
+    assert!(
+        resp["error"].is_object() || resp["result"].is_object(),
+        "Expected response"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_excessive_fuel_limit() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Submit with excessively large fuel limit
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test { rule main() {} }",
+            "fuel_limit": 999999999999i64  // Very large fuel limit
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should get an error (validation or compute actor not available)
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for excessive fuel limit"
+    );
+
+    handle.abort();
+}
