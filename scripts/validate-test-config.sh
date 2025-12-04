@@ -2,7 +2,8 @@
 # Validation script for ICN internal testing infrastructure
 # Checks configuration files, documentation consistency, and prerequisites
 
-set -e
+# Note: We don't use 'set -e' because we want to collect all errors
+# and report them at the end, rather than exiting on the first error.
 
 echo "=== ICN Internal Testing Configuration Validator ==="
 echo ""
