@@ -54,6 +54,9 @@ pub struct RpcTokenClaims {
     pub exp: u64,
     /// Scopes/permissions
     pub scopes: Vec<String>,
+    /// Cooperative ID (optional, for compute task attribution)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coop_id: Option<String>,
 }
 
 impl RpcTokenClaims {
@@ -192,6 +195,7 @@ impl RpcAuthManager {
             iat: now,
             exp: now + self.token_ttl.as_secs(),
             scopes,
+            coop_id: None, // Can be set later via token refresh with coop context
         };
 
         let token = encode(
@@ -459,6 +463,7 @@ mod tests {
             iat: 0,
             exp: u64::MAX,
             scopes: vec!["compute:write".to_string(), "ledger:*".to_string()],
+            coop_id: None,
         };
 
         assert!(claims.has_scope("compute:write"));
@@ -474,6 +479,7 @@ mod tests {
             iat: 0,
             exp: u64::MAX,
             scopes: vec!["*".to_string()],
+            coop_id: None,
         };
 
         assert!(claims.has_scope("anything"));

@@ -2020,10 +2020,14 @@ impl ComputeActor {
                     );
                 }
 
-                // TODO: Track placement_wins_total and placement_losses_total
-                // This requires executors to track which tasks they've offered on,
-                // then listen for TaskClaimed messages to determine win/loss.
-                // Implementation deferred to future work (Phase 16B+).
+                // Track placement wins and losses
+                // Winner gets 1 win, all other offers are losses
+                icn_obs::metrics::compute::placement_wins_inc();
+                if offers.len() > 1 {
+                    for _ in 0..(offers.len() - 1) {
+                        icn_obs::metrics::compute::placement_losses_inc();
+                    }
+                }
 
                 // Claim task with winner
                 let mut mgr = task_manager.lock().await;

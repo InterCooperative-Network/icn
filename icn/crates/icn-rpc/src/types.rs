@@ -244,6 +244,23 @@ pub enum CodeType {
     Wasm,
 }
 
+/// Resource requirements for compute tasks (RPC representation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceProfileRequest {
+    /// CPU cores required (e.g., 0.5 = half a core, 2.0 = two cores)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_cores: Option<f64>,
+    /// Memory required in megabytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_mb: Option<u64>,
+    /// Temporary storage required in megabytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_mb: Option<u64>,
+    /// Network bandwidth required in Mbps
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_mbps: Option<f64>,
+}
+
 /// Request to submit a compute task
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmitTaskRequest {
@@ -270,6 +287,12 @@ pub struct SubmitTaskRequest {
     pub payment_rate: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_currency: Option<String>,
+    /// Cooperative ID for task attribution (optional, can also be derived from JWT claims)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coop_id: Option<String>,
+    /// Resource requirements for the task
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_profile: Option<ResourceProfileRequest>,
 }
 
 fn default_priority() -> String {
