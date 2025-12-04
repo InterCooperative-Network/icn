@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icn-daemon
+  namespace: icn
+  labels:
+    app: icn
+    component: daemon
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: icn
+  template:
+    metadata:
+      labels:
+        app: icn
+        component: daemon
+    spec:
+      containers:
+      - name: icnd
+        image: icn:latest
+        imagePullPolicy: Never
+        args:
+          - --config
+          - /etc/icn/icn.toml
+        env:
+        - name: ICN_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
+        - name: ICN_DATA_DIR
+          value: "/data"
+        - name: HOME
+          value: "/data"
+        ports:
+        - name: quic
+          containerPort: 7777
+          protocol: UDP
+        - name: rpc
+          containerPort: 5601
+          protocol: TCP
+        - name: metrics
+          containerPort: 9100
+          protocol: TCP
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9100
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9100
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/icn
+          readOnly: true
+        - name: data
+          mountPath: /data
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      volumes:
+      - name: config
+        configMap:
+          name: icn-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: icn-data
+

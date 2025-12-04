@@ -3,7 +3,7 @@
 # Build from project root:
 #   docker build -f deploy/Dockerfile.icnd -t icn/icnd .
 
-FROM rust:1.75-slim as builder
+FROM rust:1.88-slim as builder
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \

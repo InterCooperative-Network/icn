@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: icn-data
+  namespace: icn
+  labels:
+    app: icn
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: atlas-nfs
+  resources:
+    requests:
+      storage: 10Gi
+
