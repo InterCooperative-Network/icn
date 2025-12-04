@@ -13,6 +13,55 @@ ICN (Intercooperative Network) is a substrate daemon for the cooperative interne
 - **Mutual Credit Ledger**: Double-entry accounting with Merkle-DAG
 - **P2P Coordination**: Gossip protocol with trust-gated topics
 
+## Live Deployment (Faherty Homelab)
+
+**Status**: ICN daemon is running on a K3s cluster deployed 2025-12-03.
+
+| Component | Details |
+|-----------|---------|
+| **Node Identity** | `did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3` |
+| **K3s Control** | `k3s-control` (10.8.10.40) |
+| **Workers** | `k3s-worker-1` (10.8.10.41), `k3s-worker-2` (10.8.10.42) |
+| **Storage** | NFS from Atlas (10.8.10.25) via `atlas-nfs` StorageClass |
+| **Ports** | 7777/UDP (QUIC), 5601/TCP (RPC), 9100/TCP (Prometheus) |
+
+### Quick Access Commands
+
+```bash
+# Check cluster and pod status
+ssh ubuntu@10.8.10.40 "sudo kubectl get nodes"
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods"
+
+# View ICN daemon logs
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -l app=icn"
+
+# Show identity
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
+
+# Access metrics
+curl http://10.8.10.40:30910/metrics
+```
+
+### Related Homelab Documentation
+
+| Resource | Location |
+|----------|----------|
+| **Homelab Inventory** | `/home/matt/homelab-inventory` |
+| **ICN Launchpad** | `/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md` |
+| **K3s Cluster Docs** | `/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md` |
+| **Deployment Plans** | `/home/matt/homelab-inventory/projects/icn/docs/DEPLOYMENT_PLANS.md` |
+
+### Deployment History
+
+The K3s deployment required fixes for several issues discovered during initial bringup:
+1. **GLIBC compatibility** - Required Ubuntu 24.04 base image (not Debian)
+2. **STUN port conflict** - Disabled STUN to avoid binding same port as QUIC
+3. **Governance topic** - Patched `supervisor.rs` to create topic before GovernanceActor spawn
+4. **Memory limit** - Increased to 2Gi for age keystore unlock
+5. **Health probe** - Changed to use port 9100 (metrics port)
+
+The governance topic fix has been merged upstream (commit `01009e5`).
+
 ## Workspace Structure
 
 The Cargo workspace is located in `icn/` subdirectory. All build/test commands must be run from `/home/matt/projects/icn/icn/`.
