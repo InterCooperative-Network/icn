@@ -442,4 +442,144 @@ mod tests {
             .to_string()
             .contains("Payment rate too high"));
     }
+
+    #[tokio::test]
+    async fn test_submit_fuel_too_high() {
+        let mgr = ComputeManager::new();
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                20_000_000, // Above max (10M)
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too high"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_task_id_too_long() {
+        let mgr = ComputeManager::new();
+        let long_id = "x".repeat(300); // >256 chars
+        let result = mgr
+            .submit_task(
+                long_id,
+                "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                10_000,
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too long"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_empty_code() {
+        let mgr = ComputeManager::new();
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
+                "".to_string(), // Empty code
+                vec![],
+                10_000,
+                "normal",
+                None,
+                None,
+                None,
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_priority_variants() {
+        let mgr = ComputeManager::new();
+
+        // All valid priorities should work (fail only because daemon not connected)
+        for priority in ["low", "normal", "high", "critical", "LOW", "HIGH", "CrItIcAl"] {
+            let result = mgr
+                .submit_task(
+                    "task-1".to_string(),
+                    "did:icn:alice".to_string(),
+                    Some("test-coop".to_string()),
+                    r#"{"name": "Test"}"#.to_string(),
+                    vec![],
+                    10_000,
+                    priority,
+                    None,
+                    None,
+                    None,
+                )
+                .await;
+
+            // Should fail because daemon not connected, not because of priority
+            assert!(result.is_err());
+            assert!(
+                result.unwrap_err().to_string().contains("not connected"),
+                "Priority '{}' should be valid",
+                priority
+            );
+        }
+
+        // Invalid priority defaults to "normal", so should also fail at daemon stage
+        let result = mgr
+            .submit_task(
+                "task-1".to_string(),
+                "did:icn:alice".to_string(),
+                Some("test-coop".to_string()),
+                r#"{"name": "Test"}"#.to_string(),
+                vec![],
+                10_000,
+                "invalid_priority",
+                None,
+                None,
+                None,
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not connected"));
+    }
+
+    #[tokio::test]
+    async fn test_get_status_without_daemon() {
+        let mgr = ComputeManager::new();
+        let hash = [0u8; 32];
+        let result = mgr.get_status(hash).await;
+
+        // Without daemon, falls back to local cache - unknown task returns None
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_task_without_daemon() {
+        let mgr = ComputeManager::new();
+        let hash = [0u8; 32];
+        let result = mgr
+            .cancel_task(hash, "did:icn:alice".to_string(), "test".to_string())
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not connected"));
+    }
 }
