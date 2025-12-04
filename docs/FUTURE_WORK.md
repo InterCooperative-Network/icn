@@ -85,11 +85,11 @@ Key TODOs requiring attention:
 
 ### 1.3 Documentation
 
-| Item | Description | Location |
-|------|-------------|----------|
-| Threat model | Security analysis document | `docs/threat-model.md` |
-| API versioning guide | How to evolve APIs | `docs/api-versioning.md` |
-| Operator runbook | Day-2 operations guide | `docs/operator-runbook.md` |
+| Item | Description | Location | Status |
+|------|-------------|----------|--------|
+| Threat model | Security analysis document | `docs/threat-model.md` | ✅ Complete |
+| API versioning guide | How to evolve APIs | `docs/api-versioning.md` | ✅ Complete |
+| Operator runbook | Day-2 operations guide | `docs/operations-guide.md` | ✅ Complete |
 
 ---
 
@@ -454,3 +454,4 @@ Related documents:
 |------|--------|
 | 2025-12-04 | Initial document creation |
 | 2025-12-04 | Marked role migration complete (Steward/Facilitator/Participant) |
+| 2025-12-04 | Marked documentation section complete (threat-model, api-versioning, operations-guide) |
