@@ -42,8 +42,9 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/
 ssh ubuntu@10.8.10.40 "kubectl -n icn port-forward svc/icn 9100:9100 &" && curl http://localhost:9100/metrics
 
 # Or view in Grafana (deployed 2025-12-04)
-# URL: http://10.8.10.40:30300  (admin/admin)
+# URL: http://10.8.10.40:30300
 # Dashboard: ICN Node Dashboard
+# Credentials: See K8s secret `prometheus-grafana` in monitoring namespace
 ```
 
 ### Related Homelab Documentation
@@ -70,7 +71,7 @@ The governance topic fix has been merged upstream (commit `01009e5`).
 
 | Component | Access | Notes |
 |-----------|--------|-------|
-| **Grafana** | http://10.8.10.40:30300 | admin/admin, ICN Node Dashboard |
+| **Grafana** | http://10.8.10.40:30300 | ICN Node Dashboard (creds in K8s secret) |
 | **Prometheus** | K3s internal only | Scrapes ICN metrics every 15s |
 | **AlertManager** | K3s internal only | 15 ICN-specific alerts configured |
 
@@ -974,6 +975,101 @@ See [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) for com
 - Alert queries documented in `/tmp/PHASE_18_COMPLETE.md`
 
 **Status**: System is PILOT-READY with Byzantine fault tolerance operational
+
+---
+
+**Internal Testing Infrastructure (Complete ✓)** (2025-12-04):
+
+Phase 18 completion triggered creation of comprehensive internal testing infrastructure for multi-node validation before pilot deployment.
+
+**Infrastructure Components**:
+- [x] Docker Compose 4-node test network (3 honest + 1 Byzantine)
+- [x] Monitoring stack (Prometheus + Grafana)
+- [x] 25 alert rules across 8 categories
+- [x] 38 test scenarios documented
+- [x] Complete documentation suite (3 guides)
+- [x] All Docker configuration issues resolved (5 commits)
+
+**Test Scenarios (38 total)**:
+- **Baseline** (10): Network formation, trust graph sync, gossip propagation, ledger transactions, compute tasks, governance (4 scenarios)
+- **Byzantine Detection** (10): Invalid signatures, replay attacks, ledger forks, compute forgery, ACL violations, governance attacks (4 scenarios)
+- **Performance** (6): Gossip throughput (1000 msg/sec), ledger volume (50 tx/sec), compute queue (500 tasks), governance load (100 proposals/300 votes), 24-hour soak test
+- **Resilience** (5): Node crash recovery, partition healing, Byzantine recovery, disk full, monitoring failure
+- **Operational** (4): Backup/restore, version upgrade, security incident response, capacity planning
+
+**Governance Testing (9 scenarios integrated)**:
+- Domain creation & sync (Baseline 1.6)
+- Proposal lifecycle - majority (Baseline 1.7)
+- Proposal lifecycle - quorum failure (Baseline 1.8)
+- WebSocket events (Baseline 1.9)
+- Vote manipulation attack (Byzantine 2.7)
+- Double voting attack (Byzantine 2.8)
+- Proposal spam (Byzantine 2.9)
+- Conflicting outcomes under partition (Byzantine 2.10)
+- Load test - 100 proposals, 300 votes (Performance 3.5)
+
+**Docker Services**:
+- **node1, node2, node3**: Honest ICN nodes
+- **node4**: Byzantine node (optional, `--profile byzantine`)
+- **prometheus**: Metrics collection (port 9090)
+- **grafana**: Visualization (port 3000)
+
+**Monitoring**:
+- **60+ Prometheus metrics** tracked
+- **25 alert rules** (Byzantine, network, ledger, gossip, compute, governance, system, monitoring)
+- **Grafana dashboard** with auto-provisioning
+- **Health checks** for all containers
+
+**Documentation**:
+- [`docs/INTERNAL_TESTING_PLAN.md`](docs/INTERNAL_TESTING_PLAN.md) (1,000+ lines) - Complete test plan with success criteria
+- [`docs/TESTING_QUICKSTART.md`](docs/TESTING_QUICKSTART.md) (500+ lines) - Quick start guide with manual test procedures
+- [`DEPLOY_TEST_NETWORK.md`](DEPLOY_TEST_NETWORK.md) (400+ lines) - Host system deployment instructions
+
+**Quick Start** (on host system):
+```bash
+# Build image
+docker build -t icn:latest -f Dockerfile icn/
+
+# Start 3-node network
+docker compose -f docker-compose.test.yml up -d
+
+# Verify
+curl http://localhost:9091/metrics | grep icn_network_connections_active
+# Expected: icn_network_connections_active 2
+
+# Access monitoring
+# Grafana: http://localhost:3000 (admin/admin)
+# Prometheus: http://localhost:9090
+```
+
+**Docker Fixes Applied (5 commits)**:
+1. Build context mismatch - Fixed COPY paths
+2. Missing keystore passphrase - Added ICN_PASSPHRASE env var
+3. Unsupported env vars - Switched to CLI arguments
+4. Unsupported --bind argument - Removed from all nodes
+5. Kubernetes files cleanup - Added to .gitignore
+
+**Security Warning**:
+Test environment uses hardcoded passphrase `test-passphrase-insecure-do-not-use-in-production` **ONLY for internal testing on isolated networks**. Production deployments require secure secrets management.
+
+**Success Criteria** (Go/No-Go):
+- [ ] All 38 test scenarios pass
+- [ ] No crashes or panics in 24-hour soak test
+- [ ] Byzantine nodes detected within 1 min SLA
+- [ ] Governance voting works correctly (no vote loss)
+- [ ] No false positives (honest nodes never quarantined)
+- [ ] Ledger consistency maintained (no undetected forks)
+- [ ] Network recovers from partitions <2 min
+- [ ] Stable memory usage (<2 GB/node, no leaks)
+
+**Timeline**:
+- Week 1 (Days 1-5): Baseline tests + performance baselines
+- Week 2 (Days 6-12): Byzantine + governance + resilience + operational tests + 24-hour soak test
+- **Go/No-Go Decision** at end of Week 2
+- If Go: Proceed to Track C1 (Pilot Community Selection)
+- If No-Go: Fix issues and re-test
+
+**Current Status**: Infrastructure complete and ready for deployment on host system
 
 ---
 
