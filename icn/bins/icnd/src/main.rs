@@ -109,11 +109,10 @@ async fn main() -> Result<()> {
     let identity_bundle = if keystore_path.exists() {
         tracing::info!("Identity keystore found at: {:?}", keystore_path);
 
-        // Prompt for passphrase (returns Zeroizing<Vec<u8>> for secure memory handling)
-        // Security: Passphrase is automatically zeroed from memory when it goes out of scope,
-        // preventing recovery from memory dumps or swap space.
-        // Note: This will fail when run as a systemd service (non-interactive)
-        // Consider using environment variable or socket-based authentication for production
+        // Get passphrase: tries ICN_KEYSTORE_PASSPHRASE env var first, then ICN_PASSPHRASE,
+        // then falls back to interactive prompt. For automated deployments (systemd, Docker, K8s),
+        // set one of the environment variables.
+        // Security: Passphrase uses Zeroizing<Vec<u8>> to automatically clear from memory.
         let passphrase =
             read_passphrase("Enter keystore passphrase: ").context("Failed to read passphrase")?;
 
@@ -189,7 +188,12 @@ async fn wait_for_sigterm() -> Result<()> {
     std::future::pending().await
 }
 
-/// Read passphrase from stdin
+/// Read passphrase from environment or stdin
+///
+/// Checks in order:
+/// 1. ICN_KEYSTORE_PASSPHRASE environment variable (preferred for production)
+/// 2. ICN_PASSPHRASE environment variable (legacy, for backward compatibility)
+/// 3. Interactive prompt (for development)
 ///
 /// Returns a zeroizing container that automatically clears the passphrase
 /// from memory when it goes out of scope, preventing sensitive data leakage.
@@ -197,11 +201,19 @@ async fn wait_for_sigterm() -> Result<()> {
 /// Security: Both the String returned by rpassword and the final `Vec<u8>` are
 /// wrapped in Zeroizing to ensure complete memory cleanup.
 fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
-    // Check for ICN_PASSPHRASE environment variable first
-    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+    // Check for ICN_KEYSTORE_PASSPHRASE environment variable first (preferred)
+    if let Ok(passphrase) = std::env::var("ICN_KEYSTORE_PASSPHRASE") {
+        tracing::debug!("Passphrase loaded from ICN_KEYSTORE_PASSPHRASE environment variable");
         return Ok(Zeroizing::new(passphrase.into_bytes()));
     }
 
+    // Check for ICN_PASSPHRASE environment variable (legacy, backward compatible)
+    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+        tracing::debug!("Passphrase loaded from ICN_PASSPHRASE environment variable");
+        return Ok(Zeroizing::new(passphrase.into_bytes()));
+    }
+
+    // Fall back to interactive prompt
     print!("{prompt}");
     io::stdout().flush()?;
     // Wrap the String immediately in Zeroizing to prevent it from lingering in memory

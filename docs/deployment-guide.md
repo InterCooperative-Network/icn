@@ -123,6 +123,28 @@ docker run -d \
 | `ICN_LISTEN_ADDR` | `0.0.0.0:4433` | QUIC listener address |
 | `ICN_METRICS_PORT` | `9090` | Prometheus metrics port |
 | `ICN_LOG_LEVEL` | `info` | Log level (trace, debug, info, warn, error) |
+| `ICN_KEYSTORE_PASSPHRASE` | (none) | Keystore passphrase for automated deployments (preferred) |
+| `ICN_PASSPHRASE` | (none) | Keystore passphrase (legacy, use ICN_KEYSTORE_PASSPHRASE) |
+| `ICN_GATEWAY_JWT_SECRET` | (none) | JWT secret for Gateway API authentication |
+
+**Passphrase for Automated Deployments:**
+
+For systemd, Docker, or Kubernetes deployments where interactive prompts aren't available:
+
+```bash
+# Option 1: Set in environment (preferred)
+export ICN_KEYSTORE_PASSPHRASE="your-secure-passphrase"
+icnd --config /etc/icn/icn.toml
+
+# Option 2: Use systemd EnvironmentFile
+# /etc/icn/icn.env (chmod 600)
+ICN_KEYSTORE_PASSPHRASE=your-secure-passphrase
+
+# Option 3: Docker/K8s secrets
+docker run -e ICN_KEYSTORE_PASSPHRASE="$(cat /run/secrets/icn_passphrase)" icn:latest
+```
+
+**Security Warning:** Store passphrases in secrets management systems (HashiCorp Vault, K8s Secrets, AWS Secrets Manager), not plain text files.
 
 ### Configuration File
 
