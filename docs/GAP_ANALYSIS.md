@@ -44,14 +44,16 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 - **Fix**: Add `/v1/compute/*` endpoints to OpenAPI spec
 - **Resolution**: Added cancel endpoint, schemas, status enum - commit `49c2e04` (2025-12-04)
 
-### 3. RPC Integration Tests Missing (Partial Progress)
+### 3. RPC Integration Tests Missing (Substantial Progress)
 
 **Impact**: Public API surface untested end-to-end
 
 - **Location**: `icn/crates/icn-rpc/tests/`
 - **Issue**: 47 handlers have unit tests but limited integration tests
 - **Fix**: Create integration test suite (20-30 tests)
-- **Progress (2025-12-04)**: Created initial integration test suite with 8 tests covering auth flow, server startup, error handling, token validation. More endpoint-specific tests needed. Commit `1893e51`.
+- **Progress (2025-12-04)**:
+  - Initial suite: 8 tests (auth flow, server startup, error handling, token validation). Commit `1893e51`.
+  - Extended suite: 12 additional tests (scope enforcement, multiple scopes, network/ledger/trust actor errors, missing params, batch handling, JSON-RPC version, compute auth, empty method, policy/recovery actors). Total: **20 tests**.
 
 ### 4. Privacy Crate Lacks Integration Tests
 

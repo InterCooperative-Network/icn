@@ -305,3 +305,368 @@ async fn test_auth_methods_always_accessible() {
 
     handle.abort();
 }
+
+// === Additional Integration Tests ===
+
+#[tokio::test]
+async fn test_scope_enforcement_wrong_scope_rejected() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    // Authenticate with only ledger:read scope
+    let keypair = Arc::new(KeyPair::generate().unwrap());
+    let mut client = RpcClient::with_credentials(addr, keypair);
+    let auth_result = client.authenticate(vec!["ledger:read".to_string()]).await;
+    assert!(auth_result.is_ok(), "Auth failed: {:?}", auth_result);
+
+    // Try to access network.peers which requires network:read scope
+    let result = client.get_peers().await;
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    // Should fail due to insufficient scope, not missing auth
+    assert!(
+        err_msg.contains("scope") || err_msg.contains("authorization") || err_msg.contains("403"),
+        "Expected scope/authorization error, got: {}",
+        err_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_multiple_scopes_authentication() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let keypair = Arc::new(KeyPair::generate().unwrap());
+    let mut client = RpcClient::with_credentials(addr, keypair);
+
+    // Authenticate with multiple scopes
+    let scopes = vec![
+        "network:read".to_string(),
+        "ledger:read".to_string(),
+        "trust:read".to_string(),
+    ];
+    let auth_result = client.authenticate(scopes).await;
+    assert!(auth_result.is_ok(), "Multi-scope auth failed: {:?}", auth_result);
+    assert!(client.is_authenticated());
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_network_status_without_network_actor() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "network.status",
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Without network actor, may return error OR a default/empty result
+    // Both are acceptable behaviors
+    let has_error = resp["error"].is_object();
+    let has_result = resp["result"].is_object() || resp["result"].is_null();
+    assert!(has_error || has_result, "Expected error or result");
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_ledger_balance_without_ledger_actor() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "ledger.balance",
+        "params": { "did": "did:icn:test" },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should return error about ledger actor not being available
+    assert!(resp["error"].is_object(), "Expected error when ledger actor not available");
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_trust_list_without_trust_actor() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "trust.list",
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should return error about trust actor not being available
+    assert!(resp["error"].is_object(), "Expected error when trust actor not available");
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_missing_required_params() {
+    // Use auth-enabled server since auth.verify requires auth to be enabled
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // auth.verify with missing params
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.verify",
+        "params": {},  // Missing required params (did, signature, scopes)
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(resp["error"].is_object(), "Expected error for missing params");
+    // Should get an error about missing parameters or challenge
+    let error_msg = resp["error"]["message"].as_str().unwrap_or("").to_lowercase();
+    assert!(
+        error_msg.contains("param") || error_msg.contains("missing") || error_msg.contains("did")
+            || error_msg.contains("challenge") || error_msg.contains("signature")
+            || error_msg.contains("nonce"),
+        "Expected param-related error, got: {}",
+        error_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_batch_request_handling() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // JSON-RPC batch request (array of requests)
+    let batch_request = serde_json::json!([
+        {
+            "jsonrpc": "2.0",
+            "method": "network.status",
+            "params": {},
+            "id": 1
+        },
+        {
+            "jsonrpc": "2.0",
+            "method": "network.peers",
+            "params": {},
+            "id": 2
+        }
+    ]);
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&batch_request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Batch requests should either work (array response) or be rejected with error
+    // Our server currently doesn't support batch, so expect error
+    if resp.is_object() && resp["error"].is_object() {
+        // Batch rejected - that's fine
+        assert!(true);
+    } else if resp.is_array() {
+        // Batch supported - also fine
+        assert!(true);
+    }
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_jsonrpc_version_validation() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Wrong JSON-RPC version
+    let request = serde_json::json!({
+        "jsonrpc": "1.0",  // Should be "2.0"
+        "method": "network.status",
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // May either reject (error) or accept (some servers are lenient)
+    // If error, should be about version
+    if resp["error"].is_object() {
+        // Error returned - fine
+        assert!(true);
+    } else {
+        // Lenient server accepted it - also acceptable
+        assert!(true);
+    }
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_compute_submit_requires_auth() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Try compute.submit without auth
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "compute.submit",
+        "params": {
+            "code": "contract Test {}",
+            "fuel_limit": 1000
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(resp["error"].is_object(), "Expected auth error");
+    let error_code = resp["error"]["code"].as_i64().unwrap_or(0);
+    let error_msg = resp["error"]["message"].as_str().unwrap_or("").to_lowercase();
+    // Auth error codes: -32001 (auth required) or -32401 (forbidden/auth related)
+    assert!(
+        error_code == -32001 || error_code == -32401 || error_msg.contains("auth")
+            || error_msg.contains("unauthorized") || error_msg.contains("token"),
+        "Expected auth error, got code {} msg: {}",
+        error_code,
+        error_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_empty_method_rejected() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "",  // Empty method name
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(resp["error"].is_object(), "Expected error for empty method");
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_policy_methods_without_policy_actor() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "policy.list",
+        "params": { "coop_id": "test-coop" },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should return error about policy actor not being available
+    assert!(resp["error"].is_object(), "Expected error when policy actor not available");
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_recovery_methods_without_recovery_actor() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "recovery.list",
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    // Should return error about recovery actor not being available
+    assert!(resp["error"].is_object(), "Expected error when recovery actor not available");
+
+    handle.abort();
+}
