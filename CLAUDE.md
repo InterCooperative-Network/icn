@@ -56,39 +56,43 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 
 ### Development Journal (`docs/dev-journal/`)
 
-The dev journal contains detailed, chronological records of development sessions. Each journal entry:
+The dev journal contains detailed, chronological records of development sessions.
 
-**Purpose:**
-- Document design decisions and rationale
-- Record implementation challenges and solutions
-- Provide context for future development
-- Track progress within major phases
+**Full style guide**: See [docs/DOCUMENTATION_STYLE.md](docs/DOCUMENTATION_STYLE.md) for complete formatting standards.
+
+**Quick reference:**
+
+All entries must include YAML frontmatter:
+```yaml
+---
+date: 2025-12-03
+title: "Phase 17: Storage Replication"
+type: dev-journal
+phase: 17
+topics: [storage, replication]
+status: complete
+duration: ~4 hours
+---
+```
 
 **When to create a new entry:**
 - Starting work on a new phase or major feature
-- After completing significant work (e.g., Phase 7 production hardening)
-- When making architectural decisions that need documentation
-- After resolving complex bugs or challenges
+- After completing significant work
+- When making architectural decisions
+- After resolving complex bugs
 
 **Naming convention:** `YYYY-MM-DD-phase-N-feature-name.md`
 
 **What to include:**
 - Phase/feature overview and goals
-- Implementation approach and architecture decisions
-- Challenges encountered and how they were solved
+- Implementation approach with file links (e.g., `[file.rs:L1-L100](path#L1-L100)`)
+- Challenges encountered and solutions
 - Test results and validation
-- Security considerations
-- Links to relevant commits
-- Next steps or remaining work
-
-**What NOT to include:**
-- Routine commits (those go in git log)
-- Minor bug fixes (document in commit messages)
-- Refactoring details without architectural significance
+- Next steps (use `- [ ]` / `- [x]` checkboxes)
 
 **Distinction from CHANGELOG:**
-- **Dev journal**: Detailed, developer-focused narrative with context and reasoning
-- **CHANGELOG**: Concise, user-facing list of changes following semantic versioning
+- **Dev journal**: Detailed, developer-focused narrative with context
+- **CHANGELOG**: Concise, user-facing list following Keep a Changelog format
 
 ## Build & Test Commands
 
