@@ -30,7 +30,7 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=info
-    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5001"]
+    command: ["--data-dir", "/data"]
     ports:
       - "5001:5001"    # P2P
       - "9091:9090"    # Metrics
@@ -58,7 +58,7 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=info
-    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5002"]
+    command: ["--data-dir", "/data"]
     ports:
       - "5002:5002"
       - "9092:9090"
@@ -86,7 +86,7 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=info
-    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5003"]
+    command: ["--data-dir", "/data"]
     ports:
       - "5003:5003"
       - "9093:9090"
@@ -114,7 +114,7 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=debug  # More verbose for attack analysis
-    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5004"]
+    command: ["--data-dir", "/data"]
     ports:
       - "5004:5004"
       - "9094:9090"
