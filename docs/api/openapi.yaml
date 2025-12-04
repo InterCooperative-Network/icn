@@ -843,6 +843,61 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /v1/compute/cancel/{task_hash}:
+    post:
+      tags: [Compute]
+      summary: Cancel a compute task
+      description: |
+        Cancel a pending or claimed compute task. Only the original submitter
+        can cancel their own tasks.
+
+        Tasks can only be cancelled if they are in `pending` or `claimed` status.
+        Completed or failed tasks cannot be cancelled.
+      operationId: cancelComputeTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: task_hash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+          description: Task hash (64 hex characters)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelTaskRequest'
+            example:
+              reason: "No longer needed"
+      responses:
+        '200':
+          description: Task cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelTaskResponse'
+        '400':
+          description: Task cannot be cancelled (already completed or failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not authorized to cancel this task (not the submitter)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   # ============================================
   # WebSocket Endpoint
   # ============================================
@@ -1418,12 +1473,36 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, claimed, completed, failed]
+          enum: [pending, claimed, completed, failed, cancelled]
         executor:
           type: string
           description: DID of the executor (if claimed)
         result:
           $ref: '#/components/schemas/ComputeResult'
+        cancelled_reason:
+          type: string
+          description: Cancellation reason (if cancelled)
+
+    CancelTaskRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Optional reason for cancellation
+          maxLength: 500
+
+    CancelTaskResponse:
+      type: object
+      properties:
+        task_hash:
+          type: string
+          description: Hash of the cancelled task
+        status:
+          type: string
+          enum: [cancelled]
+        message:
+          type: string
+          example: "Task cancelled successfully"
 
     ComputeResult:
       type: object
