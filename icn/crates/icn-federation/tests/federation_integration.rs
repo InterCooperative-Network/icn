@@ -18,6 +18,8 @@ use icn_identity::{Did, KeyPair};
 use icn_store::{SledStore, Store};
 use rand::rngs::OsRng;
 use std::sync::Arc;
+use wiremock::matchers::{method, path_regex};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 // === Test Helpers ===
 
@@ -394,43 +396,59 @@ fn test_settlement_interval_durations() {
 
 #[tokio::test]
 async fn test_federated_did_resolution_workflow() {
+    // Start mock server for partner gateway
+    let mock_server = MockServer::start().await;
+
     let store = create_test_store();
     let own_info = create_coop_info("my-coop", "My Cooperative", FederationPolicy::Open);
     let registry = Arc::new(CooperativeRegistry::new(store, own_info).unwrap());
 
-    // Register a partner cooperative with gateway
+    // Create partner DID before setting up mock (so we can use it in response)
+    let partner_did = test_did();
+    let partner_did_str = partner_did.to_string();
+
+    // Set up mock response for partner gateway
+    Mock::given(method("GET"))
+        .and(path_regex(r"/v1/identity/resolve/.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "did": partner_did_str,
+            "valid": true,
+            "coop_id": "partner-coop",
+            "has_attestations": false
+        })))
+        .mount(&mock_server)
+        .await;
+
+    // Register partner cooperative with mock server as gateway
     let partner = create_coop_info(
         "partner-coop",
         "Partner Cooperative",
         FederationPolicy::Open,
     )
-    .with_gateway("https://partner.example.com:8080".to_string());
+    .with_gateway(mock_server.uri());
     registry.register(partner).unwrap();
 
     let mut resolver = FederatedDidResolver::new(registry);
     resolver.set_own_coop_id("my-coop".to_string());
 
     // Resolve local DID (non-federated format)
-    // When own_coop_id is set, local resolution returns that coop_id
     let local_did = test_did();
     let local_result = resolver.resolve(&local_did.to_string()).await.unwrap();
-    assert_eq!(local_result.coop_id, Some("my-coop".to_string())); // Returns own coop when set
-    assert!(local_result.resolved_via.is_none()); // Resolved locally (no gateway used)
+    assert_eq!(local_result.coop_id, Some("my-coop".to_string()));
+    assert!(local_result.resolved_via.is_none());
 
     // Resolve own coop's federated DID
     let own_federated = FederatedDidResolver::construct_federated_did(&local_did, "my-coop");
     let own_result = resolver.resolve(&own_federated).await.unwrap();
-    // Should resolve locally (it's our own coop)
     assert_eq!(own_result.coop_id, Some("my-coop".to_string()));
-    assert!(own_result.resolved_via.is_none()); // No gateway needed for own coop
+    assert!(own_result.resolved_via.is_none());
 
-    // Resolve partner coop's federated DID
-    let partner_did = test_did();
+    // Resolve partner coop's federated DID (via mock gateway)
     let partner_federated =
         FederatedDidResolver::construct_federated_did(&partner_did, "partner-coop");
     let partner_result = resolver.resolve(&partner_federated).await.unwrap();
     assert_eq!(partner_result.coop_id, Some("partner-coop".to_string()));
-    assert!(partner_result.resolved_via.is_some()); // Resolved via gateway
+    assert!(partner_result.resolved_via.is_some());
 
     // Unknown coop should fail
     let unknown_federated =
@@ -494,6 +512,9 @@ fn test_federated_did_parsing() {
 async fn test_full_federation_onboarding_workflow() {
     // Scenario: New cooperative joins federation, establishes trust, sets up clearing
 
+    // Start mock server for new coop's gateway
+    let mock_server = MockServer::start().await;
+
     // 1. Create federation anchor
     let anchor_store = create_test_store();
     let anchor_info = create_coop_info("anchor", "Anchor Coop", FederationPolicy::Open);
@@ -503,7 +524,7 @@ async fn test_full_federation_onboarding_workflow() {
     // 2. New coop applies to join
     let new_coop_did = test_did();
     let new_coop_info = create_coop_info("new-coop", "New Cooperative", FederationPolicy::Open)
-        .with_gateway("https://new-coop.example.com:8080".to_string())
+        .with_gateway(mock_server.uri())
         .with_currency(CurrencyInfo::new("hours", "Hours", 2));
 
     anchor_registry.register(new_coop_info).unwrap();
@@ -544,10 +565,25 @@ async fn test_full_federation_onboarding_workflow() {
     clearing_manager.create_agreement(agreement).unwrap();
 
     // 5. Verify complete setup
-    let resolver = FederatedDidResolver::new(anchor_registry.clone());
+    // Create member DID and set up mock response before resolution
+    let member_did = test_did();
+    let member_did_str = member_did.to_string();
+
+    Mock::given(method("GET"))
+        .and(path_regex(r"/v1/identity/resolve/.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "did": member_did_str,
+            "valid": true,
+            "coop_id": "new-coop",
+            "has_attestations": false
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let mut resolver = FederatedDidResolver::new(anchor_registry.clone());
+    resolver.set_own_coop_id("anchor".to_string());
 
     // Can resolve new coop's DIDs
-    let member_did = test_did();
     let federated_did = FederatedDidResolver::construct_federated_did(&member_did, "new-coop");
     let resolution = resolver.resolve(&federated_did).await.unwrap();
     assert_eq!(resolution.coop_id, Some("new-coop".to_string()));

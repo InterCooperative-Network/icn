@@ -246,19 +246,73 @@ impl FederatedDidResolver {
     }
 
     /// Query a gateway endpoint for DID resolution
-    async fn query_gateway(&self, _endpoint: &str, did_str: &str) -> Result<Did> {
-        // TODO: Implement actual HTTP/RPC call to gateway
-        // For now, just parse the DID locally
-        // The gateway would return the DID document with verification methods
-
-        // Extract the key from federated format
-        let key = if let Some((_, key)) = Self::parse_federated_did(did_str) {
+    ///
+    /// Makes an HTTP GET request to the remote gateway's identity resolution endpoint.
+    /// The endpoint format is: `{gateway_endpoint}/v1/identity/resolve/{did}`
+    async fn query_gateway(&self, endpoint: &str, did_str: &str) -> Result<Did> {
+        // Extract the key from federated format to get the standard DID
+        let standard_did_str = if let Some((_, key)) = Self::parse_federated_did(did_str) {
             format!("did:icn:{key}")
         } else {
             did_str.to_string()
         };
 
-        Did::from_str(&key).map_err(|e| FederationError::InvalidDidFormat(e.to_string()))
+        // Build the resolution URL
+        let url = format!(
+            "{}/v1/identity/resolve/{}",
+            endpoint.trim_end_matches('/'),
+            urlencoding::encode(&standard_did_str)
+        );
+
+        debug!("Querying gateway for DID resolution: {}", url);
+
+        // Create HTTP client with timeout
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| FederationError::DidResolutionFailed(format!("HTTP client error: {e}")))?;
+
+        // Make the request
+        let response = client.get(&url).send().await.map_err(|e| {
+            warn!("Failed to query gateway {}: {}", endpoint, e);
+            FederationError::DidResolutionFailed(format!("Gateway request failed: {e}"))
+        })?;
+
+        // Check response status
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!(
+                "Gateway returned error status {}: {}",
+                status,
+                body.chars().take(200).collect::<String>()
+            );
+            return Err(FederationError::DidResolutionFailed(format!(
+                "Gateway returned status {status}"
+            )));
+        }
+
+        // Parse response
+        #[derive(serde::Deserialize)]
+        struct DidResolutionResponse {
+            did: String,
+            valid: bool,
+        }
+
+        let resolution: DidResolutionResponse = response.json().await.map_err(|e| {
+            FederationError::DidResolutionFailed(format!("Failed to parse gateway response: {e}"))
+        })?;
+
+        if !resolution.valid {
+            return Err(FederationError::DidResolutionFailed(format!(
+                "Gateway reports DID as invalid: {}",
+                resolution.did
+            )));
+        }
+
+        // Parse and return the DID
+        Did::from_str(&resolution.did)
+            .map_err(|e| FederationError::InvalidDidFormat(e.to_string()))
     }
 
     /// Clear the resolution cache
@@ -442,22 +496,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_federated_did_with_gateway() {
+        use wiremock::matchers::{method, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        // Start a mock server
+        let mock_server = MockServer::start().await;
+
+        // Create a test DID
+        let did = test_did();
+        let did_str = did.to_string();
+
+        // Set up the mock response
+        Mock::given(method("GET"))
+            .and(path_regex(r"/v1/identity/resolve/.*"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "did": did_str,
+                "valid": true,
+                "coop_id": "food-coop",
+                "has_attestations": false
+            })))
+            .mount(&mock_server)
+            .await;
+
         let registry = create_test_registry();
         let resolver = FederatedDidResolver::new(registry.clone());
 
-        // Register a cooperative with a gateway
+        // Register a cooperative with the mock server as gateway
         let coop = CooperativeInfo::new(
             "food-coop".to_string(),
             "Food Cooperative".to_string(),
             test_did(),
             FederationPolicy::Open,
         )
-        .with_gateway("https://food-coop.example.com:8080".to_string());
+        .with_gateway(mock_server.uri());
 
         registry.register(coop).unwrap();
 
         // Construct a federated DID for that coop
-        let did = test_did();
         let federated_did = FederatedDidResolver::construct_federated_did(&did, "food-coop");
 
         // Now resolve a DID from that coop
@@ -467,5 +542,83 @@ mod tests {
         let resolution = result.unwrap();
         assert_eq!(resolution.coop_id, Some("food-coop".to_string()));
         assert!(resolution.resolved_via.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_federated_did_gateway_error() {
+        use wiremock::matchers::{method, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        // Start a mock server
+        let mock_server = MockServer::start().await;
+
+        // Set up the mock to return an error
+        Mock::given(method("GET"))
+            .and(path_regex(r"/v1/identity/resolve/.*"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": "Invalid DID format"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let registry = create_test_registry();
+        let resolver = FederatedDidResolver::new(registry.clone());
+
+        // Register a cooperative with the mock server as gateway
+        let coop = CooperativeInfo::new(
+            "error-coop".to_string(),
+            "Error Cooperative".to_string(),
+            test_did(),
+            FederationPolicy::Open,
+        )
+        .with_gateway(mock_server.uri());
+
+        registry.register(coop).unwrap();
+
+        // Construct a federated DID
+        let did = test_did();
+        let federated_did = FederatedDidResolver::construct_federated_did(&did, "error-coop");
+
+        // Resolution should fail
+        let result = resolver.resolve(&federated_did).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_federated_did_gateway_timeout() {
+        use wiremock::matchers::{method, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        // Start a mock server
+        let mock_server = MockServer::start().await;
+
+        // Set up the mock to delay (longer than timeout)
+        Mock::given(method("GET"))
+            .and(path_regex(r"/v1/identity/resolve/.*"))
+            .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(15)))
+            .mount(&mock_server)
+            .await;
+
+        let registry = create_test_registry();
+        let resolver = FederatedDidResolver::new(registry.clone());
+
+        // Register a cooperative with the mock server as gateway
+        let coop = CooperativeInfo::new(
+            "slow-coop".to_string(),
+            "Slow Cooperative".to_string(),
+            test_did(),
+            FederationPolicy::Open,
+        )
+        .with_gateway(mock_server.uri());
+
+        registry.register(coop).unwrap();
+
+        // Construct a federated DID
+        let did = test_did();
+        let federated_did = FederatedDidResolver::construct_federated_did(&did, "slow-coop");
+
+        // Resolution should fail due to timeout
+        let result = resolver.resolve(&federated_did).await;
+        assert!(result.is_err());
     }
 }

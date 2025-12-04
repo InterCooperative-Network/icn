@@ -1618,6 +1618,14 @@ pub mod governance {
     pub fn idempotent_skips_inc() {
         counter!("icn_governance_idempotent_skips_total").increment(1);
     }
+
+    pub fn proposals_vetoed_inc() {
+        counter!("icn_governance_proposals_vetoed_total").increment(1);
+    }
+
+    pub fn proposals_force_closed_inc() {
+        counter!("icn_governance_proposals_force_closed_total").increment(1);
+    }
 }
 
 /// Trust graph metrics

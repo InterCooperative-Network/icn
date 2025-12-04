@@ -39,8 +39,13 @@ metrics.workspace = true
 ed25519-dalek.workspace = true
 sha2.workspace = true
 
+# HTTP client for remote DID resolution
+reqwest = { version = "0.12", features = ["json"] }
+urlencoding = "2.1"
+
 [dev-dependencies]
 icn-testkit.workspace = true
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread", "macros"] }
 tempfile = "3.8"
 rand.workspace = true
+wiremock = "0.6"

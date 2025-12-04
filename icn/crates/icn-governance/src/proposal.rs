@@ -65,6 +65,24 @@ pub enum ProposalState {
         /// When cancelled
         cancelled_at: Timestamp,
     },
+
+    /// Proposal vetoed by emergency governance action
+    Vetoed {
+        /// When vetoed
+        vetoed_at: Timestamp,
+        /// Reason for veto
+        reason: String,
+    },
+
+    /// Proposal force-closed before voting period ended
+    ForceClosed {
+        /// When force-closed
+        closed_at: Timestamp,
+        /// Forced outcome
+        outcome: super::ProposalOutcome,
+        /// Reason for force close
+        reason: String,
+    },
 }
 
 impl ProposalState {
@@ -81,6 +99,8 @@ impl ProposalState {
                 | ProposalState::Rejected { .. }
                 | ProposalState::NoQuorum { .. }
                 | ProposalState::Cancelled { .. }
+                | ProposalState::Vetoed { .. }
+                | ProposalState::ForceClosed { .. }
         )
     }
 
@@ -325,6 +345,57 @@ impl Proposal {
 
         Ok(())
     }
+
+    /// Veto the proposal (emergency governance action)
+    ///
+    /// Can be applied to proposals in Draft or Open state.
+    /// Vetoed proposals cannot be reopened or executed.
+    pub fn veto(&mut self, reason: String) -> anyhow::Result<()> {
+        if self.state.is_closed() {
+            anyhow::bail!("Cannot veto a closed proposal");
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.state = ProposalState::Vetoed {
+            vetoed_at: now,
+            reason,
+        };
+        self.updated_at = now;
+
+        Ok(())
+    }
+
+    /// Force close the proposal with a specified outcome
+    ///
+    /// Can be applied to proposals in Open state only.
+    /// Used for emergency situations where normal voting cannot proceed.
+    pub fn force_close(
+        &mut self,
+        outcome: super::ProposalOutcome,
+        reason: String,
+    ) -> anyhow::Result<()> {
+        if !self.state.is_open() {
+            anyhow::bail!("Can only force close proposals in Open state");
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.state = ProposalState::ForceClosed {
+            closed_at: now,
+            outcome,
+            reason,
+        };
+        self.updated_at = now;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -423,5 +494,102 @@ mod tests {
 
         // Cannot cancel after closed
         assert!(proposal.cancel().is_err());
+    }
+
+    #[test]
+    fn test_proposal_veto() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let mut proposal = Proposal::new(
+            domain_id,
+            did,
+            "Veto Test".to_string(),
+            "Test proposal for veto".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        );
+
+        // Can veto from Draft
+        proposal.veto("Security concern".to_string()).unwrap();
+        assert!(matches!(
+            proposal.state,
+            ProposalState::Vetoed { ref reason, .. } if reason == "Security concern"
+        ));
+        assert!(proposal.state.is_closed());
+
+        // Cannot veto after already vetoed
+        assert!(proposal.veto("Another reason".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_proposal_veto_from_open() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let mut proposal = Proposal::new(
+            domain_id,
+            did,
+            "Veto Open Test".to_string(),
+            "Test proposal for veto from open state".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        );
+
+        // Open for voting
+        proposal.open(3600).unwrap();
+        assert!(proposal.state.is_open());
+
+        // Can veto from Open
+        proposal.veto("Emergency veto".to_string()).unwrap();
+        assert!(matches!(proposal.state, ProposalState::Vetoed { .. }));
+        assert!(proposal.state.is_closed());
+    }
+
+    #[test]
+    fn test_proposal_force_close() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let mut proposal = Proposal::new(
+            domain_id,
+            did,
+            "Force Close Test".to_string(),
+            "Test proposal for force close".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        );
+
+        // Cannot force close from Draft (must be Open)
+        assert!(proposal
+            .force_close(
+                crate::ProposalOutcome::Accepted,
+                "Emergency".to_string()
+            )
+            .is_err());
+
+        // Open for voting
+        proposal.open(3600).unwrap();
+        assert!(proposal.state.is_open());
+
+        // Can force close from Open
+        proposal
+            .force_close(
+                crate::ProposalOutcome::Accepted,
+                "Emergency acceptance".to_string(),
+            )
+            .unwrap();
+        assert!(matches!(
+            proposal.state,
+            ProposalState::ForceClosed { ref outcome, ref reason, .. }
+            if *outcome == crate::ProposalOutcome::Accepted && reason == "Emergency acceptance"
+        ));
+        assert!(proposal.state.is_closed());
     }
 }

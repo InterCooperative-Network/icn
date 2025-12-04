@@ -86,6 +86,17 @@ pub enum GovernanceCommand {
     CloseProposal {
         proposal_id: ProposalId,
     },
+    /// Emergency veto - marks a proposal as vetoed
+    VetoProposal {
+        proposal_id: ProposalId,
+        reason: String,
+    },
+    /// Emergency force close - closes a proposal with a forced outcome
+    ForceCloseProposal {
+        proposal_id: ProposalId,
+        forced_outcome: icn_governance::ForcedOutcome,
+        reason: String,
+    },
 }
 
 /// Handle for interacting with the governance actor
@@ -570,6 +581,103 @@ impl GovernanceActor {
                     "✓ Proposal closed: {} ({:?})",
                     proposal_id.0, outcome_result
                 );
+            }
+
+            GovernanceCommand::VetoProposal {
+                proposal_id,
+                reason,
+            } => {
+                info!(
+                    "🚫 Vetoing proposal: {} (reason: {})",
+                    proposal_id.0, reason
+                );
+
+                // Notify scheduler to cancel auto-close (if scheduled)
+                let _ = self.close_tx.send(proposal_id.clone());
+
+                // Load proposal
+                let mut proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+                // Veto the proposal
+                proposal.veto(reason.clone())?;
+
+                // Persist updated state
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+
+                // Emit event for downstream processing
+                if let Some(ref event_bus) = self.event_bus {
+                    let now = now_seconds();
+                    event_bus
+                        .emit(SystemEvent::ProposalRejected {
+                            proposal_id: proposal_id.clone(),
+                            domain_id: proposal.domain_id.0.clone(),
+                            decided_at: now,
+                        })
+                        .await;
+                }
+
+                icn_obs::metrics::governance::proposals_vetoed_inc();
+                info!("✓ Proposal vetoed: {}", proposal_id.0);
+            }
+
+            GovernanceCommand::ForceCloseProposal {
+                proposal_id,
+                forced_outcome,
+                reason,
+            } => {
+                use icn_governance::ForcedOutcome;
+
+                info!(
+                    "⚡ Force closing proposal: {} as {:?} (reason: {})",
+                    proposal_id.0, forced_outcome, reason
+                );
+
+                // Notify scheduler to cancel auto-close (if scheduled)
+                let _ = self.close_tx.send(proposal_id.clone());
+
+                // Load proposal
+                let mut proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+                // Map ForcedOutcome to ProposalOutcome for the state
+                let proposal_outcome = match &forced_outcome {
+                    ForcedOutcome::Accept => ProposalOutcome::Accepted,
+                    ForcedOutcome::Reject => ProposalOutcome::Rejected,
+                    ForcedOutcome::Cancel => ProposalOutcome::NoQuorum, // Treat Cancel as NoQuorum
+                };
+
+                // Force close the proposal
+                proposal.force_close(proposal_outcome.clone(), reason.clone())?;
+
+                // Persist updated state
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+
+                // Emit appropriate event
+                if let Some(ref event_bus) = self.event_bus {
+                    let now = now_seconds();
+                    let event = match forced_outcome {
+                        ForcedOutcome::Accept => SystemEvent::ProposalAccepted {
+                            proposal_id: proposal_id.clone(),
+                            domain_id: proposal.domain_id.0.clone(),
+                            payload: proposal.payload.clone(),
+                            decided_at: now,
+                        },
+                        _ => SystemEvent::ProposalRejected {
+                            proposal_id: proposal_id.clone(),
+                            domain_id: proposal.domain_id.0.clone(),
+                            decided_at: now,
+                        },
+                    };
+                    event_bus.emit(event).await;
+                }
+
+                icn_obs::metrics::governance::proposals_force_closed_inc();
+                info!("✓ Proposal force-closed: {} as {:?}", proposal_id.0, forced_outcome);
             }
         }
 

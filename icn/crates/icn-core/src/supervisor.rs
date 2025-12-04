@@ -1815,6 +1815,7 @@ impl Supervisor {
 
                 let ledger_clone = ledger_handle.clone();
                 let audit_store = gov_store.clone();
+                let gov_handle_clone = governance_handle.clone();
 
                 // Get treasury DID from config, falling back to node DID if not configured
                 let treasury_did = self
@@ -2045,18 +2046,52 @@ impl Supervisor {
                                     info!("🚫 EMERGENCY: Veto proposal {} accepted - vetoing proposal {}",
                                           proposal_id.0, target_proposal_id);
                                     info!("   Reason: {}", reason);
-                                    // TODO: Implement veto logic - mark target proposal as vetoed
-                                    // This requires governance store integration to update proposal state
-                                    warn!("⚠️ Veto proposal execution not yet implemented");
+
+                                    // Execute veto via governance actor
+                                    let gov_handle = gov_handle_clone.clone();
+                                    let target_id = icn_governance::ProposalId(target_proposal_id.clone());
+                                    let veto_reason = reason.clone();
+
+                                    tokio::spawn(async move {
+                                        match gov_handle.submit(crate::governance::GovernanceCommand::VetoProposal {
+                                            proposal_id: target_id.clone(),
+                                            reason: veto_reason,
+                                        }).await {
+                                            Ok(_) => {
+                                                info!("✅ Successfully vetoed proposal {}", target_id.0);
+                                            }
+                                            Err(e) => {
+                                                error!("❌ Failed to veto proposal {}: {}", target_id.0, e);
+                                            }
+                                        }
+                                    });
                                 }
 
                                 ProposalPayload::ForceCloseProposal { target_proposal_id, reason, forced_outcome } => {
                                     info!("⚡ EMERGENCY: Force close proposal {} accepted - closing proposal {} as {:?}",
                                           proposal_id.0, target_proposal_id, forced_outcome);
                                     info!("   Reason: {}", reason);
-                                    // TODO: Implement force close logic
-                                    // This requires governance store integration to close proposal early
-                                    warn!("⚠️ Force close proposal execution not yet implemented");
+
+                                    // Execute force close via governance actor
+                                    let gov_handle = gov_handle_clone.clone();
+                                    let target_id = icn_governance::ProposalId(target_proposal_id.clone());
+                                    let close_reason = reason.clone();
+                                    let outcome = forced_outcome.clone();
+
+                                    tokio::spawn(async move {
+                                        match gov_handle.submit(crate::governance::GovernanceCommand::ForceCloseProposal {
+                                            proposal_id: target_id.clone(),
+                                            forced_outcome: outcome.clone(),
+                                            reason: close_reason,
+                                        }).await {
+                                            Ok(_) => {
+                                                info!("✅ Successfully force-closed proposal {} as {:?}", target_id.0, outcome);
+                                            }
+                                            Err(e) => {
+                                                error!("❌ Failed to force-close proposal {}: {}", target_id.0, e);
+                                            }
+                                        }
+                                    });
                                 }
 
                                 ProposalPayload::RollbackLedger { target_hash, reason, ref affected_accounts } => {

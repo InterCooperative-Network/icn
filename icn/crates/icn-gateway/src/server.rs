@@ -215,6 +215,12 @@ impl GatewayServer {
                         .service(api::auth::challenge)
                         .service(api::auth::verify)
                         .service(api::websocket::websocket)
+                        // Public identity resolution (for federation)
+                        .service(
+                            web::scope("/identity")
+                                .service(api::identity::resolve_did)
+                                .service(api::identity::identity_health),
+                        )
                         // Protected coop endpoints (auth + rate limiting)
                         .service(
                             web::scope("/coops")

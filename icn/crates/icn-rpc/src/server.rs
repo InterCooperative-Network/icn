@@ -1553,6 +1553,12 @@ async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) -> Rpc
                         icn_governance::ProposalState::Cancelled { cancelled_at } => {
                             ("cancelled".to_string(), None, None, Some(*cancelled_at))
                         }
+                        icn_governance::ProposalState::Vetoed { vetoed_at, .. } => {
+                            ("vetoed".to_string(), None, None, Some(*vetoed_at))
+                        }
+                        icn_governance::ProposalState::ForceClosed { closed_at, .. } => {
+                            ("force_closed".to_string(), None, None, Some(*closed_at))
+                        }
                     };
 
                     ProposalInfo {
@@ -1627,6 +1633,12 @@ async fn handle_governance_proposal_get(
                 }
                 icn_governance::ProposalState::Cancelled { cancelled_at } => {
                     ("cancelled".to_string(), None, None, Some(*cancelled_at))
+                }
+                icn_governance::ProposalState::Vetoed { vetoed_at, .. } => {
+                    ("vetoed".to_string(), None, None, Some(*vetoed_at))
+                }
+                icn_governance::ProposalState::ForceClosed { closed_at, .. } => {
+                    ("force_closed".to_string(), None, None, Some(*closed_at))
                 }
             };
 

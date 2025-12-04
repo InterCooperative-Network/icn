@@ -103,9 +103,9 @@ Key TODOs and their status:
 | ~~`icn-rpc/src/server.rs`~~ | ~~654~~ | ~~listen_addr hardcoded~~ | ✅ FIXED |
 | ~~`icn-rpc/src/server.rs`~~ | ~~1032-1033~~ | ~~bytes_processed, wall_time_ms~~ | ✅ FIXED |
 | ~~`icn-rpc/src/server.rs`~~ | ~~2005,2018~~ | ~~coop_id, resource_profile~~ | ✅ FIXED |
-| `icn-federation/src/resolver.rs` | 250 | Federated DID HTTP/RPC call | Issue #39 |
+| ~~`icn-federation/src/resolver.rs`~~ | ~~250~~ | ~~Federated DID HTTP/RPC call~~ | ✅ FIXED |
 | `icn-ccl/src/actor.rs` | 125 | Contract deployment gossip | Issue #40 |
-| `icn-core/src/supervisor.rs` | 2033,2042,2053 | Governance operations | Issue #41 |
+| ~~`icn-core/src/supervisor.rs`~~ | ~~2033,2042,2053~~ | ~~Governance operations (veto, force-close)~~ | ✅ FIXED |
 
 **Resolved (2025-12-04)**:
 - Federation signature verification implemented - commit `b411487`
@@ -117,6 +117,8 @@ Key TODOs and their status:
 - Compute submit supports resource_profile specification
 - Placement wins/losses metrics now tracked
 - **Cooperative treasury DID** - Added `[cooperative]` config section with `treasury_did` option; governance budget payouts now use treasury DID (Issue #38)
+- **Federated DID Resolution** - Implemented HTTP-based DID resolution via remote gateway endpoints; added `/v1/identity/resolve/{did}` public endpoint to gateway; resolver uses reqwest for HTTP calls with 10s timeout; 4 identity tests + 3 resolver HTTP tests added (Issue #39)
+- **Governance Operations** - Implemented veto and force-close proposal operations; added `Vetoed` and `ForceClosed` states to ProposalState; added `VetoProposal` and `ForceCloseProposal` commands to GovernanceActor; supervisor now executes veto/force-close via governance handle; 3 new proposal tests added; 2 new governance metrics added (Issue #41). Note: Ledger rollback remains unimplemented (requires manual intervention for security)
 
 ### 7. CCL Contract Crate Has No Integration Tests ✅ FIXED
 
