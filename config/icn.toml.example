@@ -318,6 +318,161 @@ reconnect_interval_secs = 30
 # reconnect_interval_secs = 15
 
 # ============================================================================
+# Gateway API Configuration (REST + WebSocket)
+# ============================================================================
+# The Gateway provides a REST API and WebSocket interface for cooperative
+# applications to interact with the ICN node. It includes JWT authentication,
+# rate limiting, and scope-based authorization.
+
+[gateway]
+
+# Enable the gateway API server
+# Default: false (disabled - opt-in for security)
+enabled = false
+
+# HTTP bind address for the gateway
+# Format: "IP:PORT"
+# Use "127.0.0.1:8080" for local-only access (recommended for development)
+# Use "0.0.0.0:8080" for external access (use with reverse proxy in production)
+# Default: "127.0.0.1:8080"
+bind_addr = "127.0.0.1:8080"
+
+# JWT token expiration time in hours
+# Tokens must be refreshed after this period
+# Default: 24
+token_expiry_hours = 24
+
+# Challenge TTL in minutes
+# Authentication challenges expire after this period
+# Default: 5
+challenge_ttl_minutes = 5
+
+# JWT secret key for token signing
+# SECURITY: MUST be set before enabling gateway!
+# Options:
+#   1. Set via config (not recommended for production)
+#   2. Set via ICN_GATEWAY_JWT_SECRET environment variable (recommended)
+#   3. Set via --gateway-jwt-secret CLI argument
+# Generate a strong secret: openssl rand -base64 32
+# Default: "" (gateway fails to start if empty)
+jwt_secret = ""
+
+# ============================================================================
+# Gateway Configuration Examples
+# ============================================================================
+#
+# Example 1: Development setup (local only)
+# [gateway]
+# enabled = true
+# bind_addr = "127.0.0.1:8080"
+# jwt_secret = "dev-secret-change-in-production"
+#
+# Example 2: Production with environment variable
+# [gateway]
+# enabled = true
+# bind_addr = "0.0.0.0:8080"  # Behind reverse proxy
+# token_expiry_hours = 12     # Shorter token lifetime
+# # JWT secret loaded from ICN_GATEWAY_JWT_SECRET env var
+#
+# Example 3: High-security configuration
+# [gateway]
+# enabled = true
+# bind_addr = "127.0.0.1:8080"  # Local only, accessed via Unix socket proxy
+# token_expiry_hours = 1        # Very short token lifetime
+# challenge_ttl_minutes = 2     # Fast challenge expiry
+
+# ============================================================================
+# Privacy Configuration (Metadata Protection)
+# ============================================================================
+# Privacy features provide metadata protection through onion routing,
+# topic encryption, and traffic obfuscation. These features add latency
+# but significantly improve privacy for sensitive communications.
+
+[privacy]
+
+# Enable privacy features
+# Default: false (disabled - opt-in due to performance impact)
+enabled = false
+
+# Enable onion routing for anonymous message delivery
+# Messages are routed through multiple relay nodes to hide sender/receiver
+# Adds latency but provides strong sender/receiver anonymity
+# Default: false
+onion_routing_enabled = false
+
+# Number of relay hops for onion routing
+# More hops = stronger privacy but higher latency
+# Recommended: 2-5 hops
+# Default: 2
+onion_hops = 2
+
+# Minimum trust score for relay node selection
+# Higher values = fewer available relays but more trusted
+# Range: 0.0 to 1.0
+# Default: 0.3
+min_relay_trust = 0.3
+
+# Enable topic name encryption
+# Topic names are encrypted so observers can't see subscriptions
+# Requires all participants to share topic key
+# Default: false
+topic_encryption_enabled = false
+
+# Enable traffic obfuscation (padding, delays, cover traffic)
+# Hides traffic patterns that could reveal activity
+# Default: false
+traffic_obfuscation_enabled = false
+
+# Message padding target size (bytes)
+# Messages are padded to this size to hide actual content length
+# Set to 0 to disable padding
+# Default: 0 (disabled)
+padding_target = 0
+
+# Maximum random delay for messages (milliseconds)
+# Adds random delay to hide timing patterns
+# Set to 0 to disable delays
+# Default: 0 (disabled)
+max_delay_ms = 0
+
+# Cover traffic rate (messages per minute)
+# Generates decoy traffic to hide real activity patterns
+# Set to 0 to disable cover traffic
+# Default: 0 (disabled)
+cover_traffic_rate = 0
+
+# ============================================================================
+# Privacy Configuration Examples
+# ============================================================================
+#
+# Example 1: Basic privacy (onion routing only)
+# [privacy]
+# enabled = true
+# onion_routing_enabled = true
+# onion_hops = 2
+# min_relay_trust = 0.3
+#
+# Example 2: Strong privacy (all features)
+# [privacy]
+# enabled = true
+# onion_routing_enabled = true
+# onion_hops = 4
+# min_relay_trust = 0.5
+# topic_encryption_enabled = true
+# traffic_obfuscation_enabled = true
+# padding_target = 4096
+# max_delay_ms = 500
+# cover_traffic_rate = 10
+#
+# Example 3: Performance-balanced privacy
+# [privacy]
+# enabled = true
+# onion_routing_enabled = true
+# onion_hops = 2  # Minimal hops for lower latency
+# topic_encryption_enabled = true  # Low overhead
+# # No traffic obfuscation for better performance
+
+# ============================================================================
 # PLANNED FEATURES (Not Yet Implemented)
 # ============================================================================
 # The following sections are shown for completeness but are not yet supported.
