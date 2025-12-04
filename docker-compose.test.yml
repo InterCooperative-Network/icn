@@ -27,11 +27,10 @@ services:
       - node1_data:/data
       - ./config:/config:ro
     environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5001
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
-      - ICN_LOG_LEVEL=info
       - RUST_BACKTRACE=1
+      - RUST_LOG=info
+    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5001"]
     ports:
       - "5001:5001"    # P2P
       - "9091:9090"    # Metrics
@@ -56,11 +55,10 @@ services:
       - node2_data:/data
       - ./config:/config:ro
     environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5002
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
-      - ICN_LOG_LEVEL=info
       - RUST_BACKTRACE=1
+      - RUST_LOG=info
+    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5002"]
     ports:
       - "5002:5002"
       - "9092:9090"
@@ -85,11 +83,10 @@ services:
       - node3_data:/data
       - ./config:/config:ro
     environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5003
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
-      - ICN_LOG_LEVEL=info
       - RUST_BACKTRACE=1
+      - RUST_LOG=info
+    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5003"]
     ports:
       - "5003:5003"
       - "9093:9090"
@@ -114,11 +111,10 @@ services:
       - node4_data:/data
       - ./config:/config:ro
     environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5004
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
-      - ICN_LOG_LEVEL=debug  # More verbose for attack analysis
       - RUST_BACKTRACE=1
+      - RUST_LOG=debug  # More verbose for attack analysis
+    command: ["--data-dir", "/data", "--bind", "0.0.0.0:5004"]
     ports:
       - "5004:5004"
       - "9094:9090"
