@@ -4,11 +4,25 @@ Get your multi-node ICN test network running in under 10 minutes.
 
 ---
 
+## ⚠️ Security Warning
+
+**This test environment uses a hardcoded passphrase for convenience:**
+```
+ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
+```
+
+**DO NOT** use this configuration in production or with real identities. This is **ONLY** for internal testing on isolated networks.
+
+For production deployments, use secure passphrases and proper secret management (e.g., Docker secrets, Kubernetes secrets, HashiCorp Vault).
+
+---
+
 ## Prerequisites
 
 - Docker 24+ and Docker Compose 2.20+
 - 4 GB RAM minimum (8 GB recommended)
 - 10 GB disk space
+- **Isolated test network** (not exposed to internet)
 
 ---
 

@@ -1,6 +1,13 @@
 # Docker Compose for ICN Internal Testing
 # Phase 18 Validation + Governance Testing
 #
+# ⚠️ SECURITY WARNING:
+# This configuration uses a hardcoded passphrase for testing convenience.
+# ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
+#
+# DO NOT use this in production or with real identities.
+# Only use on isolated test networks.
+#
 # Usage:
 #   docker compose -f docker-compose.test.yml up -d
 #   docker compose -f docker-compose.test.yml logs -f node1
@@ -22,6 +29,7 @@ services:
     environment:
       - ICN_DATA_DIR=/data
       - ICN_BIND_ADDR=0.0.0.0:5001
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - ICN_LOG_LEVEL=info
       - RUST_BACKTRACE=1
     ports:
@@ -50,6 +58,7 @@ services:
     environment:
       - ICN_DATA_DIR=/data
       - ICN_BIND_ADDR=0.0.0.0:5002
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - ICN_LOG_LEVEL=info
       - RUST_BACKTRACE=1
     ports:
@@ -78,6 +87,7 @@ services:
     environment:
       - ICN_DATA_DIR=/data
       - ICN_BIND_ADDR=0.0.0.0:5003
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - ICN_LOG_LEVEL=info
       - RUST_BACKTRACE=1
     ports:
@@ -106,6 +116,7 @@ services:
     environment:
       - ICN_DATA_DIR=/data
       - ICN_BIND_ADDR=0.0.0.0:5004
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - ICN_LOG_LEVEL=debug  # More verbose for attack analysis
       - RUST_BACKTRACE=1
     ports:
