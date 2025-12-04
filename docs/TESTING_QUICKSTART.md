@@ -45,7 +45,7 @@ docker compose -f docker-compose.test.yml up -d
 
 This starts:
 - **node1, node2, node3**: Honest ICN nodes
-- **prometheus**: Metrics collection at [http://localhost:9090](http://localhost:9090)
+- **prometheus**: Metrics collection at [http://localhost:9095](http://localhost:9095)
 - **grafana**: Dashboard at [http://localhost:3000](http://localhost:3000) (default dev creds below)
 
 **Expected time**: 30 seconds
@@ -73,7 +73,7 @@ Open in browser:
   - Password: `admin` (development only - use secrets management for production)
   - Navigate to: Dashboards → ICN Dashboard
 
-- **Prometheus**: [http://localhost:9090](http://localhost:9090)
+- **Prometheus**: [http://localhost:9095](http://localhost:9095)
   - Try query: `icn_network_connections_active`
 
 ### 5. Run Basic Commands
@@ -268,7 +268,7 @@ docker exec -it icn-node4 icnctl gov vote cast --proposal-id $PROPOSAL_ID --choi
 
 ### Prometheus Queries
 
-Access [http://localhost:9090/graph](http://localhost:9090/graph) and try:
+Access [http://localhost:9095/graph](http://localhost:9095/graph) and try:
 
 ```promql
 # Network connections per node
@@ -373,7 +373,7 @@ docker compose -f docker-compose.test.yml restart
 
 ```bash
 # Check Prometheus targets
-curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {instance, health}'
+curl http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance, health}'
 
 # Should show all nodes as "up"
 ```
@@ -479,7 +479,7 @@ docker exec -it icn-node1 icnctl status                  # Run command
 
 # Monitoring
 curl http://localhost:9091/metrics                       # Node1 metrics
-curl http://localhost:9090/api/v1/query?query=up        # Prometheus query
+curl http://localhost:9095/api/v1/query?query=up        # Prometheus query
 curl http://localhost:3000/api/health                    # Grafana health
 
 # Cleanup

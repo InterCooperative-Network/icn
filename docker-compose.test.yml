@@ -112,7 +112,7 @@ services:
       - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
       - RUST_BACKTRACE=1
       - RUST_LOG=debug  # More verbose for attack analysis
-    command: ["--data-dir", "/data"]
+    command: ["--config", "/config/node4.toml"]
     ports:
       - "5004:5004"
       - "9094:9100"    # Metrics (daemon runs on 9100)

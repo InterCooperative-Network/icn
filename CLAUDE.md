@@ -379,7 +379,7 @@ icnctl id import backup.age
 
 ## Metrics & Observability
 
-- **Prometheus metrics** exposed on `http://localhost:9090/metrics`
+- **Prometheus metrics** exposed on `http://localhost:9095/metrics`
 - Metrics crate: `icn-obs`
 - Key metrics:
   - `gossip_announces_sent`, `gossip_requests_sent`, `gossip_responses_sent`
@@ -971,7 +971,7 @@ See [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) for com
 
 **Operational**:
 - Grafana dashboard: `monitoring/grafana-dashboard.json` (5 panels)
-- Metrics endpoint: `http://localhost:9090/metrics`
+- Metrics endpoint: `http://localhost:9095/metrics`
 - Alert queries documented in `/tmp/PHASE_18_COMPLETE.md`
 
 **Status**: System is PILOT-READY with Byzantine fault tolerance operational
@@ -1039,7 +1039,7 @@ curl http://localhost:9091/metrics | grep icn_network_connections_active
 
 # Access monitoring
 # Grafana: http://localhost:3000 (dev default creds - change for prod)
-# Prometheus: http://localhost:9090
+# Prometheus: http://localhost:9095
 ```
 
 **Docker Fixes Applied (5 commits)**:

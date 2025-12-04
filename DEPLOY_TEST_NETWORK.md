@@ -134,7 +134,7 @@ exit
 - Ledger Transaction Rate (initially 0)
 
 ### Prometheus
-- **URL**: http://localhost:9090
+- **URL**: http://localhost:9095
 - **Query Examples**:
   ```promql
   icn_network_connections_active
@@ -175,7 +175,7 @@ docker exec icn-node2 icnctl gossip list test:messages
 ### Test 3: Metrics Collection
 ```bash
 # Check Prometheus is scraping all targets
-curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
+curl -s http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
 
 # Expected output (all "up"):
 # {"instance": "node1:9090", "health": "up"}
@@ -235,7 +235,7 @@ docker compose -f docker-compose.test.yml restart
 
 ```bash
 # Check Prometheus targets
-curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
+curl http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
 
 # Should show all nodes as "up"
 
@@ -365,7 +365,7 @@ Once the network is running successfully:
 | grafana    | -    | -       | -       | 3000      |
 
 ### Monitoring
-- **Prometheus**: http://localhost:9090
+- **Prometheus**: http://localhost:9095
 - **Grafana**: http://localhost:3000
 - **Node Metrics**: http://localhost:9091-9094/metrics
 - **Alert Rules**: 25 rules in `monitoring/alert_rules.yml`
@@ -394,7 +394,7 @@ docker compose -f docker-compose.test.yml ps
 
 **Metrics**: Verify Prometheus targets
 ```bash
-curl http://localhost:9090/api/v1/targets
+curl http://localhost:9095/api/v1/targets
 ```
 
 ---

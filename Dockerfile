@@ -51,14 +51,14 @@ USER icn
 WORKDIR /data
 
 # Expose ports
-# 5000-5010: P2P (configurable via ICN_BIND_ADDR)
-# 9090: Prometheus metrics
+# 5000-5010: P2P (configurable via config file)
+# 9100: Prometheus metrics (icnd default)
 # 8080: Gateway API (if enabled)
-EXPOSE 5000-5010 9090 8080
+EXPOSE 5000-5010 9100 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:9090/metrics || exit 1
+    CMD curl -f http://localhost:9100/metrics || exit 1
 
 # Default command
 ENTRYPOINT ["icnd"]
