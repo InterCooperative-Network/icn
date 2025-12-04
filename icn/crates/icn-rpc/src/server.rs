@@ -651,12 +651,12 @@ async fn handle_network_status(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     let status = if state.network_handle.is_some() {
         NetworkStatus {
             running: true,
-            listen_addr: "0.0.0.0:4433".to_string(), // TODO: Get from config
+            listen_addr: state.listen_addr.to_string(),
         }
     } else {
         NetworkStatus {
             running: false,
-            listen_addr: "".to_string(),
+            listen_addr: state.listen_addr.to_string(),
         }
     };
 
@@ -1016,6 +1016,12 @@ async fn handle_contract_call(
         vec![], // No participants for now
     );
 
+    // Track bytes processed (input params size)
+    let input_bytes = params.to_string().len();
+
+    // Start timing for wall_time tracking
+    let exec_start = Instant::now();
+
     // Execute rule
     let mut runtime = contract_runtime.write().await;
     match runtime
@@ -1026,11 +1032,18 @@ async fn handle_contract_call(
             let response_value =
                 serde_json::to_value(&result.value).unwrap_or(serde_json::json!(null));
 
+            // Calculate output bytes and total bytes processed
+            let output_bytes = response_value.to_string().len();
+            let bytes_processed = input_bytes + output_bytes;
+
+            // Calculate wall time in milliseconds
+            let wall_time_ms = exec_start.elapsed().as_millis() as u64;
+
             // Create receipt for successful execution
             let resources = crate::receipt::Resources {
                 fuel_used: result.fuel_consumed,
-                bytes_processed: 0, // TODO: Track bytes processed
-                wall_time_ms: 0,    // TODO: Track wall time
+                bytes_processed,
+                wall_time_ms,
             };
 
             let receipt = crate::receipt::Receipt::with_resources(
@@ -1938,8 +1951,27 @@ async fn handle_compute_submit(
 
     // Get authenticated submitter DID (or fallback for unauthenticated dev mode)
     let submitter = claims
+        .as_ref()
         .map(|c| c.sub.clone())
         .unwrap_or_else(|| "rpc:anonymous".to_string());
+
+    // Get coop_id: prefer request, fallback to JWT claims
+    let coop_id = request
+        .coop_id
+        .clone()
+        .or_else(|| claims.as_ref().and_then(|c| c.coop_id.clone()));
+
+    // Convert resource_profile from request to compute ResourceProfile
+    let resource_profile = request.resource_profile.as_ref().map(|rp| {
+        icn_compute::ResourceProfile {
+            cpu_cores: rp.cpu_cores,
+            memory_mb: rp.memory_mb,
+            storage_mb: rp.storage_mb,
+            network_mbps: rp.network_mbps,
+            gpu_spec: None,          // GPU not supported via RPC yet
+            duration_estimate: None, // Duration estimation not supported via RPC yet
+        }
+    });
 
     // Build compute task
     let inputs = if request.inputs.is_null() {
@@ -2001,8 +2033,8 @@ async fn handle_compute_submit(
 
     let task = icn_compute::ComputeTask {
         id: request.task_id,
-        submitter,     // Authenticated DID from JWT claims
-        coop_id: None, // TODO: Allow from request or derive from claims
+        submitter, // Authenticated DID from JWT claims
+        coop_id,   // From request or JWT claims
         code: task_code,
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
@@ -2015,8 +2047,8 @@ async fn handle_compute_submit(
         deadline: request.deadline_ms,
         payment_rate: request.payment_rate,
         payment_currency: request.payment_currency,
-        resource_profile: None, // TODO: Allow clients to specify resource requirements
-        actor_mode: None,       // Not actor mode (Phase 16D)
+        resource_profile,            // From request
+        actor_mode: None,            // Not actor mode (Phase 16D)
         placement_constraints: None, // No constraints from RPC (Phase 16E will set from policy)
     };
 
