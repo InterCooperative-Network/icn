@@ -689,13 +689,195 @@ This governance layer is not the "ICN way to make decisions" - it's a **substrat
 
 ---
 
-## 11. References
+## 11. Runtime Architecture
 
-**Code:**
+The governance system has multiple deployment modes depending on how ICN is run:
+
+### 11.1 Component Overview
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        icn-governance crate                      │
+│   Types, traits, profiles, stores (domain.rs, proposal.rs, etc.) │
+└──────────────────────────────────────────────────────────────────┘
+                                    │
+           ┌────────────────────────┼────────────────────────┐
+           │                        │                        │
+           ▼                        ▼                        ▼
+┌────────────────────┐   ┌────────────────────┐   ┌────────────────────┐
+│  GovernanceActor   │   │  GovernanceManager │   │   RPC Handlers     │
+│ (icn-core/gov/)    │   │ (icn-gateway/)     │   │ (icn-rpc/)         │
+│                    │   │                    │   │                    │
+│ • Gossip-backed    │   │ • In-memory        │   │ • JSON-RPC API     │
+│ • Persistent store │   │ • REST API support │   │ • Uses actor handle│
+│ • Auto-scheduling  │   │ • Standalone mode  │   │                    │
+└────────────────────┘   └────────────────────┘   └────────────────────┘
+         │                                                   │
+         └──────────────────────┬────────────────────────────┘
+                                ▼
+                     GovernanceOps trait
+                     (unified interface)
+```
+
+**Three consumers, one set of primitives:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **icn-governance** | `icn/crates/icn-governance/` | Core types, traits, profiles (the primitives layer) |
+| **GovernanceActor** | `icn-core/src/governance/actor.rs` | Production actor with gossip, store, auto-close scheduler |
+| **GovernanceManager** | `icn-gateway/src/governance_mgr.rs` | Standalone gateway mode (in-memory, no gossip) |
+| **RPC Handlers** | `icn-rpc/src/server.rs` | JSON-RPC methods delegating to GovernanceActor |
+
+### 11.2 Deployment Modes
+
+**Mode 1: Full Daemon (icnd)**
+
+When the ICN daemon runs, the supervisor spawns `GovernanceActor`:
+
+```rust
+// In supervisor.rs
+let governance_handle = GovernanceActor::spawn(
+    did,
+    store,       // Persistent Sled store
+    gossip,      // GossipActor for network sync
+    resolver,    // Membership resolution
+    event_bus,   // For ledger integration
+).await?;
+```
+
+This mode provides:
+- **Gossip-based synchronization**: `governance:proposal` topic
+- **Persistent storage**: Domains, proposals, votes in Sled
+- **Auto-close scheduling**: Background task closes proposals when voting period ends
+- **Event bus integration**: `ProposalAccepted` events trigger ledger transactions
+
+RPC clients use `governance.*` methods which delegate to `GovernanceHandle`:
+```bash
+icnctl gov proposal create --domain-id "coop:food" --title "Budget"
+# → JSON-RPC to icnd → GovernanceHandle → gossip broadcast
+```
+
+**Mode 2: Standalone Gateway**
+
+The gateway can run without the full daemon for development/testing:
+
+```rust
+// In gateway server.rs
+let governance_mgr = GovernanceManager::new();  // In-memory
+```
+
+This mode provides:
+- **REST API access**: `/v1/gov/*` endpoints
+- **In-memory storage**: No persistence, no gossip
+- **Simplified testing**: Quick iteration without full daemon
+
+**Mode 3: Gateway + Daemon Integration (Future)**
+
+The gateway can connect to a running daemon's governance actor:
+
+```rust
+// Planned: Gateway receives GovernanceHandle via configuration
+let gateway = GatewayServer::new_with_governance_handle(addr, jwt, handle);
+```
+
+This enables REST API clients to have full gossip-backed governance.
+
+### 11.3 Data Flow
+
+**Creating a proposal (daemon mode):**
+
+```
+User (icnctl)
+    │
+    ▼ JSON-RPC: governance.proposal.create
+┌─────────────────┐
+│   RPC Server    │ → handle_governance_proposal_create()
+└─────────────────┘
+    │
+    ▼ GovernanceCommand::CreateProposal
+┌─────────────────┐
+│GovernanceActor  │ → Persist to store
+└─────────────────┘     │
+    │                   ▼ Gossip: GovernanceMessage::ProposalCreated
+    ▼               ┌─────────────────┐
+Other nodes ←────── │  GossipActor    │
+                    └─────────────────┘
+```
+
+**Closing a proposal (daemon mode):**
+
+```
+Timer expires OR icnctl gov proposal close
+    │
+    ▼ GovernanceCommand::CloseProposal
+┌─────────────────┐
+│GovernanceActor  │ → Load votes
+└─────────────────┘     │
+    │                   ▼ MembershipResolver.member_count()
+    │                   ▼ GovernanceProfile.evaluate()
+    │                   ▼ Persist final state
+    │                   ▼ Gossip: ProposalClosed
+    │
+    ▼ EventBus: ProposalAccepted
+┌─────────────────┐
+│   LedgerActor   │ → Execute budget transfers (if Budget payload)
+└─────────────────┘
+```
+
+### 11.4 Which to Use?
+
+| Use Case | Component | Notes |
+|----------|-----------|-------|
+| Production deployment | GovernanceActor | Full gossip, persistence, scheduling |
+| CLI operations | RPC → GovernanceActor | Via `icnctl gov` commands |
+| Gateway REST API (dev) | GovernanceManager | Quick testing, no persistence |
+| Gateway REST API (prod) | Gateway + Actor handle | Future: full integration |
+| Unit tests | InMemoryGovernanceStore | Direct store operations |
+| Integration tests | GovernanceActor | Multi-node gossip validation |
+
+### 11.5 Source of Truth
+
+**In daemon mode**, the `GovernanceActor` is authoritative:
+- It maintains the canonical store
+- It broadcasts changes via gossip
+- It schedules auto-close timers
+- It emits events for ledger integration
+
+**In standalone gateway mode**, the `GovernanceManager` is local-only:
+- No network synchronization
+- State lost on restart
+- Suitable only for development/testing
+
+The `GovernanceOps` trait provides a unified interface that both implement, enabling code to work with either backend:
+
+```rust
+#[async_trait]
+pub trait GovernanceOps: Send + Sync {
+    async fn create_domain(...) -> Result<()>;
+    async fn create_proposal(...) -> Result<ProposalId>;
+    async fn open_proposal(...) -> Result<()>;
+    async fn cast_vote(...) -> Result<()>;
+    async fn close_proposal(...) -> Result<()>;
+    // Read operations...
+}
+```
+
+---
+
+## 12. References
+
+**Primitives Crate:**
 - `icn/crates/icn-governance/` - All governance primitives
 - `icn-governance/src/profile.rs` - GovernanceRule trait and cooperative_default
 - `icn-governance/src/config.rs` - GovernanceParams and defaults
 - `icn-governance/src/message.rs` - Gossip protocol messages
+- `icn-governance/src/store.rs` - GovernanceStore trait + InMemoryGovernanceStore
+
+**Runtime Components:**
+- `icn-core/src/governance/actor.rs` - GovernanceActor (production, gossip-backed)
+- `icn-gateway/src/governance_mgr.rs` - GovernanceManager (standalone gateway)
+- `icn-rpc/src/server.rs` - RPC handlers (`governance.*` methods)
+- `icn-gateway/src/api/governance.rs` - REST API endpoints (`/v1/gov/*`)
 
 **Related Documentation:**
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall ICN architecture

@@ -16,11 +16,11 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 | Category | High | Medium | Low | Total | Fixed |
 |----------|------|--------|-----|-------|-------|
 | Test Coverage | 4 | 2 | 1 | 7 | 0 |
-| Documentation | 2 | 2 | 0 | 4 | 1 |
+| Documentation | 2 | 2 | 0 | 4 | 2 |
 | Feature Completeness | 2 | 2 | 4 | 8 | 4 |
 | Monitoring | 1 | 1 | 0 | 2 | 2 |
 | Config/Deployment | 0 | 2 | 0 | 2 | 2 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **9** |
+| **TOTAL** | **9** | **9** | **5** | **23** | **10** |
 
 ---
 
@@ -119,11 +119,12 @@ Key TODOs requiring attention:
 - **Issue**: Limited error scenario testing for compute API
 - **Fix**: Add priority validation, cancellation edge cases
 
-### 11. Governance Architecture Unclear
+### 11. ~~Governance Architecture Unclear~~ ✅ FIXED
 
 - **Location**: `icn-core/src/governance/` vs `icn-rpc/src/server.rs`
 - **Issue**: Two implementations, unclear source of truth
 - **Fix**: Document architecture, add RPC→gossip integration tests
+- **Resolution**: Added "Runtime Architecture" section to `docs/governance.md` with component diagram, deployment modes, data flows, and source of truth documentation (2025-12-04)
 
 ### 12. WASM Executor Incomplete
 
