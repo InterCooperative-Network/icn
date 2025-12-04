@@ -6,14 +6,14 @@
 //! 3. Traffic obfuscation (padding, delays, cover traffic)
 //! 4. Combined privacy scenarios
 
-use icn_privacy::{
-    select_relays, ObfuscationConfig, OnionRouter,
-    TopicBloomFilter, TopicEncryptor, TrafficObfuscator,
-};
 use icn_identity::KeyPair;
-use x25519_dalek::{PublicKey, StaticSecret};
+use icn_privacy::{
+    select_relays, ObfuscationConfig, OnionRouter, TopicBloomFilter, TopicEncryptor,
+    TrafficObfuscator,
+};
 use std::collections::HashMap;
 use std::time::Duration;
+use x25519_dalek::{PublicKey, StaticSecret};
 
 // === Topic Encryption Integration Tests ===
 
@@ -50,7 +50,7 @@ fn test_bloom_filter_topic_discovery_multiple_subscribers() {
     let encryptor = TopicEncryptor::new(shared_key);
 
     // Create encrypted topics
-    let topics = vec![
+    let topics = [
         "ledger:sync",
         "governance:votes",
         "compute:tasks",
@@ -121,9 +121,7 @@ fn test_find_matches_across_many_topics() {
     let encryptor = TopicEncryptor::new(shared_key);
 
     // Create a large set of encrypted topics
-    let all_topics: Vec<String> = (0..100)
-        .map(|i| format!("topic:{}", i))
-        .collect();
+    let all_topics: Vec<String> = (0..100).map(|i| format!("topic:{}", i)).collect();
 
     let encrypted_all: Vec<_> = all_topics
         .iter()
@@ -147,7 +145,7 @@ fn test_find_matches_across_many_topics() {
 fn make_test_node() -> (icn_identity::Did, StaticSecret, PublicKey) {
     let keypair = KeyPair::generate().unwrap();
     let did = keypair.did().clone();
-    let secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
+    let secret = StaticSecret::random_from_rng(rand::thread_rng());
     let public = PublicKey::from(&secret);
     (did, secret, public)
 }
@@ -169,10 +167,12 @@ fn test_onion_circuit_creation_and_validation() {
     sender_router.add_peer_key(recipient_did.clone(), recipient_pub);
 
     // Create circuit with 2 relays
-    let circuit = sender_router.create_circuit(
-        vec![relay1_did.clone(), relay2_did.clone()],
-        recipient_did.clone(),
-    ).unwrap();
+    let circuit = sender_router
+        .create_circuit(
+            vec![relay1_did.clone(), relay2_did.clone()],
+            recipient_did.clone(),
+        )
+        .unwrap();
 
     assert_eq!(circuit.relays.len(), 2);
     assert_eq!(circuit.relays[0], relay1_did);
@@ -192,7 +192,10 @@ fn test_onion_circuit_missing_key_fails() {
     // Creating circuit should fail due to missing key
     let result = router.create_circuit(vec![relay1_did], recipient_did);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Missing public key"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Missing public key"));
 }
 
 #[test]
@@ -218,15 +221,22 @@ fn test_onion_wrap_peel_extract_two_hops() {
     recipient_router.add_peer_key(relay_did.clone(), relay_pub);
 
     // Create circuit: sender -> relay -> recipient
-    let circuit = sender_router.create_circuit(vec![relay_did.clone()], recipient_did.clone()).unwrap();
+    let circuit = sender_router
+        .create_circuit(vec![relay_did.clone()], recipient_did.clone())
+        .unwrap();
 
     // Sender wraps message
     let original_payload = b"Secret message for recipient";
-    let onion_msg = sender_router.wrap_message(&circuit, original_payload).unwrap();
+    let onion_msg = sender_router
+        .wrap_message(&circuit, original_payload)
+        .unwrap();
 
     // Relay peels one layer
     let peel_result = relay_router.peel_layer(onion_msg).unwrap();
-    assert!(peel_result.is_some(), "Relay should be able to peel a layer");
+    assert!(
+        peel_result.is_some(),
+        "Relay should be able to peel a layer"
+    );
     let (next_hop, peeled) = peel_result.unwrap();
     assert_eq!(next_hop, recipient_did);
 
@@ -413,7 +423,7 @@ fn test_cover_traffic_generation_rate() {
     let obfuscator = TrafficObfuscator::with_config(config);
 
     // If we just sent, shouldn't need to send cover traffic
-    let just_sent = Duration::from_millis(100);
+    let _just_sent = Duration::from_millis(100);
     // May or may not trigger depending on probability
 
     // If it's been a while, should be more likely to send
@@ -425,7 +435,10 @@ fn test_cover_traffic_generation_rate() {
         }
     }
     // With a 10 second gap and 1 msg/sec rate, should often trigger
-    assert!(should_send_count > 50, "Cover traffic should trigger frequently after long delay");
+    assert!(
+        should_send_count > 50,
+        "Cover traffic should trigger frequently after long delay"
+    );
 }
 
 #[test]

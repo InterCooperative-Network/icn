@@ -137,7 +137,6 @@ pub enum ProposalPayload {
     },
 
     // === Emergency Proposals (Issue #25) ===
-
     /// Freeze a member - blocks all ledger transactions for the member
     ///
     /// This is an emergency action requiring super-majority approval.

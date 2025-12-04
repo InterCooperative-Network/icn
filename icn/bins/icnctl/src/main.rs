@@ -1387,7 +1387,11 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+async fn handle_recovery_command(
+    cmd: RecoveryCommands,
+    data_dir: &Path,
+    endpoint: &str,
+) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
 
     match cmd {
@@ -1553,13 +1557,9 @@ async fn handle_recovery_command(cmd: RecoveryCommands, data_dir: &Path, endpoin
             println!(
                 "  1. Contact your {threshold} trustees out-of-band (phone, video, in-person)"
             );
-            println!(
-                "  2. Ask them to run: icnctl recovery attest {recovery_id}"
-            );
+            println!("  2. Ask them to run: icnctl recovery attest {recovery_id}");
             println!("  3. After {threshold} attestations, wait {delay} seconds delay period");
-            println!(
-                "  4. Finalize recovery: icnctl recovery finalize {recovery_id}"
-            );
+            println!("  4. Finalize recovery: icnctl recovery finalize {recovery_id}");
         }
 
         RecoveryCommands::Attest {

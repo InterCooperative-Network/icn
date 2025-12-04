@@ -370,7 +370,12 @@ impl RpcClient {
     // ========================================================================
 
     /// Add a trust edge to another DID
-    pub async fn add_trust(&mut self, target_did: &str, score: f64, label: Option<&str>) -> Result<()> {
+    pub async fn add_trust(
+        &mut self,
+        target_did: &str,
+        score: f64,
+        label: Option<&str>,
+    ) -> Result<()> {
         let params = serde_json::json!({
             "target_did": target_did,
             "score": score,
@@ -415,7 +420,9 @@ impl RpcClient {
 
     /// List all governance domains
     pub async fn list_domains(&mut self) -> Result<Vec<GovernanceDomainInfo>> {
-        let result = self.call("governance.domain.list", serde_json::json!({})).await?;
+        let result = self
+            .call("governance.domain.list", serde_json::json!({}))
+            .await?;
         let domains: Vec<GovernanceDomainInfo> =
             serde_json::from_value(result).context("Failed to deserialize domains")?;
         Ok(domains)
@@ -448,7 +455,9 @@ impl RpcClient {
 
     /// List all proposals
     pub async fn list_proposals(&mut self) -> Result<Vec<ProposalInfo>> {
-        let result = self.call("governance.proposal.list", serde_json::json!({})).await?;
+        let result = self
+            .call("governance.proposal.list", serde_json::json!({}))
+            .await?;
         let proposals: Vec<ProposalInfo> =
             serde_json::from_value(result).context("Failed to deserialize proposals")?;
         Ok(proposals)

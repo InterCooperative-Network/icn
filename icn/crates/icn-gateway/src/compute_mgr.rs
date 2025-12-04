@@ -515,7 +515,9 @@ mod tests {
         let mgr = ComputeManager::new();
 
         // All valid priorities should work (fail only because daemon not connected)
-        for priority in ["low", "normal", "high", "critical", "LOW", "HIGH", "CrItIcAl"] {
+        for priority in [
+            "low", "normal", "high", "critical", "LOW", "HIGH", "CrItIcAl",
+        ] {
             let result = mgr
                 .submit_task(
                     "task-1".to_string(),

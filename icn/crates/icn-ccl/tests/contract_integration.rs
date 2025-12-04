@@ -10,11 +10,9 @@
 //! 7. Fuel metering
 //! 8. Error scenarios
 
-use icn_ccl::{
-    BinOp, Contract, ContractMetadata, ContractRegistry, Expr, Rule, Stmt, Value,
-};
-use icn_ccl::types::{Capability, ContractState, ExecutionContext};
 use icn_ccl::interpreter::Interpreter;
+use icn_ccl::types::{Capability, ContractState, ExecutionContext};
+use icn_ccl::{BinOp, Contract, ContractMetadata, ContractRegistry, Expr, Rule, Stmt, Value};
 use icn_identity::KeyPair;
 use std::collections::HashMap;
 
@@ -29,8 +27,7 @@ fn test_identity() -> icn_identity::Did {
 fn test_create_simple_contract() {
     let alice = test_identity();
 
-    let contract = Contract::new("SimpleContract".to_string())
-        .add_participant(alice.clone());
+    let contract = Contract::new("SimpleContract".to_string()).add_participant(alice.clone());
 
     assert_eq!(contract.name, "SimpleContract");
     assert_eq!(contract.participants.len(), 1);
@@ -54,7 +51,7 @@ fn test_create_contract_with_rule() {
                     to: Expr::Literal(Value::Did(bob.clone())),
                     amount: Expr::Var("amount".to_string()),
                     currency: Expr::Literal(Value::String("credits".to_string())),
-                })
+                }),
         );
 
     assert_eq!(contract.name, "PaymentContract");
@@ -81,7 +78,7 @@ fn test_create_contract_with_precondition() {
                 })
                 .add_stmt(Stmt::Return {
                     value: Expr::Var("value".to_string()),
-                })
+                }),
         );
 
     assert!(contract.validate().is_ok());
@@ -95,8 +92,7 @@ fn test_create_contract_with_precondition() {
 fn test_contract_validation_empty_name_fails() {
     let alice = test_identity();
 
-    let contract = Contract::new("".to_string())
-        .add_participant(alice);
+    let contract = Contract::new("".to_string()).add_participant(alice);
 
     assert!(contract.validate().is_err());
 }
@@ -132,7 +128,10 @@ async fn test_deploy_contract_to_registry() {
 
     let registry = ContractRegistry::new();
 
-    let hash = registry.deploy(contract.clone(), &alice.to_string(), None).await.unwrap();
+    let hash = registry
+        .deploy(contract.clone(), &alice.to_string(), None)
+        .await
+        .unwrap();
 
     // Verify contract is in registry
     let retrieved = registry.get(&hash).await.unwrap().unwrap();
@@ -150,7 +149,10 @@ async fn test_deploy_and_get_metadata() {
         .add_rule(Rule::new("action2".to_string()));
 
     let registry = ContractRegistry::new();
-    let hash = registry.deploy(contract.clone(), &alice.to_string(), None).await.unwrap();
+    let hash = registry
+        .deploy(contract.clone(), &alice.to_string(), None)
+        .await
+        .unwrap();
 
     let metadata = registry.get_metadata(&hash).await.unwrap().unwrap();
 
@@ -181,9 +183,18 @@ async fn test_list_contracts_by_owner() {
 
     let registry = ContractRegistry::new();
 
-    registry.deploy(contract1.clone(), &alice.to_string(), None).await.unwrap();
-    registry.deploy(contract2.clone(), &alice.to_string(), None).await.unwrap();
-    registry.deploy(contract3.clone(), &bob.to_string(), None).await.unwrap();
+    registry
+        .deploy(contract1.clone(), &alice.to_string(), None)
+        .await
+        .unwrap();
+    registry
+        .deploy(contract2.clone(), &alice.to_string(), None)
+        .await
+        .unwrap();
+    registry
+        .deploy(contract3.clone(), &bob.to_string(), None)
+        .await
+        .unwrap();
 
     let alice_contracts = registry.list_by_owner(&alice.to_string()).await.unwrap();
     let bob_contracts = registry.list_by_owner(&bob.to_string()).await.unwrap();
@@ -202,8 +213,13 @@ async fn test_deploy_duplicate_contract() {
 
     let registry = ContractRegistry::new();
 
-    let _hash1 = registry.deploy(contract.clone(), &alice.to_string(), None).await.unwrap();
-    let hash2_result = registry.deploy(contract.clone(), &alice.to_string(), None).await;
+    let _hash1 = registry
+        .deploy(contract.clone(), &alice.to_string(), None)
+        .await
+        .unwrap();
+    let hash2_result = registry
+        .deploy(contract.clone(), &alice.to_string(), None)
+        .await;
 
     // Second deploy should error (AlreadyExists)
     assert!(hash2_result.is_err());
@@ -226,16 +242,16 @@ fn test_execute_arithmetic_rule() {
                         op: BinOp::Add,
                         left: Box::new(Expr::Var("a".to_string())),
                         right: Box::new(Expr::Var("b".to_string())),
-                    }
-                })
+                    },
+                }),
         );
 
     let state = ContractState::new();
     let context = ExecutionContext::new(
         alice.clone(),
-        0,      // timestamp
-        1000,   // fuel
-        vec![], // capabilities
+        0,                   // timestamp
+        1000,                // fuel
+        vec![],              // capabilities
         vec![alice.clone()], // participants
     );
 
@@ -266,17 +282,11 @@ fn test_execute_rule_with_precondition_pass() {
                 })
                 .add_stmt(Stmt::Return {
                     value: Expr::Var("value".to_string()),
-                })
+                }),
         );
 
     let state = ContractState::new();
-    let context = ExecutionContext::new(
-        alice.clone(),
-        0,
-        1000,
-        vec![],
-        vec![alice.clone()],
-    );
+    let context = ExecutionContext::new(alice.clone(), 0, 1000, vec![], vec![alice.clone()]);
 
     let mut args = HashMap::new();
     args.insert("value".to_string(), Value::Int(10));
@@ -303,17 +313,11 @@ fn test_execute_rule_with_precondition_fail() {
                 })
                 .add_stmt(Stmt::Return {
                     value: Expr::Var("value".to_string()),
-                })
+                }),
         );
 
     let state = ContractState::new();
-    let context = ExecutionContext::new(
-        alice.clone(),
-        0,
-        1000,
-        vec![],
-        vec![alice.clone()],
-    );
+    let context = ExecutionContext::new(alice.clone(), 0, 1000, vec![], vec![alice.clone()]);
 
     let mut args = HashMap::new();
     args.insert("value".to_string(), Value::Int(-5)); // Negative value fails precondition
@@ -334,13 +338,7 @@ fn test_execute_rule_not_found() {
         .add_rule(Rule::new("existing_rule".to_string()));
 
     let state = ContractState::new();
-    let context = ExecutionContext::new(
-        alice.clone(),
-        0,
-        1000,
-        vec![],
-        vec![alice.clone()],
-    );
+    let context = ExecutionContext::new(alice.clone(), 0, 1000, vec![], vec![alice.clone()]);
 
     let interpreter = Interpreter::new(contract, state, context);
     let result = interpreter.execute_rule("nonexistent_rule", HashMap::new());
@@ -372,25 +370,23 @@ fn test_fuel_consumed_during_execution() {
                         op: BinOp::Add,
                         left: Box::new(Expr::Var("x".to_string())),
                         right: Box::new(Expr::Var("y".to_string())),
-                    }
-                })
+                    },
+                }),
         );
 
     let state = ContractState::new();
-    let context = ExecutionContext::new(
-        alice.clone(),
-        0,
-        1000,
-        vec![],
-        vec![alice.clone()],
-    );
+    let context = ExecutionContext::new(alice.clone(), 0, 1000, vec![], vec![alice.clone()]);
 
     let interpreter = Interpreter::new(contract, state, context);
     let result = interpreter.execute_rule("compute", HashMap::new()).unwrap();
 
     assert_eq!(result.value, Value::Int(3));
     // Should have consumed fuel: at least 1 per statement (3 stmts) + expressions
-    assert!(result.fuel_consumed >= 3, "Expected at least 3 fuel consumed, got {}", result.fuel_consumed);
+    assert!(
+        result.fuel_consumed >= 3,
+        "Expected at least 3 fuel consumed, got {}",
+        result.fuel_consumed
+    );
 }
 
 #[test]
@@ -412,18 +408,12 @@ fn test_fuel_exhaustion() {
                 .add_stmt(Stmt::Assign {
                     name: "c".to_string(),
                     value: Expr::Literal(Value::Int(3)),
-                })
+                }),
         );
 
     let state = ContractState::new();
     // Only give 1 fuel - should run out
-    let context = ExecutionContext::new(
-        alice.clone(),
-        0,
-        1,
-        vec![],
-        vec![alice.clone()],
-    );
+    let context = ExecutionContext::new(alice.clone(), 0, 1, vec![], vec![alice.clone()]);
 
     let interpreter = Interpreter::new(contract, state, context);
     let result = interpreter.execute_rule("expensive", HashMap::new());
@@ -452,7 +442,7 @@ fn test_ledger_transfer_operation() {
                     to: Expr::Literal(Value::Did(bob.clone())),
                     amount: Expr::Var("amount".to_string()),
                     currency: Expr::Literal(Value::String("credits".to_string())),
-                })
+                }),
         );
 
     let state = ContractState::new();
@@ -476,7 +466,12 @@ fn test_ledger_transfer_operation() {
     // Should have generated a transfer operation
     assert_eq!(result.ledger_ops.len(), 1);
     match &result.ledger_ops[0] {
-        icn_ccl::types::LedgerOperation::Transfer { from, to, amount, currency } => {
+        icn_ccl::types::LedgerOperation::Transfer {
+            from,
+            to,
+            amount,
+            currency,
+        } => {
             assert_eq!(from, &alice);
             assert_eq!(to, &bob);
             assert_eq!(*amount, 100);
@@ -514,7 +509,7 @@ fn test_contract_json_roundtrip() {
                 .add_param("value".to_string())
                 .add_stmt(Stmt::Return {
                     value: Expr::Var("value".to_string()),
-                })
+                }),
         );
 
     // Serialize to JSON
@@ -555,30 +550,28 @@ fn test_comparison_operations() {
     for (op, a, b, expected) in tests {
         let contract = Contract::new("Compare".to_string())
             .add_participant(alice.clone())
-            .add_rule(
-                Rule::new("compare".to_string())
-                    .add_stmt(Stmt::Return {
-                        value: Expr::BinOp {
-                            op: op.clone(),
-                            left: Box::new(Expr::Literal(Value::Int(a))),
-                            right: Box::new(Expr::Literal(Value::Int(b))),
-                        }
-                    })
-            );
+            .add_rule(Rule::new("compare".to_string()).add_stmt(Stmt::Return {
+                value: Expr::BinOp {
+                    op,
+                    left: Box::new(Expr::Literal(Value::Int(a))),
+                    right: Box::new(Expr::Literal(Value::Int(b))),
+                },
+            }));
 
         let state = ContractState::new();
-        let context = ExecutionContext::new(
-            alice.clone(),
-            0,
-            100,
-            vec![],
-            vec![alice.clone()],
-        );
+        let context = ExecutionContext::new(alice.clone(), 0, 100, vec![], vec![alice.clone()]);
 
         let interpreter = Interpreter::new(contract, state, context);
         let result = interpreter.execute_rule("compare", HashMap::new()).unwrap();
 
-        assert_eq!(result.value, Value::Bool(expected), "Failed for {:?}({}, {})", op, a, b);
+        assert_eq!(
+            result.value,
+            Value::Bool(expected),
+            "Failed for {:?}({}, {})",
+            op,
+            a,
+            b
+        );
     }
 }
 
@@ -622,7 +615,7 @@ fn test_missing_capability_for_ledger_transfer() {
                     to: Expr::Literal(Value::Did(bob.clone())),
                     amount: Expr::Var("amount".to_string()),
                     currency: Expr::Literal(Value::String("credits".to_string())),
-                })
+                }),
         );
 
     let state = ContractState::new();
@@ -644,7 +637,9 @@ fn test_missing_capability_for_ledger_transfer() {
     // Should fail due to missing capability
     assert!(result.is_err());
     let err = result.unwrap_err().to_string().to_lowercase();
-    assert!(err.contains("capability") || err.contains("permission") || err.contains("unauthorized"));
+    assert!(
+        err.contains("capability") || err.contains("permission") || err.contains("unauthorized")
+    );
 }
 
 #[tokio::test]
@@ -665,14 +660,25 @@ async fn test_resolve_by_name() {
         .add_rule(Rule::new("action".to_string()));
 
     let registry = ContractRegistry::new();
-    let hash = registry.deploy(contract.clone(), &alice.to_string(), Some(1)).await.unwrap();
+    let hash = registry
+        .deploy(contract.clone(), &alice.to_string(), Some(1))
+        .await
+        .unwrap();
 
     // Resolve by name (latest)
-    let resolved = registry.resolve("NamedContract", None).await.unwrap().unwrap();
+    let resolved = registry
+        .resolve("NamedContract", None)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(resolved, hash);
 
     // Resolve by name + version
-    let resolved_v1 = registry.resolve("NamedContract", Some(1)).await.unwrap().unwrap();
+    let resolved_v1 = registry
+        .resolve("NamedContract", Some(1))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(resolved_v1, hash);
 
     // Non-existent version

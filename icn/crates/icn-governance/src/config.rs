@@ -302,18 +302,24 @@ mod tests {
         assert!(valid.validate().is_ok());
 
         // Test invalid freeze quorum
-        let mut invalid = EmergencyThresholds::default();
-        invalid.freeze_quorum_percentage = 101;
+        let invalid = EmergencyThresholds {
+            freeze_quorum_percentage: 101,
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Test invalid rollback approval
-        let mut invalid = EmergencyThresholds::default();
-        invalid.rollback_approval_percentage = 150;
+        let invalid = EmergencyThresholds {
+            rollback_approval_percentage: 150,
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Test invalid voting period
-        let mut invalid = EmergencyThresholds::default();
-        invalid.emergency_voting_period_seconds = 0;
+        let invalid = EmergencyThresholds {
+            emergency_voting_period_seconds: 0,
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
     }
 
@@ -333,10 +339,14 @@ mod tests {
     #[test]
     fn test_governance_config_with_emergency() {
         let emergency = EmergencyThresholds::new(
-            80, 90, // freeze
-            80, 90, // veto
-            80, 90, // force close
-            90, 95, // rollback
+            80,
+            90, // freeze
+            80,
+            90, // veto
+            80,
+            90, // force close
+            90,
+            95,           // rollback
             12 * 60 * 60, // 12 hour voting
         );
 

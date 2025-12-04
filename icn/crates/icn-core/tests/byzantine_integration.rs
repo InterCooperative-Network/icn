@@ -36,10 +36,7 @@ impl TestNode {
         // Create trust graph (store first, then did)
         let trust_store_path = temp_dir.path().join("trust");
         let trust_store = Arc::new(SledStore::open(&trust_store_path)?);
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(
-            trust_store,
-            did.clone(),
-        )));
+        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
 
         // Create misbehavior detector
         let misbehavior_detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
@@ -179,7 +176,10 @@ async fn test_acl_violation_rate_limit_quarantine() -> Result<()> {
     // Node1 creates private topic (requires trust class Partner+)
     {
         let mut gossip = node1.gossip.write().await;
-        let topic = Topic::new("private:data".to_string(), AccessControl::TrustClass(TrustClass::Partner));
+        let topic = Topic::new(
+            "private:data".to_string(),
+            AccessControl::TrustClass(TrustClass::Partner),
+        );
         gossip.create_topic(topic);
     }
 
@@ -242,10 +242,7 @@ async fn test_critical_violation_auto_ban() -> Result<()> {
     );
 
     let reputation = node1.get_reputation(&node2.did).await.unwrap();
-    assert_eq!(
-        reputation, 0.0,
-        "Banned peer should have zero reputation"
-    );
+    assert_eq!(reputation, 0.0, "Banned peer should have zero reputation");
 
     info!("✅ Critical violation triggered auto-ban");
     Ok(())
@@ -436,11 +433,11 @@ async fn test_detector_statistics() -> Result<()> {
 
     debug!("Detector stats: {:?}", stats);
 
-    assert_eq!(
-        stats.total_tracked_dids, 2,
-        "Should track 2 malicious DIDs"
+    assert_eq!(stats.total_tracked_dids, 2, "Should track 2 malicious DIDs");
+    assert!(
+        stats.total_violations >= 6,
+        "Should have at least 6 violations"
     );
-    assert!(stats.total_violations >= 6, "Should have at least 6 violations");
     assert_eq!(stats.banned_count, 1, "Should have 1 banned peer");
 
     info!("✅ Detector statistics accurate");

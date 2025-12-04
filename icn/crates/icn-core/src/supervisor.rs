@@ -169,7 +169,8 @@ impl Supervisor {
                         };
 
                         let mut graph = graph.write().await;
-                        let edge = icn_trust::TrustEdge::new(own.clone(), peer.clone(), trust_score);
+                        let edge =
+                            icn_trust::TrustEdge::new(own.clone(), peer.clone(), trust_score);
 
                         if let Err(e) = graph.add_edge(edge) {
                             warn!(

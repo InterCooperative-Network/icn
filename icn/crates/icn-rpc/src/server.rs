@@ -225,7 +225,8 @@ async fn handle_request(
         Ok(req) => req,
         Err(e) => {
             warn!("Failed to parse RPC request: {}", e);
-            counter!("icn_rpc_errors_total", "method" => "unknown", "error_code" => "-32700").increment(1);
+            counter!("icn_rpc_errors_total", "method" => "unknown", "error_code" => "-32700")
+                .increment(1);
             let response = RpcResponse::error(0, -32700, "Parse error".to_string());
             return Ok(json_response(StatusCode::OK, &response));
         }
@@ -265,7 +266,8 @@ async fn handle_request(
                     }
                     Err(e) => {
                         warn!("Token verification failed: {}", e);
-                        counter!("icn_rpc_auth_failures_total", "reason" => "invalid_token").increment(1);
+                        counter!("icn_rpc_auth_failures_total", "reason" => "invalid_token")
+                            .increment(1);
                         gauge!("icn_rpc_active_requests").decrement(1.0);
                         let response = RpcResponse::error(
                             rpc_request.id,
@@ -280,7 +282,8 @@ async fn handle_request(
                         "Missing Authorization header for method {}",
                         rpc_request.method
                     );
-                    counter!("icn_rpc_auth_failures_total", "reason" => "missing_token").increment(1);
+                    counter!("icn_rpc_auth_failures_total", "reason" => "missing_token")
+                        .increment(1);
                     gauge!("icn_rpc_active_requests").decrement(1.0);
                     let response = RpcResponse::error(
                         rpc_request.id,
@@ -318,7 +321,8 @@ async fn handle_request(
             .as_ref()
             .map(|e| e.code.to_string())
             .unwrap_or_default();
-        counter!("icn_rpc_errors_total", "method" => method, "error_code" => error_code).increment(1);
+        counter!("icn_rpc_errors_total", "method" => method, "error_code" => error_code)
+            .increment(1);
     }
 
     Ok(json_response(StatusCode::OK, &response))

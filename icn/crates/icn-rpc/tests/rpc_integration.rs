@@ -152,7 +152,10 @@ async fn test_auth_invalid_signature_rejected() {
         .unwrap();
 
     let verify_resp: serde_json::Value = response.json().await.unwrap();
-    assert!(verify_resp["error"].is_object(), "Expected error for invalid signature");
+    assert!(
+        verify_resp["error"].is_object(),
+        "Expected error for invalid signature"
+    );
     let error_msg = verify_resp["error"]["message"]
         .as_str()
         .unwrap_or("")
@@ -228,7 +231,10 @@ async fn test_rpc_error_format() {
     // Verify JSON-RPC error format
     assert!(resp["error"].is_object(), "Expected error object");
     assert!(resp["error"]["code"].is_number(), "Error should have code");
-    assert!(resp["error"]["message"].is_string(), "Error should have message");
+    assert!(
+        resp["error"]["message"].is_string(),
+        "Error should have message"
+    );
     assert_eq!(resp["id"], 1, "Response should echo request id");
 
     handle.abort();
@@ -346,7 +352,11 @@ async fn test_multiple_scopes_authentication() {
         "trust:read".to_string(),
     ];
     let auth_result = client.authenticate(scopes).await;
-    assert!(auth_result.is_ok(), "Multi-scope auth failed: {:?}", auth_result);
+    assert!(
+        auth_result.is_ok(),
+        "Multi-scope auth failed: {:?}",
+        auth_result
+    );
     assert!(client.is_authenticated());
 
     handle.abort();
@@ -404,7 +414,10 @@ async fn test_ledger_balance_without_ledger_actor() {
 
     let resp: serde_json::Value = response.json().await.unwrap();
     // Should return error about ledger actor not being available
-    assert!(resp["error"].is_object(), "Expected error when ledger actor not available");
+    assert!(
+        resp["error"].is_object(),
+        "Expected error when ledger actor not available"
+    );
 
     handle.abort();
 }
@@ -431,7 +444,10 @@ async fn test_trust_list_without_trust_actor() {
 
     let resp: serde_json::Value = response.json().await.unwrap();
     // Should return error about trust actor not being available
-    assert!(resp["error"].is_object(), "Expected error when trust actor not available");
+    assert!(
+        resp["error"].is_object(),
+        "Expected error when trust actor not available"
+    );
 
     handle.abort();
 }
@@ -459,12 +475,21 @@ async fn test_missing_required_params() {
         .unwrap();
 
     let resp: serde_json::Value = response.json().await.unwrap();
-    assert!(resp["error"].is_object(), "Expected error for missing params");
-    // Should get an error about missing parameters or challenge
-    let error_msg = resp["error"]["message"].as_str().unwrap_or("").to_lowercase();
     assert!(
-        error_msg.contains("param") || error_msg.contains("missing") || error_msg.contains("did")
-            || error_msg.contains("challenge") || error_msg.contains("signature")
+        resp["error"].is_object(),
+        "Expected error for missing params"
+    );
+    // Should get an error about missing parameters or challenge
+    let error_msg = resp["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .to_lowercase();
+    assert!(
+        error_msg.contains("param")
+            || error_msg.contains("missing")
+            || error_msg.contains("did")
+            || error_msg.contains("challenge")
+            || error_msg.contains("signature")
             || error_msg.contains("nonce"),
         "Expected param-related error, got: {}",
         error_msg
@@ -505,13 +530,19 @@ async fn test_batch_request_handling() {
     let resp: serde_json::Value = response.json().await.unwrap();
     // Batch requests should either work (array response) or be rejected with error
     // Our server currently doesn't support batch, so expect error
-    if resp.is_object() && resp["error"].is_object() {
+    let batch_handled = if resp.is_object() && resp["error"].is_object() {
         // Batch rejected - that's fine
-        assert!(true);
+        true
     } else if resp.is_array() {
         // Batch supported - also fine
-        assert!(true);
-    }
+        true
+    } else {
+        false
+    };
+    assert!(
+        batch_handled,
+        "Server should handle batch request (accept or reject)"
+    );
 
     handle.abort();
 }
@@ -540,13 +571,11 @@ async fn test_jsonrpc_version_validation() {
     let resp: serde_json::Value = response.json().await.unwrap();
     // May either reject (error) or accept (some servers are lenient)
     // If error, should be about version
-    if resp["error"].is_object() {
-        // Error returned - fine
-        assert!(true);
-    } else {
-        // Lenient server accepted it - also acceptable
-        assert!(true);
-    }
+    let version_handled = resp["error"].is_object() || resp["result"].is_object();
+    assert!(
+        version_handled,
+        "Server should handle wrong JSON-RPC version"
+    );
 
     handle.abort();
 }
@@ -578,11 +607,17 @@ async fn test_compute_submit_requires_auth() {
     let resp: serde_json::Value = response.json().await.unwrap();
     assert!(resp["error"].is_object(), "Expected auth error");
     let error_code = resp["error"]["code"].as_i64().unwrap_or(0);
-    let error_msg = resp["error"]["message"].as_str().unwrap_or("").to_lowercase();
+    let error_msg = resp["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .to_lowercase();
     // Auth error codes: -32001 (auth required) or -32401 (forbidden/auth related)
     assert!(
-        error_code == -32001 || error_code == -32401 || error_msg.contains("auth")
-            || error_msg.contains("unauthorized") || error_msg.contains("token"),
+        error_code == -32001
+            || error_code == -32401
+            || error_msg.contains("auth")
+            || error_msg.contains("unauthorized")
+            || error_msg.contains("token"),
         "Expected auth error, got code {} msg: {}",
         error_code,
         error_msg
@@ -639,7 +674,10 @@ async fn test_policy_methods_without_policy_actor() {
 
     let resp: serde_json::Value = response.json().await.unwrap();
     // Should return error about policy actor not being available
-    assert!(resp["error"].is_object(), "Expected error when policy actor not available");
+    assert!(
+        resp["error"].is_object(),
+        "Expected error when policy actor not available"
+    );
 
     handle.abort();
 }
@@ -666,7 +704,10 @@ async fn test_recovery_methods_without_recovery_actor() {
 
     let resp: serde_json::Value = response.json().await.unwrap();
     // Should return error about recovery actor not being available
-    assert!(resp["error"].is_object(), "Expected error when recovery actor not available");
+    assert!(
+        resp["error"].is_object(),
+        "Expected error when recovery actor not available"
+    );
 
     handle.abort();
 }

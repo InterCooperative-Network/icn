@@ -278,7 +278,7 @@ impl FreezeManager {
     ) -> Option<FrozenMember> {
         let removed = self.frozen.remove(did);
 
-        if let Some(ref record) = removed {
+        if let Some(ref _record) = removed {
             info!(
                 did = %did,
                 reason = %reason,

@@ -411,7 +411,7 @@ impl ComputeActor {
             checkpoint_store: None,
             migration_manager: None,
             policy_manager: None,
-            dispute_resolution: None, // Phase 18 Week 4
+            dispute_resolution: None,   // Phase 18 Week 4
             misbehavior_detector: None, // Set via set_misbehavior_detector()
         }
     }
@@ -1503,7 +1503,7 @@ impl ComputeActor {
                 let message_hash = {
                     use sha2::{Digest, Sha256};
                     let mut hasher = Sha256::new();
-                    hasher.update(&result.task_hash);
+                    hasher.update(result.task_hash);
                     hasher.update(result.task_id.as_bytes());
                     hasher.finalize().to_vec()
                 };
@@ -1515,10 +1515,11 @@ impl ComputeActor {
                 let detector_clone = detector.clone();
                 let executor_clone = executor_did.clone();
                 tokio::spawn(async move {
-                    detector_clone
-                        .write()
-                        .await
-                        .record_violation(&executor_clone, violation, message_hash);
+                    detector_clone.write().await.record_violation(
+                        &executor_clone,
+                        violation,
+                        message_hash,
+                    );
                 });
             }
 

@@ -432,8 +432,12 @@ mod tests {
             .unwrap();
 
         let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
-        coop.add_member(participant.did().clone(), MemberRole::Participant, timestamp())
-            .unwrap();
+        coop.add_member(
+            participant.did().clone(),
+            MemberRole::Participant,
+            timestamp(),
+        )
+        .unwrap();
 
         assert_eq!(coop.members.len(), 2);
         assert!(coop.is_member(participant.did()));
@@ -455,8 +459,12 @@ mod tests {
             .unwrap();
 
         let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
-        coop.add_member(participant.did().clone(), MemberRole::Participant, timestamp())
-            .unwrap();
+        coop.add_member(
+            participant.did().clone(),
+            MemberRole::Participant,
+            timestamp(),
+        )
+        .unwrap();
         coop.remove_member(participant.did()).unwrap();
 
         assert_eq!(coop.members.len(), 1);
@@ -496,10 +504,18 @@ mod tests {
             timestamp(),
         );
 
-        coop.add_member(facilitator.did().clone(), MemberRole::Facilitator, timestamp())
-            .unwrap();
-        coop.add_member(participant.did().clone(), MemberRole::Participant, timestamp())
-            .unwrap();
+        coop.add_member(
+            facilitator.did().clone(),
+            MemberRole::Facilitator,
+            timestamp(),
+        )
+        .unwrap();
+        coop.add_member(
+            participant.did().clone(),
+            MemberRole::Participant,
+            timestamp(),
+        )
+        .unwrap();
 
         // Steward can do everything
         assert!(coop.has_role(steward.did(), MemberRole::Steward));
