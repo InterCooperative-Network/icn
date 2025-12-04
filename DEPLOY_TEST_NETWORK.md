@@ -1,13 +1,114 @@
-# Deploy ICN Test Network - Host System Instructions
+# Deploy ICN Test Network
 
-**Status**: ✅ All Docker configuration fixes complete
-**Ready**: Deploy from your host system (outside dev container)
+**Status**: ✅ Production-ready configuration
+**Last Verified**: 2025-12-04
+
+---
+
+## Deployment Options
+
+| Option | Use Case | Location |
+|--------|----------|----------|
+| **K3s Homelab** | Production testing, multi-node validation | K3s cluster on Hyperion |
+| **Local Docker** | Development, quick testing | WSL2/local machine |
+
+---
+
+## Option 1: K3s Homelab Deployment (Recommended for Testing)
+
+### Infrastructure
+
+| Host | IP | Role |
+|------|-----|------|
+| k3s-control | 10.8.10.40 | K3s control plane |
+| k3s-worker-1 | 10.8.10.41 | K3s worker node |
+| k3s-worker-2 | 10.8.10.42 | K3s worker node |
+| Atlas | 10.8.10.25 | NFS storage (`atlas-nfs` StorageClass) |
+
+**Current ICN Identity**: `did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3`
+
+### Quick Access
+
+```bash
+# SSH to K3s control plane
+ssh ubuntu@10.8.10.40
+
+# Check cluster status
+sudo kubectl get nodes
+sudo kubectl -n icn get pods
+
+# View ICN logs
+sudo kubectl -n icn logs -l app=icn -f
+
+# Check ICN identity
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
+
+# Access metrics (via port-forward)
+sudo kubectl -n icn port-forward svc/icn 9100:9100 &
+curl http://localhost:9100/metrics
+```
+
+### Monitoring
+
+| Service | Access |
+|---------|--------|
+| **Grafana** | http://10.8.10.40:30300 |
+| **ICN Metrics** | Port-forward to 9100 |
+| **Dashboard** | ICN Node Dashboard |
+
+Credentials: See K8s secret `prometheus-grafana` in monitoring namespace
+
+### K8s Resources
+
+```bash
+# View all ICN resources
+sudo kubectl -n icn get all
+
+# Check persistent storage
+sudo kubectl -n icn get pvc
+
+# View ServiceMonitor (Prometheus scraping)
+sudo kubectl -n icn get servicemonitor
+```
+
+### Related Documentation
+
+| Resource | Location |
+|----------|----------|
+| Homelab Inventory | `/home/matt/homelab-inventory` |
+| ICN Launchpad | `/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md` |
+| K3s Cluster Docs | `/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md` |
+| Deployment Plans | `/home/matt/homelab-inventory/projects/icn/docs/DEPLOYMENT_PLANS.md` |
+
+---
+
+## Option 2: Local Docker Deployment (Development)
+
+### Quick Start
+
+```bash
+cd /home/matt/projects/icn
+
+# Build and start (first time takes 5-10 min)
+docker compose -f docker-compose.test.yml up -d --build
+
+# Wait for containers to be healthy
+sleep 30
+
+# Initialize node identities (first time only)
+docker exec icn-node1 icnctl -d /data id init
+docker exec icn-node2 icnctl -d /data id init
+docker exec icn-node3 icnctl -d /data id init
+
+# Verify
+docker compose -f docker-compose.test.yml ps
+```
 
 ---
 
 ## Prerequisites Check
 
-On your **host system** (not in the dev container), verify:
+On your **host system**, verify:
 
 ```bash
 # Check Docker version
@@ -85,84 +186,151 @@ icn-prometheus      "/bin/prometheus --c…"   prometheus   Up (healthy) 0.0.0.0
 
 ---
 
-## Step 3: Verify Network Formation
+## Step 3: Initialize Node Identities
 
-### 3.1 Check Node Logs
+**Important**: Each node needs a cryptographic identity initialized before it can participate in the network.
+
 ```bash
-# View node1 logs (look for "Connected to peer" messages)
+# Initialize identities (first time only)
+docker exec icn-node1 icnctl -d /data id init
+docker exec icn-node2 icnctl -d /data id init
+docker exec icn-node3 icnctl -d /data id init
+
+# Verify identities were created
+docker exec icn-node1 icnctl -d /data id show
+```
+
+**Expected output**: Each node shows a DID like `did:icn:z26prYPzZVEr8UezRwz1QtN5H1DRZ47pnuaqyW8ErrsjY`
+
+---
+
+## Step 4: Verify Node Health
+
+### 4.1 Check Node Logs
+```bash
+# View node1 logs (look for "Actor system spawned" messages)
 docker compose -f docker-compose.test.yml logs node1 | tail -20
 
-# View all nodes' connection status
-docker compose -f docker-compose.test.yml logs | grep -i "connected\|peer"
+# Check for successful startup
+docker compose -f docker-compose.test.yml logs | grep -i "spawned\|started"
 ```
 
 **What to look for**:
-- ✅ "Successfully connected to peer did:icn:..."
-- ✅ "Network connections: 2" (each node connected to 2 others)
-- ❌ Connection errors or timeouts (troubleshoot if present)
+- ✅ "Actor system spawned"
+- ✅ "Metrics server listening on 0.0.0.0:9100"
+- ✅ Container health checks passing
 
-### 3.2 Check Metrics Endpoint
+### 4.2 Check Metrics Endpoint
 ```bash
 # Query node1 metrics
-curl -s http://localhost:9091/metrics | grep icn_network_connections_active
+curl -s http://localhost:9091/metrics | grep icn_system
 
 # Expected output:
-# icn_network_connections_active 2
+# icn_system_uptime_seconds <value>
+# icn_system_actors_active 7
 
 # Check all 3 nodes
 for port in 9091 9092 9093; do
-  echo "Node on port $port:"
-  curl -s http://localhost:$port/metrics | grep icn_network_connections_active
+  echo "=== Node on port $port ==="
+  curl -s http://localhost:$port/metrics | grep -E "icn_system|icn_gossip"
 done
 ```
 
-**Expected**: Each node shows 2 active connections
+**Expected**: Each node shows 7 active actors and increasing uptime
 
-### 3.3 Interactive Node Access
+### 4.3 Interactive Node Access
 ```bash
 # Enter node1 container
 docker exec -it icn-node1 bash
 
-# Inside container, check status
-icnctl status
-icnctl network peers
-icnctl id show
+# Inside container, check identity
+icnctl -d /data id show
 
 # Exit container
 exit
 ```
 
+### Known Limitation: Peer Discovery
+
+**Note**: mDNS peer discovery does not work across Docker bridge network containers. Nodes run independently but won't auto-discover each other. For peer connectivity, you need to either:
+1. Use explicit bootstrap peers in config (format: `icn://DID@IP:PORT`)
+2. Use host networking mode
+3. Deploy to Kubernetes with proper service discovery
+
 ---
 
-## Step 4: Access Monitoring Dashboards
+## Step 5: Access Monitoring Dashboards
 
 ### Grafana
 - **URL**: http://localhost:3000
-- **Username**: `admin`
-- **Password**: `admin`
-- **Dashboard**: Navigate to "Dashboards" → "ICN Dashboard"
+- **Login**: Anonymous access enabled (no login required)
+- **Dashboard**: Navigate to "Dashboards" → "ICN Node Dashboard"
+- **Direct Link**: http://localhost:3000/d/icn-node-dashboard/icn-node-dashboard
 
 **Panels to check**:
-- Network Connections (should show 2 per node)
-- Byzantine Violations (should be 0)
-- Gossip Message Rate (should be increasing)
-- Ledger Transaction Rate (initially 0)
+- Nodes Up (should show 3)
+- System Uptime (increasing)
+- Active Actors (7 per node, 21 total)
+- Gossip & Replication metrics
+- Trust Cache stats
 
 ### Prometheus
 - **URL**: http://localhost:9095
 - **Query Examples**:
   ```promql
-  icn_network_connections_active
-  rate(icn_gossip_announces_sent_total[1m])
-  icn_misbehavior_violations_total
+  # Node status
+  up{job="icn-nodes"}
+
+  # System metrics
+  icn_system_uptime_seconds
+  icn_system_actors_active
+
+  # Gossip metrics
+  icn_gossip_digests_sent_total
+  icn_gossip_entries_total
+
+  # Trust metrics
+  icn_trust_lookups_total
+  icn_trust_cache_hits_total
   ```
 
 ---
 
-## Step 5: Run Basic Tests
+## Step 6: Run Basic Tests
 
-### Test 1: Network Connectivity
+### Test 1: Verify Prometheus Scraping
 ```bash
+# Check all targets are being scraped
+curl -s http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
+
+# Expected: node1, node2, node3 all show "up"
+```
+
+### Test 2: Query Metrics
+```bash
+# Check node count
+curl -s 'http://localhost:9095/api/v1/query?query=count(up{job="icn-nodes"}==1)' | jq '.data.result[0].value[1]'
+# Expected: "3"
+
+# Check system actors
+curl -s 'http://localhost:9095/api/v1/query?query=sum(icn_system_actors_active)' | jq '.data.result[0].value[1]'
+# Expected: "21" (7 per node × 3 nodes)
+```
+
+### Test 3: Verify Node Identities
+```bash
+# Each node should have a unique DID
+docker exec icn-node1 icnctl -d /data id show
+docker exec icn-node2 icnctl -d /data id show
+docker exec icn-node3 icnctl -d /data id show
+```
+
+### Legacy Test: Network Connectivity (Currently Limited)
+```bash
+# Note: mDNS doesn't work in Docker bridge mode
+# Nodes run independently without peer connections
+# This test is for future use with bootstrap peers
+
 # Node1 should see node2 and node3 as peers
 docker exec icn-node1 icnctl network peers | wc -l
 # Expected: 2
