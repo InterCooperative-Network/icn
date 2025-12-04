@@ -247,8 +247,7 @@ fn test_execute_arithmetic_rule() {
     let result = interpreter.execute_rule("add", args).unwrap();
 
     assert_eq!(result.value, Value::Int(8));
-    // Note: fuel_consumed tracking has a known bug in the interpreter
-    // (initial_fuel is captured after execution instead of before)
+    assert!(result.fuel_consumed > 0, "Expected fuel to be consumed");
 }
 
 #[test]
@@ -390,9 +389,8 @@ fn test_fuel_consumed_during_execution() {
     let result = interpreter.execute_rule("compute", HashMap::new()).unwrap();
 
     assert_eq!(result.value, Value::Int(3));
-    // Note: fuel_consumed tracking has a known bug in the interpreter
-    // (initial_fuel is captured after execution instead of before)
-    // TODO: Fix interpreter.rs line 86 to capture initial_fuel at start of execute_rule
+    // Should have consumed fuel: at least 1 per statement (3 stmts) + expressions
+    assert!(result.fuel_consumed >= 3, "Expected at least 3 fuel consumed, got {}", result.fuel_consumed);
 }
 
 #[test]

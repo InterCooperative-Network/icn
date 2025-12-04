@@ -51,6 +51,9 @@ impl Interpreter {
         rule_name: &str,
         args: HashMap<String, Value>,
     ) -> Result<ExecutionResult> {
+        // Capture initial fuel BEFORE execution for accurate tracking
+        let initial_fuel = self.context.fuel;
+
         let rule = self
             .contract
             .get_rule(rule_name)
@@ -82,8 +85,7 @@ impl Interpreter {
             }
         }
 
-        // Compute fuel consumed
-        let initial_fuel = self.context.fuel;
+        // Compute fuel consumed (initial_fuel captured at start of function)
         let fuel_consumed = initial_fuel.saturating_sub(self.context.fuel);
 
         // Collect state changes
