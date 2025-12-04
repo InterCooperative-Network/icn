@@ -38,8 +38,12 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -l app=icn"
 # Show identity
 ssh ubuntu@10.8.10.40 "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
 
-# Access metrics
-curl http://10.8.10.40:30910/metrics
+# Access metrics (via port-forward)
+ssh ubuntu@10.8.10.40 "kubectl -n icn port-forward svc/icn 9100:9100 &" && curl http://localhost:9100/metrics
+
+# Or view in Grafana (deployed 2025-12-04)
+# URL: http://10.8.10.40:30300  (admin/admin)
+# Dashboard: ICN Node Dashboard
 ```
 
 ### Related Homelab Documentation
@@ -61,6 +65,20 @@ The K3s deployment required fixes for several issues discovered during initial b
 5. **Health probe** - Changed to use port 9100 (metrics port)
 
 The governance topic fix has been merged upstream (commit `01009e5`).
+
+### Monitoring Stack (deployed 2025-12-04)
+
+| Component | Access | Notes |
+|-----------|--------|-------|
+| **Grafana** | http://10.8.10.40:30300 | admin/admin, ICN Node Dashboard |
+| **Prometheus** | K3s internal only | Scrapes ICN metrics every 15s |
+| **AlertManager** | K3s internal only | 15 ICN-specific alerts configured |
+
+**K8s Resources**:
+- `ServiceMonitor` in `icn` namespace → Prometheus scrapes ICN daemon
+- `PrometheusRule` in `monitoring` namespace → ICN alert rules
+
+**Files**: [deploy/k8s/monitoring/servicemonitor.yaml](deploy/k8s/monitoring/servicemonitor.yaml)
 
 ## Workspace Structure
 
