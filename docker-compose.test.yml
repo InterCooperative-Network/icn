@@ -1,0 +1,195 @@
+# Docker Compose for ICN Internal Testing
+# Phase 18 Validation + Governance Testing
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d
+#   docker compose -f docker-compose.test.yml logs -f node1
+#   docker compose -f docker-compose.test.yml down
+
+version: '3.8'
+
+services:
+  # Honest Node 1
+  node1:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node1
+    hostname: node1
+    volumes:
+      - node1_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_BIND_ADDR=0.0.0.0:5001
+      - ICN_LOG_LEVEL=info
+      - RUST_BACKTRACE=1
+    ports:
+      - "5001:5001"    # P2P
+      - "9091:9090"    # Metrics
+      - "8081:8080"    # Gateway (if enabled)
+    networks:
+      - icn_test
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Honest Node 2
+  node2:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node2
+    hostname: node2
+    volumes:
+      - node2_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_BIND_ADDR=0.0.0.0:5002
+      - ICN_LOG_LEVEL=info
+      - RUST_BACKTRACE=1
+    ports:
+      - "5002:5002"
+      - "9092:9090"
+      - "8082:8080"
+    networks:
+      - icn_test
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Honest Node 3
+  node3:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node3
+    hostname: node3
+    volumes:
+      - node3_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_BIND_ADDR=0.0.0.0:5003
+      - ICN_LOG_LEVEL=info
+      - RUST_BACKTRACE=1
+    ports:
+      - "5003:5003"
+      - "9093:9090"
+      - "8083:8080"
+    networks:
+      - icn_test
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Byzantine Node 4 (for attack testing)
+  node4:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node4
+    hostname: node4
+    volumes:
+      - node4_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_BIND_ADDR=0.0.0.0:5004
+      - ICN_LOG_LEVEL=debug  # More verbose for attack analysis
+      - RUST_BACKTRACE=1
+    ports:
+      - "5004:5004"
+      - "9094:9090"
+      - "8084:8080"
+    networks:
+      - icn_test
+    restart: unless-stopped
+    profiles:
+      - byzantine  # Only start with: --profile byzantine
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Prometheus (metrics collection)
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: icn-prometheus
+    hostname: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "9090:9090"
+    networks:
+      - icn_test
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Grafana (visualization)
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: icn-grafana
+    hostname: grafana
+    volumes:
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/icn-dashboard.json:ro
+      - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitoring/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    ports:
+      - "3000:3000"
+    networks:
+      - icn_test
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  icn_test:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:
+  node4_data:
+  prometheus_data:
+  grafana_data:
