@@ -15,12 +15,12 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
 
 | Category | High | Medium | Low | Total | Fixed |
 |----------|------|--------|-----|-------|-------|
-| Test Coverage | 4 | 2 | 1 | 7 | 1 |
+| Test Coverage | 4 | 2 | 1 | 7 | 2 |
 | Documentation | 2 | 2 | 0 | 4 | 2 |
 | Feature Completeness | 2 | 2 | 4 | 8 | 4 |
 | Monitoring | 1 | 1 | 0 | 2 | 2 |
 | Config/Deployment | 0 | 2 | 0 | 2 | 2 |
-| **TOTAL** | **9** | **9** | **5** | **23** | **11** |
+| **TOTAL** | **9** | **9** | **5** | **23** | **12** |
 
 ---
 
@@ -55,13 +55,19 @@ Comprehensive analysis of the ICN codebase identified **23 gaps** across test co
   - Initial suite: 8 tests (auth flow, server startup, error handling, token validation). Commit `1893e51`.
   - Extended suite: 12 additional tests (scope enforcement, multiple scopes, network/ledger/trust actor errors, missing params, batch handling, JSON-RPC version, compute auth, empty method, policy/recovery actors). Total: **20 tests**.
 
-### 4. Privacy Crate Lacks Integration Tests
+### 4. ~~Privacy Crate Lacks Integration Tests~~ ✅ FIXED
 
 **Impact**: Privacy features untested in realistic scenarios
 
-- **Location**: `icn/crates/icn-privacy/tests/` (doesn't exist)
+- **Location**: `icn/crates/icn-privacy/tests/privacy_integration.rs`
 - **Issue**: Only 22 inline unit tests for onion routing, traffic obfuscation
 - **Fix**: Add integration tests for circuit reliability, message padding
+- **Resolution (2025-12-04)**: Created comprehensive integration test suite with **27 tests** covering:
+  - Topic encryption (5 tests: multi-party encryption, bloom filter discovery, linkability prevention, find_matches)
+  - Onion routing (5 tests: circuit creation, missing key error, wrap/peel/extract 2-hop, relay selection with trust)
+  - Traffic obfuscation (9 tests: padding roundtrip, size uniformity, delay ranges, cover traffic timing)
+  - Combined privacy stack (3 tests: encryption + obfuscation, config accessors, defaults)
+  - Error handling (5 tests: corrupted ciphertext, wrong nonce, empty/unicode/large topics)
 
 ### 5. Federation Integration Tests Missing
 
@@ -109,7 +115,7 @@ Key TODOs requiring attention:
   - Serialization (1 test: JSON roundtrip)
   - Comparison operations (1 test: all BinOp variants)
   - Metadata creation (1 test: from_contract)
-  - Note: Discovered fuel_consumed tracking bug in interpreter (initial_fuel captured after execution)
+  - Bug fix: fuel_consumed tracking bug fixed (initial_fuel captured at start of execution) - commit `d352f69`
 
 ---
 
