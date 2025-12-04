@@ -61,3 +61,6 @@ build/
 sims/mutual-credit/results/
 sims/mutual-credit/*.csv
 sims/mutual-credit/*.png
+
+# Kubernetes deployment (not used in current testing setup)
+deploy/k8s/
