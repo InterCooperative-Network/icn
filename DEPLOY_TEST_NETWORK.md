@@ -362,9 +362,9 @@ docker exec icn-node2 icnctl gossip list test:messages
 curl -s http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
 
 # Expected output (all "up"):
-# {"instance": "node1:9100", "health": "up"}
-# {"instance": "node2:9100", "health": "up"}
-# {"instance": "node3:9100", "health": "up"}
+# {"instance": "node1", "health": "up"}
+# {"instance": "node2", "health": "up"}
+# {"instance": "node3", "health": "up"}
 ```
 
 ---
