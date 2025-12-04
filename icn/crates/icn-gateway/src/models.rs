@@ -63,12 +63,16 @@ pub struct CreateCoopRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddMemberRequest {
     pub did: String,
-    pub role: String, // "owner", "admin", or "member"
+    /// Role for the new member: "steward", "facilitator", or "participant"
+    /// Legacy names "owner", "admin", "member" are also accepted for backwards compatibility
+    pub role: String,
 }
 
 /// Update member role
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateRoleRequest {
+    /// New role: "steward", "facilitator", or "participant"
+    /// Legacy names "owner", "admin", "member" are also accepted
     pub role: String,
 }
 

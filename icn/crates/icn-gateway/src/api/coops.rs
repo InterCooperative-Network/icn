@@ -27,11 +27,16 @@ fn timestamp() -> Result<u64> {
 
 fn parse_role(role_str: &str) -> Result<MemberRole> {
     match role_str.to_lowercase().as_str() {
-        "owner" => Ok(MemberRole::Owner),
-        "admin" => Ok(MemberRole::Admin),
-        "member" => Ok(MemberRole::Member),
+        // New cooperative role names (preferred)
+        "steward" => Ok(MemberRole::Steward),
+        "facilitator" => Ok(MemberRole::Facilitator),
+        "participant" => Ok(MemberRole::Participant),
+        // Legacy role names (for backwards compatibility)
+        "owner" => Ok(MemberRole::Steward),
+        "admin" => Ok(MemberRole::Facilitator),
+        "member" => Ok(MemberRole::Participant),
         _ => Err(crate::error::GatewayError::BadRequest(format!(
-            "Invalid role: {role_str}"
+            "Invalid role: {role_str}. Valid roles: steward, facilitator, participant"
         ))),
     }
 }
@@ -524,12 +529,12 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        // Verify that Alice is the owner
+        // Verify that Alice is the steward
         let coop = coop_mgr.get_coop(&"alice-coop".to_string()).unwrap();
         assert_eq!(
             coop.members.len(),
             1,
-            "Coop should have exactly one member (the owner)"
+            "Coop should have exactly one member (the steward)"
         );
 
         let alice_member = coop
@@ -539,8 +544,8 @@ mod tests {
             .expect("Alice should be a member");
         assert_eq!(
             alice_member.role,
-            MemberRole::Owner,
-            "Alice should be the owner"
+            MemberRole::Steward,
+            "Alice should be the steward"
         );
     }
 

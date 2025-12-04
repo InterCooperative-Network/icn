@@ -18,11 +18,25 @@ use crate::error::{GatewayError, Result};
 pub type CoopId = String;
 
 /// Member role within a cooperative
+///
+/// Role names reflect cooperative values:
+/// - **Steward**: Primary caretaker with full administrative authority
+/// - **Facilitator**: Helps coordinate activities, can manage members
+/// - **Participant**: Active member of the cooperative
+///
+/// For backwards compatibility, the legacy names (Owner/Admin/Member) are
+/// accepted when parsing from JSON or API requests.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MemberRole {
-    Owner,
-    Admin,
-    Member,
+    /// Primary caretaker with full administrative authority (formerly "Owner")
+    #[serde(alias = "Owner", alias = "owner")]
+    Steward,
+    /// Coordinator who can manage members (formerly "Admin")
+    #[serde(alias = "Admin", alias = "admin")]
+    Facilitator,
+    /// Active cooperative member (formerly "Member")
+    #[serde(alias = "Member", alias = "member")]
+    Participant,
 }
 
 /// Cooperative member with role
@@ -63,13 +77,13 @@ pub struct Coop {
 
 impl Coop {
     /// Create a new cooperative
-    pub fn new(id: CoopId, name: String, owner: Did, created_at: u64) -> Self {
+    pub fn new(id: CoopId, name: String, steward: Did, created_at: u64) -> Self {
         Self {
             id,
             name,
             members: vec![CoopMember {
-                did: owner,
-                role: MemberRole::Owner,
+                did: steward,
+                role: MemberRole::Steward,
                 joined_at: created_at,
             }],
             settings: CoopSettings::default(),
@@ -93,9 +107,9 @@ impl Coop {
     /// Check if a DID has a specific role or higher
     pub fn has_role(&self, did: &Did, required_role: MemberRole) -> bool {
         match self.get_role(did) {
-            Some(MemberRole::Owner) => true, // Owner can do everything
-            Some(MemberRole::Admin) => required_role != MemberRole::Owner,
-            Some(MemberRole::Member) => required_role == MemberRole::Member,
+            Some(MemberRole::Steward) => true, // Steward can do everything
+            Some(MemberRole::Facilitator) => required_role != MemberRole::Steward,
+            Some(MemberRole::Participant) => required_role == MemberRole::Participant,
             None => false,
         }
     }
@@ -130,10 +144,10 @@ impl Coop {
             return Err(GatewayError::NotFound("Member not found".to_string()));
         }
 
-        // Ensure at least one owner remains
-        if !self.members.iter().any(|m| m.role == MemberRole::Owner) {
+        // Ensure at least one steward remains
+        if !self.members.iter().any(|m| m.role == MemberRole::Steward) {
             return Err(GatewayError::BadRequest(
-                "Cannot remove last owner".to_string(),
+                "Cannot remove last steward".to_string(),
             ));
         }
 
@@ -150,16 +164,16 @@ impl Coop {
             .map(|m| m.role.clone())
             .ok_or_else(|| GatewayError::NotFound("Member not found".to_string()))?;
 
-        // If demoting an owner, ensure at least one owner remains
-        if current_role == MemberRole::Owner && new_role != MemberRole::Owner {
-            let owner_count = self
+        // If demoting a steward, ensure at least one steward remains
+        if current_role == MemberRole::Steward && new_role != MemberRole::Steward {
+            let steward_count = self
                 .members
                 .iter()
-                .filter(|m| m.role == MemberRole::Owner)
+                .filter(|m| m.role == MemberRole::Steward)
                 .count();
-            if owner_count <= 1 {
+            if steward_count <= 1 {
                 return Err(GatewayError::BadRequest(
-                    "Cannot demote last owner".to_string(),
+                    "Cannot demote last steward".to_string(),
                 ));
             }
         }
@@ -384,13 +398,13 @@ mod tests {
     #[test]
     fn test_create_coop() {
         let manager = CoopManager::new();
-        let owner = IdentityBundle::generate().unwrap();
+        let steward = IdentityBundle::generate().unwrap();
 
         manager
             .create_coop(
                 "test-coop".to_string(),
                 "Test Coop".to_string(),
-                owner.did().clone(),
+                steward.did().clone(),
                 timestamp(),
             )
             .unwrap();
@@ -399,107 +413,107 @@ mod tests {
         assert_eq!(coop.id, "test-coop");
         assert_eq!(coop.name, "Test Coop");
         assert_eq!(coop.members.len(), 1);
-        assert_eq!(coop.members[0].role, MemberRole::Owner);
+        assert_eq!(coop.members[0].role, MemberRole::Steward);
     }
 
     #[test]
     fn test_add_member() {
         let manager = CoopManager::new();
-        let owner = IdentityBundle::generate().unwrap();
-        let member = IdentityBundle::generate().unwrap();
+        let steward = IdentityBundle::generate().unwrap();
+        let participant = IdentityBundle::generate().unwrap();
 
         manager
             .create_coop(
                 "test-coop".to_string(),
                 "Test Coop".to_string(),
-                owner.did().clone(),
+                steward.did().clone(),
                 timestamp(),
             )
             .unwrap();
 
         let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
-        coop.add_member(member.did().clone(), MemberRole::Member, timestamp())
+        coop.add_member(participant.did().clone(), MemberRole::Participant, timestamp())
             .unwrap();
 
         assert_eq!(coop.members.len(), 2);
-        assert!(coop.is_member(member.did()));
+        assert!(coop.is_member(participant.did()));
     }
 
     #[test]
     fn test_remove_member() {
         let manager = CoopManager::new();
-        let owner = IdentityBundle::generate().unwrap();
-        let member = IdentityBundle::generate().unwrap();
+        let steward = IdentityBundle::generate().unwrap();
+        let participant = IdentityBundle::generate().unwrap();
 
         manager
             .create_coop(
                 "test-coop".to_string(),
                 "Test Coop".to_string(),
-                owner.did().clone(),
+                steward.did().clone(),
                 timestamp(),
             )
             .unwrap();
 
         let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
-        coop.add_member(member.did().clone(), MemberRole::Member, timestamp())
+        coop.add_member(participant.did().clone(), MemberRole::Participant, timestamp())
             .unwrap();
-        coop.remove_member(member.did()).unwrap();
+        coop.remove_member(participant.did()).unwrap();
 
         assert_eq!(coop.members.len(), 1);
-        assert!(!coop.is_member(member.did()));
+        assert!(!coop.is_member(participant.did()));
     }
 
     #[test]
-    fn test_cannot_remove_last_owner() {
+    fn test_cannot_remove_last_steward() {
         let manager = CoopManager::new();
-        let owner = IdentityBundle::generate().unwrap();
+        let steward = IdentityBundle::generate().unwrap();
 
         manager
             .create_coop(
                 "test-coop".to_string(),
                 "Test Coop".to_string(),
-                owner.did().clone(),
+                steward.did().clone(),
                 timestamp(),
             )
             .unwrap();
 
         let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
-        let result = coop.remove_member(owner.did());
+        let result = coop.remove_member(steward.did());
 
         assert!(matches!(result, Err(GatewayError::BadRequest(_))));
     }
 
     #[test]
     fn test_role_check() {
-        let owner = IdentityBundle::generate().unwrap();
-        let admin = IdentityBundle::generate().unwrap();
-        let member = IdentityBundle::generate().unwrap();
+        let steward = IdentityBundle::generate().unwrap();
+        let facilitator = IdentityBundle::generate().unwrap();
+        let participant = IdentityBundle::generate().unwrap();
 
         let mut coop = Coop::new(
             "test".to_string(),
             "Test".to_string(),
-            owner.did().clone(),
+            steward.did().clone(),
             timestamp(),
         );
 
-        coop.add_member(admin.did().clone(), MemberRole::Admin, timestamp())
+        coop.add_member(facilitator.did().clone(), MemberRole::Facilitator, timestamp())
             .unwrap();
-        coop.add_member(member.did().clone(), MemberRole::Member, timestamp())
+        coop.add_member(participant.did().clone(), MemberRole::Participant, timestamp())
             .unwrap();
 
-        // Owner can do everything
-        assert!(coop.has_role(owner.did(), MemberRole::Owner));
-        assert!(coop.has_role(owner.did(), MemberRole::Admin));
-        assert!(coop.has_role(owner.did(), MemberRole::Member));
+        // Steward can do everything
+        assert!(coop.has_role(steward.did(), MemberRole::Steward));
+        assert!(coop.has_role(steward.did(), MemberRole::Facilitator));
+        assert!(coop.has_role(steward.did(), MemberRole::Participant));
 
-        // Admin cannot do owner actions
-        assert!(!coop.has_role(admin.did(), MemberRole::Owner));
-        assert!(coop.has_role(admin.did(), MemberRole::Admin));
-        assert!(coop.has_role(admin.did(), MemberRole::Member));
+        // Facilitator cannot do steward actions
+        assert!(!coop.has_role(facilitator.did(), MemberRole::Steward));
+        assert!(coop.has_role(facilitator.did(), MemberRole::Facilitator));
+        assert!(coop.has_role(facilitator.did(), MemberRole::Participant));
 
-        // Member can only do member actions
-        assert!(!coop.has_role(member.did(), MemberRole::Owner));
-        assert!(!coop.has_role(member.did(), MemberRole::Admin));
-        assert!(coop.has_role(member.did(), MemberRole::Member));
+        // Participant can only do participant actions
+        assert!(!coop.has_role(participant.did(), MemberRole::Steward));
+        assert!(!coop.has_role(participant.did(), MemberRole::Facilitator));
+        assert!(coop.has_role(participant.did(), MemberRole::Participant));
     }
 }
