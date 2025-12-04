@@ -32,7 +32,7 @@ For production deployments, use secure passphrases and proper secret management 
 
 ```bash
 cd /workspaces/icn
-docker build -t icn:latest -f Dockerfile .
+docker build -t icn:latest -f Dockerfile icn/
 ```
 
 **Expected time**: 5-10 minutes (first build)
@@ -60,10 +60,12 @@ docker compose -f docker-compose.test.yml ps
 docker compose -f docker-compose.test.yml logs -f node1
 
 # Check metrics endpoint
-curl http://localhost:9091/metrics | grep icn_network_connections_active
+curl http://localhost:9091/metrics | grep icn_system_actors_active
 ```
 
-**Expected output**: `icn_network_connections_active 2` (node1 connected to node2 and node3)
+**Expected output**: `icn_system_actors_active 7` (7 actors running on node1)
+
+**Note**: Without bootstrap peer configuration, nodes won't auto-discover each other (mDNS doesn't work in Docker bridge mode). See [DEPLOY_TEST_NETWORK.md](../DEPLOY_TEST_NETWORK.md) for peer connectivity setup.
 
 ### 4. Access Monitoring
 

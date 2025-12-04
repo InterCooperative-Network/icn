@@ -194,6 +194,13 @@ if command -v curl &> /dev/null; then
 else
     warning "curl not found (needed for verification steps)"
 fi
+
+if command -v jq &> /dev/null; then
+    jq_version=$(jq --version 2>/dev/null || echo "unknown")
+    success "jq installed: $jq_version"
+else
+    warning "jq not found (needed for JSON parsing in test commands)"
+fi
 echo ""
 
 # Summary

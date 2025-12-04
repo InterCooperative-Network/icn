@@ -120,6 +120,11 @@ docker --version
 docker compose version
 # Required: Docker Compose 2.20+
 
+# Check jq (used for parsing JSON in test commands)
+jq --version
+# Required: jq 1.6+
+# Install: apt install jq / brew install jq
+
 # Check available resources
 docker system info | grep -E "CPUs:|Total Memory"
 # Required: 4 GB RAM minimum (8 GB recommended)
@@ -253,10 +258,37 @@ exit
 
 ### Known Limitation: Peer Discovery
 
-**Note**: mDNS peer discovery does not work across Docker bridge network containers. Nodes run independently but won't auto-discover each other. For peer connectivity, you need to either:
-1. Use explicit bootstrap peers in config (format: `icn://DID@IP:PORT`)
-2. Use host networking mode
-3. Deploy to Kubernetes with proper service discovery
+**Note**: mDNS peer discovery does not work across Docker bridge network containers. Nodes run independently but won't auto-discover each other.
+
+**Solutions for peer connectivity:**
+
+1. **Configure bootstrap peers after initialization** (recommended for Docker testing):
+   ```bash
+   # 1. Initialize all nodes first
+   docker exec icn-node1 icnctl -d /data id init
+   docker exec icn-node2 icnctl -d /data id init
+   docker exec icn-node3 icnctl -d /data id init
+
+   # 2. Get each node's DID
+   DID1=$(docker exec icn-node1 icnctl -d /data id show | grep "did:icn" | awk '{print $2}')
+   DID2=$(docker exec icn-node2 icnctl -d /data id show | grep "did:icn" | awk '{print $2}')
+   DID3=$(docker exec icn-node3 icnctl -d /data id show | grep "did:icn" | awk '{print $2}')
+
+   # 3. Update config files with bootstrap peers (manual step)
+   # Edit config/node1.toml: bootstrap_peers = ["icn://$DID2@node2:5002", "icn://$DID3@node3:5003"]
+   # Edit config/node2.toml: bootstrap_peers = ["icn://$DID1@node1:5001", "icn://$DID3@node3:5003"]
+   # etc.
+
+   # 4. Restart containers to pick up new config
+   docker compose -f docker-compose.test.yml restart
+   ```
+
+2. **Use K3s deployment** (recommended for full testing):
+   - K3s provides proper DNS-based service discovery
+   - See Option 1 (K3s Homelab Deployment) above
+
+3. **Use host networking mode** (loses port isolation):
+   - Add `network_mode: host` to each service in docker-compose.test.yml
 
 ---
 
@@ -326,15 +358,15 @@ docker exec icn-node2 icnctl -d /data id show
 docker exec icn-node3 icnctl -d /data id show
 ```
 
-### Legacy Test: Network Connectivity (Currently Limited)
+### Test 4: Network Connectivity (Requires Bootstrap Peers)
 ```bash
 # Note: mDNS doesn't work in Docker bridge mode
-# Nodes run independently without peer connections
-# This test is for future use with bootstrap peers
+# Nodes run independently without peer connections by default
+# To enable connectivity, configure bootstrap_peers in node config files
 
-# Node1 should see node2 and node3 as peers
+# With bootstrap peers configured:
 docker exec icn-node1 icnctl network peers | wc -l
-# Expected: 2
+# Expected: 2 (connected to node2 and node3)
 
 # Verify from all nodes
 for node in node1 node2 node3; do
@@ -343,33 +375,9 @@ for node in node1 node2 node3; do
 done
 ```
 
-### Test 2: Gossip Message Propagation
-```bash
-# Publish a test message from node1
-docker exec icn-node1 bash -c 'echo "Hello ICN" | icnctl gossip publish test:messages -'
-
-# Wait for gossip propagation
-sleep 5
-
-# Check node2 received it
-docker exec icn-node2 icnctl gossip list test:messages
-# Expected: Should show the message
-```
-
-### Test 3: Metrics Collection
-```bash
-# Check Prometheus is scraping all targets
-curl -s http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
-
-# Expected output (all "up"):
-# {"instance": "node1", "health": "up"}
-# {"instance": "node2", "health": "up"}
-# {"instance": "node3", "health": "up"}
-```
-
 ---
 
-## Step 6: Start Byzantine Node (Optional)
+## Step 7: Start Byzantine Node (Optional)
 
 ```bash
 # Start node4 with byzantine profile
@@ -481,15 +489,17 @@ docker system prune -a
 
 ## Success Criteria
 
-After completing steps 1-5, you should have:
+After completing steps 1-6, you should have:
 
 - ✅ ICN Docker image built successfully
-- ✅ 3 nodes running and healthy
-- ✅ Each node connected to 2 peers
-- ✅ Prometheus scraping metrics from all nodes
+- ✅ 3 nodes running and healthy (passing health checks)
+- ✅ Each node has a unique DID identity
+- ✅ Prometheus scraping metrics from all 3 nodes (`up{job="icn-nodes"} == 1`)
 - ✅ Grafana dashboard showing real-time data
-- ✅ All containers passing health checks
+- ✅ 21 active actors total (7 per node)
 - ✅ No error messages in logs
+
+**Note**: Peer connectivity (nodes discovering each other) requires bootstrap peer configuration or K3s deployment. See "Known Limitation: Peer Discovery" section.
 
 ---
 
@@ -558,9 +568,9 @@ Once the network is running successfully:
 
 ## Documentation
 
-- **[INTERNAL_TESTING_PLAN.md](docs/INTERNAL_TESTING_PLAN.md)** - 38 test scenarios
-- **[TESTING_QUICKSTART.md](docs/TESTING_QUICKSTART.md)** - Quick reference guide
-- **[/tmp/DOCKER_FIXES_COMPLETE.md](/tmp/DOCKER_FIXES_COMPLETE.md)** - Fix summary
+- **[INTERNAL_TESTING_PLAN.md](docs/INTERNAL_TESTING_PLAN.md)** - 38 test scenarios with success criteria
+- **[TESTING_QUICKSTART.md](docs/TESTING_QUICKSTART.md)** - Quick reference guide for getting started
+- **[CLAUDE.md](CLAUDE.md)** - Project overview and architecture
 
 ---
 
@@ -585,6 +595,5 @@ curl http://localhost:9095/api/v1/targets
 
 **Deployment Status**: ✅ **READY**
 **Last Updated**: 2025-12-04
-**All Fixes Applied**: 5 commits (build context, passphrase, env vars, --bind, gitignore)
 
 🚀 **Run these commands on your host system to start testing!**

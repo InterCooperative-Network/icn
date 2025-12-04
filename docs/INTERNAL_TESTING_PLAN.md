@@ -55,76 +55,29 @@ Validate the ICN system in realistic multi-node scenarios before pilot deploymen
 ### Infrastructure Setup
 
 **Option 1: Docker Compose (Recommended for Development)**
-```yaml
-# docker-compose.yml
-services:
-  node1:
-    image: icn:latest
-    volumes:
-      - ./data/node1:/data
-    environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5001
-    ports:
-      - "5001:5001"
-      - "9091:9090"  # Metrics
 
-  node2:
-    image: icn:latest
-    volumes:
-      - ./data/node2:/data
-    environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5002
-    ports:
-      - "5002:5002"
-      - "9092:9090"
+Use the production-ready configuration in `docker-compose.test.yml`:
 
-  node3:
-    image: icn:latest
-    volumes:
-      - ./data/node3:/data
-    environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5003
-    ports:
-      - "5003:5003"
-      - "9093:9090"
+```bash
+# Build and start
+docker build -t icn:latest -f Dockerfile icn/
+docker compose -f docker-compose.test.yml up -d
 
-  node4:
-    image: icn:latest
-    volumes:
-      - ./data/node4:/data
-    environment:
-      - ICN_DATA_DIR=/data
-      - ICN_BIND_ADDR=0.0.0.0:5004
-    ports:
-      - "5004:5004"
-      - "9094:9090"
-
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana:latest
-    volumes:
-      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/icn.json
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-
-volumes:
-  prometheus_data:
-  grafana_data:
+# Check status
+docker compose -f docker-compose.test.yml ps
 ```
+
+**Port mapping summary** (see `docker-compose.test.yml` for complete config):
+| Service | P2P | Metrics (host:container) | Gateway |
+|---------|-----|--------------------------|---------|
+| node1 | 5001 | 9091:9100 | 8081 |
+| node2 | 5002 | 9092:9100 | 8082 |
+| node3 | 5003 | 9093:9100 | 8083 |
+| node4 | 5004 | 9094:9100 | 8084 |
+| prometheus | - | 9095:9090 | - |
+| grafana | - | - | 3000 |
+
+**Note**: ICN daemon runs metrics on port 9100 internally.
 
 **Option 2: Local Processes (Quick Start)**
 ```bash
