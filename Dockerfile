@@ -14,10 +14,10 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy workspace files
-COPY icn/Cargo.toml icn/Cargo.lock ./
-COPY icn/crates ./crates
-COPY icn/bins ./bins
+# Copy workspace files (build context is already ./icn from docker-compose.yml)
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY bins ./bins
 
 # Build release binaries
 RUN cargo build --release --bins
