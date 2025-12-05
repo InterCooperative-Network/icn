@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Gossip topic for filing disputes
 pub const TOPIC_DISPUTES_FILE: &str = "disputes:file";
@@ -228,20 +228,10 @@ impl DisputeResolutionSystem {
         self.disputes.insert(dispute_id, dispute.clone());
         self.persist_dispute(&dispute)?;
 
-        // Trigger automatic re-execution
-        tokio::spawn({
-            let _task_hash = task_hash;
-            let _executor = executor.clone();
-
-            async move {
-                debug!(
-                    "Spawned re-execution task for dispute {}",
-                    hex::encode(dispute_id)
-                );
-                // Re-execution happens in background
-                // In a full implementation, this would call investigate_dispute()
-            }
-        });
+        // Note: Investigation must be triggered separately via investigate_dispute()
+        // once the contract and execution context are available. This allows for
+        // flexible investigation timing and avoids coupling dispute filing with
+        // contract retrieval.
 
         Ok(dispute_id)
     }
