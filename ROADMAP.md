@@ -1224,10 +1224,53 @@ impl TrafficObfuscator {
 
 ---
 
-### Phase 21+: Future Enhancements
+### Phase 21: Contribution Credits & Infrastructure Incentives (6-8 weeks)
+**Status**: Design Document Complete (RFC v0.3.0) - **POST-PILOT**
+**Design Doc**: [docs/contribution-credits-design.md](docs/contribution-credits-design.md)
+**Glossary**: [docs/glossary.md](docs/glossary.md)
+
+**Motivation**: How do we credit infrastructure contributors (compute, storage, bandwidth) in a non-speculative way? The core insight: **infrastructure provision is labor directed at the network**.
+
+**Key Design Decisions**:
+1. **Three-Tier Credit System**: Internal → Federated → Bridge (graduated exchangeability)
+2. **Infrastructure as Labor**: Node operators earn same credits as service providers
+3. **Anti-Speculation Mechanisms**: Demurrage, provenance tracking, governance approval
+4. **Fuel System**: Regenerative rate-limiting (not a token) integrated with contributions
+5. **Two Pillars**: Communities (civic) + Cooperatives (economic) as first-class entities
+6. **Protocol Contracts**: Economic rules in CCL, governable and auditable
+
+**Implementation Phases**:
+- **Phase 21A**: Foundations - Protocol contracts, glossary, terminology cleanup (2 weeks)
+- **Phase 21B**: Contribution & Metering - Resource tracking, attestation protocol (4 weeks)
+- **Phase 21C**: Fuel System - `icn-fuel` crate, regeneration, operation costs (4 weeks)
+- **Phase 21D**: Organizations - `icn-organization` crate, communities, households (4 weeks)
+- **Phase 21E**: Exchange - Federation credits, AMM pools, demurrage (6 weeks)
+- **Phase 21F**: Marketplace - Listings, trades, multi-currency support (4 weeks)
+
+**Success Criteria**:
+- Node operators can earn credits for providing compute/storage/bandwidth
+- Credits are spendable within cooperative ecosystem
+- No external speculation possible (credits only useful internally)
+- Federation allows cross-coop exchange with governance approval
+- Fuel system prevents spam without creating economic barriers
+
+**Deliverables**:
+- `icn-fuel` crate (regenerative rate-limiting)
+- `icn-organization` crate (communities, households)
+- `icn-marketplace` crate
+- `icnctl contribution`, `icnctl fuel`, `icnctl org`, `icnctl marketplace` commands
+- Gateway API endpoints for all new systems
+- Protocol contracts in `examples/contracts/protocol/`
+- Updated ARCHITECTURE.md with economic layer
+
+**Why Post-Pilot**: Let pilot communities reveal actual infrastructure incentive needs before building. Current design is hypothesis to validate.
+
+---
+
+### Phase 22+: Future Enhancements
 **Status**: Not Planned - **DRIVEN BY PILOT LEARNINGS**
 
-**Trust Graph Hardening** (Phase 21?):
+**Trust Graph Hardening** (Phase 22?):
 - Sybil detection algorithms (graph analysis for fake identities)
 - Contribution decay (require ongoing participation to maintain trust)
 - Attestation chains (evidence-based trust, not just social links)

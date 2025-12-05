@@ -134,6 +134,10 @@ Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).
 ## Key Files
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Full architectural design
+- [glossary.md](./glossary.md) - Authoritative terminology definitions
+- [contribution-credits-design.md](./contribution-credits-design.md) - Infrastructure incentives (RFC)
+- [economic-safety.md](./economic-safety.md) - Credit limits and disputes
+- [econ-modeling.md](./econ-modeling.md) - Economic simulation results
 - [dev-journal/](./dev-journal/) - Development narrative
 - [README.md](./README.md) - Documentation guide
 
