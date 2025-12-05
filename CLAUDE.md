@@ -175,12 +175,12 @@ ssh ubuntu@10.8.10.40 "cd ~/actions-runner && sudo ./svc.sh restart"
 | **Trust Graph** | ⏳ Blocked | Needs image rebuild (#46) |
 | **Governance** | ✅ Working | Domain, proposal, voting via Gateway |
 | **Ledger** | ✅ Working | Mutual credit transactions via Gateway |
-| **Compute** | ⏳ Blocked | Gateway integration pending (#44) |
-| **Contracts** | ⏳ Blocked | icnctl runtime bug (#45) |
+| **Compute** | ✅ Fixed | Gateway connected to ComputeHandle |
+| **Contracts** | ✅ Fixed | icnctl runtime bug resolved |
 
-**GitHub Issues for Gaps**:
-- [#44](https://github.com/InterCooperative-Network/icn/issues/44) - Gateway compute integration
-- [#45](https://github.com/InterCooperative-Network/icn/issues/45) - icnctl contract deploy panic
+**GitHub Issues**:
+- [#44](https://github.com/InterCooperative-Network/icn/issues/44) - ✅ Gateway compute integration (fixed)
+- [#45](https://github.com/InterCooperative-Network/icn/issues/45) - ✅ icnctl contract deploy panic (fixed)
 - [#46](https://github.com/InterCooperative-Network/icn/issues/46) - RPC auth requires image rebuild
 
 **Test Commands** (via Gateway API):
