@@ -5,8 +5,8 @@
 //! 1. In-memory task tracking (for standalone gateway)
 //! 2. ComputeHandle (when integrated with daemon)
 
-use anyhow::Result;
 use crate::api::compute::ResourceProfileRequest;
+use anyhow::Result;
 use icn_compute::{
     ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, ResourceProfile, TaskCode,
     TaskPriority, TaskStatus,
@@ -148,7 +148,7 @@ impl ComputeManager {
                     .duration_estimate_secs
                     .map(std::time::Duration::from_secs),
             }),
-            actor_mode: None,       // Not actor mode (Phase 16D)
+            actor_mode: None,            // Not actor mode (Phase 16D)
             placement_constraints: None, // No constraints from API (Phase 16E will set from policy)
         };
 

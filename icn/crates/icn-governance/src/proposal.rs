@@ -568,10 +568,7 @@ mod tests {
 
         // Cannot force close from Draft (must be Open)
         assert!(proposal
-            .force_close(
-                crate::ProposalOutcome::Accepted,
-                "Emergency".to_string()
-            )
+            .force_close(crate::ProposalOutcome::Accepted, "Emergency".to_string())
             .is_err());
 
         // Open for voting

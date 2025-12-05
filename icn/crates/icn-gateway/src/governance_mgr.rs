@@ -51,11 +51,7 @@ impl GovernanceManager {
             GovernanceProfileId::builtin(&profile)
         };
 
-        let config = GovernanceConfig::new(
-            profile_id,
-            membership,
-            params,
-        );
+        let config = GovernanceConfig::new(profile_id, membership, params);
 
         let domain = GovernanceDomain::new(name, config);
 

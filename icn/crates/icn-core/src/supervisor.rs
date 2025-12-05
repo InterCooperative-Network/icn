@@ -1827,9 +1827,7 @@ impl Supervisor {
                         serde_json::from_value::<Did>(serde_json::Value::String(s.clone())).ok()
                     })
                     .unwrap_or_else(|| {
-                        debug!(
-                            "No treasury_did configured, using node DID for budget payouts"
-                        );
+                        debug!("No treasury_did configured, using node DID for budget payouts");
                         did.clone()
                     });
 
@@ -2490,12 +2488,16 @@ impl Supervisor {
             let rpc_addr = format!("127.0.0.1:{rpc_port}").parse()?;
 
             // Enable RPC auth if gateway is enabled with a jwt_secret
-            let mut rpc_server = if self.config.gateway.enabled && !self.config.gateway.jwt_secret.is_empty() {
-                info!("RPC server auth enabled (using gateway JWT secret)");
-                RpcServer::new_with_auth(rpc_addr, self.config.gateway.jwt_secret.as_bytes().to_vec())
-            } else {
-                RpcServer::new(rpc_addr)
-            };
+            let mut rpc_server =
+                if self.config.gateway.enabled && !self.config.gateway.jwt_secret.is_empty() {
+                    info!("RPC server auth enabled (using gateway JWT secret)");
+                    RpcServer::new_with_auth(
+                        rpc_addr,
+                        self.config.gateway.jwt_secret.as_bytes().to_vec(),
+                    )
+                } else {
+                    RpcServer::new(rpc_addr)
+                };
             rpc_server.set_network_handle(network_handle.clone());
             rpc_server.set_ledger_handle(ledger_handle.clone());
             rpc_server.set_contract_runtime(contract_runtime_handle.clone());

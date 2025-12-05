@@ -68,18 +68,12 @@ pub async fn resolve_did(
     let did: Did = match did_str.parse() {
         Ok(d) => d,
         Err(e) => {
-            return Err(GatewayError::BadRequest(format!(
-                "Invalid DID format: {e}"
-            )));
+            return Err(GatewayError::BadRequest(format!("Invalid DID format: {e}")));
         }
     };
 
     // Get own cooperative info if available
-    let own_coop_id = fed_mgr
-        .get_own_info()
-        .await
-        .ok()
-        .map(|info| info.coop_id);
+    let own_coop_id = fed_mgr.get_own_info().await.ok().map(|info| info.coop_id);
 
     // Check for attestations if requested
     let (has_attestations, attestation_count) = if query.include_attestations {

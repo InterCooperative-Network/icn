@@ -417,7 +417,7 @@ impl Default for PrivacyConfig {
 }
 
 /// Cooperative configuration for cooperative-specific settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CooperativeConfig {
     /// Treasury DID for the cooperative
     /// This DID is used as the source for budget payouts and other financial operations.
@@ -435,15 +435,6 @@ pub struct CooperativeConfig {
     pub description: Option<String>,
 }
 
-impl Default for CooperativeConfig {
-    fn default() -> Self {
-        CooperativeConfig {
-            treasury_did: None,
-            name: None,
-            description: None,
-        }
-    }
-}
 
 fn default_gateway_bind_addr() -> String {
     "127.0.0.1:8080".to_string()

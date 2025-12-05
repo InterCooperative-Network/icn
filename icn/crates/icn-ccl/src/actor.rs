@@ -708,8 +708,12 @@ mod tests {
             ContractDeploymentMessage::compute_signing_bytes(&code_hash, installed_at);
         let deployer_signature = alice_kp.sign(&signing_bytes).to_bytes().to_vec();
 
-        let msg =
-            ContractDeploymentMessage::new(code_hash.clone(), contract, installation, deployer_signature);
+        let msg = ContractDeploymentMessage::new(
+            code_hash.clone(),
+            contract,
+            installation,
+            deployer_signature,
+        );
 
         // Handle the message
         actor.handle_deployment_message(msg).await.unwrap();

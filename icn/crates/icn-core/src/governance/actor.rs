@@ -677,7 +677,10 @@ impl GovernanceActor {
                 }
 
                 icn_obs::metrics::governance::proposals_force_closed_inc();
-                info!("✓ Proposal force-closed: {} as {:?}", proposal_id.0, forced_outcome);
+                info!(
+                    "✓ Proposal force-closed: {} as {:?}",
+                    proposal_id.0, forced_outcome
+                );
             }
         }
 

@@ -311,8 +311,7 @@ impl FederatedDidResolver {
         }
 
         // Parse and return the DID
-        Did::from_str(&resolution.did)
-            .map_err(|e| FederationError::InvalidDidFormat(e.to_string()))
+        Did::from_str(&resolution.did).map_err(|e| FederationError::InvalidDidFormat(e.to_string()))
     }
 
     /// Clear the resolution cache
