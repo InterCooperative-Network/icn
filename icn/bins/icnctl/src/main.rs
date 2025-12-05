@@ -2439,7 +2439,7 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                     } else {
                         "No"
                     };
-                    println!("{:<20} {:<30} {:<10}", coop_id, name, federated);
+                    println!("{coop_id:<20} {name:<30} {federated:<10}");
                 }
             }
         }
@@ -2483,7 +2483,7 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
 
                 // Show policy
                 if let Some(policy) = result.get("federation_policy") {
-                    println!("\n  Federation Policy: {}", policy);
+                    println!("\n  Federation Policy: {policy}");
                 }
 
                 // Show capabilities
@@ -2501,7 +2501,7 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                         for currency in currencies {
                             let symbol = currency["symbol"].as_str().unwrap_or("?");
                             let name = currency["name"].as_str().unwrap_or("?");
-                            println!("    - {} ({})", symbol, name);
+                            println!("    - {symbol} ({name})");
                         }
                     }
                 }
@@ -2710,7 +2710,7 @@ async fn handle_attestation_command(cmd: AttestationCommands, endpoint: &str) ->
                     let source = att["source_coop_id"].as_str().unwrap_or("?");
                     let context = att["trust_context"].as_str().unwrap_or("?");
                     let trust = att["trust_score"].as_f64().unwrap_or(0.0);
-                    println!("{:<20} {:<12} {:<10.2}", source, context, trust);
+                    println!("{source:<20} {context:<12} {trust:<10.2}");
                 }
             }
         }
@@ -2741,7 +2741,7 @@ async fn handle_attestation_command(cmd: AttestationCommands, endpoint: &str) ->
                     };
                     let context = att["trust_context"].as_str().unwrap_or("?");
                     let trust = att["trust_score"].as_f64().unwrap_or(0.0);
-                    println!("{:<50} {:<12} {:<10.2}", short_did, context, trust);
+                    println!("{short_did:<50} {context:<12} {trust:<10.2}");
                 }
             }
         }
@@ -2811,7 +2811,7 @@ async fn handle_clearing_command(cmd: ClearingCommands, endpoint: &str) -> Resul
                     let coop_a = agreement["coop_a"].as_str().unwrap_or("?");
                     let coop_b = agreement["coop_b"].as_str().unwrap_or("?");
                     let max_imb = agreement["max_imbalance"].as_i64().unwrap_or(0);
-                    println!("{:<20} {:<20} {:<20} {:<15}", id, coop_a, coop_b, max_imb);
+                    println!("{id:<20} {coop_a:<20} {coop_b:<20} {max_imb:<15}");
                 }
             }
         }

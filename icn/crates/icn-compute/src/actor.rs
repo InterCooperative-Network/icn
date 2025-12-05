@@ -92,7 +92,7 @@ fn outcome_to_value(outcome: &crate::types::ExecutionOutcome) -> icn_ccl::Value 
             icn_ccl::Value::String(format!("success:{}", hex::encode(data)))
         }
         crate::types::ExecutionOutcome::Failed(error) => {
-            icn_ccl::Value::String(format!("failed:{}", error))
+            icn_ccl::Value::String(format!("failed:{error}"))
         }
         crate::types::ExecutionOutcome::OutOfFuel => {
             icn_ccl::Value::String("out_of_fuel".to_string())
