@@ -407,73 +407,120 @@ impl Ledger {
                 }
             }
 
-            // Resolve pairwise (for now, handle 2-way forks)
-            // TODO: Handle n-way forks by iteratively resolving
+            // Handle N-way forks using tournament-style resolution
+            // Compare entries pairwise: winner of round 1 vs entry 3, winner vs entry 4, etc.
             if entries.len() >= 2 {
-                let fork = Fork {
-                    common_parents: vec![parent.clone()],
-                    entry1: entries[0].clone(),
-                    entry2: entries[1].clone(),
-                    detected_at: SystemTime::now(),
-                };
+                let is_nway = entries.len() > 2;
+                let entry_count = entries.len();
 
-                match self.fork_resolver.resolve_fork(&fork) {
-                    Ok(resolution) => {
-                        info!(
-                            parent = %parent.to_hex(),
-                            resolution = ?resolution,
-                            "Resolved fork"
-                        );
+                // Track winning entry index and all losers
+                let mut winner_idx = 0;
+                let mut losers: Vec<usize> = Vec::new();
+                let mut requires_manual = false;
+                let mut manual_reason = String::new();
 
-                        // Quarantine the losing entry
-                        match &resolution {
-                            ForkResolution::KeepFirst => {
-                                if let Some(hash) = &fork.entry2.id {
-                                    self.quarantine_forked_entry(
-                                        &fork.entry2,
-                                        "Lost fork resolution",
-                                    )?;
-                                    icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
+                // Tournament: compare current winner against each subsequent entry
+                for challenger_idx in 1..entries.len() {
+                    let fork = Fork {
+                        common_parents: vec![parent.clone()],
+                        entry1: entries[winner_idx].clone(),
+                        entry2: entries[challenger_idx].clone(),
+                        detected_at: SystemTime::now(),
+                    };
+
+                    match self.fork_resolver.resolve_fork(&fork) {
+                        Ok(resolution) => {
+                            match &resolution {
+                                ForkResolution::KeepFirst => {
+                                    // Current winner stays, challenger loses
+                                    losers.push(challenger_idx);
                                     debug!(
-                                        quarantined = %hash.to_hex(),
-                                        "Quarantined losing fork entry"
+                                        round = challenger_idx,
+                                        winner = winner_idx,
+                                        "Tournament round: keeping current winner"
                                     );
                                 }
-                            }
-                            ForkResolution::KeepSecond => {
-                                if let Some(hash) = &fork.entry1.id {
-                                    self.quarantine_forked_entry(
-                                        &fork.entry1,
-                                        "Lost fork resolution",
-                                    )?;
-                                    icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
+                                ForkResolution::KeepSecond => {
+                                    // Challenger wins, previous winner loses
+                                    losers.push(winner_idx);
+                                    winner_idx = challenger_idx;
                                     debug!(
-                                        quarantined = %hash.to_hex(),
-                                        "Quarantined losing fork entry"
+                                        round = challenger_idx,
+                                        new_winner = winner_idx,
+                                        "Tournament round: challenger wins"
                                     );
                                 }
+                                ForkResolution::RequiresManual { reason } => {
+                                    requires_manual = true;
+                                    manual_reason = reason.clone();
+                                    warn!(
+                                        parent = %parent.to_hex(),
+                                        round = challenger_idx,
+                                        reason = reason,
+                                        "Fork requires manual resolution, stopping tournament"
+                                    );
+                                    break;
+                                }
                             }
-                            ForkResolution::RequiresManual { reason } => {
-                                warn!(
-                                    parent = %parent.to_hex(),
-                                    reason = reason,
-                                    "Fork requires manual resolution"
-                                );
-                                icn_obs::metrics::ledger_forks::manual_resolution_required_inc(
-                                    reason,
-                                );
+
+                            // Store the last resolution for reporting
+                            if challenger_idx == entries.len() - 1 && !requires_manual {
+                                resolutions.push((fork, resolution));
                             }
                         }
-
-                        resolutions.push((fork, resolution));
+                        Err(e) => {
+                            warn!(
+                                parent = %parent.to_hex(),
+                                round = challenger_idx,
+                                error = %e,
+                                "Failed to resolve fork round"
+                            );
+                        }
                     }
-                    Err(e) => {
-                        warn!(
-                            parent = %parent.to_hex(),
-                            error = %e,
-                            "Failed to resolve fork"
+                }
+
+                // Handle manual resolution requirement
+                if requires_manual {
+                    icn_obs::metrics::ledger_forks::manual_resolution_required_inc(&manual_reason);
+                    continue;
+                }
+
+                // Quarantine all losing entries
+                for loser_idx in &losers {
+                    let loser_entry = &entries[*loser_idx];
+                    if let Some(hash) = &loser_entry.id {
+                        self.quarantine_forked_entry(
+                            loser_entry,
+                            if is_nway {
+                                "Lost N-way fork resolution"
+                            } else {
+                                "Lost fork resolution"
+                            },
+                        )?;
+                        debug!(
+                            quarantined = %hash.to_hex(),
+                            entry_index = loser_idx,
+                            "Quarantined losing fork entry"
                         );
                     }
+                }
+
+                // Record metrics
+                icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
+                if is_nway {
+                    icn_obs::metrics::ledger_forks::nway_fork_resolved_inc(entry_count);
+                    info!(
+                        parent = %parent.to_hex(),
+                        entry_count = entry_count,
+                        losers_quarantined = losers.len(),
+                        winner_idx = winner_idx,
+                        "Resolved N-way fork via tournament"
+                    );
+                } else {
+                    info!(
+                        parent = %parent.to_hex(),
+                        "Resolved 2-way fork"
+                    );
                 }
             }
         }

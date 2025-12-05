@@ -1089,6 +1089,10 @@ pub fn init_descriptions() {
         "icn_ledger_forks_trust_resolution_total",
         "Total number of forks resolved by trust score"
     );
+    describe_counter!(
+        "icn_ledger_nway_forks_resolved_total",
+        "Total number of N-way forks (3+ conflicting entries) resolved"
+    );
 
     // Storage quota metrics (Phase 18 Week 6)
     describe_counter!(
@@ -2547,6 +2551,15 @@ pub mod ledger_forks {
         counter!(
             "icn_ledger_forks_trust_resolution_total",
             "winner" => winner.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record resolution of an N-way fork (3+ conflicting entries)
+    pub fn nway_fork_resolved_inc(entry_count: usize) {
+        counter!(
+            "icn_ledger_nway_forks_resolved_total",
+            "entry_count" => entry_count.to_string()
         )
         .increment(1);
     }

@@ -471,4 +471,111 @@ mod tests {
         let forks = detector.detect_forks();
         assert_eq!(forks.len(), 0);
     }
+
+    #[test]
+    fn test_nway_fork_detection() {
+        let mut detector = ForkDetector::new();
+
+        let parent = ContentHash([0u8; 32]);
+        let author1 = make_test_did();
+        let author2 = make_test_did();
+        let author3 = make_test_did();
+        let author4 = make_test_did();
+
+        // Create 4 entries all referencing the same parent (4-way fork)
+        let entry1 = make_test_entry(author1, vec![parent.clone()], 1000);
+        let entry2 = make_test_entry(author2, vec![parent.clone()], 2000);
+        let entry3 = make_test_entry(author3, vec![parent.clone()], 3000);
+        let entry4 = make_test_entry(author4, vec![parent.clone()], 4000);
+
+        // Index all entries
+        detector.index_entry(&entry1);
+        detector.index_entry(&entry2);
+        detector.index_entry(&entry3);
+        detector.index_entry(&entry4);
+
+        // Should detect fork with 4 children
+        assert!(detector.has_fork(&parent));
+
+        let forks = detector.detect_forks();
+        assert_eq!(forks.len(), 1);
+        assert_eq!(forks[0].0, parent);
+        assert_eq!(forks[0].1.len(), 4);
+    }
+
+    #[test]
+    fn test_nway_fork_resolution_tournament() {
+        let resolver = ForkResolver::new(ForkResolutionStrategy::TimestampPreference);
+
+        let parent = ContentHash([0u8; 32]);
+        let author1 = make_test_did();
+        let author2 = make_test_did();
+        let author3 = make_test_did();
+
+        // Create 3 entries with different timestamps
+        // Entry1 (ts=1000) should win as earliest
+        let entry1 = make_test_entry(author1, vec![parent.clone()], 1000);
+        let entry2 = make_test_entry(author2, vec![parent.clone()], 2000);
+        let entry3 = make_test_entry(author3, vec![parent.clone()], 3000);
+
+        // Tournament round 1: entry1 vs entry2
+        let fork1 = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry1.clone(),
+            entry2: entry2.clone(),
+            detected_at: SystemTime::now(),
+        };
+        let resolution1 = resolver.resolve_fork(&fork1).unwrap();
+        assert_eq!(resolution1, ForkResolution::KeepFirst); // entry1 wins (earlier timestamp)
+
+        // Tournament round 2: entry1 (winner) vs entry3
+        let fork2 = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry1.clone(),
+            entry2: entry3.clone(),
+            detected_at: SystemTime::now(),
+        };
+        let resolution2 = resolver.resolve_fork(&fork2).unwrap();
+        assert_eq!(resolution2, ForkResolution::KeepFirst); // entry1 wins again
+
+        // Final result: entry1 is the overall winner, entry2 and entry3 should be quarantined
+    }
+
+    #[test]
+    fn test_nway_fork_resolution_challenger_wins() {
+        let resolver = ForkResolver::new(ForkResolutionStrategy::TimestampPreference);
+
+        let parent = ContentHash([0u8; 32]);
+        let author1 = make_test_did();
+        let author2 = make_test_did();
+        let author3 = make_test_did();
+
+        // Create 3 entries where later entry has earliest timestamp
+        // Entry3 (ts=500) should ultimately win
+        let entry1 = make_test_entry(author1, vec![parent.clone()], 2000);
+        let entry2 = make_test_entry(author2, vec![parent.clone()], 1500);
+        let entry3 = make_test_entry(author3, vec![parent.clone()], 500);
+
+        // Tournament round 1: entry1 vs entry2
+        let fork1 = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry1.clone(),
+            entry2: entry2.clone(),
+            detected_at: SystemTime::now(),
+        };
+        let resolution1 = resolver.resolve_fork(&fork1).unwrap();
+        assert_eq!(resolution1, ForkResolution::KeepSecond); // entry2 wins (earlier)
+
+        // Tournament round 2: entry2 (new winner) vs entry3
+        let fork2 = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry2.clone(),
+            entry2: entry3.clone(),
+            detected_at: SystemTime::now(),
+        };
+        let resolution2 = resolver.resolve_fork(&fork2).unwrap();
+        assert_eq!(resolution2, ForkResolution::KeepSecond); // entry3 wins (earliest)
+
+        // Final result: entry3 is the overall winner
+    }
 }
