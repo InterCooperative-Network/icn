@@ -17,6 +17,9 @@ on:
         required: true
         default: 'true'
         type: boolean
+  schedule:
+    # Run cleanup weekly on Sunday at 3am UTC
+    - cron: '0 3 * * 0'
 
 env:
   IMAGE_NAME: icn
@@ -27,6 +30,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    # Skip test on scheduled runs (cleanup only)
+    if: github.event_name != 'schedule'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -42,6 +47,8 @@ jobs:
     name: Build and Deploy
     needs: test
     runs-on: [self-hosted, homelab, k3s]
+    # Skip build/deploy on scheduled runs (cleanup only)
+    if: github.event_name != 'schedule'
 
     steps:
       - name: Checkout repository
