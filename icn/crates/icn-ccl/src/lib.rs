@@ -53,8 +53,9 @@ pub mod types;
 pub use actor::{ContractActor, GossipCallback, CONTRACTS_DEPLOY_TOPIC};
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
 pub use disputes::{
-    Dispute, DisputeConfig, DisputeEvidence, DisputeId, DisputeOutcome, DisputeReason,
-    DisputeResolutionSystem, DisputeStats, DisputeStatus, MisbehaviorCallback,
+    Dispute, DisputeActor, DisputeActorHandle, DisputeConfig, DisputeEvidence, DisputeId,
+    DisputeMessage, DisputeOutcome, DisputeReason, DisputeResolutionSystem, DisputeStats,
+    DisputeStatus, MisbehaviorCallback, TOPIC_DISPUTES_FILE,
 };
 pub use interpreter::Interpreter;
 pub use messages::{

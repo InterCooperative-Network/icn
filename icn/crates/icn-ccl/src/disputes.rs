@@ -17,12 +17,35 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
 
+/// Gossip topic for filing disputes
+pub const TOPIC_DISPUTES_FILE: &str = "disputes:file";
+
 /// Callback for recording misbehavior violations
 /// Arguments: (violator_did, task_hash, evidence_bytes)
 pub type MisbehaviorCallback = Arc<dyn Fn(&Did, ContentHash, Vec<u8>) + Send + Sync>;
 
 /// Unique identifier for a dispute
 pub type DisputeId = [u8; 32];
+
+/// Message types for dispute gossip protocol
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DisputeMessage {
+    /// Dispute filed for a compute task
+    DisputeFiled {
+        dispute_id: DisputeId,
+        task_hash: ContentHash,
+        executor: String,
+        challenger: String,
+        reason: DisputeReason,
+        filed_at: u64,
+    },
+    /// Dispute resolved
+    DisputeResolved {
+        dispute_id: DisputeId,
+        outcome: DisputeOutcome,
+        resolved_at: u64,
+    },
+}
 
 /// Outcome of a dispute resolution
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -516,6 +539,230 @@ pub struct DisputeStats {
     pub executor_correct: usize,
     pub both_wrong: usize,
     pub inconclusive: usize,
+}
+
+/// Message type for DisputeActor operations
+#[derive(Debug)]
+pub enum DisputeActorMsg {
+    /// File a new dispute
+    FileDispute {
+        task_hash: ContentHash,
+        executor: Did,
+        challenger: Did,
+        evidence: DisputeEvidence,
+        reply: tokio::sync::oneshot::Sender<Result<DisputeId>>,
+    },
+    /// Investigate a dispute (re-execute contract)
+    InvestigateDispute {
+        dispute_id: DisputeId,
+        contract: Contract,
+        rule_name: String,
+        args: HashMap<String, Value>,
+        reply: tokio::sync::oneshot::Sender<Result<DisputeOutcome>>,
+    },
+    /// Get dispute by ID
+    GetDispute {
+        dispute_id: DisputeId,
+        reply: tokio::sync::oneshot::Sender<Option<Dispute>>,
+    },
+    /// Get statistics
+    GetStats {
+        reply: tokio::sync::oneshot::Sender<DisputeStats>,
+    },
+    /// Add mediator to pool
+    AddMediator {
+        mediator: Did,
+    },
+    /// Remove mediator from pool
+    RemoveMediator {
+        mediator: Did,
+    },
+}
+
+/// Handle for interacting with the DisputeActor
+#[derive(Clone)]
+pub struct DisputeActorHandle {
+    tx: tokio::sync::mpsc::Sender<DisputeActorMsg>,
+}
+
+impl DisputeActorHandle {
+    /// File a dispute for a compute task result
+    pub async fn file_dispute(
+        &self,
+        task_hash: ContentHash,
+        executor: Did,
+        challenger: Did,
+        evidence: DisputeEvidence,
+    ) -> Result<DisputeId> {
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(DisputeActorMsg::FileDispute {
+                task_hash,
+                executor,
+                challenger,
+                evidence,
+                reply,
+            })
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))?;
+        rx.await.map_err(|_| anyhow!("Reply channel closed"))?
+    }
+
+    /// Investigate a dispute by re-executing the contract
+    pub async fn investigate_dispute(
+        &self,
+        dispute_id: DisputeId,
+        contract: Contract,
+        rule_name: String,
+        args: HashMap<String, Value>,
+    ) -> Result<DisputeOutcome> {
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(DisputeActorMsg::InvestigateDispute {
+                dispute_id,
+                contract,
+                rule_name,
+                args,
+                reply,
+            })
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))?;
+        rx.await.map_err(|_| anyhow!("Reply channel closed"))?
+    }
+
+    /// Get a dispute by ID
+    pub async fn get_dispute(&self, dispute_id: DisputeId) -> Option<Dispute> {
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(DisputeActorMsg::GetDispute { dispute_id, reply })
+            .await
+            .ok()?;
+        rx.await.ok()?
+    }
+
+    /// Get dispute statistics
+    pub async fn get_stats(&self) -> DisputeStats {
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        if self.tx.send(DisputeActorMsg::GetStats { reply }).await.is_ok() {
+            rx.await.unwrap_or_else(|_| DisputeStats {
+                total_disputes: 0,
+                pending: 0,
+                investigating: 0,
+                resolved_auto: 0,
+                under_mediation: 0,
+                closed: 0,
+                submitter_correct: 0,
+                executor_correct: 0,
+                both_wrong: 0,
+                inconclusive: 0,
+            })
+        } else {
+            DisputeStats {
+                total_disputes: 0,
+                pending: 0,
+                investigating: 0,
+                resolved_auto: 0,
+                under_mediation: 0,
+                closed: 0,
+                submitter_correct: 0,
+                executor_correct: 0,
+                both_wrong: 0,
+                inconclusive: 0,
+            }
+        }
+    }
+
+    /// Add a mediator to the pool
+    pub async fn add_mediator(&self, mediator: Did) {
+        let _ = self.tx.send(DisputeActorMsg::AddMediator { mediator }).await;
+    }
+
+    /// Remove a mediator from the pool
+    pub async fn remove_mediator(&self, mediator: Did) {
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::RemoveMediator { mediator })
+            .await;
+    }
+}
+
+/// DisputeActor wraps DisputeResolutionSystem for integration with supervisor
+pub struct DisputeActor {
+    system: DisputeResolutionSystem,
+    rx: tokio::sync::mpsc::Receiver<DisputeActorMsg>,
+}
+
+impl DisputeActor {
+    /// Spawn a new DisputeActor and return its handle
+    pub fn spawn(config: DisputeConfig, dispute_store: Arc<dyn Store>) -> DisputeActorHandle {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let system = DisputeResolutionSystem::new(config, dispute_store);
+
+        let actor = DisputeActor { system, rx };
+
+        tokio::spawn(async move {
+            actor.run().await;
+        });
+
+        DisputeActorHandle { tx }
+    }
+
+    /// Main actor loop
+    async fn run(mut self) {
+        info!("DisputeActor started");
+
+        while let Some(msg) = self.rx.recv().await {
+            match msg {
+                DisputeActorMsg::FileDispute {
+                    task_hash,
+                    executor,
+                    challenger,
+                    evidence,
+                    reply,
+                } => {
+                    let result = self
+                        .system
+                        .file_dispute(task_hash, executor, challenger, evidence)
+                        .await;
+                    let _ = reply.send(result);
+                }
+                DisputeActorMsg::InvestigateDispute {
+                    dispute_id,
+                    contract,
+                    rule_name,
+                    args,
+                    reply,
+                } => {
+                    let result = self
+                        .system
+                        .investigate_dispute(dispute_id, &contract, &rule_name, args)
+                        .await;
+                    let _ = reply.send(result);
+                }
+                DisputeActorMsg::GetDispute { dispute_id, reply } => {
+                    let dispute = self.system.get_dispute(&dispute_id).cloned();
+                    let _ = reply.send(dispute);
+                }
+                DisputeActorMsg::GetStats { reply } => {
+                    let stats = self.system.get_stats();
+                    let _ = reply.send(stats);
+                }
+                DisputeActorMsg::AddMediator { mediator } => {
+                    self.system.add_mediator(mediator);
+                }
+                DisputeActorMsg::RemoveMediator { mediator } => {
+                    self.system.remove_mediator(&mediator);
+                }
+            }
+        }
+
+        info!("DisputeActor stopped");
+    }
+
+    /// Set misbehavior callback
+    pub fn set_misbehavior_callback(&mut self, callback: MisbehaviorCallback) {
+        self.system.set_misbehavior_callback(callback);
+    }
 }
 
 #[cfg(test)]

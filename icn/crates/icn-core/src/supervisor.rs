@@ -804,6 +804,11 @@ impl Supervisor {
                 tokio::sync::RwLock<Option<icn_compute::ComputeHandle>>,
             > = Arc::new(tokio::sync::RwLock::new(None));
 
+            // Create dispute handle holder (will be filled after DisputeActor is spawned)
+            let dispute_handle_holder: Arc<
+                tokio::sync::RwLock<Option<icn_ccl::DisputeActorHandle>>,
+            > = Arc::new(tokio::sync::RwLock::new(None));
+
             // Set send callback on gossip actor to enable request/response
             {
                 let mut gossip = gossip_handle.write().await;
@@ -891,6 +896,7 @@ impl Supervisor {
                 let network_handle_for_candidates = network_handle.clone();
 
                 let compute_handle_for_notifications = compute_handle_holder.clone();
+                let dispute_handle_for_notifications = dispute_handle_holder.clone();
 
                 // Create profile cache for peer capability discovery
                 let profile_cache: Arc<
@@ -1438,6 +1444,86 @@ impl Supervisor {
                                 }
                                 Err(e) => {
                                     warn!("Failed to deserialize compute message: {}", e);
+                                }
+                            }
+                        }
+                        // Handle dispute filing
+                        else if topic == icn_ccl::TOPIC_DISPUTES_FILE {
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get dispute entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            match bincode::deserialize::<icn_ccl::DisputeMessage>(&entry_data) {
+                                Ok(dispute_msg) => {
+                                    let dispute_holder = dispute_handle_for_notifications.clone();
+                                    tokio::spawn(async move {
+                                        if let Some(handle) = dispute_holder.read().await.as_ref() {
+                                            match dispute_msg {
+                                                icn_ccl::DisputeMessage::DisputeFiled {
+                                                    dispute_id,
+                                                    ..
+                                                } => {
+                                                    info!(
+                                                        "Received dispute filing notification: {}",
+                                                        hex::encode(dispute_id)
+                                                    );
+                                                    // Update metrics
+                                                    let stats = handle.get_stats().await;
+                                                    icn_obs::metrics::disputes::pending_set(
+                                                        stats.pending as u64,
+                                                    );
+                                                    icn_obs::metrics::disputes::investigating_set(
+                                                        stats.investigating as u64,
+                                                    );
+                                                }
+                                                icn_ccl::DisputeMessage::DisputeResolved {
+                                                    dispute_id,
+                                                    outcome,
+                                                    ..
+                                                } => {
+                                                    info!(
+                                                        "Received dispute resolution notification: {} - {:?}",
+                                                        hex::encode(dispute_id),
+                                                        outcome
+                                                    );
+                                                    // Update metrics based on outcome
+                                                    let outcome_type = match outcome {
+                                                        icn_ccl::DisputeOutcome::SubmitterCorrect {
+                                                            ..
+                                                        } => "submitter_correct",
+                                                        icn_ccl::DisputeOutcome::ExecutorCorrect {
+                                                            ..
+                                                        } => "executor_correct",
+                                                        icn_ccl::DisputeOutcome::BothWrong { .. } => {
+                                                            "both_wrong"
+                                                        }
+                                                        icn_ccl::DisputeOutcome::Inconclusive {
+                                                            ..
+                                                        } => "inconclusive",
+                                                    };
+                                                    icn_obs::metrics::disputes::resolved_inc(
+                                                        outcome_type,
+                                                    );
+
+                                                    // Update stats metrics
+                                                    let stats = handle.get_stats().await;
+                                                    icn_obs::metrics::disputes::pending_set(
+                                                        stats.pending as u64,
+                                                    );
+                                                    icn_obs::metrics::disputes::investigating_set(
+                                                        stats.investigating as u64,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize dispute message: {}", e);
                                 }
                             }
                         }
@@ -2343,17 +2429,18 @@ impl Supervisor {
             compute_actor.set_policy_manager(policy_manager.clone());
             info!("✓ Policy manager initialized for cooperative scheduling");
 
-            // Initialize dispute resolution system (Phase 18 Week 4)
+            // Spawn DisputeActor (Phase 18 Week 4)
             let dispute_store_path = self.config.store_path().join("disputes");
             let dispute_store: Arc<dyn icn_store::Store> =
                 Arc::new(SledStore::open(&dispute_store_path)?);
             let dispute_config = icn_ccl::DisputeConfig::default();
-            let dispute_system =
-                icn_ccl::DisputeResolutionSystem::new(dispute_config.clone(), dispute_store);
-            let dispute_system_handle = Arc::new(tokio::sync::RwLock::new(dispute_system));
-            compute_actor.set_dispute_resolution(dispute_system_handle.clone());
+            let dispute_handle = icn_ccl::DisputeActor::spawn(dispute_config.clone(), dispute_store);
+
+            // Fill dispute handle holder for notification callback
+            *dispute_handle_holder.write().await = Some(dispute_handle.clone());
+
             info!(
-                "✓ Dispute resolution system initialized (re-execution timeout: {:?})",
+                "✓ DisputeActor spawned (re-execution timeout: {:?})",
                 dispute_config.re_execution_timeout
             );
 
@@ -2385,6 +2472,13 @@ impl Supervisor {
                     } else {
                         info!("Subscribed to compute topic: {}", topic);
                     }
+                }
+
+                // Subscribe to disputes topic
+                if let Err(e) = gossip.subscribe(icn_ccl::TOPIC_DISPUTES_FILE, did.clone()) {
+                    warn!("Failed to subscribe to disputes topic: {}", e);
+                } else {
+                    info!("Subscribed to disputes topic");
                 }
             }
 
