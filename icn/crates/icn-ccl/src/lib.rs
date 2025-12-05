@@ -116,4 +116,27 @@ mod example_contract_tests {
         assert_eq!(contract.rules.len(), 1);
         assert_eq!(contract.state_vars.len(), 0);
     }
+
+    #[test]
+    fn test_infrastructure_credit_protocol_contract() {
+        let json =
+            include_str!("../../../../contracts/protocol/infrastructure-credit-v1.ccl.json");
+        let contract: Contract = serde_json::from_str(json)
+            .expect("Failed to deserialize infrastructure-credit-v1.ccl.json");
+        contract
+            .validate()
+            .expect("InfrastructureCreditProtocol contract validation failed");
+
+        assert_eq!(contract.name, "InfrastructureCreditProtocol");
+        assert_eq!(contract.participants.len(), 1);
+        assert_eq!(contract.currency, Some("hours".to_string()));
+        assert_eq!(contract.state_vars.len(), 5); // compute_rate, storage_rate, bandwidth_rate, uptime_rate, network_treasury
+        assert_eq!(contract.rules.len(), 7); // calculate_credits, issue_credits, 4x update_*_rate, get_rates
+
+        // Verify specific rules exist
+        assert!(contract.get_rule("calculate_credits").is_some());
+        assert!(contract.get_rule("issue_credits").is_some());
+        assert!(contract.get_rule("update_compute_rate").is_some());
+        assert!(contract.get_rule("get_rates").is_some());
+    }
 }

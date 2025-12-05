@@ -682,3 +682,160 @@ async fn test_resolve_by_name() {
     let no_v2 = registry.resolve("NamedContract", Some(2)).await.unwrap();
     assert!(no_v2.is_none());
 }
+
+// === Infrastructure Credit Protocol Tests ===
+
+#[test]
+fn test_infrastructure_credit_calculate_credits() {
+    // Load the protocol contract from JSON
+    let json = include_str!("../../../../contracts/protocol/infrastructure-credit-v1.ccl.json");
+    let contract: Contract =
+        serde_json::from_str(json).expect("Failed to deserialize infrastructure-credit-v1");
+    contract
+        .validate()
+        .expect("InfrastructureCreditProtocol validation failed");
+
+    // Initialize state with state vars (mimics ContractRuntime::install_contract)
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    // Get the network treasury DID from participants
+    let treasury_did = contract.participants[0].clone();
+
+    // Create execution context
+    let context = ExecutionContext::new(
+        treasury_did.clone(),
+        0,    // timestamp
+        5000, // fuel
+        vec![],
+        contract.participants.clone(),
+    );
+
+    // Test calculate_credits rule
+    // Rates: compute_rate=100, storage_rate=10, bandwidth_rate=2, uptime_rate=5
+    // Formula: (input * rate) / 100
+    let mut args = HashMap::new();
+    args.insert("compute_hours".to_string(), Value::Int(100)); // 100 * 100 / 100 = 100
+    args.insert("storage_gb_months".to_string(), Value::Int(1000)); // 1000 * 10 / 100 = 100
+    args.insert("bandwidth_gb".to_string(), Value::Int(5000)); // 5000 * 2 / 100 = 100
+    args.insert("uptime_hours".to_string(), Value::Int(2000)); // 2000 * 5 / 100 = 100
+
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context);
+    let result = interpreter.execute_rule("calculate_credits", args).unwrap();
+
+    // Total: 100 + 100 + 100 + 100 = 400
+    assert_eq!(result.value, Value::Int(400));
+    assert!(result.fuel_consumed > 0);
+}
+
+#[test]
+fn test_infrastructure_credit_calculate_credits_edge_cases() {
+    let json = include_str!("../../../../contracts/protocol/infrastructure-credit-v1.ccl.json");
+    let contract: Contract = serde_json::from_str(json).unwrap();
+
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    let treasury_did = contract.participants[0].clone();
+    let context = ExecutionContext::new(
+        treasury_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+
+    // Test with zero inputs
+    let mut args = HashMap::new();
+    args.insert("compute_hours".to_string(), Value::Int(0));
+    args.insert("storage_gb_months".to_string(), Value::Int(0));
+    args.insert("bandwidth_gb".to_string(), Value::Int(0));
+    args.insert("uptime_hours".to_string(), Value::Int(0));
+
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context.clone());
+    let result = interpreter.execute_rule("calculate_credits", args).unwrap();
+    assert_eq!(result.value, Value::Int(0));
+
+    // Test with small amounts (integer division behavior)
+    let mut args = HashMap::new();
+    args.insert("compute_hours".to_string(), Value::Int(50)); // 50 * 100 / 100 = 50
+    args.insert("storage_gb_months".to_string(), Value::Int(50)); // 50 * 10 / 100 = 5
+    args.insert("bandwidth_gb".to_string(), Value::Int(50)); // 50 * 2 / 100 = 1
+    args.insert("uptime_hours".to_string(), Value::Int(50)); // 50 * 5 / 100 = 2
+
+    let context2 = ExecutionContext::new(
+        treasury_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let interpreter2 = Interpreter::new(contract.clone(), state.clone(), context2);
+    let result2 = interpreter2.execute_rule("calculate_credits", args).unwrap();
+    assert_eq!(result2.value, Value::Int(58)); // 50 + 5 + 1 + 2 = 58
+}
+
+#[test]
+fn test_infrastructure_credit_update_rate_preconditions() {
+    let json = include_str!("../../../../contracts/protocol/infrastructure-credit-v1.ccl.json");
+    let contract: Contract = serde_json::from_str(json).unwrap();
+
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    let treasury_did = contract.participants[0].clone();
+
+    // Test valid rate update (within bounds 1-1000)
+    let context = ExecutionContext::new(
+        treasury_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+
+    let mut args = HashMap::new();
+    args.insert("new_rate".to_string(), Value::Int(200));
+
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context);
+    let result = interpreter.execute_rule("update_compute_rate", args);
+    assert!(result.is_ok());
+
+    // Test invalid rate (0 - fails > 0 precondition)
+    let context2 = ExecutionContext::new(
+        treasury_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+
+    let mut args = HashMap::new();
+    args.insert("new_rate".to_string(), Value::Int(0));
+
+    let interpreter2 = Interpreter::new(contract.clone(), state.clone(), context2);
+    let result2 = interpreter2.execute_rule("update_compute_rate", args);
+    assert!(result2.is_err());
+
+    // Test invalid rate (1001 - fails <= 1000 precondition)
+    let context3 = ExecutionContext::new(
+        treasury_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+
+    let mut args = HashMap::new();
+    args.insert("new_rate".to_string(), Value::Int(1001));
+
+    let interpreter3 = Interpreter::new(contract.clone(), state.clone(), context3);
+    let result3 = interpreter3.execute_rule("update_compute_rate", args);
+    assert!(result3.is_err());
+}
