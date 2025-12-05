@@ -84,6 +84,51 @@ pub enum ComputeEvent {
 /// Callback for broadcasting compute events (e.g., to WebSocket clients)
 pub type EventCallback = Arc<dyn Fn(ComputeEvent) + Send + Sync>;
 
+/// Convert an ExecutionOutcome to a CCL Value for dispute evidence
+fn outcome_to_value(outcome: &crate::types::ExecutionOutcome) -> icn_ccl::Value {
+    match outcome {
+        crate::types::ExecutionOutcome::Success(data) => {
+            // Convert bytes to hex string for dispute evidence
+            icn_ccl::Value::String(format!("success:{}", hex::encode(data)))
+        }
+        crate::types::ExecutionOutcome::Failed(error) => {
+            icn_ccl::Value::String(format!("failed:{}", error))
+        }
+        crate::types::ExecutionOutcome::OutOfFuel => {
+            icn_ccl::Value::String("out_of_fuel".to_string())
+        }
+        crate::types::ExecutionOutcome::Timeout => {
+            icn_ccl::Value::String("timeout".to_string())
+        }
+    }
+}
+
+/// Compare two compute results to check if they conflict
+/// Returns true if the results match, false if they conflict
+fn results_match(r1: &ComputeResult, r2: &ComputeResult) -> bool {
+    match (&r1.outcome, &r2.outcome) {
+        // Both success - compare output bytes
+        (
+            crate::types::ExecutionOutcome::Success(data1),
+            crate::types::ExecutionOutcome::Success(data2),
+        ) => data1 == data2,
+        // Both failed - compare error messages
+        (
+            crate::types::ExecutionOutcome::Failed(err1),
+            crate::types::ExecutionOutcome::Failed(err2),
+        ) => err1 == err2,
+        // Both out of fuel
+        (
+            crate::types::ExecutionOutcome::OutOfFuel,
+            crate::types::ExecutionOutcome::OutOfFuel,
+        ) => true,
+        // Both timeout
+        (crate::types::ExecutionOutcome::Timeout, crate::types::ExecutionOutcome::Timeout) => true,
+        // Different outcome types = conflict
+        _ => false,
+    }
+}
+
 /// Handle for interacting with the ComputeActor
 #[derive(Clone)]
 pub struct ComputeHandle {
@@ -1558,8 +1603,93 @@ impl ComputeActor {
 
         // Check if we have enough confirmations
         if consensus.results.len() >= consensus.required {
-            // For now, just accept the first result
-            // Future: compare results and handle disagreements
+            // Detect conflicts: compare all results against the first one
+            let first_result = &consensus.results[0];
+            let mut conflicts: Vec<&ComputeResult> = Vec::new();
+
+            for r in consensus.results.iter().skip(1) {
+                if !results_match(first_result, r) {
+                    conflicts.push(r);
+                }
+            }
+
+            // If we detected conflicts, record metrics and file disputes
+            if !conflicts.is_empty() {
+                tracing::warn!(
+                    task_id = %result.task_id,
+                    task_hash = %task_hash_str,
+                    conflict_count = conflicts.len(),
+                    "Compute result conflict detected between executors"
+                );
+
+                // Record conflict metric
+                icn_obs::metrics::compute::result_conflicts_inc(&task_hash_str);
+
+                // Auto-file disputes for each conflicting result
+                if let Some(ref dispute_system) = self.dispute_resolution {
+                    for conflicting in &conflicts {
+                        let first_executor: icn_identity::Did =
+                            match first_result.executor.parse() {
+                                Ok(did) => did,
+                                Err(_) => continue,
+                            };
+                        let conflicting_executor: icn_identity::Did =
+                            match conflicting.executor.parse() {
+                                Ok(did) => did,
+                                Err(_) => continue,
+                            };
+
+                        let evidence = icn_ccl::DisputeEvidence {
+                            task_hash: result.task_hash,
+                            claimed_result: outcome_to_value(&conflicting.outcome),
+                            reason: icn_ccl::DisputeReason::IncorrectResult {
+                                expected: outcome_to_value(&first_result.outcome),
+                                actual: outcome_to_value(&conflicting.outcome),
+                            },
+                            additional_data: bincode::serialize(&(
+                                &first_result.fuel_used,
+                                &conflicting.fuel_used,
+                            ))
+                            .unwrap_or_default(),
+                            filed_at: std::time::SystemTime::now(),
+                        };
+
+                        let dispute_system_clone = dispute_system.clone();
+                        let conflicting_executor_clone = conflicting_executor.clone();
+                        let first_executor_clone = first_executor.clone();
+                        let task_hash_for_dispute = result.task_hash;
+
+                        tokio::spawn(async move {
+                            let mut system = dispute_system_clone.write().await;
+                            match system
+                                .file_dispute(
+                                    task_hash_for_dispute,
+                                    conflicting_executor_clone,
+                                    first_executor_clone,
+                                    evidence,
+                                )
+                                .await
+                            {
+                                Ok(dispute_id) => {
+                                    icn_obs::metrics::compute::result_conflict_disputes_filed_inc();
+                                    tracing::info!(
+                                        dispute_id = hex::encode(dispute_id),
+                                        "Auto-filed dispute for compute result conflict"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        "Failed to auto-file dispute for result conflict"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Accept the first result (future: implement majority voting)
             let accepted_result = consensus.results[0].clone();
 
             // Clean up consensus tracking
@@ -3225,5 +3355,183 @@ mod tests {
         tracing::info!("   - Migration request sent from A to B with checkpoint");
         tracing::info!("   - Executor B accepted migration and stored checkpoint");
         tracing::info!("   - Actor state preserved across migration");
+    }
+
+    // ===== Conflict Detection Tests (Issue #54) =====
+
+    #[test]
+    fn test_results_match_both_success_same_data() {
+        let r1 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:alice".into(),
+            outcome: crate::types::ExecutionOutcome::Success(vec![1, 2, 3]),
+            fuel_used: 100,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        let r2 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:bob".into(),
+            outcome: crate::types::ExecutionOutcome::Success(vec![1, 2, 3]),
+            fuel_used: 110,
+            duration_ms: 12,
+            completed_at: 1001,
+            signature: vec![],
+        };
+
+        assert!(results_match(&r1, &r2), "Same success data should match");
+    }
+
+    #[test]
+    fn test_results_match_both_success_different_data() {
+        let r1 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:alice".into(),
+            outcome: crate::types::ExecutionOutcome::Success(vec![1, 2, 3]),
+            fuel_used: 100,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        let r2 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:bob".into(),
+            outcome: crate::types::ExecutionOutcome::Success(vec![4, 5, 6]),
+            fuel_used: 110,
+            duration_ms: 12,
+            completed_at: 1001,
+            signature: vec![],
+        };
+
+        assert!(
+            !results_match(&r1, &r2),
+            "Different success data should not match"
+        );
+    }
+
+    #[test]
+    fn test_results_match_success_vs_failed() {
+        let r1 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:alice".into(),
+            outcome: crate::types::ExecutionOutcome::Success(vec![1, 2, 3]),
+            fuel_used: 100,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        let r2 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:bob".into(),
+            outcome: crate::types::ExecutionOutcome::Failed("error".into()),
+            fuel_used: 50,
+            duration_ms: 5,
+            completed_at: 1001,
+            signature: vec![],
+        };
+
+        assert!(
+            !results_match(&r1, &r2),
+            "Success vs Failed should not match"
+        );
+    }
+
+    #[test]
+    fn test_results_match_both_out_of_fuel() {
+        let r1 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:alice".into(),
+            outcome: crate::types::ExecutionOutcome::OutOfFuel,
+            fuel_used: 10000,
+            duration_ms: 100,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        let r2 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:bob".into(),
+            outcome: crate::types::ExecutionOutcome::OutOfFuel,
+            fuel_used: 10000,
+            duration_ms: 105,
+            completed_at: 1001,
+            signature: vec![],
+        };
+
+        assert!(
+            results_match(&r1, &r2),
+            "Both OutOfFuel should match"
+        );
+    }
+
+    #[test]
+    fn test_results_match_both_timeout() {
+        let r1 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:alice".into(),
+            outcome: crate::types::ExecutionOutcome::Timeout,
+            fuel_used: 5000,
+            duration_ms: 30000,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        let r2 = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "test".into(),
+            executor: "did:icn:bob".into(),
+            outcome: crate::types::ExecutionOutcome::Timeout,
+            fuel_used: 4500,
+            duration_ms: 30000,
+            completed_at: 1001,
+            signature: vec![],
+        };
+
+        assert!(results_match(&r1, &r2), "Both Timeout should match");
+    }
+
+    #[test]
+    fn test_outcome_to_value_success() {
+        let outcome = crate::types::ExecutionOutcome::Success(vec![0xde, 0xad, 0xbe, 0xef]);
+        let value = outcome_to_value(&outcome);
+
+        if let icn_ccl::Value::String(s) = value {
+            assert!(s.starts_with("success:"));
+            assert!(s.contains("deadbeef"));
+        } else {
+            panic!("Expected String value");
+        }
+    }
+
+    #[test]
+    fn test_outcome_to_value_failed() {
+        let outcome = crate::types::ExecutionOutcome::Failed("test error".into());
+        let value = outcome_to_value(&outcome);
+
+        if let icn_ccl::Value::String(s) = value {
+            assert_eq!(s, "failed:test error");
+        } else {
+            panic!("Expected String value");
+        }
+    }
+
+    #[test]
+    fn test_outcome_to_value_out_of_fuel() {
+        let outcome = crate::types::ExecutionOutcome::OutOfFuel;
+        let value = outcome_to_value(&outcome);
+
+        if let icn_ccl::Value::String(s) = value {
+            assert_eq!(s, "out_of_fuel");
+        } else {
+            panic!("Expected String value");
+        }
     }
 }

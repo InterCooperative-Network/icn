@@ -960,6 +960,14 @@ pub fn init_descriptions() {
         "icn_compute_placement_constraints_enforced_total",
         "Total number of placement constraint enforcements"
     );
+    describe_counter!(
+        "icn_compute_result_conflicts_total",
+        "Total number of compute result conflicts detected (executors returned different results)"
+    );
+    describe_counter!(
+        "icn_compute_result_conflict_disputes_filed_total",
+        "Total number of disputes auto-filed due to compute result conflicts"
+    );
 
     // Misbehavior detection metrics (Phase 18)
     describe_counter!(
@@ -2223,6 +2231,20 @@ pub mod compute {
 
     pub fn tasks_rejected_capacity_inc() {
         counter!("icn_compute_tasks_rejected_capacity_total").increment(1);
+    }
+
+    /// Record compute result conflicts when executors return differing results
+    pub fn result_conflicts_inc(task_hash: &str) {
+        counter!(
+            "icn_compute_result_conflicts_total",
+            "task_hash" => task_hash.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record disputes filed due to result conflicts
+    pub fn result_conflict_disputes_filed_inc() {
+        counter!("icn_compute_result_conflict_disputes_filed_total").increment(1);
     }
 
     // Placement negotiation metrics (Phase 16B)
