@@ -425,11 +425,11 @@ impl FuelAccount {
         Ok(())
     }
 
-    /// Consume fuel for an operation
+    /// Consume fuel for an operation (respects reserved fuel)
     pub fn consume(&mut self, amount: u64) -> Result<(), FuelError> {
         self.regenerate();
-        if self.available < amount {
-            return Err(FuelError::Exhausted);
+        if self.usable() < amount {
+            return Err(FuelError::InsufficientFuel);
         }
         self.available -= amount;
         Ok(())
