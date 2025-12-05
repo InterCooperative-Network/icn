@@ -12,8 +12,8 @@
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2025-12-05 | Initial draft |
-| 0.2.0 | 2025-12-05 | Added unified fuel model, communities as first-class entities, organizational structures, protocol contracts, comprehensive open questions |
-| 0.3.0 | 2025-12-05 | Major revision: unified fuel reservation model, full Community entity with types and partnerships, provenance scope table, expanded demurrage exemptions, reorganized structure |
+| 0.2.0 | 2025-12-05 | Added unified fuel model, communities as first-class entities, organizational structures, protocol contracts |
+| 0.3.0 | 2025-12-05 | Added fuel guarantees, sybil resistance, human labor system, organizational fuel, dispute resolution, issuance principles, anti-capture principles, fraud prevention, demurrage tradeoffs, routing protection, export layer protection |
 
 ---
 
@@ -27,18 +27,16 @@ This document defines how ICN credits infrastructure contributors (compute, stor
 - Value flows from reciprocity, not scarcity
 - Governance controls exchangeability
 
-**Relationship to Fuel**: Credits are **claims on value**. Fuel is **permission to act**. Contributors earn credits AND receive higher fuel allowances. Both systems work together - fuel is consumed from a single regenerating pool for all network operations including compute execution.
+**Relationship to Fuel**: Credits are **claims on value**. Fuel is **permission to act**. Contributors earn credits AND receive higher fuel allowances. Both systems work together—fuel is consumed from a single regenerating pool for all network operations including compute execution.
 
-**Crucially, this design does not introduce a tradeable token.** All accounting uses mutual credit on existing ledgers, governed by cooperatives. There is no ICN coin, no mining, no external exchange.
-
-**Terminology**: See [glossary.md](glossary.md) for authoritative definitions of all terms used in this document.
+**Crucially, this design does not introduce a tradeable token at the protocol layer.** All accounting uses mutual credit on existing ledgers, governed by cooperatives. There is no ICN coin, no mining, no external exchange.
 
 ---
 
 ## TL;DR
 
 - **Run a node** → Earn credits for compute/storage/bandwidth
-- **Credits are hours** → Spendable on goods, services, or infrastructure
+- **Credits are hours** → Spendable on goods, services, or infrastructure (or your coop's chosen base currency)
 - **No speculation** → Demurrage, provenance tracking, governance controls
 - **Fuel gates actions** → Regenerates over time, scales with contribution
 - **Two pillars** → Communities (civic) + Cooperatives (economic)
@@ -53,20 +51,23 @@ This document defines how ICN credits infrastructure contributors (compute, stor
 2. [Design Philosophy](#design-philosophy)
 3. [Three-Tier Credit System](#three-tier-credit-system)
 4. [Infrastructure as Labor](#infrastructure-as-labor)
-5. [Contribution Verification](#contribution-verification)
-6. [Fuel System](#fuel-system)
-7. [Organizational Structures](#organizational-structures)
-8. [Internal Marketplace](#internal-marketplace)
-9. [Anti-Speculation Mechanisms](#anti-speculation-mechanisms)
-10. [Protocol Contracts](#protocol-contracts)
-11. [Exchange Architecture](#exchange-architecture)
-12. [Implementation Roadmap](#implementation-roadmap)
-13. [Technical Specifications](#technical-specifications)
-14. [Non-Goals](#non-goals)
-15. [Open Questions](#open-questions)
-16. [Example: Dave's Journey](#example-daves-journey)
-17. [References](#references)
-18. [Core Principles](#core-principles)
+5. [Human Labor Credit System](#human-labor-credit-system)
+6. [Contribution Verification](#contribution-verification)
+7. [Fuel System](#fuel-system)
+8. [Organizational Structures](#organizational-structures)
+9. [Internal Marketplace](#internal-marketplace)
+10. [Anti-Speculation Mechanisms](#anti-speculation-mechanisms)
+11. [Credit Issuance Principles](#credit-issuance-principles)
+12. [Anti-Capture Principles](#anti-capture-principles)
+13. [Dispute Resolution](#dispute-resolution)
+14. [Protocol Contracts](#protocol-contracts)
+15. [Exchange Architecture](#exchange-architecture)
+16. [Implementation Roadmap](#implementation-roadmap)
+17. [Technical Specifications](#technical-specifications)
+18. [Design Invariants](#design-invariants)
+19. [Non-Goals](#non-goals)
+20. [Open Questions](#open-questions)
+21. [References](#references)
 
 ---
 
@@ -125,7 +126,7 @@ The network itself has a "treasury DID" that issues credits when nodes contribut
 | Deflationary/inflationary games | Balanced by usage |
 | "Number go up" narrative | "How much did we contribute?" narrative |
 
-**The key difference**: Credits represent actual resource contribution, not speculative value. You can't get rich by hoarding them - you can only use them to access network resources or trade for goods/services.
+**The key difference**: Credits represent actual resource contribution, not speculative value. You can't get rich by hoarding them—you can only use them to access network resources or trade for goods/services.
 
 ---
 
@@ -273,6 +274,24 @@ pub enum BridgeBacking {
 
 **Future (v2)**: Multi-currency coops may choose to keep infrastructure currencies distinct, using internal exchange pools. This requires the `exchange/v1` protocol contract.
 
+### Equity Invariants
+
+Infrastructure contribution rates are **political choices**, not neutral market prices. To prevent infrastructure from creating class hierarchies within coops, the following invariants should guide rate-setting:
+
+**It must always be possible for someone with no hardware and no capital to:**
+- Earn credits through human labor alone
+- Attain governance power equal to any infrastructure contributor
+- Access shared infrastructure indirectly via their coop/community
+- Hold any elected or appointed role
+
+**Coops should consider:**
+- Capping infrastructure earnings as a percentage of total credit issuance
+- Applying slightly higher demurrage to infrastructure-earned credits (optional)
+- Establishing hardware lending/grant programs so contribution isn't wealth-gated
+- Regularly reviewing the ratio of infrastructure rates to human labor rates
+
+**The goal**: Infrastructure contribution should be rewarded fairly, but should not create a class of "infrastructure rentiers" who dominate the coop economy through capital ownership rather than labor.
+
 ### Resource Types
 
 Infrastructure contributions are measured in concrete units:
@@ -299,7 +318,111 @@ let entry = JournalEntryBuilder::new(network_treasury_did.clone())
     .build()?;
 ```
 
-Now Dave's infrastructure credits are just hours - **spendable anywhere in the cooperative** for anything. Infrastructure capacity is just another listing type in the marketplace, priced in the same mutual credit system as tutoring, tomatoes, and childcare. Running a node is labor; the marketplace treats it equally.
+Now Dave's infrastructure credits are just hours—**spendable anywhere in the cooperative** for anything. Infrastructure capacity is just another listing type in the marketplace, priced in the same mutual credit system as tutoring, tomatoes, and childcare. Running a node is labor; the marketplace treats it equally.
+
+---
+
+## Human Labor Credit System
+
+Human labor earning uses the same attestation infrastructure as infrastructure, but with different workflows.
+
+### Labor Types
+
+```rust
+pub enum LaborContribution {
+    /// Logged via coop/community work tracking
+    OrganizationalLabor {
+        org: OrgId,
+        hours: u64,
+        category: LaborCategory,
+        supervisor_attestation: Option<Attestation>,
+    },
+
+    /// Peer-to-peer service delivery (marketplace)
+    ServiceDelivery {
+        listing: ListingId,
+        recipient: Did,
+        hours: u64,
+        recipient_attestation: Attestation,
+    },
+
+    /// Community service (care work, mutual aid)
+    CommunityService {
+        community: CommunityId,
+        description: String,
+        hours: u64,
+        beneficiary_attestations: Vec<Attestation>,
+    },
+}
+
+pub enum LaborCategory {
+    // Organizational roles
+    Governance,      // Facilitation, coordination, administration
+    Operations,      // Day-to-day coop work
+    Development,     // Software, infrastructure
+    Outreach,        // Community building, marketing
+
+    // Service categories
+    Education,       // Teaching, tutoring, training
+    Care,            // Childcare, eldercare, health support
+    Skilled,         // Trades, professional services
+    Creative,        // Art, design, media
+    Physical,        // Manual labor, agriculture
+}
+```
+
+### Attestation Workflows
+
+**For organizational labor**:
+1. Member logs hours in coop/community system
+2. Supervisor or coordinator attests (single attestation sufficient for orgs with designated roles)
+3. Credits issued weekly/monthly per org policy
+
+**For marketplace services**:
+1. Listing defines terms
+2. Service delivered
+3. Recipient attests completion and quality
+4. Credits transfer automatically
+
+**For community service**:
+1. Member claims hours with description
+2. Beneficiaries attest (minimum 2 for claims > 10 hours)
+3. Community reviews and approves
+4. Credits issued from community treasury or via protocol contract
+
+### Integration with CCL
+
+Labor agreements can be codified in CCL contracts:
+
+```json
+{
+  "name": "WeeklyLabor",
+  "rules": [
+    {
+      "name": "log_hours",
+      "params": ["member", "hours", "category"],
+      "requires": [{"MemberOf": {"member": {"Var": "member"}, "org": "this"}}],
+      "body": [
+        {"LedgerTransfer": {
+          "from": "org_treasury",
+          "to": {"Var": "member"},
+          "amount": {"Var": "hours"},
+          "currency": "hours"
+        }}
+      ]
+    }
+  ]
+}
+```
+
+### Governance Oversight
+
+Each coop/community sets:
+- Hourly rate equivalencies (if different from 1:1)
+- Category-specific rates (e.g., hazardous work pays 1.5x)
+- Maximum hours claimable per period
+- Attestation requirements per labor type
+- Appeals process for disputed hours
 
 ---
 
@@ -344,6 +467,117 @@ fn validate_contribution(attestation: &ContributionAttestation) -> bool {
 - Requires network of attesters
 - Could be gamed by colluding nodes
 
+### Sybil Resistance Model
+
+**Important constraint**: "Peer attestation" does not mean "any DID can attest." In practice, attesters are constrained by:
+
+- **Membership status**: Must be a member of the same coop/community or a federated org
+- **Membership age**: New members may have reduced attestation weight or be ineligible to attest large contributions
+- **Trust graph thresholds**: Attestations from untrusted or low-trust DIDs carry minimal weight
+- **Organizational attestation**: Contributions above certain thresholds may require attestation from an organizational DID (coop, community, or household), not just individuals
+
+This social anchoring is the first line of defense against Sybil attacks. Identity issuance and membership onboarding are the gatekeeping mechanisms; attestation validates within that trust boundary.
+
+### Attestation Eligibility Requirements
+
+To attest contributions above trivial thresholds, an attester must satisfy:
+
+| Constraint | Requirement | Rationale |
+|------------|-------------|-----------|
+| **Membership age** | ≥ 90 days in good standing | New members cannot immediately vouch |
+| **Trust score** | ≥ 0.3 | Isolated or distrusted members cannot attest |
+| **Attestation budget** | Max 10 attestations per period per attester | Prevents attestation factories |
+| **Non-reciprocity** | Cannot attest someone who attested you in same period | Breaks simple collusion rings |
+| **Org anchor** | For claims > 500 credits: requires ≥1 organizational attestation | Large claims need institutional backing |
+
+### Organizational Attestation
+
+For significant contributions, at least one attester must be an **organizational DID**:
+
+```rust
+pub enum AttesterType {
+    Individual(Did),
+    Organization(OrgDid),  // Coop, community, or household
+}
+
+pub fn validate_large_contribution(claim: &Claim, attestations: &[Attestation]) -> bool {
+    if claim.amount > LARGE_CLAIM_THRESHOLD {
+        // Requires at least one org attestation
+        let has_org = attestations.iter().any(|a| matches!(a.attester_type, AttesterType::Organization(_)));
+        if !has_org {
+            return false;
+        }
+    }
+    // Normal weighted validation
+    validate_attestation_weights(attestations)
+}
+```
+
+### Trust Graph Depth
+
+Attestations are weighted not just by trust score, but by **graph depth from organizational anchors**:
+
+```
+Org DID (coop/community) ─── depth 0 (weight: 1.0)
+    │
+    ├── Long-standing member ─── depth 1 (weight: 0.9)
+    │       │
+    │       └── Newer member vouched by them ─── depth 2 (weight: 0.7)
+    │
+    └── Another path...
+```
+
+Members with no path to an organizational anchor have zero attestation weight.
+
+### Attestation Fraud Prevention
+
+#### Attack Vectors
+
+| Attack | Description |
+|--------|-------------|
+| **Collusion ring** | Small group vouches for each other's fake contributions |
+| **Attestation factory** | One member attests everything without verification |
+| **Org capture** | Corrupt org leadership attests fake member contributions |
+| **Time inflation** | Real work, exaggerated hours |
+
+#### Countermeasures
+
+| Measure | Implementation |
+|---------|----------------|
+| **Attestation budget** | Max 10 per member per period |
+| **Non-reciprocity** | Can't attest someone who attested you this period |
+| **Org attestation for large claims** | Claims > 500 require org-level DID |
+| **Membership age threshold** | New members can't attest for 90 days |
+| **Random audits** | X% of claims randomly selected for deeper review |
+| **Attestation accuracy tracking** | Historical accuracy affects future weight |
+
+#### Penalties
+
+| Offense | Penalty |
+|---------|---------|
+| First fraudulent attestation | Attestation privileges suspended 30 days |
+| Second offense | Suspended 180 days, trust score penalty |
+| Third offense | Membership review, potential expulsion |
+| Organized fraud (multiple participants) | All participants face membership review |
+
+#### Detection
+
+```rust
+pub struct AttestationAudit {
+    /// Check for reciprocal attestation patterns
+    pub fn detect_reciprocity_clusters(&self) -> Vec<Cluster>;
+
+    /// Check for attesters who approve everything
+    pub fn detect_rubber_stampers(&self) -> Vec<Did>;
+
+    /// Check for contribution patterns that don't match observed capacity
+    pub fn detect_implausible_claims(&self) -> Vec<Claim>;
+
+    /// Compare claimed vs measured (for infra)
+    pub fn detect_inflation(&self) -> Vec<DiscrepancyReport>;
+}
+```
+
 ### Verification Tiers Based on Value
 
 Combine approaches based on contribution size:
@@ -352,7 +586,7 @@ Combine approaches based on contribution size:
 |-------------------|---------------------|
 | Small (<100 credits) | Peer attestation only |
 | Medium (100-1000) | Attestation + spot checks |
-| Large (>1000) | Full cryptographic proof |
+| Large (>1000) | Full cryptographic proof + org attestation |
 
 ### Provenance Scope
 
@@ -365,6 +599,20 @@ Not all credits need full provenance tracking:
 | **Tier 3 (Bridge candidate)** | Full chain | Required for external auditability |
 
 **Implementation note**: Credits start with compressed provenance. When a member requests bridge-out eligibility, the system reconstructs or requires full provenance for the specific units being bridged. Credits that have been transferred internally may not be reconstructible and thus remain Tier 1/2 only.
+
+**Storage philosophy**: ICN will never store full provenance for all credits indefinitely. Full-chain provenance is an opt-in requirement for bridgeable units only.
+
+For members who may want to bridge credits in the future:
+- They may retain their own detailed provenance proofs (encrypted, off-ledger)
+- These proofs can be presented when bridge eligibility is requested
+- The network validates but does not permanently store the full chain
+
+For coop-level auditing:
+- Coops choose how far back they keep detailed provenance
+- The network does not enforce a global retention horizon
+- Archived provenance may be compressed or summarized after a governance-set period
+
+This keeps the ledger from becoming a forever-archive of every micro-transfer while still enabling auditability where it matters.
 
 ---
 
@@ -398,7 +646,7 @@ Fuel prevents:
 
 ### Unified Fuel Model
 
-All operations draw from a single regenerating fuel pool - both network operations (posting, trading, voting) and compute execution.
+All operations draw from a single regenerating fuel pool—both network operations (posting, trading, voting) and compute execution.
 
 ```rust
 pub struct FuelAccount {
@@ -425,19 +673,14 @@ impl FuelAccount {
         Ok(())
     }
 
-    /// Consume fuel for an operation (respects reserved fuel)
+    /// Consume fuel for an operation
     pub fn consume(&mut self, amount: u64) -> Result<(), FuelError> {
         self.regenerate();
-        if self.usable() < amount {
-            return Err(FuelError::InsufficientFuel);
+        if self.available < amount {
+            return Err(FuelError::Exhausted);
         }
         self.available -= amount;
         Ok(())
-    }
-
-    /// Release reserved fuel (unused portion returned)
-    pub fn unreserve(&mut self, amount: u64) {
-        self.reserved = self.reserved.saturating_sub(amount);
     }
 
     /// Lazy regeneration on access
@@ -467,6 +710,9 @@ impl FuelAccount {
 ### Fuel Allowance Calculation
 
 ```rust
+pub const MINIMUM_CIVIC_FUEL: u64 = 50;
+pub const MINIMUM_REGEN_RATE: u64 = 10;  // Per day
+
 impl FuelAllowance {
     pub fn calculate(
         did: &Did,
@@ -477,15 +723,15 @@ impl FuelAllowance {
         let trust_bonus = (trust_score * 500.0) as u64;
         let contribution_bonus = contribution_history.total_contributed / 10;
 
-        let max = base + trust_bonus + contribution_bonus;
-        let regen_rate = max / 24;  // Fully regenerate in 24 hours
+        let calculated_max = base + trust_bonus + contribution_bonus;
+        let calculated_regen = calculated_max / 24;  // Fully regenerate in 24 hours
 
         FuelAllowance {
             did: did.clone(),
-            available: max,
+            available: calculated_max.max(MINIMUM_CIVIC_FUEL),
             reserved: 0,
-            max,
-            regen_rate,
+            max: calculated_max.max(MINIMUM_CIVIC_FUEL),
+            regen_rate: calculated_regen.max(MINIMUM_REGEN_RATE),
             last_update: now()
         }
     }
@@ -503,6 +749,44 @@ impl FuelAllowance {
 | Submit compute job | Variable | Reserved upfront, unused returned |
 | Marketplace listing | 10 | Quality over quantity |
 | Execute trade | 20 | Meaningful transactions |
+
+### Fuel Guarantees
+
+To prevent fuel from becoming a barrier to democratic participation, ICN makes the following guarantees:
+
+#### Minimum Civic Allowance
+
+Even members with zero credits and minimal trust receive a base fuel allowance sufficient for:
+- Casting votes on proposals they're eligible for
+- Creating at least one proposal per governance period
+- Sending basic messages to their coop/community
+- Viewing their balances and contribution history
+
+#### Guaranteed Minimum Operations
+
+The following operations can **never** be blocked due to fuel exhaustion:
+
+| Operation | Guaranteed Minimum | Rationale |
+|-----------|-------------------|-----------|
+| Cast vote on eligible proposals | 1 per proposal | Democratic participation is non-negotiable |
+| Create proposal | 1 per governance period | Right to raise issues |
+| Send direct message | 5 per day | Basic communication |
+| View own balances/history | Unlimited | Transparency is not a privilege |
+| Respond to disputes involving self | Unlimited | Right to defend oneself |
+
+#### No Permanent Lockout
+
+Fuel always regenerates. A member who exhausts their fuel today will have usable fuel tomorrow. There is no mechanism by which someone can be permanently excluded from participation.
+
+#### Credits ≠ Fuel
+
+Having many credits does not grant more fuel. Having zero credits does not prevent fuel regeneration. These are independent resources:
+- **Credits** = long-term economic power (what you've earned and can spend)
+- **Fuel** = short-term activity budget (permission to act, regenerates daily)
+
+#### Emergency Provisions
+
+Coops may establish emergency fuel grants for members facing unusual circumstances (e.g., coordinating disaster response). This is a governance decision, not a protocol feature.
 
 ### Fuel Regeneration Mechanics
 
@@ -552,6 +836,66 @@ impl ComputeManager {
     }
 }
 ```
+
+### Organizational Fuel
+
+Organizations (coops, communities, households) are first-class fuel consumers.
+
+#### Organizational Fuel Pool
+
+```rust
+pub struct OrganizationalFuel {
+    pub org: OrgId,
+    pub available: u64,
+    pub reserved: u64,
+    pub max: u64,
+    pub regen_rate: u64,
+    pub last_update: Timestamp,
+}
+```
+
+#### How Organizations Earn Fuel
+
+| Source | Mechanism |
+|--------|-----------|
+| **Member contributions routed to org** | Each hour of infra credit routed to org adds to org's fuel bonus |
+| **Org-owned infrastructure** | Coops running their own nodes earn fuel directly |
+| **Member count** | Base fuel scales with active membership |
+| **Federation membership** | Federated orgs receive federation fuel allocations |
+
+#### Organizational Fuel Calculation
+
+```rust
+impl OrganizationalFuel {
+    pub fn calculate(org: &Organization) -> Self {
+        let member_base = org.active_members().len() as u64 * 50;
+        let infra_bonus = org.routed_contributions_this_period() / 10;
+        let federation_bonus = if org.is_federated() { 500 } else { 0 };
+
+        let max = member_base + infra_bonus + federation_bonus;
+        let regen_rate = max / 24;
+
+        OrganizationalFuel { max, regen_rate, /* ... */ }
+    }
+}
+```
+
+#### What Organizations Use Fuel For
+
+| Operation | Fuel Cost | Notes |
+|-----------|-----------|-------|
+| Publish org-wide announcements | 10 | Per message |
+| Run gateway services | 1/hour | Continuous cost |
+| Execute org governance actions | 50 | Per proposal |
+| Send federation communications | 20 | Cross-org messaging |
+| Host compute jobs on behalf of members | Variable | Reserved like member jobs |
+
+#### Rate Limits
+
+Even organizations have limits:
+- Maximum burst operations per hour
+- Fuel exhaustion blocks non-critical operations
+- Critical operations (governance, emergency comms) have separate reserve pool
 
 ---
 
@@ -732,6 +1076,53 @@ pub enum CommunityContributionHandling {
 }
 ```
 
+### Routing Exploitation Prevention
+
+#### The Attack
+
+A wealthy member could:
+1. Create a "household" they control
+2. Route 100% of contributions there
+3. Household routes to a coop treasury they influence
+4. Use org-level privileges to gain disproportionate influence
+
+#### Countermeasures
+
+| Measure | Implementation |
+|---------|----------------|
+| **Real membership requirement** | Households need 2+ real DIDs with independent histories |
+| **Routing audit** | All routing is publicly visible in ledger |
+| **Pass-through ceilings** | Max % of org funds can come from single source |
+| **Velocity limits** | Rapid routing changes trigger review |
+| **Beneficial ownership disclosure** | Orgs must disclose controlling members |
+
+#### Detection
+
+```rust
+pub struct RoutingAudit {
+    /// Detect single-source dependency
+    pub fn detect_concentration(&self, org: OrgId) -> ConcentrationReport;
+
+    /// Detect circular routing patterns
+    pub fn detect_loops(&self) -> Vec<RoutingLoop>;
+
+    /// Detect rapid routing changes
+    pub fn detect_velocity_anomalies(&self) -> Vec<VelocityAlert>;
+
+    /// Check household legitimacy
+    pub fn verify_household_independence(&self, household: HouseholdId) -> bool;
+}
+```
+
+#### Policy Recommendations
+
+| Policy | Suggested Default |
+|--------|-------------------|
+| Max single-source contribution to org | 25% |
+| Min household members | 2 |
+| Min member independence (shared history < X%) | 50% |
+| Routing change cooldown | 30 days |
+
 ### Community Currency Options
 
 Communities choose their currency model:
@@ -754,11 +1145,37 @@ More formalization = more benefits, but informal participation is welcomed:
 | Community | 50% | Community credits | Local + partners | Local |
 | Cooperative | 100% | Full coop credits | Coop + federation | Full |
 
+### Example: Alex's Multi-Membership
+
+Alex lives in a four-person household, belongs to a neighborhood community, and works in a tech worker coop. Here's how their contributions flow:
+
+**Contribution routing**:
+```
+Alex's infrastructure contribution: 100 CPU-hours/month
+├── 50% → Tech Workers Coop (livelihood)     → 50 hours as tech-hours
+├── 30% → Smith Household (shared costs)     → 30 hours to household pool
+└── 20% → Oakwood Mutual Aid (community)     → 20 hours as oakwood-credits
+```
+
+**Fuel calculation**: Alex's fuel allowance is based on their **total** contribution (100 hours worth), plus trust bonuses. The credits flow according to routing, but fuel reflects overall network contribution.
+
+**Spending**:
+- Alex uses tech-hours to buy services from fellow coop members
+- The household pool covers shared subscriptions and childcare exchanges
+- Oakwood-credits go to the community garden and tool library
+
+**Governance**: Alex votes in:
+- Tech Workers Coop (full member)
+- Oakwood Community (full member)
+- Their household doesn't have formal governance (decisions made at the kitchen table)
+
+**Federation access**: Because Tech Workers Coop is in the PNW Federation, Alex can also spend tech-hours at Food Coop (federated) at the agreed exchange rate.
+
 ---
 
 ## Internal Marketplace
 
-Credits aren't just for infrastructure - they enable a full internal economy.
+Credits aren't just for infrastructure—they enable a full internal economy.
 
 ### Listing Types
 
@@ -828,9 +1245,9 @@ pub async fn execute_trade(&self, trade: &Trade) -> Result<TradeReceipt> {
 
 ## Anti-Speculation Mechanisms
 
-### 1. Demurrage (Negative Interest)
+### 1. Demurrage (Circulation Charge)
 
-Credits lose value over time if not used:
+Credits lose value over time if not used. Demurrage may also be called a **"circulation charge"**—a small cost for holding credits idle, encouraging them to flow through the economy rather than accumulate.
 
 ```rust
 pub struct DemurragePolicy {
@@ -842,6 +1259,28 @@ pub struct DemurragePolicy {
 
 **Effect**: Encourages circulation, discourages hoarding.
 
+#### Demurrage Tradeoffs
+
+Demurrage is the most politically sensitive economic parameter. It must be understood as a tradeoff, not a pure good.
+
+| If demurrage is too weak | If demurrage is too strong |
+|--------------------------|---------------------------|
+| Hoarding begins | Resentment toward the system |
+| Store-of-value accumulation | People flee to bridgeable variants |
+| Proto-capitalist dynamics | Shadow currencies emerge |
+| Credit stratification | Members feel punished for saving |
+| Circulation slows | Loophole-seeking behavior |
+
+#### Finding Balance
+
+**Recommended starting point**: 2-5% annually, applied monthly
+
+**Adjustments based on**:
+- Circulation velocity (if high, lower demurrage; if low, raise it)
+- Member satisfaction surveys
+- Credit concentration metrics
+- Hoarding detection (large idle balances)
+
 #### Demurrage Governance Layers
 
 Demurrage is **not** a single global policy. It operates at multiple levels:
@@ -852,19 +1291,49 @@ Demurrage is **not** a single global policy. It operates at multiple levels:
 | **Federation** | Recommended defaults for member coops | e.g., "PNW Federation recommends 5%/year" |
 | **Cooperative** | Actual policy via `demurrage/v1` contract | Must stay within network constraints |
 
+#### Exemptions (Required)
+
+| Exemption | Rationale |
+|-----------|-----------|
+| **Emergency reserves** | Safety funds must not decay |
+| **Disaster response pools** | Critical infrastructure |
+| **Committed liquidity** | Already serving circulation |
+| **Short-term savings (< 3 months)** | Normal cash flow management |
+| **Hardship cases** | Governance-approved exemptions |
+
+#### Exemptions (Optional, Governance Choice)
+
+| Exemption | Consideration |
+|-----------|---------------|
+| New member grace period | Helps onboarding |
+| Seasonal worker buffers | Accounts for uneven earning |
+| Long-term project reserves | Saving for equipment, property |
+
 #### Exemption Examples
 
 Demurrage should penalize idle hoarding, not structural precarity. Coops MAY exempt:
 
 | Exemption | Rationale |
 |-----------|-----------|
-| **Disability accommodations** | Members with reduced capacity shouldn't be penalized |
-| **Parental/caregiver leave** | Temporary absence for caregiving |
+| **Disability flag** | Members with reduced capacity shouldn't be penalized |
+| **Parental leave** | Temporary absence for caregiving |
 | **Medical crisis** | Illness, hospitalization, recovery |
 | **Seasonal workers** | Some work is inherently cyclical |
-| **New members** | Grace period (e.g., first 90 days) |
-| **Reserve accounts** | Designated emergency funds |
-| **Escrow balances** | Funds held for pending transactions |
+| **New members** | Grace period (e.g., first 6 months) |
+
+**What demurrage never applies to**:
+- Governance-designated safety reserves (e.g., emergency funds, disaster response pools)
+- Community treasuries with explicit mandates for accumulation (e.g., saving for a building purchase)
+- Credits actively committed to liquidity pools
+
+These exemptions require explicit governance designation. The default is that all idle credits are subject to demurrage.
+
+#### Transparency Requirement
+
+Demurrage rates, exemptions, and collected fees must be publicly visible:
+- How much demurrage collected this period
+- Where it went (burned, redistributed, treasury)
+- Who received exemptions
 
 ### 2. Contribution-Locked Exchange
 
@@ -929,6 +1398,99 @@ pub struct BridgeRestrictions {
     pub identity_requirement: IdentityRequirement,
 }
 ```
+
+---
+
+## Credit Issuance Principles
+
+### Who Can Issue Credits
+
+Credits enter the system through:
+
+| Source | Mechanism | Governance |
+|--------|-----------|------------|
+| **Infrastructure contribution** | Protocol contract calculates from verified metrics | Network-level formula |
+| **Human labor** | Attestation workflow + org approval | Coop/community policy |
+| **Bridge-in** | External value deposited | Bridge contract terms |
+| **Governance grant** | Explicit proposal + vote | Coop governance |
+
+### What Cannot Issue Credits
+
+- **Self-attestation alone** (requires peer/org verification)
+- **Unverified claims** (must pass attestation threshold)
+- **Protocol exploits** (detected and penalized)
+- **Off-ledger agreements** (if not recorded, doesn't exist)
+
+### Issuance Rate Governance
+
+Each coop sets:
+- Maximum credits issuable per period
+- Ratio of infrastructure vs. labor credits
+- Bridge-in limits
+- Emergency issuance procedures
+
+---
+
+## Anti-Capture Principles
+
+### Governance Capture Prevention
+
+| Risk | Mitigation |
+|------|------------|
+| **Wealthy members dominate** | Voting power capped; 1-member-1-vote default |
+| **Infrastructure whales** | Infra earnings capped as % of total issuance |
+| **Bridge arbitrage** | Only original earner can bridge; governance approval for large amounts |
+| **Org treasury capture** | Multi-sig requirements; transparency mandates |
+
+### Economic Capture Prevention
+
+| Risk | Mitigation |
+|------|------------|
+| **Credit hoarding** | Demurrage penalizes idle balances |
+| **Market manipulation** | No external market; internal rates governance-set |
+| **Liquidity drain** | Outflow limits; holding periods |
+| **Sybil accumulation** | Attestation requires real membership + trust |
+
+---
+
+## Dispute Resolution
+
+### Dispute Types
+
+| Type | Examples | Resolution Path |
+|------|----------|-----------------|
+| **Contribution disputes** | "They didn't do the work they claimed" | Attestation audit → org mediation → governance |
+| **Trade disputes** | "Service wasn't delivered as described" | Escrow release → mediation → governance |
+| **Attestation disputes** | "False attestation harmed me" | Fraud investigation → penalties |
+| **Membership disputes** | "Wrongful expulsion" | Appeals process → federation arbitration |
+
+### Resolution Process
+
+```rust
+pub enum DisputeStatus {
+    Filed { filed_at: Timestamp, filer: Did },
+    InMediation { mediator: Did, started_at: Timestamp },
+    Escalated { proposal_id: ProposalId, escalation_reason: String, escalated_at: Timestamp },
+    Resolved { mediator: Did, outcome: DisputeOutcome, resolved_at: Timestamp },
+}
+
+pub enum DisputeOutcome {
+    Upheld,           // Filer wins
+    Rejected,         // Respondent wins
+    PartialAdjustment { amount: i64, currency: String },
+    VoidTransaction,  // Undo the disputed action
+}
+```
+
+### Escalation to Governance
+
+When disputes cannot be resolved through mediation:
+- Value exceeds mediator authority
+- Mediator conflict of interest
+- Disputed party rejects mediator decision
+- Involves community-wide policy
+
+Escalated disputes become governance proposals for community vote.
 
 ---
 
@@ -1287,6 +1849,22 @@ icn_bridge_blocked_governance_total
 
 ---
 
+## Design Invariants
+
+These properties must hold at all times:
+
+| Invariant | Description |
+|-----------|-------------|
+| **No external token** | There is no ICN coin tradeable on public exchanges |
+| **Fuel always regenerates** | No permanent lockout from participation |
+| **Credits require verification** | Self-attestation alone cannot create credits |
+| **Demurrage exemptions are explicit** | Default is all idle credits decay |
+| **Bridge requires governance** | Large outflows need community approval |
+| **Provenance is reconstructible** | For bridge-eligible credits only |
+| **Orgs are transparent** | Routing, treasury, membership visible |
+
+---
+
 ## Non-Goals
 
 To maintain focus, this RFC explicitly does **not** cover:
@@ -1369,99 +1947,6 @@ These may be revisited in future RFCs based on community needs.
 ### Non-Infrastructure Contributions (Future)
 
 25. **Peer endorsement system**: How do we recognize governance participation, moderation, care work without enabling spam? Counting activities (proposals created, votes cast) incentivizes quantity over quality. Needs endorsement-based design.
-
----
-
-## Example: Dave's Journey
-
-This section illustrates how a contributor progresses through the system.
-
-### Week 1: Starting Out
-
-Dave installs `icnd` on his home server. He doesn't join any coop yet.
-
-```bash
-icnd init --passphrase "..."
-icnd start
-```
-
-His node starts contributing to the Global Commons. He earns minimal benefits (30% fuel, federation credits only).
-
-### Week 4: Getting Attested
-
-After a month of reliable uptime, other nodes start attesting to Dave's contributions:
-
-```bash
-# Another node operator attests
-icnctl contribution attest \
-  --contributor did:icn:dave \
-  --resource compute \
-  --amount 720 \
-  --period "2025-01-01/2025-01-31"
-```
-
-Once Dave has enough weighted attestations, his contributions are verified and he receives credits.
-
-### Week 8: Joining a Cooperative
-
-Dave joins the local Tech Coop. He routes 70% of his contribution there:
-
-```bash
-icnctl node route --to coop:tech-workers --percent 70
-icnctl node route --to global-commons --percent 30
-```
-
-Now he earns full coop credits (70%) plus federation credits (30%).
-
-### Week 12: First Trade
-
-Dave uses his credits to get tutoring from Alice (also in Tech Coop):
-
-```bash
-icnctl marketplace trade \
-  --offer "20 hours" \
-  --request "2 hours tutoring from did:icn:alice"
-```
-
-Alice accepts. Dave's balance decreases by 20 hours, Alice's increases. No fiat changed hands.
-
-### Month 6: Household Pooling
-
-Dave's household pools 4 devices. His kids' tablets contribute when charging overnight:
-
-```bash
-icnctl household create "Smith Family"
-icnctl device add --type tablet --availability when-charging
-icnctl device add --type laptop --availability when-idle
-```
-
-Benefits are shared equally among household members.
-
-### Year 1: Cross-Coop Trading
-
-Tech Coop federates with Food Coop. Dave buys organic vegetables with credits he earned running infrastructure:
-
-```bash
-icnctl exchange federate \
-  --from coop:tech-workers \
-  --to coop:food-collective \
-  --amount 50
-```
-
-The exchange rate (1 tech-hour = 1.5 food-hours) was set by the federated coops' governance.
-
-### The Journey Summarized
-
-```
-Week 1:  Individual → Global Commons (minimal benefits)
-Week 4:  Attested contributor (earning credits)
-Week 8:  Coop member (full benefits)
-Week 12: Active trader (using credits for services)
-Month 6: Household (pooled devices)
-Year 1:  Federated (cross-coop trading)
-```
-
-Dave never bought tokens. He earned value through genuine contribution, and spent it within the cooperative ecosystem.
 
 ---
 
