@@ -678,4 +678,189 @@ impl RpcClient {
         });
         self.call("dispute.resolve", params).await
     }
+
+    // ============================================================================
+    // Federation methods
+    // ============================================================================
+
+    /// List known cooperatives
+    pub async fn federation_coop_list(&mut self) -> Result<serde_json::Value> {
+        self.call("federation.coop.list", serde_json::json!({})).await
+    }
+
+    /// Get a specific cooperative
+    pub async fn federation_coop_get(&mut self, coop_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "coop_id": coop_id,
+        });
+        self.call("federation.coop.get", params).await
+    }
+
+    /// Register a new cooperative
+    pub async fn federation_coop_register(
+        &mut self,
+        coop_id: &str,
+        name: &str,
+        public_did: &str,
+        gateway_endpoints: Vec<String>,
+        capabilities: Vec<String>,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "coop_id": coop_id,
+            "name": name,
+            "public_did": public_did,
+            "gateway_endpoints": gateway_endpoints,
+            "capabilities": capabilities,
+        });
+        self.call("federation.coop.register", params).await
+    }
+
+    /// Remove a cooperative
+    pub async fn federation_coop_remove(&mut self, coop_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "coop_id": coop_id,
+        });
+        self.call("federation.coop.remove", params).await
+    }
+
+    /// Get own cooperative info
+    pub async fn federation_own_get(&mut self) -> Result<serde_json::Value> {
+        self.call("federation.own.get", serde_json::json!({})).await
+    }
+
+    /// Update own cooperative info
+    pub async fn federation_own_update(
+        &mut self,
+        name: Option<&str>,
+        gateway_endpoints: Option<Vec<String>>,
+        capabilities: Option<Vec<String>>,
+    ) -> Result<serde_json::Value> {
+        let mut params = serde_json::json!({});
+        if let Some(n) = name {
+            params["name"] = serde_json::json!(n);
+        }
+        if let Some(eps) = gateway_endpoints {
+            params["gateway_endpoints"] = serde_json::json!(eps);
+        }
+        if let Some(caps) = capabilities {
+            params["capabilities"] = serde_json::json!(caps);
+        }
+        self.call("federation.own.update", params).await
+    }
+
+    /// List vouches for a cooperative
+    pub async fn federation_vouch_list(&mut self, coop_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "coop_id": coop_id,
+        });
+        self.call("federation.vouch.list", params).await
+    }
+
+    /// Issue a vouch for another cooperative
+    pub async fn federation_vouch_issue(
+        &mut self,
+        target_coop_id: &str,
+        trust_score: f64,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "target_coop_id": target_coop_id,
+            "trust_score": trust_score,
+        });
+        self.call("federation.vouch.issue", params).await
+    }
+
+    /// Remove a vouch for a cooperative
+    pub async fn federation_vouch_remove(&mut self, target_coop_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "target_coop_id": target_coop_id,
+        });
+        self.call("federation.vouch.remove", params).await
+    }
+
+    // ========================================================================
+    // Attestation methods
+    // ========================================================================
+
+    /// List attestations for a member DID
+    pub async fn federation_attestation_list(&mut self, member_did: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "member_did": member_did,
+        });
+        self.call("federation.attestation.list", params).await
+    }
+
+    /// List attestations from a cooperative
+    pub async fn federation_attestation_from(&mut self, coop_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "coop_id": coop_id,
+        });
+        self.call("federation.attestation.from", params).await
+    }
+
+    /// Issue an attestation for a member
+    pub async fn federation_attestation_issue(
+        &mut self,
+        member_did: &str,
+        trust_score: f64,
+        context: &str,
+        validity_days: u64,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "member_did": member_did,
+            "trust_score": trust_score,
+            "context": context,
+            "validity_days": validity_days,
+        });
+        self.call("federation.attestation.issue", params).await
+    }
+
+    // ========================================================================
+    // Clearing methods
+    // ========================================================================
+
+    /// List clearing agreements
+    pub async fn federation_clearing_list(&mut self) -> Result<serde_json::Value> {
+        self.call("federation.clearing.list", serde_json::json!({})).await
+    }
+
+    /// Show clearing agreement details
+    pub async fn federation_clearing_show(&mut self, agreement_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "agreement_id": agreement_id,
+        });
+        self.call("federation.clearing.show", params).await
+    }
+
+    /// Create a new clearing agreement
+    pub async fn federation_clearing_create(
+        &mut self,
+        agreement_id: &str,
+        partner_coop: &str,
+        max_imbalance: i64,
+        settlement: &str,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "agreement_id": agreement_id,
+            "partner_coop": partner_coop,
+            "max_imbalance": max_imbalance,
+            "settlement": settlement,
+        });
+        self.call("federation.clearing.create", params).await
+    }
+
+    /// Get clearing position
+    pub async fn federation_clearing_position(&mut self, agreement_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "agreement_id": agreement_id,
+        });
+        self.call("federation.clearing.position", params).await
+    }
+
+    /// Trigger settlement
+    pub async fn federation_clearing_settle(&mut self, agreement_id: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "agreement_id": agreement_id,
+        });
+        self.call("federation.clearing.settle", params).await
+    }
 }

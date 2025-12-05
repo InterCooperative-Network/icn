@@ -815,6 +815,9 @@ impl Supervisor {
                 tokio::sync::RwLock<Option<icn_ccl::DisputeActorHandle>>,
             > = Arc::new(tokio::sync::RwLock::new(None));
 
+            // Keep a reference to federation registry for RPC server (declared here to be in scope for later use)
+            let federation_registry_for_rpc: Option<Arc<icn_federation::CooperativeRegistry>>;
+
             // Set send callback on gossip actor to enable request/response
             {
                 let mut gossip = gossip_handle.write().await;
@@ -953,6 +956,9 @@ impl Supervisor {
                         })?,
                     );
 
+                    // Keep reference for RPC server
+                    federation_registry_for_rpc = Some(federation_registry.clone());
+
                     // Create federation gossip handler
                     let federation_handler = Arc::new(
                         icn_federation::FederationGossipHandler::new(federation_registry),
@@ -993,6 +999,7 @@ impl Supervisor {
 
                     Some(federation_handler)
                 } else {
+                    federation_registry_for_rpc = None;
                     None
                 };
 
@@ -2617,6 +2624,9 @@ impl Supervisor {
             rpc_server.set_compute_handle(compute_handle);
             rpc_server.set_trust_handle(trust_graph_handle.clone());
             rpc_server.set_dispute_manager(dispute_manager_handle);
+            if let Some(registry) = federation_registry_for_rpc {
+                rpc_server.set_federation_registry(registry);
+            }
 
             background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {
