@@ -34,8 +34,8 @@ pub enum DisputeMessage {
     DisputeFiled {
         dispute_id: DisputeId,
         task_hash: ContentHash,
-        executor: String,
-        challenger: String,
+        executor: Did,
+        challenger: Did,
         reason: DisputeReason,
         filed_at: u64,
     },
