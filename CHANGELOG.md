@@ -28,6 +28,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Closes #53.
 
+### Added - Trust-Weighted Mediator Selection (2025-12-05)
+
+**Dispute Resolution** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- Mediator assignment now uses trust-weighted selection instead of simple round-robin
+- **Trust scoring**: Mediators with higher trust scores are more likely to be selected
+- **Conflict-of-interest detection**: Mediators who are executor or challenger are excluded
+- **Workload balancing**: Mediators with fewer active disputes get priority (0.1 penalty per active dispute)
+- **Minimum trust threshold**: Only mediators above `mediator_min_trust` (default 0.7) are eligible
+- Added `TrustCallback` type for trust graph integration
+- Added `MediatorInfo` struct with expertise tags support
+- Added `add_mediator_with_expertise()` for domain-specific mediator pools
+- Added 6 new tests: trust-weighted selection, conflict detection, workload balancing
+
+**Actor API**:
+- `DisputeActorHandle::set_trust_callback()` - Set callback for trust score queries
+- `DisputeActorHandle::add_mediator_with_expertise()` - Add mediator with expertise tags
+
+Closes #57.
+
 ### Fixed - Re-execution Timeout Enforcement (2025-12-05)
 
 **Dispute Investigation** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):

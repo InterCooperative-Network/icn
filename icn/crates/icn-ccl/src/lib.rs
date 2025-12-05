@@ -55,7 +55,7 @@ pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
 pub use disputes::{
     Dispute, DisputeActor, DisputeActorHandle, DisputeConfig, DisputeEvidence, DisputeId,
     DisputeMessage, DisputeOutcome, DisputeReason, DisputeResolutionSystem, DisputeStats,
-    DisputeStatus, MisbehaviorCallback, TOPIC_DISPUTES_FILE,
+    DisputeStatus, MediatorInfo, MisbehaviorCallback, TrustCallback, TOPIC_DISPUTES_FILE,
 };
 pub use interpreter::Interpreter;
 pub use messages::{

@@ -24,6 +24,10 @@ pub const TOPIC_DISPUTES_FILE: &str = "disputes:file";
 /// Arguments: (violator_did, task_hash, evidence_bytes)
 pub type MisbehaviorCallback = Arc<dyn Fn(&Did, ContentHash, Vec<u8>) + Send + Sync>;
 
+/// Callback for querying trust scores from the trust graph
+/// Takes a DID string and returns the trust score (0.0 to 1.0)
+pub type TrustCallback = Arc<dyn Fn(&str) -> f64 + Send + Sync>;
+
 /// Unique identifier for a dispute
 pub type DisputeId = [u8; 32];
 
@@ -169,13 +173,23 @@ impl Default for DisputeConfig {
     }
 }
 
+/// Mediator information including expertise and workload
+#[derive(Debug, Clone)]
+pub struct MediatorInfo {
+    /// The mediator's DID
+    pub did: Did,
+    /// Domain expertise tags (e.g., "finance", "technical", "governance")
+    pub expertise_tags: Vec<String>,
+}
+
 /// Dispute resolution system for contract execution
 pub struct DisputeResolutionSystem {
     config: DisputeConfig,
     dispute_store: Arc<dyn Store>,
     disputes: HashMap<DisputeId, Dispute>,
-    mediator_pool: Vec<Did>,
+    mediator_pool: Vec<MediatorInfo>,
     misbehavior_callback: Option<MisbehaviorCallback>,
+    trust_callback: Option<TrustCallback>,
 }
 
 impl DisputeResolutionSystem {
@@ -186,7 +200,13 @@ impl DisputeResolutionSystem {
             disputes: HashMap::new(),
             mediator_pool: Vec::new(),
             misbehavior_callback: None,
+            trust_callback: None,
         }
+    }
+
+    /// Set the trust callback for querying mediator trust scores
+    pub fn set_trust_callback(&mut self, callback: TrustCallback) {
+        self.trust_callback = Some(callback);
     }
 
     /// Set the misbehavior callback for recording violations
@@ -453,8 +473,14 @@ impl DisputeResolutionSystem {
         Ok(outcome)
     }
 
-    /// Assign a mediator to a dispute
-    fn assign_mediator(&self, _dispute: &Dispute) -> Result<Option<Did>> {
+    /// Assign a mediator to a dispute using trust-weighted selection
+    ///
+    /// Selection criteria:
+    /// 1. Filter by conflict-of-interest (mediator != executor or challenger)
+    /// 2. Filter by minimum trust threshold
+    /// 3. Weight by trust score (higher trust = more likely)
+    /// 4. Consider workload (fewer active disputes = preferred)
+    fn assign_mediator(&self, dispute: &Dispute) -> Result<Option<Did>> {
         if !self.config.auto_assign_mediators {
             return Ok(None);
         }
@@ -464,26 +490,129 @@ impl DisputeResolutionSystem {
             return Ok(None);
         }
 
-        // Simple round-robin assignment for now
-        // In production, consider mediator workload, expertise, etc.
-        let mediator = self.mediator_pool[0].clone();
+        // Get eligible mediators (filter by conflict-of-interest)
+        let eligible: Vec<&MediatorInfo> = self
+            .mediator_pool
+            .iter()
+            .filter(|m| !self.has_conflict_of_interest(&m.did, dispute))
+            .collect();
 
-        info!("Assigned mediator {} to dispute", mediator);
+        if eligible.is_empty() {
+            warn!(
+                "No eligible mediators (all have conflicts of interest) for dispute {}",
+                hex::encode(dispute.dispute_id)
+            );
+            return Ok(None);
+        }
 
-        Ok(Some(mediator))
+        // Score each eligible mediator
+        let mut scored_mediators: Vec<(&MediatorInfo, f64)> = eligible
+            .iter()
+            .filter_map(|m| {
+                let score = self.calculate_mediator_score(m, dispute);
+                if score > 0.0 {
+                    Some((*m, score))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if scored_mediators.is_empty() {
+            warn!(
+                "No mediators meet minimum trust threshold ({}) for dispute {}",
+                self.config.mediator_min_trust,
+                hex::encode(dispute.dispute_id)
+            );
+            return Ok(None);
+        }
+
+        // Sort by score descending
+        scored_mediators.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Select the top-scored mediator
+        let selected = &scored_mediators[0].0;
+        let score = scored_mediators[0].1;
+
+        info!(
+            "Assigned mediator {} (score: {:.3}) to dispute {}",
+            selected.did,
+            score,
+            hex::encode(dispute.dispute_id)
+        );
+
+        Ok(Some(selected.did.clone()))
+    }
+
+    /// Check if a mediator has a conflict of interest with a dispute
+    fn has_conflict_of_interest(&self, mediator: &Did, dispute: &Dispute) -> bool {
+        // Mediator cannot be the executor or challenger
+        mediator == &dispute.executor || mediator == &dispute.challenger
+    }
+
+    /// Calculate a mediator's score for a dispute
+    ///
+    /// Score = trust_score * (1 - workload_penalty)
+    /// - trust_score: from trust graph (0.0 to 1.0)
+    /// - workload_penalty: based on active dispute count (0.0 to 0.5)
+    fn calculate_mediator_score(&self, mediator: &MediatorInfo, _dispute: &Dispute) -> f64 {
+        // Get trust score (default to 0.5 if no callback)
+        let trust_score = self
+            .trust_callback
+            .as_ref()
+            .map(|cb| cb(&mediator.did.to_string()))
+            .unwrap_or(0.5);
+
+        // Filter by minimum trust threshold
+        if trust_score < self.config.mediator_min_trust {
+            return 0.0;
+        }
+
+        // Calculate workload (count active disputes for this mediator)
+        let active_disputes = self.get_mediator_workload(&mediator.did);
+
+        // Workload penalty: 0.1 per active dispute, max 0.5
+        let workload_penalty = (active_disputes as f64 * 0.1).min(0.5);
+
+        // Final score
+        let score = trust_score * (1.0 - workload_penalty);
+
+        score
+    }
+
+    /// Get the number of active disputes assigned to a mediator
+    fn get_mediator_workload(&self, mediator: &Did) -> usize {
+        self.disputes
+            .values()
+            .filter(|d| match &d.status {
+                DisputeStatus::UnderMediation { mediator: m, .. } => m == mediator,
+                _ => false,
+            })
+            .count()
     }
 
     /// Add a mediator to the pool
     pub fn add_mediator(&mut self, mediator: Did) {
-        if !self.mediator_pool.contains(&mediator) {
-            info!("Adding mediator {} to pool", mediator);
-            self.mediator_pool.push(mediator);
+        self.add_mediator_with_expertise(mediator, vec![]);
+    }
+
+    /// Add a mediator to the pool with expertise tags
+    pub fn add_mediator_with_expertise(&mut self, mediator: Did, expertise_tags: Vec<String>) {
+        if !self.mediator_pool.iter().any(|m| m.did == mediator) {
+            info!(
+                "Adding mediator {} to pool with expertise: {:?}",
+                mediator, expertise_tags
+            );
+            self.mediator_pool.push(MediatorInfo {
+                did: mediator,
+                expertise_tags,
+            });
         }
     }
 
     /// Remove a mediator from the pool
     pub fn remove_mediator(&mut self, mediator: &Did) {
-        self.mediator_pool.retain(|m| m != mediator);
+        self.mediator_pool.retain(|m| &m.did != mediator);
         info!("Removed mediator {} from pool", mediator);
     }
 
@@ -636,6 +765,15 @@ pub enum DisputeActorMsg {
     SetMisbehaviorCallback {
         callback: MisbehaviorCallback,
     },
+    /// Set trust callback for mediator scoring
+    SetTrustCallback {
+        callback: TrustCallback,
+    },
+    /// Add mediator with expertise tags
+    AddMediatorWithExpertise {
+        mediator: Did,
+        expertise_tags: Vec<String>,
+    },
 }
 
 impl std::fmt::Debug for DisputeActorMsg {
@@ -683,6 +821,17 @@ impl std::fmt::Debug for DisputeActorMsg {
             Self::SetMisbehaviorCallback { .. } => {
                 f.debug_struct("SetMisbehaviorCallback").finish()
             }
+            Self::SetTrustCallback { .. } => {
+                f.debug_struct("SetTrustCallback").finish()
+            }
+            Self::AddMediatorWithExpertise {
+                mediator,
+                expertise_tags,
+            } => f
+                .debug_struct("AddMediatorWithExpertise")
+                .field("mediator", mediator)
+                .field("expertise_tags", expertise_tags)
+                .finish(),
         }
     }
 }
@@ -776,6 +925,25 @@ impl DisputeActorHandle {
         let _ = self
             .tx
             .send(DisputeActorMsg::SetMisbehaviorCallback { callback })
+            .await;
+    }
+
+    /// Set trust callback for mediator scoring
+    pub async fn set_trust_callback(&self, callback: TrustCallback) {
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::SetTrustCallback { callback })
+            .await;
+    }
+
+    /// Add a mediator with expertise tags
+    pub async fn add_mediator_with_expertise(&self, mediator: Did, expertise_tags: Vec<String>) {
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::AddMediatorWithExpertise {
+                mediator,
+                expertise_tags,
+            })
             .await;
     }
 }
@@ -888,6 +1056,17 @@ impl DisputeActor {
                     let mut sys = system.write().await;
                     sys.set_misbehavior_callback(callback);
                 }
+                DisputeActorMsg::SetTrustCallback { callback } => {
+                    let mut sys = system.write().await;
+                    sys.set_trust_callback(callback);
+                }
+                DisputeActorMsg::AddMediatorWithExpertise {
+                    mediator,
+                    expertise_tags,
+                } => {
+                    let mut sys = system.write().await;
+                    sys.add_mediator_with_expertise(mediator, expertise_tags);
+                }
             }
         }
 
@@ -942,6 +1121,15 @@ impl DisputeActor {
                 }
                 DisputeActorMsg::SetMisbehaviorCallback { callback } => {
                     self.system.set_misbehavior_callback(callback);
+                }
+                DisputeActorMsg::SetTrustCallback { callback } => {
+                    self.system.set_trust_callback(callback);
+                }
+                DisputeActorMsg::AddMediatorWithExpertise {
+                    mediator,
+                    expertise_tags,
+                } => {
+                    self.system.add_mediator_with_expertise(mediator, expertise_tags);
                 }
             }
         }
@@ -1136,7 +1324,7 @@ mod tests {
         // Remove mediator
         system.remove_mediator(&mediator1);
         assert_eq!(system.mediator_pool.len(), 1);
-        assert!(system.mediator_pool.contains(&mediator2));
+        assert!(system.mediator_pool.iter().any(|m| m.did == mediator2));
     }
 
     #[tokio::test]
@@ -1250,5 +1438,304 @@ mod tests {
                 panic!("Unexpected outcome: {:?}", other);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_trust_weighted_mediator_selection() {
+        let config = DisputeConfig {
+            auto_assign_mediators: true,
+            mediator_min_trust: 0.5, // Lower threshold for test
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Add three mediators with different trust scores
+        let low_trust_mediator = make_test_did();
+        let mid_trust_mediator = make_test_did();
+        let high_trust_mediator = make_test_did();
+
+        system.add_mediator(low_trust_mediator.clone());
+        system.add_mediator(mid_trust_mediator.clone());
+        system.add_mediator(high_trust_mediator.clone());
+
+        // Set up trust callback that returns different scores
+        let lt = low_trust_mediator.to_string();
+        let mt = mid_trust_mediator.to_string();
+        let ht = high_trust_mediator.to_string();
+        let trust_cb: TrustCallback = Arc::new(move |did: &str| {
+            if did == lt {
+                0.6
+            } else if did == mt {
+                0.75
+            } else if did == ht {
+                0.9
+            } else {
+                0.5
+            }
+        });
+        system.set_trust_callback(trust_cb);
+
+        // Create a dispute with parties NOT in the mediator pool
+        let executor = make_test_did();
+        let challenger = make_test_did();
+        let task_hash = [10u8; 32];
+
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        let dispute = system.get_dispute(&dispute_id).unwrap();
+
+        // High trust mediator should be selected
+        let selected = system.assign_mediator(dispute).unwrap();
+        assert!(selected.is_some());
+        assert_eq!(selected.unwrap(), high_trust_mediator);
+    }
+
+    #[tokio::test]
+    async fn test_conflict_of_interest_detection() {
+        let config = DisputeConfig {
+            auto_assign_mediators: true,
+            mediator_min_trust: 0.3,
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Create parties
+        let executor = make_test_did();
+        let challenger = make_test_did();
+        let neutral_mediator = make_test_did();
+
+        // Add executor and challenger as mediators (conflict of interest)
+        // plus one neutral mediator
+        system.add_mediator(executor.clone());
+        system.add_mediator(challenger.clone());
+        system.add_mediator(neutral_mediator.clone());
+
+        // Set up trust callback (all equal trust)
+        let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+        system.set_trust_callback(trust_cb);
+
+        let task_hash = [11u8; 32];
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        let dispute = system.get_dispute(&dispute_id).unwrap();
+
+        // Only neutral_mediator should be selected (executor and challenger have conflict)
+        let selected = system.assign_mediator(dispute).unwrap();
+        assert!(selected.is_some());
+        assert_eq!(selected.unwrap(), neutral_mediator);
+    }
+
+    #[tokio::test]
+    async fn test_all_mediators_have_conflict() {
+        let config = DisputeConfig {
+            auto_assign_mediators: true,
+            mediator_min_trust: 0.3,
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Create parties
+        let executor = make_test_did();
+        let challenger = make_test_did();
+
+        // Only add executor and challenger as mediators (all have conflict)
+        system.add_mediator(executor.clone());
+        system.add_mediator(challenger.clone());
+
+        let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+        system.set_trust_callback(trust_cb);
+
+        let task_hash = [12u8; 32];
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        let dispute = system.get_dispute(&dispute_id).unwrap();
+
+        // No mediator should be selected (all have conflict)
+        let selected = system.assign_mediator(dispute).unwrap();
+        assert!(selected.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_mediator_below_trust_threshold() {
+        let config = DisputeConfig {
+            auto_assign_mediators: true,
+            mediator_min_trust: 0.7, // High threshold
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        let low_trust_mediator = make_test_did();
+        system.add_mediator(low_trust_mediator.clone());
+
+        // Trust callback returns score below threshold
+        let trust_cb: TrustCallback = Arc::new(|_| 0.5); // Below 0.7 threshold
+        system.set_trust_callback(trust_cb);
+
+        let executor = make_test_did();
+        let challenger = make_test_did();
+        let task_hash = [13u8; 32];
+
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        let dispute = system.get_dispute(&dispute_id).unwrap();
+
+        // No mediator should be selected (below trust threshold)
+        let selected = system.assign_mediator(dispute).unwrap();
+        assert!(selected.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_mediator_workload_balancing() {
+        let config = DisputeConfig {
+            auto_assign_mediators: true,
+            mediator_min_trust: 0.5,
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        let busy_mediator = make_test_did();
+        let idle_mediator = make_test_did();
+
+        system.add_mediator(busy_mediator.clone());
+        system.add_mediator(idle_mediator.clone());
+
+        // Equal trust for both
+        let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+        system.set_trust_callback(trust_cb);
+
+        // Create an existing dispute and assign to busy_mediator manually
+        let executor1 = make_test_did();
+        let challenger1 = make_test_did();
+        let task_hash1 = [20u8; 32];
+
+        let evidence1 = DisputeEvidence {
+            task_hash: task_hash1,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id1 = system
+            .file_dispute(task_hash1, executor1.clone(), challenger1.clone(), evidence1)
+            .await
+            .unwrap();
+
+        // Manually set this dispute to be under mediation by busy_mediator
+        {
+            let dispute = system.disputes.get_mut(&dispute_id1).unwrap();
+            dispute.status = DisputeStatus::UnderMediation {
+                mediator: busy_mediator.clone(),
+                assigned_at: SystemTime::now(),
+            };
+        }
+
+        // Now create a new dispute
+        let executor2 = make_test_did();
+        let challenger2 = make_test_did();
+        let task_hash2 = [21u8; 32];
+
+        let evidence2 = DisputeEvidence {
+            task_hash: task_hash2,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id2 = system
+            .file_dispute(task_hash2, executor2.clone(), challenger2.clone(), evidence2)
+            .await
+            .unwrap();
+
+        let dispute = system.get_dispute(&dispute_id2).unwrap();
+
+        // idle_mediator should be selected (lower workload)
+        let selected = system.assign_mediator(dispute).unwrap();
+        assert!(selected.is_some());
+        assert_eq!(selected.unwrap(), idle_mediator);
+    }
+
+    #[test]
+    fn test_add_mediator_with_expertise() {
+        let config = DisputeConfig::default();
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        let mediator = make_test_did();
+        let expertise = vec!["finance".to_string(), "technical".to_string()];
+
+        system.add_mediator_with_expertise(mediator.clone(), expertise.clone());
+
+        assert_eq!(system.mediator_pool.len(), 1);
+        assert_eq!(system.mediator_pool[0].did, mediator);
+        assert_eq!(system.mediator_pool[0].expertise_tags, expertise);
     }
 }
