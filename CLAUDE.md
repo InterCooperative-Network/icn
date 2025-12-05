@@ -119,6 +119,82 @@ See [deploy/k8s/README.md](deploy/k8s/README.md) for details.
 
 **Files**: [deploy/k8s/monitoring/servicemonitor.yaml](deploy/k8s/monitoring/servicemonitor.yaml)
 
+### CI/CD Pipeline (deployed 2025-12-05)
+
+**Self-Hosted GitHub Actions Runner** on K3s control plane for automated builds and deployments.
+
+| Component | Details |
+|-----------|---------|
+| **Runner Name** | `homelab-runner` |
+| **Runner Host** | `k3s-control` (10.8.10.40) |
+| **Labels** | `self-hosted, linux, x64, homelab, k3s` |
+| **Workflow** | `.github/workflows/docker-build-deploy.yml` |
+
+**How It Works**:
+1. Push to `main` branch triggers workflow
+2. Tests run on GitHub-hosted runners (ubuntu-latest)
+3. Build & deploy runs on self-hosted runner:
+   - Builds Docker image with commit SHA tag
+   - Imports image directly to containerd (`k3s ctr images import`)
+   - Updates all ICN deployments with `kubectl set image`
+   - Rolls out changes and waits for pods to be ready
+
+**Manual Trigger**:
+```bash
+# Via GitHub CLI
+gh workflow run docker-build-deploy.yml
+
+# Via GitHub UI
+# Go to: Actions → Build and Deploy to K3s → Run workflow
+```
+
+**Setup Files**:
+- [deploy/k8s/self-hosted-runner/README.md](deploy/k8s/self-hosted-runner/README.md) - Setup documentation
+- [deploy/k8s/self-hosted-runner/setup-runner.sh](deploy/k8s/self-hosted-runner/setup-runner.sh) - Automated installer
+- [deploy/k8s/scripts/deploy-from-registry.sh](deploy/k8s/scripts/deploy-from-registry.sh) - Manual deploy from ghcr.io
+
+**Runner Management**:
+```bash
+# Check runner status
+ssh ubuntu@10.8.10.40 "cd ~/actions-runner && sudo ./svc.sh status"
+
+# View runner logs
+ssh ubuntu@10.8.10.40 "journalctl -u actions.runner.* -f"
+
+# Restart runner
+ssh ubuntu@10.8.10.40 "cd ~/actions-runner && sudo ./svc.sh restart"
+```
+
+### Pilot Testing Status (2025-12-05)
+
+**5-Node Pilot Network** running on K3s with P2P mesh topology.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Identity** | ✅ Working | All 5 nodes have unique DIDs |
+| **Trust Graph** | ⏳ Blocked | Needs image rebuild (#46) |
+| **Governance** | ✅ Working | Domain, proposal, voting via Gateway |
+| **Ledger** | ✅ Working | Mutual credit transactions via Gateway |
+| **Compute** | ⏳ Blocked | Gateway integration pending (#44) |
+| **Contracts** | ⏳ Blocked | icnctl runtime bug (#45) |
+
+**GitHub Issues for Gaps**:
+- [#44](https://github.com/InterCooperative-Network/icn/issues/44) - Gateway compute integration
+- [#45](https://github.com/InterCooperative-Network/icn/issues/45) - icnctl contract deploy panic
+- [#46](https://github.com/InterCooperative-Network/icn/issues/46) - RPC auth requires image rebuild
+
+**Test Commands** (via Gateway API):
+```bash
+# Get auth token
+TOKEN=$(icnctl auth token --gateway http://10.8.10.40:30080 --coop pilot-coop)
+
+# List governance domains
+curl -H "Authorization: Bearer $TOKEN" http://10.8.10.40:30080/v1/gov/domains
+
+# Check ledger balance
+curl -H "Authorization: Bearer $TOKEN" http://10.8.10.40:30080/v1/ledger/pilot-coop/balance/<did>
+```
+
 ## Workspace Structure
 
 The Cargo workspace is located in `icn/` subdirectory. All build/test commands must be run from `/home/matt/projects/icn/icn/`.
