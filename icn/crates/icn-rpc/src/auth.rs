@@ -307,6 +307,7 @@ pub mod scopes {
     pub const POLICY_READ: &str = "policy:read";
     pub const TRUST_READ: &str = "trust:read";
     pub const RECOVERY_READ: &str = "recovery:read";
+    pub const DISPUTE_READ: &str = "dispute:read";
 
     // Write scopes
     pub const NETWORK_WRITE: &str = "network:write";
@@ -317,6 +318,7 @@ pub mod scopes {
     pub const POLICY_WRITE: &str = "policy:write";
     pub const TRUST_WRITE: &str = "trust:write";
     pub const RECOVERY_WRITE: &str = "recovery:write";
+    pub const DISPUTE_WRITE: &str = "dispute:write";
 
     // Admin scopes
     pub const ADMIN: &str = "admin";
@@ -331,6 +333,7 @@ pub mod scopes {
         POLICY_READ,
         TRUST_READ,
         RECOVERY_READ,
+        DISPUTE_READ,
     ];
 
     /// All write scopes
@@ -343,6 +346,7 @@ pub mod scopes {
         POLICY_WRITE,
         TRUST_WRITE,
         RECOVERY_WRITE,
+        DISPUTE_WRITE,
     ];
 }
 
@@ -392,6 +396,12 @@ pub fn required_scope_for_method(method: &str) -> Option<&'static str> {
         "recovery.list" | "recovery.status" => Some(scopes::RECOVERY_READ),
         "recovery.initiate" | "recovery.attest" | "recovery.finalize" | "recovery.cancel" => {
             Some(scopes::RECOVERY_WRITE)
+        }
+
+        // Dispute methods (ledger entry disputes)
+        "dispute.list" | "dispute.get" => Some(scopes::DISPUTE_READ),
+        "dispute.file" | "dispute.add_evidence" | "dispute.assign_mediator" | "dispute.resolve" => {
+            Some(scopes::DISPUTE_WRITE)
         }
 
         // Unknown methods - require admin

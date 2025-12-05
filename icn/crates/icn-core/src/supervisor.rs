@@ -3,7 +3,7 @@
 use anyhow::{bail, Context, Result};
 use icn_gossip::GossipActor;
 use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
-use icn_ledger::Ledger;
+use icn_ledger::{DisputeManager, Ledger};
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
 use icn_time::ClockSync;
@@ -365,12 +365,18 @@ impl Supervisor {
             // Spawn Ledger
             let store_path = self.config.store_path().join("ledger");
             let store = Arc::new(SledStore::open(&store_path)?);
-            let mut ledger = Ledger::new(store)?;
+            let mut ledger = Ledger::new(store.clone())?;
             ledger.set_gossip(gossip_handle.clone());
             ledger.set_misbehavior_detector(misbehavior_detector.clone());
             let ledger_handle = Arc::new(tokio::sync::RwLock::new(ledger));
 
             info!("Ledger initialized at {}", store_path.display());
+
+            // Initialize DisputeManager (shares store with Ledger)
+            let dispute_manager = DisputeManager::new(store.clone())?;
+            let dispute_manager_handle = Arc::new(tokio::sync::RwLock::new(dispute_manager));
+
+            info!("Dispute manager initialized");
 
             // Initialize Contract Runtime
             let contract_runtime = icn_ccl::ContractRuntime::new(ledger_handle.clone());
@@ -2610,6 +2616,7 @@ impl Supervisor {
             compute_handle_for_gateway = Some(compute_handle.clone());
             rpc_server.set_compute_handle(compute_handle);
             rpc_server.set_trust_handle(trust_graph_handle.clone());
+            rpc_server.set_dispute_manager(dispute_manager_handle);
 
             background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {

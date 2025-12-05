@@ -603,4 +603,79 @@ impl RpcClient {
         self.call("recovery.cancel", params).await?;
         Ok(())
     }
+
+    // ==================== Dispute Methods ====================
+
+    /// File a dispute against a ledger entry
+    pub async fn dispute_file(
+        &mut self,
+        entry_hash: &str,
+        reason: &str,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_hash": entry_hash,
+            "reason": reason,
+        });
+        self.call("dispute.file", params).await
+    }
+
+    /// List disputes with optional status filter
+    pub async fn dispute_list(
+        &mut self,
+        status: Option<&str>,
+        filer: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "status": status,
+            "filer": filer,
+        });
+        self.call("dispute.list", params).await
+    }
+
+    /// Get details of a specific dispute
+    pub async fn dispute_get(&mut self, entry_hash: &str) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_hash": entry_hash,
+        });
+        self.call("dispute.get", params).await
+    }
+
+    /// Add evidence to a dispute
+    pub async fn dispute_add_evidence(
+        &mut self,
+        entry_hash: &str,
+        evidence: &str,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_hash": entry_hash,
+            "evidence": evidence,
+        });
+        self.call("dispute.add_evidence", params).await
+    }
+
+    /// Assign a mediator to a dispute
+    pub async fn dispute_assign_mediator(
+        &mut self,
+        entry_hash: &str,
+        mediator_did: &str,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_hash": entry_hash,
+            "mediator_did": mediator_did,
+        });
+        self.call("dispute.assign_mediator", params).await
+    }
+
+    /// Resolve a dispute (requires mediator role)
+    pub async fn dispute_resolve(
+        &mut self,
+        entry_hash: &str,
+        outcome: &str,
+    ) -> Result<serde_json::Value> {
+        let params = serde_json::json!({
+            "entry_hash": entry_hash,
+            "outcome": outcome,
+        });
+        self.call("dispute.resolve", params).await
+    }
 }

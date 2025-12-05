@@ -60,6 +60,10 @@ enum Commands {
     #[command(subcommand)]
     Ledger(LedgerCommands),
 
+    /// Dispute management (ledger entry disputes)
+    #[command(subcommand)]
+    Dispute(DisputeCommands),
+
     /// Contract operations
     #[command(subcommand)]
     Contract(ContractCommands),
@@ -1013,6 +1017,70 @@ enum SnapshotCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum DisputeCommands {
+    /// File a dispute against a ledger entry
+    File {
+        /// Entry hash (hex) to dispute
+        #[arg(long)]
+        entry_hash: String,
+
+        /// Reason for the dispute
+        #[arg(short, long)]
+        reason: String,
+    },
+
+    /// List disputes
+    List {
+        /// Filter by status: pending, resolved, all (default: pending)
+        #[arg(short, long, default_value = "pending")]
+        status: String,
+
+        /// Filter by filer DID
+        #[arg(short, long)]
+        filer: Option<String>,
+    },
+
+    /// Get details of a specific dispute
+    Get {
+        /// Entry hash (hex) of the disputed entry
+        entry_hash: String,
+    },
+
+    /// Add evidence to a dispute
+    AddEvidence {
+        /// Entry hash (hex) of the disputed entry
+        #[arg(long)]
+        entry_hash: String,
+
+        /// Evidence text to add
+        #[arg(short, long)]
+        evidence: String,
+    },
+
+    /// Assign a mediator to a dispute
+    AssignMediator {
+        /// Entry hash (hex) of the disputed entry
+        #[arg(long)]
+        entry_hash: String,
+
+        /// Mediator DID
+        #[arg(short, long)]
+        mediator: String,
+    },
+
+    /// Resolve a dispute (requires mediator role)
+    Resolve {
+        /// Entry hash (hex) of the disputed entry
+        #[arg(long)]
+        entry_hash: String,
+
+        /// Resolution outcome: upheld, reversed, settlement, writeoff
+        #[arg(short, long)]
+        outcome: String,
+    },
+}
+
 fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(dir) = data_dir {
         Ok(dir)
@@ -1189,6 +1257,10 @@ async fn main() -> Result<()> {
 
         Commands::Quota(quota_cmd) => {
             handle_quota_command(quota_cmd, &data_dir, &args.endpoint).await?
+        }
+
+        Commands::Dispute(dispute_cmd) => {
+            handle_dispute_command(dispute_cmd, &args.endpoint).await?
         }
 
         Commands::Completions { shell } => {
@@ -5579,6 +5651,234 @@ async fn handle_quota_command(cmd: QuotaCommands, data_dir: &Path, endpoint: &st
                 };
 
                 println!("{short_member:<60} {cpu_hours:>12.2} {tasks:>10} {credits:>12}");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<()> {
+    let rpc_addr = endpoint.parse()?;
+    let mut client = icn_rpc::RpcClient::new(rpc_addr);
+
+    match cmd {
+        DisputeCommands::File { entry_hash, reason } => {
+            let result = client
+                .dispute_file(&entry_hash, &reason)
+                .await
+                .context("Failed to file dispute. Is icnd running?")?;
+
+            println!("Dispute filed successfully!");
+            println!();
+            println!("  Entry Hash: {entry_hash}");
+            println!("  Reason:     {reason}");
+
+            if let Some(filed_at) = result.get("filed_at") {
+                println!("  Filed At:   {}", filed_at);
+            }
+        }
+
+        DisputeCommands::List { status, filer } => {
+            let status_filter = if status == "all" {
+                None
+            } else {
+                Some(status.as_str())
+            };
+
+            let result = client
+                .dispute_list(status_filter, filer.as_deref())
+                .await
+                .context("Failed to list disputes. Is icnd running?")?;
+
+            let disputes = result
+                .get("disputes")
+                .and_then(|d| d.as_array())
+                .cloned()
+                .unwrap_or_default();
+
+            if disputes.is_empty() {
+                println!("No disputes found.");
+            } else {
+                println!(
+                    "{:<20} {:<12} {:<45} {}",
+                    "Entry Hash", "Status", "Filer", "Filed At"
+                );
+                println!("{:-<100}", "");
+
+                for dispute in &disputes {
+                    let hash = dispute
+                        .get("entry_hash")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+                    let status = dispute
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+                    let filer = dispute
+                        .get("filer")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+                    let filed_at = dispute
+                        .get("filed_at")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+
+                    let short_hash = if hash.len() > 18 {
+                        format!("{}...", &hash[0..15])
+                    } else {
+                        hash.to_string()
+                    };
+
+                    let short_filer = if filer.len() > 43 {
+                        format!("{}...", &filer[0..40])
+                    } else {
+                        filer.to_string()
+                    };
+
+                    println!("{short_hash:<20} {status:<12} {short_filer:<45} {filed_at}");
+                }
+
+                println!();
+                println!("Total: {} dispute(s)", disputes.len());
+            }
+        }
+
+        DisputeCommands::Get { entry_hash } => {
+            let result = client
+                .dispute_get(&entry_hash)
+                .await
+                .context("Failed to get dispute. Is icnd running?")?;
+
+            if let Some(dispute) = result.get("dispute") {
+                println!("Dispute Details:");
+                println!();
+                println!(
+                    "  Entry Hash: {}",
+                    dispute.get("entry_hash").and_then(|v| v.as_str()).unwrap_or("N/A")
+                );
+                println!(
+                    "  Status:     {}",
+                    dispute.get("status").and_then(|v| v.as_str()).unwrap_or("N/A")
+                );
+                println!(
+                    "  Filer:      {}",
+                    dispute.get("filer").and_then(|v| v.as_str()).unwrap_or("N/A")
+                );
+                println!(
+                    "  Reason:     {}",
+                    dispute.get("reason").and_then(|v| v.as_str()).unwrap_or("N/A")
+                );
+                println!(
+                    "  Filed At:   {}",
+                    dispute.get("filed_at").and_then(|v| v.as_str()).unwrap_or("N/A")
+                );
+
+                if let Some(mediator) = dispute.get("mediator").and_then(|v| v.as_str()) {
+                    println!("  Mediator:   {mediator}");
+                }
+
+                if let Some(outcome) = dispute.get("outcome").and_then(|v| v.as_str()) {
+                    println!("  Outcome:    {outcome}");
+                }
+
+                if let Some(resolved_at) = dispute.get("resolved_at").and_then(|v| v.as_str()) {
+                    println!("  Resolved:   {resolved_at}");
+                }
+
+                // Display evidence
+                if let Some(evidence) = dispute.get("evidence").and_then(|v| v.as_array()) {
+                    if !evidence.is_empty() {
+                        println!();
+                        println!("  Evidence ({} item(s)):", evidence.len());
+                        for (i, e) in evidence.iter().enumerate() {
+                            let text = e.get("text").and_then(|v| v.as_str()).unwrap_or("N/A");
+                            let submitted_by =
+                                e.get("submitted_by").and_then(|v| v.as_str()).unwrap_or("N/A");
+                            let submitted_at =
+                                e.get("submitted_at").and_then(|v| v.as_str()).unwrap_or("N/A");
+
+                            println!("    {}. \"{}\"", i + 1, text);
+                            println!("       By: {submitted_by}");
+                            println!("       At: {submitted_at}");
+                        }
+                    }
+                }
+            } else if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
+                println!("Error: {error}");
+            } else {
+                println!("Dispute not found for entry hash: {entry_hash}");
+            }
+        }
+
+        DisputeCommands::AddEvidence {
+            entry_hash,
+            evidence,
+        } => {
+            let result = client
+                .dispute_add_evidence(&entry_hash, &evidence)
+                .await
+                .context("Failed to add evidence. Is icnd running?")?;
+
+            if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                println!("Evidence added successfully!");
+                println!();
+                println!("  Entry Hash: {entry_hash}");
+                println!("  Evidence:   {evidence}");
+            } else if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
+                println!("Failed to add evidence: {error}");
+            }
+        }
+
+        DisputeCommands::AssignMediator {
+            entry_hash,
+            mediator,
+        } => {
+            let result = client
+                .dispute_assign_mediator(&entry_hash, &mediator)
+                .await
+                .context("Failed to assign mediator. Is icnd running?")?;
+
+            if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                println!("Mediator assigned successfully!");
+                println!();
+                println!("  Entry Hash: {entry_hash}");
+                println!("  Mediator:   {mediator}");
+            } else if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
+                println!("Failed to assign mediator: {error}");
+            }
+        }
+
+        DisputeCommands::Resolve {
+            entry_hash,
+            outcome,
+        } => {
+            // Validate outcome
+            let valid_outcomes = ["upheld", "reversed", "settlement", "writeoff"];
+            if !valid_outcomes.contains(&outcome.as_str()) {
+                anyhow::bail!(
+                    "Invalid outcome '{}'. Valid outcomes: {}",
+                    outcome,
+                    valid_outcomes.join(", ")
+                );
+            }
+
+            let result = client
+                .dispute_resolve(&entry_hash, &outcome)
+                .await
+                .context("Failed to resolve dispute. Is icnd running?")?;
+
+            if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                println!("Dispute resolved successfully!");
+                println!();
+                println!("  Entry Hash: {entry_hash}");
+                println!("  Outcome:    {outcome}");
+
+                if let Some(resolved_at) = result.get("resolved_at").and_then(|v| v.as_str()) {
+                    println!("  Resolved:   {resolved_at}");
+                }
+            } else if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
+                println!("Failed to resolve dispute: {error}");
             }
         }
     }

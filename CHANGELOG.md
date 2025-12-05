@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Dispute Management CLI (2025-12-05)
+
+**icnctl dispute subcommands** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `icnctl dispute file --entry-hash <hash> --reason <text>` - File a dispute against a ledger entry
+- `icnctl dispute list [--status pending|resolved|all] [--filer <did>]` - List disputes with optional filters
+- `icnctl dispute get --entry-hash <hash>` - Get dispute details including evidence
+- `icnctl dispute add-evidence --entry-hash <hash> --evidence <text>` - Add evidence to a dispute
+- `icnctl dispute assign-mediator --entry-hash <hash> --mediator <did>` - Assign a mediator
+- `icnctl dispute resolve --entry-hash <hash> --outcome <upheld|reversed|settlement|writeoff>` - Resolve dispute
+
+**RPC Server** ([crates/icn-rpc/src/server.rs](icn/crates/icn-rpc/src/server.rs)):
+- Added 6 new RPC methods: `dispute.file`, `dispute.list`, `dispute.get`, `dispute.add_evidence`, `dispute.assign_mediator`, `dispute.resolve`
+- Added `dispute:read` and `dispute:write` authorization scopes
+- Integrated DisputeManager from icn-ledger crate
+
+**Supervisor Integration** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- DisputeManager now initialized alongside Ledger (shares store)
+- Wired to RPC server for runtime access
+
+Closes #53.
+
 ### Added - WebSocket Compute Event Handlers (2025-11-28)
 
 **WebSocket Example** ([sdk/typescript/examples/websocket-events.ts](sdk/typescript/examples/websocket-events.ts)):
