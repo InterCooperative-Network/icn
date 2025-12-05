@@ -685,7 +685,8 @@ impl RpcClient {
 
     /// List known cooperatives
     pub async fn federation_coop_list(&mut self) -> Result<serde_json::Value> {
-        self.call("federation.coop.list", serde_json::json!({})).await
+        self.call("federation.coop.list", serde_json::json!({}))
+            .await
     }
 
     /// Get a specific cooperative
@@ -770,7 +771,10 @@ impl RpcClient {
     }
 
     /// Remove a vouch for a cooperative
-    pub async fn federation_vouch_remove(&mut self, target_coop_id: &str) -> Result<serde_json::Value> {
+    pub async fn federation_vouch_remove(
+        &mut self,
+        target_coop_id: &str,
+    ) -> Result<serde_json::Value> {
         let params = serde_json::json!({
             "target_coop_id": target_coop_id,
         });
@@ -782,7 +786,10 @@ impl RpcClient {
     // ========================================================================
 
     /// List attestations for a member DID
-    pub async fn federation_attestation_list(&mut self, member_did: &str) -> Result<serde_json::Value> {
+    pub async fn federation_attestation_list(
+        &mut self,
+        member_did: &str,
+    ) -> Result<serde_json::Value> {
         let params = serde_json::json!({
             "member_did": member_did,
         });
@@ -790,7 +797,10 @@ impl RpcClient {
     }
 
     /// List attestations from a cooperative
-    pub async fn federation_attestation_from(&mut self, coop_id: &str) -> Result<serde_json::Value> {
+    pub async fn federation_attestation_from(
+        &mut self,
+        coop_id: &str,
+    ) -> Result<serde_json::Value> {
         let params = serde_json::json!({
             "coop_id": coop_id,
         });
@@ -820,11 +830,15 @@ impl RpcClient {
 
     /// List clearing agreements
     pub async fn federation_clearing_list(&mut self) -> Result<serde_json::Value> {
-        self.call("federation.clearing.list", serde_json::json!({})).await
+        self.call("federation.clearing.list", serde_json::json!({}))
+            .await
     }
 
     /// Show clearing agreement details
-    pub async fn federation_clearing_show(&mut self, agreement_id: &str) -> Result<serde_json::Value> {
+    pub async fn federation_clearing_show(
+        &mut self,
+        agreement_id: &str,
+    ) -> Result<serde_json::Value> {
         let params = serde_json::json!({
             "agreement_id": agreement_id,
         });
@@ -849,7 +863,10 @@ impl RpcClient {
     }
 
     /// Get clearing position
-    pub async fn federation_clearing_position(&mut self, agreement_id: &str) -> Result<serde_json::Value> {
+    pub async fn federation_clearing_position(
+        &mut self,
+        agreement_id: &str,
+    ) -> Result<serde_json::Value> {
         let params = serde_json::json!({
             "agreement_id": agreement_id,
         });
@@ -857,7 +874,10 @@ impl RpcClient {
     }
 
     /// Trigger settlement
-    pub async fn federation_clearing_settle(&mut self, agreement_id: &str) -> Result<serde_json::Value> {
+    pub async fn federation_clearing_settle(
+        &mut self,
+        agreement_id: &str,
+    ) -> Result<serde_json::Value> {
         let params = serde_json::json!({
             "agreement_id": agreement_id,
         });

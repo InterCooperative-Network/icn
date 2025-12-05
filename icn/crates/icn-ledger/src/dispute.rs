@@ -516,7 +516,12 @@ mod tests {
 
         // File a dispute first
         manager
-            .file_dispute(entry_hash.clone(), filer, "Incorrect charge".to_string(), 1000)
+            .file_dispute(
+                entry_hash.clone(),
+                filer,
+                "Incorrect charge".to_string(),
+                1000,
+            )
             .unwrap();
 
         assert!(manager.has_active_dispute(&entry_hash));

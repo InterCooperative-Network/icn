@@ -444,13 +444,9 @@ async fn dispatch_request(
         "federation.coop.register" => {
             handle_federation_coop_register(req.id, &req.params, state).await
         }
-        "federation.coop.remove" => {
-            handle_federation_coop_remove(req.id, &req.params, state).await
-        }
+        "federation.coop.remove" => handle_federation_coop_remove(req.id, &req.params, state).await,
         "federation.own.get" => handle_federation_own_get(req.id, state).await,
-        "federation.own.update" => {
-            handle_federation_own_update(req.id, &req.params, state).await
-        }
+        "federation.own.update" => handle_federation_own_update(req.id, &req.params, state).await,
         "federation.vouch.list" => handle_federation_vouch_list(req.id, &req.params, state).await,
         "federation.vouch.issue" => {
             handle_federation_vouch_issue(req.id, &req.params, state, claims).await
@@ -3713,10 +3709,8 @@ async fn handle_federation_coop_list(id: u64, state: &Arc<RpcServer>) -> RpcResp
 
     match registry.list() {
         Ok(coops) => {
-            let coop_json: Vec<serde_json::Value> = coops
-                .iter()
-                .map(|c| coop_info_to_json(c))
-                .collect();
+            let coop_json: Vec<serde_json::Value> =
+                coops.iter().map(|c| coop_info_to_json(c)).collect();
             RpcResponse::success(id, serde_json::json!({ "cooperatives": coop_json }))
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to list cooperatives: {e}")),
@@ -4225,7 +4219,11 @@ async fn handle_federation_attestation_issue(
 
     // Validate trust score
     if !(0.0..=1.0).contains(&params.trust_score) {
-        return RpcResponse::error(id, -32602, "Trust score must be between 0.0 and 1.0".to_string());
+        return RpcResponse::error(
+            id,
+            -32602,
+            "Trust score must be between 0.0 and 1.0".to_string(),
+        );
     }
 
     let did = match Did::from_str(&params.member_did) {
@@ -4307,7 +4305,13 @@ async fn handle_federation_clearing_list(id: u64, state: &Arc<RpcServer>) -> Rpc
     let own_coop_id = registry.own_coop_info().coop_id.clone();
     let manager = match ClearingManager::new(store, own_coop_id) {
         Ok(m) => m,
-        Err(e) => return RpcResponse::error(id, -32000, format!("Failed to create clearing manager: {e}")),
+        Err(e) => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                format!("Failed to create clearing manager: {e}"),
+            )
+        }
     };
 
     let agreements = manager.list_agreements();
@@ -4368,7 +4372,13 @@ async fn handle_federation_clearing_show(
     let own_coop_id = registry.own_coop_info().coop_id.clone();
     let manager = match ClearingManager::new(store, own_coop_id) {
         Ok(m) => m,
-        Err(e) => return RpcResponse::error(id, -32000, format!("Failed to create clearing manager: {e}")),
+        Err(e) => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                format!("Failed to create clearing manager: {e}"),
+            )
+        }
     };
 
     match manager.get_agreement(&params.agreement_id) {
@@ -4444,7 +4454,9 @@ async fn handle_federation_clearing_create(
                 format!("Partner cooperative '{}' not found", params.partner_coop),
             );
         }
-        Err(e) => return RpcResponse::error(id, -32000, format!("Failed to get partner coop: {e}")),
+        Err(e) => {
+            return RpcResponse::error(id, -32000, format!("Failed to get partner coop: {e}"))
+        }
     };
 
     let settlement_interval = match params.settlement.to_lowercase().as_str() {
@@ -4473,7 +4485,13 @@ async fn handle_federation_clearing_create(
 
     let manager = match ClearingManager::new(store, own_coop_id.clone()) {
         Ok(m) => m,
-        Err(e) => return RpcResponse::error(id, -32000, format!("Failed to create clearing manager: {e}")),
+        Err(e) => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                format!("Failed to create clearing manager: {e}"),
+            )
+        }
     };
 
     match manager.create_agreement(agreement) {
@@ -4533,7 +4551,13 @@ async fn handle_federation_clearing_position(
     let own_coop_id = registry.own_coop_info().coop_id.clone();
     let manager = match ClearingManager::new(store, own_coop_id) {
         Ok(m) => m,
-        Err(e) => return RpcResponse::error(id, -32000, format!("Failed to create clearing manager: {e}")),
+        Err(e) => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                format!("Failed to create clearing manager: {e}"),
+            )
+        }
     };
 
     match manager.calculate_position(&params.agreement_id) {
@@ -4587,7 +4611,13 @@ async fn handle_federation_clearing_settle(
     let own_coop_id = registry.own_coop_info().coop_id.clone();
     let manager = match ClearingManager::new(store, own_coop_id) {
         Ok(m) => m,
-        Err(e) => return RpcResponse::error(id, -32000, format!("Failed to create clearing manager: {e}")),
+        Err(e) => {
+            return RpcResponse::error(
+                id,
+                -32000,
+                format!("Failed to create clearing manager: {e}"),
+            )
+        }
     };
 
     match manager.trigger_settlement(&params.agreement_id) {

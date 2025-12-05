@@ -2422,9 +2422,7 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                 .context("Failed to list cooperatives from daemon. Is icnd running?")?;
 
             let empty_vec = vec![];
-            let coops = result["cooperatives"]
-                .as_array()
-                .unwrap_or(&empty_vec);
+            let coops = result["cooperatives"].as_array().unwrap_or(&empty_vec);
 
             if coops.is_empty() {
                 println!("No cooperatives registered yet.\n");
@@ -2456,22 +2454,32 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                 println!("Cooperative '{coop_id}' not found.");
             } else {
                 println!("Cooperative Details:\n");
-                println!("  ID:          {}", result["coop_id"].as_str().unwrap_or("?"));
+                println!(
+                    "  ID:          {}",
+                    result["coop_id"].as_str().unwrap_or("?")
+                );
                 println!("  Name:        {}", result["name"].as_str().unwrap_or("?"));
-                println!("  DID:         {}", result["public_did"].as_str().unwrap_or("?"));
+                println!(
+                    "  DID:         {}",
+                    result["public_did"].as_str().unwrap_or("?")
+                );
 
                 if let Some(gateways) = result["gateway_endpoints"].as_array() {
                     if !gateways.is_empty() {
-                        let gw_strs: Vec<&str> = gateways
-                            .iter()
-                            .filter_map(|g| g.as_str())
-                            .collect();
+                        let gw_strs: Vec<&str> =
+                            gateways.iter().filter_map(|g| g.as_str()).collect();
                         println!("  Gateways:    {}", gw_strs.join(", "));
                     }
                 }
 
-                println!("  Federated:   {}", result["federated"].as_bool().unwrap_or(false));
-                println!("  Last seen:   {}", result["last_seen"].as_u64().unwrap_or(0));
+                println!(
+                    "  Federated:   {}",
+                    result["federated"].as_bool().unwrap_or(false)
+                );
+                println!(
+                    "  Last seen:   {}",
+                    result["last_seen"].as_u64().unwrap_or(0)
+                );
 
                 // Show policy
                 if let Some(policy) = result.get("federation_policy") {
@@ -2481,10 +2489,7 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                 // Show capabilities
                 if let Some(caps) = result["capabilities"].as_array() {
                     if !caps.is_empty() {
-                        let cap_strs: Vec<&str> = caps
-                            .iter()
-                            .filter_map(|c| c.as_str())
-                            .collect();
+                        let cap_strs: Vec<&str> = caps.iter().filter_map(|c| c.as_str()).collect();
                         println!("  Capabilities: {}", cap_strs.join(", "));
                     }
                 }
@@ -2521,13 +2526,19 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                 .context("Failed to register cooperative. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Cooperative registered successfully!\n");
                 println!("  ID:      {coop_id}");
                 println!("  Name:    {name}");
                 println!("  Gateway: {gateway}");
-                println!("  DID:     {}", result["public_did"].as_str().unwrap_or("?"));
+                println!(
+                    "  DID:     {}",
+                    result["public_did"].as_str().unwrap_or("?")
+                );
             }
         }
 
@@ -2548,7 +2559,10 @@ async fn handle_coop_command(cmd: CoopCommands, endpoint: &str) -> Result<()> {
                 .context("Failed to update cooperative. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Cooperative updated successfully.");
             }
@@ -2580,10 +2594,16 @@ async fn handle_vouch_command(cmd: VouchCommands, endpoint: &str) -> Result<()> 
                 .context("Failed to issue vouch. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Vouch issued successfully!\n");
-                println!("  From:     {}", result["voucher_coop_id"].as_str().unwrap_or("?"));
+                println!(
+                    "  From:     {}",
+                    result["voucher_coop_id"].as_str().unwrap_or("?")
+                );
                 println!("  Target:   {target_coop}");
                 println!("  Trust:    {trust:.2}");
             }
@@ -2618,9 +2638,7 @@ async fn handle_vouch_command(cmd: VouchCommands, endpoint: &str) -> Result<()> 
                 let coop_id = coop["coop_id"].as_str().unwrap_or("?");
 
                 // Get vouches for this coop
-                let vouches_result = client
-                    .federation_vouch_list(coop_id)
-                    .await;
+                let vouches_result = client.federation_vouch_list(coop_id).await;
 
                 if let Ok(vouches) = vouches_result {
                     if let Some(vouchers) = vouches["vouchers"].as_array() {
@@ -2629,7 +2647,8 @@ async fn handle_vouch_command(cmd: VouchCommands, endpoint: &str) -> Result<()> 
                                 found_vouches = true;
                                 let trust = vouch["trust_score"].as_f64().unwrap_or(0.0);
                                 let expired = vouch["is_expired"].as_bool().unwrap_or(false);
-                                println!("{:<20} {:<10.2} {:<10}",
+                                println!(
+                                    "{:<20} {:<10.2} {:<10}",
                                     coop_id,
                                     trust,
                                     if expired { "Yes" } else { "No" }
@@ -2653,7 +2672,10 @@ async fn handle_vouch_command(cmd: VouchCommands, endpoint: &str) -> Result<()> 
                 .context("Failed to revoke vouch. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Vouch for '{target_coop}' revoked successfully.");
             }
@@ -2676,9 +2698,7 @@ async fn handle_attestation_command(cmd: AttestationCommands, endpoint: &str) ->
                 .context("Failed to list attestations. Is icnd running?")?;
 
             let empty_atts = vec![];
-            let attestations = result["attestations"]
-                .as_array()
-                .unwrap_or(&empty_atts);
+            let attestations = result["attestations"].as_array().unwrap_or(&empty_atts);
 
             if attestations.is_empty() {
                 println!("No valid attestations found for {member_did}.");
@@ -2742,7 +2762,10 @@ async fn handle_attestation_command(cmd: AttestationCommands, endpoint: &str) ->
                 .context("Failed to issue attestation. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Attestation issued successfully!\n");
                 println!("  Member:   {member_did}");
@@ -2769,9 +2792,7 @@ async fn handle_clearing_command(cmd: ClearingCommands, endpoint: &str) -> Resul
                 .context("Failed to list clearing agreements. Is icnd running?")?;
 
             let empty_agreements = vec![];
-            let agreements = result["agreements"]
-                .as_array()
-                .unwrap_or(&empty_agreements);
+            let agreements = result["agreements"].as_array().unwrap_or(&empty_agreements);
 
             if agreements.is_empty() {
                 println!("No clearing agreements yet.\n");
@@ -2805,12 +2826,30 @@ async fn handle_clearing_command(cmd: ClearingCommands, endpoint: &str) -> Resul
                 println!("Agreement '{agreement_id}' not found.");
             } else {
                 println!("Clearing Agreement Details:\n");
-                println!("  ID:            {}", result["agreement_id"].as_str().unwrap_or("?"));
-                println!("  Coop A:        {}", result["coop_a"].as_str().unwrap_or("?"));
-                println!("  Coop B:        {}", result["coop_b"].as_str().unwrap_or("?"));
-                println!("  Max Imbalance: {}", result["max_imbalance"].as_i64().unwrap_or(0));
-                println!("  Settlement:    {}", result["settlement_interval"].as_str().unwrap_or("?"));
-                println!("  Signatures:    {}", result["signatures"].as_u64().unwrap_or(0));
+                println!(
+                    "  ID:            {}",
+                    result["agreement_id"].as_str().unwrap_or("?")
+                );
+                println!(
+                    "  Coop A:        {}",
+                    result["coop_a"].as_str().unwrap_or("?")
+                );
+                println!(
+                    "  Coop B:        {}",
+                    result["coop_b"].as_str().unwrap_or("?")
+                );
+                println!(
+                    "  Max Imbalance: {}",
+                    result["max_imbalance"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Settlement:    {}",
+                    result["settlement_interval"].as_str().unwrap_or("?")
+                );
+                println!(
+                    "  Signatures:    {}",
+                    result["signatures"].as_u64().unwrap_or(0)
+                );
 
                 if let Some(rates) = result["exchange_rates"].as_object() {
                     if !rates.is_empty() {
@@ -2831,12 +2870,20 @@ async fn handle_clearing_command(cmd: ClearingCommands, endpoint: &str) -> Resul
             settlement,
         } => {
             let result = client
-                .federation_clearing_create(&agreement_id, &partner_coop, max_imbalance, &settlement)
+                .federation_clearing_create(
+                    &agreement_id,
+                    &partner_coop,
+                    max_imbalance,
+                    &settlement,
+                )
                 .await
                 .context("Failed to create clearing agreement. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 let our_coop = result["our_coop"].as_str().unwrap_or("?");
                 println!("Clearing agreement created successfully!\n");
@@ -2870,13 +2917,28 @@ async fn handle_clearing_command(cmd: ClearingCommands, endpoint: &str) -> Resul
                 .context("Failed to get clearing position. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Clearing Position for '{agreement_id}':\n");
-                println!("  Coop A owes B: {}", result["coop_a_owes_b"].as_i64().unwrap_or(0));
-                println!("  Coop B owes A: {}", result["coop_b_owes_a"].as_i64().unwrap_or(0));
-                println!("  Net position:  {}", result["net_position"].as_i64().unwrap_or(0));
-                println!("  Pending transfers: {}", result["pending_transfers"].as_u64().unwrap_or(0));
+                println!(
+                    "  Coop A owes B: {}",
+                    result["coop_a_owes_b"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Coop B owes A: {}",
+                    result["coop_b_owes_a"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Net position:  {}",
+                    result["net_position"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Pending transfers: {}",
+                    result["pending_transfers"].as_u64().unwrap_or(0)
+                );
             }
         }
 
@@ -2887,14 +2949,32 @@ async fn handle_clearing_command(cmd: ClearingCommands, endpoint: &str) -> Resul
                 .context("Failed to settle. Is icnd running?")?;
 
             if result.get("error").is_some() {
-                println!("Error: {}", result["error"].as_str().unwrap_or("Unknown error"));
+                println!(
+                    "Error: {}",
+                    result["error"].as_str().unwrap_or("Unknown error")
+                );
             } else {
                 println!("Settlement Report:\n");
-                println!("  Agreement:         {}", result["agreement_id"].as_str().unwrap_or("?"));
-                println!("  Coop A owed:       {}", result["coop_a_owed"].as_i64().unwrap_or(0));
-                println!("  Coop B owed:       {}", result["coop_b_owed"].as_i64().unwrap_or(0));
-                println!("  Net settlement:    {}", result["net_settlement"].as_i64().unwrap_or(0));
-                println!("  Transfers settled: {}", result["transfers_settled"].as_u64().unwrap_or(0));
+                println!(
+                    "  Agreement:         {}",
+                    result["agreement_id"].as_str().unwrap_or("?")
+                );
+                println!(
+                    "  Coop A owed:       {}",
+                    result["coop_a_owed"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Coop B owed:       {}",
+                    result["coop_b_owed"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Net settlement:    {}",
+                    result["net_settlement"].as_i64().unwrap_or(0)
+                );
+                println!(
+                    "  Transfers settled: {}",
+                    result["transfers_settled"].as_u64().unwrap_or(0)
+                );
                 println!("\nSettlement completed successfully.");
             }
         }

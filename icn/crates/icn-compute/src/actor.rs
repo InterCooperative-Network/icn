@@ -97,9 +97,7 @@ fn outcome_to_value(outcome: &crate::types::ExecutionOutcome) -> icn_ccl::Value 
         crate::types::ExecutionOutcome::OutOfFuel => {
             icn_ccl::Value::String("out_of_fuel".to_string())
         }
-        crate::types::ExecutionOutcome::Timeout => {
-            icn_ccl::Value::String("timeout".to_string())
-        }
+        crate::types::ExecutionOutcome::Timeout => icn_ccl::Value::String("timeout".to_string()),
     }
 }
 
@@ -118,10 +116,9 @@ fn results_match(r1: &ComputeResult, r2: &ComputeResult) -> bool {
             crate::types::ExecutionOutcome::Failed(err2),
         ) => err1 == err2,
         // Both out of fuel
-        (
-            crate::types::ExecutionOutcome::OutOfFuel,
-            crate::types::ExecutionOutcome::OutOfFuel,
-        ) => true,
+        (crate::types::ExecutionOutcome::OutOfFuel, crate::types::ExecutionOutcome::OutOfFuel) => {
+            true
+        }
         // Both timeout
         (crate::types::ExecutionOutcome::Timeout, crate::types::ExecutionOutcome::Timeout) => true,
         // Different outcome types = conflict
@@ -1628,11 +1625,11 @@ impl ComputeActor {
                 // Auto-file disputes for each conflicting result
                 if let Some(ref dispute_system) = self.dispute_resolution {
                     for conflicting in &conflicts {
-                        let first_executor: icn_identity::Did =
-                            match first_result.executor.parse() {
-                                Ok(did) => did,
-                                Err(_) => continue,
-                            };
+                        let first_executor: icn_identity::Did = match first_result.executor.parse()
+                        {
+                            Ok(did) => did,
+                            Err(_) => continue,
+                        };
                         let conflicting_executor: icn_identity::Did =
                             match conflicting.executor.parse() {
                                 Ok(did) => did,
@@ -3466,10 +3463,7 @@ mod tests {
             signature: vec![],
         };
 
-        assert!(
-            results_match(&r1, &r2),
-            "Both OutOfFuel should match"
-        );
+        assert!(results_match(&r1, &r2), "Both OutOfFuel should match");
     }
 
     #[test]
