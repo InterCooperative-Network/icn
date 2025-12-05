@@ -10,24 +10,6 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
-# Reusable step: free disk space on GitHub-hosted runners
-x-free-disk-space-step: &free-disk-space-step
-  name: Free disk space
-  run: |
-    echo "Initial disk usage:"
-    df -h
-
-    echo "Removing preinstalled SDKs to free space..."
-    sudo rm -rf /usr/share/dotnet
-    sudo rm -rf /usr/local/lib/android
-    sudo rm -rf /opt/ghc
-
-    echo "Pruning Docker data (if any)..."
-    docker system prune -af || true
-
-    echo "Final disk usage:"
-    df -h
-
 jobs:
   fmt:
     name: Format Check
@@ -47,7 +29,13 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - <<: *free-disk-space-step
+      - name: Free disk space
+        run: |
+          echo "Removing preinstalled SDKs to free space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
 
       - uses: actions/checkout@v4
 
@@ -67,7 +55,13 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - <<: *free-disk-space-step
+      - name: Free disk space
+        run: |
+          echo "Removing preinstalled SDKs to free space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
 
       - uses: actions/checkout@v4
 
@@ -85,7 +79,13 @@ jobs:
     name: Build Release
     runs-on: ubuntu-latest
     steps:
-      - <<: *free-disk-space-step
+      - name: Free disk space
+        run: |
+          echo "Removing preinstalled SDKs to free space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
 
       - uses: actions/checkout@v4
 
@@ -115,7 +115,14 @@ jobs:
       run:
         working-directory: ./sdk/typescript
     steps:
-      - <<: *free-disk-space-step
+      - name: Free disk space
+        run: |
+          echo "Removing preinstalled SDKs to free space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
+        working-directory: .
 
       - uses: actions/checkout@v4
 
@@ -142,7 +149,14 @@ jobs:
       run:
         working-directory: ./web/pilot-ui
     steps:
-      - <<: *free-disk-space-step
+      - name: Free disk space
+        run: |
+          echo "Removing preinstalled SDKs to free space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          docker system prune -af || true
+        working-directory: .
 
       - uses: actions/checkout@v4
 
