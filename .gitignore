@@ -6,6 +6,8 @@ target/
 # Cargo
 # Track workspace Cargo.lock for reproducible builds
 !icn/Cargo.lock
+# Ignore example Cargo.lock files
+examples/*/Cargo.lock
 
 # IDE
 .idea/
