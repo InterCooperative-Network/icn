@@ -21,6 +21,26 @@ pub enum CodeType {
     Wasm,
 }
 
+/// Resource profile for compute tasks (API representation)
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+pub struct ResourceProfileRequest {
+    /// CPU cores required (e.g., 0.5 = half a core, 2.0 = two cores)
+    #[serde(default)]
+    pub cpu_cores: Option<f64>,
+    /// Memory required in megabytes
+    #[serde(default)]
+    pub memory_mb: Option<u64>,
+    /// Temporary storage required in megabytes
+    #[serde(default)]
+    pub storage_mb: Option<u64>,
+    /// Network bandwidth required in Mbps
+    #[serde(default)]
+    pub network_mbps: Option<f64>,
+    /// Expected runtime duration in seconds
+    #[serde(default)]
+    pub duration_estimate_secs: Option<u64>,
+}
+
 /// Request to submit a compute task
 #[derive(Debug, serde::Deserialize)]
 pub struct SubmitTaskRequest {
@@ -54,6 +74,9 @@ pub struct SubmitTaskRequest {
     /// Payment currency (default: credits)
     #[serde(default)]
     pub payment_currency: Option<String>,
+    /// Resource requirements for the task (optional)
+    #[serde(default)]
+    pub resource_profile: Option<ResourceProfileRequest>,
 }
 
 fn default_fuel_limit() -> u64 {
@@ -147,6 +170,7 @@ pub async fn submit_task(
             req.deadline_ms,
             req.payment_rate,
             req.payment_currency.clone(),
+            req.resource_profile.clone(),
         )
         .await
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;

@@ -6,8 +6,10 @@
 //! 2. ComputeHandle (when integrated with daemon)
 
 use anyhow::Result;
+use crate::api::compute::ResourceProfileRequest;
 use icn_compute::{
-    ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TaskStatus,
+    ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, ResourceProfile, TaskCode,
+    TaskPriority, TaskStatus,
 };
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -80,6 +82,7 @@ impl ComputeManager {
             deadline_ms,
             payment_rate,
             payment_currency,
+            None, // No resource profile for legacy API
         )
         .await
     }
@@ -97,6 +100,7 @@ impl ComputeManager {
         deadline_ms: Option<u64>,
         payment_rate: Option<u64>,
         payment_currency: Option<String>,
+        resource_profile: Option<ResourceProfileRequest>,
     ) -> Result<TaskHash> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -134,7 +138,16 @@ impl ComputeManager {
             deadline: absolute_deadline,
             payment_rate,
             payment_currency,
-            resource_profile: None, // TODO: Allow REST API clients to specify resource requirements
+            resource_profile: resource_profile.map(|rp| ResourceProfile {
+                cpu_cores: rp.cpu_cores,
+                memory_mb: rp.memory_mb,
+                storage_mb: rp.storage_mb,
+                network_mbps: rp.network_mbps,
+                gpu_spec: None, // GPU not exposed via REST API yet
+                duration_estimate: rp
+                    .duration_estimate_secs
+                    .map(std::time::Duration::from_secs),
+            }),
             actor_mode: None,       // Not actor mode (Phase 16D)
             placement_constraints: None, // No constraints from API (Phase 16E will set from policy)
         };
