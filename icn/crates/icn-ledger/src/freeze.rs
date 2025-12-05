@@ -411,14 +411,14 @@ impl FreezeManager {
         record: &FrozenMember,
         store: &Arc<dyn Store>,
     ) -> anyhow::Result<()> {
-        let key = format!("{}{}", FREEZE_PREFIX, did);
+        let key = format!("{FREEZE_PREFIX}{did}");
         let value = serde_json::to_vec(record)?;
         store.put(key.as_bytes(), &value)?;
         Ok(())
     }
 
     fn remove_frozen(&self, did: &Did, store: &Arc<dyn Store>) -> anyhow::Result<()> {
-        let key = format!("{}{}", FREEZE_PREFIX, did);
+        let key = format!("{FREEZE_PREFIX}{did}");
         store.delete(key.as_bytes())?;
         Ok(())
     }

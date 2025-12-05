@@ -89,8 +89,8 @@ fn test_registry_persistence_across_restarts() {
         // Register multiple coops
         for i in 1..=5 {
             let coop = create_coop_info(
-                &format!("coop-{}", i),
-                &format!("Cooperative {}", i),
+                &format!("coop-{i}"),
+                &format!("Cooperative {i}"),
                 FederationPolicy::Open,
             );
             registry.register(coop).unwrap();

@@ -6,6 +6,8 @@
 //! 3. Protected method access with valid/invalid tokens
 //! 4. Error handling and response formats
 
+#![allow(clippy::uninlined_format_args)]
+
 use anyhow::Result;
 use icn_identity::KeyPair;
 use icn_rpc::{RpcClient, RpcServer};

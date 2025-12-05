@@ -156,8 +156,7 @@ async fn test_unauthorized_subscription_violation() -> Result<()> {
     let score = reputation.unwrap();
     assert!(
         score < 1.0,
-        "Reputation should decrease after violation (score: {})",
-        score
+        "Reputation should decrease after violation (score: {score})"
     );
 
     debug!("Node2 reputation after violation: {:.3}", score);
@@ -190,7 +189,7 @@ async fn test_acl_violation_rate_limit_quarantine() -> Result<()> {
     for i in 0..12 {
         let mut gossip = node1.gossip.write().await;
         let result = gossip.subscribe("private:data", node2.did.clone());
-        assert!(result.is_err(), "Iteration {}: Subscription should fail", i);
+        assert!(result.is_err(), "Iteration {i}: Subscription should fail");
 
         // Small delay to simulate realistic attack
         drop(gossip);

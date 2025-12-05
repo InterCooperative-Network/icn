@@ -567,10 +567,7 @@ fn test_comparison_operations() {
         assert_eq!(
             result.value,
             Value::Bool(expected),
-            "Failed for {:?}({}, {})",
-            op,
-            a,
-            b
+            "Failed for {op:?}({a}, {b})"
         );
     }
 }

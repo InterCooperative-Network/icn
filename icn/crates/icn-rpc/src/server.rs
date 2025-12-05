@@ -421,7 +421,9 @@ async fn dispatch_request(
         "dispute.file" => handle_dispute_file(req.id, &req.params, state, claims).await,
         "dispute.list" => handle_dispute_list(req.id, &req.params, state).await,
         "dispute.get" => handle_dispute_get(req.id, &req.params, state).await,
-        "dispute.add_evidence" => handle_dispute_add_evidence(req.id, &req.params, state, claims).await,
+        "dispute.add_evidence" => {
+            handle_dispute_add_evidence(req.id, &req.params, state, claims).await
+        }
         "dispute.assign_mediator" => {
             handle_dispute_assign_mediator(req.id, &req.params, state, claims).await
         }
@@ -3204,7 +3206,12 @@ async fn handle_dispute_file(
         .as_secs();
 
     let mut manager = dispute_manager.write().await;
-    match manager.file_dispute(entry_hash.clone(), filer_did.clone(), params.reason.clone(), filed_at) {
+    match manager.file_dispute(
+        entry_hash.clone(),
+        filer_did.clone(),
+        params.reason.clone(),
+        filed_at,
+    ) {
         Ok(_dispute) => {
             info!(
                 "Dispute filed against entry {} by {}",
@@ -3273,7 +3280,7 @@ async fn handle_dispute_list(
             return RpcResponse::error(
                 id,
                 -32602,
-                format!("Invalid status filter '{}': must be pending, resolved, or all", other),
+                format!("Invalid status filter '{other}': must be pending, resolved, or all"),
             );
         }
     };
@@ -3532,11 +3539,15 @@ async fn handle_dispute_resolve(
         "upheld" => DisputeOutcome::Upheld,
         "reversed" => DisputeOutcome::Reversed,
         "settlement" => DisputeOutcome::Settlement {
-            terms: params.terms.unwrap_or_else(|| "Settlement agreed".to_string()),
+            terms: params
+                .terms
+                .unwrap_or_else(|| "Settlement agreed".to_string()),
             replacement_entry: None,
         },
         "writeoff" => DisputeOutcome::WriteOff {
-            reason: params.reason.unwrap_or_else(|| "Debt written off".to_string()),
+            reason: params
+                .reason
+                .unwrap_or_else(|| "Debt written off".to_string()),
         },
         _ => {
             return RpcResponse::error(
@@ -3553,7 +3564,12 @@ async fn handle_dispute_resolve(
         .as_secs();
 
     let mut manager = dispute_manager.write().await;
-    match manager.resolve_dispute(&entry_hash, mediator_did.clone(), outcome.clone(), resolved_at) {
+    match manager.resolve_dispute(
+        &entry_hash,
+        mediator_did.clone(),
+        outcome.clone(),
+        resolved_at,
+    ) {
         Ok(()) => {
             info!(
                 "Dispute {} resolved by {} with outcome {:?}",
@@ -3589,7 +3605,7 @@ fn dispute_to_json(dispute: &Dispute) -> serde_json::Value {
             resolved_at,
         } => (
             Some(mediator.to_string()),
-            Some(format!("{:?}", outcome)),
+            Some(format!("{outcome:?}")),
             Some(*resolved_at),
         ),
         _ => (dispute.mediator.as_ref().map(|m| m.to_string()), None, None),

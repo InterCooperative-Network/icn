@@ -108,15 +108,15 @@ impl CooperativeInfo {
         let verifying_key = self
             .public_did
             .to_verifying_key()
-            .map_err(|e| format!("Failed to extract public key from DID: {}", e))?;
+            .map_err(|e| format!("Failed to extract public key from DID: {e}"))?;
 
         let signature = ed25519_dalek::Signature::from_slice(&self.signature)
-            .map_err(|e| format!("Invalid signature format: {}", e))?;
+            .map_err(|e| format!("Invalid signature format: {e}"))?;
 
         use ed25519_dalek::Verifier;
         verifying_key
             .verify(&self.signing_bytes(), &signature)
-            .map_err(|e| format!("Signature verification failed: {}", e))
+            .map_err(|e| format!("Signature verification failed: {e}"))
     }
 
     /// Check if this cooperative supports a specific capability
@@ -328,15 +328,15 @@ impl Vouch {
         let verifying_key = self
             .voucher_did
             .to_verifying_key()
-            .map_err(|e| format!("Failed to extract public key from DID: {}", e))?;
+            .map_err(|e| format!("Failed to extract public key from DID: {e}"))?;
 
         let signature = ed25519_dalek::Signature::from_slice(&self.signature)
-            .map_err(|e| format!("Invalid signature format: {}", e))?;
+            .map_err(|e| format!("Invalid signature format: {e}"))?;
 
         use ed25519_dalek::Verifier;
         verifying_key
             .verify(&self.signing_bytes(), &signature)
-            .map_err(|e| format!("Signature verification failed: {}", e))
+            .map_err(|e| format!("Signature verification failed: {e}"))
     }
 
     /// Check if the vouch has expired

@@ -147,7 +147,7 @@ mod tests {
 
         let did = test_did();
         let req = test::TestRequest::get()
-            .uri(&format!("/identity/resolve/{}", did))
+            .uri(&format!("/identity/resolve/{did}"))
             .to_request();
         let resp = test::call_service(&app, req).await;
 
@@ -188,8 +188,7 @@ mod tests {
         let did = test_did();
         let req = test::TestRequest::get()
             .uri(&format!(
-                "/identity/resolve/{}?include_attestations=true",
-                did
+                "/identity/resolve/{did}?include_attestations=true"
             ))
             .to_request();
         let resp = test::call_service(&app, req).await;

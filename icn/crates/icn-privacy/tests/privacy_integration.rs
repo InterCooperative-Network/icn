@@ -121,7 +121,7 @@ fn test_find_matches_across_many_topics() {
     let encryptor = TopicEncryptor::new(shared_key);
 
     // Create a large set of encrypted topics
-    let all_topics: Vec<String> = (0..100).map(|i| format!("topic:{}", i)).collect();
+    let all_topics: Vec<String> = (0..100).map(|i| format!("topic:{i}")).collect();
 
     let encrypted_all: Vec<_> = all_topics
         .iter()
@@ -389,8 +389,8 @@ fn test_random_delays_within_bounds() {
     for _ in 0..100 {
         let delay = obfuscator.random_delay();
         let delay_ms = delay.as_millis() as u64;
-        assert!(delay_ms >= 100, "Delay {} should be >= 100ms", delay_ms);
-        assert!(delay_ms <= 500, "Delay {} should be <= 500ms", delay_ms);
+        assert!(delay_ms >= 100, "Delay {delay_ms} should be >= 100ms");
+        assert!(delay_ms <= 500, "Delay {delay_ms} should be <= 500ms");
     }
 }
 
@@ -642,7 +642,7 @@ fn test_bloom_filter_many_topics() {
 
     // Add many topics
     for i in 0..1000 {
-        filter.insert(&format!("topic:{}", i));
+        filter.insert(&format!("topic:{i}"));
     }
 
     assert_eq!(filter.len(), 1000);

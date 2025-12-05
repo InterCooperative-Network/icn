@@ -378,12 +378,15 @@ impl DisputeResolutionSystem {
         };
 
         // Apply escalation multiplier for repeat offenders
-        let escalation_count = record.disputes_lost.saturating_sub(
-            self.config.penalty_config.escalation_threshold,
-        );
+        let escalation_count = record
+            .disputes_lost
+            .saturating_sub(self.config.penalty_config.escalation_threshold);
         let escalation_factor = if escalation_count > 0 {
             icn_obs::metrics::disputes::escalated_penalties_inc();
-            self.config.penalty_config.escalation_multiplier.powi(escalation_count as i32)
+            self.config
+                .penalty_config
+                .escalation_multiplier
+                .powi(escalation_count as i32)
         } else {
             1.0
         };
@@ -551,99 +554,99 @@ impl DisputeResolutionSystem {
         let rule_name_owned = rule_name.to_string();
 
         // Wrap synchronous execution in spawn_blocking and apply timeout
-        let execution_future = tokio::task::spawn_blocking(move || {
-            interpreter.execute_rule(&rule_name_owned, args)
-        });
+        let execution_future =
+            tokio::task::spawn_blocking(move || interpreter.execute_rule(&rule_name_owned, args));
 
-        let re_execution_result = match tokio::time::timeout(timeout_duration, execution_future).await {
-            Ok(Ok(Ok(result))) => result.value,
-            Ok(Ok(Err(e))) => {
-                warn!(
-                    "Re-execution failed for dispute {}: {}",
-                    hex::encode(dispute_id),
-                    e
-                );
+        let re_execution_result =
+            match tokio::time::timeout(timeout_duration, execution_future).await {
+                Ok(Ok(Ok(result))) => result.value,
+                Ok(Ok(Err(e))) => {
+                    warn!(
+                        "Re-execution failed for dispute {}: {}",
+                        hex::encode(dispute_id),
+                        e
+                    );
 
-                // If re-execution fails, mark as inconclusive
-                let mediator = {
-                    let dispute = self.disputes.get(&dispute_id).unwrap();
-                    self.assign_mediator(dispute)?
-                };
-
-                let outcome = DisputeOutcome::Inconclusive {
-                    reason: format!("Re-execution failed: {e}"),
-                    mediator_assigned: mediator,
-                };
-
-                {
-                    let dispute = self.disputes.get_mut(&dispute_id).unwrap();
-                    dispute.status = DisputeStatus::Resolved {
-                        outcome: outcome.clone(),
-                        resolved_at: SystemTime::now(),
+                    // If re-execution fails, mark as inconclusive
+                    let mediator = {
+                        let dispute = self.disputes.get(&dispute_id).unwrap();
+                        self.assign_mediator(dispute)?
                     };
-                }
 
-                return Ok(outcome);
-            }
-            Ok(Err(join_error)) => {
-                warn!(
-                    "Re-execution task panicked for dispute {}: {}",
-                    hex::encode(dispute_id),
-                    join_error
-                );
-
-                let mediator = {
-                    let dispute = self.disputes.get(&dispute_id).unwrap();
-                    self.assign_mediator(dispute)?
-                };
-
-                let outcome = DisputeOutcome::Inconclusive {
-                    reason: format!("Re-execution task panicked: {join_error}"),
-                    mediator_assigned: mediator,
-                };
-
-                {
-                    let dispute = self.disputes.get_mut(&dispute_id).unwrap();
-                    dispute.status = DisputeStatus::Resolved {
-                        outcome: outcome.clone(),
-                        resolved_at: SystemTime::now(),
+                    let outcome = DisputeOutcome::Inconclusive {
+                        reason: format!("Re-execution failed: {e}"),
+                        mediator_assigned: mediator,
                     };
+
+                    {
+                        let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                        dispute.status = DisputeStatus::Resolved {
+                            outcome: outcome.clone(),
+                            resolved_at: SystemTime::now(),
+                        };
+                    }
+
+                    return Ok(outcome);
                 }
+                Ok(Err(join_error)) => {
+                    warn!(
+                        "Re-execution task panicked for dispute {}: {}",
+                        hex::encode(dispute_id),
+                        join_error
+                    );
 
-                return Ok(outcome);
-            }
-            Err(_elapsed) => {
-                // Timeout occurred - mark as inconclusive and assign mediator
-                warn!(
-                    "Re-execution timed out after {:?} for dispute {}",
-                    timeout_duration,
-                    hex::encode(dispute_id)
-                );
-
-                let mediator = {
-                    let dispute = self.disputes.get(&dispute_id).unwrap();
-                    self.assign_mediator(dispute)?
-                };
-
-                let outcome = DisputeOutcome::Inconclusive {
-                    reason: format!(
-                        "Re-execution timed out after {}s",
-                        timeout_duration.as_secs()
-                    ),
-                    mediator_assigned: mediator,
-                };
-
-                {
-                    let dispute = self.disputes.get_mut(&dispute_id).unwrap();
-                    dispute.status = DisputeStatus::Resolved {
-                        outcome: outcome.clone(),
-                        resolved_at: SystemTime::now(),
+                    let mediator = {
+                        let dispute = self.disputes.get(&dispute_id).unwrap();
+                        self.assign_mediator(dispute)?
                     };
-                }
 
-                return Ok(outcome);
-            }
-        };
+                    let outcome = DisputeOutcome::Inconclusive {
+                        reason: format!("Re-execution task panicked: {join_error}"),
+                        mediator_assigned: mediator,
+                    };
+
+                    {
+                        let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                        dispute.status = DisputeStatus::Resolved {
+                            outcome: outcome.clone(),
+                            resolved_at: SystemTime::now(),
+                        };
+                    }
+
+                    return Ok(outcome);
+                }
+                Err(_elapsed) => {
+                    // Timeout occurred - mark as inconclusive and assign mediator
+                    warn!(
+                        "Re-execution timed out after {:?} for dispute {}",
+                        timeout_duration,
+                        hex::encode(dispute_id)
+                    );
+
+                    let mediator = {
+                        let dispute = self.disputes.get(&dispute_id).unwrap();
+                        self.assign_mediator(dispute)?
+                    };
+
+                    let outcome = DisputeOutcome::Inconclusive {
+                        reason: format!(
+                            "Re-execution timed out after {}s",
+                            timeout_duration.as_secs()
+                        ),
+                        mediator_assigned: mediator,
+                    };
+
+                    {
+                        let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                        dispute.status = DisputeStatus::Resolved {
+                            outcome: outcome.clone(),
+                            resolved_at: SystemTime::now(),
+                        };
+                    }
+
+                    return Ok(outcome);
+                }
+            };
 
         // Get dispute reason for penalty calculation
         let dispute_reason = {
@@ -856,9 +859,7 @@ impl DisputeResolutionSystem {
         let workload_penalty = (active_disputes as f64 * 0.1).min(0.5);
 
         // Final score
-        let score = trust_score * (1.0 - workload_penalty);
-
-        score
+        trust_score * (1.0 - workload_penalty)
     }
 
     /// Get the number of active disputes assigned to a mediator
@@ -1035,29 +1036,17 @@ pub enum DisputeActorMsg {
         reply: tokio::sync::oneshot::Sender<DisputeStats>,
     },
     /// Add mediator to pool
-    AddMediator {
-        mediator: Did,
-    },
+    AddMediator { mediator: Did },
     /// Remove mediator from pool
-    RemoveMediator {
-        mediator: Did,
-    },
+    RemoveMediator { mediator: Did },
     /// Set misbehavior callback
-    SetMisbehaviorCallback {
-        callback: MisbehaviorCallback,
-    },
+    SetMisbehaviorCallback { callback: MisbehaviorCallback },
     /// Set trust callback for mediator scoring
-    SetTrustCallback {
-        callback: TrustCallback,
-    },
+    SetTrustCallback { callback: TrustCallback },
     /// Set gossip callback for broadcasting dispute events
-    SetGossipCallback {
-        callback: DisputeGossipCallback,
-    },
+    SetGossipCallback { callback: DisputeGossipCallback },
     /// Set trust penalty callback for applying penalties to dispute losers
-    SetTrustPenaltyCallback {
-        callback: TrustPenaltyCallback,
-    },
+    SetTrustPenaltyCallback { callback: TrustPenaltyCallback },
     /// Add mediator with expertise tags
     AddMediatorWithExpertise {
         mediator: Did,
@@ -1115,12 +1104,8 @@ impl std::fmt::Debug for DisputeActorMsg {
             Self::SetMisbehaviorCallback { .. } => {
                 f.debug_struct("SetMisbehaviorCallback").finish()
             }
-            Self::SetTrustCallback { .. } => {
-                f.debug_struct("SetTrustCallback").finish()
-            }
-            Self::SetGossipCallback { .. } => {
-                f.debug_struct("SetGossipCallback").finish()
-            }
+            Self::SetTrustCallback { .. } => f.debug_struct("SetTrustCallback").finish(),
+            Self::SetGossipCallback { .. } => f.debug_struct("SetGossipCallback").finish(),
             Self::SetTrustPenaltyCallback { .. } => {
                 f.debug_struct("SetTrustPenaltyCallback").finish()
             }
@@ -1204,7 +1189,12 @@ impl DisputeActorHandle {
     /// Get dispute statistics
     pub async fn get_stats(&self) -> DisputeStats {
         let (reply, rx) = tokio::sync::oneshot::channel();
-        if self.tx.send(DisputeActorMsg::GetStats { reply }).await.is_ok() {
+        if self
+            .tx
+            .send(DisputeActorMsg::GetStats { reply })
+            .await
+            .is_ok()
+        {
             rx.await.unwrap_or_default()
         } else {
             DisputeStats::default()
@@ -1213,7 +1203,10 @@ impl DisputeActorHandle {
 
     /// Add a mediator to the pool
     pub async fn add_mediator(&self, mediator: Did) {
-        let _ = self.tx.send(DisputeActorMsg::AddMediator { mediator }).await;
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::AddMediator { mediator })
+            .await;
     }
 
     /// Remove a mediator from the pool
@@ -1360,7 +1353,9 @@ impl DisputeActor {
                     reply,
                 } => {
                     let mut sys = system.write().await;
-                    let result = sys.file_dispute(task_hash, executor, challenger, evidence).await;
+                    let result = sys
+                        .file_dispute(task_hash, executor, challenger, evidence)
+                        .await;
                     let _ = reply.send(result);
                 }
                 DisputeActorMsg::InvestigateDispute {
@@ -1371,7 +1366,9 @@ impl DisputeActor {
                     reply,
                 } => {
                     let mut sys = system.write().await;
-                    let result = sys.investigate_dispute(dispute_id, &contract, &rule_name, args).await;
+                    let result = sys
+                        .investigate_dispute(dispute_id, &contract, &rule_name, args)
+                        .await;
                     let _ = reply.send(result);
                 }
                 DisputeActorMsg::GetDispute { dispute_id, reply } => {
@@ -1485,7 +1482,8 @@ impl DisputeActor {
                     mediator,
                     expertise_tags,
                 } => {
-                    self.system.add_mediator_with_expertise(mediator, expertise_tags);
+                    self.system
+                        .add_mediator_with_expertise(mediator, expertise_tags);
                 }
                 DisputeActorMsg::GetOffenderRecord { did, reply } => {
                     let _ = reply.send(self.system.get_offender_record(&did).cloned());
@@ -1786,16 +1784,17 @@ mod tests {
             DisputeOutcome::Inconclusive { reason, .. } => {
                 // If it timed out, verify the reason mentions timeout
                 assert!(
-                    reason.contains("timed out") || reason.contains("failed") || reason.contains("panicked"),
-                    "Expected timeout/failure reason, got: {}",
-                    reason
+                    reason.contains("timed out")
+                        || reason.contains("failed")
+                        || reason.contains("panicked"),
+                    "Expected timeout/failure reason, got: {reason}"
                 );
             }
             DisputeOutcome::ExecutorCorrect { .. } => {
                 // Contract executed fast enough - this is also valid
             }
             other => {
-                panic!("Unexpected outcome: {:?}", other);
+                panic!("Unexpected outcome: {other:?}");
             }
         }
     }
@@ -2041,7 +2040,12 @@ mod tests {
         };
 
         let dispute_id1 = system
-            .file_dispute(task_hash1, executor1.clone(), challenger1.clone(), evidence1)
+            .file_dispute(
+                task_hash1,
+                executor1.clone(),
+                challenger1.clone(),
+                evidence1,
+            )
             .await
             .unwrap();
 
@@ -2071,7 +2075,12 @@ mod tests {
         };
 
         let dispute_id2 = system
-            .file_dispute(task_hash2, executor2.clone(), challenger2.clone(), evidence2)
+            .file_dispute(
+                task_hash2,
+                executor2.clone(),
+                challenger2.clone(),
+                evidence2,
+            )
             .await
             .unwrap();
 
@@ -2421,8 +2430,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_repeat_offender_escalation() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
         let config = DisputeConfig {
             enable_penalties: true,
             penalty_config: PenaltyConfig {

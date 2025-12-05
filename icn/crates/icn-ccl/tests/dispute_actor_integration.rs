@@ -1,8 +1,8 @@
 //! Integration tests for DisputeActor
 
 use icn_ccl::{
-    Contract, DisputeActor, DisputeConfig, DisputeEvidence, DisputeReason, Expr, Rule, Stmt,
-    Value, BinOp,
+    BinOp, Contract, DisputeActor, DisputeConfig, DisputeEvidence, DisputeReason, Expr, Rule, Stmt,
+    Value,
 };
 use icn_identity::KeyPair;
 use icn_store::SledStore;
@@ -99,7 +99,7 @@ async fn test_dispute_actor_file_and_investigate() {
         icn_ccl::DisputeOutcome::SubmitterCorrect { verified_result } => {
             assert_eq!(verified_result, Value::Int(5));
         }
-        other => panic!("Expected SubmitterCorrect, got {:?}", other),
+        other => panic!("Expected SubmitterCorrect, got {other:?}"),
     }
 
     // Check stats
@@ -165,7 +165,8 @@ async fn test_dispute_actor_concurrent_operations() {
                 filed_at: SystemTime::now(),
             };
 
-            h.file_dispute(task_hash, executor, challenger, evidence).await
+            h.file_dispute(task_hash, executor, challenger, evidence)
+                .await
         });
         handles_vec.push(handle_task);
     }

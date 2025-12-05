@@ -5675,7 +5675,7 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
             println!("  Reason:     {reason}");
 
             if let Some(filed_at) = result.get("filed_at") {
-                println!("  Filed At:   {}", filed_at);
+                println!("  Filed At:   {filed_at}");
             }
         }
 
@@ -5701,8 +5701,8 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
                 println!("No disputes found.");
             } else {
                 println!(
-                    "{:<20} {:<12} {:<45} {}",
-                    "Entry Hash", "Status", "Filer", "Filed At"
+                    "{:<20} {:<12} {:<45} Filed At",
+                    "Entry Hash", "Status", "Filer"
                 );
                 println!("{:-<100}", "");
 
@@ -5755,23 +5755,38 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
                 println!();
                 println!(
                     "  Entry Hash: {}",
-                    dispute.get("entry_hash").and_then(|v| v.as_str()).unwrap_or("N/A")
+                    dispute
+                        .get("entry_hash")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("N/A")
                 );
                 println!(
                     "  Status:     {}",
-                    dispute.get("status").and_then(|v| v.as_str()).unwrap_or("N/A")
+                    dispute
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("N/A")
                 );
                 println!(
                     "  Filer:      {}",
-                    dispute.get("filer").and_then(|v| v.as_str()).unwrap_or("N/A")
+                    dispute
+                        .get("filer")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("N/A")
                 );
                 println!(
                     "  Reason:     {}",
-                    dispute.get("reason").and_then(|v| v.as_str()).unwrap_or("N/A")
+                    dispute
+                        .get("reason")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("N/A")
                 );
                 println!(
                     "  Filed At:   {}",
-                    dispute.get("filed_at").and_then(|v| v.as_str()).unwrap_or("N/A")
+                    dispute
+                        .get("filed_at")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("N/A")
                 );
 
                 if let Some(mediator) = dispute.get("mediator").and_then(|v| v.as_str()) {
@@ -5793,10 +5808,14 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
                         println!("  Evidence ({} item(s)):", evidence.len());
                         for (i, e) in evidence.iter().enumerate() {
                             let text = e.get("text").and_then(|v| v.as_str()).unwrap_or("N/A");
-                            let submitted_by =
-                                e.get("submitted_by").and_then(|v| v.as_str()).unwrap_or("N/A");
-                            let submitted_at =
-                                e.get("submitted_at").and_then(|v| v.as_str()).unwrap_or("N/A");
+                            let submitted_by = e
+                                .get("submitted_by")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("N/A");
+                            let submitted_at = e
+                                .get("submitted_at")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("N/A");
 
                             println!("    {}. \"{}\"", i + 1, text);
                             println!("       By: {submitted_by}");
@@ -5820,7 +5839,11 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
                 .await
                 .context("Failed to add evidence. Is icnd running?")?;
 
-            if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+            if result
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
                 println!("Evidence added successfully!");
                 println!();
                 println!("  Entry Hash: {entry_hash}");
@@ -5839,7 +5862,11 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
                 .await
                 .context("Failed to assign mediator. Is icnd running?")?;
 
-            if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+            if result
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
                 println!("Mediator assigned successfully!");
                 println!();
                 println!("  Entry Hash: {entry_hash}");
@@ -5868,7 +5895,11 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
                 .await
                 .context("Failed to resolve dispute. Is icnd running?")?;
 
-            if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+            if result
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
                 println!("Dispute resolved successfully!");
                 println!();
                 println!("  Entry Hash: {entry_hash}");

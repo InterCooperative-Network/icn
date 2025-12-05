@@ -120,7 +120,7 @@ fn test_validate_timestamp_not_synchronized() {
 
     match result {
         Err(TimeError::NotSynchronized) => {} // Expected
-        other => panic!("Expected NotSynchronized error, got {:?}", other),
+        other => panic!("Expected NotSynchronized error, got {other:?}"),
     }
 }
 
@@ -133,7 +133,7 @@ fn test_network_time_not_synchronized() {
 
     match result {
         Err(TimeError::NotSynchronized) => {} // Expected
-        other => panic!("Expected NotSynchronized error, got {:?}", other),
+        other => panic!("Expected NotSynchronized error, got {other:?}"),
     }
 }
 
@@ -207,7 +207,7 @@ fn test_validate_timestamp_too_old() {
     assert!(result.is_err());
     match result {
         Err(TimeError::TimestampOutOfRange(..)) => {} // Expected
-        other => panic!("Expected TimestampOutOfRange error, got {:?}", other),
+        other => panic!("Expected TimestampOutOfRange error, got {other:?}"),
     }
 }
 
@@ -226,7 +226,7 @@ fn test_validate_timestamp_in_future() {
     assert!(result.is_err());
     match result {
         Err(TimeError::TimestampOutOfRange(..)) => {} // Expected
-        other => panic!("Expected TimestampOutOfRange error, got {:?}", other),
+        other => panic!("Expected TimestampOutOfRange error, got {other:?}"),
     }
 }
 
@@ -465,21 +465,21 @@ async fn test_real_sync_insufficient_servers() {
 #[test]
 fn test_time_error_not_synchronized() {
     let err = TimeError::NotSynchronized;
-    let msg = format!("{}", err);
+    let msg = format!("{err}");
     assert!(msg.contains("not synchronized") || msg.contains("NotSynchronized"));
 }
 
 #[test]
 fn test_time_error_insufficient_responses() {
     let err = TimeError::InsufficientResponses(2, 3);
-    let msg = format!("{}", err);
+    let msg = format!("{err}");
     assert!(msg.contains("2") && msg.contains("3"));
 }
 
 #[test]
 fn test_time_error_timestamp_out_of_range() {
     let err = TimeError::TimestampOutOfRange(500_000, 300_000);
-    let msg = format!("{}", err);
+    let msg = format!("{err}");
     // Should contain the skew values
     assert!(!msg.is_empty());
 }
