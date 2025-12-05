@@ -95,6 +95,9 @@ impl Supervisor {
         // Event broadcaster for WebSocket delivery (shared between compute actor and gateway)
         let event_broadcaster: Option<Arc<icn_gateway::EventBroadcaster>>;
 
+        // Compute handle for gateway integration
+        let compute_handle_for_gateway: Option<icn_compute::ComputeHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -2503,6 +2506,8 @@ impl Supervisor {
             rpc_server.set_contract_runtime(contract_runtime_handle.clone());
             rpc_server.set_gossip_handle(gossip_handle.clone());
             rpc_server.set_governance_handle(governance_handle);
+            // Clone compute_handle for gateway before giving to RPC
+            compute_handle_for_gateway = Some(compute_handle.clone());
             rpc_server.set_compute_handle(compute_handle);
             rpc_server.set_trust_handle(trust_graph_handle.clone());
 
@@ -2649,8 +2654,9 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster without identity
+            // No event broadcaster or compute handle without identity
             event_broadcaster = None;
+            compute_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -2685,7 +2691,8 @@ impl Supervisor {
                 std::thread::spawn(move || {
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(async move {
-                        let gateway_server = if let Some(broadcaster) = broadcaster_for_gateway {
+                        let mut gateway_server = if let Some(broadcaster) = broadcaster_for_gateway
+                        {
                             icn_gateway::GatewayServer::new_with_broadcaster(
                                 gateway_addr,
                                 jwt_secret,
@@ -2695,6 +2702,11 @@ impl Supervisor {
                         } else {
                             icn_gateway::GatewayServer::new(gateway_addr, jwt_secret)
                         };
+
+                        // Connect compute handle if available
+                        if let Some(handle) = compute_handle_for_gateway {
+                            gateway_server = gateway_server.with_compute_handle(handle);
+                        }
 
                         if let Err(e) = gateway_server.run().await {
                             warn!("Gateway server error: {}", e);

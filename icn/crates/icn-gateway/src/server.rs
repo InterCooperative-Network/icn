@@ -20,6 +20,7 @@ use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
+use icn_compute::ComputeHandle;
 
 /// Gateway server configuration
 pub struct GatewayServer {
@@ -29,6 +30,7 @@ pub struct GatewayServer {
     event_broadcaster: Option<Arc<EventBroadcaster>>,
     security_config: SecurityConfig,
     rate_limit_config: Option<RateLimitConfig>,
+    compute_handle: Option<ComputeHandle>,
 }
 
 impl GatewayServer {
@@ -41,6 +43,7 @@ impl GatewayServer {
             event_broadcaster: None,
             security_config: SecurityConfig::development(), // Permissive for tests
             rate_limit_config: None,
+            compute_handle: None,
         }
     }
 
@@ -57,6 +60,7 @@ impl GatewayServer {
             event_broadcaster: None,
             security_config: SecurityConfig::production(), // Strict for production
             rate_limit_config: None,
+            compute_handle: None,
         }
     }
 
@@ -74,12 +78,19 @@ impl GatewayServer {
             event_broadcaster: Some(event_broadcaster),
             security_config: SecurityConfig::production(),
             rate_limit_config: None,
+            compute_handle: None,
         }
     }
 
     /// Set custom security configuration
     pub fn with_security_config(mut self, config: SecurityConfig) -> Self {
         self.security_config = config;
+        self
+    }
+
+    /// Set compute handle for daemon integration
+    pub fn with_compute_handle(mut self, handle: ComputeHandle) -> Self {
+        self.compute_handle = Some(handle);
         self
     }
 
@@ -97,7 +108,13 @@ impl GatewayServer {
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
         let governance_manager = Arc::new(GovernanceManager::new());
-        let compute_manager = Arc::new(ComputeManager::new());
+        let compute_manager = if let Some(handle) = self.compute_handle {
+            info!("Compute manager connected to daemon");
+            Arc::new(ComputeManager::with_handle(handle))
+        } else {
+            info!("Compute manager running standalone (no daemon connection)");
+            Arc::new(ComputeManager::new())
+        };
         let federation_manager = Arc::new(FederationManager::new());
 
         // Create ledger manager with persistent storage if data_dir is set
