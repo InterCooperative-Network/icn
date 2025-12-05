@@ -10,7 +10,7 @@
 This document provides a formal threat model for the InterCooperative Network (ICN) using the STRIDE framework. It identifies adversary classes, maps attack surfaces by system layer, analyzes threats for each component, and documents mitigations.
 
 **Security Posture Summary**:
-- **1121 tests** covering security-critical paths
+- **1134 tests** covering security-critical paths
 - **Three-layer security architecture** (Transport, Message, Application)
 - **8 critical vulnerabilities fixed** during production hardening
 - **Known gaps documented** with priority rankings

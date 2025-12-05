@@ -991,7 +991,7 @@ See [docs/scheduler-evolution-plan.md](docs/scheduler-evolution-plan.md) for com
 - [x] Prometheus metrics (7 metrics: violations, quarantines, bans, auto-bans)
 - [x] Grafana dashboard (5 panels for Byzantine fault monitoring)
 - [x] Comprehensive tests (8 integration + 8 unit tests, all passing)
-- [x] All 1121 workspace tests passing
+- [x] All 1134 workspace tests passing
 
 **Byzantine Detection Features**:
 - **Violation Severity**: Critical (10) → auto-ban, Major (5) → warnings, Minor (1) → tracked

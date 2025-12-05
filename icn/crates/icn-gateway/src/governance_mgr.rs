@@ -37,12 +37,22 @@ impl GovernanceManager {
         &self,
         domain_id: GovernanceDomainId,
         name: String,
-        _profile: String, // TODO: Use profile to configure params
+        profile: String,
         params: GovernanceParams,
         membership: MembershipConfig,
     ) -> Result<()> {
+        // Create profile ID based on the profile string
+        // - "contract:did:..." -> Contract-based profile
+        // - Anything else -> Built-in profile name
+        let profile_id = if profile.starts_with("contract:") {
+            let did = profile.strip_prefix("contract:").unwrap_or(&profile);
+            GovernanceProfileId::contract(did)
+        } else {
+            GovernanceProfileId::builtin(&profile)
+        };
+
         let config = GovernanceConfig::new(
-            GovernanceProfileId::builtin("cooperative"),
+            profile_id,
             membership,
             params,
         );
@@ -355,5 +365,63 @@ impl GovernanceManager {
 impl Default for GovernanceManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_create_domain_with_builtin_profile() {
+        let mgr = GovernanceManager::new();
+        let domain_id = GovernanceDomainId("test-coop".to_string());
+        let membership = MembershipConfig {
+            source: MembershipSource::StaticList(vec![]),
+        };
+        let params = GovernanceParams::new(50, 50, 86400);
+
+        let result = mgr
+            .create_domain(
+                domain_id.clone(),
+                "Test Coop".to_string(),
+                "cooperative_default".to_string(),
+                params,
+                membership,
+            )
+            .await;
+
+        assert!(result.is_ok());
+
+        // Verify domain was created with correct profile
+        let domain = mgr.get_domain(&domain_id).await.unwrap().unwrap();
+        assert_eq!(domain.config.profile.0, "cooperative_default");
+    }
+
+    #[tokio::test]
+    async fn test_create_domain_with_contract_profile() {
+        let mgr = GovernanceManager::new();
+        let domain_id = GovernanceDomainId("contract-coop".to_string());
+        let membership = MembershipConfig {
+            source: MembershipSource::StaticList(vec![]),
+        };
+        let params = GovernanceParams::new(50, 50, 86400);
+
+        let result = mgr
+            .create_domain(
+                domain_id.clone(),
+                "Contract Coop".to_string(),
+                "contract:did:icn:abc123".to_string(),
+                params,
+                membership,
+            )
+            .await;
+
+        assert!(result.is_ok());
+
+        // Verify domain was created with contract-based profile
+        let domain = mgr.get_domain(&domain_id).await.unwrap().unwrap();
+        assert_eq!(domain.config.profile.0, "contract:did:icn:abc123");
+        assert!(domain.config.profile.is_contract());
     }
 }

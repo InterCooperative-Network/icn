@@ -325,7 +325,7 @@ Replace traditional IAM with trust + capabilities:
     - Target: 0 warnings ✅
 
 [ ] Increase test coverage
-    - Current: 1121 tests (increased from 785)
+    - Current: 1134 tests (increased from 785)
     - Target: 90%+ line coverage on core crates
 
 [ ] Documentation coverage
