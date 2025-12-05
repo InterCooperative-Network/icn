@@ -180,8 +180,8 @@ Three-layer security model:
 
 ### Adding Metrics
 
-1. Define metric in `icn-obs/src/metrics/{module}.rs`
-2. Register in `init_metrics()` function
+1. Define metric in `icn-obs/src/metrics.rs`
+2. Register in `init_descriptions()` function
 3. Increment/observe at instrumentation points
 4. Follow naming convention: `{actor}_{metric}_{unit}`
 
@@ -228,7 +228,7 @@ When working on specific features, reference these files:
 - **Ledger Logic**: `icn-ledger/src/ledger.rs`, `icn-ledger/src/sync.rs`
 - **Contract Execution**: `icn-ccl/src/interpreter.rs`, `icn-ccl/src/ast.rs`
 - **Gateway API**: `icn-gateway/src/server.rs`, `icn-gateway/src/api/`
-- **Governance**: `icn-governance/src/types.rs`, `icn-governance/src/store.rs`
+- **Governance**: `icn-governance/src/proposal.rs`, `icn-governance/src/domain.rs`, `icn-governance/src/vote.rs`, `icn-governance/src/store.rs`
 - **Compute Layer**: `icn-compute/src/actor.rs`, `icn-compute/src/executor.rs`
 
 ## Documentation
