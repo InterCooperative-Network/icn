@@ -111,7 +111,11 @@ impl RpcClient {
     }
 
     /// Call an RPC method (with automatic auth if credentials are set)
-    pub async fn call(&mut self, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
+    pub async fn call(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         // Auto-authenticate if we have credentials but no token
         // (and this isn't an auth method)
         if self.credentials.is_some() && self.token.is_none() && !method.starts_with("auth.") {

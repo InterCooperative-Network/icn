@@ -1179,11 +1179,17 @@ async fn main() -> Result<()> {
 
         Commands::Auth(auth_cmd) => handle_auth_command(auth_cmd, &data_dir).await?,
 
-        Commands::Compute(compute_cmd) => handle_compute_command(compute_cmd, &data_dir, &args.endpoint).await?,
+        Commands::Compute(compute_cmd) => {
+            handle_compute_command(compute_cmd, &data_dir, &args.endpoint).await?
+        }
 
-        Commands::Policy(policy_cmd) => handle_policy_command(policy_cmd, &data_dir, &args.endpoint).await?,
+        Commands::Policy(policy_cmd) => {
+            handle_policy_command(policy_cmd, &data_dir, &args.endpoint).await?
+        }
 
-        Commands::Quota(quota_cmd) => handle_quota_command(quota_cmd, &data_dir, &args.endpoint).await?,
+        Commands::Quota(quota_cmd) => {
+            handle_quota_command(quota_cmd, &data_dir, &args.endpoint).await?
+        }
 
         Commands::Completions { shell } => {
             let mut cmd = Args::command();
@@ -4331,7 +4337,9 @@ async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -
             }
 
             DomainCommands::List => {
-                let result = client.call("governance.domain.list", serde_json::json!({})).await?;
+                let result = client
+                    .call("governance.domain.list", serde_json::json!({}))
+                    .await?;
                 let domains: Vec<serde_json::Value> =
                     serde_json::from_value(result).context("Failed to parse domain list")?;
 
@@ -4460,8 +4468,9 @@ async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -
                 ProposalCommands::List { domain_id, state } => {
                     println!("Proposals in domain '{domain_id}':");
 
-                    let result =
-                        client.call("governance.proposal.list", serde_json::json!({})).await?;
+                    let result = client
+                        .call("governance.proposal.list", serde_json::json!({}))
+                        .await?;
                     let proposals: Vec<serde_json::Value> =
                         serde_json::from_value(result).context("Failed to parse proposal list")?;
 
@@ -5221,7 +5230,11 @@ token_expiry_hours = 24
     Ok(())
 }
 
-async fn handle_compute_command(cmd: ComputeCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+async fn handle_compute_command(
+    cmd: ComputeCommands,
+    data_dir: &Path,
+    endpoint: &str,
+) -> Result<()> {
     // Create authenticated RPC client
     let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
