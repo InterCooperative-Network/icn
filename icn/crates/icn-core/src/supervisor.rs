@@ -2488,13 +2488,21 @@ impl Supervisor {
             // Spawn RPC server with network, ledger, contract, gossip, and governance handles
             let rpc_port = self.config.network.rpc_port;
             let rpc_addr = format!("127.0.0.1:{rpc_port}").parse()?;
-            let mut rpc_server = RpcServer::new(rpc_addr);
+
+            // Enable RPC auth if gateway is enabled with a jwt_secret
+            let mut rpc_server = if self.config.gateway.enabled && !self.config.gateway.jwt_secret.is_empty() {
+                info!("RPC server auth enabled (using gateway JWT secret)");
+                RpcServer::new_with_auth(rpc_addr, self.config.gateway.jwt_secret.as_bytes().to_vec())
+            } else {
+                RpcServer::new(rpc_addr)
+            };
             rpc_server.set_network_handle(network_handle.clone());
             rpc_server.set_ledger_handle(ledger_handle.clone());
             rpc_server.set_contract_runtime(contract_runtime_handle.clone());
             rpc_server.set_gossip_handle(gossip_handle.clone());
             rpc_server.set_governance_handle(governance_handle);
             rpc_server.set_compute_handle(compute_handle);
+            rpc_server.set_trust_handle(trust_graph_handle.clone());
 
             background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {

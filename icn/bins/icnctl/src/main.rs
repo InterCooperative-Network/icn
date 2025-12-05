@@ -4834,15 +4834,14 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 bail!("No keystore found. Run 'icnctl id init' first.");
             }
 
-            // Prompt for passphrase
-            let passphrase = rpassword::prompt_password("Keystore passphrase: ")
-                .context("Failed to read passphrase")?;
+            // Get passphrase (from env var or prompt)
+            let passphrase = read_passphrase("Keystore passphrase: ")?;
 
             // Unlock keystore
             let mut keystore = icn_identity::keystore::AgeKeyStore::open(&keystore_path)
                 .context("Failed to open keystore")?;
             keystore
-                .unlock(passphrase.as_bytes())
+                .unlock(&passphrase)
                 .context("Failed to unlock keystore")?;
 
             let bundle = keystore
@@ -4887,12 +4886,13 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 .await
                 .context("Failed to parse challenge response")?;
 
-            let challenge = challenge_data["challenge"]
+            let challenge = challenge_data["nonce"]
                 .as_str()
-                .context("Missing challenge in response")?;
+                .context("Missing nonce in response")?;
 
-            // Step 2: Sign the challenge
-            let signature = keypair.sign(challenge.as_bytes());
+            // Step 2: Sign the challenge (nonce is hex-encoded, decode before signing)
+            let nonce_bytes = hex::decode(challenge).context("Invalid nonce format")?;
+            let signature = keypair.sign(&nonce_bytes);
             let signature_hex = hex::encode(signature.to_bytes());
 
             // Step 3: Verify signature and get token
