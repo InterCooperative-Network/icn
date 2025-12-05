@@ -839,3 +839,240 @@ fn test_infrastructure_credit_update_rate_preconditions() {
     let result3 = interpreter3.execute_rule("update_compute_rate", args);
     assert!(result3.is_err());
 }
+
+// === Fuel Allocation Protocol Tests ===
+
+#[test]
+fn test_fuel_allocation_calculate_allowance() {
+    let json = include_str!("../../../../contracts/protocol/fuel-allocation-v1.ccl.json");
+    let contract: Contract = serde_json::from_str(json).unwrap();
+    contract.validate().expect("Fuel allocation validation failed");
+
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    let gov_did = contract.participants[0].clone();
+    let context = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+
+    // Test with moderate trust and contribution
+    // Base: 100, trust_bonus = 50 * 200 / 100 = 100, contrib_bonus = 1000 * 100 / 1000 = 100
+    // Total: 100 + 100 + 100 = 300
+    // Regen: 300 / 24 = 12 (above min 10)
+    let mut args = HashMap::new();
+    args.insert("trust_score".to_string(), Value::Int(50)); // 50% trust (scaled 0-100)
+    args.insert("contribution_credits".to_string(), Value::Int(1000));
+
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context);
+    let result = interpreter.execute_rule("calculate_allowance", args).unwrap();
+
+    match result.value {
+        Value::Map(map) => {
+            assert_eq!(
+                map.get("max_fuel"),
+                Some(&Value::Int(300)),
+                "Expected max_fuel=300"
+            );
+            assert_eq!(
+                map.get("regen_rate"),
+                Some(&Value::Int(12)),
+                "Expected regen_rate=12"
+            );
+        }
+        _ => panic!("Expected Map result"),
+    }
+}
+
+#[test]
+fn test_fuel_allocation_minimum_guarantees() {
+    let json = include_str!("../../../../contracts/protocol/fuel-allocation-v1.ccl.json");
+    let contract: Contract = serde_json::from_str(json).unwrap();
+
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    let gov_did = contract.participants[0].clone();
+
+    // Test with zero trust and zero contribution
+    // Raw allowance: 100 + 0 + 0 = 100 (above min 50)
+    // Regen: 100 / 24 = 4 → but min is 10, so should be 10
+    let context = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+
+    let mut args = HashMap::new();
+    args.insert("trust_score".to_string(), Value::Int(0));
+    args.insert("contribution_credits".to_string(), Value::Int(0));
+
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context);
+    let result = interpreter.execute_rule("calculate_allowance", args).unwrap();
+
+    match result.value {
+        Value::Map(map) => {
+            // Base allowance 100 is above min_civic_fuel 50
+            assert_eq!(
+                map.get("max_fuel"),
+                Some(&Value::Int(100)),
+                "Expected max_fuel=100 (base allowance)"
+            );
+            // 100/24=4, but min_regen_rate is 10
+            assert_eq!(
+                map.get("regen_rate"),
+                Some(&Value::Int(10)),
+                "Expected regen_rate=10 (minimum guarantee)"
+            );
+        }
+        _ => panic!("Expected Map result"),
+    }
+}
+
+#[test]
+fn test_fuel_allocation_get_operation_cost() {
+    let json = include_str!("../../../../contracts/protocol/fuel-allocation-v1.ccl.json");
+    let contract: Contract = serde_json::from_str(json).unwrap();
+
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    let gov_did = contract.participants[0].clone();
+
+    // Test message cost (should be 1)
+    let context = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args = HashMap::new();
+    args.insert("operation_type".to_string(), Value::String("message".to_string()));
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context);
+    let result = interpreter.execute_rule("get_operation_cost", args).unwrap();
+    assert_eq!(result.value, Value::Int(1));
+
+    // Test transaction cost (should be 10)
+    let context2 = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args2 = HashMap::new();
+    args2.insert("operation_type".to_string(), Value::String("transaction".to_string()));
+    let interpreter2 = Interpreter::new(contract.clone(), state.clone(), context2);
+    let result2 = interpreter2.execute_rule("get_operation_cost", args2).unwrap();
+    assert_eq!(result2.value, Value::Int(10));
+
+    // Test proposal cost (should be 50)
+    let context3 = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args3 = HashMap::new();
+    args3.insert("operation_type".to_string(), Value::String("proposal".to_string()));
+    let interpreter3 = Interpreter::new(contract.clone(), state.clone(), context3);
+    let result3 = interpreter3.execute_rule("get_operation_cost", args3).unwrap();
+    assert_eq!(result3.value, Value::Int(50));
+
+    // Test compute cost (should be 10)
+    let context4 = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args4 = HashMap::new();
+    args4.insert("operation_type".to_string(), Value::String("compute".to_string()));
+    let interpreter4 = Interpreter::new(contract.clone(), state.clone(), context4);
+    let result4 = interpreter4.execute_rule("get_operation_cost", args4).unwrap();
+    assert_eq!(result4.value, Value::Int(10));
+
+    // Test unknown operation (should return 0)
+    let context5 = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args5 = HashMap::new();
+    args5.insert("operation_type".to_string(), Value::String("unknown".to_string()));
+    let interpreter5 = Interpreter::new(contract.clone(), state.clone(), context5);
+    let result5 = interpreter5.execute_rule("get_operation_cost", args5).unwrap();
+    assert_eq!(result5.value, Value::Int(0));
+}
+
+#[test]
+fn test_fuel_allocation_update_cost_preconditions() {
+    let json = include_str!("../../../../contracts/protocol/fuel-allocation-v1.ccl.json");
+    let contract: Contract = serde_json::from_str(json).unwrap();
+
+    let mut state = ContractState::new();
+    for state_var in &contract.state_vars {
+        state.set(state_var.name.clone(), state_var.initial_value.clone());
+    }
+
+    let gov_did = contract.participants[0].clone();
+
+    // Test valid cost update (within bounds 1-100)
+    let context = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args = HashMap::new();
+    args.insert("new_cost".to_string(), Value::Int(5));
+    let interpreter = Interpreter::new(contract.clone(), state.clone(), context);
+    let result = interpreter.execute_rule("update_message_cost", args);
+    assert!(result.is_ok());
+
+    // Test invalid cost (0 - fails >= 1 precondition)
+    let context2 = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args2 = HashMap::new();
+    args2.insert("new_cost".to_string(), Value::Int(0));
+    let interpreter2 = Interpreter::new(contract.clone(), state.clone(), context2);
+    let result2 = interpreter2.execute_rule("update_message_cost", args2);
+    assert!(result2.is_err());
+
+    // Test invalid cost (101 - fails <= 100 precondition)
+    let context3 = ExecutionContext::new(
+        gov_did.clone(),
+        0,
+        5000,
+        vec![],
+        contract.participants.clone(),
+    );
+    let mut args3 = HashMap::new();
+    args3.insert("new_cost".to_string(), Value::Int(101));
+    let interpreter3 = Interpreter::new(contract.clone(), state.clone(), context3);
+    let result3 = interpreter3.execute_rule("update_message_cost", args3);
+    assert!(result3.is_err());
+}

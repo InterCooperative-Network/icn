@@ -1,0 +1,497 @@
+{
+  "name": "FuelAllocationProtocol",
+  "participants": [
+    "did:icn:z6MknetworkFuelGovernance0000000000000000000"
+  ],
+  "currency": "fuel",
+  "state_vars": [
+    {
+      "name": "base_allowance",
+      "initial_value": { "Int": 100 }
+    },
+    {
+      "name": "min_civic_fuel",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "min_regen_rate",
+      "initial_value": { "Int": 10 }
+    },
+    {
+      "name": "trust_multiplier",
+      "initial_value": { "Int": 200 }
+    },
+    {
+      "name": "contribution_multiplier",
+      "initial_value": { "Int": 100 }
+    },
+    {
+      "name": "message_cost",
+      "initial_value": { "Int": 1 }
+    },
+    {
+      "name": "transaction_cost",
+      "initial_value": { "Int": 10 }
+    },
+    {
+      "name": "proposal_cost",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "compute_base_cost",
+      "initial_value": { "Int": 10 }
+    }
+  ],
+  "rules": [
+    {
+      "name": "calculate_allowance",
+      "params": [
+        { "name": "trust_score" },
+        { "name": "contribution_credits" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "Assign": {
+            "name": "trust_bonus",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "trust_score" },
+                    "right": { "Var": "trust_multiplier" }
+                  }
+                },
+                "right": { "Literal": { "Int": 100 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "contribution_bonus",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "contribution_credits" },
+                    "right": { "Var": "contribution_multiplier" }
+                  }
+                },
+                "right": { "Literal": { "Int": 1000 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "raw_allowance",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "base_allowance" },
+                    "right": { "Var": "trust_bonus" }
+                  }
+                },
+                "right": { "Var": "contribution_bonus" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Lt",
+                "left": { "Var": "raw_allowance" },
+                "right": { "Var": "min_civic_fuel" }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "max_fuel",
+                  "value": { "Var": "min_civic_fuel" }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "max_fuel",
+                  "value": { "Var": "raw_allowance" }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "raw_regen",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": { "Var": "max_fuel" },
+                "right": { "Literal": { "Int": 24 } }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Lt",
+                "left": { "Var": "raw_regen" },
+                "right": { "Var": "min_regen_rate" }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "regen_rate",
+                  "value": { "Var": "min_regen_rate" }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "regen_rate",
+                  "value": { "Var": "raw_regen" }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["max_fuel", { "Var": "max_fuel" }],
+                ["regen_rate", { "Var": "regen_rate" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_operation_cost",
+      "params": [
+        { "name": "operation_type" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "operation_type" },
+                "right": { "Literal": { "String": "message" } }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": { "Var": "message_cost" }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "operation_type" },
+                "right": { "Literal": { "String": "transaction" } }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": { "Var": "transaction_cost" }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "operation_type" },
+                "right": { "Literal": { "String": "proposal" } }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": { "Var": "proposal_cost" }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "operation_type" },
+                "right": { "Literal": { "String": "compute" } }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": { "Var": "compute_base_cost" }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Return": {
+            "value": { "Literal": { "Int": 0 } }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_message_cost",
+      "params": [
+        { "name": "new_cost" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 1 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 100 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "message_cost",
+            "value": { "Var": "new_cost" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_transaction_cost",
+      "params": [
+        { "name": "new_cost" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 1 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 100 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "transaction_cost",
+            "value": { "Var": "new_cost" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_proposal_cost",
+      "params": [
+        { "name": "new_cost" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 1 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 200 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "proposal_cost",
+            "value": { "Var": "new_cost" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_compute_base_cost",
+      "params": [
+        { "name": "new_cost" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 1 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_cost" },
+            "right": { "Literal": { "Int": 100 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "compute_base_cost",
+            "value": { "Var": "new_cost" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_trust_multiplier",
+      "params": [
+        { "name": "new_multiplier" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_multiplier" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_multiplier" },
+            "right": { "Literal": { "Int": 500 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "trust_multiplier",
+            "value": { "Var": "new_multiplier" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_contribution_multiplier",
+      "params": [
+        { "name": "new_multiplier" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_multiplier" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_multiplier" },
+            "right": { "Literal": { "Int": 500 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "contribution_multiplier",
+            "value": { "Var": "new_multiplier" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_all_costs",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["message_cost", { "Var": "message_cost" }],
+                ["transaction_cost", { "Var": "transaction_cost" }],
+                ["proposal_cost", { "Var": "proposal_cost" }],
+                ["compute_base_cost", { "Var": "compute_base_cost" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_multipliers",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["base_allowance", { "Var": "base_allowance" }],
+                ["min_civic_fuel", { "Var": "min_civic_fuel" }],
+                ["min_regen_rate", { "Var": "min_regen_rate" }],
+                ["trust_multiplier", { "Var": "trust_multiplier" }],
+                ["contribution_multiplier", { "Var": "contribution_multiplier" }]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

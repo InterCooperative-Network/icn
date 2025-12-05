@@ -139,4 +139,27 @@ mod example_contract_tests {
         assert!(contract.get_rule("update_compute_rate").is_some());
         assert!(contract.get_rule("get_rates").is_some());
     }
+
+    #[test]
+    fn test_fuel_allocation_protocol_contract() {
+        let json = include_str!("../../../../contracts/protocol/fuel-allocation-v1.ccl.json");
+        let contract: Contract = serde_json::from_str(json)
+            .expect("Failed to deserialize fuel-allocation-v1.ccl.json");
+        contract
+            .validate()
+            .expect("FuelAllocationProtocol contract validation failed");
+
+        assert_eq!(contract.name, "FuelAllocationProtocol");
+        assert_eq!(contract.participants.len(), 1);
+        assert_eq!(contract.currency, Some("fuel".to_string()));
+        assert_eq!(contract.state_vars.len(), 9); // base, min_civic, min_regen, trust_mult, contrib_mult, 4 costs
+        assert_eq!(contract.rules.len(), 10); // calculate_allowance, get_operation_cost, 6 update_*, 2 get_*
+
+        // Verify specific rules exist
+        assert!(contract.get_rule("calculate_allowance").is_some());
+        assert!(contract.get_rule("get_operation_cost").is_some());
+        assert!(contract.get_rule("update_message_cost").is_some());
+        assert!(contract.get_rule("get_all_costs").is_some());
+        assert!(contract.get_rule("get_multipliers").is_some());
+    }
 }
