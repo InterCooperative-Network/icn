@@ -28,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Closes #53.
 
+### Fixed - Re-execution Timeout Enforcement (2025-12-05)
+
+**Dispute Investigation** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- `DisputeConfig.re_execution_timeout` is now enforced during dispute investigation
+- Contract re-execution wrapped in `tokio::time::timeout` with `spawn_blocking`
+- On timeout, dispute marked as `Inconclusive` with reason "Re-execution timed out after Ns"
+- Mediator automatically assigned for timed-out disputes
+- Added `test_investigate_dispute_timeout` test case
+
+Closes #55.
+
 ### Added - WebSocket Compute Event Handlers (2025-11-28)
 
 **WebSocket Example** ([sdk/typescript/examples/websocket-events.ts](sdk/typescript/examples/websocket-events.ts)):

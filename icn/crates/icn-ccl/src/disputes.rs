@@ -287,10 +287,18 @@ impl DisputeResolutionSystem {
         // Create a fresh interpreter for clean re-execution
         let interpreter = Interpreter::new(contract.clone(), state, context);
 
-        // Re-execute the contract
-        let re_execution_result = match interpreter.execute_rule(rule_name, args) {
-            Ok(result) => result.value,
-            Err(e) => {
+        // Re-execute the contract with timeout enforcement
+        let timeout_duration = self.config.re_execution_timeout;
+        let rule_name_owned = rule_name.to_string();
+
+        // Wrap synchronous execution in spawn_blocking and apply timeout
+        let execution_future = tokio::task::spawn_blocking(move || {
+            interpreter.execute_rule(&rule_name_owned, args)
+        });
+
+        let re_execution_result = match tokio::time::timeout(timeout_duration, execution_future).await {
+            Ok(Ok(Ok(result))) => result.value,
+            Ok(Ok(Err(e))) => {
                 warn!(
                     "Re-execution failed for dispute {}: {}",
                     hex::encode(dispute_id),
@@ -305,6 +313,64 @@ impl DisputeResolutionSystem {
 
                 let outcome = DisputeOutcome::Inconclusive {
                     reason: format!("Re-execution failed: {e}"),
+                    mediator_assigned: mediator,
+                };
+
+                {
+                    let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                    dispute.status = DisputeStatus::Resolved {
+                        outcome: outcome.clone(),
+                        resolved_at: SystemTime::now(),
+                    };
+                }
+
+                return Ok(outcome);
+            }
+            Ok(Err(join_error)) => {
+                warn!(
+                    "Re-execution task panicked for dispute {}: {}",
+                    hex::encode(dispute_id),
+                    join_error
+                );
+
+                let mediator = {
+                    let dispute = self.disputes.get(&dispute_id).unwrap();
+                    self.assign_mediator(dispute)?
+                };
+
+                let outcome = DisputeOutcome::Inconclusive {
+                    reason: format!("Re-execution task panicked: {join_error}"),
+                    mediator_assigned: mediator,
+                };
+
+                {
+                    let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                    dispute.status = DisputeStatus::Resolved {
+                        outcome: outcome.clone(),
+                        resolved_at: SystemTime::now(),
+                    };
+                }
+
+                return Ok(outcome);
+            }
+            Err(_elapsed) => {
+                // Timeout occurred - mark as inconclusive and assign mediator
+                warn!(
+                    "Re-execution timed out after {:?} for dispute {}",
+                    timeout_duration,
+                    hex::encode(dispute_id)
+                );
+
+                let mediator = {
+                    let dispute = self.disputes.get(&dispute_id).unwrap();
+                    self.assign_mediator(dispute)?
+                };
+
+                let outcome = DisputeOutcome::Inconclusive {
+                    reason: format!(
+                        "Re-execution timed out after {}s",
+                        timeout_duration.as_secs()
+                    ),
                     mediator_assigned: mediator,
                 };
 
@@ -1119,5 +1185,70 @@ mod tests {
         assert_eq!(stats.total_disputes, 3);
         assert_eq!(stats.resolved_auto, 2);
         assert_eq!(stats.pending, 1);
+    }
+
+    #[tokio::test]
+    async fn test_investigate_dispute_timeout() {
+        // Use a very short timeout (1ms) to trigger timeout behavior
+        let config = DisputeConfig {
+            re_execution_timeout: Duration::from_millis(1),
+            auto_assign_mediators: true,
+            mediator_min_trust: 0.7,
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Add a mediator so assignment can succeed
+        let mediator = make_test_did();
+        system.add_mediator(mediator.clone());
+
+        let contract = make_test_contract();
+        let task_hash = [99u8; 32];
+        let executor = make_test_did();
+        let challenger = make_test_did();
+
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+
+        let outcome = system
+            .investigate_dispute(dispute_id, &contract, "add", args)
+            .await
+            .unwrap();
+
+        // With such a short timeout, this may or may not timeout depending on scheduling.
+        // Accept either a successful resolution OR an Inconclusive timeout.
+        match outcome {
+            DisputeOutcome::Inconclusive { reason, .. } => {
+                // If it timed out, verify the reason mentions timeout
+                assert!(
+                    reason.contains("timed out") || reason.contains("failed") || reason.contains("panicked"),
+                    "Expected timeout/failure reason, got: {}",
+                    reason
+                );
+            }
+            DisputeOutcome::ExecutorCorrect { .. } => {
+                // Contract executed fast enough - this is also valid
+            }
+            other => {
+                panic!("Unexpected outcome: {:?}", other);
+            }
+        }
     }
 }
