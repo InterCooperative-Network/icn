@@ -212,6 +212,42 @@ pub enum ProposalPayload {
         /// List of affected accounts (for notification)
         affected_accounts: Vec<Did>,
     },
+
+    // === Dispute Escalation (Issue #52) ===
+    /// Escalated dispute resolution requiring community vote
+    ///
+    /// When a ledger dispute cannot be resolved by mediators (large value,
+    /// conflict of interest, or rejected decision), it escalates to governance.
+    DisputeResolution {
+        /// Hash of the disputed ledger entry (links to icn-ledger dispute)
+        dispute_entry_hash: String,
+        /// Original filer of the dispute
+        filer: Did,
+        /// Original reason for the dispute
+        reason: String,
+        /// Reason for escalation (why mediator couldn't resolve)
+        escalation_reason: String,
+        /// Proposed resolution outcome if the proposal passes
+        proposed_outcome: DisputeResolutionOutcome,
+    },
+}
+
+/// Possible outcomes for a dispute resolution governance proposal
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DisputeResolutionOutcome {
+    /// Uphold the dispute - original entry was wrong
+    Uphold,
+    /// Reject the dispute - original entry was correct
+    Reject,
+    /// Partial resolution with adjustments
+    Partial {
+        /// Adjustment amount (positive = credit to filer, negative = credit to counterparty)
+        adjustment: i64,
+        /// Currency of adjustment
+        currency: String,
+    },
+    /// Void the transaction entirely
+    VoidTransaction,
 }
 
 /// Forced outcome for emergency proposal closure

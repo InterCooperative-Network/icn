@@ -187,6 +187,123 @@ impl DisputeManager {
         self.active_disputes.len()
     }
 
+    /// Escalate a dispute to governance for community vote
+    ///
+    /// This is used when:
+    /// - The dispute value exceeds mediator authority
+    /// - There is a mediator conflict of interest
+    /// - The disputed party rejects the mediator's decision
+    /// - The dispute involves community-wide policy
+    ///
+    /// # Arguments
+    /// * `entry_hash` - Hash of the disputed entry
+    /// * `escalation_reason` - Why this dispute needs community vote
+    /// * `proposal_id` - The governance proposal ID tracking this escalation
+    /// * `escalated_at` - Unix timestamp when escalation occurred
+    ///
+    /// # Returns
+    /// The updated dispute record with Escalated status
+    pub fn escalate_to_governance(
+        &mut self,
+        entry_hash: &ContentHash,
+        escalation_reason: String,
+        proposal_id: String,
+        escalated_at: u64,
+    ) -> Result<Dispute> {
+        let mut dispute = self
+            .active_disputes
+            .remove(entry_hash)
+            .context("Dispute not found")?;
+
+        // Verify dispute is in a state that can be escalated
+        match &dispute.status {
+            DisputeStatus::Contested { .. } => {
+                // OK to escalate
+            }
+            DisputeStatus::Resolved { .. } => {
+                anyhow::bail!("Cannot escalate an already resolved dispute");
+            }
+            DisputeStatus::Escalated { .. } => {
+                anyhow::bail!("Dispute is already escalated");
+            }
+            DisputeStatus::Normal => {
+                anyhow::bail!("Cannot escalate a dispute with Normal status");
+            }
+        }
+
+        // Update status to Escalated
+        dispute.status = DisputeStatus::Escalated {
+            proposal_id: proposal_id.clone(),
+            escalation_reason: escalation_reason.clone(),
+            escalated_at,
+        };
+
+        // Save the escalated dispute
+        self.save_dispute(&dispute)?;
+
+        info!(
+            "Dispute {} escalated to governance (proposal: {}): {}",
+            entry_hash, proposal_id, escalation_reason
+        );
+
+        Ok(dispute)
+    }
+
+    /// Resolve an escalated dispute based on governance outcome
+    ///
+    /// Called when a governance proposal for dispute resolution is closed.
+    ///
+    /// # Arguments
+    /// * `entry_hash` - Hash of the disputed entry
+    /// * `outcome` - The dispute outcome determined by governance vote
+    /// * `resolved_at` - Unix timestamp when resolved
+    pub fn resolve_escalated_dispute(
+        &mut self,
+        entry_hash: &ContentHash,
+        outcome: DisputeOutcome,
+        resolved_at: u64,
+    ) -> Result<()> {
+        // Load from storage since escalated disputes are not in active_disputes
+        let key = format!("{}{}", DISPUTE_PREFIX, entry_hash.to_hex());
+        let value = self
+            .store
+            .get(key.as_bytes())?
+            .context("Dispute not found in storage")?;
+        let mut dispute: Dispute =
+            serde_json::from_slice(&value).context("Failed to deserialize dispute")?;
+
+        // Verify dispute is escalated
+        match &dispute.status {
+            DisputeStatus::Escalated { .. } => {
+                // OK to resolve
+            }
+            _ => {
+                anyhow::bail!("Can only resolve escalated disputes with this method");
+            }
+        }
+
+        // Use "governance" as the mediator for escalated disputes
+        let governance_did = Did::from_str("did:icn:governance").unwrap_or_else(|_| {
+            // Fallback: use a placeholder DID
+            dispute.filed_by.clone()
+        });
+
+        dispute.status = DisputeStatus::Resolved {
+            mediator: governance_did,
+            outcome: outcome.clone(),
+            resolved_at,
+        };
+
+        self.save_dispute(&dispute)?;
+
+        info!(
+            "Escalated dispute {} resolved via governance: {:?}",
+            entry_hash, outcome
+        );
+
+        Ok(())
+    }
+
     /// Save a dispute to storage
     fn save_dispute(&self, dispute: &Dispute) -> Result<()> {
         let key = format!("{}{}", DISPUTE_PREFIX, dispute.entry_hash.to_hex());
@@ -387,5 +504,120 @@ mod tests {
 
         let filer2_disputes = manager.get_disputes_by_filer(&filer2);
         assert_eq!(filer2_disputes.len(), 1);
+    }
+
+    #[test]
+    fn test_escalate_to_governance() {
+        let store = test_store();
+        let mut manager = DisputeManager::new(store).unwrap();
+
+        let entry_hash = ContentHash::from_bytes([1u8; 32]);
+        let filer = KeyPair::generate().unwrap().did().clone();
+
+        // File a dispute first
+        manager
+            .file_dispute(entry_hash.clone(), filer, "Incorrect charge".to_string(), 1000)
+            .unwrap();
+
+        assert!(manager.has_active_dispute(&entry_hash));
+
+        // Escalate to governance
+        let escalated = manager
+            .escalate_to_governance(
+                &entry_hash,
+                "Value exceeds mediator authority".to_string(),
+                "proposal-123".to_string(),
+                2000,
+            )
+            .unwrap();
+
+        // Should no longer be in active disputes
+        assert!(!manager.has_active_dispute(&entry_hash));
+
+        // Status should be Escalated
+        match escalated.status {
+            DisputeStatus::Escalated {
+                proposal_id,
+                escalation_reason,
+                escalated_at,
+            } => {
+                assert_eq!(proposal_id, "proposal-123");
+                assert_eq!(escalation_reason, "Value exceeds mediator authority");
+                assert_eq!(escalated_at, 2000);
+            }
+            _ => panic!("Expected Escalated status"),
+        }
+    }
+
+    #[test]
+    fn test_escalate_already_escalated_fails() {
+        let store = test_store();
+        let mut manager = DisputeManager::new(store).unwrap();
+
+        let entry_hash = ContentHash::from_bytes([1u8; 32]);
+        let filer = KeyPair::generate().unwrap().did().clone();
+
+        manager
+            .file_dispute(entry_hash.clone(), filer, "Reason".to_string(), 1000)
+            .unwrap();
+
+        // First escalation succeeds
+        manager
+            .escalate_to_governance(
+                &entry_hash,
+                "First escalation".to_string(),
+                "proposal-1".to_string(),
+                2000,
+            )
+            .unwrap();
+
+        // Second escalation should fail (dispute no longer in active_disputes)
+        let result = manager.escalate_to_governance(
+            &entry_hash,
+            "Second escalation".to_string(),
+            "proposal-2".to_string(),
+            3000,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_escalated_dispute() {
+        let store = test_store();
+        let mut manager = DisputeManager::new(store).unwrap();
+
+        let entry_hash = ContentHash::from_bytes([1u8; 32]);
+        let filer = KeyPair::generate().unwrap().did().clone();
+
+        manager
+            .file_dispute(entry_hash.clone(), filer, "Reason".to_string(), 1000)
+            .unwrap();
+
+        manager
+            .escalate_to_governance(
+                &entry_hash,
+                "Escalation reason".to_string(),
+                "proposal-123".to_string(),
+                2000,
+            )
+            .unwrap();
+
+        // Resolve via governance
+        manager
+            .resolve_escalated_dispute(&entry_hash, DisputeOutcome::Upheld, 3000)
+            .unwrap();
+
+        // Load from storage to verify
+        let key = format!("ledger:dispute:{}", entry_hash.to_hex());
+        let value = manager.store.get(key.as_bytes()).unwrap().unwrap();
+        let dispute: Dispute = serde_json::from_slice(&value).unwrap();
+
+        match dispute.status {
+            DisputeStatus::Resolved { outcome, .. } => {
+                assert_eq!(outcome, DisputeOutcome::Upheld);
+            }
+            _ => panic!("Expected Resolved status"),
+        }
     }
 }

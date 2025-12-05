@@ -3652,6 +3652,7 @@ fn dispute_to_json(dispute: &Dispute) -> serde_json::Value {
         icn_ledger::DisputeStatus::Normal => "normal",
         icn_ledger::DisputeStatus::Contested { .. } => "contested",
         icn_ledger::DisputeStatus::Resolved { .. } => "resolved",
+        icn_ledger::DisputeStatus::Escalated { .. } => "escalated",
     };
 
     let (mediator, outcome, resolved_at) = match &dispute.status {
@@ -3667,6 +3668,20 @@ fn dispute_to_json(dispute: &Dispute) -> serde_json::Value {
         _ => (dispute.mediator.as_ref().map(|m| m.to_string()), None, None),
     };
 
+    // Extract escalation info if present
+    let (proposal_id, escalation_reason, escalated_at) = match &dispute.status {
+        icn_ledger::DisputeStatus::Escalated {
+            proposal_id,
+            escalation_reason,
+            escalated_at,
+        } => (
+            Some(proposal_id.clone()),
+            Some(escalation_reason.clone()),
+            Some(*escalated_at),
+        ),
+        _ => (None, None, None),
+    };
+
     serde_json::json!({
         "entry_hash": dispute.entry_hash.to_hex(),
         "filed_by": dispute.filed_by.to_string(),
@@ -3677,6 +3692,9 @@ fn dispute_to_json(dispute: &Dispute) -> serde_json::Value {
         "mediator": mediator,
         "outcome": outcome,
         "resolved_at": resolved_at,
+        "proposal_id": proposal_id,
+        "escalation_reason": escalation_reason,
+        "escalated_at": escalated_at,
     })
 }
 
@@ -4593,11 +4611,25 @@ async fn handle_federation_clearing_settle(
 
 /// Convert a CooperativeInfo to JSON
 fn coop_info_to_json(coop: &icn_federation::CooperativeInfo) -> serde_json::Value {
+    // Determine if the coop allows federation based on its policy
+    let federated = coop.federation_policy.allows_federation();
+
+    // Serialize the federation policy to JSON
+    let federation_policy = match &coop.federation_policy {
+        icn_federation::FederationPolicy::Open => serde_json::json!({"type": "Open"}),
+        icn_federation::FederationPolicy::Vouched { min_vouches } => {
+            serde_json::json!({"type": "Vouched", "min_vouches": min_vouches})
+        }
+        icn_federation::FederationPolicy::Closed => serde_json::json!({"type": "Closed"}),
+    };
+
     serde_json::json!({
         "coop_id": coop.coop_id,
         "name": coop.name,
         "public_did": coop.public_did.to_string(),
         "gateway_endpoints": coop.gateway_endpoints,
+        "federation_policy": federation_policy,
+        "federated": federated,
         "capabilities": coop.capabilities,
         "currencies": coop.currencies.iter().map(|c| serde_json::json!({
             "symbol": c.symbol,

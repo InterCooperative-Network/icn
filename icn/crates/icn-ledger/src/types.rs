@@ -277,6 +277,18 @@ pub enum DisputeStatus {
         /// When the dispute was resolved (Unix timestamp)
         resolved_at: u64,
     },
+
+    /// Dispute has been escalated to governance for community vote
+    Escalated {
+        /// Governance proposal ID tracking the escalation
+        proposal_id: String,
+
+        /// Reason for escalation
+        escalation_reason: String,
+
+        /// When escalated (Unix timestamp)
+        escalated_at: u64,
+    },
 }
 
 /// Outcome of a dispute resolution

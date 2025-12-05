@@ -2208,6 +2208,40 @@ impl Supervisor {
                                     // 4. Broadcast rollback notification to network
                                     warn!("⚠️ Ledger rollback execution not yet implemented - MANUAL INTERVENTION REQUIRED");
                                 }
+
+                                ProposalPayload::DisputeResolution {
+                                    dispute_entry_hash,
+                                    filer: _,
+                                    reason: _,
+                                    escalation_reason: _,
+                                    proposed_outcome,
+                                } => {
+                                    info!("⚖️ Dispute resolution proposal {} accepted", proposal_id.0);
+                                    info!("   Dispute entry: {}", dispute_entry_hash);
+                                    info!("   Proposed outcome: {:?}", proposed_outcome);
+
+                                    // TODO: Execute the dispute resolution outcome
+                                    // This requires:
+                                    // 1. Convert governance outcome to ledger outcome
+                                    // 2. Call resolve_escalated_dispute on DisputeManager
+                                    // 3. Apply any adjustments to ledger
+                                    // For now, log the action needed
+                                    match proposed_outcome {
+                                        icn_governance::DisputeResolutionOutcome::Uphold => {
+                                            info!("   Action: Uphold dispute - reverse original entry");
+                                        }
+                                        icn_governance::DisputeResolutionOutcome::Reject => {
+                                            info!("   Action: Reject dispute - original entry stands");
+                                        }
+                                        icn_governance::DisputeResolutionOutcome::Partial { adjustment, currency } => {
+                                            info!("   Action: Apply partial adjustment of {} {}", adjustment, currency);
+                                        }
+                                        icn_governance::DisputeResolutionOutcome::VoidTransaction => {
+                                            info!("   Action: Void the entire transaction");
+                                        }
+                                    }
+                                    warn!("⚠️ Dispute resolution execution not yet fully automated - MANUAL VERIFICATION RECOMMENDED");
+                                }
                             }
                         }
 
