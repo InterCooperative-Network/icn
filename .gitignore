@@ -4,8 +4,8 @@ target/
 *.pdb
 
 # Cargo
-Cargo.lock
-!bins/*/Cargo.lock
+# Track workspace Cargo.lock for reproducible builds
+!icn/Cargo.lock
 
 # IDE
 .idea/
