@@ -1153,7 +1153,7 @@ async fn main() -> Result<()> {
         Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
 
         Commands::Contract(contract_cmd) => {
-            handle_contract_command(contract_cmd, &args.endpoint, &data_dir)?
+            handle_contract_command(contract_cmd, &args.endpoint, &data_dir).await?
         }
 
         Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
@@ -3109,7 +3109,6 @@ async fn handle_quarantine_command(
     Ok(())
 }
 
-#[tokio::main]
 async fn handle_contract_command(
     cmd: ContractCommands,
     endpoint: &str,
