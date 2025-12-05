@@ -1,8 +1,10 @@
 # ICN Glossary
 
 **Status**: Reference Document
-**Version**: 1.0.0
+**Version**: 1.1.0
 **Last Updated**: 2025-12-05
+
+*Expanded with contribution credits terminology (Phase 21)*
 
 This glossary defines the authoritative terminology for ICN. All documentation, code, and user-facing text should use these terms consistently.
 
@@ -18,6 +20,7 @@ This glossary defines the authoritative terminology for ICN. All documentation, 
 6. [Governance](#governance)
 7. [Technical Terms](#technical-terms)
 8. [Disambiguation](#disambiguation)
+9. [Related Documents](#related-documents)
 
 ---
 
@@ -41,6 +44,26 @@ Categories of trust levels that determine rate limits and access:
 
 ### Attestation
 A signed statement by one DID about another. Used for contribution verification, trust building, and identity claims.
+
+**Eligibility requirements** for contribution attesters:
+- Membership age ≥ 90 days
+- Trust score ≥ 0.3
+- Max 10 attestations per period
+- Non-reciprocity (cannot attest someone who attested you)
+
+### Organizational Attestation
+For large contributions (> 500 credits), at least one attester must be an **organizational DID** (coop, community, or household), not just individuals.
+
+### Sybil Resistance
+Protections against fake identity attacks in the attestation system:
+- Membership age requirements
+- Trust score thresholds
+- Attestation budgets
+- Non-reciprocity rules
+- Organizational anchoring for large claims
+
+### Trust Graph Depth
+Attestation weight based on path length from organizational anchors. Members with no path to an org have zero attestation weight.
 
 ---
 
@@ -83,6 +106,20 @@ The network-wide pool for:
 - Public goods
 
 Anyone can contribute to the Global Commons without joining a coop.
+
+### Contribution Routing
+How infrastructure credits are split when earned. Contributors specify allocations:
+- **Personal**: To individual account
+- **Cooperative**: To coop treasury
+- **Community**: To community
+- **Household**: To shared household pool
+- **GlobalCommons**: To network-wide pool
+- **Federation**: To federation treasury
+
+**Exploitation safeguards**:
+- Real membership requirements (2+ independent DIDs for households)
+- Pass-through ceilings (max % from single source: 25%)
+- Velocity limits (rapid changes trigger review)
 
 ### Network
 The ICN network as a whole. Has:
@@ -143,6 +180,26 @@ The DID `did:icn:network:infrastructure` that issues credits for infrastructure 
 ### Exchange Pool
 An automated market maker (AMM) for swapping between currencies within ICN. Governance-controlled, not speculative.
 
+### Marketplace
+The internal economy where credits are spent on goods, services, and infrastructure.
+
+**Listing types**:
+- **Service**: Labor with duration (tutoring, repair, care)
+- **Good**: Physical items (food, tools, crafts)
+- **Digital**: Content with license (software, designs)
+- **Infrastructure**: Compute/storage capacity
+- **Subscription**: Recurring service access
+
+### Human Labor Credit
+Credits earned through human work (as opposed to infrastructure contributions).
+
+**Labor types**:
+- **Organizational labor**: Logged via coop/community work tracking
+- **Service delivery**: Peer-to-peer marketplace services
+- **Community service**: Care work, mutual aid
+
+**Labor categories**: Governance, Operations, Development, Outreach, Education, Care, Skilled, Creative, Physical
+
 ---
 
 ## Fuel System
@@ -177,6 +234,19 @@ Each operation consumes fuel:
 - Ledger transaction: 10 fuel
 - Create proposal: 50 fuel
 - Submit compute job: Variable
+
+### Fuel Guarantees
+**Minimum civic fuel** (50 units) ensures every member can participate in governance regardless of contribution level.
+
+**Guaranteed operations** (never blocked by fuel exhaustion):
+- Cast vote on eligible proposals (1 per proposal)
+- Create one proposal per governance period
+- Send 5 direct messages per day
+- View own balances (unlimited)
+- Respond to disputes involving self
+
+### Fuel Reservation
+For compute jobs, fuel is **reserved upfront** from the submitter's account. Unused fuel is returned when the job completes.
 
 ### Compute Limit
 The execution limit for CCL contract execution. This is **distinct from fuel** but draws from the same fuel pool when submitting jobs.
@@ -227,6 +297,11 @@ Economic rules encoded in CCL. Can be:
 - **Adopted**: Used as-is
 - **Extended**: Customized with additions
 - **Replaced**: Completely custom
+
+**Key protocol contracts**:
+- `infrastructure-credit/v1`: Rates for infrastructure → credit conversion
+- `fuel-allocation/v1`: Fuel allowance calculation rules
+- `demurrage/v1`: Circulation charge policies
 
 ### Role
 A governance position with specific powers:
@@ -320,6 +395,14 @@ Both are first-class ICN entities. Individuals typically belong to both.
 - Prefer plain language with glossary terms
 - Provide tooltips linking to glossary
 - Avoid jargon without explanation
+
+---
+
+## Related Documents
+
+- [Contribution Credits Design](contribution-credits-design.md) - Full economic design specification
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [governance-primitives.md](governance-primitives.md) - Governance layer design
 
 ---
 

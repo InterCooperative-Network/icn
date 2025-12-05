@@ -229,6 +229,7 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 
 **Documentation directory `/home/matt/projects/icn/docs/`:**
 - `ARCHITECTURE.md` - System architecture, component design, and implementation details
+- `glossary.md` - Authoritative terminology definitions for ICN concepts
 - `production-hardening.md` - Security hardening measures and vulnerability fixes
 - `deployment-guide.md` - Installation, configuration, monitoring, and operations
 - `topic-subscriptions-api.md` - API reference for gossip subscriptions
