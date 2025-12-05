@@ -435,7 +435,6 @@ pub struct CooperativeConfig {
     pub description: Option<String>,
 }
 
-
 fn default_gateway_bind_addr() -> String {
     "127.0.0.1:8080".to_string()
 }
