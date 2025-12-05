@@ -723,8 +723,16 @@ pub struct DisputeActor {
 impl DisputeActor {
     /// Spawn a new DisputeActor and return its handle
     pub fn spawn(config: DisputeConfig, dispute_store: Arc<dyn Store>) -> DisputeActorHandle {
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
         let system = DisputeResolutionSystem::new(config, dispute_store);
+        Self::spawn_with_system(system)
+    }
+
+    /// Spawn a DisputeActor with a shared DisputeResolutionSystem
+    ///
+    /// This allows sharing the dispute system with other components (e.g., ComputeActor)
+    /// while still having the actor manage the message processing loop.
+    pub fn spawn_with_system(system: DisputeResolutionSystem) -> DisputeActorHandle {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
 
         let actor = DisputeActor { system, rx };
 
@@ -733,6 +741,91 @@ impl DisputeActor {
         });
 
         DisputeActorHandle { tx }
+    }
+
+    /// Create a shared DisputeResolutionSystem for use with ComputeActor
+    ///
+    /// Returns both the shared system (for ComputeActor) and the actor handle.
+    /// The system is wrapped in Arc<RwLock> so ComputeActor can access it directly.
+    pub fn spawn_shared(
+        config: DisputeConfig,
+        dispute_store: Arc<dyn Store>,
+    ) -> (
+        Arc<tokio::sync::RwLock<DisputeResolutionSystem>>,
+        DisputeActorHandle,
+    ) {
+        let system = Arc::new(tokio::sync::RwLock::new(DisputeResolutionSystem::new(
+            config,
+            dispute_store,
+        )));
+
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+
+        // Clone the Arc for the actor
+        let actor_system = system.clone();
+
+        tokio::spawn(async move {
+            Self::run_shared(actor_system, rx).await;
+        });
+
+        (system, DisputeActorHandle { tx })
+    }
+
+    /// Run loop for shared system variant
+    async fn run_shared(
+        system: Arc<tokio::sync::RwLock<DisputeResolutionSystem>>,
+        mut rx: tokio::sync::mpsc::Receiver<DisputeActorMsg>,
+    ) {
+        info!("DisputeActor started (shared mode)");
+
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                DisputeActorMsg::FileDispute {
+                    task_hash,
+                    executor,
+                    challenger,
+                    evidence,
+                    reply,
+                } => {
+                    let mut sys = system.write().await;
+                    let result = sys.file_dispute(task_hash, executor, challenger, evidence).await;
+                    let _ = reply.send(result);
+                }
+                DisputeActorMsg::InvestigateDispute {
+                    dispute_id,
+                    contract,
+                    rule_name,
+                    args,
+                    reply,
+                } => {
+                    let mut sys = system.write().await;
+                    let result = sys.investigate_dispute(dispute_id, &contract, &rule_name, args).await;
+                    let _ = reply.send(result);
+                }
+                DisputeActorMsg::GetDispute { dispute_id, reply } => {
+                    let sys = system.read().await;
+                    let _ = reply.send(sys.get_dispute(&dispute_id).cloned());
+                }
+                DisputeActorMsg::GetStats { reply } => {
+                    let sys = system.read().await;
+                    let _ = reply.send(sys.get_stats());
+                }
+                DisputeActorMsg::AddMediator { mediator } => {
+                    let mut sys = system.write().await;
+                    sys.add_mediator(mediator);
+                }
+                DisputeActorMsg::RemoveMediator { mediator } => {
+                    let mut sys = system.write().await;
+                    sys.remove_mediator(&mediator);
+                }
+                DisputeActorMsg::SetMisbehaviorCallback { callback } => {
+                    let mut sys = system.write().await;
+                    sys.set_misbehavior_callback(callback);
+                }
+            }
+        }
+
+        info!("DisputeActor stopped (shared mode)");
     }
 
     /// Main actor loop

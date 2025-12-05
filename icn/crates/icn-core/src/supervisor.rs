@@ -2429,12 +2429,14 @@ impl Supervisor {
             compute_actor.set_policy_manager(policy_manager.clone());
             info!("✓ Policy manager initialized for cooperative scheduling");
 
-            // Spawn DisputeActor (Phase 18 Week 4)
+            // Spawn DisputeActor with shared system (Phase 18 Week 4)
+            // The shared system allows ComputeActor to file disputes directly
             let dispute_store_path = self.config.store_path().join("disputes");
             let dispute_store: Arc<dyn icn_store::Store> =
                 Arc::new(SledStore::open(&dispute_store_path)?);
             let dispute_config = icn_ccl::DisputeConfig::default();
-            let dispute_handle = icn_ccl::DisputeActor::spawn(dispute_config.clone(), dispute_store);
+            let (dispute_system, dispute_handle) =
+                icn_ccl::DisputeActor::spawn_shared(dispute_config.clone(), dispute_store);
 
             // Fill dispute handle holder for notification callback
             // Note: Write guard is automatically released at end of statement
@@ -2448,6 +2450,9 @@ impl Supervisor {
             // Set signing key for result signatures
             let signing_key_bytes = identity_bundle.keypair().to_signing_key_bytes();
             compute_actor.set_signing_key(signing_key_bytes.to_vec());
+
+            // Connect dispute system to compute actor for filing disputes
+            compute_actor.set_dispute_resolution(dispute_system);
 
             // Set misbehavior detector for Byzantine fault detection (Phase 18)
             compute_actor.set_misbehavior_detector(misbehavior_detector.clone());
