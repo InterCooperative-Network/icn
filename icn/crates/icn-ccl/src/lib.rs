@@ -56,7 +56,8 @@ pub use disputes::{
     Dispute, DisputeActor, DisputeActorHandle, DisputeConfig, DisputeEvidence,
     DisputeGossipCallback, DisputeId, DisputeMessage, DisputeOutcome, DisputeReason,
     DisputeResolutionSystem, DisputeStats, DisputeStatus, MediatorInfo, MisbehaviorCallback,
-    TrustCallback, TOPIC_DISPUTES_FILE, TOPIC_DISPUTES_RESOLVED,
+    OffenderRecord, PenaltyConfig, TrustCallback, TrustPenaltyCallback, TOPIC_DISPUTES_FILE,
+    TOPIC_DISPUTES_RESOLVED,
 };
 pub use interpreter::Interpreter;
 pub use messages::{

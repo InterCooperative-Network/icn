@@ -49,6 +49,50 @@ Closes #53.
 
 Closes #56.
 
+### Added - Penalty System for Dispute Losers (2025-12-05)
+
+**Trust Penalty Mechanism** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- Executors who lose disputes now receive trust score penalties
+- Configurable penalty amounts for different offense types:
+  - Incorrect result (first offense): 0.05 default
+  - Incorrect result (repeat): 0.1 default
+  - Timeout not reported: 0.08 default
+  - Fuel exceeded not reported: 0.08 default
+- Escalating penalties for repeat offenders (1.5x multiplier after threshold)
+- Penalty cap at 1.0 to prevent over-penalization
+
+**Penalty Configuration** (`DisputeConfig`):
+- `enable_penalties: bool` - Toggle penalty system (default: false)
+- `penalty_config: PenaltyConfig` - Configurable penalty amounts and escalation
+
+**Repeat Offender Tracking** (`OffenderRecord`):
+- Tracks disputes lost per DID
+- Tracks offense types (incorrect results, timeouts, fuel exceeded)
+- Cumulative trust penalty tracking
+- Escalation kicks in after configurable threshold (default: 3 offenses)
+
+**API**:
+- `TrustPenaltyCallback` - Callback type for trust score reduction
+- `DisputeResolutionSystem::set_trust_penalty_callback()` - Set penalty callback
+- `DisputeResolutionSystem::get_offender_record()` - Query offender history
+- `DisputeActorHandle::set_trust_penalty_callback()` - Actor handle method
+- `DisputeActorHandle::get_offender_record()` - Query via actor
+
+**Prometheus Metrics** ([crates/icn-obs/src/metrics.rs](icn/crates/icn-obs/src/metrics.rs)):
+- `icn_disputes_penalties_applied_total` - Total penalties by reason
+- `icn_disputes_penalty_amount` - Histogram of penalty amounts
+- `icn_disputes_offenders_tracked` - Number of tracked offenders
+- `icn_disputes_repeat_offenders_total` - Repeat offender detections
+- `icn_disputes_escalated_penalties_total` - Escalated penalty applications
+
+**New Tests**:
+- `test_penalty_applied_on_submitter_correct_outcome` - Verifies penalty on executor loss
+- `test_no_penalty_when_executor_correct` - Verifies no penalty when executor wins
+- `test_repeat_offender_escalation` - Verifies escalating penalties work
+- `test_penalty_disabled` - Verifies penalties can be disabled
+
+Closes #58.
+
 ### Added - Trust-Weighted Mediator Selection (2025-12-05)
 
 **Dispute Resolution** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):

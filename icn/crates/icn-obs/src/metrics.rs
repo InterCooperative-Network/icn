@@ -1043,6 +1043,26 @@ pub fn init_descriptions() {
         "icn_disputes_mediator_pool_size",
         "Number of mediators in the pool"
     );
+    describe_counter!(
+        "icn_disputes_penalties_applied_total",
+        "Total number of trust penalties applied to dispute losers"
+    );
+    describe_histogram!(
+        "icn_disputes_penalty_amount",
+        "Distribution of penalty amounts applied"
+    );
+    describe_gauge!(
+        "icn_disputes_offenders_tracked",
+        "Number of offenders being tracked for repeat offenses"
+    );
+    describe_counter!(
+        "icn_disputes_repeat_offenders_total",
+        "Total number of repeat offenders detected"
+    );
+    describe_counter!(
+        "icn_disputes_escalated_penalties_total",
+        "Total number of escalated penalties applied"
+    );
 
     // Ledger fork resolution metrics (Phase 18 Week 5)
     describe_counter!(
@@ -2459,6 +2479,35 @@ pub mod disputes {
 
     pub fn mediator_pool_size_set(count: usize) {
         gauge!("icn_disputes_mediator_pool_size").set(count as f64);
+    }
+
+    // Penalty metrics (Issue #58)
+    pub fn penalties_applied_inc(reason: &str) {
+        counter!(
+            "icn_disputes_penalties_applied_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    pub fn penalty_amount_record(amount: f64, reason: &str) {
+        histogram!(
+            "icn_disputes_penalty_amount",
+            "reason" => reason.to_string()
+        )
+        .record(amount);
+    }
+
+    pub fn offenders_tracked_set(count: usize) {
+        gauge!("icn_disputes_offenders_tracked").set(count as f64);
+    }
+
+    pub fn repeat_offenders_inc() {
+        counter!("icn_disputes_repeat_offenders_total").increment(1);
+    }
+
+    pub fn escalated_penalties_inc() {
+        counter!("icn_disputes_escalated_penalties_total").increment(1);
     }
 }
 

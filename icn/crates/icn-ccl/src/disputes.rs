@@ -35,6 +35,64 @@ pub type MisbehaviorCallback = Arc<dyn Fn(&Did, ContentHash, Vec<u8>) + Send + S
 /// Takes a DID string and returns the trust score (0.0 to 1.0)
 pub type TrustCallback = Arc<dyn Fn(&str) -> f64 + Send + Sync>;
 
+/// Callback for reducing trust scores as a penalty
+/// Takes (violator_did, penalty_amount) and applies the reduction
+pub type TrustPenaltyCallback = Arc<dyn Fn(&Did, f64) + Send + Sync>;
+
+/// Configuration for dispute penalties
+#[derive(Debug, Clone)]
+pub struct PenaltyConfig {
+    /// Trust penalty for first-time incorrect result
+    pub incorrect_result_first_offense: f64,
+
+    /// Trust penalty for repeat incorrect results
+    pub incorrect_result_repeat: f64,
+
+    /// Trust penalty for unreported timeout
+    pub timeout_not_reported: f64,
+
+    /// Trust penalty for unreported fuel exceeded
+    pub fuel_exceeded_not_reported: f64,
+
+    /// Multiplier for escalating penalties (applies after 2nd offense)
+    pub escalation_multiplier: f64,
+
+    /// Number of offenses before escalation kicks in
+    pub escalation_threshold: usize,
+}
+
+impl Default for PenaltyConfig {
+    fn default() -> Self {
+        Self {
+            incorrect_result_first_offense: 0.05,
+            incorrect_result_repeat: 0.1,
+            timeout_not_reported: 0.02,
+            fuel_exceeded_not_reported: 0.05,
+            escalation_multiplier: 1.5,
+            escalation_threshold: 2,
+        }
+    }
+}
+
+/// Record of past offenses for a DID
+#[derive(Debug, Clone, Default)]
+pub struct OffenderRecord {
+    /// Total number of disputes lost
+    pub disputes_lost: usize,
+
+    /// Number of incorrect results
+    pub incorrect_results: usize,
+
+    /// Number of unreported timeouts
+    pub unreported_timeouts: usize,
+
+    /// Number of unreported fuel exceeded
+    pub unreported_fuel_exceeded: usize,
+
+    /// Total trust penalty applied
+    pub total_trust_penalty: f64,
+}
+
 /// Unique identifier for a dispute
 pub type DisputeId = [u8; 32];
 
@@ -168,6 +226,12 @@ pub struct DisputeConfig {
 
     /// Minimum trust score required to be a mediator (default: 0.7 = Federated)
     pub mediator_min_trust: f64,
+
+    /// Penalty configuration for dispute losers
+    pub penalty_config: PenaltyConfig,
+
+    /// Whether to apply penalties when executors lose disputes
+    pub enable_penalties: bool,
 }
 
 impl Default for DisputeConfig {
@@ -176,6 +240,8 @@ impl Default for DisputeConfig {
             re_execution_timeout: Duration::from_secs(60),
             auto_assign_mediators: true,
             mediator_min_trust: 0.7, // Federated trust class
+            penalty_config: PenaltyConfig::default(),
+            enable_penalties: true,
         }
     }
 }
@@ -198,6 +264,8 @@ pub struct DisputeResolutionSystem {
     misbehavior_callback: Option<MisbehaviorCallback>,
     trust_callback: Option<TrustCallback>,
     gossip_callback: Option<DisputeGossipCallback>,
+    trust_penalty_callback: Option<TrustPenaltyCallback>,
+    offender_records: HashMap<String, OffenderRecord>,
 }
 
 impl DisputeResolutionSystem {
@@ -210,6 +278,8 @@ impl DisputeResolutionSystem {
             misbehavior_callback: None,
             trust_callback: None,
             gossip_callback: None,
+            trust_penalty_callback: None,
+            offender_records: HashMap::new(),
         }
     }
 
@@ -230,6 +300,126 @@ impl DisputeResolutionSystem {
     pub fn set_gossip_callback(&mut self, callback: DisputeGossipCallback) {
         self.gossip_callback = Some(callback);
         info!("Gossip callback configured for dispute broadcasts");
+    }
+
+    /// Set the trust penalty callback for reducing trust scores on misbehavior
+    ///
+    /// When set, executors who lose disputes will have their trust scores reduced
+    /// according to the penalty configuration. This integrates with the trust graph
+    /// to apply economic consequences for incorrect results.
+    pub fn set_trust_penalty_callback(&mut self, callback: TrustPenaltyCallback) {
+        self.trust_penalty_callback = Some(callback);
+        info!("Trust penalty callback configured for dispute penalties");
+    }
+
+    /// Apply a penalty to an offender based on the dispute outcome
+    ///
+    /// This method:
+    /// 1. Looks up or creates the offender's record
+    /// 2. Updates the record with the new offense
+    /// 3. Calculates the penalty with escalation for repeat offenders
+    /// 4. Calls the trust penalty callback to apply the reduction
+    ///
+    /// Returns the penalty amount applied.
+    fn apply_penalty(&mut self, offender: &Did, reason: &DisputeReason) -> f64 {
+        if !self.config.enable_penalties {
+            return 0.0;
+        }
+
+        let offender_key = offender.to_string();
+        let record = self
+            .offender_records
+            .entry(offender_key.clone())
+            .or_default();
+
+        // Update offense counts
+        record.disputes_lost += 1;
+
+        // Determine if this is a repeat offender
+        let is_repeat_offender = record.disputes_lost > 1;
+        if is_repeat_offender {
+            icn_obs::metrics::disputes::repeat_offenders_inc();
+        }
+
+        // Calculate base penalty based on reason
+        let reason_str = match reason {
+            DisputeReason::IncorrectResult { .. } => "incorrect_result",
+            DisputeReason::TimeoutNotReported { .. } => "timeout_not_reported",
+            DisputeReason::FuelLimitExceeded { .. } => "fuel_exceeded",
+            DisputeReason::ExecutionFailed { .. } => "execution_failed",
+        };
+
+        let base_penalty = match reason {
+            DisputeReason::IncorrectResult { .. } => {
+                record.incorrect_results += 1;
+                if record.incorrect_results == 1 {
+                    self.config.penalty_config.incorrect_result_first_offense
+                } else {
+                    self.config.penalty_config.incorrect_result_repeat
+                }
+            }
+            DisputeReason::TimeoutNotReported { .. } => {
+                record.unreported_timeouts += 1;
+                self.config.penalty_config.timeout_not_reported
+            }
+            DisputeReason::FuelLimitExceeded { .. } => {
+                record.unreported_fuel_exceeded += 1;
+                self.config.penalty_config.fuel_exceeded_not_reported
+            }
+            DisputeReason::ExecutionFailed { .. } => {
+                // Execution failures are treated like incorrect results
+                record.incorrect_results += 1;
+                if record.incorrect_results == 1 {
+                    self.config.penalty_config.incorrect_result_first_offense
+                } else {
+                    self.config.penalty_config.incorrect_result_repeat
+                }
+            }
+        };
+
+        // Apply escalation multiplier for repeat offenders
+        let escalation_count = record.disputes_lost.saturating_sub(
+            self.config.penalty_config.escalation_threshold,
+        );
+        let escalation_factor = if escalation_count > 0 {
+            icn_obs::metrics::disputes::escalated_penalties_inc();
+            self.config.penalty_config.escalation_multiplier.powi(escalation_count as i32)
+        } else {
+            1.0
+        };
+
+        let final_penalty = (base_penalty * escalation_factor).min(1.0); // Cap at 1.0
+        record.total_trust_penalty += final_penalty;
+
+        // Capture values we need for logging before releasing the mutable borrow
+        let total_penalty = record.total_trust_penalty;
+        let disputes_lost = record.disputes_lost;
+
+        // Record metrics
+        icn_obs::metrics::disputes::penalties_applied_inc(reason_str);
+        icn_obs::metrics::disputes::penalty_amount_record(final_penalty, reason_str);
+        icn_obs::metrics::disputes::offenders_tracked_set(self.offender_records.len());
+
+        // Apply the penalty via callback
+        if let Some(ref callback) = self.trust_penalty_callback {
+            callback(offender, final_penalty);
+            info!(
+                "Applied trust penalty of {:.3} to {} (total: {:.3}, disputes lost: {})",
+                final_penalty, offender, total_penalty, disputes_lost
+            );
+        } else {
+            warn!(
+                "Trust penalty callback not set - penalty of {:.3} for {} not applied",
+                final_penalty, offender
+            );
+        }
+
+        final_penalty
+    }
+
+    /// Get the offender record for a DID
+    pub fn get_offender_record(&self, did: &Did) -> Option<&OffenderRecord> {
+        self.offender_records.get(&did.to_string())
     }
 
     /// File a dispute for a compute task result
@@ -455,6 +645,12 @@ impl DisputeResolutionSystem {
             }
         };
 
+        // Get dispute reason for penalty calculation
+        let dispute_reason = {
+            let dispute = self.disputes.get(&dispute_id).unwrap();
+            dispute.evidence.reason.clone()
+        };
+
         // Compare results (we already extracted evidence_claimed_result earlier)
         let outcome = if re_execution_result == evidence_claimed_result {
             // Executor was correct
@@ -482,6 +678,10 @@ impl DisputeResolutionSystem {
                     .into_bytes();
                     callback(&executor, task_hash, evidence);
                 }
+
+                // Apply trust penalty to executor
+                self.apply_penalty(&executor, &dispute_reason);
+
                 DisputeOutcome::SubmitterCorrect {
                     verified_result: re_execution_result.clone(),
                 }
@@ -494,6 +694,10 @@ impl DisputeResolutionSystem {
                     .into_bytes();
                     callback(&executor, task_hash, evidence);
                 }
+
+                // Apply trust penalty to executor (even if both were wrong, executor still failed)
+                self.apply_penalty(&executor, &dispute_reason);
+
                 DisputeOutcome::BothWrong {
                     correct_result: re_execution_result.clone(),
                 }
@@ -850,10 +1054,19 @@ pub enum DisputeActorMsg {
     SetGossipCallback {
         callback: DisputeGossipCallback,
     },
+    /// Set trust penalty callback for applying penalties to dispute losers
+    SetTrustPenaltyCallback {
+        callback: TrustPenaltyCallback,
+    },
     /// Add mediator with expertise tags
     AddMediatorWithExpertise {
         mediator: Did,
         expertise_tags: Vec<String>,
+    },
+    /// Get offender record for a DID
+    GetOffenderRecord {
+        did: Did,
+        reply: tokio::sync::oneshot::Sender<Option<OffenderRecord>>,
     },
 }
 
@@ -908,6 +1121,9 @@ impl std::fmt::Debug for DisputeActorMsg {
             Self::SetGossipCallback { .. } => {
                 f.debug_struct("SetGossipCallback").finish()
             }
+            Self::SetTrustPenaltyCallback { .. } => {
+                f.debug_struct("SetTrustPenaltyCallback").finish()
+            }
             Self::AddMediatorWithExpertise {
                 mediator,
                 expertise_tags,
@@ -915,6 +1131,10 @@ impl std::fmt::Debug for DisputeActorMsg {
                 .debug_struct("AddMediatorWithExpertise")
                 .field("mediator", mediator)
                 .field("expertise_tags", expertise_tags)
+                .finish(),
+            Self::GetOffenderRecord { did, .. } => f
+                .debug_struct("GetOffenderRecord")
+                .field("did", did)
                 .finish(),
         }
     }
@@ -1041,6 +1261,29 @@ impl DisputeActorHandle {
             })
             .await;
     }
+
+    /// Set trust penalty callback for applying penalties to dispute losers
+    ///
+    /// When set, executors who lose disputes will have their trust scores reduced
+    /// according to the penalty configuration.
+    pub async fn set_trust_penalty_callback(&self, callback: TrustPenaltyCallback) {
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::SetTrustPenaltyCallback { callback })
+            .await;
+    }
+
+    /// Get offender record for a DID
+    ///
+    /// Returns the record of past offenses if the DID has lost any disputes.
+    pub async fn get_offender_record(&self, did: Did) -> Option<OffenderRecord> {
+        let (reply, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(DisputeActorMsg::GetOffenderRecord { did, reply })
+            .await
+            .ok()?;
+        rx.await.ok()?
+    }
 }
 
 /// DisputeActor wraps DisputeResolutionSystem for integration with supervisor
@@ -1159,12 +1402,20 @@ impl DisputeActor {
                     let mut sys = system.write().await;
                     sys.set_gossip_callback(callback);
                 }
+                DisputeActorMsg::SetTrustPenaltyCallback { callback } => {
+                    let mut sys = system.write().await;
+                    sys.set_trust_penalty_callback(callback);
+                }
                 DisputeActorMsg::AddMediatorWithExpertise {
                     mediator,
                     expertise_tags,
                 } => {
                     let mut sys = system.write().await;
                     sys.add_mediator_with_expertise(mediator, expertise_tags);
+                }
+                DisputeActorMsg::GetOffenderRecord { did, reply } => {
+                    let sys = system.read().await;
+                    let _ = reply.send(sys.get_offender_record(&did).cloned());
                 }
             }
         }
@@ -1227,11 +1478,17 @@ impl DisputeActor {
                 DisputeActorMsg::SetGossipCallback { callback } => {
                     self.system.set_gossip_callback(callback);
                 }
+                DisputeActorMsg::SetTrustPenaltyCallback { callback } => {
+                    self.system.set_trust_penalty_callback(callback);
+                }
                 DisputeActorMsg::AddMediatorWithExpertise {
                     mediator,
                     expertise_tags,
                 } => {
                     self.system.add_mediator_with_expertise(mediator, expertise_tags);
+                }
+                DisputeActorMsg::GetOffenderRecord { did, reply } => {
+                    let _ = reply.send(self.system.get_offender_record(&did).cloned());
                 }
             }
         }
@@ -1484,6 +1741,7 @@ mod tests {
             re_execution_timeout: Duration::from_millis(1),
             auto_assign_mediators: true,
             mediator_min_trust: 0.7,
+            ..Default::default()
         };
         let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
         let mut system = DisputeResolutionSystem::new(config, store);
@@ -2018,5 +2276,299 @@ mod tests {
             .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
             .await;
         assert!(result.is_ok());
+    }
+
+    // === Penalty System Tests (Issue #58) ===
+
+    #[tokio::test]
+    async fn test_penalty_applied_on_submitter_correct_outcome() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let config = DisputeConfig {
+            enable_penalties: true,
+            penalty_config: PenaltyConfig {
+                incorrect_result_first_offense: 0.1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Track penalties
+        let penalty_count = Arc::new(AtomicUsize::new(0));
+        let last_penalty = Arc::new(std::sync::Mutex::new(0.0f64));
+        let last_offender = Arc::new(std::sync::Mutex::new(String::new()));
+
+        let pc = penalty_count.clone();
+        let lp = last_penalty.clone();
+        let lo = last_offender.clone();
+
+        let penalty_cb: TrustPenaltyCallback = Arc::new(move |did, penalty| {
+            pc.fetch_add(1, Ordering::SeqCst);
+            *lp.lock().unwrap() = penalty;
+            *lo.lock().unwrap() = did.to_string();
+        });
+        system.set_trust_penalty_callback(penalty_cb);
+
+        // Create a contract that adds 2+3=5
+        let contract = make_test_contract();
+        let executor = make_test_did();
+        let challenger = make_test_did();
+        let task_hash = [60u8; 32];
+
+        // Executor claims result is 6 (wrong), submitter expects 5 (correct)
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(6), // Wrong
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5), // Submitter is correct
+                actual: Value::Int(6),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        // Investigate - should find executor wrong
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+
+        let outcome = system
+            .investigate_dispute(dispute_id, &contract, "add", args)
+            .await
+            .unwrap();
+
+        // Verify outcome is SubmitterCorrect
+        assert!(matches!(outcome, DisputeOutcome::SubmitterCorrect { .. }));
+
+        // Verify penalty was applied
+        assert_eq!(penalty_count.load(Ordering::SeqCst), 1);
+        assert!((*last_penalty.lock().unwrap() - 0.1).abs() < 0.0001);
+        assert_eq!(*last_offender.lock().unwrap(), executor.to_string());
+
+        // Check offender record
+        let record = system.get_offender_record(&executor).unwrap();
+        assert_eq!(record.disputes_lost, 1);
+        assert_eq!(record.incorrect_results, 1);
+    }
+
+    #[tokio::test]
+    async fn test_no_penalty_when_executor_correct() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let config = DisputeConfig {
+            enable_penalties: true,
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Track penalties
+        let penalty_count = Arc::new(AtomicUsize::new(0));
+        let pc = penalty_count.clone();
+
+        let penalty_cb: TrustPenaltyCallback = Arc::new(move |_, _| {
+            pc.fetch_add(1, Ordering::SeqCst);
+        });
+        system.set_trust_penalty_callback(penalty_cb);
+
+        let contract = make_test_contract();
+        let executor = make_test_did();
+        let challenger = make_test_did();
+        let task_hash = [61u8; 32];
+
+        // Executor claims correct result
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5), // Correct (2+3=5)
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4), // Challenger is wrong
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+
+        let outcome = system
+            .investigate_dispute(dispute_id, &contract, "add", args)
+            .await
+            .unwrap();
+
+        // Verify outcome is ExecutorCorrect
+        assert!(matches!(outcome, DisputeOutcome::ExecutorCorrect { .. }));
+
+        // Verify no penalty was applied
+        assert_eq!(penalty_count.load(Ordering::SeqCst), 0);
+
+        // No offender record should exist
+        assert!(system.get_offender_record(&executor).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_repeat_offender_escalation() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let config = DisputeConfig {
+            enable_penalties: true,
+            penalty_config: PenaltyConfig {
+                incorrect_result_first_offense: 0.1,
+                incorrect_result_repeat: 0.15,
+                escalation_threshold: 2,
+                escalation_multiplier: 1.5,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Track penalties
+        let penalties = Arc::new(std::sync::Mutex::new(Vec::<f64>::new()));
+        let p = penalties.clone();
+
+        let penalty_cb: TrustPenaltyCallback = Arc::new(move |_, penalty| {
+            p.lock().unwrap().push(penalty);
+        });
+        system.set_trust_penalty_callback(penalty_cb);
+
+        let contract = make_test_contract();
+        let executor = make_test_did();
+
+        // First offense
+        let evidence1 = DisputeEvidence {
+            task_hash: [70u8; 32],
+            claimed_result: Value::Int(6),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5),
+                actual: Value::Int(6),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+        let dispute_id1 = system
+            .file_dispute([70u8; 32], executor.clone(), make_test_did(), evidence1)
+            .await
+            .unwrap();
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+        system
+            .investigate_dispute(dispute_id1, &contract, "add", args.clone())
+            .await
+            .unwrap();
+
+        // Second offense
+        let evidence2 = DisputeEvidence {
+            task_hash: [71u8; 32],
+            claimed_result: Value::Int(7),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5),
+                actual: Value::Int(7),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+        let dispute_id2 = system
+            .file_dispute([71u8; 32], executor.clone(), make_test_did(), evidence2)
+            .await
+            .unwrap();
+        system
+            .investigate_dispute(dispute_id2, &contract, "add", args.clone())
+            .await
+            .unwrap();
+
+        // Third offense (escalation kicks in)
+        let evidence3 = DisputeEvidence {
+            task_hash: [72u8; 32],
+            claimed_result: Value::Int(8),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5),
+                actual: Value::Int(8),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+        let dispute_id3 = system
+            .file_dispute([72u8; 32], executor.clone(), make_test_did(), evidence3)
+            .await
+            .unwrap();
+        system
+            .investigate_dispute(dispute_id3, &contract, "add", args.clone())
+            .await
+            .unwrap();
+
+        let applied = penalties.lock().unwrap();
+        assert_eq!(applied.len(), 3);
+        assert!((applied[0] - 0.1).abs() < 0.0001); // First offense: 0.1
+        assert!((applied[1] - 0.15).abs() < 0.0001); // Second offense: 0.15 (repeat rate)
+        assert!((applied[2] - 0.225).abs() < 0.0001); // Third offense: 0.15 * 1.5 = 0.225 (escalated)
+
+        // Check offender record
+        let record = system.get_offender_record(&executor).unwrap();
+        assert_eq!(record.disputes_lost, 3);
+        assert_eq!(record.incorrect_results, 3);
+    }
+
+    #[tokio::test]
+    async fn test_penalty_disabled() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let config = DisputeConfig {
+            enable_penalties: false, // Disabled
+            ..Default::default()
+        };
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        let penalty_count = Arc::new(AtomicUsize::new(0));
+        let pc = penalty_count.clone();
+
+        let penalty_cb: TrustPenaltyCallback = Arc::new(move |_, _| {
+            pc.fetch_add(1, Ordering::SeqCst);
+        });
+        system.set_trust_penalty_callback(penalty_cb);
+
+        let contract = make_test_contract();
+        let executor = make_test_did();
+
+        let evidence = DisputeEvidence {
+            task_hash: [80u8; 32],
+            claimed_result: Value::Int(6),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5),
+                actual: Value::Int(6),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+        let dispute_id = system
+            .file_dispute([80u8; 32], executor.clone(), make_test_did(), evidence)
+            .await
+            .unwrap();
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+        system
+            .investigate_dispute(dispute_id, &contract, "add", args)
+            .await
+            .unwrap();
+
+        // No penalty should be applied when disabled
+        assert_eq!(penalty_count.load(Ordering::SeqCst), 0);
     }
 }
