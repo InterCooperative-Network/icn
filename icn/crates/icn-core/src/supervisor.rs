@@ -2437,6 +2437,7 @@ impl Supervisor {
             let dispute_handle = icn_ccl::DisputeActor::spawn(dispute_config.clone(), dispute_store);
 
             // Fill dispute handle holder for notification callback
+            // Note: Write guard is automatically released at end of statement
             *dispute_handle_holder.write().await = Some(dispute_handle.clone());
 
             info!(

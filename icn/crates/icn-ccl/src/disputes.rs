@@ -517,7 +517,7 @@ impl DisputeResolutionSystem {
 }
 
 /// Statistics about disputes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DisputeStats {
     pub total_disputes: usize,
     pub pending: usize,
@@ -532,7 +532,6 @@ pub struct DisputeStats {
 }
 
 /// Message type for DisputeActor operations
-#[derive(Debug)]
 pub enum DisputeActorMsg {
     /// File a new dispute
     FileDispute {
@@ -567,6 +566,59 @@ pub enum DisputeActorMsg {
     RemoveMediator {
         mediator: Did,
     },
+    /// Set misbehavior callback
+    SetMisbehaviorCallback {
+        callback: MisbehaviorCallback,
+    },
+}
+
+impl std::fmt::Debug for DisputeActorMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FileDispute {
+                task_hash,
+                executor,
+                challenger,
+                evidence,
+                ..
+            } => f
+                .debug_struct("FileDispute")
+                .field("task_hash", task_hash)
+                .field("executor", executor)
+                .field("challenger", challenger)
+                .field("evidence", evidence)
+                .finish(),
+            Self::InvestigateDispute {
+                dispute_id,
+                contract,
+                rule_name,
+                args,
+                ..
+            } => f
+                .debug_struct("InvestigateDispute")
+                .field("dispute_id", dispute_id)
+                .field("contract", contract)
+                .field("rule_name", rule_name)
+                .field("args", args)
+                .finish(),
+            Self::GetDispute { dispute_id, .. } => f
+                .debug_struct("GetDispute")
+                .field("dispute_id", dispute_id)
+                .finish(),
+            Self::GetStats { .. } => f.debug_struct("GetStats").finish(),
+            Self::AddMediator { mediator } => f
+                .debug_struct("AddMediator")
+                .field("mediator", mediator)
+                .finish(),
+            Self::RemoveMediator { mediator } => f
+                .debug_struct("RemoveMediator")
+                .field("mediator", mediator)
+                .finish(),
+            Self::SetMisbehaviorCallback { .. } => {
+                f.debug_struct("SetMisbehaviorCallback").finish()
+            }
+        }
+    }
 }
 
 /// Handle for interacting with the DisputeActor
@@ -634,31 +686,9 @@ impl DisputeActorHandle {
     pub async fn get_stats(&self) -> DisputeStats {
         let (reply, rx) = tokio::sync::oneshot::channel();
         if self.tx.send(DisputeActorMsg::GetStats { reply }).await.is_ok() {
-            rx.await.unwrap_or_else(|_| DisputeStats {
-                total_disputes: 0,
-                pending: 0,
-                investigating: 0,
-                resolved_auto: 0,
-                under_mediation: 0,
-                closed: 0,
-                submitter_correct: 0,
-                executor_correct: 0,
-                both_wrong: 0,
-                inconclusive: 0,
-            })
+            rx.await.unwrap_or_default()
         } else {
-            DisputeStats {
-                total_disputes: 0,
-                pending: 0,
-                investigating: 0,
-                resolved_auto: 0,
-                under_mediation: 0,
-                closed: 0,
-                submitter_correct: 0,
-                executor_correct: 0,
-                both_wrong: 0,
-                inconclusive: 0,
-            }
+            DisputeStats::default()
         }
     }
 
@@ -672,6 +702,14 @@ impl DisputeActorHandle {
         let _ = self
             .tx
             .send(DisputeActorMsg::RemoveMediator { mediator })
+            .await;
+    }
+
+    /// Set misbehavior callback for recording violations
+    pub async fn set_misbehavior_callback(&self, callback: MisbehaviorCallback) {
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::SetMisbehaviorCallback { callback })
             .await;
     }
 }
@@ -743,15 +781,13 @@ impl DisputeActor {
                 DisputeActorMsg::RemoveMediator { mediator } => {
                     self.system.remove_mediator(&mediator);
                 }
+                DisputeActorMsg::SetMisbehaviorCallback { callback } => {
+                    self.system.set_misbehavior_callback(callback);
+                }
             }
         }
 
         info!("DisputeActor stopped");
-    }
-
-    /// Set misbehavior callback
-    pub fn set_misbehavior_callback(&mut self, callback: MisbehaviorCallback) {
-        self.system.set_misbehavior_callback(callback);
     }
 }
 
