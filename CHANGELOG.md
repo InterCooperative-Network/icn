@@ -28,6 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Closes #53.
 
+### Added - Gossip Topics for Dispute Announcements (2025-12-05)
+
+**Dispute Broadcasting** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- Disputes are now broadcast via gossip when filed and resolved
+- Added `TOPIC_DISPUTES_FILE` ("disputes:file") for new dispute announcements
+- Added `TOPIC_DISPUTES_RESOLVED` ("disputes:resolved") for resolution announcements
+- Added `DisputeGossipCallback` type for integrating with gossip layer
+- Broadcasts include dispute ID, task hash, executor, challenger, reason/outcome
+- Enables mediators and observers to receive real-time dispute notifications
+
+**Actor API**:
+- `DisputeActorHandle::set_gossip_callback()` - Set callback for broadcasting dispute events
+- `DisputeResolutionSystem::set_gossip_callback()` - Direct system configuration
+
+**New Tests**:
+- `test_gossip_broadcast_on_file_dispute` - Verifies DisputeFiled broadcast
+- `test_gossip_broadcast_on_dispute_resolved` - Verifies DisputeResolved broadcast
+- `test_no_broadcast_without_callback` - Verifies graceful handling without callback
+
+Closes #56.
+
 ### Added - Trust-Weighted Mediator Selection (2025-12-05)
 
 **Dispute Resolution** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):

@@ -20,6 +20,13 @@ use tracing::{info, warn};
 /// Gossip topic for filing disputes
 pub const TOPIC_DISPUTES_FILE: &str = "disputes:file";
 
+/// Gossip topic for resolved disputes
+pub const TOPIC_DISPUTES_RESOLVED: &str = "disputes:resolved";
+
+/// Callback for broadcasting dispute messages via gossip
+/// Takes the topic and serialized DisputeMessage bytes
+pub type DisputeGossipCallback = Arc<dyn Fn(&str, Vec<u8>) + Send + Sync>;
+
 /// Callback for recording misbehavior violations
 /// Arguments: (violator_did, task_hash, evidence_bytes)
 pub type MisbehaviorCallback = Arc<dyn Fn(&Did, ContentHash, Vec<u8>) + Send + Sync>;
@@ -190,6 +197,7 @@ pub struct DisputeResolutionSystem {
     mediator_pool: Vec<MediatorInfo>,
     misbehavior_callback: Option<MisbehaviorCallback>,
     trust_callback: Option<TrustCallback>,
+    gossip_callback: Option<DisputeGossipCallback>,
 }
 
 impl DisputeResolutionSystem {
@@ -201,6 +209,7 @@ impl DisputeResolutionSystem {
             mediator_pool: Vec::new(),
             misbehavior_callback: None,
             trust_callback: None,
+            gossip_callback: None,
         }
     }
 
@@ -212,6 +221,15 @@ impl DisputeResolutionSystem {
     /// Set the misbehavior callback for recording violations
     pub fn set_misbehavior_callback(&mut self, callback: MisbehaviorCallback) {
         self.misbehavior_callback = Some(callback);
+    }
+
+    /// Set the gossip callback for broadcasting dispute events
+    ///
+    /// When set, dispute events (filed, resolved) will be broadcast to the network
+    /// via gossip topics. This enables mediators and observers to receive notifications.
+    pub fn set_gossip_callback(&mut self, callback: DisputeGossipCallback) {
+        self.gossip_callback = Some(callback);
+        info!("Gossip callback configured for dispute broadcasts");
     }
 
     /// File a dispute for a compute task result
@@ -247,6 +265,37 @@ impl DisputeResolutionSystem {
         // Store dispute
         self.disputes.insert(dispute_id, dispute.clone());
         self.persist_dispute(&dispute)?;
+
+        // Broadcast DisputeFiled message via gossip
+        if let Some(ref callback) = self.gossip_callback {
+            let filed_at = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let message = DisputeMessage::DisputeFiled {
+                dispute_id,
+                task_hash,
+                executor: executor.clone(),
+                challenger: challenger.clone(),
+                reason: evidence.reason.clone(),
+                filed_at,
+            };
+
+            match serde_json::to_vec(&message) {
+                Ok(bytes) => {
+                    callback(TOPIC_DISPUTES_FILE, bytes);
+                    info!(
+                        "Broadcast DisputeFiled for dispute {} on topic {}",
+                        hex::encode(dispute_id),
+                        TOPIC_DISPUTES_FILE
+                    );
+                }
+                Err(e) => {
+                    warn!("Failed to serialize DisputeFiled message: {}", e);
+                }
+            }
+        }
 
         // Note: Investigation must be triggered separately via investigate_dispute()
         // once the contract and execution context are available. This allows for
@@ -469,6 +518,34 @@ impl DisputeResolutionSystem {
         };
 
         self.persist_dispute(&dispute_for_persist)?;
+
+        // Broadcast DisputeResolved message via gossip
+        if let Some(ref callback) = self.gossip_callback {
+            let resolved_at = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let message = DisputeMessage::DisputeResolved {
+                dispute_id,
+                outcome: outcome.clone(),
+                resolved_at,
+            };
+
+            match serde_json::to_vec(&message) {
+                Ok(bytes) => {
+                    callback(TOPIC_DISPUTES_RESOLVED, bytes);
+                    info!(
+                        "Broadcast DisputeResolved for dispute {} on topic {}",
+                        hex::encode(dispute_id),
+                        TOPIC_DISPUTES_RESOLVED
+                    );
+                }
+                Err(e) => {
+                    warn!("Failed to serialize DisputeResolved message: {}", e);
+                }
+            }
+        }
 
         Ok(outcome)
     }
@@ -769,6 +846,10 @@ pub enum DisputeActorMsg {
     SetTrustCallback {
         callback: TrustCallback,
     },
+    /// Set gossip callback for broadcasting dispute events
+    SetGossipCallback {
+        callback: DisputeGossipCallback,
+    },
     /// Add mediator with expertise tags
     AddMediatorWithExpertise {
         mediator: Did,
@@ -823,6 +904,9 @@ impl std::fmt::Debug for DisputeActorMsg {
             }
             Self::SetTrustCallback { .. } => {
                 f.debug_struct("SetTrustCallback").finish()
+            }
+            Self::SetGossipCallback { .. } => {
+                f.debug_struct("SetGossipCallback").finish()
             }
             Self::AddMediatorWithExpertise {
                 mediator,
@@ -933,6 +1017,17 @@ impl DisputeActorHandle {
         let _ = self
             .tx
             .send(DisputeActorMsg::SetTrustCallback { callback })
+            .await;
+    }
+
+    /// Set gossip callback for broadcasting dispute events
+    ///
+    /// When set, dispute events (filed, resolved) will be broadcast to mediators
+    /// and observers via gossip topics.
+    pub async fn set_gossip_callback(&self, callback: DisputeGossipCallback) {
+        let _ = self
+            .tx
+            .send(DisputeActorMsg::SetGossipCallback { callback })
             .await;
     }
 
@@ -1060,6 +1155,10 @@ impl DisputeActor {
                     let mut sys = system.write().await;
                     sys.set_trust_callback(callback);
                 }
+                DisputeActorMsg::SetGossipCallback { callback } => {
+                    let mut sys = system.write().await;
+                    sys.set_gossip_callback(callback);
+                }
                 DisputeActorMsg::AddMediatorWithExpertise {
                     mediator,
                     expertise_tags,
@@ -1124,6 +1223,9 @@ impl DisputeActor {
                 }
                 DisputeActorMsg::SetTrustCallback { callback } => {
                     self.system.set_trust_callback(callback);
+                }
+                DisputeActorMsg::SetGossipCallback { callback } => {
+                    self.system.set_gossip_callback(callback);
                 }
                 DisputeActorMsg::AddMediatorWithExpertise {
                     mediator,
@@ -1737,5 +1839,184 @@ mod tests {
         assert_eq!(system.mediator_pool.len(), 1);
         assert_eq!(system.mediator_pool[0].did, mediator);
         assert_eq!(system.mediator_pool[0].expertise_tags, expertise);
+    }
+
+    #[tokio::test]
+    async fn test_gossip_broadcast_on_file_dispute() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let config = DisputeConfig::default();
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Track broadcasts
+        let broadcast_count = Arc::new(AtomicUsize::new(0));
+        let received_topic = Arc::new(std::sync::Mutex::new(String::new()));
+        let received_bytes = Arc::new(std::sync::Mutex::new(Vec::new()));
+
+        let bc = broadcast_count.clone();
+        let rt = received_topic.clone();
+        let rb = received_bytes.clone();
+
+        let gossip_cb: DisputeGossipCallback = Arc::new(move |topic, bytes| {
+            bc.fetch_add(1, Ordering::SeqCst);
+            *rt.lock().unwrap() = topic.to_string();
+            *rb.lock().unwrap() = bytes;
+        });
+        system.set_gossip_callback(gossip_cb);
+
+        // File a dispute
+        let task_hash = [50u8; 32];
+        let executor = make_test_did();
+        let challenger = make_test_did();
+
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(10),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5),
+                actual: Value::Int(10),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        // Verify broadcast occurred
+        assert_eq!(broadcast_count.load(Ordering::SeqCst), 1);
+        assert_eq!(*received_topic.lock().unwrap(), TOPIC_DISPUTES_FILE);
+
+        // Verify message content
+        let bytes = received_bytes.lock().unwrap().clone();
+        let message: DisputeMessage = serde_json::from_slice(&bytes).unwrap();
+        match message {
+            DisputeMessage::DisputeFiled {
+                dispute_id: msg_id,
+                task_hash: msg_hash,
+                executor: msg_executor,
+                challenger: msg_challenger,
+                ..
+            } => {
+                assert_eq!(msg_id, dispute_id);
+                assert_eq!(msg_hash, task_hash);
+                assert_eq!(msg_executor, executor);
+                assert_eq!(msg_challenger, challenger);
+            }
+            _ => panic!("Expected DisputeFiled message"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_gossip_broadcast_on_dispute_resolved() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let config = DisputeConfig::default();
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Track broadcasts
+        let broadcast_count = Arc::new(AtomicUsize::new(0));
+        let last_topic = Arc::new(std::sync::Mutex::new(String::new()));
+        let last_bytes = Arc::new(std::sync::Mutex::new(Vec::new()));
+
+        let bc = broadcast_count.clone();
+        let lt = last_topic.clone();
+        let lb = last_bytes.clone();
+
+        let gossip_cb: DisputeGossipCallback = Arc::new(move |topic, bytes| {
+            bc.fetch_add(1, Ordering::SeqCst);
+            *lt.lock().unwrap() = topic.to_string();
+            *lb.lock().unwrap() = bytes;
+        });
+        system.set_gossip_callback(gossip_cb);
+
+        // File a dispute (this will trigger 1 broadcast)
+        let contract = make_test_contract();
+        let task_hash = [51u8; 32];
+        let executor = make_test_did();
+        let challenger = make_test_did();
+
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(5), // Correct answer
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(4),
+                actual: Value::Int(5),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        let dispute_id = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await
+            .unwrap();
+
+        // Verify first broadcast (DisputeFiled)
+        assert_eq!(broadcast_count.load(Ordering::SeqCst), 1);
+        assert_eq!(*last_topic.lock().unwrap(), TOPIC_DISPUTES_FILE);
+
+        // Investigate the dispute (this will trigger another broadcast)
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+
+        let outcome = system
+            .investigate_dispute(dispute_id, &contract, "add", args)
+            .await
+            .unwrap();
+
+        // Verify second broadcast (DisputeResolved)
+        assert_eq!(broadcast_count.load(Ordering::SeqCst), 2);
+        assert_eq!(*last_topic.lock().unwrap(), TOPIC_DISPUTES_RESOLVED);
+
+        // Verify message content
+        let bytes = last_bytes.lock().unwrap().clone();
+        let message: DisputeMessage = serde_json::from_slice(&bytes).unwrap();
+        match message {
+            DisputeMessage::DisputeResolved {
+                dispute_id: msg_id,
+                outcome: msg_outcome,
+                ..
+            } => {
+                assert_eq!(msg_id, dispute_id);
+                assert_eq!(msg_outcome, outcome);
+            }
+            _ => panic!("Expected DisputeResolved message"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_no_broadcast_without_callback() {
+        let config = DisputeConfig::default();
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        // Don't set gossip callback - should not panic
+
+        let task_hash = [52u8; 32];
+        let executor = make_test_did();
+        let challenger = make_test_did();
+
+        let evidence = DisputeEvidence {
+            task_hash,
+            claimed_result: Value::Int(10),
+            reason: DisputeReason::IncorrectResult {
+                expected: Value::Int(5),
+                actual: Value::Int(10),
+            },
+            additional_data: vec![],
+            filed_at: SystemTime::now(),
+        };
+
+        // Should succeed without a callback
+        let result = system
+            .file_dispute(task_hash, executor.clone(), challenger.clone(), evidence)
+            .await;
+        assert!(result.is_ok());
     }
 }
