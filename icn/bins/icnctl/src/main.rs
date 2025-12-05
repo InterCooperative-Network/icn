@@ -1162,7 +1162,7 @@ async fn main() -> Result<()> {
             handle_federation_command(fed_cmd, &data_dir, &args.endpoint).await?
         }
 
-        Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir, &args.endpoint)?,
+        Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir, &args.endpoint).await?,
 
         Commands::Snapshot(snapshot_cmd) => handle_snapshot_command(snapshot_cmd, &data_dir)?,
 
@@ -1179,11 +1179,11 @@ async fn main() -> Result<()> {
 
         Commands::Auth(auth_cmd) => handle_auth_command(auth_cmd, &data_dir).await?,
 
-        Commands::Compute(compute_cmd) => handle_compute_command(compute_cmd, &args.endpoint)?,
+        Commands::Compute(compute_cmd) => handle_compute_command(compute_cmd, &data_dir, &args.endpoint).await?,
 
-        Commands::Policy(policy_cmd) => handle_policy_command(policy_cmd, &args.endpoint)?,
+        Commands::Policy(policy_cmd) => handle_policy_command(policy_cmd, &data_dir, &args.endpoint).await?,
 
-        Commands::Quota(quota_cmd) => handle_quota_command(quota_cmd, &args.endpoint)?,
+        Commands::Quota(quota_cmd) => handle_quota_command(quota_cmd, &data_dir, &args.endpoint).await?,
 
         Commands::Completions { shell } => {
             let mut cmd = Args::command();
@@ -4214,58 +4214,10 @@ fn extract_backup_metadata(_archive: &mut Archive<File>, input: &Path) -> Result
 
 // RPC client helpers
 
-#[derive(Serialize)]
-struct JsonRpcRequest {
-    jsonrpc: String,
-    id: u64,
-    method: String,
-    params: serde_json::Value,
-}
+async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+    // Create authenticated RPC client
+    let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
 
-#[derive(Deserialize)]
-struct JsonRpcResponse {
-    #[allow(dead_code)]
-    jsonrpc: String,
-    #[allow(dead_code)]
-    id: u64,
-    result: Option<serde_json::Value>,
-    error: Option<JsonRpcError>,
-}
-
-#[derive(Deserialize)]
-struct JsonRpcError {
-    code: i32,
-    message: String,
-}
-
-fn rpc_call(endpoint: &str, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
-    let url = format!("http://{endpoint}/rpc");
-    let request = JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: 1,
-        method: method.to_string(),
-        params,
-    };
-
-    let client = reqwest::blocking::Client::new();
-    let response: JsonRpcResponse = client
-        .post(&url)
-        .json(&request)
-        .send()
-        .context("Failed to connect to daemon. Is icnd running?")?
-        .json()
-        .context("Failed to parse RPC response")?;
-
-    if let Some(error) = response.error {
-        bail!("RPC error ({}): {}", error.code, error.message);
-    }
-
-    response
-        .result
-        .ok_or_else(|| anyhow::anyhow!("RPC response missing result"))
-}
-
-fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Result<()> {
     match cmd {
         GovCommands::Domain(domain_cmd) => match domain_cmd {
             DomainCommands::Create {
@@ -4305,7 +4257,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                     },
                 });
 
-                rpc_call(endpoint, "governance.domain.create", params)?;
+                client.call("governance.domain.create", params).await?;
 
                 println!("✓ Governance domain created:");
                 println!("  ID: {domain_id}");
@@ -4319,7 +4271,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
 
             DomainCommands::Show { domain_id } => {
                 let params = serde_json::json!({ "domain_id": domain_id });
-                let result = rpc_call(endpoint, "governance.domain.get", params)?;
+                let result = client.call("governance.domain.get", params).await?;
                 let domain = result.as_object().context("Invalid domain data")?;
 
                 println!("Governance Domain:");
@@ -4379,7 +4331,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
             }
 
             DomainCommands::List => {
-                let result = rpc_call(endpoint, "governance.domain.list", serde_json::json!({}))?;
+                let result = client.call("governance.domain.list", serde_json::json!({})).await?;
                 let domains: Vec<serde_json::Value> =
                     serde_json::from_value(result).context("Failed to parse domain list")?;
 
@@ -4463,7 +4415,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                         "payload": payload_json
                     });
 
-                    let result = rpc_call(endpoint, "governance.proposal.create", params)?;
+                    let result = client.call("governance.proposal.create", params).await?;
                     let proposal_id = result["proposal_id"]
                         .as_str()
                         .context("Missing proposal_id in response")?;
@@ -4479,14 +4431,14 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                 } => {
                     // Get proposal to find its domain
                     let get_params = serde_json::json!({ "proposal_id": proposal_id });
-                    let proposal_data = rpc_call(endpoint, "governance.proposal.get", get_params)?;
+                    let proposal_data = client.call("governance.proposal.get", get_params).await?;
                     let domain_id = proposal_data["domain_id"]
                         .as_str()
                         .context("Missing domain_id")?;
 
                     // Get domain to determine voting period
                     let domain_params = serde_json::json!({ "domain_id": domain_id });
-                    let domain_data = rpc_call(endpoint, "governance.domain.get", domain_params)?;
+                    let domain_data = client.call("governance.domain.get", domain_params).await?;
                     let default_period = domain_data["params"]["voting_period_seconds"]
                         .as_u64()
                         .unwrap_or(86400);
@@ -4498,7 +4450,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                         "proposal_id": proposal_id,
                         "voting_period_seconds": voting_period
                     });
-                    rpc_call(endpoint, "governance.proposal.open", open_params)?;
+                    client.call("governance.proposal.open", open_params).await?;
 
                     println!("✓ Proposal opened for voting:");
                     println!("  ID: {proposal_id}");
@@ -4509,7 +4461,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                     println!("Proposals in domain '{domain_id}':");
 
                     let result =
-                        rpc_call(endpoint, "governance.proposal.list", serde_json::json!({}))?;
+                        client.call("governance.proposal.list", serde_json::json!({})).await?;
                     let proposals: Vec<serde_json::Value> =
                         serde_json::from_value(result).context("Failed to parse proposal list")?;
 
@@ -4537,7 +4489,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
 
                 ProposalCommands::Show { proposal_id } => {
                     let params = serde_json::json!({ "proposal_id": proposal_id });
-                    let proposal = rpc_call(endpoint, "governance.proposal.get", params)?;
+                    let proposal = client.call("governance.proposal.get", params).await?;
 
                     println!("Proposal:");
                     println!("  ID: {}", proposal["id"].as_str().unwrap_or("unknown"));
@@ -4575,7 +4527,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
 
                 ProposalCommands::Close { proposal_id } => {
                     let params = serde_json::json!({ "proposal_id": proposal_id });
-                    rpc_call(endpoint, "governance.proposal.close", params)?;
+                    client.call("governance.proposal.close", params).await?;
 
                     println!("✓ Proposal closed:");
                     println!("  ID: {proposal_id}");
@@ -4607,7 +4559,7 @@ fn handle_gov_command(cmd: GovCommands, _data_dir: &Path, endpoint: &str) -> Res
                     "comment": comment
                 });
 
-                rpc_call(endpoint, "governance.vote.cast", params)?;
+                client.call("governance.vote.cast", params).await?;
 
                 println!("✓ Vote recorded:");
                 println!("  Proposal: {proposal_id}");
@@ -5269,7 +5221,10 @@ token_expiry_hours = 24
     Ok(())
 }
 
-fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
+async fn handle_compute_command(cmd: ComputeCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+    // Create authenticated RPC client
+    let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
+
     match cmd {
         ComputeCommands::Submit {
             contract,
@@ -5305,7 +5260,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                 "payment_currency": payment_currency,
             });
 
-            let result = rpc_call(endpoint, "compute.submit", params)?;
+            let result = client.call("compute.submit", params).await?;
 
             let task_hash = result
                 .get("task_hash")
@@ -5359,7 +5314,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                 "payment_currency": payment_currency,
             });
 
-            let result = rpc_call(endpoint, "compute.submit", params)?;
+            let result = client.call("compute.submit", params).await?;
 
             let task_hash = result
                 .get("task_hash")
@@ -5376,7 +5331,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
 
         ComputeCommands::Status { task_hash } => {
             let params = serde_json::json!({ "task_hash": task_hash });
-            let result = rpc_call(endpoint, "compute.status", params)?;
+            let result = client.call("compute.status", params).await?;
 
             let status = result
                 .get("status")
@@ -5426,7 +5381,7 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
                 "task_hash": task_hash,
                 "reason": reason,
             });
-            let result = rpc_call(endpoint, "compute.cancel", params)?;
+            let result = client.call("compute.cancel", params).await?;
 
             let status = result
                 .get("status")
@@ -5442,7 +5397,10 @@ fn handle_compute_command(cmd: ComputeCommands, endpoint: &str) -> Result<()> {
     Ok(())
 }
 
-fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
+async fn handle_policy_command(cmd: PolicyCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+    // Create authenticated RPC client
+    let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
+
     match cmd {
         PolicyCommands::Set { coop_id, policy } => {
             // Read policy JSON
@@ -5456,7 +5414,7 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
                 "policy": policy_value,
             });
 
-            rpc_call(endpoint, "policy.set", params)?;
+            client.call("policy.set", params).await?;
 
             println!("✓ Policy set for cooperative: {coop_id}");
             println!();
@@ -5466,7 +5424,7 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
 
         PolicyCommands::Show { coop_id } => {
             let params = serde_json::json!({ "coop_id": coop_id });
-            let result = rpc_call(endpoint, "policy.get", params)?;
+            let result = client.call("policy.get", params).await?;
 
             if result.is_null() {
                 println!("No policy set for cooperative: {coop_id}");
@@ -5480,7 +5438,7 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
 
         PolicyCommands::List => {
             let params = serde_json::json!({});
-            let result = rpc_call(endpoint, "policy.list", params)?;
+            let result = client.call("policy.list", params).await?;
 
             let policies = result.as_array().context("Expected array of policies")?;
 
@@ -5510,7 +5468,7 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
 
         PolicyCommands::Remove { coop_id } => {
             let params = serde_json::json!({ "coop_id": coop_id });
-            rpc_call(endpoint, "policy.remove", params)?;
+            client.call("policy.remove", params).await?;
 
             println!("✓ Policy removed for cooperative: {coop_id}");
         }
@@ -5519,14 +5477,17 @@ fn handle_policy_command(cmd: PolicyCommands, endpoint: &str) -> Result<()> {
     Ok(())
 }
 
-fn handle_quota_command(cmd: QuotaCommands, endpoint: &str) -> Result<()> {
+async fn handle_quota_command(cmd: QuotaCommands, data_dir: &Path, endpoint: &str) -> Result<()> {
+    // Create authenticated RPC client
+    let mut client = create_authenticated_rpc_client(endpoint, data_dir)?;
+
     match cmd {
         QuotaCommands::Show { coop_id, member } => {
             let params = serde_json::json!({
                 "coop_id": coop_id,
                 "member_did": member,
             });
-            let result = rpc_call(endpoint, "quota.usage", params)?;
+            let result = client.call("quota.usage", params).await?;
 
             println!("Usage for {member} in {coop_id}:");
             println!();
@@ -5561,7 +5522,7 @@ fn handle_quota_command(cmd: QuotaCommands, endpoint: &str) -> Result<()> {
 
         QuotaCommands::List { coop_id } => {
             let params = serde_json::json!({ "coop_id": coop_id });
-            let result = rpc_call(endpoint, "quota.list", params)?;
+            let result = client.call("quota.list", params).await?;
 
             let usage_records = result
                 .as_array()
