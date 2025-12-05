@@ -234,6 +234,7 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `topic-subscriptions-api.md` - API reference for gossip subscriptions
 - `governance-primitives.md` - Design spec for governance layer (Phase 13)
 - `econ-modeling.md` - Economic modeling research for mutual credit systems
+- `contribution-credits-design.md` - Infrastructure incentives design (Phase 21 RFC)
 - `dev-journal/` - Detailed development journals (see below)
 
 ### Development Journal (`docs/dev-journal/`)
