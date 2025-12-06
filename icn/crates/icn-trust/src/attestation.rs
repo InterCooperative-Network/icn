@@ -42,7 +42,11 @@ pub struct TrustAttestation {
     pub created_at: u64,
 
     /// Ed25519 signature over the canonical representation
-    /// Signature covers: issuer || subject || score || ttl || created_at || graph_type
+    ///
+    /// V2 (current): issuer || subject || score || ttl || created_at || graph_type || labels || evidence
+    /// V1 (legacy):  issuer || subject || score || ttl || created_at || labels || evidence
+    ///
+    /// The verify() method supports both formats for backward compatibility.
     pub signature: Vec<u8>,
 
     /// The type of trust graph this attestation belongs to
@@ -109,11 +113,16 @@ impl TrustAttestation {
         self
     }
 
-    /// Get the canonical signing payload
+    /// Get the canonical signing payload (v2 format, includes graph_type)
     ///
     /// The signature covers the core attestation fields in a deterministic order:
     /// issuer || subject || score || ttl || created_at || graph_type || labels || evidence
     fn signing_payload(&self) -> Vec<u8> {
+        self.signing_payload_v2()
+    }
+
+    /// V2 signing payload - includes graph_type (multi-graph support)
+    fn signing_payload_v2(&self) -> Vec<u8> {
         let mut hasher = Sha256::new();
 
         // Core fields
@@ -125,6 +134,36 @@ impl TrustAttestation {
 
         // Graph type (added for multi-graph support)
         hasher.update(self.graph_type.as_str().as_bytes());
+
+        // Labels (sorted for determinism)
+        let mut sorted_labels = self.labels.clone();
+        sorted_labels.sort();
+        for label in sorted_labels {
+            hasher.update(label.as_bytes());
+        }
+
+        // Evidence (sorted for determinism)
+        let mut sorted_evidence = self.evidence.clone();
+        sorted_evidence.sort();
+        for ev in sorted_evidence {
+            hasher.update(ev.as_bytes());
+        }
+
+        hasher.finalize().to_vec()
+    }
+
+    /// V1 signing payload - legacy format without graph_type (backward compatibility)
+    fn signing_payload_v1(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+
+        // Core fields (same as v2 but without graph_type)
+        hasher.update(self.issuer.as_str().as_bytes());
+        hasher.update(self.subject.as_str().as_bytes());
+        hasher.update(self.score.to_le_bytes());
+        hasher.update(self.ttl_seconds.to_le_bytes());
+        hasher.update(self.created_at.to_le_bytes());
+
+        // Note: No graph_type in v1 format
 
         // Labels (sorted for determinism)
         let mut sorted_labels = self.labels.clone();
@@ -166,6 +205,10 @@ impl TrustAttestation {
     /// Verify the signature on this attestation
     ///
     /// Extracts the verifying key from the issuer DID and checks the signature.
+    ///
+    /// For backward compatibility, this method tries both v2 (with graph_type) and
+    /// v1 (without graph_type) signing formats. This ensures that attestations signed
+    /// before multi-graph support was added will still verify correctly.
     pub fn verify(&self) -> Result<()> {
         if self.signature.is_empty() {
             anyhow::bail!("Attestation has no signature");
@@ -189,10 +232,17 @@ impl TrustAttestation {
             .map_err(|_| anyhow::anyhow!("Failed to convert signature to array"))?;
         let signature = Signature::from_bytes(&sig_bytes);
 
-        // Verify
-        let payload = self.signing_payload();
+        // Try v2 format first (with graph_type)
+        let payload_v2 = self.signing_payload_v2();
+        if verifying_key.verify(&payload_v2, &signature).is_ok() {
+            return Ok(());
+        }
+
+        // Fall back to v1 format for backward compatibility (without graph_type)
+        // This handles attestations signed before multi-graph support was added
+        let payload_v1 = self.signing_payload_v1();
         verifying_key
-            .verify(&payload, &signature)
+            .verify(&payload_v1, &signature)
             .map_err(|e| anyhow::anyhow!("Signature verification failed: {e}"))?;
 
         Ok(())

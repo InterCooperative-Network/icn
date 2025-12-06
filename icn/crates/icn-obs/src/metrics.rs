@@ -1203,6 +1203,44 @@ pub fn init_descriptions() {
         "icn_privacy_onion_routing_errors_total",
         "Total number of onion routing errors (decryption failures, etc.)"
     );
+
+    // Contribution metrics (Phase 21.1)
+    describe_counter!(
+        "icn_contribution_compute_cpu_seconds_total",
+        "Total compute CPU-seconds contributed by DID"
+    );
+    describe_counter!(
+        "icn_contribution_storage_byte_seconds_total",
+        "Total storage byte-seconds contributed by DID"
+    );
+    describe_counter!(
+        "icn_contribution_bandwidth_bytes_total",
+        "Total bandwidth bytes contributed by DID"
+    );
+    describe_counter!(
+        "icn_contribution_uptime_seconds_total",
+        "Total uptime seconds contributed by DID"
+    );
+    describe_gauge!(
+        "icn_contribution_compute_jobs_completed",
+        "Number of compute jobs completed by executor DID"
+    );
+    describe_gauge!(
+        "icn_contribution_storage_replicas_healthy",
+        "Number of healthy storage replicas by provider DID"
+    );
+    describe_gauge!(
+        "icn_contribution_uptime_last_heartbeat",
+        "Unix timestamp of last heartbeat from DID"
+    );
+    describe_histogram!(
+        "icn_contribution_compute_job_duration_seconds",
+        "Duration of compute jobs in seconds by executor DID"
+    );
+    describe_histogram!(
+        "icn_contribution_bandwidth_transfer_bytes",
+        "Size of bandwidth transfers in bytes"
+    );
 }
 
 /// Network metrics
@@ -2748,5 +2786,126 @@ pub mod privacy {
 
     pub fn onion_routing_errors_inc() {
         counter!("icn_privacy_onion_routing_errors_total").increment(1);
+    }
+}
+
+/// Contribution metering metrics (Phase 21.1)
+pub mod contribution {
+    use metrics::{counter, gauge, histogram};
+
+    // ============================================================
+    // Compute Contribution Metrics
+    // ============================================================
+
+    /// Record compute CPU-seconds contributed by a DID
+    pub fn compute_cpu_seconds_add(did: &str, cpu_seconds: u64) {
+        counter!(
+            "icn_contribution_compute_cpu_seconds_total",
+            "did" => did.to_string()
+        )
+        .increment(cpu_seconds);
+    }
+
+    /// Record a completed compute job and its duration
+    pub fn compute_job_completed(did: &str, duration_secs: f64) {
+        gauge!(
+            "icn_contribution_compute_jobs_completed",
+            "did" => did.to_string()
+        )
+        .increment(1.0);
+        histogram!(
+            "icn_contribution_compute_job_duration_seconds",
+            "did" => did.to_string()
+        )
+        .record(duration_secs);
+    }
+
+    /// Set the number of jobs completed by a DID (for recovery/sync)
+    pub fn compute_jobs_completed_set(did: &str, count: u64) {
+        gauge!(
+            "icn_contribution_compute_jobs_completed",
+            "did" => did.to_string()
+        )
+        .set(count as f64);
+    }
+
+    // ============================================================
+    // Storage Contribution Metrics
+    // ============================================================
+
+    /// Record storage byte-seconds contributed by a DID
+    pub fn storage_byte_seconds_add(did: &str, byte_seconds: u64) {
+        counter!(
+            "icn_contribution_storage_byte_seconds_total",
+            "did" => did.to_string()
+        )
+        .increment(byte_seconds);
+    }
+
+    /// Set the number of healthy replicas for a provider DID
+    pub fn storage_replicas_healthy_set(did: &str, count: u64) {
+        gauge!(
+            "icn_contribution_storage_replicas_healthy",
+            "did" => did.to_string()
+        )
+        .set(count as f64);
+    }
+
+    /// Increment healthy replicas for a provider DID
+    pub fn storage_replicas_healthy_inc(did: &str) {
+        gauge!(
+            "icn_contribution_storage_replicas_healthy",
+            "did" => did.to_string()
+        )
+        .increment(1.0);
+    }
+
+    /// Decrement healthy replicas for a provider DID
+    pub fn storage_replicas_healthy_dec(did: &str) {
+        gauge!(
+            "icn_contribution_storage_replicas_healthy",
+            "did" => did.to_string()
+        )
+        .decrement(1.0);
+    }
+
+    // ============================================================
+    // Bandwidth Contribution Metrics
+    // ============================================================
+
+    /// Record bandwidth bytes contributed by a DID
+    pub fn bandwidth_bytes_add(did: &str, bytes: u64) {
+        counter!(
+            "icn_contribution_bandwidth_bytes_total",
+            "did" => did.to_string()
+        )
+        .increment(bytes);
+    }
+
+    /// Record a bandwidth transfer for histogram tracking
+    pub fn bandwidth_transfer_record(bytes: u64) {
+        histogram!("icn_contribution_bandwidth_transfer_bytes").record(bytes as f64);
+    }
+
+    // ============================================================
+    // Uptime Contribution Metrics
+    // ============================================================
+
+    /// Record uptime seconds contributed by a DID
+    pub fn uptime_seconds_add(did: &str, seconds: u64) {
+        counter!(
+            "icn_contribution_uptime_seconds_total",
+            "did" => did.to_string()
+        )
+        .increment(seconds);
+    }
+
+    /// Record a heartbeat from a DID (sets last heartbeat timestamp)
+    pub fn uptime_heartbeat_record(did: &str, timestamp: u64) {
+        gauge!(
+            "icn_contribution_uptime_last_heartbeat",
+            "did" => did.to_string()
+        )
+        .set(timestamp as f64);
     }
 }

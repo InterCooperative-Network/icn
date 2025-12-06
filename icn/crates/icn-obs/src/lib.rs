@@ -1,5 +1,6 @@
 //! ICN Obs - Observability (logging, metrics, tracing)
 
+pub mod contribution;
 pub mod health;
 pub mod metrics;
 
@@ -8,6 +9,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+pub use contribution::{AggregatedMetrics, ResourceMetrics, ResourceType};
 pub use health::{start_monitoring_server, HealthService, HealthState, HealthStatus};
 
 /// Initialize observability stack

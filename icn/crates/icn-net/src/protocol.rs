@@ -443,7 +443,9 @@ impl NetworkMessage {
 }
 
 /// Helper for reading length-prefixed messages from QUIC streams
-pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<NetworkMessage> {
+/// Read a length-prefixed message from a QUIC stream
+/// Returns the message and the number of bytes read (including 4-byte length prefix)
+pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
@@ -468,11 +470,14 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<NetworkMessage
         .await
         .context("Failed to read message body")?;
 
-    NetworkMessage::from_bytes(&buf)
+    let msg = NetworkMessage::from_bytes(&buf)?;
+    // Return total bytes: 4 (length prefix) + message body
+    Ok((msg, 4 + len))
 }
 
 /// Helper for writing length-prefixed messages to QUIC streams
-pub async fn write_message(send: &mut quinn::SendStream, msg: &NetworkMessage) -> Result<()> {
+/// Returns the number of bytes written (including 4-byte length prefix)
+pub async fn write_message(send: &mut quinn::SendStream, msg: &NetworkMessage) -> Result<usize> {
     use tokio::io::AsyncWriteExt;
 
     let bytes = msg.to_bytes()?;
@@ -490,7 +495,8 @@ pub async fn write_message(send: &mut quinn::SendStream, msg: &NetworkMessage) -
 
     send.flush().await.context("Failed to flush stream")?;
 
-    Ok(())
+    // Return total bytes: 4 (length prefix) + message body
+    Ok(4 + bytes.len())
 }
 
 #[cfg(test)]

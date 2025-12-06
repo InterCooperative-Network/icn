@@ -1439,7 +1439,13 @@ impl NetworkActor {
                 Ok((mut send, mut recv)) => {
                     // Read network message
                     match read_message(&mut recv).await {
-                        Ok(message) => {
+                        Ok((message, bytes_read)) => {
+                            // Track bandwidth contribution (Phase 21.1)
+                            icn_obs::metrics::contribution::bandwidth_bytes_add(
+                                own_did.as_str(),
+                                bytes_read as u64,
+                            );
+
                             // Check rate limit BEFORE processing message
                             let allowed = rate_limiter.check_rate_limit(&message.from).await;
 

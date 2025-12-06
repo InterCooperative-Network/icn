@@ -1275,6 +1275,15 @@ impl ComputeActor {
         icn_obs::metrics::compute::fuel_used_record(result.fuel_used);
         icn_obs::metrics::compute::fuel_total_add(result.fuel_used);
 
+        // Record contribution metrics (Phase 21.1)
+        // Fuel approximates CPU work; we convert fuel to CPU-seconds using a ratio
+        // For now, 1000 fuel = 1 CPU-second (calibrated based on CCL interpreter)
+        let cpu_seconds = result.fuel_used / 1000;
+        if cpu_seconds > 0 {
+            icn_obs::metrics::contribution::compute_cpu_seconds_add(&self.own_did, cpu_seconds);
+        }
+        icn_obs::metrics::contribution::compute_job_completed(&self.own_did, duration);
+
         // Log outcome
         match &result.outcome {
             crate::types::ExecutionOutcome::Success(output) => {

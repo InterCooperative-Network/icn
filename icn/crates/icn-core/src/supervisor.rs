@@ -2735,6 +2735,8 @@ impl Supervisor {
             // Spawn metrics update task
             let start_time = std::time::Instant::now();
             let network_handle_metrics = network_handle.clone();
+            let did_for_metrics = did.clone();
+            let mut last_uptime_recorded: u64 = 0;
             let mut metrics_shutdown = self.shutdown_tx.subscribe();
             background_tasks.spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
@@ -2744,6 +2746,26 @@ impl Supervisor {
                             // Update uptime
                             let uptime_secs = start_time.elapsed().as_secs();
                             icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
+
+                            // Record uptime contribution (Phase 21.1)
+                            // Track the delta since last recording to avoid double-counting
+                            let uptime_delta = uptime_secs - last_uptime_recorded;
+                            if uptime_delta > 0 {
+                                icn_obs::metrics::contribution::uptime_seconds_add(
+                                    did_for_metrics.as_str(),
+                                    uptime_delta,
+                                );
+                                // Record heartbeat timestamp for liveness tracking
+                                let now = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs();
+                                icn_obs::metrics::contribution::uptime_heartbeat_record(
+                                    did_for_metrics.as_str(),
+                                    now,
+                                );
+                                last_uptime_recorded = uptime_secs;
+                            }
 
                             // Count active actors (network + gossip + ledger + rpc + anti-entropy + digest-emitter + cache-cleanup = 7)
                             icn_obs::metrics::system::actors_active_set(7);
