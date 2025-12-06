@@ -3709,8 +3709,7 @@ async fn handle_federation_coop_list(id: u64, state: &Arc<RpcServer>) -> RpcResp
 
     match registry.list() {
         Ok(coops) => {
-            let coop_json: Vec<serde_json::Value> =
-                coops.iter().map(coop_info_to_json).collect();
+            let coop_json: Vec<serde_json::Value> = coops.iter().map(coop_info_to_json).collect();
             RpcResponse::success(id, serde_json::json!({ "cooperatives": coop_json }))
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to list cooperatives: {e}")),

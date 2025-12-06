@@ -119,8 +119,7 @@ mod example_contract_tests {
 
     #[test]
     fn test_infrastructure_credit_protocol_contract() {
-        let json =
-            include_str!("../../../../contracts/protocol/infrastructure-credit-v1.ccl.json");
+        let json = include_str!("../../../../contracts/protocol/infrastructure-credit-v1.ccl.json");
         let contract: Contract = serde_json::from_str(json)
             .expect("Failed to deserialize infrastructure-credit-v1.ccl.json");
         contract
@@ -143,8 +142,8 @@ mod example_contract_tests {
     #[test]
     fn test_fuel_allocation_protocol_contract() {
         let json = include_str!("../../../../contracts/protocol/fuel-allocation-v1.ccl.json");
-        let contract: Contract = serde_json::from_str(json)
-            .expect("Failed to deserialize fuel-allocation-v1.ccl.json");
+        let contract: Contract =
+            serde_json::from_str(json).expect("Failed to deserialize fuel-allocation-v1.ccl.json");
         contract
             .validate()
             .expect("FuelAllocationProtocol contract validation failed");

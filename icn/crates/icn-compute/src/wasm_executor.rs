@@ -499,7 +499,7 @@ mod tests {
                 // Should return 42 as little-endian i32
                 assert_eq!(output, vec![42, 0, 0, 0]);
             }
-            other => panic!("Expected success, got: {:?}", other),
+            other => panic!("Expected success, got: {other:?}"),
         }
     }
 
@@ -560,7 +560,7 @@ mod tests {
             ExecutionOutcome::Success(output) => {
                 assert_eq!(output, vec![99, 0, 0, 0]);
             }
-            other => panic!("Expected success, got: {:?}", other),
+            other => panic!("Expected success, got: {other:?}"),
         }
     }
 
@@ -623,7 +623,7 @@ mod tests {
                 // Sum of [1,2,3,4,5] = 15
                 assert_eq!(output, vec![15, 0, 0, 0]);
             }
-            other => panic!("Expected success, got: {:?}", other),
+            other => panic!("Expected success, got: {other:?}"),
         }
     }
 
