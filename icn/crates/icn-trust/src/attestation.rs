@@ -3,6 +3,7 @@
 //! This module provides signed trust attestations that can be broadcast
 //! over the gossip network to build distributed trust webs.
 
+use crate::types::TrustGraphType;
 use crate::TrustEdge;
 use anyhow::Result;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -41,16 +42,31 @@ pub struct TrustAttestation {
     pub created_at: u64,
 
     /// Ed25519 signature over the canonical representation
-    /// Signature covers: issuer || subject || score || ttl || created_at
+    /// Signature covers: issuer || subject || score || ttl || created_at || graph_type
     pub signature: Vec<u8>,
+
+    /// The type of trust graph this attestation belongs to
+    ///
+    /// Defaults to `Social` for backward compatibility with attestations
+    /// created before multi-graph support was added.
+    #[serde(default)]
+    pub graph_type: TrustGraphType,
 }
 
 impl TrustAttestation {
-    /// Create a new unsigned attestation
+    /// Create a new unsigned attestation (defaults to Social graph type)
     ///
     /// Note: This returns an attestation with an empty signature.
     /// You must call `sign()` before broadcasting.
     pub fn new(issuer: Did, subject: Did, score: f64) -> Self {
+        Self::new_typed(issuer, subject, score, TrustGraphType::Social)
+    }
+
+    /// Create a new unsigned attestation with explicit graph type
+    ///
+    /// Note: This returns an attestation with an empty signature.
+    /// You must call `sign()` before broadcasting.
+    pub fn new_typed(issuer: Did, subject: Did, score: f64, graph_type: TrustGraphType) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -65,6 +81,7 @@ impl TrustAttestation {
             ttl_seconds: 30 * 24 * 60 * 60, // 30 days default
             created_at: now,
             signature: Vec::new(),
+            graph_type,
         }
     }
 
@@ -86,10 +103,16 @@ impl TrustAttestation {
         self
     }
 
+    /// Set the graph type
+    pub fn with_graph_type(mut self, graph_type: TrustGraphType) -> Self {
+        self.graph_type = graph_type;
+        self
+    }
+
     /// Get the canonical signing payload
     ///
     /// The signature covers the core attestation fields in a deterministic order:
-    /// issuer || subject || score || ttl || created_at || labels || evidence
+    /// issuer || subject || score || ttl || created_at || graph_type || labels || evidence
     fn signing_payload(&self) -> Vec<u8> {
         let mut hasher = Sha256::new();
 
@@ -99,6 +122,9 @@ impl TrustAttestation {
         hasher.update(self.score.to_le_bytes());
         hasher.update(self.ttl_seconds.to_le_bytes());
         hasher.update(self.created_at.to_le_bytes());
+
+        // Graph type (added for multi-graph support)
+        hasher.update(self.graph_type.as_str().as_bytes());
 
         // Labels (sorted for determinism)
         let mut sorted_labels = self.labels.clone();
@@ -258,6 +284,7 @@ impl TrustAttestation {
             evidence: self.evidence.clone(),
             expires_at: Some(self.expires_at()),
             created_at: self.created_at,
+            graph_type: self.graph_type,
         }
     }
 
@@ -299,6 +326,7 @@ impl TrustAttestation {
             ttl_seconds,
             created_at: edge.created_at,
             signature: Vec::new(),
+            graph_type: edge.graph_type,
         }
     }
 
@@ -504,6 +532,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time,
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         let new_att = TrustAttestation {
@@ -515,6 +544,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time + 400, // 6.67 minutes newer (> 5 min tolerance)
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         assert!(new_att.should_supersede(old_att.created_at, old_att.score));
@@ -537,6 +567,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time,
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         let high_trust_att = TrustAttestation {
@@ -548,6 +579,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time + 60, // 1 minute newer (within tolerance)
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         // Higher trust should supersede even if only slightly newer
@@ -573,6 +605,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time,
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         let new_att = TrustAttestation {
@@ -584,6 +617,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time + 60, // 1 minute newer (within tolerance)
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         // With equal scores, newer timestamp wins
@@ -611,6 +645,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: node_a_time,
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         let att_from_node_b = TrustAttestation {
@@ -622,6 +657,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: node_b_time,
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         // Node A's attestation appears 10 minutes newer, but that's within 2x tolerance
@@ -650,6 +686,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time,
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         // Alice downgrades trust significantly
@@ -662,6 +699,7 @@ mod tests {
             ttl_seconds: 86400,
             created_at: base_time + 3600, // 1 hour later (well outside tolerance)
             signature: vec![],
+            graph_type: TrustGraphType::default(),
         };
 
         // Downgrade should supersede because it's much newer

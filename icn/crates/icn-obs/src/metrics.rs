@@ -526,6 +526,24 @@ pub fn init_descriptions() {
         "Total number of existing trust edges updated from attestations"
     );
 
+    // Multi-graph trust metrics (Phase 21)
+    describe_gauge!(
+        "icn_trust_edges_by_graph",
+        "Number of trust edges by graph type (social, economic, technical)"
+    );
+    describe_counter!(
+        "icn_trust_lookups_by_graph_total",
+        "Trust score lookups by graph type"
+    );
+    describe_counter!(
+        "icn_trust_attestations_received_by_graph_total",
+        "Trust attestations received by graph type"
+    );
+    describe_histogram!(
+        "icn_trust_score_by_graph",
+        "Trust score distribution by graph type"
+    );
+
     // Contract metrics
     describe_gauge!(
         "icn_contract_installed_total",
@@ -1718,6 +1736,37 @@ pub mod trust {
 
     pub fn attestations_updated_inc() {
         counter!("icn_trust_attestations_updated_total").increment(1);
+    }
+
+    // ========================================
+    // Multi-graph metrics (Phase 21)
+    // ========================================
+
+    /// Set edge count for a specific graph type
+    pub fn edges_by_graph_set(graph_type: &str, count: u64) {
+        gauge!("icn_trust_edges_by_graph", "graph_type" => graph_type.to_string())
+            .set(count as f64);
+    }
+
+    /// Increment lookups for a specific graph type
+    pub fn lookups_by_graph_inc(graph_type: &str) {
+        counter!("icn_trust_lookups_by_graph_total", "graph_type" => graph_type.to_string())
+            .increment(1);
+    }
+
+    /// Increment attestations received for a specific graph type
+    pub fn attestations_received_by_graph_inc(graph_type: &str) {
+        counter!(
+            "icn_trust_attestations_received_by_graph_total",
+            "graph_type" => graph_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record score distribution for a specific graph type
+    pub fn score_by_graph_record(graph_type: &str, score: f64) {
+        histogram!("icn_trust_score_by_graph", "graph_type" => graph_type.to_string())
+            .record(score);
     }
 }
 

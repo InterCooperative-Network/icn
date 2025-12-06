@@ -129,6 +129,9 @@ impl Supervisor {
             );
 
             // Create trust graph
+            // Note: Phase 21 adds TrustGraphFacade for multi-graph support (Social, Economic, Technical).
+            // Currently using TrustGraph directly. Migration to TrustGraphFacade requires updating
+            // consumer type signatures. See docs/trust-multi-graph-migration.md for migration guide.
             let trust_store_path = self.config.store_path().join("trust");
             let trust_store: Arc<dyn icn_store::Store> =
                 Arc::new(SledStore::open(&trust_store_path)?);

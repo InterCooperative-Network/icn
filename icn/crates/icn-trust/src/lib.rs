@@ -1,10 +1,61 @@
 //! ICN Trust - Trust graph management and policy enforcement
+//!
+//! This crate provides trust graph infrastructure for ICN with three orthogonal
+//! trust dimensions:
+//! - **Social**: Peer endorsements and community participation
+//! - **EconomicReliability**: Payment history and credit behavior
+//! - **TechnicalReliability**: Node uptime and task success rates
+//!
+//! # Multi-Graph Architecture (Phase 21)
+//!
+//! ICN uses three separate trust graphs to prevent any single clique from
+//! gaining cross-domain influence:
+//!
+//! - **Social Graph**: "I know you, we've worked together"
+//!   - Used for: Connection priority, gossip bandwidth, topic access
+//!   - Scoring: 60% direct, 40% transitive (reputation spreads)
+//!
+//! - **Economic Graph**: "You have a consistent record of clearing obligations"
+//!   - Used for: Credit limits, dispute weighting, federation trade limits
+//!   - Scoring: 80% direct, 20% transitive (payment history matters most)
+//!
+//! - **Technical Graph**: "Your node behaves correctly under load"
+//!   - Used for: Compute scheduling, contract execution, storage selection
+//!   - Scoring: 90% direct, 10% transitive (your node's performance is yours)
+//!
+//! # Quick Start
+//!
+//! ```ignore
+//! use icn_trust::{MultiTrustGraph, TrustGraphType, TrustEdge};
+//!
+//! // Create multi-graph container
+//! let mut multi = MultiTrustGraph::new(store, own_did);
+//!
+//! // Add edges to specific graphs
+//! multi.economic_mut().add_edge(TrustEdge::new(alice, bob, 0.8))?;
+//! multi.technical_mut().add_edge(TrustEdge::new(alice, bob, 0.6))?;
+//!
+//! // Typed access for domain-specific operations
+//! let credit_score = multi.economic().compute_trust_score(&member)?;
+//! let tech_score = multi.technical().compute_trust_score(&node)?;
+//!
+//! // Combined score for backward compatibility
+//! let combined = multi.compute_combined_trust_score(&peer)?;
+//! ```
 
 pub mod attestation;
+pub mod facade;
+pub mod multi_graph;
 pub mod trust_cache;
+pub mod typed_graph;
+pub mod types;
 
 pub use attestation::TrustAttestation;
+pub use facade::TrustGraphFacade;
+pub use multi_graph::MultiTrustGraph;
 pub use trust_cache::TrustCache;
+pub use typed_graph::TypedTrustGraph;
+pub use types::{ScoringWeights, TrustGraphType};
 
 use anyhow::Result;
 use icn_identity::Did;
@@ -58,11 +109,22 @@ pub struct TrustEdge {
     pub evidence: Vec<String>, // Evidence references (content hashes)
     pub expires_at: Option<u64>,
     pub created_at: u64,
+    /// The type of trust graph this edge belongs to
+    ///
+    /// Defaults to `Social` for backward compatibility with edges
+    /// created before multi-graph support was added.
+    #[serde(default)]
+    pub graph_type: TrustGraphType,
 }
 
 impl TrustEdge {
-    /// Create a new trust edge
+    /// Create a new trust edge (defaults to Social graph type)
     pub fn new(source: Did, target: Did, score: f64) -> Self {
+        Self::new_typed(source, target, score, TrustGraphType::Social)
+    }
+
+    /// Create a new trust edge with explicit graph type
+    pub fn new_typed(source: Did, target: Did, score: f64, graph_type: TrustGraphType) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -76,6 +138,7 @@ impl TrustEdge {
             evidence: Vec::new(),
             expires_at: None,
             created_at: now,
+            graph_type,
         }
     }
 
@@ -101,23 +164,52 @@ impl TrustEdge {
         self.expires_at = Some(expires_at);
         self
     }
+
+    /// Set the graph type
+    pub fn with_graph_type(mut self, graph_type: TrustGraphType) -> Self {
+        self.graph_type = graph_type;
+        self
+    }
 }
 
 /// Trust graph manager
+///
+/// Manages trust edges and computes trust scores from this node's perspective.
+/// Each graph can optionally use a storage prefix for namespace isolation
+/// when running multiple trust graphs (Social, Economic, Technical).
 pub struct TrustGraph {
     store: Arc<dyn Store>,
     own_did: Did,
     /// LRU cache for trust scores with TTL-based invalidation (Phase 19)
     cache: TrustCache,
+    /// Storage key prefix for namespace isolation (e.g., "trust/social")
+    storage_prefix: String,
 }
 
 impl TrustGraph {
-    /// Create a new trust graph
+    /// Default storage prefix for legacy single-graph mode
+    const DEFAULT_PREFIX: &'static str = "trust";
+
+    /// Create a new trust graph with default storage prefix
     pub fn new(store: Arc<dyn Store>, own_did: Did) -> Self {
         Self {
             store,
             own_did,
             cache: TrustCache::new(),
+            storage_prefix: Self::DEFAULT_PREFIX.to_string(),
+        }
+    }
+
+    /// Create a new trust graph with a custom storage prefix
+    ///
+    /// This is used by `TypedTrustGraph` to create isolated namespaces for
+    /// each trust graph type (social, economic, technical).
+    pub fn new_with_prefix(store: Arc<dyn Store>, own_did: Did, prefix: &str) -> Self {
+        Self {
+            store,
+            own_did,
+            cache: TrustCache::new(),
+            storage_prefix: prefix.to_string(),
         }
     }
 
@@ -132,7 +224,29 @@ impl TrustGraph {
             store,
             own_did,
             cache: TrustCache::with_config(cache_size, cache_ttl),
+            storage_prefix: Self::DEFAULT_PREFIX.to_string(),
         }
+    }
+
+    /// Create a new trust graph with custom prefix and cache configuration
+    pub fn with_prefix_and_cache(
+        store: Arc<dyn Store>,
+        own_did: Did,
+        prefix: &str,
+        cache_size: usize,
+        cache_ttl: std::time::Duration,
+    ) -> Self {
+        Self {
+            store,
+            own_did,
+            cache: TrustCache::with_config(cache_size, cache_ttl),
+            storage_prefix: prefix.to_string(),
+        }
+    }
+
+    /// Returns the storage prefix used by this graph
+    pub fn storage_prefix(&self) -> &str {
+        &self.storage_prefix
     }
 
     /// Get the DID of this node
@@ -143,15 +257,11 @@ impl TrustGraph {
     /// Add or update a trust edge
     pub fn add_edge(&mut self, edge: TrustEdge) -> Result<()> {
         info!(
-            "Adding trust edge: {} -> {} (score: {})",
-            edge.source, edge.target, edge.score
+            "Adding trust edge: {} -> {} (score: {}, prefix: {})",
+            edge.source, edge.target, edge.score, self.storage_prefix
         );
 
-        let key = format!(
-            "trust/edges/{}:{}",
-            edge.source.as_str(),
-            edge.target.as_str()
-        );
+        let key = self.edge_key(&edge.source, &edge.target);
         let value = serde_json::to_vec(&edge)?;
 
         self.store.put(key.as_bytes(), &value)?;
@@ -162,9 +272,29 @@ impl TrustGraph {
         Ok(())
     }
 
+    /// Generate storage key for an edge
+    fn edge_key(&self, source: &Did, target: &Did) -> String {
+        format!(
+            "{}/edges/{}:{}",
+            self.storage_prefix,
+            source.as_str(),
+            target.as_str()
+        )
+    }
+
+    /// Generate storage key prefix for all edges from a source
+    fn edge_prefix(&self, source: &Did) -> String {
+        format!("{}/edges/{}:", self.storage_prefix, source.as_str())
+    }
+
+    /// Generate storage key prefix for scanning all edges
+    fn all_edges_prefix(&self) -> String {
+        format!("{}/edges/", self.storage_prefix)
+    }
+
     /// Get a trust edge
     pub fn get_edge(&self, source: &Did, target: &Did) -> Result<Option<TrustEdge>> {
-        let key = format!("trust/edges/{}:{}", source.as_str(), target.as_str());
+        let key = self.edge_key(source, target);
 
         match self.store.get(key.as_bytes())? {
             Some(value) => {
@@ -187,7 +317,7 @@ impl TrustGraph {
 
     /// Get all outgoing edges from a DID
     pub fn get_outgoing_edges(&self, source: &Did) -> Result<Vec<TrustEdge>> {
-        let prefix = format!("trust/edges/{}:", source.as_str());
+        let prefix = self.edge_prefix(source);
         let mut edges = Vec::new();
 
         let now = std::time::SystemTime::now()
@@ -205,24 +335,50 @@ impl TrustGraph {
         Ok(edges)
     }
 
-    /// Compute trust score for a DID (from own perspective)
+    /// Compute trust score for a DID using default weights (70% direct, 30% transitive)
     ///
     /// Uses a simplified PageRank-like algorithm:
     /// TrustScore(own -> target) =
     ///     DirectTrust(own -> target) * 0.7 +
     ///     TransitiveTrust(own -> intermediate -> target) * 0.3
     pub fn compute_trust_score(&self, target: &Did) -> Result<f64> {
+        self.compute_trust_score_weighted(target, ScoringWeights::legacy())
+    }
+
+    /// Compute trust score for a DID using custom weights
+    ///
+    /// This allows different trust graph types to use different weighting:
+    /// - **Social**: 60/40 - Reputation spreads through networks
+    /// - **Economic**: 80/20 - Your payment history matters most
+    /// - **Technical**: 90/10 - Your node's performance is yours
+    ///
+    /// # Arguments
+    /// * `target` - The DID to compute trust for
+    /// * `weights` - Custom direct/transitive weighting
+    ///
+    /// # Returns
+    /// Trust score in range [0.0, 1.0]
+    pub fn compute_trust_score_weighted(
+        &self,
+        target: &Did,
+        weights: ScoringWeights,
+    ) -> Result<f64> {
         // Record lookup
         icn_obs::metrics::trust::lookups_inc();
 
         // Check LRU cache first (with TTL validation)
+        // Note: Cache doesn't distinguish by weights, so this is only valid
+        // when consistently using the same weights (TypedTrustGraph ensures this)
         if let Some(score) = self.cache.get(target) {
             icn_obs::metrics::trust::cache_hits_inc();
             return Ok(score);
         }
 
         icn_obs::metrics::trust::cache_misses_inc();
-        debug!("Computing trust score for {}", target);
+        debug!(
+            "Computing trust score for {} (weights: {:?})",
+            target, weights
+        );
 
         // Get direct trust edge
         let direct_score = self
@@ -257,12 +413,13 @@ impl TrustGraph {
             0.0
         };
 
-        // Combine: 70% direct, 30% transitive
-        let final_score = (direct_score * 0.7 + transitive_score * 0.3).min(1.0);
+        // Combine using provided weights
+        let final_score =
+            (direct_score * weights.direct + transitive_score * weights.transitive).min(1.0);
 
         debug!(
-            "Trust score for {}: direct={}, transitive={}, final={}",
-            target, direct_score, transitive_score, final_score
+            "Trust score for {}: direct={}, transitive={}, final={} (weights: {}/{})",
+            target, direct_score, transitive_score, final_score, weights.direct, weights.transitive
         );
 
         // Cache result (LRU cache with automatic eviction)
@@ -282,7 +439,7 @@ impl TrustGraph {
 
     /// Remove a trust edge
     pub fn remove_edge(&mut self, source: &Did, target: &Did) -> Result<()> {
-        let key = format!("trust/edges/{}:{}", source.as_str(), target.as_str());
+        let key = self.edge_key(source, target);
         self.store.delete(key.as_bytes())?;
 
         // Invalidate cache for target
@@ -301,7 +458,8 @@ impl TrustGraph {
         let mut dids: HashSet<Did> = HashSet::new();
 
         // Scan all edges
-        let results = self.store.scan(b"trust/edges/")?;
+        let prefix = self.all_edges_prefix();
+        let results = self.store.scan(prefix.as_bytes())?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
@@ -372,6 +530,7 @@ impl TrustGraph {
                 evidence: edge.evidence,
                 expires_at: edge.expires_at,
                 created_at: edge.created_at,
+                graph_type: edge.graph_type,
             };
 
             self.add_edge(new_edge)?;
@@ -383,7 +542,8 @@ impl TrustGraph {
 
         // 2. Get all incoming edges to old_did (old_did as target)
         // We need to scan all edges and find ones where target == old_did
-        let all_edges_results = self.store.scan(b"trust/edges/")?;
+        let prefix = self.all_edges_prefix();
+        let all_edges_results = self.store.scan(prefix.as_bytes())?;
 
         for (_key, value) in all_edges_results {
             let edge: TrustEdge = serde_json::from_slice(&value)?;
@@ -399,6 +559,7 @@ impl TrustGraph {
                     evidence: edge.evidence,
                     expires_at: edge.expires_at,
                     created_at: edge.created_at,
+                    graph_type: edge.graph_type,
                 };
 
                 self.add_edge(new_edge)?;

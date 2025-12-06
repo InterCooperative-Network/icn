@@ -17,7 +17,7 @@ use icn_identity::{
 use icn_ledger::{entry::JournalEntryBuilder, Ledger};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_store::{SledStore, Store};
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustGraphType};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -442,6 +442,7 @@ async fn test_full_recovery_flow() -> Result<()> {
             evidence: vec![],
             expires_at: None,
             created_at: 1234567890,
+            graph_type: TrustGraphType::default(),
         })?;
         trust.add_edge(TrustEdge {
             source: alice_did.clone(),
@@ -451,6 +452,7 @@ async fn test_full_recovery_flow() -> Result<()> {
             evidence: vec![],
             expires_at: None,
             created_at: 1234567890,
+            graph_type: TrustGraphType::default(),
         })?;
     }
 
