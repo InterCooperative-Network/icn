@@ -110,6 +110,21 @@ impl Interpreter {
                 Ok(None)
             }
 
+            Stmt::SetState { key, value } => {
+                // Check WriteState capability for this key
+                self.check_write_state_capability(key)?;
+
+                // Evaluate and persist the value
+                let val = self.eval_expr(value)?;
+                self.state.data.insert(key.clone(), val.clone());
+
+                // Also update locals so the new value is visible in the current execution
+                self.locals.insert(key.clone(), val);
+
+                debug!("SetState: {} updated", key);
+                Ok(None)
+            }
+
             Stmt::LedgerTransfer {
                 from,
                 to,
@@ -427,6 +442,19 @@ impl Interpreter {
             }
         }
         bail!("WriteLedger capability required")
+    }
+
+    /// Check WriteState capability for a specific key
+    fn check_write_state_capability(&self, key: &str) -> Result<()> {
+        for cap in &self.context.capabilities {
+            if let Capability::WriteState { keys } = cap {
+                // Empty keys list means all keys are allowed
+                if keys.is_empty() || keys.iter().any(|k| k == key || k == "*") {
+                    return Ok(());
+                }
+            }
+        }
+        bail!("WriteState capability required for key '{}'", key)
     }
 }
 

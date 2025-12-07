@@ -560,8 +560,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "consensus_period_hours",
+          "SetState": {
+            "key": "consensus_period_hours",
             "value": { "Var": "new_hours" }
           }
         }
@@ -590,8 +590,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "fallback_threshold_pct",
+          "SetState": {
+            "key": "fallback_threshold_pct",
             "value": { "Var": "new_threshold" }
           }
         }
@@ -620,8 +620,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "quorum_pct",
+          "SetState": {
+            "key": "quorum_pct",
             "value": { "Var": "new_quorum" }
           }
         }

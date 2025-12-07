@@ -108,8 +108,13 @@ pub struct Trigger {
 /// Statement
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Stmt {
-    /// Variable assignment: x = expr
+    /// Variable assignment: x = expr (local variable, not persisted)
     Assign { name: String, value: Expr },
+
+    /// Persistent state update: modifies contract state variable
+    /// Unlike Assign, this persists the value to the contract's state storage.
+    /// Requires WriteState capability for the specified key.
+    SetState { key: String, value: Expr },
 
     /// Ledger transfer
     LedgerTransfer {
@@ -445,6 +450,9 @@ impl Contract {
                     }
                 }
                 Stmt::Assign { value, .. } => {
+                    Self::validate_expr_depth(value, 0)?;
+                }
+                Stmt::SetState { value, .. } => {
                     Self::validate_expr_depth(value, 0)?;
                 }
                 Stmt::LedgerTransfer {

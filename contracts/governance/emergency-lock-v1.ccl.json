@@ -634,8 +634,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "ratification_hours",
+          "SetState": {
+            "key": "ratification_hours",
             "value": { "Var": "new_hours" }
           }
         }
@@ -664,8 +664,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "emergency_initiator_count",
+          "SetState": {
+            "key": "emergency_initiator_count",
             "value": { "Var": "new_count" }
           }
         }

@@ -405,8 +405,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "proposal_period_hours",
+          "SetState": {
+            "key": "proposal_period_hours",
             "value": { "Var": "new_hours" }
           }
         }
@@ -435,8 +435,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "min_acknowledgment_pct",
+          "SetState": {
+            "key": "min_acknowledgment_pct",
             "value": { "Var": "new_pct" }
           }
         }

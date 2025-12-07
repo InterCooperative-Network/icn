@@ -450,8 +450,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "council_size",
+          "SetState": {
+            "key": "council_size",
             "value": { "Var": "new_size" }
           }
         }
@@ -480,8 +480,8 @@
       ],
       "body": [
         {
-          "Assign": {
-            "name": "council_term_days",
+          "SetState": {
+            "key": "council_term_days",
             "value": { "Var": "new_days" }
           }
         }
