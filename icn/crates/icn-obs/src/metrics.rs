@@ -2040,6 +2040,11 @@ pub mod replication {
     pub fn candidates_evaluated_inc(count: u64) {
         counter!("icn_replication_candidates_evaluated_total").increment(count);
     }
+
+    /// Increment counter when under-replication is detected during replica status update
+    pub fn content_under_replicated_detected_inc() {
+        counter!("icn_replication_under_replicated_detected_total").increment(1);
+    }
 }
 
 /// Gateway API metrics

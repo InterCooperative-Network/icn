@@ -757,18 +757,29 @@ impl GovernanceActor {
                             }
                         }
                     }
-                    MembershipSource::TrustThreshold(_) => {
-                        // For trust-based membership, explicit add/remove is converted
-                        // to a static list (preserving existing trust threshold as fallback)
+                    MembershipSource::TrustThreshold(threshold) => {
+                        // For trust-based membership, we cannot add/remove individual members
+                        // because membership is derived from the trust graph, not a static list.
+                        //
+                        // Proper resolution would require:
+                        // 1. Query trust graph for all DIDs meeting threshold
+                        // 2. Convert to static list with those members
+                        // 3. Apply add/remove action
+                        //
+                        // However, this is a governance decision - converting from trust-based
+                        // to static membership is a significant policy change that should be
+                        // handled via a ConfigChange proposal, not implicitly.
                         warn!(
-                            "Domain {} uses trust-based membership; converting to static list for explicit member management",
+                            "Domain {} uses trust-based membership (threshold: {}); \
+                             explicit add/remove not supported. Submit a ConfigChange proposal \
+                             to convert to static membership first.",
+                            domain_id.0, threshold
+                        );
+                        bail!(
+                            "Cannot add/remove members from trust-based membership domain '{}'. \
+                             Use a ConfigChange proposal to convert to static membership first.",
                             domain_id.0
                         );
-                        let new_list = match action {
-                            MembershipAction::Add => vec![member.clone()],
-                            MembershipAction::Remove => vec![],
-                        };
-                        domain.config.membership.source = MembershipSource::StaticList(new_list);
                     }
                 }
 

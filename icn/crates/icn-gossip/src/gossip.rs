@@ -1570,8 +1570,27 @@ impl GossipActor {
                         "Batch updated replica status"
                     );
 
-                    // TODO (Phase 17 Week 3): Check if replica count below threshold
-                    // This will be handled by ReplicationManager actor
+                    // Phase 17 Week 3: Check if replica count below threshold
+                    // The ReplicationManager handles remediation through its periodic health check.
+                    // Here we emit a metric for immediate observability.
+                    const DEFAULT_REPLICA_TARGET: usize = 3;
+                    if let Ok(Some(metadata)) = store.get_replica_metadata(&content_hash) {
+                        let healthy_count = metadata
+                            .replicas
+                            .iter()
+                            .filter(|r| r.health == icn_store::ReplicaHealth::Healthy)
+                            .count();
+
+                        if healthy_count < DEFAULT_REPLICA_TARGET {
+                            icn_obs::metrics::replication::content_under_replicated_detected_inc();
+                            warn!(
+                                content_hash = %hex::encode(content_hash),
+                                healthy_replicas = healthy_count,
+                                target_replicas = DEFAULT_REPLICA_TARGET,
+                                "Content under-replicated - ReplicationManager will request additional replicas"
+                            );
+                        }
+                    }
                 } else {
                     debug!("No store configured, replica status not persisted");
                 }

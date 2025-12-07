@@ -89,10 +89,10 @@ These cause incorrect behavior but may not immediately crash the system.
 **Issue**: Member add/remove proposals don't modify actual membership
 **Fix**: Implemented membership update execution. Added `GovernanceCommand::UpdateMembership` which adds/removes members from `MembershipSource::StaticList`. Supervisor calls this when Membership proposals are accepted. Gossip broadcasts `DomainUpdated`.
 
-### H3. Replica Threshold Never Checked
+### H3. Replica Threshold Never Checked - FIXED
 **Location**: `icn-gossip/src/gossip.rs:1573`
 **Issue**: Phase 17 incomplete - replica count below threshold not detected
-**Fix**: Notify ReplicationManager when replica count drops
+**Fix**: Added immediate replica threshold check during `ReplicaStatus` message handling. Now checks if healthy replica count < 3, emits `content_under_replicated_detected_total` metric, and logs warning. ReplicationManager handles remediation via its periodic health check.
 
 ### H4. Partition Healing Incomplete
 **Location**: `icn-gossip/src/gossip.rs:248`
