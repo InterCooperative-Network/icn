@@ -1157,12 +1157,8 @@ impl Ledger {
         for entry in &entries_to_archive {
             if let Some(ref hash) = entry.id {
                 // Store in archive namespace with metadata
-                let archive_key = format!(
-                    "{}{}:{}",
-                    ARCHIVE_PREFIX,
-                    archive_timestamp,
-                    hash.to_hex()
-                );
+                let archive_key =
+                    format!("{}{}:{}", ARCHIVE_PREFIX, archive_timestamp, hash.to_hex());
                 let archive_data = serde_json::to_vec(&ArchiveRecord {
                     entry: entry.clone(),
                     archived_at: archive_timestamp,
