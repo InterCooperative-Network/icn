@@ -17,7 +17,7 @@ use icn_trust::TrustGraph;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
@@ -33,6 +33,20 @@ pub struct ForkStats {
 
 /// Key prefix for cached balances in storage
 const BALANCE_PREFIX: &str = "ledger:balance:";
+
+/// Key prefix for archived entries (from rollback operations)
+const ARCHIVE_PREFIX: &str = "ledger:archive:";
+
+/// Record of an archived entry (from rollback operations)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ArchiveRecord {
+    /// The archived journal entry
+    pub entry: JournalEntry,
+    /// Unix timestamp when the entry was archived
+    pub archived_at: u64,
+    /// Reason for archival (from governance rollback proposal)
+    pub reason: String,
+}
 
 /// Ledger manager for double-entry mutual credit accounting
 pub struct Ledger {
@@ -117,6 +131,25 @@ impl Ledger {
     /// Append a journal entry to the ledger
     #[instrument(skip(self, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), account_count = entry.accounts.len()))]
     pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
+        self.append_entry_internal(entry, true)
+    }
+
+    /// Append a journal entry without publishing to gossip
+    /// Used when receiving entries from gossip to avoid re-broadcasting
+    pub fn append_entry_from_sync(&mut self, entry: JournalEntry) -> Result<ContentHash> {
+        self.append_entry_internal(entry, false)
+    }
+
+    /// Internal append method with control over gossip publishing
+    ///
+    /// # Arguments
+    /// * `entry` - The journal entry to append  
+    /// * `broadcast` - Whether to publish to gossip (false when receiving from gossip)
+    fn append_entry_internal(
+        &mut self,
+        entry: JournalEntry,
+        broadcast: bool,
+    ) -> Result<ContentHash> {
         // Validate the entry has a hash
         let hash = entry
             .id
@@ -170,9 +203,12 @@ impl Ledger {
             }
         }
 
-        // Publish to gossip if available
-        if let Some(gossip) = &self.gossip {
-            self.publish_to_gossip(gossip, &entry)?;
+        // Publish to gossip if available and broadcast is enabled
+        // (broadcast is false when receiving from gossip to avoid re-broadcasting)
+        if broadcast {
+            if let Some(gossip) = &self.gossip {
+                self.publish_to_gossip(gossip, &entry)?;
+            }
         }
 
         Ok(hash)
@@ -238,12 +274,8 @@ impl Ledger {
                 // Ensure entry has the correct ID
                 entry.id = Some(hash.clone());
 
-                // Append the entry (this will also publish to gossip if gossip is set,
-                // but we should avoid re-publishing entries we just received)
-                // For now, temporarily remove gossip handle to avoid re-broadcast
-                let gossip = self.gossip.take();
-                let result = self.append_entry(entry);
-                self.gossip = gossip;
+                // Use append_entry_from_sync to avoid re-broadcasting entries we received
+                let result = self.append_entry_from_sync(entry);
 
                 match result {
                     Ok(h) => {
@@ -305,16 +337,64 @@ impl Ledger {
                 // Handle response with entry
                 if let Some(e) = entry {
                     debug!("Received entry {} response", hash);
-                    // Temporarily remove gossip to avoid re-broadcast
-                    let gossip = self.gossip.take();
-                    let result = self.append_entry(e);
-                    self.gossip = gossip;
+                    // Use append_entry_from_sync to avoid re-broadcasting entries we received
+                    let result = self.append_entry_from_sync(e);
 
                     if let Err(e) = result {
                         warn!("Failed to store entry from response: {}", e);
                     }
                 } else {
                     debug!("Entry {} not found on remote", hash);
+                }
+
+                Ok(())
+            }
+
+            LedgerSyncMessage::RollbackNotification {
+                target_hash,
+                archived_entries,
+                reason,
+                executed_at,
+            } => {
+                // Handle rollback notification from network
+                // This is triggered when another node (the proposal executor) performs a rollback
+                // We should verify and apply the same rollback locally
+                warn!(
+                    "📢 Received rollback notification: target={}, archived={} entries, reason={}",
+                    target_hash,
+                    archived_entries.len(),
+                    reason
+                );
+
+                // Check if we have the target entry
+                if self.get_entry(&target_hash)?.is_none() {
+                    warn!(
+                        "Rollback target {} not found locally - may need full resync",
+                        target_hash
+                    );
+                    return Ok(());
+                }
+
+                // Execute the rollback locally (don't broadcast again)
+                match self.rollback_to_entry(&target_hash, &reason, false) {
+                    Ok(local_archived) => {
+                        // Verify our archived entries match
+                        if local_archived.len() != archived_entries.len() {
+                            warn!(
+                                "Rollback mismatch: archived {} locally vs {} from notification",
+                                local_archived.len(),
+                                archived_entries.len()
+                            );
+                        }
+                        info!(
+                            "✅ Applied rollback from network: archived {} entries (notification at {})",
+                            local_archived.len(),
+                            executed_at
+                        );
+                    }
+                    Err(e) => {
+                        error!("Failed to apply rollback from network: {}", e);
+                    }
                 }
 
                 Ok(())
@@ -998,6 +1078,184 @@ impl Ledger {
         );
 
         Ok(decision)
+    }
+
+    // === Emergency Recovery: Ledger Rollback (C1) ===
+
+    /// Roll back the ledger to a specific entry
+    ///
+    /// This is an emergency recovery operation that:
+    /// 1. Verifies the target hash exists in the ledger
+    /// 2. Identifies all entries that come after the target (by timestamp)
+    /// 3. Archives those entries to a separate storage namespace
+    /// 4. Removes them from the active ledger
+    /// 5. Recomputes all balances from remaining entries
+    /// 6. Optionally broadcasts a rollback notification via gossip
+    ///
+    /// # Arguments
+    /// * `target_hash` - Hash of the entry to roll back to (this entry is kept)
+    /// * `reason` - Reason for the rollback (from governance proposal)
+    /// * `broadcast` - Whether to broadcast rollback notification via gossip
+    ///
+    /// # Returns
+    /// Vector of archived entry hashes
+    ///
+    /// # Safety
+    /// This is a destructive operation. Entries are moved to archive storage
+    /// but not deleted, allowing potential recovery if needed.
+    #[instrument(skip(self), fields(target_hash = %target_hash))]
+    pub fn rollback_to_entry(
+        &mut self,
+        target_hash: &ContentHash,
+        reason: &str,
+        broadcast: bool,
+    ) -> Result<Vec<ContentHash>> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        info!(
+            "🚨 ROLLBACK: Beginning rollback to entry {} (reason: {})",
+            target_hash, reason
+        );
+
+        // Step 1: Verify target entry exists
+        let target_entry = self
+            .get_entry(target_hash)?
+            .ok_or_else(|| anyhow::anyhow!("Target entry {} not found", target_hash))?;
+
+        let target_timestamp = target_entry.timestamp;
+        info!(
+            "Found target entry with timestamp {}, author: {}",
+            target_timestamp, target_entry.author
+        );
+
+        // Step 2: Get all entries and identify those to archive
+        let all_entries = self.get_all_entries()?;
+        let entries_to_archive: Vec<JournalEntry> = all_entries
+            .into_iter()
+            .filter(|e| e.timestamp > target_timestamp)
+            .collect();
+
+        let archived_count = entries_to_archive.len();
+        info!(
+            "Identified {} entries to archive (after timestamp {})",
+            archived_count, target_timestamp
+        );
+
+        if entries_to_archive.is_empty() {
+            info!("No entries to archive - target is already at tip");
+            return Ok(vec![]);
+        }
+
+        // Step 3: Archive entries to separate namespace
+        let mut archived_hashes = Vec::with_capacity(archived_count);
+        let archive_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        for entry in &entries_to_archive {
+            if let Some(ref hash) = entry.id {
+                // Store in archive namespace with metadata
+                let archive_key = format!(
+                    "{}{}:{}",
+                    ARCHIVE_PREFIX,
+                    archive_timestamp,
+                    hash.to_hex()
+                );
+                let archive_data = serde_json::to_vec(&ArchiveRecord {
+                    entry: entry.clone(),
+                    archived_at: archive_timestamp,
+                    reason: reason.to_string(),
+                })?;
+
+                self.store.put(archive_key.as_bytes(), &archive_data)?;
+                archived_hashes.push(hash.clone());
+
+                debug!("Archived entry {} to {}", hash, archive_key);
+            }
+        }
+
+        // Step 4: Remove entries from active ledger
+        for hash in &archived_hashes {
+            let journal_key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
+            self.store.delete(journal_key.as_bytes())?;
+            debug!("Removed entry {} from active ledger", hash);
+        }
+
+        // Step 5: Rebuild fork index with remaining entries
+        self.fork_detector = ForkDetector::new();
+        self.rebuild_fork_index()?;
+
+        // Step 6: Recompute balances from remaining entries
+        self.recompute_balances()?;
+
+        info!(
+            "✓ Rollback complete: archived {} entries, new balance for {} accounts",
+            archived_count,
+            self.cached_balances.len()
+        );
+
+        // Step 7: Broadcast rollback notification via gossip
+        if broadcast {
+            if let Some(ref gossip) = self.gossip {
+                let notification = LedgerSyncMessage::RollbackNotification {
+                    target_hash: target_hash.clone(),
+                    archived_entries: archived_hashes.clone(),
+                    reason: reason.to_string(),
+                    executed_at: archive_timestamp,
+                };
+
+                let data = serialize_sync_message(&notification)?;
+                // Use "ledger:system" topic for system-wide notifications
+                if let Err(e) = gossip.publish("ledger:system", data) {
+                    warn!("Failed to broadcast rollback notification: {}", e);
+                } else {
+                    info!("Broadcast rollback notification to network");
+                }
+            }
+        }
+
+        // Emit metrics
+        icn_obs::metrics::ledger::rollback_performed_inc();
+
+        Ok(archived_hashes)
+    }
+
+    /// Get archived entries for a specific rollback timestamp
+    pub fn get_archived_entries(&self, archive_timestamp: u64) -> Result<Vec<JournalEntry>> {
+        let prefix = format!("{}{}:", ARCHIVE_PREFIX, archive_timestamp);
+        let pairs = self.store.scan(prefix.as_bytes())?;
+
+        let mut entries = Vec::new();
+        for (_key, value) in pairs {
+            let record: ArchiveRecord = serde_json::from_slice(&value)?;
+            entries.push(record.entry);
+        }
+
+        Ok(entries)
+    }
+
+    /// List all rollback timestamps (for recovery purposes)
+    pub fn list_rollback_timestamps(&self) -> Result<Vec<u64>> {
+        let prefix = ARCHIVE_PREFIX.as_bytes();
+        let pairs = self.store.scan(prefix)?;
+
+        let mut timestamps = std::collections::HashSet::new();
+        for (key, _value) in pairs {
+            // Key format: "ledger:archive:{timestamp}:{hash}"
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(rest) = key_str.strip_prefix(ARCHIVE_PREFIX) {
+                if let Some(ts_str) = rest.split(':').next() {
+                    if let Ok(ts) = ts_str.parse::<u64>() {
+                        timestamps.insert(ts);
+                    }
+                }
+            }
+        }
+
+        let mut sorted: Vec<_> = timestamps.into_iter().collect();
+        sorted.sort();
+        Ok(sorted)
     }
 
     /// Validate a journal entry before accepting it

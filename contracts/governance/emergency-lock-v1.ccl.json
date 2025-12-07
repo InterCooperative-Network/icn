@@ -1,0 +1,698 @@
+{
+  "name": "EmergencyLock",
+  "participants": [],
+  "currency": null,
+  "state_vars": [
+    {
+      "name": "emergency_initiator_count",
+      "initial_value": { "Int": 2 }
+    },
+    {
+      "name": "ratification_hours",
+      "initial_value": { "Int": 48 }
+    },
+    {
+      "name": "ratification_quorum_pct",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "ratification_threshold_pct",
+      "initial_value": { "Int": 60 }
+    },
+    {
+      "name": "override_threshold_pct",
+      "initial_value": { "Int": 75 }
+    },
+    {
+      "name": "cooldown_hours",
+      "initial_value": { "Int": 168 }
+    },
+    {
+      "name": "max_active_emergencies",
+      "initial_value": { "Int": 3 }
+    }
+  ],
+  "rules": [
+    {
+      "name": "check_can_initiate_emergency",
+      "params": [
+        { "name": "initiator_count" },
+        { "name": "active_emergencies" },
+        { "name": "hours_since_last" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "Assign": {
+            "name": "enough_initiators",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "initiator_count" },
+                "right": { "Var": "emergency_initiator_count" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "under_limit",
+            "value": {
+              "BinOp": {
+                "op": "Lt",
+                "left": { "Var": "active_emergencies" },
+                "right": { "Var": "max_active_emergencies" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "cooldown_passed",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "hours_since_last" },
+                "right": { "Var": "cooldown_hours" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "can_initiate",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "enough_initiators" },
+                "right": {
+                  "BinOp": {
+                    "op": "And",
+                    "left": { "Var": "under_limit" },
+                    "right": { "Var": "cooldown_passed" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["can_initiate", { "Var": "can_initiate" }],
+                ["enough_initiators", { "Var": "enough_initiators" }],
+                ["under_limit", { "Var": "under_limit" }],
+                ["cooldown_passed", { "Var": "cooldown_passed" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_ratification",
+      "params": [
+        { "name": "yes_votes" },
+        { "name": "no_votes" },
+        { "name": "total_members" },
+        { "name": "hours_elapsed" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "yes_votes" },
+                "right": { "Var": "no_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "ratification_quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "total_votes" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": { "Literal": { "Int": 0 } }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": {
+                    "BinOp": {
+                      "op": "Div",
+                      "left": {
+                        "BinOp": {
+                          "op": "Mul",
+                          "left": { "Var": "yes_votes" },
+                          "right": { "Literal": { "Int": 100 } }
+                        }
+                      },
+                      "right": { "Var": "total_votes" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "period_ended",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "hours_elapsed" },
+                "right": { "Var": "ratification_hours" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "is_ratified",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Ge",
+                    "left": { "Var": "approval_pct" },
+                    "right": { "Var": "ratification_threshold_pct" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": { "Var": "is_ratified" },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "ratified" } }],
+                      ["is_ratified", { "Literal": { "Bool": true } }],
+                      ["approval_pct", { "Var": "approval_pct" }],
+                      ["participation_pct", { "Var": "participation_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "UnOp": {
+                "op": "Not",
+                "operand": { "Var": "period_ended" }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "pending" } }],
+                      ["is_ratified", { "Literal": { "Bool": false } }],
+                      ["hours_remaining", {
+                        "BinOp": {
+                          "op": "Sub",
+                          "left": { "Var": "ratification_hours" },
+                          "right": { "Var": "hours_elapsed" }
+                        }
+                      }],
+                      ["approval_pct", { "Var": "approval_pct" }],
+                      ["participation_pct", { "Var": "participation_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["outcome", { "Literal": { "String": "rejected" } }],
+                ["is_ratified", { "Literal": { "Bool": false } }],
+                ["reason", { "Literal": { "String": "ratification_failed" } }],
+                ["approval_pct", { "Var": "approval_pct" }],
+                ["quorum_met", { "Var": "quorum_met" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_override",
+      "params": [
+        { "name": "override_votes" },
+        { "name": "total_members" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "override_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "override_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "override_successful",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "override_pct" },
+                "right": { "Var": "override_threshold_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["override_successful", { "Var": "override_successful" }],
+                ["override_pct", { "Var": "override_pct" }],
+                ["threshold_pct", { "Var": "override_threshold_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "evaluate_emergency",
+      "params": [
+        { "name": "yes_votes" },
+        { "name": "no_votes" },
+        { "name": "override_votes" },
+        { "name": "total_members" },
+        { "name": "hours_elapsed" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "override_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "override_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "override_successful",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "override_pct" },
+                "right": { "Var": "override_threshold_pct" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": { "Var": "override_successful" },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "overridden" } }],
+                      ["emergency_cancelled", { "Literal": { "Bool": true } }],
+                      ["override_pct", { "Var": "override_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "yes_votes" },
+                "right": { "Var": "no_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "ratification_quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "total_votes" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": { "Literal": { "Int": 0 } }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": {
+                    "BinOp": {
+                      "op": "Div",
+                      "left": {
+                        "BinOp": {
+                          "op": "Mul",
+                          "left": { "Var": "yes_votes" },
+                          "right": { "Literal": { "Int": 100 } }
+                        }
+                      },
+                      "right": { "Var": "total_votes" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "is_ratified",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Ge",
+                    "left": { "Var": "approval_pct" },
+                    "right": { "Var": "ratification_threshold_pct" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "period_ended",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "hours_elapsed" },
+                "right": { "Var": "ratification_hours" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": { "Var": "is_ratified" },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "ratified" } }],
+                      ["emergency_active", { "Literal": { "Bool": true } }],
+                      ["emergency_cancelled", { "Literal": { "Bool": false } }],
+                      ["approval_pct", { "Var": "approval_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "UnOp": {
+                "op": "Not",
+                "operand": { "Var": "period_ended" }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "active_pending_ratification" } }],
+                      ["emergency_active", { "Literal": { "Bool": true } }],
+                      ["emergency_cancelled", { "Literal": { "Bool": false } }],
+                      ["hours_remaining", {
+                        "BinOp": {
+                          "op": "Sub",
+                          "left": { "Var": "ratification_hours" },
+                          "right": { "Var": "hours_elapsed" }
+                        }
+                      }],
+                      ["approval_pct", { "Var": "approval_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["outcome", { "Literal": { "String": "expired_unratified" } }],
+                ["emergency_active", { "Literal": { "Bool": false } }],
+                ["emergency_cancelled", { "Literal": { "Bool": true } }],
+                ["reason", { "Literal": { "String": "failed_ratification" } }],
+                ["approval_pct", { "Var": "approval_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_ratification_hours",
+      "params": [
+        { "name": "new_hours" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_hours" },
+            "right": { "Literal": { "Int": 12 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_hours" },
+            "right": { "Literal": { "Int": 168 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "ratification_hours",
+            "value": { "Var": "new_hours" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_initiator_count",
+      "params": [
+        { "name": "new_count" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_count" },
+            "right": { "Literal": { "Int": 1 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_count" },
+            "right": { "Literal": { "Int": 10 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "emergency_initiator_count",
+            "value": { "Var": "new_count" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_config",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["emergency_initiator_count", { "Var": "emergency_initiator_count" }],
+                ["ratification_hours", { "Var": "ratification_hours" }],
+                ["ratification_quorum_pct", { "Var": "ratification_quorum_pct" }],
+                ["ratification_threshold_pct", { "Var": "ratification_threshold_pct" }],
+                ["override_threshold_pct", { "Var": "override_threshold_pct" }],
+                ["cooldown_hours", { "Var": "cooldown_hours" }],
+                ["max_active_emergencies", { "Var": "max_active_emergencies" }]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

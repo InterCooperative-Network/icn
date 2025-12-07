@@ -1,0 +1,651 @@
+{
+  "name": "ConsensusWithFallback",
+  "participants": [],
+  "currency": null,
+  "state_vars": [
+    {
+      "name": "consensus_period_hours",
+      "initial_value": { "Int": 168 }
+    },
+    {
+      "name": "fallback_threshold_pct",
+      "initial_value": { "Int": 67 }
+    },
+    {
+      "name": "quorum_pct",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "proposal_count",
+      "initial_value": { "Int": 0 }
+    },
+    {
+      "name": "min_discussion_hours",
+      "initial_value": { "Int": 24 }
+    }
+  ],
+  "rules": [
+    {
+      "name": "check_consensus",
+      "params": [
+        { "name": "yes_votes" },
+        { "name": "no_votes" },
+        { "name": "abstain_votes" },
+        { "name": "total_members" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "yes_votes" },
+                    "right": { "Var": "no_votes" }
+                  }
+                },
+                "right": { "Var": "abstain_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "is_consensus",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Eq",
+                    "left": { "Var": "no_votes" },
+                    "right": { "Literal": { "Int": 0 } }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["is_consensus", { "Var": "is_consensus" }],
+                ["quorum_met", { "Var": "quorum_met" }],
+                ["participation_pct", { "Var": "participation_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_fallback_majority",
+      "params": [
+        { "name": "yes_votes" },
+        { "name": "no_votes" },
+        { "name": "abstain_votes" },
+        { "name": "total_members" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "yes_votes" },
+                    "right": { "Var": "no_votes" }
+                  }
+                },
+                "right": { "Var": "abstain_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "voting_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "yes_votes" },
+                "right": { "Var": "no_votes" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "voting_votes" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": { "Literal": { "Int": 0 } }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": {
+                    "BinOp": {
+                      "op": "Div",
+                      "left": {
+                        "BinOp": {
+                          "op": "Mul",
+                          "left": { "Var": "yes_votes" },
+                          "right": { "Literal": { "Int": 100 } }
+                        }
+                      },
+                      "right": { "Var": "voting_votes" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "is_approved",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Ge",
+                    "left": { "Var": "approval_pct" },
+                    "right": { "Var": "fallback_threshold_pct" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["is_approved", { "Var": "is_approved" }],
+                ["quorum_met", { "Var": "quorum_met" }],
+                ["approval_pct", { "Var": "approval_pct" }],
+                ["participation_pct", { "Var": "participation_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "evaluate_proposal",
+      "params": [
+        { "name": "yes_votes" },
+        { "name": "no_votes" },
+        { "name": "abstain_votes" },
+        { "name": "total_members" },
+        { "name": "hours_elapsed" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "hours_elapsed" },
+            "right": { "Var": "min_discussion_hours" }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "yes_votes" },
+                    "right": { "Var": "no_votes" }
+                  }
+                },
+                "right": { "Var": "abstain_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "is_consensus",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Eq",
+                    "left": { "Var": "no_votes" },
+                    "right": { "Literal": { "Int": 0 } }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": { "Var": "is_consensus" },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "consensus_approved" } }],
+                      ["is_approved", { "Literal": { "Bool": true } }],
+                      ["method", { "Literal": { "String": "consensus" } }],
+                      ["quorum_met", { "Var": "quorum_met" }],
+                      ["participation_pct", { "Var": "participation_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Assign": {
+            "name": "in_fallback_period",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "hours_elapsed" },
+                "right": { "Var": "consensus_period_hours" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "UnOp": {
+                "op": "Not",
+                "operand": { "Var": "in_fallback_period" }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "pending_consensus" } }],
+                      ["is_approved", { "Literal": { "Bool": false } }],
+                      ["method", { "Literal": { "String": "awaiting_consensus" } }],
+                      ["quorum_met", { "Var": "quorum_met" }],
+                      ["participation_pct", { "Var": "participation_pct" }],
+                      ["hours_remaining", {
+                        "BinOp": {
+                          "op": "Sub",
+                          "left": { "Var": "consensus_period_hours" },
+                          "right": { "Var": "hours_elapsed" }
+                        }
+                      }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Assign": {
+            "name": "voting_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "yes_votes" },
+                "right": { "Var": "no_votes" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "voting_votes" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": { "Literal": { "Int": 0 } }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": {
+                    "BinOp": {
+                      "op": "Div",
+                      "left": {
+                        "BinOp": {
+                          "op": "Mul",
+                          "left": { "Var": "yes_votes" },
+                          "right": { "Literal": { "Int": 100 } }
+                        }
+                      },
+                      "right": { "Var": "voting_votes" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "fallback_approved",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Ge",
+                    "left": { "Var": "approval_pct" },
+                    "right": { "Var": "fallback_threshold_pct" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": { "Var": "fallback_approved" },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "fallback_approved" } }],
+                      ["is_approved", { "Literal": { "Bool": true } }],
+                      ["method", { "Literal": { "String": "supermajority" } }],
+                      ["quorum_met", { "Var": "quorum_met" }],
+                      ["approval_pct", { "Var": "approval_pct" }],
+                      ["participation_pct", { "Var": "participation_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "rejected" } }],
+                      ["is_approved", { "Literal": { "Bool": false } }],
+                      ["method", { "Literal": { "String": "fallback_failed" } }],
+                      ["quorum_met", { "Var": "quorum_met" }],
+                      ["approval_pct", { "Var": "approval_pct" }],
+                      ["participation_pct", { "Var": "participation_pct" }]
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_consensus_period",
+      "params": [
+        { "name": "new_hours" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_hours" },
+            "right": { "Literal": { "Int": 24 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_hours" },
+            "right": { "Literal": { "Int": 720 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "consensus_period_hours",
+            "value": { "Var": "new_hours" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_fallback_threshold",
+      "params": [
+        { "name": "new_threshold" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_threshold" },
+            "right": { "Literal": { "Int": 51 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_threshold" },
+            "right": { "Literal": { "Int": 100 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "fallback_threshold_pct",
+            "value": { "Var": "new_threshold" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_quorum",
+      "params": [
+        { "name": "new_quorum" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_quorum" },
+            "right": { "Literal": { "Int": 10 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_quorum" },
+            "right": { "Literal": { "Int": 100 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "quorum_pct",
+            "value": { "Var": "new_quorum" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_config",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["consensus_period_hours", { "Var": "consensus_period_hours" }],
+                ["fallback_threshold_pct", { "Var": "fallback_threshold_pct" }],
+                ["quorum_pct", { "Var": "quorum_pct" }],
+                ["min_discussion_hours", { "Var": "min_discussion_hours" }]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

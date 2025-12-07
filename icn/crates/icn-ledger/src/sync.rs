@@ -21,6 +21,21 @@ pub enum LedgerSyncMessage {
         hash: ContentHash,
         entry: Option<JournalEntry>,
     },
+
+    /// Rollback notification from governance (emergency recovery)
+    ///
+    /// This message instructs all nodes to roll back to a specific entry.
+    /// Only valid when originating from an accepted governance proposal.
+    RollbackNotification {
+        /// Hash of the entry to roll back to (all entries after this are archived)
+        target_hash: ContentHash,
+        /// Hashes of entries that were archived (for verification)
+        archived_entries: Vec<ContentHash>,
+        /// Reason for rollback (from governance proposal)
+        reason: String,
+        /// Unix timestamp when rollback was executed
+        executed_at: u64,
+    },
 }
 
 /// Get the topic name for a currency's ledger sync

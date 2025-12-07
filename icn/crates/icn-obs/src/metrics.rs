@@ -1680,6 +1680,10 @@ pub mod ledger {
     pub fn quarantine_size_set(size: u64) {
         gauge!("icn_ledger_quarantine_size").set(size as f64);
     }
+
+    pub fn rollback_performed_inc() {
+        counter!("icn_ledger_rollback_performed_total").increment(1);
+    }
 }
 
 /// Governance execution metrics

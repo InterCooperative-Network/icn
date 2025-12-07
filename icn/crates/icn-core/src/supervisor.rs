@@ -156,6 +156,8 @@ impl Supervisor {
             );
 
             // Set up trust penalty callback to update trust graph (Phase 18)
+            // NOTE: This callback is synchronous (uses block_in_place) to prevent race conditions
+            // with gossip-received trust updates. The caller waits for the trust update to complete.
             let trust_graph_for_penalty = trust_graph_handle.clone();
             let own_did_for_penalty = did.clone();
             let trust_penalty_callback: icn_security::TrustPenaltyCallback =
@@ -164,31 +166,35 @@ impl Supervisor {
                     let peer = peer_did.clone();
                     let own = own_did_for_penalty.clone();
 
-                    // Spawn async task to update trust graph
-                    tokio::spawn(async move {
-                        // Map reputation (0.0-1.0) to trust score (0.0-1.0)
-                        // Reputation below 0.5 becomes untrusted (<0.1)
-                        let trust_score = if reputation_score < 0.5 {
-                            reputation_score * 0.2 // 0.5 → 0.1, 0.0 → 0.0
-                        } else {
-                            reputation_score // Keep 0.5-1.0 range
-                        };
+                    // Use block_in_place to synchronously update trust graph
+                    // This prevents races with gossip-received trust updates
+                    tokio::task::block_in_place(|| {
+                        let rt = tokio::runtime::Handle::current();
+                        rt.block_on(async {
+                            // Map reputation (0.0-1.0) to trust score (0.0-1.0)
+                            // Reputation below 0.5 becomes untrusted (<0.1)
+                            let trust_score = if reputation_score < 0.5 {
+                                reputation_score * 0.2 // 0.5 → 0.1, 0.0 → 0.0
+                            } else {
+                                reputation_score // Keep 0.5-1.0 range
+                            };
 
-                        let mut graph = graph.write().await;
-                        let edge =
-                            icn_trust::TrustEdge::new(own.clone(), peer.clone(), trust_score);
+                            let mut graph = graph.write().await;
+                            let edge =
+                                icn_trust::TrustEdge::new(own.clone(), peer.clone(), trust_score);
 
-                        if let Err(e) = graph.add_edge(edge) {
-                            warn!(
-                                "Failed to update trust graph for {} (reputation: {:.2}): {}",
-                                peer, reputation_score, e
-                            );
-                        } else {
-                            debug!(
-                                "Updated trust for {} to {:.2} (reputation: {:.2})",
-                                peer, trust_score, reputation_score
-                            );
-                        }
+                            if let Err(e) = graph.add_edge(edge) {
+                                warn!(
+                                    "Failed to update trust graph for {} (reputation: {:.2}): {}",
+                                    peer, reputation_score, e
+                                );
+                            } else {
+                                debug!(
+                                    "Updated trust for {} to {:.2} (reputation: {:.2})",
+                                    peer, trust_score, reputation_score
+                                );
+                            }
+                        })
                     });
                 });
 
@@ -1921,6 +1927,7 @@ impl Supervisor {
                 let ledger_clone = ledger_handle.clone();
                 let audit_store = gov_store.clone();
                 let gov_handle_clone = governance_handle.clone();
+                let dispute_manager_clone = dispute_manager_handle.clone();
 
                 // Get treasury DID from config, falling back to node DID if not configured
                 let treasury_did = self
@@ -2203,13 +2210,68 @@ impl Supervisor {
                                     error!("   Target hash: {}", target_hash);
                                     error!("   Reason: {}", reason);
                                     error!("   Affected accounts: {:?}", affected_accounts);
-                                    // TODO: Implement ledger rollback logic
-                                    // This is a very dangerous operation that requires:
-                                    // 1. Verify target_hash exists in ledger
-                                    // 2. Archive entries after target_hash
-                                    // 3. Recompute balances from genesis to target_hash
-                                    // 4. Broadcast rollback notification to network
-                                    warn!("⚠️ Ledger rollback execution not yet implemented - MANUAL INTERVENTION REQUIRED");
+
+                                    // Execute ledger rollback
+                                    let ledger = ledger_clone.clone();
+                                    let target_hash_str = target_hash.clone();
+                                    let rollback_reason = reason.clone();
+                                    let store = audit_store.clone();
+                                    let prop_id = proposal_id.clone();
+
+                                    tokio::spawn(async move {
+                                        use icn_ledger::ContentHash;
+
+                                        // Convert hex string to ContentHash
+                                        let target_bytes = match hex::decode(&target_hash_str) {
+                                            Ok(bytes) if bytes.len() == 32 => {
+                                                let mut arr = [0u8; 32];
+                                                arr.copy_from_slice(&bytes);
+                                                arr
+                                            }
+                                            Ok(_) => {
+                                                error!("❌ Invalid target hash length for rollback");
+                                                icn_obs::metrics::governance::execution_failures_inc("invalid_rollback_hash");
+                                                return;
+                                            }
+                                            Err(e) => {
+                                                error!("❌ Failed to decode rollback target hash: {}", e);
+                                                icn_obs::metrics::governance::execution_failures_inc("invalid_rollback_hash");
+                                                return;
+                                            }
+                                        };
+                                        let content_hash = ContentHash::from_bytes(target_bytes);
+
+                                        // Execute rollback
+                                        let mut ledger_write = ledger.write().await;
+                                        match ledger_write.rollback_to_entry(&content_hash, &rollback_reason, true) {
+                                            Ok(archived_hashes) => {
+                                                info!("✅ Ledger rollback complete: archived {} entries", archived_hashes.len());
+
+                                                // Record successful execution
+                                                if let Err(e) = store.put(
+                                                    format!("gov:executed:{}", prop_id.0).as_bytes(),
+                                                    serde_json::json!({
+                                                        "proposal_id": prop_id.0,
+                                                        "action": "ledger_rollback",
+                                                        "target_hash": target_hash_str,
+                                                        "archived_count": archived_hashes.len(),
+                                                        "executed_at": std::time::SystemTime::now()
+                                                            .duration_since(std::time::UNIX_EPOCH)
+                                                            .unwrap()
+                                                            .as_secs()
+                                                    }).to_string().as_bytes(),
+                                                ) {
+                                                    warn!("Failed to record rollback execution: {}", e);
+                                                }
+
+                                                icn_obs::metrics::governance::proposals_executed_inc("rollback_ledger");
+                                            }
+                                            Err(e) => {
+                                                error!("❌ Ledger rollback failed: {}", e);
+                                                icn_obs::metrics::governance::execution_failures_inc("rollback_failed");
+                                            }
+                                        }
+                                    });
                                 }
 
                                 ProposalPayload::DisputeResolution {
@@ -2223,27 +2285,85 @@ impl Supervisor {
                                     info!("   Dispute entry: {}", dispute_entry_hash);
                                     info!("   Proposed outcome: {:?}", proposed_outcome);
 
-                                    // TODO: Execute the dispute resolution outcome
-                                    // This requires:
-                                    // 1. Convert governance outcome to ledger outcome
-                                    // 2. Call resolve_escalated_dispute on DisputeManager
-                                    // 3. Apply any adjustments to ledger
-                                    // For now, log the action needed
-                                    match proposed_outcome {
-                                        icn_governance::DisputeResolutionOutcome::Uphold => {
-                                            info!("   Action: Uphold dispute - reverse original entry");
+                                    // Execute the dispute resolution
+                                    let dispute_manager = dispute_manager_clone.clone();
+                                    let entry_hash_str = dispute_entry_hash.clone();
+                                    let outcome = proposed_outcome.clone();
+                                    let store = audit_store.clone();
+                                    let prop_id = proposal_id.clone();
+                                    let decision_time = decided_at;
+
+                                    tokio::spawn(async move {
+                                        use icn_ledger::{ContentHash, DisputeOutcome};
+
+                                        // Convert hex string to ContentHash
+                                        let entry_bytes = match hex::decode(&entry_hash_str) {
+                                            Ok(bytes) if bytes.len() == 32 => {
+                                                let mut arr = [0u8; 32];
+                                                arr.copy_from_slice(&bytes);
+                                                arr
+                                            }
+                                            Ok(_) => {
+                                                error!("❌ Invalid dispute entry hash length");
+                                                icn_obs::metrics::governance::execution_failures_inc("invalid_dispute_hash");
+                                                return;
+                                            }
+                                            Err(e) => {
+                                                error!("❌ Failed to decode dispute entry hash: {}", e);
+                                                icn_obs::metrics::governance::execution_failures_inc("invalid_dispute_hash");
+                                                return;
+                                            }
+                                        };
+                                        let content_hash = ContentHash::from_bytes(entry_bytes);
+
+                                        // Convert governance outcome to ledger outcome
+                                        let ledger_outcome = match &outcome {
+                                            icn_governance::DisputeResolutionOutcome::Uphold => {
+                                                // Governance upheld the dispute = entry was wrong = reverse it
+                                                DisputeOutcome::Reversed
+                                            }
+                                            icn_governance::DisputeResolutionOutcome::Reject => {
+                                                // Governance rejected the dispute = entry was valid = uphold it
+                                                DisputeOutcome::Upheld
+                                            }
+                                            icn_governance::DisputeResolutionOutcome::Partial { adjustment, currency } => {
+                                                DisputeOutcome::Settlement {
+                                                    terms: format!("Partial adjustment: {} {}", adjustment, currency),
+                                                }
+                                            }
+                                            icn_governance::DisputeResolutionOutcome::VoidTransaction => {
+                                                DisputeOutcome::Reversed
+                                            }
+                                        };
+
+                                        // Resolve the escalated dispute
+                                        let mut dm = dispute_manager.write().await;
+                                        match dm.resolve_escalated_dispute(&content_hash, ledger_outcome.clone(), decision_time) {
+                                            Ok(()) => {
+                                                info!("✅ Dispute {} resolved: {:?}", entry_hash_str, ledger_outcome);
+
+                                                // Record successful execution
+                                                if let Err(e) = store.put(
+                                                    format!("gov:executed:{}", prop_id.0).as_bytes(),
+                                                    serde_json::json!({
+                                                        "proposal_id": prop_id.0,
+                                                        "action": "dispute_resolution",
+                                                        "entry_hash": entry_hash_str,
+                                                        "outcome": format!("{:?}", ledger_outcome),
+                                                        "executed_at": decision_time
+                                                    }).to_string().as_bytes(),
+                                                ) {
+                                                    warn!("Failed to record dispute resolution execution: {}", e);
+                                                }
+
+                                                icn_obs::metrics::governance::proposals_executed_inc("dispute_resolution");
+                                            }
+                                            Err(e) => {
+                                                error!("❌ Failed to resolve dispute {}: {}", entry_hash_str, e);
+                                                icn_obs::metrics::governance::execution_failures_inc("dispute_resolution_failed");
+                                            }
                                         }
-                                        icn_governance::DisputeResolutionOutcome::Reject => {
-                                            info!("   Action: Reject dispute - original entry stands");
-                                        }
-                                        icn_governance::DisputeResolutionOutcome::Partial { adjustment, currency } => {
-                                            info!("   Action: Apply partial adjustment of {} {}", adjustment, currency);
-                                        }
-                                        icn_governance::DisputeResolutionOutcome::VoidTransaction => {
-                                            info!("   Action: Void the entire transaction");
-                                        }
-                                    }
-                                    warn!("⚠️ Dispute resolution execution not yet fully automated - MANUAL VERIFICATION RECOMMENDED");
+                                    });
                                 }
                             }
                         }
@@ -2664,6 +2784,9 @@ impl Supervisor {
             if let Some(registry) = federation_registry_for_rpc {
                 rpc_server.set_federation_registry(registry);
             }
+
+            // Enable trust-based rate limiting for API requests (C8)
+            rpc_server.enable_trust_rate_limiting();
 
             background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {

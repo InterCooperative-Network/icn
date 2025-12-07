@@ -1,0 +1,514 @@
+{
+  "name": "CouncilDelegation",
+  "participants": [],
+  "currency": null,
+  "state_vars": [
+    {
+      "name": "council_size",
+      "initial_value": { "Int": 5 }
+    },
+    {
+      "name": "election_quorum_pct",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "council_term_days",
+      "initial_value": { "Int": 365 }
+    },
+    {
+      "name": "recall_threshold_pct",
+      "initial_value": { "Int": 67 }
+    },
+    {
+      "name": "recall_quorum_pct",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "council_approval_threshold",
+      "initial_value": { "Int": 60 }
+    },
+    {
+      "name": "member_veto_threshold_pct",
+      "initial_value": { "Int": 75 }
+    }
+  ],
+  "rules": [
+    {
+      "name": "check_election_result",
+      "params": [
+        { "name": "candidate_votes" },
+        { "name": "total_voters" },
+        { "name": "positions_available" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_voters" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "positions_available" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "votes_cast",
+            "value": { "Var": "candidate_votes" }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "votes_cast" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_voters" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "election_quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["quorum_met", { "Var": "quorum_met" }],
+                ["participation_pct", { "Var": "participation_pct" }],
+                ["positions_available", { "Var": "positions_available" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_council_decision",
+      "params": [
+        { "name": "yes_votes" },
+        { "name": "no_votes" },
+        { "name": "abstain_votes" },
+        { "name": "current_council_size" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "current_council_size" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "yes_votes" },
+                    "right": { "Var": "no_votes" }
+                  }
+                },
+                "right": { "Var": "abstain_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "current_council_size" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "voting_members",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "yes_votes" },
+                "right": { "Var": "no_votes" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "voting_members" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": { "Literal": { "Int": 0 } }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "approval_pct",
+                  "value": {
+                    "BinOp": {
+                      "op": "Div",
+                      "left": {
+                        "BinOp": {
+                          "op": "Mul",
+                          "left": { "Var": "yes_votes" },
+                          "right": { "Literal": { "Int": 100 } }
+                        }
+                      },
+                      "right": { "Var": "voting_members" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "is_approved",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "approval_pct" },
+                "right": { "Var": "council_approval_threshold" }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["is_approved", { "Var": "is_approved" }],
+                ["approval_pct", { "Var": "approval_pct" }],
+                ["participation_pct", { "Var": "participation_pct" }],
+                ["yes_votes", { "Var": "yes_votes" }],
+                ["no_votes", { "Var": "no_votes" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_recall_vote",
+      "params": [
+        { "name": "recall_votes" },
+        { "name": "retain_votes" },
+        { "name": "total_members" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_votes",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": { "Var": "recall_votes" },
+                "right": { "Var": "retain_votes" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "participation_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "quorum_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "participation_pct" },
+                "right": { "Var": "recall_quorum_pct" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "Eq",
+                "left": { "Var": "total_votes" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            },
+            "then_block": [
+              {
+                "Assign": {
+                  "name": "recall_pct",
+                  "value": { "Literal": { "Int": 0 } }
+                }
+              }
+            ],
+            "else_block": [
+              {
+                "Assign": {
+                  "name": "recall_pct",
+                  "value": {
+                    "BinOp": {
+                      "op": "Div",
+                      "left": {
+                        "BinOp": {
+                          "op": "Mul",
+                          "left": { "Var": "recall_votes" },
+                          "right": { "Literal": { "Int": 100 } }
+                        }
+                      },
+                      "right": { "Var": "total_votes" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Assign": {
+            "name": "recall_successful",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "quorum_met" },
+                "right": {
+                  "BinOp": {
+                    "op": "Ge",
+                    "left": { "Var": "recall_pct" },
+                    "right": { "Var": "recall_threshold_pct" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["recall_successful", { "Var": "recall_successful" }],
+                ["recall_pct", { "Var": "recall_pct" }],
+                ["quorum_met", { "Var": "quorum_met" }],
+                ["participation_pct", { "Var": "participation_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_member_veto",
+      "params": [
+        { "name": "veto_votes" },
+        { "name": "total_members" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "veto_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "veto_votes" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "veto_successful",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "veto_pct" },
+                "right": { "Var": "member_veto_threshold_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["veto_successful", { "Var": "veto_successful" }],
+                ["veto_pct", { "Var": "veto_pct" }],
+                ["threshold_pct", { "Var": "member_veto_threshold_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_council_size",
+      "params": [
+        { "name": "new_size" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_size" },
+            "right": { "Literal": { "Int": 3 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_size" },
+            "right": { "Literal": { "Int": 21 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "council_size",
+            "value": { "Var": "new_size" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_council_term",
+      "params": [
+        { "name": "new_days" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_days" },
+            "right": { "Literal": { "Int": 90 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_days" },
+            "right": { "Literal": { "Int": 730 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "council_term_days",
+            "value": { "Var": "new_days" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_config",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["council_size", { "Var": "council_size" }],
+                ["election_quorum_pct", { "Var": "election_quorum_pct" }],
+                ["council_term_days", { "Var": "council_term_days" }],
+                ["recall_threshold_pct", { "Var": "recall_threshold_pct" }],
+                ["recall_quorum_pct", { "Var": "recall_quorum_pct" }],
+                ["council_approval_threshold", { "Var": "council_approval_threshold" }],
+                ["member_veto_threshold_pct", { "Var": "member_veto_threshold_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

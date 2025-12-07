@@ -33,7 +33,7 @@ use icn_governance::{GovernanceOps, MembershipAction};
 use icn_identity::recovery::{RecoveryAttestation, RecoveryEvent, RecoveryStatus};
 use icn_identity::Did;
 use icn_ledger::{ContentHash, Dispute, DisputeManager, DisputeOutcome, DisputeStatus, Ledger};
-use icn_net::NetworkHandle;
+use icn_net::{NetworkHandle, RateLimiter, TrustGatedRateLimitConfig};
 use icn_store::Store;
 use icn_trust::{TrustEdge, TrustGraph};
 
@@ -65,6 +65,8 @@ pub struct RpcServer {
     own_keypair: Option<Arc<icn_identity::KeyPair>>,
     receipt_store: Arc<ReceiptStore>,
     auth_manager: Option<Arc<RpcAuthManager>>,
+    /// Trust-gated rate limiter for API requests (C8: Trust-based API rate limiting)
+    rate_limiter: Option<Arc<RateLimiter>>,
     listen_addr: SocketAddr,
 }
 
@@ -85,6 +87,7 @@ impl RpcServer {
             own_keypair: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             auth_manager: None,
+            rate_limiter: None,
             listen_addr,
         }
     }
@@ -109,6 +112,7 @@ impl RpcServer {
             own_keypair: None,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)),
             auth_manager: Some(Arc::new(RpcAuthManager::new(jwt_secret, true))),
+            rate_limiter: None,
             listen_addr,
         }
     }
@@ -116,6 +120,27 @@ impl RpcServer {
     /// Set the authentication manager (for configuring after construction)
     pub fn set_auth_manager(&mut self, jwt_secret: Vec<u8>) {
         self.auth_manager = Some(Arc::new(RpcAuthManager::new(jwt_secret, true)));
+    }
+
+    /// Enable trust-based rate limiting for API requests (C8)
+    ///
+    /// Requires a trust graph to be set first via `set_trust_handle`.
+    /// Different trust levels get different rate limits:
+    /// - Isolated (< 0.1): 10 req/sec
+    /// - Known (0.1-0.4): 50 req/sec
+    /// - Partner (0.4-0.7): 100 req/sec
+    /// - Federated (0.7+): 200 req/sec
+    pub fn enable_trust_rate_limiting(&mut self) {
+        if let Some(ref trust_graph) = self.trust_handle {
+            let config = TrustGatedRateLimitConfig::default();
+            self.rate_limiter = Some(Arc::new(RateLimiter::new_trust_gated(
+                config,
+                trust_graph.clone(),
+            )));
+            info!("Trust-based rate limiting enabled for RPC server");
+        } else {
+            warn!("Cannot enable trust rate limiting: no trust graph configured");
+        }
     }
 
     /// Check if authentication is enabled
@@ -319,6 +344,29 @@ async fn handle_request(
         // Auth not enabled - allow all (backward compatibility / dev mode)
         None
     };
+
+    // Apply trust-based rate limiting if enabled (C8)
+    // Rate limit based on the authenticated user's DID
+    if let (Some(ref rate_limiter), Some(ref claims)) = (&state.rate_limiter, &claims) {
+        // Parse DID from claims
+        if let Ok(did) = claims.sub.parse::<Did>() {
+            let allowed = rate_limiter.check_rate_limit(&did).await;
+            if !allowed {
+                warn!(
+                    "Rate limit exceeded for DID {} on method {}",
+                    claims.sub, rpc_request.method
+                );
+                counter!("icn_rpc_rate_limited_total", "method" => method.clone()).increment(1);
+                gauge!("icn_rpc_active_requests").decrement(1.0);
+                let response = RpcResponse::error(
+                    rpc_request.id,
+                    -32429, // Custom error code for rate limiting
+                    "Rate limit exceeded. Please slow down your requests.".to_string(),
+                );
+                return Ok(json_response(StatusCode::TOO_MANY_REQUESTS, &response));
+            }
+        }
+    }
 
     // Increment request counter
     counter!("icn_rpc_requests_total", "method" => method.clone()).increment(1);
