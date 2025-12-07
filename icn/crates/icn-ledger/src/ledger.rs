@@ -258,6 +258,7 @@ impl Ledger {
         LedgerSyncMessage::NewEntry { .. } => "NewEntry",
         LedgerSyncMessage::RequestEntry { .. } => "RequestEntry",
         LedgerSyncMessage::EntryResponse { .. } => "EntryResponse",
+        LedgerSyncMessage::RollbackNotification { .. } => "RollbackNotification",
     }))]
     pub fn handle_sync_message(&mut self, msg: LedgerSyncMessage) -> Result<()> {
         match msg {
@@ -1207,7 +1208,7 @@ impl Ledger {
 
                 let data = serialize_sync_message(&notification)?;
                 // Use "ledger:system" topic for system-wide notifications
-                if let Err(e) = gossip.publish("ledger:system", data) {
+                if let Err(e) = gossip.blocking_write().publish("ledger:system", data) {
                     warn!("Failed to broadcast rollback notification: {}", e);
                 } else {
                     info!("Broadcast rollback notification to network");

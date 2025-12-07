@@ -2329,6 +2329,7 @@ impl Supervisor {
                                             icn_governance::DisputeResolutionOutcome::Partial { adjustment, currency } => {
                                                 DisputeOutcome::Settlement {
                                                     terms: format!("Partial adjustment: {} {}", adjustment, currency),
+                                                    replacement_entry: None,
                                                 }
                                             }
                                             icn_governance::DisputeResolutionOutcome::VoidTransaction => {
