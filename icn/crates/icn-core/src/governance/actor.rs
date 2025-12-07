@@ -18,9 +18,9 @@ use icn_store::Store;
 
 use icn_governance::{
     DecisionOutcome, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceMessage,
-    GovernanceParams, GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipConfig,
-    MembershipResolver, Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
-    TallySnapshot, Vote, VoteChoice, VoteTally,
+    GovernanceParams, GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipAction,
+    MembershipConfig, MembershipResolver, MembershipSource, Proposal, ProposalId, ProposalOutcome,
+    ProposalPayload, ProposalState, TallySnapshot, Vote, VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -96,6 +96,17 @@ pub enum GovernanceCommand {
         proposal_id: ProposalId,
         forced_outcome: icn_governance::ForcedOutcome,
         reason: String,
+    },
+    /// Update domain configuration (from accepted ConfigChange proposal)
+    UpdateDomainConfig {
+        domain_id: GovernanceDomainId,
+        new_config: GovernanceConfig,
+    },
+    /// Update domain membership (from accepted Membership proposal)
+    UpdateMembership {
+        domain_id: GovernanceDomainId,
+        action: MembershipAction,
+        member: Did,
     },
 }
 
@@ -682,6 +693,102 @@ impl GovernanceActor {
                     proposal_id.0, forced_outcome
                 );
             }
+
+            GovernanceCommand::UpdateDomainConfig {
+                domain_id,
+                new_config,
+            } => {
+                info!("⚙️  Updating domain config: {}", domain_id.0);
+
+                // Load existing domain
+                let mut domain = self
+                    .load_domain(&domain_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", domain_id.0))?;
+
+                // Update configuration
+                domain.update_config(new_config);
+
+                // Persist locally
+                self.store
+                    .put(&domain_key(&domain_id), &serde_json::to_vec(&domain)?)?;
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::domain_updated(domain))
+                    .await?;
+
+                icn_obs::metrics::governance::domain_config_updated_inc();
+                info!("✓ Domain config updated: {}", domain_id.0);
+            }
+
+            GovernanceCommand::UpdateMembership {
+                domain_id,
+                action,
+                member,
+            } => {
+                info!(
+                    "👥 Updating membership for domain {}: {:?} {}",
+                    domain_id.0, action, member
+                );
+
+                // Load existing domain
+                let mut domain = self
+                    .load_domain(&domain_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", domain_id.0))?;
+
+                // Update membership based on source type
+                match &mut domain.config.membership.source {
+                    MembershipSource::StaticList(members) => {
+                        match action {
+                            MembershipAction::Add => {
+                                if !members.contains(&member) {
+                                    members.push(member.clone());
+                                    info!("✓ Added {} to domain {} membership", member, domain_id.0);
+                                } else {
+                                    info!("Member {} already in domain {}", member, domain_id.0);
+                                }
+                            }
+                            MembershipAction::Remove => {
+                                if let Some(pos) = members.iter().position(|m| m == &member) {
+                                    members.remove(pos);
+                                    info!("✓ Removed {} from domain {} membership", member, domain_id.0);
+                                } else {
+                                    warn!("Member {} not found in domain {}", member, domain_id.0);
+                                }
+                            }
+                        }
+                    }
+                    MembershipSource::TrustThreshold(_) => {
+                        // For trust-based membership, explicit add/remove is converted
+                        // to a static list (preserving existing trust threshold as fallback)
+                        warn!(
+                            "Domain {} uses trust-based membership; converting to static list for explicit member management",
+                            domain_id.0
+                        );
+                        let new_list = match action {
+                            MembershipAction::Add => vec![member.clone()],
+                            MembershipAction::Remove => vec![],
+                        };
+                        domain.config.membership.source = MembershipSource::StaticList(new_list);
+                    }
+                }
+
+                // Update timestamp
+                domain.updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
+                // Persist locally
+                self.store
+                    .put(&domain_key(&domain_id), &serde_json::to_vec(&domain)?)?;
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::domain_updated(domain))
+                    .await?;
+
+                icn_obs::metrics::governance::membership_updated_inc();
+                info!("✓ Membership update complete for domain {}", domain_id.0);
+            }
         }
 
         Ok(())
@@ -740,6 +847,13 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
             // Use domain.id as the key
             let id = GovernanceDomainId(domain.id.0.clone());
             store.put(&domain_key(&id), &serde_json::to_vec(&domain)?)?;
+        }
+
+        GovernanceMessage::DomainUpdated { domain } => {
+            // Update existing domain with new config
+            let id = GovernanceDomainId(domain.id.0.clone());
+            store.put(&domain_key(&id), &serde_json::to_vec(&domain)?)?;
+            info!("Domain config updated via gossip: {}", id.0);
         }
 
         GovernanceMessage::ProposalCreated { proposal } => {

@@ -79,15 +79,15 @@ These must be fixed before any real-world use.
 
 These cause incorrect behavior but may not immediately crash the system.
 
-### H1. Configuration Changes Not Applied
+### H1. Configuration Changes Not Applied - FIXED
 **Location**: `icn-core/src/supervisor.rs:2083`
 **Issue**: ConfigChange proposals accepted but never take effect
-**Fix**: Implement config update logic or hot-reload
+**Fix**: Implemented config update execution. Supervisor now parses `new_config` JSON string into `GovernanceConfig`, calls `GovernanceCommand::UpdateDomainConfig` which updates the domain and broadcasts `DomainUpdated` message via gossip.
 
-### H2. Membership Updates Not Executed
+### H2. Membership Updates Not Executed - FIXED
 **Location**: `icn-core/src/supervisor.rs:2089`
 **Issue**: Member add/remove proposals don't modify actual membership
-**Fix**: Update governance domain membership on proposal acceptance
+**Fix**: Implemented membership update execution. Added `GovernanceCommand::UpdateMembership` which adds/removes members from `MembershipSource::StaticList`. Supervisor calls this when Membership proposals are accepted. Gossip broadcasts `DomainUpdated`.
 
 ### H3. Replica Threshold Never Checked
 **Location**: `icn-gossip/src/gossip.rs:1573`

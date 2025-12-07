@@ -1718,6 +1718,14 @@ pub mod governance {
     pub fn proposals_force_closed_inc() {
         counter!("icn_governance_proposals_force_closed_total").increment(1);
     }
+
+    pub fn domain_config_updated_inc() {
+        counter!("icn_governance_domain_config_updated_total").increment(1);
+    }
+
+    pub fn membership_updated_inc() {
+        counter!("icn_governance_membership_updated_total").increment(1);
+    }
 }
 
 /// Trust graph metrics
