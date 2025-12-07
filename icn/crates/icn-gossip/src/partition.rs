@@ -169,11 +169,7 @@ impl VectorClockMerger {
     }
 
     /// Merge remote clock and return version gaps with full context (H8 fix)
-    pub fn merge(
-        &mut self,
-        _peer: &Did,
-        remote_clock: VectorClock,
-    ) -> Result<Vec<VersionGap>> {
+    pub fn merge(&mut self, _peer: &Did, remote_clock: VectorClock) -> Result<Vec<VersionGap>> {
         let mut gaps = Vec::new();
         let now = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -372,7 +368,8 @@ impl PartitionHealer {
     /// Mark that healing has started with a peer
     /// Call this when sending PartitionHealRequest, before receiving response
     pub fn mark_healing_started(&mut self, peer: &Did) {
-        self.healing_in_progress.insert(peer.clone(), Instant::now());
+        self.healing_in_progress
+            .insert(peer.clone(), Instant::now());
         debug!("Marked healing started with peer {}", peer);
     }
 

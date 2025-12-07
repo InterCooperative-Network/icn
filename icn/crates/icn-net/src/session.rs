@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::tls;
 

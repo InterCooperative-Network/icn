@@ -737,26 +737,27 @@ impl GovernanceActor {
 
                 // Update membership based on source type
                 match &mut domain.config.membership.source {
-                    MembershipSource::StaticList(members) => {
-                        match action {
-                            MembershipAction::Add => {
-                                if !members.contains(&member) {
-                                    members.push(member.clone());
-                                    info!("✓ Added {} to domain {} membership", member, domain_id.0);
-                                } else {
-                                    info!("Member {} already in domain {}", member, domain_id.0);
-                                }
-                            }
-                            MembershipAction::Remove => {
-                                if let Some(pos) = members.iter().position(|m| m == &member) {
-                                    members.remove(pos);
-                                    info!("✓ Removed {} from domain {} membership", member, domain_id.0);
-                                } else {
-                                    warn!("Member {} not found in domain {}", member, domain_id.0);
-                                }
+                    MembershipSource::StaticList(members) => match action {
+                        MembershipAction::Add => {
+                            if !members.contains(&member) {
+                                members.push(member.clone());
+                                info!("✓ Added {} to domain {} membership", member, domain_id.0);
+                            } else {
+                                info!("Member {} already in domain {}", member, domain_id.0);
                             }
                         }
-                    }
+                        MembershipAction::Remove => {
+                            if let Some(pos) = members.iter().position(|m| m == &member) {
+                                members.remove(pos);
+                                info!(
+                                    "✓ Removed {} from domain {} membership",
+                                    member, domain_id.0
+                                );
+                            } else {
+                                warn!("Member {} not found in domain {}", member, domain_id.0);
+                            }
+                        }
+                    },
                     MembershipSource::TrustThreshold(threshold) => {
                         // For trust-based membership, we cannot add/remove individual members
                         // because membership is derived from the trust graph, not a static list.

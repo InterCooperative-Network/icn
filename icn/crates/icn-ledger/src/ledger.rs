@@ -215,11 +215,7 @@ impl Ledger {
                     // For unknown peers, check against minimum threshold
                     if self.min_trust_for_entry > 0.0 {
                         icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
-                        anyhow::bail!(
-                            "Cannot verify trust for entry author {}: {}",
-                            author_did,
-                            e
-                        );
+                        anyhow::bail!("Cannot verify trust for entry author {}: {}", author_did, e);
                     }
                 }
             }

@@ -1945,8 +1945,9 @@ impl Supervisor {
 
                 event_bus.subscribe(Arc::new(move |event| {
                     match event {
-                        SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, .. } => {
-                            match payload {
+                        SystemEvent::ProposalAccepted { proposal_id, payload, decided_at, domain_id, .. } => {
+                            let domain_id = domain_id.clone(); // Clone for use in async blocks
+                            match &payload {
                                 ProposalPayload::Budget { amount, recipient, currency, purpose: _ } => {
                                     info!("📊 Executing budget proposal {}: {} {} to {}",
                                           proposal_id.0, amount, currency, recipient);
@@ -1958,6 +1959,9 @@ impl Supervisor {
                                     let from_did = treasury_did.clone();
                                     let store = audit_store.clone();
                                     let decision_time = decided_at;
+                                    let amount = *amount;
+                                    let recipient = recipient.clone();
+                                    let currency = currency.clone();
 
                                     tokio::spawn(async move {
                                         use icn_ledger::entry::JournalEntryBuilder;
@@ -2089,34 +2093,31 @@ impl Supervisor {
                                           proposal_id.0, new_config);
 
                                     // Parse the new_config JSON string into GovernanceConfig
-                                    match serde_json::from_str::<icn_governance::GovernanceConfig>(&new_config) {
+                                    match serde_json::from_str::<icn_governance::GovernanceConfig>(new_config) {
                                         Ok(parsed_config) => {
-                                            // Extract domain_id from the event
-                                            if let SystemEvent::ProposalAccepted { domain_id, .. } = event {
-                                                let gov_handle = gov_handle_clone.clone();
-                                                let prop_id = proposal_id.clone();
-                                                let dom_id = icn_governance::GovernanceDomainId::new(domain_id);
+                                            let gov_handle = gov_handle_clone.clone();
+                                            let prop_id = proposal_id.clone();
+                                            let dom_id = icn_governance::GovernanceDomainId::new(domain_id.clone());
 
-                                                tokio::spawn(async move {
-                                                    use crate::governance::GovernanceCommand;
+                                            tokio::spawn(async move {
+                                                use crate::governance::GovernanceCommand;
 
-                                                    match gov_handle.submit(GovernanceCommand::UpdateDomainConfig {
-                                                        domain_id: dom_id.clone(),
-                                                        new_config: parsed_config,
-                                                    }).await {
-                                                        Ok(_) => {
-                                                            info!("✅ Config change proposal {} applied to domain {}",
-                                                                  prop_id.0, dom_id.0);
-                                                            icn_obs::metrics::governance::proposals_executed_inc("config_change");
-                                                        }
-                                                        Err(e) => {
-                                                            error!("❌ Failed to apply config change proposal {}: {}",
-                                                                  prop_id.0, e);
-                                                            icn_obs::metrics::governance::execution_failures_inc("config_change");
-                                                        }
+                                                match gov_handle.submit(GovernanceCommand::UpdateDomainConfig {
+                                                    domain_id: dom_id.clone(),
+                                                    new_config: parsed_config,
+                                                }).await {
+                                                    Ok(_) => {
+                                                        info!("✅ Config change proposal {} applied to domain {}",
+                                                              prop_id.0, dom_id.0);
+                                                        icn_obs::metrics::governance::proposals_executed_inc("config_change");
                                                     }
-                                                });
-                                            }
+                                                    Err(e) => {
+                                                        error!("❌ Failed to apply config change proposal {}: {}",
+                                                              prop_id.0, e);
+                                                        icn_obs::metrics::governance::execution_failures_inc("config_change");
+                                                    }
+                                                }
+                                            });
                                         }
                                         Err(e) => {
                                             error!("❌ Failed to parse config change proposal {}: {}",
@@ -2130,35 +2131,32 @@ impl Supervisor {
                                     info!("👥 Membership change proposal {} accepted: {:?} for {}",
                                           proposal_id.0, action, member);
 
-                                    // Extract domain_id from the event
-                                    if let SystemEvent::ProposalAccepted { domain_id, .. } = event {
-                                        let gov_handle = gov_handle_clone.clone();
-                                        let prop_id = proposal_id.clone();
-                                        let dom_id = icn_governance::GovernanceDomainId::new(domain_id);
-                                        let act = action.clone();
-                                        let mem = member.clone();
+                                    let gov_handle = gov_handle_clone.clone();
+                                    let prop_id = proposal_id.clone();
+                                    let dom_id = icn_governance::GovernanceDomainId::new(domain_id.clone());
+                                    let act = action.clone();
+                                    let mem = member.clone();
 
-                                        tokio::spawn(async move {
-                                            use crate::governance::GovernanceCommand;
+                                    tokio::spawn(async move {
+                                        use crate::governance::GovernanceCommand;
 
-                                            match gov_handle.submit(GovernanceCommand::UpdateMembership {
-                                                domain_id: dom_id.clone(),
-                                                action: act,
-                                                member: mem.clone(),
-                                            }).await {
-                                                Ok(_) => {
-                                                    info!("✅ Membership proposal {} applied to domain {}",
-                                                          prop_id.0, dom_id.0);
-                                                    icn_obs::metrics::governance::proposals_executed_inc("membership");
-                                                }
-                                                Err(e) => {
-                                                    error!("❌ Failed to apply membership proposal {}: {}",
-                                                          prop_id.0, e);
-                                                    icn_obs::metrics::governance::execution_failures_inc("membership");
-                                                }
+                                        match gov_handle.submit(GovernanceCommand::UpdateMembership {
+                                            domain_id: dom_id.clone(),
+                                            action: act,
+                                            member: mem.clone(),
+                                        }).await {
+                                            Ok(_) => {
+                                                info!("✅ Membership proposal {} applied to domain {}",
+                                                      prop_id.0, dom_id.0);
+                                                icn_obs::metrics::governance::proposals_executed_inc("membership");
                                             }
-                                        });
-                                    }
+                                            Err(e) => {
+                                                error!("❌ Failed to apply membership proposal {}: {}",
+                                                      prop_id.0, e);
+                                                icn_obs::metrics::governance::execution_failures_inc("membership");
+                                            }
+                                        }
+                                    });
                                 }
 
                                 ProposalPayload::Text { .. } => {
@@ -2180,6 +2178,9 @@ impl Supervisor {
 
                                     let ledger = ledger_clone.clone();
                                     let prop_id = proposal_id.clone();
+                                    let member = member.clone();
+                                    let reason = reason.clone();
+                                    let duration_seconds = *duration_seconds;
 
                                     tokio::spawn(async move {
                                         let mut ledger_guard = ledger.write().await;
@@ -2200,6 +2201,8 @@ impl Supervisor {
 
                                     let ledger = ledger_clone.clone();
                                     let prop_id = proposal_id.clone();
+                                    let member = member.clone();
+                                    let reason = reason.clone();
 
                                     tokio::spawn(async move {
                                         let mut ledger_guard = ledger.write().await;
