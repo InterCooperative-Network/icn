@@ -503,7 +503,10 @@ impl RateLimitingConfig {
             partner: self.partner.to_rate_limit_config(refill_interval),
             federated: self.federated.to_rate_limit_config(refill_interval),
             refill_interval,
-            min_trust_threshold: 0.0, // Default: allow all authenticated DIDs
+            // Default minimum trust threshold for rate limiting (H6 fix)
+            // 0.1 requires "Known" trust class (at least one explicit trust edge)
+            // This prevents completely unknown DIDs from bypassing rate limits
+            min_trust_threshold: 0.1,
         }
     }
 

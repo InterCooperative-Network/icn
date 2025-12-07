@@ -137,39 +137,82 @@ pub struct VectorClockMerger {
     local_clock: VectorClock,
 }
 
+/// Version gap detected during vector clock merge (H8 enhancement)
+#[derive(Debug, Clone)]
+pub struct VersionGap {
+    /// The DID (author) with the version gap
+    pub author_did: Did,
+    /// Our local version for this author
+    pub local_version: u64,
+    /// Remote peer's version for this author
+    pub remote_version: u64,
+    /// Unix timestamp when gap was detected
+    pub detected_at: u64,
+    /// Whether we are ahead (they need our data) or behind (we need theirs)
+    pub direction: GapDirection,
+}
+
+/// Direction of version gap
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GapDirection {
+    /// Remote is ahead - we need their updates
+    RemoteAhead,
+    /// We are ahead - they need our updates
+    LocalAhead,
+    /// Both sides have diverged (concurrent updates - true conflict)
+    Diverged,
+}
+
 impl VectorClockMerger {
     pub fn new(local_clock: VectorClock) -> Self {
         Self { local_clock }
     }
 
-    /// Merge remote clock and return conflicts (concurrent updates)
+    /// Merge remote clock and return version gaps with full context (H8 fix)
     pub fn merge(
         &mut self,
         _peer: &Did,
         remote_clock: VectorClock,
-    ) -> Result<Vec<(Did, u64, u64)>> {
-        let mut conflicts = Vec::new();
+    ) -> Result<Vec<VersionGap>> {
+        let mut gaps = Vec::new();
+        let now = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
 
         // For each peer in remote clock
         for (remote_did, &remote_version) in &remote_clock.clock {
             let local_version = self.local_clock.get(remote_did);
 
-            // Check for conflict (concurrent updates)
+            // Check for version gaps
             if remote_version > local_version {
                 // Remote is ahead - we need their updates
                 debug!(
                     "Detected version gap for {}: local={}, remote={}",
                     remote_did, local_version, remote_version
                 );
-                conflicts.push((remote_did.clone(), local_version, remote_version));
+                gaps.push(VersionGap {
+                    author_did: remote_did.clone(),
+                    local_version,
+                    remote_version,
+                    detected_at: now,
+                    direction: GapDirection::RemoteAhead,
+                });
             } else if remote_version < local_version {
-                // We're ahead - they need our updates (not a conflict from our perspective)
+                // We're ahead - they need our updates
                 debug!(
                     "We are ahead of remote for {}: local={}, remote={}",
                     remote_did, local_version, remote_version
                 );
+                gaps.push(VersionGap {
+                    author_did: remote_did.clone(),
+                    local_version,
+                    remote_version,
+                    detected_at: now,
+                    direction: GapDirection::LocalAhead,
+                });
             }
-            // If equal, no conflict
+            // If equal, no gap
         }
 
         // Check for peers in our clock that aren't in remote clock
@@ -179,13 +222,33 @@ impl VectorClockMerger {
                     "Peer {} in local clock but not remote: version={}",
                     local_did, local_version
                 );
+                gaps.push(VersionGap {
+                    author_did: local_did.clone(),
+                    local_version,
+                    remote_version: 0,
+                    detected_at: now,
+                    direction: GapDirection::LocalAhead,
+                });
             }
         }
 
         // Merge the clocks (take max of each peer's version)
         self.local_clock.merge(&remote_clock);
 
-        Ok(conflicts)
+        Ok(gaps)
+    }
+
+    /// Legacy merge returning simple tuples for backward compatibility
+    pub fn merge_simple(
+        &mut self,
+        peer: &Did,
+        remote_clock: VectorClock,
+    ) -> Result<Vec<(Did, u64, u64)>> {
+        let gaps = self.merge(peer, remote_clock)?;
+        Ok(gaps
+            .into_iter()
+            .map(|g| (g.author_did, g.local_version, g.remote_version))
+            .collect())
     }
 
     pub fn get_clock(&self) -> &VectorClock {
@@ -293,6 +356,8 @@ impl ConflictResolver {
 pub struct PartitionHealer {
     merger: VectorClockMerger,
     resolver: ConflictResolver,
+    /// Tracks peers currently being healed (to avoid duplicate requests)
+    healing_in_progress: HashMap<Did, Instant>,
 }
 
 impl PartitionHealer {
@@ -300,7 +365,32 @@ impl PartitionHealer {
         Self {
             merger: VectorClockMerger::new(local_clock),
             resolver: ConflictResolver::new(),
+            healing_in_progress: HashMap::new(),
         }
+    }
+
+    /// Mark that healing has started with a peer
+    /// Call this when sending PartitionHealRequest, before receiving response
+    pub fn mark_healing_started(&mut self, peer: &Did) {
+        self.healing_in_progress.insert(peer.clone(), Instant::now());
+        debug!("Marked healing started with peer {}", peer);
+    }
+
+    /// Check if healing is already in progress with a peer
+    /// Returns true if healing was started recently (within 30 seconds)
+    pub fn is_healing_in_progress(&self, peer: &Did) -> bool {
+        if let Some(started_at) = self.healing_in_progress.get(peer) {
+            // Healing should complete within 30 seconds, otherwise consider it stale
+            started_at.elapsed() < Duration::from_secs(30)
+        } else {
+            false
+        }
+    }
+
+    /// Mark that healing has completed with a peer
+    pub fn mark_healing_complete(&mut self, peer: &Did) {
+        self.healing_in_progress.remove(peer);
+        debug!("Marked healing complete with peer {}", peer);
     }
 
     /// When partition heals, merge vector clocks and resolve conflicts

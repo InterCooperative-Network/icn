@@ -42,8 +42,8 @@ pub use gossip::{
     GossipHandle, PeerSamplingCallback, SendMessageCallback,
 };
 pub use partition::{
-    Conflict, ConflictResolution, ConflictResolver, DataType, PartitionConfig, PartitionDetector,
-    PartitionHealer, ResolutionOutcome, VectorClockMerger,
+    Conflict, ConflictResolution, ConflictResolver, DataType, GapDirection, PartitionConfig,
+    PartitionDetector, PartitionHealer, ResolutionOutcome, VectorClockMerger, VersionGap,
 };
 pub use scalability::{CompressedVectorClock, ShardStats, ShardedTopic, TopicShard, VarInt};
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};

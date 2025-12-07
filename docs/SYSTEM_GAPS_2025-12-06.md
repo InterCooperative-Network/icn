@@ -17,7 +17,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
-**Update 2025-12-07**: All 8 Critical issues have been addressed. See status below.
+**Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
 
 ---
 
@@ -94,37 +94,37 @@ These cause incorrect behavior but may not immediately crash the system.
 **Issue**: Phase 17 incomplete - replica count below threshold not detected
 **Fix**: Added immediate replica threshold check during `ReplicaStatus` message handling. Now checks if healthy replica count < 3, emits `content_under_replicated_detected_total` metric, and logs warning. ReplicationManager handles remediation via its periodic health check.
 
-### H4. Partition Healing Incomplete
+### H4. Partition Healing Incomplete - FIXED
 **Location**: `icn-gossip/src/gossip.rs:248`
 **Issue**: TODO for PartitionHealRequest/Response - uses empty VectorClock
 **Impact**: Partitions detected but not actually healed
-**Fix**: Implement clock exchange protocol
+**Fix**: `heal_partition_with_peer()` now sends `PartitionHealRequest` with actual vector clock. Added `mark_healing_started/complete` to PartitionHealer for tracking. Response handler merges clocks and requests diverged entries.
 
-### H5. Ledger Entry Acceptance Has No Trust Check
+### H5. Ledger Entry Acceptance Has No Trust Check - FIXED
 **Location**: `icn-ledger/src/ledger.rs` - append_entry()
 **Issue**: Credit limits use trust, but entry acceptance doesn't validate trust
 **Impact**: Malicious peers can spam ledger up to credit limit
-**Fix**: Add trust score validation before accepting entries
+**Fix**: Added `trust_graph` and `min_trust_for_entry` fields to Ledger. `append_entry_internal()` now validates author's trust score against threshold (default 0.1 = Known class). Rejects entries from low-trust authors with metric tracking.
 
-### H6. Default Trust Thresholds Too Permissive
+### H6. Default Trust Thresholds Too Permissive - FIXED
 **Locations**: TLS (0.0), Compute (0.0)
 **Issue**: Default accepts everyone with valid DID
-**Fix**: Change defaults to 0.1 (Known minimum), document rationale
+**Fix**: Updated `TrustGatedRateLimitConfig.min_trust_threshold` default from 0.0 to 0.1 (Known trust class minimum). Added warning in TLS fallback path to indicate development-only mode. Compute already uses proper defaults (MIN_TRUST_SUBMIT=0.1, MIN_TRUST_EXECUTE=0.3).
 
-### H7. Gossip Messages Not Trust-Gated
+### H7. Gossip Messages Not Trust-Gated - FIXED
 **Location**: `icn-gossip/src/gossip.rs`
 **Issue**: Subscriptions check trust, but message flow doesn't
-**Fix**: Add trust validation in message handling path
+**Fix**: Added trust validation at start of `handle_message()`. Messages from senders with trust < 0.1 (Known class) are rejected. Unknown senders are also rejected. Metric `messages_rejected_low_trust_total` tracks rejections.
 
-### H8. Vector Clock Merge Missing Conflict Data
+### H8. Vector Clock Merge Missing Conflict Data - FIXED
 **Location**: `icn-gossip/src/partition.rs:145-189`
 **Issue**: Merge returns version numbers but no actual conflict entries
-**Fix**: Include content hashes and timestamps for resolution
+**Fix**: Created `VersionGap` struct with `author_did`, `local_version`, `remote_version`, `detected_at` timestamp, and `GapDirection` (RemoteAhead/LocalAhead/Diverged). Merge now returns `Vec<VersionGap>` with full context. Added `merge_simple()` for backward compatibility.
 
-### H9. Task Completion Not Published
-**Location**: `icn-compute/src/task.rs:95-108`
+### H9. Task Completion Not Published - VERIFIED IMPLEMENTED
+**Location**: `icn-compute/src/actor.rs:1424-1427`
 **Issue**: Status updated locally, never gossiped
-**Fix**: Publish task status changes to gossip network
+**Status**: Already implemented. `ComputeActor` broadcasts `ComputeMessage::TaskResult` via `send_callback` after local execution (line 1425). It also broadcasts `TaskCancelled` for cancellations (line 1004) and `TaskResult` with timeout outcome for deadline failures (line 825). The `task.rs` file only manages local state; gossip publishing is correctly handled at the actor level.
 
 ---
 

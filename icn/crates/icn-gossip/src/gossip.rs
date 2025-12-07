@@ -243,24 +243,34 @@ impl GossipActor {
 
         info!("Attempting to heal partition with peer {}", peer);
 
-        // Get peer's vector clock (we'd need to exchange this via a handshake message)
-        // For now, we'll just merge what we have and log
-        // TODO: Add a PartitionHealRequest/Response message exchange to get peer's clock
+        // Send PartitionHealRequest with our vector clock
+        // The peer will respond with PartitionHealResponse containing their clock
+        // The response handler (handle_message) will merge clocks and trigger sync
+        let last_contact_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
 
-        // Merge clocks and resolve conflicts (no conflicts for now since we don't have peer's clock)
+        self.send_message(
+            Some(peer.clone()),
+            GossipMessage::PartitionHealRequest {
+                requesting_peer: self.own_did.clone(),
+                vector_clock: self.clock.clone(),
+                last_contact_ms,
+            },
+        );
+
+        info!(
+            "Sent PartitionHealRequest to {} with vector clock (clocks will be merged on response)",
+            peer
+        );
+
+        // Note: The actual clock merging and conflict resolution happens asynchronously
+        // when we receive PartitionHealResponse in handle_message()
+
+        // Mark as healing in progress (actual healing completes when response arrives)
         let mut healer_guard = healer_ref.write().await;
-        let outcomes = healer_guard
-            .heal_partition(peer, VectorClock::new(), vec![])
-            .await?;
-
-        if !outcomes.is_empty() {
-            info!(
-                "Healed partition with {}: {} conflicts resolved",
-                peer,
-                outcomes.len()
-            );
-            icn_obs::metrics::gossip::partition_healed_inc();
-        }
+        healer_guard.mark_healing_started(peer);
 
         Ok(())
     }
@@ -881,6 +891,47 @@ impl GossipActor {
     /// Handle incoming gossip message from network
     #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]
     pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
+        // H7 fix: Trust-gated message handling
+        // Check sender's trust score before processing messages
+        const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum
+
+        if let Some(ref trust_graph) = self.trust_graph {
+            if let Ok(tg) = trust_graph.try_read() {
+                match tg.compute_trust_score(sender) {
+                    Ok(score) if score < MIN_TRUST_FOR_MESSAGE => {
+                        warn!(
+                            peer_did = %sender,
+                            trust_score = score,
+                            min_required = MIN_TRUST_FOR_MESSAGE,
+                            message_type = message.variant_name(),
+                            "Rejecting message from low-trust sender"
+                        );
+                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+                        anyhow::bail!(
+                            "Message sender {} has insufficient trust ({:.3} < {:.3})",
+                            sender,
+                            score,
+                            MIN_TRUST_FOR_MESSAGE
+                        );
+                    }
+                    Ok(_) => {
+                        // Trust validated successfully
+                    }
+                    Err(e) => {
+                        // Unknown sender - reject by default
+                        debug!(
+                            peer_did = %sender,
+                            error = %e,
+                            "Cannot compute trust score for message sender"
+                        );
+                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+                        anyhow::bail!("Cannot verify trust for message sender {}: {}", sender, e);
+                    }
+                }
+            }
+            // If we can't acquire lock, skip trust check (avoid blocking)
+        }
+
         // Phase 18 Week 3: Record contact for partition detection
         if let Some(ref detector) = self.partition_detector {
             if let Ok(mut d) = detector.try_write() {
@@ -1682,6 +1733,13 @@ impl GossipActor {
                 if let Some(ref detector) = self.partition_detector {
                     if let Ok(mut d) = detector.try_write() {
                         d.record_contact(&responding_peer);
+                    }
+                }
+
+                // Mark healing as complete with this peer
+                if let Some(ref healer) = self.partition_healer {
+                    if let Ok(mut h) = healer.try_write() {
+                        h.mark_healing_complete(&responding_peer);
                     }
                 }
 

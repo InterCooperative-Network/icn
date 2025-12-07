@@ -48,6 +48,10 @@ pub struct ArchiveRecord {
     pub reason: String,
 }
 
+/// Minimum trust score required for entry acceptance (Known+ trust level)
+/// Default: 0.1 (requires at least Known trust class)
+const DEFAULT_MIN_TRUST_FOR_ENTRY: f64 = 0.1;
+
 /// Ledger manager for double-entry mutual credit accounting
 pub struct Ledger {
     /// Storage backend
@@ -76,6 +80,12 @@ pub struct Ledger {
 
     /// Byzantine fault detector (Phase 18)
     misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
+
+    /// Trust graph for entry validation
+    trust_graph: Option<Arc<TrustGraph>>,
+
+    /// Minimum trust score for entry acceptance
+    min_trust_for_entry: f64,
 }
 
 impl Ledger {
@@ -94,6 +104,8 @@ impl Ledger {
             fork_resolver: ForkResolver::new(ForkResolutionStrategy::default()), // Hybrid strategy
             misbehavior_detector: None, // Set via set_misbehavior_detector()
             freeze_manager,
+            trust_graph: None,
+            min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
         };
 
         // Load cached balances from storage
@@ -105,9 +117,16 @@ impl Ledger {
         Ok(ledger)
     }
 
-    /// Set the trust graph for trust-weighted fork resolution (Phase 18 Week 5)
+    /// Set the trust graph for trust-weighted fork resolution and entry validation
     pub fn set_trust_graph(&mut self, trust_graph: Arc<TrustGraph>) {
+        self.trust_graph = Some(trust_graph.clone());
         self.fork_resolver.set_trust_graph(trust_graph);
+    }
+
+    /// Set the minimum trust score required for entry acceptance
+    /// Default is 0.1 (Known trust class)
+    pub fn set_min_trust_for_entry(&mut self, min_trust: f64) {
+        self.min_trust_for_entry = min_trust;
     }
 
     /// Set the fork resolution strategy
@@ -143,7 +162,7 @@ impl Ledger {
     /// Internal append method with control over gossip publishing
     ///
     /// # Arguments
-    /// * `entry` - The journal entry to append  
+    /// * `entry` - The journal entry to append
     /// * `broadcast` - Whether to publish to gossip (false when receiving from gossip)
     fn append_entry_internal(
         &mut self,
@@ -156,6 +175,55 @@ impl Ledger {
             .as_ref()
             .context("Entry must have a computed hash before appending")?
             .clone();
+
+        // Trust-based entry validation (H5 fix)
+        // Skip trust check if no trust graph configured (allows local-only operation)
+        if let Some(ref trust_graph) = self.trust_graph {
+            let author_did = &entry.author;
+            match trust_graph.compute_trust_score(author_did) {
+                Ok(trust_score) => {
+                    if trust_score < self.min_trust_for_entry {
+                        warn!(
+                            author = %author_did,
+                            trust_score = trust_score,
+                            min_required = self.min_trust_for_entry,
+                            entry_hash = %hash,
+                            "Rejecting entry from low-trust author"
+                        );
+                        icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
+                        anyhow::bail!(
+                            "Entry author {} has insufficient trust score ({:.3} < {:.3})",
+                            author_did,
+                            trust_score,
+                            self.min_trust_for_entry
+                        );
+                    }
+                    debug!(
+                        author = %author_did,
+                        trust_score = trust_score,
+                        "Entry author trust validated"
+                    );
+                }
+                Err(e) => {
+                    // If we can't compute trust, treat as unknown/isolated peer
+                    warn!(
+                        author = %author_did,
+                        error = %e,
+                        entry_hash = %hash,
+                        "Cannot compute trust score for entry author, treating as isolated"
+                    );
+                    // For unknown peers, check against minimum threshold
+                    if self.min_trust_for_entry > 0.0 {
+                        icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
+                        anyhow::bail!(
+                            "Cannot verify trust for entry author {}: {}",
+                            author_did,
+                            e
+                        );
+                    }
+                }
+            }
+        }
 
         // Serialize and store
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());

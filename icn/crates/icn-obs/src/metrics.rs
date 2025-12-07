@@ -1538,6 +1538,11 @@ pub mod gossip {
     pub fn partition_vector_clock_merges_inc() {
         counter!("icn_partition_vector_clock_merges_total").increment(1);
     }
+
+    /// H7: Messages rejected due to low trust score
+    pub fn messages_rejected_low_trust_inc() {
+        counter!("icn_gossip_messages_rejected_low_trust_total").increment(1);
+    }
 }
 
 /// Scalability metrics (Phase 19)
@@ -1683,6 +1688,10 @@ pub mod ledger {
 
     pub fn rollback_performed_inc() {
         counter!("icn_ledger_rollback_performed_total").increment(1);
+    }
+
+    pub fn entries_rejected_low_trust_inc() {
+        counter!("icn_ledger_entries_rejected_low_trust_total").increment(1);
     }
 }
 

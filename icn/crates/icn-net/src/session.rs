@@ -114,12 +114,14 @@ impl SessionManager {
             );
             tls::create_client_config(trust_graph, own_did, min_trust_threshold)?
         } else {
-            // Fallback: create a permissive client config (accepts all authenticated DIDs)
-            info!("TLS verification in development mode (no trust graph)");
+            // Fallback: create a permissive client config for development mode
+            // Note: In production, trust_graph should always be provided
+            warn!("TLS verification in development mode (no trust graph) - not suitable for production");
             // Create a temporary trust graph for development mode
             let temp_store: Arc<dyn icn_store::Store> =
                 Arc::new(icn_store::SledStore::temporary()?);
             let temp_trust_graph = icn_trust::TrustGraph::new(temp_store, own_did.clone());
+            // Development mode uses 0.0 threshold; production should use trust_graph with proper threshold
             tls::create_client_config(Arc::new(RwLock::new(temp_trust_graph)), own_did, Some(0.0))?
         };
         let mut client_config = ClientConfig::new(Arc::new(
