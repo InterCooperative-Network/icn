@@ -2626,29 +2626,44 @@ All eight substrate layers contribute to making this workflow secure, decentrali
 
 This section documents acknowledged gaps, limitations, and planned improvements for ICN. It serves as both a roadmap for future development and transparent disclosure of current system boundaries.
 
+**Summary Status (as of 2025-12):**
+- ✅ **12.1** Byzantine Fault Tolerance - Implemented
+- ✅ **12.2** Network Partition Healing - Implemented
+- ⏳ **12.3** Contract Execution Disputes - Partial
+- ✅ **12.4** Ledger Fork Resolution - Implemented
+- ✅ **12.5** Storage Exhaustion Protection - Implemented
+- ⏳ **12.6** Upgrade Coordination - Not started
+- ⏳ **12.7** Scalability Limits - Documented, testing ongoing
+- ✅ **12.8** Clock Synchronization - Implemented
+- ✅ **12.9** Privacy & Metadata Leakage - Implemented
+- ⏳ **12.10** Trust Graph Gaming - Not started
+
 ### 12.1 Byzantine Fault Tolerance
 
-**Current State:** ICN detects some malicious behavior but lacks comprehensive Byzantine fault detection and mitigation.
+**Status:** ✅ **IMPLEMENTED** (Phase 18 Week 1-2)
+
+**Current State:** ICN implements comprehensive Byzantine fault detection and mitigation via the `icn-security` crate.
 
 **What Works:**
 - ✅ Sybil resistance via trust graph
 - ✅ Message authentication (Ed25519 signatures)
 - ✅ Replay protection (sequence numbers + Bloom filters)
 - ✅ Trust-gated access control
+- ✅ Automatic detection of conflicting signed statements
+- ✅ Reputation scoring with automatic trust penalties
+- ✅ Quarantine mechanism for malicious nodes
+- ✅ Integration with trust graph for penalty callbacks
 
-**What's Missing:**
-- ❌ No automatic detection of conflicting signed statements
-- ❌ No reputation slashing for proven misbehavior
-- ❌ No ban/quarantine mechanism for malicious nodes
-- ❌ No detection of selective message dropping
+**Implementation:**
 
-**Planned (Phase 18):**
+Located in `icn-security/src/misbehavior.rs`:
 
 ```rust
 pub struct MisbehaviorDetector {
-    violations: HashMap<Did, Vec<Violation>>,
+    violations: HashMap<Did, Vec<ViolationRecord>>,
     thresholds: MisbehaviorThresholds,
     reputation_scores: HashMap<Did, ReputationScore>,
+    trust_penalty_callback: Option<TrustPenaltyCallback>,
 }
 
 pub enum Violation {
@@ -2656,87 +2671,101 @@ pub enum Violation {
     ConflictingLedgerEntries { entry1: ContentHash, entry2: ContentHash },
     FailedComputeVerification { task_hash: ContentHash, expected: ContentHash, actual: ContentHash },
     ExcessiveResourceUse { metric: String, observed: u64, limit: u64 },
-    TrustGraphSpam { rate: f64, threshold: f64 },
-}
-
-pub struct MisbehaviorThresholds {
-    max_violations_per_hour: usize,       // Ban if exceeded
-    reputation_penalty_per_violation: f64, // Reduce trust score
-    auto_ban_violation_types: Vec<ViolationType>,
+    TrustGraphSpam { rate_per_hour: f64, threshold: f64 },
+    ConflictingSignedStatements { statement1: ContentHash, statement2: ContentHash, conflict_type: String },
+    ReplayAttack { message_hash: ContentHash, sequence: u64 },
 }
 ```
 
-**Detection Strategy:**
-- Monitor for contradictory signed statements
-- Cross-verify compute results with re-execution
-- Track resource usage patterns (rate limiting violations)
-- Community reporting mechanism (governance integration)
+**Severity Scoring:**
+- Critical (10 points): ConflictingLedgerEntries, ConflictingSignedStatements, ReplayAttack
+- Major (5 points): FailedComputeVerification, InvalidSignature
+- Minor (1 point): ExcessiveResourceUse, TrustGraphSpam
 
-**Mitigation:**
-- Automatic trust score reduction
-- Temporary quarantine (24-48h)
-- Permanent ban for severe violations (with appeal process)
-- Network-wide gossip of violation proofs
+**Integration Points:**
+- Shared `MisbehaviorDetector` between NetworkActor and GossipActor (`icn-core/src/supervisor.rs`)
+- Trust penalty callback automatically updates trust graph
+- Ledger detects conflicting entries and reports violations (`icn-ledger/src/ledger.rs`)
+
+**Integration Test:** `icn-core/tests/byzantine_integration.rs`
 
 **Metrics:**
-- `icn_misbehavior_violations_detected_total{did, violation_type}`
-- `icn_misbehavior_auto_bans_total`
-- `icn_misbehavior_reputation_penalties_total`
+- `icn_misbehavior_violations_detected_total{violation_type}`
+- `icn_misbehavior_reputation_updated_total`
+- `icn_misbehavior_quarantined_total`
+
+**Remaining Work:**
+- ❌ Detection of selective message dropping (requires protocol-level heartbeats)
+- ❌ Community reporting mechanism via governance
 
 ---
 
 ### 12.2 Network Partition Healing
 
-**Current State:** ICN handles short partitions well but lacks explicit strategy for long-duration splits.
+**Status:** ✅ **IMPLEMENTED** (Phase 18 Week 3)
+
+**Current State:** ICN implements comprehensive partition detection and healing via the `icn-gossip` crate.
 
 **What Works:**
 - ✅ Causal consistency with vector clocks
 - ✅ Anti-entropy Bloom filter exchange
 - ✅ Deterministic merge ordering
+- ✅ Partition detection with configurable threshold (default: 5 min)
+- ✅ Divergence detection with version gaps
+- ✅ Policy-based conflict resolution per data type
+- ✅ Automatic healing for gossip/trust; manual for ledger
 
-**What's Missing:**
-- ❌ No documented maximum partition duration
-- ❌ No "too divergent to auto-merge" detection
-- ❌ No split-brain detection for cooperatives
-- ❌ No staged reconciliation for large divergences
+**Implementation:**
 
-**Planned (Phase 18):**
+Located in `icn-gossip/src/partition.rs`:
 
-**Partition Tolerance Thresholds:**
-```toml
-[network.partition_healing]
-max_offline_duration_days = 30
-divergence_threshold_entries = 10000  # Beyond this, require manual review
-auto_reconcile_window_hours = 72      # Automatic within 3 days
+```rust
+pub struct PartitionDetector {
+    last_seen: HashMap<Did, Instant>,
+    config: PartitionConfig,  // Default: 5min threshold, 30s check interval
+}
+
+pub struct PartitionHealer {
+    merger: VectorClockMerger,
+    resolver: ConflictResolver,
+    healing_in_progress: HashMap<Did, Instant>,
+}
+
+pub enum ConflictResolution {
+    KeepLocal,
+    KeepRemote,
+    KeepBoth,        // For append-only data (gossip)
+    LastWriteWins,   // For trust edges, contracts
+    RequiresManual,  // For ledger entries
+}
 ```
 
-**Healing Protocol:**
-```
-1. Reconnection Detection
-   → Exchange vector clocks
-   → Calculate divergence magnitude
+**Default Resolution Policies:**
+- LedgerEntry: `RequiresManual` (critical financial data)
+- Contract: `LastWriteWins` (timestamp-based)
+- TrustEdge: `LastWriteWins` (timestamp-based)
+- GossipEntry: `KeepBoth` (append-only)
 
-2. Divergence Classification
-   → Small (<100 entries): Auto-merge
-   → Medium (100-10k entries): Staged reconciliation
-   → Large (>10k entries): Manual review required
-
-3. Staged Reconciliation
-   → Phase 1: Sync critical data (identity, trust edges)
-   → Phase 2: Sync ledger (apply deterministic ordering)
-   → Phase 3: Sync contracts and compute state
-   → Phase 4: Verify invariants and emit metrics
-
-4. Conflict Resolution
-   → Quarantine contradictory entries
-   → Invoke dispute resolution (Phase 12 integration)
-   → Emit reconciliation report
+**Version Gap Detection (H8 Enhancement):**
+```rust
+pub struct VersionGap {
+    author_did: Did,
+    local_version: u64,
+    remote_version: u64,
+    direction: GapDirection,  // RemoteAhead, LocalAhead, Diverged
+}
 ```
 
-**Split-Brain Detection:**
-- Monitor for cooperatives with duplicate governance domains
-- Detect conflicting policy proposals with same ID
-- Alert operators when cooperative members see different leaders
+**Integration Points:**
+- Partition detector set on GossipActor (`icn-core/src/supervisor.rs`)
+- PartitionHealer invoked during vector clock merge
+- Metrics tracked for partition events
+
+**Integration Test:** `icn-core/tests/partition_integration.rs`
+
+**Remaining Work:**
+- ❌ Split-brain detection for governance domains
+- ❌ Operator alerts for long-duration partitions (>24h)
 
 ---
 
@@ -2802,103 +2831,128 @@ pub enum DisputeResolution {
 
 ### 12.4 Ledger Fork Resolution
 
-**Current State:** Basic quarantine mechanism exists but lacks formalized multi-party dispute resolution.
+**Status:** ✅ **IMPLEMENTED** (Phase 18 Week 5)
+
+**Current State:** ICN implements comprehensive fork detection and resolution via `icn-ledger/src/fork_resolution.rs`.
 
 **What Works:**
 - ✅ Deterministic ordering (timestamp, author DID, entry hash)
 - ✅ Quarantine for invalid entries
 - ✅ Invariant checking (double-entry, credit limits)
+- ✅ Fork detection (same parents, different hashes)
+- ✅ Multiple resolution strategies (timestamp, trust, signatures, hybrid)
+- ✅ Trust-weighted resolution with TrustGraph integration
 
-**What's Missing:**
-- ❌ No formalized fork resolution algorithm
-- ❌ No multi-party mediation workflow
-- ❌ No definition of "too divergent to merge"
+**Implementation:**
 
-**Planned (Phase 18):**
+Located in `icn-ledger/src/fork_resolution.rs`:
 
-**Fork Classification:**
 ```rust
-pub enum ForkSeverity {
-    Trivial,      // Concurrent but compatible (auto-merge)
-    Resolvable,   // Conflicts but within credit limits (mediation)
-    Severe,       // Overdrafts or double-spends (governance decision)
+pub enum ForkResolutionStrategy {
+    TimestampPreference,    // First-write-wins (simple coordination)
+    TrustWeighted,          // Prefer higher-trust participant
+    MajoritySignatures,     // Prefer entry with more co-signatures
+    Hybrid,                 // Combination (default for production)
+}
+
+pub struct ForkResolver {
+    strategy: ForkResolutionStrategy,
+    trust_graph: Option<Arc<TrustGraph>>,
+}
+
+pub struct Fork {
+    common_parents: Vec<ContentHash>,
+    entry1: JournalEntry,
+    entry2: JournalEntry,
+    detected_at: SystemTime,
+}
+
+pub enum ForkResolution {
+    KeepFirst,
+    KeepSecond,
+    RequiresManual { reason: String },
 }
 ```
 
-**Resolution Algorithm:**
-```
-1. Detect Fork
-   → Multiple entries with same parent
-   → Calculate severity
+**Resolution Strategies:**
+- **TimestampPreference**: First-write-wins, author DID as tiebreaker
+- **TrustWeighted**: Prefer entry from higher-trust participant
+- **MajoritySignatures**: Prefer entry with more co-signatures
+- **Hybrid** (default): Trust score (50%) + timestamp (30%) + signatures (20%)
 
-2. Auto-Merge (Trivial)
-   → Apply deterministic ordering
-   → Verify invariants hold
-   → Emit merged ledger state
+**Hybrid Scoring:**
+```rust
+fn resolve_hybrid(...) -> Result<ForkResolution> {
+    let mut score1: f64 = 0.0;
+    let mut score2: f64 = 0.0;
 
-3. Mediation (Resolvable)
-   → Freeze affected accounts
-   → Invoke Phase 12 dispute resolution
-   → Designated mediator reviews evidence
-   → Governance vote if needed
-
-4. Governance Decision (Severe)
-   → Create emergency proposal
-   → Community votes on resolution
-   → Execute outcome (write-off, reversal, etc.)
+    // Trust component (50%): higher trust = higher score
+    // Timestamp component (30%): earlier timestamp = higher score
+    // Signature component (20%): more co-signers = higher score
+}
 ```
 
-**Integration with Phase 12 Disputes:**
-- Ledger forks automatically create disputes
-- Mediators assigned based on trust + availability
-- Resolution stored as signed governance record
+**Remaining Work:**
+- ❌ Multi-party mediation workflow for `RequiresManual` cases
+- ❌ Governance integration for severe forks (overdrafts/double-spends)
 
 ---
 
 ### 12.5 Storage Exhaustion Protection
 
-**Current State:** Section 7.3 describes pruning but lacks automatic enforcement.
+**Status:** ✅ **IMPLEMENTED** (Phase 18 Week 6)
 
-**What's Missing:**
-- ❌ No disk quota monitoring
-- ❌ No automatic pruning enforcement
-- ❌ No emergency shedding of non-critical data
+**Current State:** ICN implements storage quota management with priority-based eviction via `icn-store/src/quotas.rs`.
 
-**Planned (Phase 18):**
+**What Works:**
+- ✅ Per-DID storage quotas
+- ✅ Global storage limit enforcement
+- ✅ Priority-based eviction (Low → Normal → High → Critical)
+- ✅ Eviction threshold triggering (default: 90% capacity)
+- ✅ Integration with GossipActor for entry limits
 
-```toml
-[storage.limits]
-max_disk_usage_gb = 100
-emergency_pruning_threshold_gb = 90
-critical_data_minimum_gb = 10
+**Implementation:**
 
-[storage.pruning]
-auto_prune_enabled = true
-prune_interval_hours = 24
-prune_non_participants = true  # Prune data for non-participated contracts
-```
+Located in `icn-store/src/quotas.rs`:
 
-**Monitoring:**
 ```rust
-// Periodic storage health check (every 10 minutes)
-fn check_storage_health() {
-    let usage = disk_usage();
+pub enum QuotaPriority {
+    Low = 0,      // Evicted first (cached data, temp files)
+    Normal = 1,   // Evicted second (gossip entries, routine data)
+    High = 2,     // Evicted third (contracts, trust edges)
+    Critical = 3, // Never auto-evicted (keystore, ledger, governance)
+}
 
-    if usage > emergency_threshold {
-        trigger_emergency_pruning();
-        alert_operator();
-    } else if usage > warning_threshold {
-        schedule_pruning();
-        emit_metric("storage_warning");
-    }
+pub struct StorageQuotaManager {
+    quotas: HashMap<Did, StorageQuota>,
+    global_limit: u64,            // Total limit across all DIDs
+    global_usage: u64,
+    items: Vec<StorageItem>,      // Tracked for eviction
+    eviction_threshold: f64,      // Default: 0.9 (90%)
+}
+
+pub struct StorageQuota {
+    max_bytes: u64,
+    current_bytes: u64,
+    priority: QuotaPriority,
+    updated_at: SystemTime,
 }
 ```
 
-**Pruning Priority:**
-1. Ephemeral compute tasks (oldest first)
-2. Old gossip entries (keep recent 10k)
-3. Non-participated contract state
-4. Archived ledger entries (keep Merkle roots)
+**Integration Points:**
+- Supervisor creates `StorageQuotaManager` (1GB global, 90% eviction threshold)
+- GossipActor uses quota manager to check entry limits (`icn-core/src/supervisor.rs`)
+- Per-DID quotas default to 10MB
+
+**Eviction Strategy:**
+1. Sort items by priority (lowest first), then age (oldest first)
+2. Evict items until below threshold
+3. Skip `Critical` priority items
+
+**Remaining Work:**
+- ❌ Disk-level monitoring (filesystem usage vs in-memory tracking)
+- ❌ Operator alerts for emergency pruning
+- ❌ Configurable pruning schedules
 
 **Metrics:**
 - `icn_storage_disk_usage_bytes`
@@ -3003,29 +3057,59 @@ ProposalPayload::ProtocolUpgrade {
 
 ### 12.8 Clock Synchronization
 
-**Current State:** Relies on "reasonable" clock skew tolerance (300s default).
+**Status:** ✅ **IMPLEMENTED** (Phase 19 Week 3-4)
 
-**What's Missing:**
-- ❌ No NTP integration
-- ❌ No clock drift monitoring
-- ❌ No operator alerts for severe clock skew
+**Current State:** ICN implements clock synchronization via the `icn-time` crate using Rough Time Protocol (RFC 8915).
 
-**Planned (Phase 19 - Nice-to-Have):**
+**What Works:**
+- ✅ Rough Time protocol implementation
+- ✅ Clock offset calculation from network median
+- ✅ Timestamp validation with ±300s tolerance
+- ✅ Integration with supervisor for distributed time consensus
+- ✅ Configurable trusted time servers
 
-```toml
-[time]
-max_clock_skew_seconds = 300
-ntp_servers = ["pool.ntp.org", "time.cloudflare.com"]
-ntp_sync_enabled = true
-ntp_sync_interval_hours = 6
-clock_drift_alert_threshold_seconds = 60
+**Implementation:**
+
+Located in `icn-time/src/sync.rs`:
+
+```rust
+pub struct ClockSync {
+    /// Local clock offset from network median (milliseconds)
+    pub offset_millis: i64,
+
+    /// Confidence interval / uncertainty
+    pub uncertainty: Duration,
+
+    /// Last successful sync time
+    pub last_sync: Option<Instant>,
+
+    /// Maximum acceptable clock skew (default: 300s)
+    pub max_clock_skew: Duration,
+
+    /// Configured Rough Time servers
+    trusted_servers: Vec<RoughTimeServer>,
+}
+
+// Default servers
+pub fn default_servers() -> Vec<RoughTimeServer> {
+    vec![
+        "roughtime.cloudflare.com:2003",
+        "roughtime.int08h.com:2002",
+        "roughtime.sandbox.google.com:2002",
+    ]
+}
 ```
 
-**Monitoring:**
-- Periodic NTP sync (every 6h)
-- Measure drift vs. NTP time
-- Alert if drift > 60s
-- Reject messages with timestamp > 5min in future/past
+**Key Parameters:**
+- `MAX_CLOCK_SKEW`: 300 seconds (5 minutes)
+- `MIN_SERVERS`: 3 (for median calculation)
+- `QUERY_TIMEOUT`: 5 seconds
+
+**Integration Test:** `icn-time/tests/time_integration.rs`
+
+**Remaining Work:**
+- ❌ Operator alerts for severe clock skew (>60s drift)
+- ❌ Automatic periodic re-sync in background task
 
 **Metrics:**
 - `icn_time_clock_drift_seconds`
@@ -3131,29 +3215,34 @@ pub enum TrustAnomaly {
 
 ### 12.11 Implementation Priorities
 
-**Phase 17 (Storage Hardening) - 4 weeks:**
-- ✅ Section 7.4 (Data Replication) - just added
-- Trust-weighted automatic replication
-- Replica tracking and monitoring
-- Re-replication on node failure
+**Phase 17 (Storage Hardening) - Complete ✅:**
+- ✅ Section 7.4 (Data Replication)
+- ✅ Trust-weighted automatic replication
+- ✅ Replica tracking and monitoring
+- ✅ Re-replication on node failure
 
-**Phase 18 (Pre-Pilot Hardening) - 6 weeks:**
-1. Byzantine fault detection (12.1)
-2. Network partition healing (12.2)
-3. Contract execution disputes (12.3)
-4. Ledger fork resolution (12.4)
-5. Storage exhaustion protection (12.5)
-6. Upgrade coordination via governance (12.6)
+**Phase 18 (Pre-Pilot Hardening) - Complete ✅:**
+1. ✅ Byzantine fault detection (12.1) - `icn-security/src/misbehavior.rs`
+2. ✅ Network partition healing (12.2) - `icn-gossip/src/partition.rs`
+3. ⏳ Contract execution disputes (12.3) - Partially complete
+4. ✅ Ledger fork resolution (12.4) - `icn-ledger/src/fork_resolution.rs`
+5. ✅ Storage exhaustion protection (12.5) - `icn-store/src/quotas.rs`
+6. ⏳ Upgrade coordination via governance (12.6) - Not yet started
 
-**Phase 19 (Post-Pilot Improvements) - 4 weeks:**
-7. Clock synchronization (12.8)
-8. Scalability testing & documentation (12.7)
-9. Trust graph gaming detection (12.10)
+**Phase 19 (Post-Pilot Improvements) - In Progress:**
+7. ✅ Clock synchronization (12.8) - `icn-time/src/sync.rs`
+8. ⏳ Scalability testing & documentation (12.7) - Ongoing
+9. ❌ Trust graph gaming detection (12.10) - Not yet started
 
 **Phase 20 (Complete ✅):**
-10. Privacy & metadata protection (12.9) - Onion routing, topic encryption, traffic obfuscation integrated
+10. ✅ Privacy & metadata protection (12.9) - Onion routing, topic encryption, traffic obfuscation integrated
 
-**Total estimated time to production-ready:** 14 weeks (Phase 17-18)
+**Remaining Work:**
+- Contract execution disputes: Multi-executor verification, slashing
+- Upgrade coordination: Governance-driven protocol upgrades
+- Trust graph gaming: Anomaly detection for circular vouching, Sybil clusters
+
+**Production-Ready Status:** Core infrastructure complete. Pilot deployment active.
 
 ---
 
