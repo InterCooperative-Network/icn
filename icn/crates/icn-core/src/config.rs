@@ -144,7 +144,9 @@ pub struct NetworkConfig {
     /// - 0.1 = Require at least "Known" trust class (one trust edge)
     /// - 0.4 = Require "Partner" trust class
     /// - 0.7 = Require "Federated" trust class
+    ///
     /// Default: 0.1 (require at least one trust relationship)
+    ///
     /// For controlled/trusted environments, set to 0.0 to disable trust gating
     #[serde(default = "default_min_trust_threshold")]
     pub min_trust_threshold: f64,
@@ -590,7 +592,10 @@ impl RateLimitingConfig {
     ///
     /// # Arguments
     /// * `min_trust_threshold` - Minimum trust score required for TLS connections (from network config)
-    pub fn to_trust_gated_config(&self, min_trust_threshold: f64) -> icn_net::TrustGatedRateLimitConfig {
+    pub fn to_trust_gated_config(
+        &self,
+        min_trust_threshold: f64,
+    ) -> icn_net::TrustGatedRateLimitConfig {
         use std::time::Duration;
 
         let refill_interval = Duration::from_millis(self.refill_interval_ms);
@@ -723,7 +728,9 @@ mod tests {
         assert_eq!(trust_gated.federated.burst_capacity, 50);
         assert_eq!(trust_gated.refill_interval.as_millis(), 100);
         // Verify the passed trust threshold is used
-        assert!((trust_gated.min_trust_threshold - default_min_trust_threshold()).abs() < f64::EPSILON);
+        assert!(
+            (trust_gated.min_trust_threshold - default_min_trust_threshold()).abs() < f64::EPSILON
+        );
 
         // Verify fallback config
         assert_eq!(fallback.max_messages_per_second, 100);
@@ -1080,9 +1087,9 @@ log_level = "info"
         assert!((config.network.min_trust_threshold - 0.0).abs() < f64::EPSILON);
 
         // Test that trust threshold is passed through to rate limiting config
-        let trust_gated = config.rate_limiting.to_trust_gated_config(
-            config.network.min_trust_threshold
-        );
+        let trust_gated = config
+            .rate_limiting
+            .to_trust_gated_config(config.network.min_trust_threshold);
         assert!((trust_gated.min_trust_threshold - 0.0).abs() < f64::EPSILON);
     }
 }

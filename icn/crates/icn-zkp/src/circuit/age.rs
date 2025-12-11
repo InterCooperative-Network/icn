@@ -155,11 +155,11 @@ impl Circuit for AgeProofCircuit {
         // Build the proof
         // In production, this would invoke winterfell STARK prover
         // For now, we create a simulated proof structure
-        let public_hash = compute_public_inputs_hash(public);
 
         #[cfg(feature = "stark")]
         {
             // TODO: Actual STARK proof generation with winterfell
+            let _public_hash = compute_public_inputs_hash(public);
             unimplemented!("Full STARK proofs require 'stark' feature");
         }
 
@@ -168,6 +168,8 @@ impl Circuit for AgeProofCircuit {
             // Simulated proof for testing
             // Contains: commitment to private data, public hash, simulated proof data
             use sha3::{Digest, Sha3_256};
+
+            let public_hash = compute_public_inputs_hash(public);
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.birthdate_days.to_le_bytes());
