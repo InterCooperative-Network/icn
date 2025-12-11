@@ -29,6 +29,9 @@ These principles ensure ICN remains decentralized, resilient, and aligned with c
 
 1. [Identity & Key Management](#1-identity--key-management)
     - 1.5 [SDIS Identity Extensions](#15-sdis-identity-extensions-experimental)
+        - 1.5.9 [Zero-Knowledge Proofs](#159-zero-knowledge-proofs-phase-s4)
+        - 1.5.10 [Credential Presentation](#1510-credential-presentation-phase-s5)
+        - 1.5.11 [SDIS Governance](#1511-sdis-governance-phase-s6)
 2. [Trust Graph Model](#2-trust-graph-model)
 3. [Network Transport](#3-network-transport)
 4. [Ledger Design](#4-ledger-design)
@@ -241,7 +244,7 @@ pub struct Delegation {
 
 ### 1.5 SDIS Identity Extensions (Experimental)
 
-**Status:** Phase S1-S2 implemented, integration ongoing
+**Status:** Phase S1-S5 complete, governance integration in progress
 
 ICN is evolving toward SDIS (Sovereign Digital Identity System) to provide:
 - **Permanent anchor-based identity**: Key rotation without identity change
@@ -441,6 +444,9 @@ impl AgeKeyStore {
 | VUI types | icn-identity | ✅ Complete |
 | Keystore v4 | icn-identity | ✅ Complete |
 | Steward network | icn-steward | ✅ Phase S3.1 |
+| Zero-knowledge proofs | icn-zkp | ✅ Phase S4 |
+| Credential presentation | icn-gateway | ✅ Phase S5 |
+| SDIS governance | icn-governance | ✅ Phase S6 |
 | Enrollment flow | icn-enrollment | 🚧 Planned |
 
 #### 1.5.8 Steward Network (Phase S3)
@@ -546,6 +552,128 @@ pub struct StewardConfig {
     heartbeat_interval_secs: u64,    // Default: 30
 }
 ```
+
+#### 1.5.9 Zero-Knowledge Proofs (Phase S4)
+
+The ZKP system enables privacy-preserving credential verification using STARK proofs.
+
+**Core Components:**
+
+| Component | Purpose |
+|-----------|---------|
+| `AirConstraint` | Polynomial constraints for STARK prover |
+| `ProofGenerator` | Creates zero-knowledge proofs from witness data |
+| `ProofVerifier` | Verifies proofs without learning private data |
+| `ProofType` | Attribute proof types (age, citizenship, membership) |
+
+**Proof Types:**
+```rust
+pub enum ProofType {
+    AgeAtLeast { threshold: u8 },
+    Citizenship { country_code: [u8; 2] },
+    Membership { org_did: Did },
+    NonRevocation,
+}
+```
+
+**STARK Configuration:**
+- Security level: 128 bits
+- Field: Goldilocks (64-bit prime)
+- Blowup factor: 4
+- FRI folding: 4
+
+#### 1.5.10 Credential Presentation (Phase S5)
+
+The credential presentation system provides three verification levels for identity credentials.
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Verification Levels                           │
+├─────────────────────────────────────────────────────────────────┤
+│  Level 1: QR Scan        │ <2s   │ Offline │ Ed25519           │
+│  Level 2: NFC/BLE        │ ~5s   │ Offline │ Hybrid Ed+ML-DSA  │
+│  Level 3: Network        │ ~10s  │ Online  │ STARK proofs      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**QR Encoding (137 bytes):**
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0-1 | 2 | Magic bytes "IC" |
+| 2 | 1 | Version |
+| 3 | 1 | Proof type |
+| 4-19 | 16 | Truncated anchor |
+| 20-51 | 32 | Ephemeral public key |
+| 52-55 | 4 | Relative expiry |
+| 56-71 | 16 | Nonce |
+| 72-135 | 64 | Ed25519 signature |
+| 136 | 1 | Channels bitmap |
+
+**Ephemeral Proof System:**
+```rust
+pub struct EphemeralProof {
+    anchor_id: [u8; 16],      // Truncated for QR
+    ephemeral_pk: [u8; 32],   // Session key
+    proof_type: ProofType,
+    expires_at: u32,          // Relative seconds
+    nonce: [u8; 16],          // Replay protection
+    signature: [u8; 64],      // Ed25519
+    channels: u8,             // Available upgrade paths
+}
+
+pub struct EphemeralBinding {
+    proof_nonce: [u8; 16],
+    anchor_id: [u8; 32],      // Full anchor
+    ephemeral_pk: [u8; 32],
+    hybrid_signature: Vec<u8>, // Ed25519 + ML-DSA
+}
+```
+
+**Security Properties:**
+- Replay protection via 16-byte nonces and LRU cache
+- Configurable expiry (max 24 hours)
+- Post-quantum security at Level 2+
+- Zero-knowledge proofs at Level 3
+
+#### 1.5.11 SDIS Governance (Phase S6)
+
+SDIS governance enables community oversight of the steward network and identity system.
+
+**Proposal Types:**
+```rust
+pub enum SdisProposal {
+    AppointSteward { candidate: Did, sponsors: Vec<Did>, ... },
+    RemoveSteward { steward: Did, reason: String, ... },
+    SanctionSteward { steward: Did, penalty: StewardPenalty, ... },
+    ReconfirmSteward { steward: Did, new_term_end: u64, ... },
+    ModifyThreshold { threshold_type: ThresholdType, ... },
+    ApproveAuthority { authority: InstitutionalAuthority },
+    RevokeAuthority { authority_did: Did, reason: String, ... },
+    RevocationAppeal { target: RevocationTarget, ... },
+    SuspendSteward { steward: Did, reason: String, duration: u64 },
+    ReinstateSteward { steward: Did, reason: String },
+    UpdateJurisdictionTier { steward: Did, new_tier: JurisdictionTier, ... },
+    ForceKeyRotation { steward: Did, reason: String },
+}
+```
+
+**Voting Requirements:**
+
+| Proposal Type | Quorum | Approval | Timeout |
+|--------------|--------|----------|---------|
+| AppointSteward | 60% | 66% | 14 days |
+| RemoveSteward | 70% | 75% | 7 days |
+| SanctionSteward | 60% | 66% | 3 days |
+| ModifyThreshold | 80% | 80% | 21 days |
+| RevocationAppeal | 50% | 60% | 30 days |
+
+**Penalty Types:**
+- Warning (recorded but no action)
+- FineCredits (deduct from bond)
+- SuspendDays (temporary suspension)
+- RevokeBond (permanent removal)
 
 ---
 

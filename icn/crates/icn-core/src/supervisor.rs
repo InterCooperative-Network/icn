@@ -2434,6 +2434,32 @@ impl Supervisor {
                                         }
                                     });
                                 }
+
+                                ProposalPayload::Sdis { proposal } => {
+                                    info!("🆔 SDIS proposal {} accepted: {:?}", proposal_id.0, proposal);
+
+                                    // SDIS proposals handle steward network governance
+                                    // Most require off-chain coordination with steward nodes
+                                    // For now, log and emit metrics - actual execution depends on steward network
+                                    match proposal {
+                                        icn_governance::SdisProposal::AppointSteward { candidate, .. } => {
+                                            info!("   Action: Appoint steward {}", candidate);
+                                            icn_obs::metrics::governance::proposals_executed_inc("sdis_appoint_steward");
+                                        }
+                                        icn_governance::SdisProposal::RemoveSteward { steward, .. } => {
+                                            info!("   Action: Remove steward {}", steward);
+                                            icn_obs::metrics::governance::proposals_executed_inc("sdis_remove_steward");
+                                        }
+                                        icn_governance::SdisProposal::SanctionSteward { steward, penalty, .. } => {
+                                            info!("   Action: Sanction steward {} with {:?}", steward, penalty);
+                                            icn_obs::metrics::governance::proposals_executed_inc("sdis_sanction_steward");
+                                        }
+                                        _ => {
+                                            info!("   Action: Other SDIS operation");
+                                            icn_obs::metrics::governance::proposals_executed_inc("sdis_other");
+                                        }
+                                    }
+                                }
                             }
                         }
 
