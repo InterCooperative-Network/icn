@@ -33,6 +33,8 @@
 //!
 //! # Modules
 //!
+//! - [`actor`] - StewardActor for managing steward operations
+//! - [`handle`] - StewardHandle for async interaction with actor
 //! - [`profile`] - StewardProfile with status, jurisdiction, and statistics
 //! - [`token`] - EnrollmentToken for blind signature-based enrollment
 //! - [`vui_registry`] - Distributed VUI uniqueness checking
@@ -40,19 +42,25 @@
 //! - [`gossip`] - Steward-specific gossip messages
 //! - [`config`] - StewardConfig for runtime configuration
 
+pub mod actor;
 pub mod ceremony;
 pub mod config;
 pub mod gossip;
+pub mod handle;
 pub mod profile;
 pub mod token;
 pub mod vui_registry;
 
 // Re-exports
+pub use actor::StewardActor;
+pub use ceremony::enrollment::EnrollmentResult;
+pub use ceremony::recovery::RecoveryResult;
 pub use ceremony::{CeremonyError, CeremonyState, EnrollmentCeremony, RecoveryCeremony};
 pub use config::StewardConfig;
 pub use gossip::{
     EnrollmentMessage, RecoveryMessage, StewardAnnouncement, StewardMessage, VuiSyncMessage,
 };
+pub use handle::{StewardHandle, StewardMsg, StewardStats as ActorStats};
 pub use profile::{JurisdictionTier, StewardProfile, StewardStats, StewardStatus};
 pub use token::{EnrollmentToken, TokenIssuanceRecord, TokenRequest, TokenResponse};
 pub use vui_registry::{DistributedCheckResult, LocalCheckResult, VuiRegistry, VuiRegistryError};
