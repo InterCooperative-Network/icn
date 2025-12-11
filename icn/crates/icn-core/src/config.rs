@@ -587,7 +587,7 @@ impl Default for Config {
 
 impl RateLimitingConfig {
     /// Convert to trust-gated rate limit config for icn-net
-    /// 
+    ///
     /// # Arguments
     /// * `min_trust_threshold` - Minimum trust score required for TLS connections (from network config)
     pub fn to_trust_gated_config(&self, min_trust_threshold: f64) -> icn_net::TrustGatedRateLimitConfig {
@@ -709,7 +709,7 @@ mod tests {
         let config = RateLimitingConfig::default();
 
         // Convert to icn-net types with default trust threshold
-        let trust_gated = config.to_trust_gated_config(0.1);
+        let trust_gated = config.to_trust_gated_config(default_min_trust_threshold());
         let fallback = config.to_fallback_config();
 
         // Verify trust-gated config
@@ -723,7 +723,7 @@ mod tests {
         assert_eq!(trust_gated.federated.burst_capacity, 50);
         assert_eq!(trust_gated.refill_interval.as_millis(), 100);
         // Verify the passed trust threshold is used
-        assert!((trust_gated.min_trust_threshold - 0.1).abs() < f64::EPSILON);
+        assert!((trust_gated.min_trust_threshold - default_min_trust_threshold()).abs() < f64::EPSILON);
 
         // Verify fallback config
         assert_eq!(fallback.max_messages_per_second, 100);
