@@ -2576,6 +2576,7 @@ dependencies = [
  "icn-rpc",
  "icn-security",
  "icn-snapshot",
+ "icn-steward",
  "icn-store",
  "icn-time",
  "icn-trust",

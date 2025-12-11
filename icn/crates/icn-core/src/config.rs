@@ -38,6 +38,85 @@ pub struct Config {
     /// Cooperative configuration for cooperative-specific settings
     #[serde(default)]
     pub cooperative: CooperativeConfig,
+
+    /// Steward configuration for SDIS steward network participation
+    #[serde(default)]
+    pub steward: StewardNodeConfig,
+}
+
+/// Steward node configuration for SDIS steward network participation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StewardNodeConfig {
+    /// Enable steward functionality on this node
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// VUI threshold - minimum stewards required for VUI computation (t-of-n)
+    #[serde(default = "default_vui_threshold")]
+    pub vui_threshold: u32,
+
+    /// Total number of stewards holding pepper shares (n in t-of-n)
+    #[serde(default = "default_vui_total_shares")]
+    pub vui_total_shares: u32,
+
+    /// Maximum concurrent enrollment ceremonies
+    #[serde(default = "default_max_concurrent_enrollments")]
+    pub max_concurrent_enrollments: usize,
+
+    /// Maximum concurrent recovery ceremonies
+    #[serde(default = "default_max_concurrent_recoveries")]
+    pub max_concurrent_recoveries: usize,
+
+    /// Token validity period in seconds
+    #[serde(default = "default_token_validity_secs")]
+    pub token_validity_secs: u64,
+}
+
+fn default_vui_threshold() -> u32 {
+    3
+}
+
+fn default_vui_total_shares() -> u32 {
+    5
+}
+
+fn default_max_concurrent_enrollments() -> usize {
+    100
+}
+
+fn default_max_concurrent_recoveries() -> usize {
+    50
+}
+
+fn default_token_validity_secs() -> u64 {
+    7 * 24 * 60 * 60 // 7 days
+}
+
+impl Default for StewardNodeConfig {
+    fn default() -> Self {
+        StewardNodeConfig {
+            enabled: false,
+            vui_threshold: default_vui_threshold(),
+            vui_total_shares: default_vui_total_shares(),
+            max_concurrent_enrollments: default_max_concurrent_enrollments(),
+            max_concurrent_recoveries: default_max_concurrent_recoveries(),
+            token_validity_secs: default_token_validity_secs(),
+        }
+    }
+}
+
+impl StewardNodeConfig {
+    /// Convert to icn-steward StewardConfig
+    pub fn to_steward_config(&self) -> icn_steward::StewardConfig {
+        icn_steward::StewardConfig {
+            vui_threshold: self.vui_threshold,
+            vui_total_shares: self.vui_total_shares,
+            max_concurrent_enrollments: self.max_concurrent_enrollments,
+            max_concurrent_recoveries: self.max_concurrent_recoveries,
+            token_validity_secs: self.token_validity_secs,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,6 +565,7 @@ impl Default for Config {
             federation: FederationConfig::default(),
             privacy: PrivacyConfig::default(),
             cooperative: CooperativeConfig::default(),
+            steward: StewardNodeConfig::default(),
         }
     }
 }
@@ -877,5 +957,77 @@ bootstrap_peer_trust = 0.4
         // Verify bootstrap peers in network config
         assert_eq!(config.network.bootstrap_peers.len(), 1);
         assert!(config.network.bootstrap_peers[0].contains("did:icn:test"));
+    }
+
+    #[test]
+    fn test_steward_config_defaults() {
+        let config = StewardNodeConfig::default();
+
+        assert!(!config.enabled);
+        assert_eq!(config.vui_threshold, 3);
+        assert_eq!(config.vui_total_shares, 5);
+        assert_eq!(config.max_concurrent_enrollments, 100);
+        assert_eq!(config.max_concurrent_recoveries, 50);
+        assert_eq!(config.token_validity_secs, 7 * 24 * 60 * 60);
+    }
+
+    #[test]
+    fn test_steward_config_serialization() {
+        let toml_str = r#"
+enabled = true
+vui_threshold = 5
+vui_total_shares = 9
+max_concurrent_enrollments = 200
+max_concurrent_recoveries = 100
+token_validity_secs = 86400
+"#;
+
+        let config: StewardNodeConfig = toml::from_str(toml_str).unwrap();
+
+        assert!(config.enabled);
+        assert_eq!(config.vui_threshold, 5);
+        assert_eq!(config.vui_total_shares, 9);
+        assert_eq!(config.max_concurrent_enrollments, 200);
+        assert_eq!(config.max_concurrent_recoveries, 100);
+        assert_eq!(config.token_validity_secs, 86400);
+    }
+
+    #[test]
+    fn test_steward_config_conversion() {
+        let node_config = StewardNodeConfig {
+            enabled: true,
+            vui_threshold: 5,
+            vui_total_shares: 9,
+            max_concurrent_enrollments: 200,
+            max_concurrent_recoveries: 100,
+            token_validity_secs: 86400,
+        };
+
+        let steward_config = node_config.to_steward_config();
+
+        assert_eq!(steward_config.vui_threshold, 5);
+        assert_eq!(steward_config.vui_total_shares, 9);
+        assert_eq!(steward_config.max_concurrent_enrollments, 200);
+        assert_eq!(steward_config.max_concurrent_recoveries, 100);
+        assert_eq!(steward_config.token_validity_secs, 86400);
+    }
+
+    #[test]
+    fn test_config_with_steward() {
+        let config = Config::default();
+
+        // Verify steward config is present and has defaults
+        assert!(!config.steward.enabled);
+        assert_eq!(config.steward.vui_threshold, 3);
+        assert_eq!(config.steward.vui_total_shares, 5);
+
+        // Serialize to TOML
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        assert!(toml_str.contains("[steward]"));
+
+        // Deserialize back
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+        assert!(!deserialized.steward.enabled);
+        assert_eq!(deserialized.steward.vui_threshold, 3);
     }
 }

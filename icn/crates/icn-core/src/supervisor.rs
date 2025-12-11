@@ -824,6 +824,11 @@ impl Supervisor {
                 tokio::sync::RwLock<Option<icn_ccl::DisputeActorHandle>>,
             > = Arc::new(tokio::sync::RwLock::new(None));
 
+            // Create steward handle holder (will be filled if steward is enabled)
+            let steward_handle_holder: Arc<
+                tokio::sync::RwLock<Option<icn_steward::StewardHandle>>,
+            > = Arc::new(tokio::sync::RwLock::new(None));
+
             // Keep a reference to federation registry for RPC server (declared here to be in scope for later use)
             let federation_registry_for_rpc: Option<Arc<icn_federation::CooperativeRegistry>>;
 
@@ -2949,6 +2954,141 @@ impl Supervisor {
             });
 
             info!("Clock sync background task spawned (interval: 10 minutes)");
+
+            // Spawn steward actor if enabled (SDIS Phase S3)
+            if self.config.steward.enabled {
+                let steward_config = self.config.steward.to_steward_config();
+
+                // Create gossip send callback for steward messages
+                let gossip_handle_for_steward = gossip_handle.clone();
+
+                let send_gossip_callback: icn_steward::actor::SendGossipCallback =
+                    Arc::new(move |steward_msg| {
+                        let gossip = gossip_handle_for_steward.clone();
+
+                        tokio::spawn(async move {
+                            // Determine topic based on message type
+                            let topic = match &steward_msg {
+                                icn_steward::StewardMessage::Announce(_) => {
+                                    icn_steward::topics::STEWARD_ANNOUNCE
+                                }
+                                icn_steward::StewardMessage::Enrollment(_) => {
+                                    icn_steward::topics::ENROLLMENT
+                                }
+                                icn_steward::StewardMessage::Recovery(_) => {
+                                    icn_steward::topics::RECOVERY
+                                }
+                                icn_steward::StewardMessage::VuiSync(_) => {
+                                    icn_steward::topics::VUI_SYNC
+                                }
+                            };
+
+                            // Serialize message
+                            let data = match bincode::serialize(&steward_msg) {
+                                Ok(d) => d,
+                                Err(e) => {
+                                    warn!("Failed to serialize steward message: {}", e);
+                                    return;
+                                }
+                            };
+
+                            // Publish via gossip (handles topic creation, ACL, and broadcast)
+                            {
+                                let mut gossip = gossip.write().await;
+                                if let Err(e) = gossip.publish(topic, data) {
+                                    warn!("Failed to publish steward message: {}", e);
+                                }
+                            }
+                        });
+                    });
+
+                // Spawn steward actor
+                match icn_steward::StewardActor::spawn(
+                    did.clone(),
+                    steward_config,
+                    self.shutdown_tx.clone(),
+                    Some(send_gossip_callback),
+                )
+                .await
+                {
+                    Ok(handle) => {
+                        info!("✓ Steward actor spawned for DID: {}", did);
+
+                        // Fill steward handle holder
+                        *steward_handle_holder.write().await = Some(handle.clone());
+
+                        // Subscribe to steward gossip topics
+                        {
+                            let mut gossip = gossip_handle.write().await;
+                            for topic in &[
+                                icn_steward::topics::STEWARD_ANNOUNCE,
+                                icn_steward::topics::VUI_SYNC,
+                                icn_steward::topics::ENROLLMENT,
+                                icn_steward::topics::RECOVERY,
+                            ] {
+                                if let Err(e) = gossip.subscribe(topic, did.clone()) {
+                                    warn!("Failed to subscribe to steward topic {}: {}", topic, e);
+                                } else {
+                                    info!("Subscribed to steward topic: {}", topic);
+                                }
+                            }
+                        }
+
+                        // Set up notification callback for steward messages
+                        let steward_handle_for_callback = steward_handle_holder.clone();
+                        {
+                            let mut gossip = gossip_handle.write().await;
+                            gossip.set_notification_callback(Arc::new(
+                                move |topic, entry, _subscriber_did| {
+                                    // Only process steward topics
+                                    if !topic.starts_with("steward:") {
+                                        return;
+                                    }
+
+                                    let steward_holder = steward_handle_for_callback.clone();
+                                    let data = entry.data.clone();
+                                    let topic_clone = topic.clone();
+
+                                    tokio::spawn(async move {
+                                        let steward_guard = steward_holder.read().await;
+                                        if steward_guard.is_none() {
+                                            return;
+                                        }
+
+                                        // Parse steward message
+                                        match bincode::deserialize::<icn_steward::StewardMessage>(
+                                            &data,
+                                        ) {
+                                            Ok(msg) => {
+                                                debug!(
+                                                    "Received steward message on topic {}: {:?}",
+                                                    topic_clone, msg
+                                                );
+                                                // Message handling would be routed to StewardActor here
+                                                // via handle methods in a full implementation
+                                            }
+                                            Err(e) => {
+                                                debug!(
+                                                    "Failed to deserialize steward message on {}: {}",
+                                                    topic_clone, e
+                                                );
+                                            }
+                                        }
+                                    });
+                                },
+                            ));
+                        }
+
+                        info!(
+                            "Steward network participation enabled (threshold: {}-of-{})",
+                            self.config.steward.vui_threshold, self.config.steward.vui_total_shares
+                        );
+                    }
+                    Err(e) => {
+                        error!("Failed to spawn steward actor: {}", e);
+                    }
+                }
+            }
 
             // Spawn metrics update task
             let start_time = std::time::Instant::now();
