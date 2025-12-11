@@ -1,6 +1,6 @@
 # SDIS Implementation Plan for ICN
 
-**Status**: Draft
+**Status**: In Progress (Phase S1 Complete, Phase S2 Started)
 **Created**: 2025-12-10
 **Target**: Full SDIS integration into ICN substrate
 
@@ -285,11 +285,20 @@ pub fn keybundle_from_seed(seed: &[u8; 64]) -> Result<KeyBundleKeys> {
 
 ### S1 Deliverables Checklist
 
-- [ ] `icn-crypto-pq` crate compiles
-- [ ] All unit tests pass (target: 50+ tests)
+- [x] `icn-crypto-pq` crate compiles
+- [x] All unit tests pass (51 tests passing)
 - [ ] Benchmarks documented
 - [ ] Integration with existing `icn-identity` verified
 - [ ] Security review of crypto choices
+
+**Completed Modules (2025-12-10)**:
+- `ml_dsa.rs` - ML-DSA (Dilithium3) wrapper
+- `hybrid.rs` - Hybrid Ed25519 + ML-DSA signatures
+- `ml_kem.rs` - ML-KEM (Kyber768) key encapsulation
+- `hybrid_kem.rs` - Hybrid X25519 + ML-KEM key exchange
+- `kdf.rs` - HKDF-SHA3-256 key derivation
+- `threshold.rs` - Secret sharing and threshold PRF
+- `blind.rs` - Blind signatures for enrollment tokens
 
 ---
 

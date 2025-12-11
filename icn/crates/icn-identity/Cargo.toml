@@ -15,6 +15,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 icn-obs.workspace = true
+icn-crypto-pq.workspace = true
 multibase = "0.9"
 age = "0.10"
 secrecy = "0.8"

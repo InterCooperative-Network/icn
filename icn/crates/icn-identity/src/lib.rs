@@ -1,11 +1,20 @@
 //! ICN Identity - DID management, key generation, and cryptographic operations
+//!
+//! This crate provides identity primitives for ICN, including:
+//! - Traditional Ed25519-based DIDs (`did:icn:<pubkey>`)
+//! - SDIS Anchor-based DIDs (`did:icn:<anchor-id>`)
+//! - KeyBundle with hybrid post-quantum signatures
+//! - VUI (Verifiable Unique Identifier) types
 
+pub mod anchor;
 pub mod batch_verify;
 pub mod bundle;
+pub mod keybundle;
 pub mod keystore;
 pub mod multi_device;
 pub mod recovery;
 pub mod sync;
+pub mod vui;
 
 use anyhow::Result;
 use ed25519_dalek::{SigningKey, VerifyingKey};
@@ -13,10 +22,12 @@ use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
+pub use anchor::{Anchor, EnrollmentPathway};
 pub use batch_verify::{
     verify_signatures_batched, BatchVerifier, BatchVerifyResult, SignatureToVerify,
 };
 pub use bundle::{verify_binding_info, BindingInfo, IdentityBundle};
+pub use keybundle::KeyBundle;
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
@@ -26,6 +37,7 @@ pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };
 pub use sync::{DidDocumentCache, IdentityUpdateMessage, IDENTITY_UPDATES_TOPIC};
+pub use vui::Vui;
 
 /// A decentralized identifier for an ICN node
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -111,6 +123,14 @@ impl Did {
 
         VerifyingKey::from_bytes(&key_bytes)
             .map_err(|e| anyhow::anyhow!("Invalid Ed25519 public key: {e}"))
+    }
+
+    /// Internal constructor for creating DIDs from raw strings
+    ///
+    /// This bypasses validation and should only be used by trusted code
+    /// (e.g., anchor module creating DIDs from anchor IDs).
+    pub(crate) fn new_unchecked(s: String) -> Self {
+        Did(s)
     }
 }
 
