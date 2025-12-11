@@ -264,7 +264,7 @@ fn test_duplicate_enrollment_rejection() {
         .unwrap();
 
     service
-        .complete_vui_computation(&response1.ceremony_id, &[partial1.clone()])
+        .complete_vui_computation(&response1.ceremony_id, std::slice::from_ref(&partial1))
         .unwrap();
 
     let is_unique1 = service.verify_uniqueness(&response1.ceremony_id).unwrap();
@@ -345,7 +345,7 @@ fn test_different_users_can_enroll() {
         .unwrap();
 
     service
-        .complete_vui_computation(&response1.ceremony_id, &[partial1.clone()])
+        .complete_vui_computation(&response1.ceremony_id, std::slice::from_ref(&partial1))
         .unwrap();
     service.verify_uniqueness(&response1.ceremony_id).unwrap();
 
@@ -379,7 +379,7 @@ fn test_different_users_can_enroll() {
         .unwrap();
 
     service
-        .complete_vui_computation(&response2.ceremony_id, &[partial2.clone()])
+        .complete_vui_computation(&response2.ceremony_id, std::slice::from_ref(&partial2))
         .unwrap();
 
     // Should succeed - different VUI
