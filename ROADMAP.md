@@ -1798,8 +1798,13 @@ SDIS extends ICN's identity layer with:
 - ✅ StewardProfile and status management
 - ✅ EnrollmentToken with blind signatures
 - ✅ VuiRegistry (Bloom filter + exact set)
-- ✅ EnrollmentCeremony and RecoveryCeremony
+- ✅ EnrollmentCeremony and RecoveryCeremony state machines
 - ✅ StewardActor with handle pattern
+- ✅ EnrollmentService for end-to-end orchestration
+- ✅ EnrollmentClient for client-side VUI computation
+- ✅ Threshold PRF integration (3-of-5 tested)
+- ✅ Gossip messages for multi-steward coordination
+- ✅ 73 tests (57 unit + 16 integration)
 
 ### Phase S4: Zero-Knowledge Proofs ✅ COMPLETE
 **Crate**: `icn-zkp`
@@ -1841,9 +1846,10 @@ SDIS extends ICN's identity layer with:
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Enrollment flow | 🚧 Planned | Requires operational steward network |
-| Multi-steward ceremonies | 🚧 Planned | Depends on enrollment |
-| Key recovery integration | 🚧 Planned | Social recovery via stewards |
+| Enrollment flow | ✅ Complete | EnrollmentService + EnrollmentClient + 16 integration tests |
+| Multi-steward ceremonies | ✅ Complete | Threshold PRF, gossip coordination, coordinator pattern |
+| Key recovery integration | 🚧 Planned | Social recovery via stewards (RecoveryCeremony ready) |
+| Operational steward network | 🚧 Planned | Deployment infrastructure for production |
 
 ### Security Properties
 
@@ -2029,5 +2035,5 @@ See [Strategic Gap Analysis](docs/strategic-gap-analysis.md) for complete 15-gap
 
 ---
 
-**Last Updated**: 2025-12-10 (Track S SDIS Complete - Post-quantum identity with steward network, ZKP credentials, and three-tier verification)
+**Last Updated**: 2025-12-11 (Track S SDIS Complete - Enrollment flow with 16 integration tests, multi-steward ceremonies with threshold PRF)
 **Next Review**: After pilot community selection (Track C1) or pilot MVP completion (Track C2)
