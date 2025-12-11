@@ -92,7 +92,8 @@ export class ICNClient {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.token = options.token;
     this.timeout = options.timeout ?? 30000;
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    // Bind fetch to globalThis to preserve context when called as a method
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.retryOptions = { ...DEFAULT_RETRY, ...options.retry };
     this.autoRefresh = options.autoRefresh ?? false;
     this.refreshBeforeExpiry = options.refreshBeforeExpiry ?? 60;

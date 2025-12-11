@@ -36,7 +36,9 @@
     "react-native": ">=0.72.0"
   },
   "dependencies": {
-    "@icn/client": "^0.1.0"
+    "@icn/client": "^0.1.0",
+    "@noble/ed25519": "^3.0.0",
+    "@noble/hashes": "^2.0.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

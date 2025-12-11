@@ -5,7 +5,7 @@
  */
 
 import { Platform } from 'react-native';
-import { createWallet, createMobileClient, SecureStorage, Wallet, MobileClient } from '@icn/react-native';
+import { createWallet, createMobileClient, SecureStorage, ICNWallet, ICNMobileClient } from '@icn/react-native';
 
 // Web localStorage adapter (fallback for web)
 const webStorage: SecureStorage = {
@@ -43,13 +43,13 @@ const getNativeStorage = async (): Promise<SecureStorage> => {
   };
 };
 
-// Gateway URL - replace with your ICN gateway
-const GATEWAY_URL = 'https://icn.mycoop.org';
+// Gateway URL - ICN production gateway
+const GATEWAY_URL = 'https://api.icn.zone';
 
 // Storage, wallet, and client are initialized asynchronously
 let secureStorage: SecureStorage | null = null;
-export let wallet: Wallet | null = null;
-export let client: MobileClient | null = null;
+export let wallet: ICNWallet | null = null;
+export let client: ICNMobileClient | null = null;
 
 // Initialize client (call on app startup)
 export async function initializeClient(): Promise<void> {

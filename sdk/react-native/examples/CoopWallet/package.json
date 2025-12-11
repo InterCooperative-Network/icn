@@ -12,6 +12,8 @@
     "@expo/webpack-config": "^19.0.0",
     "@icn/client": "file:../../../../sdk/typescript",
     "@icn/react-native": "file:../../",
+    "@noble/ed25519": "^3.0.0",
+    "@noble/hashes": "^2.0.1",
     "@react-navigation/native": "^6.1.0",
     "@react-navigation/native-stack": "^6.9.0",
     "expo": "~49.0.0",

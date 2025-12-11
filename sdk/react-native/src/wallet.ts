@@ -2,9 +2,10 @@
  * ICN Wallet for React Native
  *
  * Manages identity keys with secure storage.
- * Uses react-native-keychain or expo-secure-store for key storage.
+ * Uses @noble/ed25519 for cryptographic operations.
  */
 
+import * as ed from '@noble/ed25519';
 import { ICNWallet, KeyPair, SecureStorage } from './types';
 
 const PRIVATE_KEY_KEY = '@icn/wallet/private_key';
@@ -12,42 +13,37 @@ const PUBLIC_KEY_KEY = '@icn/wallet/public_key';
 const DID_KEY = '@icn/wallet/did';
 
 /**
- * Wallet implementation using secure storage
- *
- * Note: This is a reference implementation. For production, you should:
- * 1. Use react-native-keychain for iOS Keychain / Android Keystore
- * 2. Use a proper cryptographic library like @noble/ed25519
- * 3. Consider hardware security modules on supported devices
+ * Wallet implementation using secure storage and @noble/ed25519
  *
  * @example
  * ```typescript
- * import { ICNWallet } from '@icn/react-native';
- * import * as Keychain from 'react-native-keychain';
+ * import { createWallet, SecureStorage } from '@icn/react-native';
+ * import * as SecureStore from 'expo-secure-store';
  *
  * // Create secure storage adapter
  * const secureStorage: SecureStorage = {
  *   async setItem(key, value) {
- *     await Keychain.setGenericPassword(key, value, { service: key });
+ *     await SecureStore.setItemAsync(key, value);
  *   },
  *   async getItem(key) {
- *     const result = await Keychain.getGenericPassword({ service: key });
- *     return result ? result.password : null;
+ *     return SecureStore.getItemAsync(key);
  *   },
  *   async removeItem(key) {
- *     await Keychain.resetGenericPassword({ service: key });
+ *     await SecureStore.deleteItemAsync(key);
  *   },
  *   async hasItem(key) {
- *     const result = await Keychain.getGenericPassword({ service: key });
- *     return !!result;
+ *     const value = await SecureStore.getItemAsync(key);
+ *     return value !== null;
  *   },
  * };
  *
- * const wallet = new ICNWallet(secureStorage);
+ * const wallet = createWallet(secureStorage);
  * ```
  */
 export class ICNWalletImpl implements ICNWallet {
   private storage: SecureStorage;
   private cachedKeyPair: KeyPair | null = null;
+  private cachedPrivateKey: Uint8Array | null = null;
 
   constructor(storage: SecureStorage) {
     this.storage = storage;
@@ -55,32 +51,31 @@ export class ICNWalletImpl implements ICNWallet {
 
   /**
    * Generate a new Ed25519 key pair
-   *
-   * Note: This requires a cryptographic library. In production, use:
-   * - react-native-quick-crypto
-   * - @noble/ed25519
-   * - expo-crypto
    */
   async generateKeyPair(): Promise<KeyPair> {
     // Generate 32 random bytes for the private key
-    const privateKeyBytes = await this.generateRandomBytes(32);
-    const privateKey = this.bytesToHex(privateKeyBytes);
+    const privateKey = ed.utils.randomSecretKey();
 
-    // Derive public key (simplified - use proper Ed25519 in production)
-    const publicKey = await this.derivePublicKey(privateKeyBytes);
+    // Derive public key from private key
+    const publicKey = await ed.getPublicKeyAsync(privateKey);
 
-    // Generate DID from public key
-    const did = `did:icn:${this.base58Encode(this.hexToBytes(publicKey))}`;
+    // Convert to hex strings for storage
+    const privateKeyHex = this.bytesToHex(privateKey);
+    const publicKeyHex = this.bytesToHex(publicKey);
+
+    // Generate DID from public key using multibase base58btc
+    const did = `did:icn:${this.base58btcEncode(publicKey)}`;
 
     // Store keys securely
     await Promise.all([
-      this.storage.setItem(PRIVATE_KEY_KEY, privateKey),
-      this.storage.setItem(PUBLIC_KEY_KEY, publicKey),
+      this.storage.setItem(PRIVATE_KEY_KEY, privateKeyHex),
+      this.storage.setItem(PUBLIC_KEY_KEY, publicKeyHex),
       this.storage.setItem(DID_KEY, did),
     ]);
 
-    const keyPair: KeyPair = { publicKey, did };
+    const keyPair: KeyPair = { publicKey: publicKeyHex, did };
     this.cachedKeyPair = keyPair;
+    this.cachedPrivateKey = privateKey;
 
     return keyPair;
   }
@@ -88,23 +83,26 @@ export class ICNWalletImpl implements ICNWallet {
   /**
    * Import an existing key pair
    */
-  async importKeyPair(privateKey: string): Promise<KeyPair> {
-    const privateKeyBytes = this.hexToBytes(privateKey);
-    if (privateKeyBytes.length !== 32) {
+  async importKeyPair(privateKeyHex: string): Promise<KeyPair> {
+    const privateKey = this.hexToBytes(privateKeyHex);
+    if (privateKey.length !== 32) {
       throw new Error('Invalid private key length. Expected 32 bytes.');
     }
 
-    const publicKey = await this.derivePublicKey(privateKeyBytes);
-    const did = `did:icn:${this.base58Encode(this.hexToBytes(publicKey))}`;
+    // Derive public key from private key
+    const publicKey = await ed.getPublicKeyAsync(privateKey);
+    const publicKeyHex = this.bytesToHex(publicKey);
+    const did = `did:icn:${this.base58btcEncode(publicKey)}`;
 
     await Promise.all([
-      this.storage.setItem(PRIVATE_KEY_KEY, privateKey),
-      this.storage.setItem(PUBLIC_KEY_KEY, publicKey),
+      this.storage.setItem(PRIVATE_KEY_KEY, privateKeyHex),
+      this.storage.setItem(PUBLIC_KEY_KEY, publicKeyHex),
       this.storage.setItem(DID_KEY, did),
     ]);
 
-    const keyPair: KeyPair = { publicKey, did };
+    const keyPair: KeyPair = { publicKey: publicKeyHex, did };
     this.cachedKeyPair = keyPair;
+    this.cachedPrivateKey = privateKey;
 
     return keyPair;
   }
@@ -140,25 +138,36 @@ export class ICNWalletImpl implements ICNWallet {
       this.storage.removeItem(DID_KEY),
     ]);
     this.cachedKeyPair = null;
+    this.cachedPrivateKey = null;
   }
 
   /**
    * Sign a message with the stored private key
+   *
+   * The message is expected to be a hex-encoded string (the challenge nonce).
+   * Returns the signature as a hex-encoded string.
    */
   async sign(message: string): Promise<string> {
-    const privateKey = await this.storage.getItem(PRIVATE_KEY_KEY);
+    // Get private key from cache or storage
+    let privateKey = this.cachedPrivateKey;
     if (!privateKey) {
-      throw new Error('No private key stored. Generate or import a key pair first.');
+      const privateKeyHex = await this.storage.getItem(PRIVATE_KEY_KEY);
+      if (!privateKeyHex) {
+        throw new Error('No private key stored. Generate or import a key pair first.');
+      }
+      privateKey = this.hexToBytes(privateKeyHex);
+      this.cachedPrivateKey = privateKey;
     }
 
-    // Sign the message
-    const messageBytes = new TextEncoder().encode(message);
-    const privateKeyBytes = this.hexToBytes(privateKey);
+    // The message from the gateway is a hex-encoded nonce
+    // We need to sign the raw bytes of the nonce
+    const messageBytes = this.hexToBytes(message);
 
-    // Simplified signing - use proper Ed25519 in production
-    const signature = await this.ed25519Sign(messageBytes, privateKeyBytes);
+    // Sign with Ed25519
+    const signature = await ed.signAsync(messageBytes, privateKey);
 
-    return this.bytesToBase64(signature);
+    // Return signature as hex string
+    return this.bytesToHex(signature);
   }
 
   /**
@@ -166,71 +175,6 @@ export class ICNWalletImpl implements ICNWallet {
    */
   async hasKeyPair(): Promise<boolean> {
     return this.storage.hasItem(PRIVATE_KEY_KEY);
-  }
-
-  // ===========================================================================
-  // Cryptographic helpers - Replace with proper implementation in production
-  // ===========================================================================
-
-  /**
-   * Generate random bytes
-   * In production, use:
-   * - react-native-quick-crypto
-   * - expo-crypto
-   */
-  private async generateRandomBytes(length: number): Promise<Uint8Array> {
-    // In React Native, you should use a native crypto module
-    // This is a placeholder that won't work in production
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-      const bytes = new Uint8Array(length);
-      crypto.getRandomValues(bytes);
-      return bytes;
-    }
-
-    throw new Error(
-      'No secure random source available. ' +
-      'Install react-native-quick-crypto or expo-crypto.'
-    );
-  }
-
-  /**
-   * Derive public key from private key
-   * Replace with proper Ed25519 implementation
-   */
-  private async derivePublicKey(privateKey: Uint8Array): Promise<string> {
-    // This is a placeholder - use @noble/ed25519 or similar in production
-    // For now, we'll use a simple hash as a placeholder
-    const hash = await this.sha256(privateKey);
-    return this.bytesToHex(hash);
-  }
-
-  /**
-   * Sign with Ed25519
-   * Replace with proper implementation using @noble/ed25519
-   */
-  private async ed25519Sign(
-    message: Uint8Array,
-    privateKey: Uint8Array
-  ): Promise<Uint8Array> {
-    // This is a placeholder - use @noble/ed25519 in production
-    // The actual signature should be 64 bytes
-    const combined = new Uint8Array(message.length + privateKey.length);
-    combined.set(privateKey);
-    combined.set(message, privateKey.length);
-    return this.sha256(combined);
-  }
-
-  /**
-   * SHA-256 hash
-   */
-  private async sha256(data: Uint8Array): Promise<Uint8Array> {
-    if (typeof crypto !== 'undefined' && crypto.subtle) {
-      // Pass Uint8Array directly - crypto.subtle.digest accepts BufferSource
-      // Avoid using data.buffer which can cause issues if the array is a view with non-zero offset
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      return new Uint8Array(hashBuffer);
-    }
-    throw new Error('No SHA-256 implementation available');
   }
 
   // ===========================================================================
@@ -251,12 +195,10 @@ export class ICNWalletImpl implements ICNWallet {
     return bytes;
   }
 
-  private bytesToBase64(bytes: Uint8Array): string {
-    const binary = String.fromCharCode(...bytes);
-    return btoa(binary);
-  }
-
-  private base58Encode(bytes: Uint8Array): string {
+  /**
+   * Base58btc encoding with multibase prefix 'z'
+   */
+  private base58btcEncode(bytes: Uint8Array): string {
     const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     let num = BigInt('0x' + this.bytesToHex(bytes));
     let result = '';
@@ -276,7 +218,8 @@ export class ICNWalletImpl implements ICNWallet {
       }
     }
 
-    return result;
+    // Add multibase prefix 'z' for base58btc
+    return 'z' + result;
   }
 }
 

@@ -60,13 +60,15 @@ const DEMO_TRANSACTIONS = [
   { id: '5', type: 'received', from: 'Eve', to: 'You', amount: 4, memo: 'Car repair help', date: '2025-12-05' },
 ];
 
-// Import client with error handling
-let client: any = null;
+// Import client module - client is set after initializeClient() is called
+let clientModule: any = null;
 let initializeClient: () => Promise<void> = async () => {};
 
+// Getter to always get the current client value
+const getClient = () => clientModule?.client || null;
+
 try {
-  const clientModule = require('./src/client');
-  client = clientModule.client;
+  clientModule = require('./src/client');
   initializeClient = clientModule.initializeClient;
 } catch (e) {
   console.error('Failed to import client:', e);
@@ -76,8 +78,8 @@ try {
 // Inline Screens (Web-safe, no external hook dependencies)
 // ============================================================================
 
-function LoginScreen({ onLogin }: { onLogin: (coopId: string) => void }) {
-  const [coopId, setCoopId] = useState('');
+function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => void }) {
+  const [coopId, setCoopId] = useState('test-coop');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,10 +93,21 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string) => void }) {
     setError(null);
 
     try {
-      // For demo/web mode, skip actual API call and just authenticate locally
-      // In production with a running gateway, client.login() would work
-      onLogin(coopId.trim());
+      const client = getClient();
+      if (client) {
+        // Use real authentication with the gateway
+        const authState = await client.login(coopId.trim(), [
+          'coop:read',
+          'coop:write',
+          'ledger:read',
+          'ledger:write',
+        ]);
+        onLogin(coopId.trim(), authState.did || '');
+      } else {
+        throw new Error('Client not initialized. Please refresh the page.');
+      }
     } catch (err) {
+      console.error('Login error:', err);
       setError((err as Error).message);
     } finally {
       setIsLoading(false);
@@ -147,23 +160,33 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string) => void }) {
 function HomeScreen({
   navigation,
   coopId,
+  userDid,
   onLogout
 }: {
   navigation: any;
   coopId: string;
+  userDid: string;
   onLogout: () => void;
 }) {
   const [balance, setBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [did, setDid] = useState<string | null>(null);
 
   useEffect(() => {
-    if (client?.authState?.did) {
-      setDid(client.authState.did);
+    // Try to fetch real balance from API
+    async function fetchBalance() {
+      const client = getClient();
+      if (client && coopId && userDid) {
+        try {
+          const result = await client.getBalance(coopId, userDid);
+          setBalance(result?.balance ?? 0);
+        } catch (e) {
+          console.warn('Failed to fetch balance, using default:', e);
+          setBalance(0);
+        }
+      }
     }
-    // Simulate fetching balance
-    setBalance(Math.floor(Math.random() * 100));
-  }, []);
+    fetchBalance();
+  }, [coopId, userDid]);
 
   const refresh = useCallback(() => {
     setIsLoading(true);
@@ -174,13 +197,6 @@ function HomeScreen({
   }, []);
 
   const handleLogout = async () => {
-    if (client) {
-      try {
-        await client.logout();
-      } catch (e) {
-        console.error('Logout error:', e);
-      }
-    }
     onLogout();
   };
 
@@ -206,7 +222,7 @@ function HomeScreen({
           <Text style={styles.balanceCurrency}> hours</Text>
         </Text>
         <Text style={styles.coopName}>{coopId}</Text>
-        <Text style={styles.didText}>{formatDid(did || '')}</Text>
+        <Text style={styles.didText}>{formatDid(userDid)}</Text>
       </View>
 
       {/* Quick Actions */}
@@ -1224,16 +1240,17 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [coopId, setCoopId] = useState<string>('');
+  const [userDid, setUserDid] = useState<string>('');
 
   useEffect(() => {
     async function init() {
       try {
-        if (client) {
-          await initializeClient();
-          if (client.authState?.isAuthenticated) {
-            setIsAuthenticated(true);
-            setCoopId(client.authState.coopId || '');
-          }
+        await initializeClient();
+        const client = getClient();
+        if (client?.authState?.isAuthenticated) {
+          setIsAuthenticated(true);
+          setCoopId(client.authState.coopId || '');
+          setUserDid(client.authState.did || '');
         }
       } catch (error) {
         console.error('Init error:', error);
@@ -1244,14 +1261,24 @@ export default function App() {
     init();
   }, []);
 
-  const handleLogin = (coop: string) => {
+  const handleLogin = (coop: string, did: string) => {
     setCoopId(coop);
+    setUserDid(did);
     setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const client = getClient();
+    if (client) {
+      try {
+        await client.logout();
+      } catch (e) {
+        console.error('Logout error:', e);
+      }
+    }
     setIsAuthenticated(false);
     setCoopId('');
+    setUserDid('');
   };
 
   if (!isReady) {
@@ -1284,6 +1311,7 @@ export default function App() {
                 <HomeScreen
                   navigation={navigation}
                   coopId={coopId}
+                  userDid={userDid}
                   onLogout={handleLogout}
                 />
               )}
