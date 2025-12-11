@@ -71,12 +71,9 @@ pub fn configure_cors(config: &SecurityConfig) -> Cors {
 
         cors
     } else {
-        // Strict CORS - only same origin
-        Cors::default().allow_any_method().allowed_headers(vec![
-            header::AUTHORIZATION,
-            header::ACCEPT,
-            header::CONTENT_TYPE,
-        ])
+        // Production mode: permissive CORS to work behind reverse proxy (Cloudflare)
+        // The reverse proxy handles actual CORS policy enforcement
+        Cors::permissive()
     }
 }
 
