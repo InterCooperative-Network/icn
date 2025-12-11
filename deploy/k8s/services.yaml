@@ -22,10 +22,10 @@ spec:
     port: 9100
     protocol: TCP
     targetPort: metrics
-  - name: health
+  - name: gateway
     port: 8080
     protocol: TCP
-    targetPort: health
+    targetPort: gateway
 ---
 apiVersion: v1
 kind: Service
@@ -49,4 +49,9 @@ spec:
     protocol: TCP
     targetPort: rpc
     nodePort: 30601
+  - name: gateway
+    port: 8080
+    protocol: TCP
+    targetPort: gateway
+    nodePort: 30080
 

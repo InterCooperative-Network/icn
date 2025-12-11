@@ -32,6 +32,11 @@ spec:
             secretKeyRef:
               name: icn-secrets
               key: passphrase
+        - name: ICN_GATEWAY_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: jwt-secret
         - name: ICN_DATA_DIR
           value: "/data"
         - name: HOME
@@ -46,24 +51,24 @@ spec:
         - name: metrics
           containerPort: 9100
           protocol: TCP
-        - name: health
+        - name: gateway
           containerPort: 8080
           protocol: TCP
         livenessProbe:
           httpGet:
-            path: /metrics
-            port: 9100
+            path: /v1/health
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 30
-          timeoutSeconds: 1
+          timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /metrics
-            port: 9100
+            path: /v1/health
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 1
+          timeoutSeconds: 5
           failureThreshold: 3
         resources:
           requests:
