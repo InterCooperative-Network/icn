@@ -23,8 +23,42 @@ import {
   ScrollView,
   RefreshControl,
   KeyboardAvoidingView,
+  Clipboard,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+
+// QR Code - conditionally import for web compatibility
+let QRCode: any = null;
+try {
+  QRCode = require('react-native-qrcode-svg').default;
+} catch (e) {
+  console.log('QR Code library not available');
+}
+
+// Clipboard helper
+const copyToClipboard = async (text: string) => {
+  if (Platform.OS === 'web') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    Clipboard.setString(text);
+    return true;
+  }
+};
+
+// Demo transaction data
+const DEMO_TRANSACTIONS = [
+  { id: '1', type: 'received', from: 'Alice', to: 'You', amount: 2, memo: 'Garden help', date: '2025-12-10' },
+  { id: '2', type: 'sent', from: 'You', to: 'Bob', amount: 1.5, memo: 'Tutoring', date: '2025-12-09' },
+  { id: '3', type: 'received', from: 'Carol', to: 'You', amount: 3, memo: 'Website design', date: '2025-12-08' },
+  { id: '4', type: 'sent', from: 'You', to: 'Dave', amount: 0.5, memo: 'Coffee meetup', date: '2025-12-07' },
+  { id: '5', type: 'received', from: 'Eve', to: 'You', amount: 4, memo: 'Car repair help', date: '2025-12-05' },
+];
 
 // Import client with error handling
 let client: any = null;
@@ -210,6 +244,42 @@ function HomeScreen({
         </TouchableOpacity>
       </View>
 
+      {/* Recent Transactions */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
+            <Text style={styles.seeAllLink}>See All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {DEMO_TRANSACTIONS.slice(0, 3).map((tx) => (
+          <View key={tx.id} style={styles.transactionItem}>
+            <View style={[
+              styles.txIcon,
+              tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
+            ]}>
+              <Text style={styles.txIconText}>{tx.type === 'received' ? '↓' : '↑'}</Text>
+            </View>
+            <View style={styles.txContent}>
+              <Text style={styles.txPerson}>
+                {tx.type === 'received' ? `From ${tx.from}` : `To ${tx.to}`}
+              </Text>
+              <Text style={styles.txMemo}>{tx.memo}</Text>
+            </View>
+            <View style={styles.txAmountContainer}>
+              <Text style={[
+                styles.txAmount,
+                tx.type === 'received' ? styles.txAmountReceived : styles.txAmountSent
+              ]}>
+                {tx.type === 'received' ? '+' : '-'}{tx.amount}h
+              </Text>
+              <Text style={styles.txDate}>{tx.date}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
       {/* SDIS Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Identity & Verification</Text>
@@ -250,6 +320,19 @@ function HomeScreen({
           <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Settings */}
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={() => navigation.navigate('Settings')}
+      >
+        <Text style={styles.menuIcon}>⚙️</Text>
+        <View style={styles.menuContent}>
+          <Text style={styles.menuLabel}>Settings</Text>
+          <Text style={styles.menuDescription}>App preferences and account</Text>
+        </View>
+        <Text style={styles.menuArrow}>›</Text>
+      </TouchableOpacity>
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -368,6 +451,7 @@ function PaymentScreen({ navigation }: { navigation: any }) {
 // ============================================================================
 function ReceiveScreen({ route }: { route: any }) {
   const [amount, setAmount] = useState('');
+  const [copied, setCopied] = useState(false);
   const did = 'did:icn:demo123456789abcdef';
 
   const qrData = JSON.stringify({
@@ -377,17 +461,55 @@ function ReceiveScreen({ route }: { route: any }) {
     timestamp: Date.now(),
   });
 
+  const handleCopyDid = async () => {
+    const success = await copyToClipboard(did);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleShare = async () => {
+    const paymentLink = `icn://pay?to=${did}${amount ? `&amount=${amount}` : ''}`;
+    const success = await copyToClipboard(paymentLink);
+    if (success) {
+      if (Platform.OS === 'web') {
+        alert('Payment link copied to clipboard!');
+      } else {
+        Alert.alert('Copied', 'Payment link copied to clipboard');
+      }
+    }
+  };
+
   return (
     <ScrollView style={styles.receiveContainer}>
       <View style={styles.qrCard}>
         <Text style={styles.qrTitle}>Scan to Pay Me</Text>
 
-        {/* QR Code Placeholder - in real app use react-native-qrcode-svg */}
-        <View style={styles.qrPlaceholder}>
-          <Text style={styles.qrPlaceholderText}>📱</Text>
-          <Text style={styles.qrPlaceholderLabel}>QR Code</Text>
-          <Text style={styles.qrData}>{did.slice(0, 20)}...</Text>
+        {/* QR Code */}
+        <View style={styles.qrWrapper}>
+          {QRCode && Platform.OS !== 'web' ? (
+            <QRCode value={qrData} size={180} />
+          ) : (
+            <View style={styles.qrPlaceholder}>
+              <View style={styles.qrFallback}>
+                <Text style={styles.qrFallbackText}>⬛⬜⬛⬜⬛</Text>
+                <Text style={styles.qrFallbackText}>⬜⬛⬜⬛⬜</Text>
+                <Text style={styles.qrFallbackText}>⬛⬜⬛⬜⬛</Text>
+                <Text style={styles.qrFallbackText}>⬜⬛⬜⬛⬜</Text>
+                <Text style={styles.qrFallbackText}>⬛⬜⬛⬜⬛</Text>
+              </View>
+              <Text style={styles.qrPlaceholderLabel}>QR Code</Text>
+            </View>
+          )}
         </View>
+
+        {amount && (
+          <View style={styles.requestAmount}>
+            <Text style={styles.requestAmountLabel}>Requesting</Text>
+            <Text style={styles.requestAmountValue}>{amount} hours</Text>
+          </View>
+        )}
 
         <View style={styles.formSection}>
           <Text style={styles.label}>Request Amount (optional)</Text>
@@ -406,11 +528,16 @@ function ReceiveScreen({ route }: { route: any }) {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.copyButton}>
-        <Text style={styles.copyButtonText}>📋 Copy DID</Text>
+      <TouchableOpacity
+        style={[styles.copyButton, copied && styles.copyButtonSuccess]}
+        onPress={handleCopyDid}
+      >
+        <Text style={[styles.copyButtonText, copied && styles.copyButtonTextSuccess]}>
+          {copied ? '✓ Copied!' : '📋 Copy DID'}
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.shareButton}>
+      <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
         <Text style={styles.shareButtonText}>📤 Share Payment Link</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -469,7 +596,7 @@ function ScanScreen({ navigation }: { navigation: any }) {
 // Governance Screen - View and vote on proposals
 // ============================================================================
 function GovernanceScreen({ navigation }: { navigation: any }) {
-  const [proposals] = useState([
+  const [proposals, setProposals] = useState([
     {
       id: '1',
       title: 'Increase new member credit limit',
@@ -478,6 +605,7 @@ function GovernanceScreen({ navigation }: { navigation: any }) {
       votesFor: 23,
       votesAgainst: 5,
       endDate: '2025-12-20',
+      myVote: null as 'for' | 'against' | null,
     },
     {
       id: '2',
@@ -487,6 +615,7 @@ function GovernanceScreen({ navigation }: { navigation: any }) {
       votesFor: 45,
       votesAgainst: 2,
       endDate: '2025-12-18',
+      myVote: null as 'for' | 'against' | null,
     },
     {
       id: '3',
@@ -496,32 +625,56 @@ function GovernanceScreen({ navigation }: { navigation: any }) {
       votesFor: 67,
       votesAgainst: 8,
       endDate: '2025-12-01',
+      myVote: 'for' as 'for' | 'against' | null,
     },
   ]);
+
+  const handleVote = (proposalId: string, voteType: 'for' | 'against') => {
+    setProposals(prev => prev.map(p => {
+      if (p.id !== proposalId) return p;
+
+      // If already voted, don't allow changing
+      if (p.myVote !== null) {
+        if (Platform.OS === 'web') {
+          alert('You have already voted on this proposal');
+        } else {
+          Alert.alert('Already Voted', 'You have already voted on this proposal');
+        }
+        return p;
+      }
+
+      // Record vote
+      return {
+        ...p,
+        myVote: voteType,
+        votesFor: voteType === 'for' ? p.votesFor + 1 : p.votesFor,
+        votesAgainst: voteType === 'against' ? p.votesAgainst + 1 : p.votesAgainst,
+      };
+    }));
+  };
+
+  const totalVotes = proposals.reduce((sum, p) => sum + p.votesFor + p.votesAgainst, 0);
+  const activeCount = proposals.filter(p => p.status === 'active').length;
 
   return (
     <ScrollView style={styles.governanceContainer}>
       <View style={styles.govStats}>
         <View style={styles.govStat}>
-          <Text style={styles.govStatNumber}>3</Text>
+          <Text style={styles.govStatNumber}>{proposals.length}</Text>
           <Text style={styles.govStatLabel}>Proposals</Text>
         </View>
         <View style={styles.govStat}>
-          <Text style={styles.govStatNumber}>2</Text>
+          <Text style={styles.govStatNumber}>{activeCount}</Text>
           <Text style={styles.govStatLabel}>Active</Text>
         </View>
         <View style={styles.govStat}>
-          <Text style={styles.govStatNumber}>150</Text>
+          <Text style={styles.govStatNumber}>{totalVotes}</Text>
           <Text style={styles.govStatLabel}>Total Votes</Text>
         </View>
       </View>
 
       {proposals.map((proposal) => (
-        <TouchableOpacity
-          key={proposal.id}
-          style={styles.proposalCard}
-          onPress={() => alert('Proposal: ' + proposal.title)}
-        >
+        <View key={proposal.id} style={styles.proposalCard}>
           <View style={styles.proposalHeader}>
             <Text style={styles.proposalTitle}>{proposal.title}</Text>
             <View style={[
@@ -535,25 +688,40 @@ function GovernanceScreen({ navigation }: { navigation: any }) {
           </View>
           <Text style={styles.proposalDescription}>{proposal.description}</Text>
           <View style={styles.voteBar}>
-            <View style={[styles.voteFor, { flex: proposal.votesFor }]} />
-            <View style={[styles.voteAgainst, { flex: proposal.votesAgainst }]} />
+            <View style={[styles.voteFor, { flex: proposal.votesFor || 1 }]} />
+            <View style={[styles.voteAgainst, { flex: proposal.votesAgainst || 1 }]} />
           </View>
           <View style={styles.voteStats}>
             <Text style={styles.voteText}>👍 {proposal.votesFor}</Text>
             <Text style={styles.voteText}>👎 {proposal.votesAgainst}</Text>
             <Text style={styles.endDate}>Ends: {proposal.endDate}</Text>
           </View>
-          {proposal.status === 'active' && (
+
+          {proposal.myVote && (
+            <View style={styles.votedBadge}>
+              <Text style={styles.votedText}>
+                You voted {proposal.myVote === 'for' ? '👍 For' : '👎 Against'}
+              </Text>
+            </View>
+          )}
+
+          {proposal.status === 'active' && !proposal.myVote && (
             <View style={styles.voteButtons}>
-              <TouchableOpacity style={styles.voteForButton}>
+              <TouchableOpacity
+                style={styles.voteForButton}
+                onPress={() => handleVote(proposal.id, 'for')}
+              >
                 <Text style={styles.voteButtonText}>Vote For</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.voteAgainstButton}>
+              <TouchableOpacity
+                style={styles.voteAgainstButton}
+                onPress={() => handleVote(proposal.id, 'against')}
+              >
                 <Text style={styles.voteButtonText}>Vote Against</Text>
               </TouchableOpacity>
             </View>
           )}
-        </TouchableOpacity>
+        </View>
       ))}
     </ScrollView>
   );
@@ -832,6 +1000,207 @@ function VerificationHistoryScreen() {
 }
 
 // ============================================================================
+// Transactions Screen - Full transaction history
+// ============================================================================
+function TransactionsScreen() {
+  const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
+
+  const filteredTx = DEMO_TRANSACTIONS.filter(tx => {
+    if (filter === 'all') return true;
+    return tx.type === filter;
+  });
+
+  const totalSent = DEMO_TRANSACTIONS.filter(t => t.type === 'sent')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalReceived = DEMO_TRANSACTIONS.filter(t => t.type === 'received')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  return (
+    <ScrollView style={styles.transactionsContainer}>
+      <View style={styles.txSummary}>
+        <View style={styles.txSummaryItem}>
+          <Text style={styles.txSummaryLabel}>Total Received</Text>
+          <Text style={[styles.txSummaryValue, styles.txAmountReceived]}>+{totalReceived}h</Text>
+        </View>
+        <View style={styles.txSummaryItem}>
+          <Text style={styles.txSummaryLabel}>Total Sent</Text>
+          <Text style={[styles.txSummaryValue, styles.txAmountSent]}>-{totalSent}h</Text>
+        </View>
+      </View>
+
+      <View style={styles.filterRow}>
+        {(['all', 'received', 'sent'] as const).map((f) => (
+          <TouchableOpacity
+            key={f}
+            style={[styles.filterButton, filter === f && styles.filterButtonActive]}
+            onPress={() => setFilter(f)}
+          >
+            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {filteredTx.map((tx) => (
+        <View key={tx.id} style={styles.transactionItem}>
+          <View style={[
+            styles.txIcon,
+            tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
+          ]}>
+            <Text style={styles.txIconText}>{tx.type === 'received' ? '↓' : '↑'}</Text>
+          </View>
+          <View style={styles.txContent}>
+            <Text style={styles.txPerson}>
+              {tx.type === 'received' ? `From ${tx.from}` : `To ${tx.to}`}
+            </Text>
+            <Text style={styles.txMemo}>{tx.memo}</Text>
+          </View>
+          <View style={styles.txAmountContainer}>
+            <Text style={[
+              styles.txAmount,
+              tx.type === 'received' ? styles.txAmountReceived : styles.txAmountSent
+            ]}>
+              {tx.type === 'received' ? '+' : '-'}{tx.amount}h
+            </Text>
+            <Text style={styles.txDate}>{tx.date}</Text>
+          </View>
+        </View>
+      ))}
+
+      {filteredTx.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📭</Text>
+          <Text style={styles.emptyText}>No transactions found</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Settings Screen - App preferences
+// ============================================================================
+function SettingsScreen({ onLogout }: { onLogout: () => void }) {
+  const [notifications, setNotifications] = useState(true);
+  const [biometrics, setBiometrics] = useState(false);
+  const did = 'did:icn:demo123456789abcdef';
+
+  const handleExportKeys = async () => {
+    if (Platform.OS === 'web') {
+      alert('Key export would be initiated here. In production, this would securely export your keys.');
+    } else {
+      Alert.alert(
+        'Export Keys',
+        'This will export your private keys. Keep them secure!',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Export', onPress: () => Alert.alert('Exported', 'Keys exported successfully') }
+        ]
+      );
+    }
+  };
+
+  return (
+    <ScrollView style={styles.settingsContainer}>
+      <View style={styles.settingsSection}>
+        <Text style={styles.settingsSectionTitle}>Account</Text>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Your DID</Text>
+            <Text style={styles.settingsItemValue} numberOfLines={1}>
+              {did.slice(0, 25)}...
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={async () => {
+              await copyToClipboard(did);
+              if (Platform.OS === 'web') {
+                alert('DID copied!');
+              } else {
+                Alert.alert('Copied', 'DID copied to clipboard');
+              }
+            }}
+          >
+            <Text style={styles.settingsAction}>Copy</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.settingsItem} onPress={handleExportKeys}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Export Keys</Text>
+            <Text style={styles.settingsItemDescription}>Backup your private keys</Text>
+          </View>
+          <Text style={styles.settingsArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.settingsSection}>
+        <Text style={styles.settingsSectionTitle}>Preferences</Text>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Push Notifications</Text>
+            <Text style={styles.settingsItemDescription}>Receive payment alerts</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggle, notifications && styles.toggleOn]}
+            onPress={() => setNotifications(!notifications)}
+          >
+            <View style={[styles.toggleThumb, notifications && styles.toggleThumbOn]} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Biometric Auth</Text>
+            <Text style={styles.settingsItemDescription}>Use fingerprint or face ID</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggle, biometrics && styles.toggleOn]}
+            onPress={() => setBiometrics(!biometrics)}
+          >
+            <View style={[styles.toggleThumb, biometrics && styles.toggleThumbOn]} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.settingsSection}>
+        <Text style={styles.settingsSectionTitle}>About</Text>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Version</Text>
+          </View>
+          <Text style={styles.settingsValue}>0.1.0</Text>
+        </View>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Network</Text>
+          </View>
+          <Text style={styles.settingsValue}>ICN Testnet</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.dangerButton} onPress={onLogout}>
+        <Text style={styles.dangerButtonText}>Logout</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.dangerButtonOutline}>
+        <Text style={styles.dangerButtonOutlineText}>Delete Account</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.settingsFooter}>
+        InterCooperative Network{'\n'}
+        Building the cooperative economy
+      </Text>
+    </ScrollView>
+  );
+}
+
+// ============================================================================
 // Navigation Setup
 // ============================================================================
 
@@ -845,6 +1214,8 @@ export type RootStackParamList = {
   Identity: undefined;
   Verify: undefined;
   VerificationHistory: undefined;
+  Transactions: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -924,6 +1295,10 @@ export default function App() {
             <Stack.Screen name="Identity" component={IdentityScreen} options={{ title: 'My Identity' }} />
             <Stack.Screen name="Verify" component={VerifyScreen} options={{ title: 'Verify Identity' }} />
             <Stack.Screen name="VerificationHistory" component={VerificationHistoryScreen} options={{ title: 'History' }} />
+            <Stack.Screen name="Transactions" component={TransactionsScreen} options={{ title: 'Transactions' }} />
+            <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
+              {() => <SettingsScreen onLogout={handleLogout} />}
+            </Stack.Screen>
           </>
         )}
       </Stack.Navigator>
@@ -1710,5 +2085,282 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#666',
+  },
+
+  // Transaction styles (Home)
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  seeAllLink: {
+    fontSize: 14,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  txIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  txIconReceived: {
+    backgroundColor: '#e8f5e9',
+  },
+  txIconSent: {
+    backgroundColor: '#ffebee',
+  },
+  txIconText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  txContent: {
+    flex: 1,
+  },
+  txPerson: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  txMemo: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  txAmountContainer: {
+    alignItems: 'flex-end',
+  },
+  txAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  txAmountReceived: {
+    color: '#4caf50',
+  },
+  txAmountSent: {
+    color: '#f44336',
+  },
+  txDate: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
+  },
+
+  // QR Code styles
+  qrWrapper: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  qrFallback: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  qrFallbackText: {
+    fontSize: 24,
+    letterSpacing: 4,
+  },
+  requestAmount: {
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  requestAmountLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  requestAmountValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4A90A4',
+    textAlign: 'center',
+  },
+  copyButtonSuccess: {
+    backgroundColor: '#4caf50',
+  },
+  copyButtonTextSuccess: {
+    color: '#fff',
+  },
+
+  // Voted badge
+  votedBadge: {
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  votedText: {
+    fontSize: 14,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+
+  // Transactions screen
+  transactionsContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  txSummary: {
+    flexDirection: 'row',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+    justifyContent: 'space-around',
+  },
+  txSummaryItem: {
+    alignItems: 'center',
+  },
+  txSummaryLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  txSummaryValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  filterButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#4A90A4',
+  },
+  filterText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  filterTextActive: {
+    color: '#fff',
+  },
+
+  // Settings screen
+  settingsContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  settingsSection: {
+    marginTop: 24,
+  },
+  settingsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginLeft: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingsItemContent: {
+    flex: 1,
+  },
+  settingsItemLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  settingsItemValue: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  settingsItemDescription: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  settingsAction: {
+    fontSize: 14,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+  settingsArrow: {
+    fontSize: 24,
+    color: '#ccc',
+  },
+  settingsValue: {
+    fontSize: 14,
+    color: '#666',
+  },
+  toggle: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ccc',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleOn: {
+    backgroundColor: '#4A90A4',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
+  },
+  dangerButton: {
+    backgroundColor: '#f44336',
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  dangerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dangerButtonOutline: {
+    borderWidth: 1,
+    borderColor: '#f44336',
+    marginHorizontal: 16,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  dangerButtonOutlineText: {
+    color: '#f44336',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  settingsFooter: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 32,
+    marginBottom: 48,
+    lineHeight: 20,
   },
 });
