@@ -61,15 +61,42 @@ jobs:
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.IMAGE_NAME }}:latest
           echo "✓ Image built successfully"
 
-      - name: Save and import to containerd
+      - name: Save and distribute to all nodes
         run: |
-          echo "Exporting image to containerd..."
-          docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} | sudo k3s ctr images import -
-          docker save ${{ env.IMAGE_NAME }}:latest | sudo k3s ctr images import -
-          echo "✓ Image imported to containerd"
+          echo "Saving Docker image..."
+          docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o /tmp/icn-image.tar
 
-          # Verify
-          sudo k3s ctr images ls | grep ${{ env.IMAGE_NAME }} || true
+          echo "Importing to control node..."
+          sudo k3s ctr images import /tmp/icn-image.tar
+
+          echo "Distributing to worker nodes..."
+          WORKERS="10.8.10.41 10.8.10.42"
+          for WORKER in $WORKERS; do
+            echo "  → Importing to $WORKER..."
+            cat /tmp/icn-image.tar | ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images import -" || {
+              echo "  ⚠ Failed to import to $WORKER (node may be down)"
+            }
+          done
+
+          # Also import latest tag
+          docker save ${{ env.IMAGE_NAME }}:latest -o /tmp/icn-latest.tar
+          sudo k3s ctr images import /tmp/icn-latest.tar
+          for WORKER in $WORKERS; do
+            cat /tmp/icn-latest.tar | ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images import -" 2>/dev/null || true
+          done
+
+          # Cleanup
+          rm -f /tmp/icn-image.tar /tmp/icn-latest.tar
+
+          echo "✓ Image distributed to all nodes"
+
+          # Verify on all nodes
+          echo "Images on control:"
+          sudo k3s ctr images ls | grep "${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" | head -1 || true
+          for WORKER in $WORKERS; do
+            echo "Images on $WORKER:"
+            ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images ls | grep '${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}' | head -1" || true
+          done
 
       - name: Deploy to K3s
         if: ${{ github.event.inputs.deploy != 'false' }}
@@ -140,13 +167,24 @@ jobs:
   # Cleanup old images (runs weekly)
   cleanup:
     name: Cleanup Old Images
-    runs-on: [self-hosted, homelab]
+    runs-on: [self-hosted, homelab, k3s]
     if: github.event_name == 'schedule'
     steps:
-      - name: Remove old images
+      - name: Remove old images on all nodes
         run: |
-          echo "Cleaning up old images..."
-          # Keep last 5 versions
-          sudo k3s ctr images ls | grep icn | sort -r | tail -n +6 | awk '{print $1}' | xargs -r sudo k3s ctr images rm
+          echo "Cleaning up old images on all nodes..."
+          WORKERS="10.8.10.41 10.8.10.42"
+
+          # Cleanup on control node
+          echo "Cleaning control node..."
+          sudo k3s ctr images ls | grep "docker.io/library/icn:" | sort -r | tail -n +6 | awk '{print $1}' | xargs -r sudo k3s ctr images rm 2>/dev/null || true
+
+          # Cleanup on worker nodes
+          for WORKER in $WORKERS; do
+            echo "Cleaning $WORKER..."
+            ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images ls | grep 'docker.io/library/icn:' | sort -r | tail -n +6 | awk '{print \$1}' | xargs -r sudo k3s ctr images rm" 2>/dev/null || true
+          done
+
+          # Cleanup local docker
           docker image prune -f
           echo "✓ Cleanup complete"
