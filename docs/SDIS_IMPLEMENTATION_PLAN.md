@@ -496,13 +496,13 @@ impl DidDocument {
 
 ### S2 Deliverables Checklist
 
-- [ ] Anchor type implemented and tested
-- [ ] KeyBundle type implemented and tested
-- [ ] Keystore v4 migration working
-- [ ] VUI types defined
-- [ ] IdentityBundle extended
-- [ ] Backward compatibility with legacy DIDs
-- [ ] All existing icn-identity tests still pass
+- [x] Anchor type implemented and tested (12 tests)
+- [x] KeyBundle type implemented and tested (11 tests)
+- [x] Keystore v4 migration working (6 tests)
+- [x] VUI types defined (7 tests)
+- [x] IdentityBundle extended
+- [x] Backward compatibility with legacy DIDs
+- [x] All existing icn-identity tests still pass (85 total)
 
 ---
 
@@ -885,13 +885,13 @@ impl StewardHandle {
 
 ### S3 Deliverables Checklist
 
-- [ ] `icn-steward` crate compiles
-- [ ] VUI registry with distributed checking
-- [ ] Enrollment ceremony state machine
-- [ ] Recovery ceremony state machine
-- [ ] StewardActor with gossip integration
-- [ ] Integration tests with multiple stewards
-- [ ] Threshold operations tested
+- [x] `icn-steward` crate compiles (73 tests passing)
+- [x] VUI registry with distributed checking (Bloom filter + exact set)
+- [x] Enrollment ceremony state machine
+- [x] Recovery ceremony state machine
+- [x] StewardActor with gossip integration
+- [x] Integration tests with multiple stewards (16 integration tests)
+- [x] Threshold operations tested (3-of-5 PRF combination)
 
 ---
 
@@ -1465,7 +1465,18 @@ async fn test_full_enrollment_flow() {
 - Threshold PRF integration for VUI computation
 - VUI uniqueness checking via registry
 - Expanded gossip messages (ParticipationRequest, PrfPartialDelivery, UniquenessCheck/Response)
-- 57 steward tests passing (55 unit + 2 new enrollment flow tests)
+- 73 steward tests passing (57 unit + 16 integration tests)
+- `enrollment_integration.rs` - Comprehensive integration tests:
+  - Single steward enrollment end-to-end
+  - Multi-steward enrollment simulation with coordinator pattern
+  - 3-of-5 threshold PRF combination
+  - Duplicate enrollment rejection
+  - Different users can enroll successfully
+  - VUI commitment verification
+  - Gossip message serialization
+  - Client-side blinded request creation
+  - Error handling (missing pepper share, no partials)
+  - Share commitment and VUI registry operations
 
 ---
 
