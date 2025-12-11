@@ -413,6 +413,8 @@ export function useSdisVerifierWithHistory(client: ICNMobileClient) {
 
   return {
     ...verifierHook,
+    // Override verify with verifyWithHistory to provide correct signature with proofTypeLabel
+    verify: verifyWithHistory,
     verifyWithHistory,
     history: historyHook.history,
     clearHistory: historyHook.clearHistory,

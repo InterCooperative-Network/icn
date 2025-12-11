@@ -5,7 +5,7 @@
  */
 
 import { Platform } from 'react-native';
-import { createWallet, createMobileClient, SecureStorage } from '@icn/react-native';
+import { createWallet, createMobileClient, SecureStorage, Wallet, MobileClient } from '@icn/react-native';
 
 // Web localStorage adapter (fallback for web)
 const webStorage: SecureStorage = {
@@ -43,28 +43,38 @@ const getNativeStorage = async (): Promise<SecureStorage> => {
   };
 };
 
-// Use web storage on web, native secure store on mobile
-const secureStorage: SecureStorage = Platform.OS === 'web' ? webStorage : webStorage;
-
-// Create wallet for key management
-export const wallet = createWallet(secureStorage);
-
-// Create mobile client
-// Replace with your ICN gateway URL
+// Gateway URL - replace with your ICN gateway
 const GATEWAY_URL = 'https://icn.mycoop.org';
 
-export const client = createMobileClient({
-  baseUrl: GATEWAY_URL,
-  wallet,
-  storage: secureStorage,
-});
+// Storage, wallet, and client are initialized asynchronously
+let secureStorage: SecureStorage | null = null;
+export let wallet: Wallet | null = null;
+export let client: MobileClient | null = null;
 
 // Initialize client (call on app startup)
 export async function initializeClient(): Promise<void> {
+  // Get platform-appropriate storage
+  if (Platform.OS === 'web') {
+    secureStorage = webStorage;
+  } else {
+    // Use native secure storage on iOS/Android
+    secureStorage = await getNativeStorage();
+  }
+
+  // Create wallet for key management
+  wallet = createWallet(secureStorage);
+
   // Ensure wallet has a key pair
   if (!(await wallet.hasKeyPair())) {
     await wallet.generateKeyPair();
   }
+
+  // Create mobile client
+  client = createMobileClient({
+    baseUrl: GATEWAY_URL,
+    wallet,
+    storage: secureStorage,
+  });
 
   // Load persisted auth state
   await client.initialize();
