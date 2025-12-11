@@ -115,8 +115,8 @@ pub fn derive_session_key(
 pub fn prf_partial(pepper_share: &[u8; 32], input: &[u8]) -> [u8; 32] {
     use hmac::{Hmac, Mac};
 
-    let mut mac = Hmac::<Sha3_256>::new_from_slice(pepper_share)
-        .expect("HMAC key length should be valid");
+    let mut mac =
+        Hmac::<Sha3_256>::new_from_slice(pepper_share).expect("HMAC key length should be valid");
     mac.update(input);
     mac.finalize().into_bytes().into()
 }

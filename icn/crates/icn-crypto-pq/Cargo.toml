@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 # Classical cryptography
 ed25519-dalek = { version = "2.1", features = ["rand_core", "serde"] }
-x25519-dalek = { version = "2.0", features = ["serde"] }
+x25519-dalek = { version = "2.0", features = ["serde", "static_secrets"] }
 curve25519-dalek = "4.1"
 
 # Post-quantum cryptography (NIST FIPS standards)

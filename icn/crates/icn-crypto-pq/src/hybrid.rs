@@ -251,7 +251,10 @@ impl HybridKeypair {
         let classical_sig = self.classical_signing.sign(message);
 
         // ML-DSA signature
-        let pq_sig = self.pq_keypair.sign(message).expect("ML-DSA signing failed");
+        let pq_sig = self
+            .pq_keypair
+            .sign(message)
+            .expect("ML-DSA signing failed");
 
         HybridSignature::new(classical_sig, pq_sig)
     }

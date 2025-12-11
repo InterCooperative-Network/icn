@@ -36,13 +36,25 @@
 //! | Public Key | 32 bytes | ~2 KB |
 //! | Secret Key | 32 bytes | ~4 KB |
 
+pub mod blind;
 pub mod hybrid;
+pub mod hybrid_kem;
 pub mod kdf;
 pub mod ml_dsa;
+pub mod ml_kem;
+pub mod threshold;
 
+pub use blind::{
+    BlindSignature, BlindedMessage, BlindingFactor, EnrollmentToken, UnblindedSignature,
+};
 pub use hybrid::{HybridKeypair, HybridPublicKey, HybridSignature};
+pub use hybrid_kem::{HybridKemCiphertext, HybridKemKeypair, HybridKemPublicKey};
 pub use kdf::{derive_hybrid_key, derive_keybundle_keys};
 pub use ml_dsa::{MlDsaKeypair, MlDsaPublicKey, MlDsaSignature};
+pub use ml_kem::{MlKemCiphertext, MlKemKeypair, MlKemPublicKey};
+pub use threshold::{
+    combine_prf_partials, AdditiveSecretSharing, PepperShare, PrfPartial, ShareCommitment,
+};
 
 /// Errors from cryptographic operations
 #[derive(Debug, thiserror::Error)]
