@@ -1,3 +1,6 @@
+// Allow unused_assignments from Zeroize derive macro generated code
+#![allow(unused_assignments)]
+
 //! ICN Zero-Knowledge Proofs
 //!
 //! Zero-knowledge proof system for SDIS (Sovereign Digital Identity System).
