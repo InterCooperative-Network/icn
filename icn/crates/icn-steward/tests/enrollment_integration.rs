@@ -8,12 +8,10 @@
 
 use icn_crypto_pq::threshold::{PepperShare, PrfPartial, ShareCommitment};
 use icn_identity::KeyPair;
-use icn_steward::{
-    EnrollmentClient, EnrollmentConfig, EnrollmentRequest, EnrollmentService,
-};
 use icn_steward::ceremony::enrollment::ShareContribution;
 use icn_steward::gossip::{EnrollmentMessage, StewardMessage, VuiSyncMessage};
 use icn_steward::vui_registry::VuiRegistry;
+use icn_steward::{EnrollmentClient, EnrollmentConfig, EnrollmentRequest, EnrollmentService};
 
 /// Create a test DID
 fn test_did() -> icn_identity::Did {
@@ -275,7 +273,9 @@ fn test_duplicate_enrollment_rejection() {
     // Complete first enrollment
     client1.add_partial(partial1);
     client1.compute_vui().unwrap();
-    let token_request1 = client1.create_blinded_request(response1.ceremony_id).unwrap();
+    let token_request1 = client1
+        .create_blinded_request(response1.ceremony_id)
+        .unwrap();
     service
         .issue_blinded_signature(&response1.ceremony_id, &token_request1.blinded_message)
         .unwrap();
@@ -351,7 +351,9 @@ fn test_different_users_can_enroll() {
 
     client1.add_partial(partial1);
     client1.compute_vui().unwrap();
-    let token_request1 = client1.create_blinded_request(response1.ceremony_id).unwrap();
+    let token_request1 = client1
+        .create_blinded_request(response1.ceremony_id)
+        .unwrap();
     service
         .issue_blinded_signature(&response1.ceremony_id, &token_request1.blinded_message)
         .unwrap();
@@ -386,7 +388,9 @@ fn test_different_users_can_enroll() {
 
     client2.add_partial(partial2);
     client2.compute_vui().unwrap();
-    let token_request2 = client2.create_blinded_request(response2.ceremony_id).unwrap();
+    let token_request2 = client2
+        .create_blinded_request(response2.ceremony_id)
+        .unwrap();
     service
         .issue_blinded_signature(&response2.ceremony_id, &token_request2.blinded_message)
         .unwrap();
@@ -489,7 +493,12 @@ fn test_enrollment_gossip_message_serialization() {
     let serialized = serde_json::to_string(&msg).unwrap();
     let deserialized: EnrollmentMessage = serde_json::from_str(&serialized).unwrap();
 
-    if let EnrollmentMessage::ParticipationRequest { ceremony_id, threshold, .. } = deserialized {
+    if let EnrollmentMessage::ParticipationRequest {
+        ceremony_id,
+        threshold,
+        ..
+    } = deserialized
+    {
         assert_eq!(ceremony_id, [1u8; 32]);
         assert_eq!(threshold, 3);
     } else {
@@ -602,7 +611,10 @@ fn test_vui_registry_basic_operations() {
 
     // Initially not registered
     let check = registry.check_local(&vui_hash);
-    assert!(matches!(check, icn_steward::vui_registry::LocalCheckResult::NotRegistered));
+    assert!(matches!(
+        check,
+        icn_steward::vui_registry::LocalCheckResult::NotRegistered
+    ));
 
     // Register
     let result = registry.register(vui_hash, steward_did.clone(), steward_did.clone());
@@ -610,5 +622,8 @@ fn test_vui_registry_basic_operations() {
 
     // Now registered
     let check = registry.check_local(&vui_hash);
-    assert!(matches!(check, icn_steward::vui_registry::LocalCheckResult::Registered(_)));
+    assert!(matches!(
+        check,
+        icn_steward::vui_registry::LocalCheckResult::Registered(_)
+    ));
 }

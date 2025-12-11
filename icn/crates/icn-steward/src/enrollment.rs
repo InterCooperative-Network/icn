@@ -222,8 +222,7 @@ impl EnrollmentService {
             .as_secs();
 
         // Generate ceremony ID
-        let ceremony_id =
-            EnrollmentCeremony::generate_ceremony_id(&request.vui_commitment, now);
+        let ceremony_id = EnrollmentCeremony::generate_ceremony_id(&request.vui_commitment, now);
 
         // Check for duplicate
         if self.ceremonies.contains_key(&ceremony_id) {

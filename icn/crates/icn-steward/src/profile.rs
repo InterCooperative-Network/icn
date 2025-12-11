@@ -109,8 +109,7 @@ pub enum StewardStatus {
 /// Jurisdiction tier determining verification requirements
 ///
 /// Higher tiers require more scrutiny for enrollments from that jurisdiction.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum JurisdictionTier {
     /// Standard jurisdiction - normal verification
     #[default]
@@ -241,7 +240,6 @@ impl StewardStats {
         Self::default()
     }
 }
-
 
 #[cfg(test)]
 mod tests {

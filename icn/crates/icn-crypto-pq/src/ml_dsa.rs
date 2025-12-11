@@ -85,9 +85,8 @@ impl MlDsaSignature {
 
     /// Convert to pqcrypto DetachedSignature
     fn to_pqcrypto(&self) -> Result<DetachedSignature> {
-        DetachedSignature::from_bytes(&self.bytes).map_err(|e| {
-            CryptoError::InvalidSignature(format!("Invalid ML-DSA signature: {e:?}"))
-        })
+        DetachedSignature::from_bytes(&self.bytes)
+            .map_err(|e| CryptoError::InvalidSignature(format!("Invalid ML-DSA signature: {e:?}")))
     }
 }
 

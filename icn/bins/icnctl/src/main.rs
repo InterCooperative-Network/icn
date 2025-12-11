@@ -6121,19 +6121,40 @@ async fn handle_steward_command(
                 // Parse and display steward section
                 let config: toml::Value = toml::from_str(&config_content)?;
                 if let Some(steward) = config.get("steward") {
-                    let enabled = steward.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
-                    let threshold = steward.get("vui_threshold").and_then(|v| v.as_integer()).unwrap_or(3);
-                    let total = steward.get("vui_total_shares").and_then(|v| v.as_integer()).unwrap_or(5);
-                    let max_enroll = steward.get("max_concurrent_enrollments").and_then(|v| v.as_integer()).unwrap_or(100);
-                    let max_recover = steward.get("max_concurrent_recoveries").and_then(|v| v.as_integer()).unwrap_or(50);
-                    let token_validity = steward.get("token_validity_secs").and_then(|v| v.as_integer()).unwrap_or(604800);
+                    let enabled = steward
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let threshold = steward
+                        .get("vui_threshold")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(3);
+                    let total = steward
+                        .get("vui_total_shares")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(5);
+                    let max_enroll = steward
+                        .get("max_concurrent_enrollments")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(100);
+                    let max_recover = steward
+                        .get("max_concurrent_recoveries")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(50);
+                    let token_validity = steward
+                        .get("token_validity_secs")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(604800);
 
                     println!("enabled:                   {enabled}");
                     println!("vui_threshold:             {threshold}");
                     println!("vui_total_shares:          {total}");
                     println!("max_concurrent_enrollments: {max_enroll}");
                     println!("max_concurrent_recoveries:  {max_recover}");
-                    println!("token_validity_secs:       {token_validity} ({} days)", token_validity / 86400);
+                    println!(
+                        "token_validity_secs:       {token_validity} ({} days)",
+                        token_validity / 86400
+                    );
                 } else {
                     println!("No [steward] section in config.toml");
                     println!("\nDefault configuration:");
@@ -6151,7 +6172,10 @@ async fn handle_steward_command(
             let hash_bytes = hex::decode(&vui_hash)
                 .with_context(|| format!("Invalid VUI hash hex: {vui_hash}"))?;
             if hash_bytes.len() != 32 {
-                bail!("VUI hash must be 32 bytes (64 hex chars), got {} bytes", hash_bytes.len());
+                bail!(
+                    "VUI hash must be 32 bytes (64 hex chars), got {} bytes",
+                    hash_bytes.len()
+                );
             }
 
             println!("Checking VUI registry for hash: {}...", &vui_hash[..16]);
@@ -6162,7 +6186,10 @@ async fn handle_steward_command(
             println!("   Start daemon with steward enabled in config.toml");
         }
 
-        StewardCommands::StartEnrollment { vui_commitment, pathway_hash } => {
+        StewardCommands::StartEnrollment {
+            vui_commitment,
+            pathway_hash,
+        } => {
             // Validate inputs
             let commitment_bytes = hex::decode(&vui_commitment)
                 .with_context(|| format!("Invalid VUI commitment hex: {vui_commitment}"))?;
@@ -6192,11 +6219,19 @@ async fn handle_steward_command(
                 bail!("Ceremony ID must be 32 bytes");
             }
 
-            println!("Checking enrollment ceremony status: {}...", &ceremony_id[..16]);
+            println!(
+                "Checking enrollment ceremony status: {}...",
+                &ceremony_id[..16]
+            );
             println!("\n⚠️  Ceremony status check requires running steward daemon.");
         }
 
-        StewardCommands::StartRecovery { old_did, new_did, evidence_hash, anchor_commitment } => {
+        StewardCommands::StartRecovery {
+            old_did,
+            new_did,
+            evidence_hash,
+            anchor_commitment,
+        } => {
             // Validate DIDs
             if !old_did.starts_with("did:icn:") {
                 bail!("Invalid old DID format: {old_did}");
@@ -6236,11 +6271,17 @@ async fn handle_steward_command(
                 bail!("Ceremony ID must be 32 bytes");
             }
 
-            println!("Checking recovery ceremony status: {}...", &ceremony_id[..16]);
+            println!(
+                "Checking recovery ceremony status: {}...",
+                &ceremony_id[..16]
+            );
             println!("\n⚠️  Ceremony status check requires running steward daemon.");
         }
 
-        StewardCommands::IssueToken { vui_commitment, blinded_message } => {
+        StewardCommands::IssueToken {
+            vui_commitment,
+            blinded_message,
+        } => {
             // Validate commitment
             let commitment_bytes = hex::decode(&vui_commitment)
                 .with_context(|| format!("Invalid VUI commitment hex: {vui_commitment}"))?;
@@ -6259,7 +6300,9 @@ async fn handle_steward_command(
             println!("  VUI commitment:   {}...", &vui_commitment[..16]);
             println!("  Blinded message:  {} bytes", blinded_bytes.len());
 
-            println!("\n⚠️  Token issuance requires running steward daemon with steward privileges.");
+            println!(
+                "\n⚠️  Token issuance requires running steward daemon with steward privileges."
+            );
             println!("   This is a placeholder for the full SDIS token issuance flow.");
         }
 

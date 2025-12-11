@@ -52,7 +52,9 @@ fn test_single_steward_recovery() {
 
     // Add attestation
     let attestation = RecoveryAttestation::support(steward_did.clone(), vec![1, 2, 3]);
-    service.add_attestation(&response.ceremony_id, attestation).unwrap();
+    service
+        .add_attestation(&response.ceremony_id, attestation)
+        .unwrap();
 
     // Verify and complete
     assert!(service.can_proceed(&response.ceremony_id));
@@ -93,7 +95,9 @@ fn test_three_of_five_threshold_recovery() {
     for i in 0..3 {
         let steward = test_did();
         let attestation = RecoveryAttestation::support(steward, vec![i as u8]);
-        service.add_attestation(&response.ceremony_id, attestation).unwrap();
+        service
+            .add_attestation(&response.ceremony_id, attestation)
+            .unwrap();
     }
 
     // Should have enough support
@@ -126,7 +130,9 @@ fn test_recovery_requires_threshold() {
     // Add only 2 attestations (below threshold)
     for i in 0..2 {
         let attestation = RecoveryAttestation::support(test_did(), vec![i as u8]);
-        service.add_attestation(&response.ceremony_id, attestation).unwrap();
+        service
+            .add_attestation(&response.ceremony_id, attestation)
+            .unwrap();
     }
 
     // Should NOT have enough support
@@ -154,22 +160,30 @@ fn test_mixed_attestations() {
     let response = service.start_ceremony(request).unwrap();
 
     // Add 2 supporting, 1 rejecting, 1 supporting
-    service.add_attestation(
-        &response.ceremony_id,
-        RecoveryAttestation::support(test_did(), vec![1]),
-    ).unwrap();
-    service.add_attestation(
-        &response.ceremony_id,
-        RecoveryAttestation::support(test_did(), vec![2]),
-    ).unwrap();
-    service.add_attestation(
-        &response.ceremony_id,
-        RecoveryAttestation::reject(test_did(), "Suspicious".to_string(), vec![3]),
-    ).unwrap();
-    service.add_attestation(
-        &response.ceremony_id,
-        RecoveryAttestation::support(test_did(), vec![4]),
-    ).unwrap();
+    service
+        .add_attestation(
+            &response.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![1]),
+        )
+        .unwrap();
+    service
+        .add_attestation(
+            &response.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![2]),
+        )
+        .unwrap();
+    service
+        .add_attestation(
+            &response.ceremony_id,
+            RecoveryAttestation::reject(test_did(), "Suspicious".to_string(), vec![3]),
+        )
+        .unwrap();
+    service
+        .add_attestation(
+            &response.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![4]),
+        )
+        .unwrap();
 
     // 3 supporting attestations - should be able to proceed
     assert!(service.can_proceed(&response.ceremony_id));
@@ -194,10 +208,12 @@ fn test_double_recovery_prevention() {
     let request1 = RecoveryRequest::new(old_did.clone(), new_did.clone(), evidence1);
     let response1 = service.start_ceremony(request1).unwrap();
 
-    service.add_attestation(
-        &response1.ceremony_id,
-        RecoveryAttestation::support(test_did(), vec![]),
-    ).unwrap();
+    service
+        .add_attestation(
+            &response1.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![]),
+        )
+        .unwrap();
     service.verify_and_bind(&response1.ceremony_id).unwrap();
     service.complete_recovery(&response1.ceremony_id).unwrap();
 
@@ -248,7 +264,12 @@ fn test_revocation_chain() {
     let evidence1 = RecoveryEvidence::new(&[1u8; 32], [1u8; 32]);
     let request1 = RecoveryRequest::new(original_did.clone(), new_did_1.clone(), evidence1);
     let response1 = service.start_ceremony(request1).unwrap();
-    service.add_attestation(&response1.ceremony_id, RecoveryAttestation::support(test_did(), vec![])).unwrap();
+    service
+        .add_attestation(
+            &response1.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![]),
+        )
+        .unwrap();
     service.verify_and_bind(&response1.ceremony_id).unwrap();
     service.complete_recovery(&response1.ceremony_id).unwrap();
 
@@ -256,7 +277,12 @@ fn test_revocation_chain() {
     let evidence2 = RecoveryEvidence::new(&[2u8; 32], [2u8; 32]);
     let request2 = RecoveryRequest::new(new_did_1.clone(), new_did_2.clone(), evidence2);
     let response2 = service.start_ceremony(request2).unwrap();
-    service.add_attestation(&response2.ceremony_id, RecoveryAttestation::support(test_did(), vec![])).unwrap();
+    service
+        .add_attestation(
+            &response2.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![]),
+        )
+        .unwrap();
     service.verify_and_bind(&response2.ceremony_id).unwrap();
     service.complete_recovery(&response2.ceremony_id).unwrap();
 
@@ -295,10 +321,12 @@ fn test_recovery_stats_tracking() {
     assert_eq!(stats.active_ceremonies, 1);
 
     // Complete it
-    service.add_attestation(
-        &response.ceremony_id,
-        RecoveryAttestation::support(test_did(), vec![]),
-    ).unwrap();
+    service
+        .add_attestation(
+            &response.ceremony_id,
+            RecoveryAttestation::support(test_did(), vec![]),
+        )
+        .unwrap();
     service.verify_and_bind(&response.ceremony_id).unwrap();
     service.complete_recovery(&response.ceremony_id).unwrap();
 
@@ -328,7 +356,9 @@ fn test_duplicate_attestation_rejected() {
     let attestation1 = RecoveryAttestation::support(attesting_steward.clone(), vec![1]);
     let attestation2 = RecoveryAttestation::support(attesting_steward, vec![2]);
 
-    service.add_attestation(&response.ceremony_id, attestation1).unwrap();
+    service
+        .add_attestation(&response.ceremony_id, attestation1)
+        .unwrap();
     let result = service.add_attestation(&response.ceremony_id, attestation2);
 
     assert!(result.is_err());
@@ -376,7 +406,12 @@ fn test_recovery_gossip_message_serialization() {
     let serialized = serde_json::to_string(&msg).unwrap();
     let deserialized: RecoveryMessage = serde_json::from_str(&serialized).unwrap();
 
-    if let RecoveryMessage::RecoveryRequest { ceremony_id, evidence_hash, .. } = deserialized {
+    if let RecoveryMessage::RecoveryRequest {
+        ceremony_id,
+        evidence_hash,
+        ..
+    } = deserialized
+    {
         assert_eq!(ceremony_id, [1u8; 32]);
         assert_eq!(evidence_hash, [2u8; 32]);
     } else {
@@ -404,7 +439,9 @@ fn test_recovery_complete_message() {
     let serialized = serde_json::to_string(&wrapped).unwrap();
     let deserialized: StewardMessage = serde_json::from_str(&serialized).unwrap();
 
-    if let StewardMessage::Recovery(RecoveryMessage::RecoveryComplete { attesters, .. }) = deserialized {
+    if let StewardMessage::Recovery(RecoveryMessage::RecoveryComplete { attesters, .. }) =
+        deserialized
+    {
         assert_eq!(attesters.len(), 2);
     } else {
         panic!("Wrong variant");
@@ -428,7 +465,10 @@ fn test_recovery_attestation_message() {
     let serialized1 = serde_json::to_string(&msg1).unwrap();
     let deserialized1: RecoveryMessage = serde_json::from_str(&serialized1).unwrap();
 
-    if let RecoveryMessage::RecoveryAttestation { supports, reason, .. } = deserialized1 {
+    if let RecoveryMessage::RecoveryAttestation {
+        supports, reason, ..
+    } = deserialized1
+    {
         assert!(supports);
         assert!(reason.is_none());
     } else {
@@ -448,7 +488,10 @@ fn test_recovery_attestation_message() {
     let serialized2 = serde_json::to_string(&msg2).unwrap();
     let deserialized2: RecoveryMessage = serde_json::from_str(&serialized2).unwrap();
 
-    if let RecoveryMessage::RecoveryAttestation { supports, reason, .. } = deserialized2 {
+    if let RecoveryMessage::RecoveryAttestation {
+        supports, reason, ..
+    } = deserialized2
+    {
         assert!(!supports);
         assert_eq!(reason, Some("Evidence not convincing".to_string()));
     } else {

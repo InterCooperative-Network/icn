@@ -19,7 +19,9 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::ceremony::recovery::{RecoveryAttestation, RecoveryCeremony, RecoveryPhase, RecoveryResult};
+use crate::ceremony::recovery::{
+    RecoveryAttestation, RecoveryCeremony, RecoveryPhase, RecoveryResult,
+};
 use crate::ceremony::CeremonyId;
 
 /// Configuration for the recovery service
@@ -208,7 +210,10 @@ impl RecoveryService {
     }
 
     /// Start a recovery ceremony (coordinator role)
-    pub fn start_ceremony(&mut self, request: RecoveryRequest) -> anyhow::Result<RecoveryStartResponse> {
+    pub fn start_ceremony(
+        &mut self,
+        request: RecoveryRequest,
+    ) -> anyhow::Result<RecoveryStartResponse> {
         // Check if old DID is already revoked
         if self.revoked_dids.contains_key(&request.old_did) {
             anyhow::bail!("DID has already been recovered/revoked");
@@ -224,7 +229,8 @@ impl RecoveryService {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let ceremony_id = RecoveryCeremony::generate_ceremony_id(&request.old_did, &request.new_did, now);
+        let ceremony_id =
+            RecoveryCeremony::generate_ceremony_id(&request.old_did, &request.new_did, now);
 
         // Create ceremony
         let ceremony = RecoveryCeremony::new(
@@ -253,7 +259,9 @@ impl RecoveryService {
         ceremony_id: &CeremonyId,
         attestation: RecoveryAttestation,
     ) -> anyhow::Result<()> {
-        let ceremony = self.ceremonies.get_mut(ceremony_id)
+        let ceremony = self
+            .ceremonies
+            .get_mut(ceremony_id)
             .ok_or_else(|| anyhow::anyhow!("Ceremony not found"))?;
 
         ceremony.add_attestation(attestation)?;
@@ -270,7 +278,9 @@ impl RecoveryService {
 
     /// Proceed through verification and key binding
     pub fn verify_and_bind(&mut self, ceremony_id: &CeremonyId) -> anyhow::Result<()> {
-        let ceremony = self.ceremonies.get_mut(ceremony_id)
+        let ceremony = self
+            .ceremonies
+            .get_mut(ceremony_id)
             .ok_or_else(|| anyhow::anyhow!("Ceremony not found"))?;
 
         // Progress through phases
@@ -282,8 +292,13 @@ impl RecoveryService {
     }
 
     /// Complete the recovery ceremony
-    pub fn complete_recovery(&mut self, ceremony_id: &CeremonyId) -> anyhow::Result<RecoveryResult> {
-        let ceremony = self.ceremonies.get_mut(ceremony_id)
+    pub fn complete_recovery(
+        &mut self,
+        ceremony_id: &CeremonyId,
+    ) -> anyhow::Result<RecoveryResult> {
+        let ceremony = self
+            .ceremonies
+            .get_mut(ceremony_id)
             .ok_or_else(|| anyhow::anyhow!("Ceremony not found"))?;
 
         let result = ceremony.complete()?;
@@ -324,16 +339,19 @@ impl RecoveryService {
     /// Get service statistics
     pub fn stats(&self) -> RecoveryStats {
         RecoveryStats {
-            active_ceremonies: self.ceremonies
+            active_ceremonies: self
+                .ceremonies
                 .values()
                 .filter(|c| c.phase != RecoveryPhase::Completed && c.phase != RecoveryPhase::Failed)
                 .count(),
             revoked_dids: self.revoked_dids.len(),
-            successful_recoveries: self.ceremonies
+            successful_recoveries: self
+                .ceremonies
                 .values()
                 .filter(|c| c.phase == RecoveryPhase::Completed)
                 .count() as u64,
-            failed_recoveries: self.ceremonies
+            failed_recoveries: self
+                .ceremonies
                 .values()
                 .filter(|c| c.phase == RecoveryPhase::Failed || c.phase == RecoveryPhase::Rejected)
                 .count() as u64,
@@ -368,14 +386,20 @@ impl RecoveryClient {
     }
 
     /// Generate evidence for recovery
-    pub fn generate_evidence(&mut self, vui: &[u8; 32], anchor_commitment: [u8; 32]) -> &RecoveryEvidence {
+    pub fn generate_evidence(
+        &mut self,
+        vui: &[u8; 32],
+        anchor_commitment: [u8; 32],
+    ) -> &RecoveryEvidence {
         self.evidence = Some(RecoveryEvidence::new(vui, anchor_commitment));
         self.evidence.as_ref().unwrap()
     }
 
     /// Create recovery request
     pub fn create_request(&self) -> anyhow::Result<RecoveryRequest> {
-        let evidence = self.evidence.clone()
+        let evidence = self
+            .evidence
+            .clone()
             .ok_or_else(|| anyhow::anyhow!("Evidence not generated"))?;
 
         Ok(RecoveryRequest::new(
@@ -482,11 +506,15 @@ mod tests {
 
         // Add attestations
         let attestation1 = RecoveryAttestation::support(test_did(), vec![1, 2, 3]);
-        service.add_attestation(&response.ceremony_id, attestation1).unwrap();
+        service
+            .add_attestation(&response.ceremony_id, attestation1)
+            .unwrap();
         assert!(!service.can_proceed(&response.ceremony_id));
 
         let attestation2 = RecoveryAttestation::support(test_did(), vec![4, 5, 6]);
-        service.add_attestation(&response.ceremony_id, attestation2).unwrap();
+        service
+            .add_attestation(&response.ceremony_id, attestation2)
+            .unwrap();
         assert!(service.can_proceed(&response.ceremony_id));
     }
 
@@ -509,14 +537,18 @@ mod tests {
         let response = service.start_ceremony(request).unwrap();
 
         // Add attestations
-        service.add_attestation(
-            &response.ceremony_id,
-            RecoveryAttestation::support(test_did(), vec![]),
-        ).unwrap();
-        service.add_attestation(
-            &response.ceremony_id,
-            RecoveryAttestation::support(test_did(), vec![]),
-        ).unwrap();
+        service
+            .add_attestation(
+                &response.ceremony_id,
+                RecoveryAttestation::support(test_did(), vec![]),
+            )
+            .unwrap();
+        service
+            .add_attestation(
+                &response.ceremony_id,
+                RecoveryAttestation::support(test_did(), vec![]),
+            )
+            .unwrap();
 
         // Complete recovery
         service.verify_and_bind(&response.ceremony_id).unwrap();
@@ -550,14 +582,18 @@ mod tests {
         let request1 = RecoveryRequest::new(old_did.clone(), new_did.clone(), evidence1);
         let response1 = service.start_ceremony(request1).unwrap();
 
-        service.add_attestation(
-            &response1.ceremony_id,
-            RecoveryAttestation::support(test_did(), vec![]),
-        ).unwrap();
-        service.add_attestation(
-            &response1.ceremony_id,
-            RecoveryAttestation::support(test_did(), vec![]),
-        ).unwrap();
+        service
+            .add_attestation(
+                &response1.ceremony_id,
+                RecoveryAttestation::support(test_did(), vec![]),
+            )
+            .unwrap();
+        service
+            .add_attestation(
+                &response1.ceremony_id,
+                RecoveryAttestation::support(test_did(), vec![]),
+            )
+            .unwrap();
 
         service.verify_and_bind(&response1.ceremony_id).unwrap();
         service.complete_recovery(&response1.ceremony_id).unwrap();
@@ -621,10 +657,12 @@ mod tests {
         assert_eq!(stats.active_ceremonies, 1);
 
         // Complete it
-        service.add_attestation(
-            &response1.ceremony_id,
-            RecoveryAttestation::support(test_did(), vec![]),
-        ).unwrap();
+        service
+            .add_attestation(
+                &response1.ceremony_id,
+                RecoveryAttestation::support(test_did(), vec![]),
+            )
+            .unwrap();
         service.verify_and_bind(&response1.ceremony_id).unwrap();
         service.complete_recovery(&response1.ceremony_id).unwrap();
 
@@ -651,10 +689,12 @@ mod tests {
         let request = RecoveryRequest::new(old_did.clone(), new_did.clone(), evidence);
         let response = service.start_ceremony(request).unwrap();
 
-        service.add_attestation(
-            &response.ceremony_id,
-            RecoveryAttestation::support(test_did(), vec![]),
-        ).unwrap();
+        service
+            .add_attestation(
+                &response.ceremony_id,
+                RecoveryAttestation::support(test_did(), vec![]),
+            )
+            .unwrap();
         service.verify_and_bind(&response.ceremony_id).unwrap();
         service.complete_recovery(&response.ceremony_id).unwrap();
 
