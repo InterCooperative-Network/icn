@@ -259,78 +259,575 @@ function HomeScreen({
   );
 }
 
-// Placeholder screens
-function PaymentScreen() {
+// ============================================================================
+// Payment Screen - Send hours to another member
+// ============================================================================
+function PaymentScreen({ navigation }: { navigation: any }) {
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSend = async () => {
+    if (!recipient.trim() || !amount.trim()) {
+      alert('Please enter recipient and amount');
+      return;
+    }
+
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    setIsLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      setSuccess(true);
+    }, 1500);
+  };
+
+  if (success) {
+    return (
+      <View style={styles.successContainer}>
+        <Text style={styles.successIcon}>✅</Text>
+        <Text style={styles.successTitle}>Payment Sent!</Text>
+        <Text style={styles.successAmount}>{amount} hours</Text>
+        <Text style={styles.successRecipient}>to {recipient}</Text>
+        {memo && <Text style={styles.successMemo}>"{memo}"</Text>}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>💸</Text>
-      <Text style={styles.placeholderTitle}>Send Payment</Text>
-      <Text style={styles.placeholderText}>Enter recipient and amount</Text>
+    <KeyboardAvoidingView
+      style={styles.formContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView style={styles.formScroll}>
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Recipient DID or Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="did:icn:... or @username"
+            value={recipient}
+            onChangeText={setRecipient}
+            autoCapitalize="none"
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Amount (hours)</Text>
+          <TextInput
+            style={styles.amountInput}
+            placeholder="0.0"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Memo (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.memoInput]}
+            placeholder="What's this for?"
+            value={memo}
+            onChangeText={setMemo}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.primaryButton, styles.sendButton, isLoading && styles.buttonDisabled]}
+          onPress={handleSend}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Send Payment</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ============================================================================
+// Receive Screen - Display QR code for receiving payments
+// ============================================================================
+function ReceiveScreen({ route }: { route: any }) {
+  const [amount, setAmount] = useState('');
+  const did = 'did:icn:demo123456789abcdef';
+
+  const qrData = JSON.stringify({
+    type: 'icn-payment-request',
+    recipient: did,
+    amount: amount ? parseFloat(amount) : undefined,
+    timestamp: Date.now(),
+  });
+
+  return (
+    <ScrollView style={styles.receiveContainer}>
+      <View style={styles.qrCard}>
+        <Text style={styles.qrTitle}>Scan to Pay Me</Text>
+
+        {/* QR Code Placeholder - in real app use react-native-qrcode-svg */}
+        <View style={styles.qrPlaceholder}>
+          <Text style={styles.qrPlaceholderText}>📱</Text>
+          <Text style={styles.qrPlaceholderLabel}>QR Code</Text>
+          <Text style={styles.qrData}>{did.slice(0, 20)}...</Text>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Request Amount (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter amount in hours"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <View style={styles.didDisplay}>
+          <Text style={styles.didLabel}>Your DID:</Text>
+          <Text style={styles.didValue} selectable>{did}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.copyButton}>
+        <Text style={styles.copyButtonText}>📋 Copy DID</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.shareButton}>
+        <Text style={styles.shareButtonText}>📤 Share Payment Link</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Scan Screen - QR code scanner
+// ============================================================================
+function ScanScreen({ navigation }: { navigation: any }) {
+  const [manualEntry, setManualEntry] = useState('');
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.scanContainer}>
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraText}>Camera not available on web</Text>
+        </View>
+
+        <View style={styles.manualEntrySection}>
+          <Text style={styles.sectionTitle}>Manual Entry</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Paste DID or payment request"
+            value={manualEntry}
+            onChangeText={setManualEntry}
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => {
+              if (manualEntry.trim()) {
+                alert('Processing: ' + manualEntry.slice(0, 50) + '...');
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>Process</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.scanContainer}>
+      <View style={styles.cameraPlaceholder}>
+        <Text style={styles.cameraIcon}>📷</Text>
+        <Text style={styles.cameraText}>Point at QR Code</Text>
+      </View>
     </View>
   );
 }
 
-function ReceiveScreen() {
+// ============================================================================
+// Governance Screen - View and vote on proposals
+// ============================================================================
+function GovernanceScreen({ navigation }: { navigation: any }) {
+  const [proposals] = useState([
+    {
+      id: '1',
+      title: 'Increase new member credit limit',
+      description: 'Raise the initial credit limit for new members from 10 to 20 hours.',
+      status: 'active',
+      votesFor: 23,
+      votesAgainst: 5,
+      endDate: '2025-12-20',
+    },
+    {
+      id: '2',
+      title: 'Add childcare service category',
+      description: 'Create a new service category for childcare and babysitting services.',
+      status: 'active',
+      votesFor: 45,
+      votesAgainst: 2,
+      endDate: '2025-12-18',
+    },
+    {
+      id: '3',
+      title: 'Monthly community meetup',
+      description: 'Establish a monthly in-person meetup for cooperative members.',
+      status: 'passed',
+      votesFor: 67,
+      votesAgainst: 8,
+      endDate: '2025-12-01',
+    },
+  ]);
+
   return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>📥</Text>
-      <Text style={styles.placeholderTitle}>Receive Payment</Text>
-      <Text style={styles.placeholderText}>Show QR code to receive</Text>
+    <ScrollView style={styles.governanceContainer}>
+      <View style={styles.govStats}>
+        <View style={styles.govStat}>
+          <Text style={styles.govStatNumber}>3</Text>
+          <Text style={styles.govStatLabel}>Proposals</Text>
+        </View>
+        <View style={styles.govStat}>
+          <Text style={styles.govStatNumber}>2</Text>
+          <Text style={styles.govStatLabel}>Active</Text>
+        </View>
+        <View style={styles.govStat}>
+          <Text style={styles.govStatNumber}>150</Text>
+          <Text style={styles.govStatLabel}>Total Votes</Text>
+        </View>
+      </View>
+
+      {proposals.map((proposal) => (
+        <TouchableOpacity
+          key={proposal.id}
+          style={styles.proposalCard}
+          onPress={() => alert('Proposal: ' + proposal.title)}
+        >
+          <View style={styles.proposalHeader}>
+            <Text style={styles.proposalTitle}>{proposal.title}</Text>
+            <View style={[
+              styles.statusBadge,
+              proposal.status === 'active' ? styles.statusActive : styles.statusPassed
+            ]}>
+              <Text style={styles.statusText}>
+                {proposal.status === 'active' ? '🗳️ Active' : '✅ Passed'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.proposalDescription}>{proposal.description}</Text>
+          <View style={styles.voteBar}>
+            <View style={[styles.voteFor, { flex: proposal.votesFor }]} />
+            <View style={[styles.voteAgainst, { flex: proposal.votesAgainst }]} />
+          </View>
+          <View style={styles.voteStats}>
+            <Text style={styles.voteText}>👍 {proposal.votesFor}</Text>
+            <Text style={styles.voteText}>👎 {proposal.votesAgainst}</Text>
+            <Text style={styles.endDate}>Ends: {proposal.endDate}</Text>
+          </View>
+          {proposal.status === 'active' && (
+            <View style={styles.voteButtons}>
+              <TouchableOpacity style={styles.voteForButton}>
+                <Text style={styles.voteButtonText}>Vote For</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.voteAgainstButton}>
+                <Text style={styles.voteButtonText}>Vote Against</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Identity Screen - View and share your SDIS identity
+// ============================================================================
+function IdentityScreen({ navigation }: { navigation: any }) {
+  const [proofType, setProofType] = useState<'membership' | 'age' | 'reputation'>('membership');
+  const did = 'did:icn:demo123456789abcdef';
+
+  const proofTypes = [
+    { id: 'membership', label: 'Membership', icon: '🏠', desc: 'Prove you are a member' },
+    { id: 'age', label: 'Age (18+)', icon: '🔞', desc: 'Prove you are 18 or older' },
+    { id: 'reputation', label: 'Reputation', icon: '⭐', desc: 'Show your trust score' },
+  ];
+
+  return (
+    <ScrollView style={styles.identityContainer}>
+      {/* Identity Card */}
+      <View style={styles.identityCard}>
+        <View style={styles.identityAvatar}>
+          <Text style={styles.avatarText}>👤</Text>
+        </View>
+        <Text style={styles.identityName}>Demo User</Text>
+        <Text style={styles.identityDid} selectable>{did}</Text>
+        <View style={styles.identityStats}>
+          <View style={styles.identityStat}>
+            <Text style={styles.identityStatValue}>4.8</Text>
+            <Text style={styles.identityStatLabel}>Trust Score</Text>
+          </View>
+          <View style={styles.identityStat}>
+            <Text style={styles.identityStatValue}>127</Text>
+            <Text style={styles.identityStatLabel}>Transactions</Text>
+          </View>
+          <View style={styles.identityStat}>
+            <Text style={styles.identityStatValue}>2y</Text>
+            <Text style={styles.identityStatLabel}>Member Since</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Proof Generation */}
+      <View style={styles.proofSection}>
+        <Text style={styles.sectionTitle}>Generate Proof</Text>
+        <Text style={styles.sectionSubtitle}>
+          Create a one-time proof to share with others
+        </Text>
+
+        {proofTypes.map((type) => (
+          <TouchableOpacity
+            key={type.id}
+            style={[
+              styles.proofTypeOption,
+              proofType === type.id && styles.proofTypeSelected
+            ]}
+            onPress={() => setProofType(type.id as any)}
+          >
+            <Text style={styles.proofTypeIcon}>{type.icon}</Text>
+            <View style={styles.proofTypeContent}>
+              <Text style={styles.proofTypeLabel}>{type.label}</Text>
+              <Text style={styles.proofTypeDesc}>{type.desc}</Text>
+            </View>
+            {proofType === type.id && <Text style={styles.checkmark}>✓</Text>}
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity style={styles.generateButton}>
+          <Text style={styles.generateButtonText}>Generate QR Proof</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Credentials */}
+      <View style={styles.credentialsSection}>
+        <Text style={styles.sectionTitle}>My Credentials</Text>
+        <View style={styles.credentialItem}>
+          <Text style={styles.credentialIcon}>📧</Text>
+          <View style={styles.credentialContent}>
+            <Text style={styles.credentialLabel}>Email Verified</Text>
+            <Text style={styles.credentialValue}>user@example.com</Text>
+          </View>
+          <Text style={styles.credentialStatus}>✅</Text>
+        </View>
+        <View style={styles.credentialItem}>
+          <Text style={styles.credentialIcon}>📱</Text>
+          <View style={styles.credentialContent}>
+            <Text style={styles.credentialLabel}>Phone Verified</Text>
+            <Text style={styles.credentialValue}>+1 (555) 123-4567</Text>
+          </View>
+          <Text style={styles.credentialStatus}>✅</Text>
+        </View>
+        <View style={styles.credentialItem}>
+          <Text style={styles.credentialIcon}>🏠</Text>
+          <View style={styles.credentialContent}>
+            <Text style={styles.credentialLabel}>Cooperative Member</Text>
+            <Text style={styles.credentialValue}>Since Dec 2023</Text>
+          </View>
+          <Text style={styles.credentialStatus}>✅</Text>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Verify Screen - Verify another member's identity
+// ============================================================================
+function VerifyScreen({ navigation }: { navigation: any }) {
+  const [verificationResult, setVerificationResult] = useState<null | {
+    valid: boolean;
+    name: string;
+    did: string;
+    proofType: string;
+    trustScore: number;
+  }>(null);
+
+  const simulateVerification = () => {
+    // Simulate scanning a QR code
+    setTimeout(() => {
+      setVerificationResult({
+        valid: true,
+        name: 'Alice Member',
+        did: 'did:icn:alice789xyz',
+        proofType: 'Membership',
+        trustScore: 4.5,
+      });
+    }, 1000);
+  };
+
+  if (verificationResult) {
+    return (
+      <View style={styles.verifyResultContainer}>
+        <View style={[
+          styles.verifyResultCard,
+          verificationResult.valid ? styles.verifyValid : styles.verifyInvalid
+        ]}>
+          <Text style={styles.verifyResultIcon}>
+            {verificationResult.valid ? '✅' : '❌'}
+          </Text>
+          <Text style={styles.verifyResultTitle}>
+            {verificationResult.valid ? 'Verified!' : 'Invalid'}
+          </Text>
+
+          {verificationResult.valid && (
+            <>
+              <Text style={styles.verifyResultName}>{verificationResult.name}</Text>
+              <Text style={styles.verifyResultDid}>{verificationResult.did}</Text>
+
+              <View style={styles.verifyResultDetails}>
+                <View style={styles.verifyResultDetail}>
+                  <Text style={styles.verifyDetailLabel}>Proof Type</Text>
+                  <Text style={styles.verifyDetailValue}>{verificationResult.proofType}</Text>
+                </View>
+                <View style={styles.verifyResultDetail}>
+                  <Text style={styles.verifyDetailLabel}>Trust Score</Text>
+                  <Text style={styles.verifyDetailValue}>⭐ {verificationResult.trustScore}</Text>
+                </View>
+              </View>
+            </>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => setVerificationResult(null)}
+        >
+          <Text style={styles.buttonText}>Scan Another</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.verifyContainer}>
+      {Platform.OS === 'web' ? (
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraText}>Camera not available on web</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, { marginTop: 20 }]}
+            onPress={simulateVerification}
+          >
+            <Text style={styles.buttonText}>Simulate Scan</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraText}>Point at identity QR code</Text>
+        </View>
+      )}
+
+      <View style={styles.verifyInstructions}>
+        <Text style={styles.instructionTitle}>How to verify</Text>
+        <Text style={styles.instructionText}>
+          1. Ask the person to show their identity QR code{'\n'}
+          2. Point your camera at the code{'\n'}
+          3. Wait for verification result
+        </Text>
+      </View>
     </View>
   );
 }
 
-function ScanScreen() {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>📷</Text>
-      <Text style={styles.placeholderTitle}>Scan QR Code</Text>
-      <Text style={styles.placeholderText}>
-        {Platform.OS === 'web'
-          ? 'Camera scanning not available on web'
-          : 'Point camera at QR code'}
-      </Text>
-    </View>
-  );
-}
-
-function GovernanceScreen() {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>🗳️</Text>
-      <Text style={styles.placeholderTitle}>Governance</Text>
-      <Text style={styles.placeholderText}>View and vote on proposals</Text>
-    </View>
-  );
-}
-
-function IdentityScreen() {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>🪪</Text>
-      <Text style={styles.placeholderTitle}>My Identity</Text>
-      <Text style={styles.placeholderText}>Your SDIS identity details</Text>
-    </View>
-  );
-}
-
-function VerifyScreen() {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>✅</Text>
-      <Text style={styles.placeholderTitle}>Verify Identity</Text>
-      <Text style={styles.placeholderText}>Scan to verify someone</Text>
-    </View>
-  );
-}
-
+// ============================================================================
+// Verification History Screen
+// ============================================================================
 function VerificationHistoryScreen() {
+  const [history] = useState([
+    {
+      id: '1',
+      name: 'Bob Builder',
+      did: 'did:icn:bob123',
+      date: '2025-12-10',
+      type: 'Membership',
+      direction: 'verified', // you verified them
+    },
+    {
+      id: '2',
+      name: 'Carol Worker',
+      did: 'did:icn:carol456',
+      date: '2025-12-09',
+      type: 'Age (18+)',
+      direction: 'verified',
+    },
+    {
+      id: '3',
+      name: 'Dave Helper',
+      did: 'did:icn:dave789',
+      date: '2025-12-08',
+      type: 'Reputation',
+      direction: 'was_verified', // they verified you
+    },
+  ]);
+
   return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>📋</Text>
-      <Text style={styles.placeholderTitle}>Verification History</Text>
-      <Text style={styles.placeholderText}>Your past verifications</Text>
-    </View>
+    <ScrollView style={styles.historyContainer}>
+      <View style={styles.historyStats}>
+        <View style={styles.historyStat}>
+          <Text style={styles.historyStatNumber}>12</Text>
+          <Text style={styles.historyStatLabel}>You Verified</Text>
+        </View>
+        <View style={styles.historyStat}>
+          <Text style={styles.historyStatNumber}>8</Text>
+          <Text style={styles.historyStatLabel}>Verified You</Text>
+        </View>
+      </View>
+
+      {history.map((item) => (
+        <View key={item.id} style={styles.historyItem}>
+          <View style={styles.historyIcon}>
+            <Text style={styles.historyIconText}>
+              {item.direction === 'verified' ? '→' : '←'}
+            </Text>
+          </View>
+          <View style={styles.historyContent}>
+            <Text style={styles.historyName}>{item.name}</Text>
+            <Text style={styles.historyDid}>{item.did.slice(0, 20)}...</Text>
+            <Text style={styles.historyMeta}>
+              {item.type} • {item.date}
+            </Text>
+          </View>
+          <Text style={styles.historyStatus}>✅</Text>
+        </View>
+      ))}
+
+      {history.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📋</Text>
+          <Text style={styles.emptyText}>No verifications yet</Text>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
@@ -632,27 +1129,586 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Placeholder screens
-  placeholder: {
+  // Form styles
+  formContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  formScroll: {
+    padding: 16,
+  },
+  formSection: {
+    marginBottom: 20,
+  },
+  amountInput: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    fontSize: 32,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  memoInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  sendButton: {
+    marginTop: 20,
+  },
+
+  // Success screen
+  successContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
     padding: 24,
   },
-  placeholderIcon: {
+  successIcon: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  successAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#4A90A4',
+  },
+  successRecipient: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 8,
+  },
+  successMemo: {
+    fontSize: 16,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 12,
+  },
+
+  // Receive screen
+  receiveContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+  },
+  qrCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  qrTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
+  qrPlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  qrPlaceholderText: {
+    fontSize: 64,
+  },
+  qrPlaceholderLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  qrData: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 4,
+  },
+  didDisplay: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    width: '100%',
+  },
+  didLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  didValue: {
+    fontSize: 12,
+    color: '#333',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  copyButton: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  copyButtonText: {
+    fontSize: 16,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+  shareButton: {
+    backgroundColor: '#4A90A4',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+
+  // Scan screen
+  scanContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  cameraPlaceholder: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 300,
+  },
+  cameraIcon: {
     fontSize: 64,
     marginBottom: 16,
   },
-  placeholderTitle: {
+  cameraText: {
+    fontSize: 18,
+    color: '#fff',
+  },
+  manualEntrySection: {
+    padding: 16,
+  },
+
+  // Governance screen
+  governanceContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  govStats: {
+    flexDirection: 'row',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+    justifyContent: 'space-around',
+  },
+  govStat: {
+    alignItems: 'center',
+  },
+  govStatNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  govStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  proposalCard: {
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+  },
+  proposalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  proposalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusActive: {
+    backgroundColor: '#e3f2fd',
+  },
+  statusPassed: {
+    backgroundColor: '#e8f5e9',
+  },
+  statusText: {
+    fontSize: 12,
+  },
+  proposalDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  voteBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  voteFor: {
+    backgroundColor: '#4caf50',
+  },
+  voteAgainst: {
+    backgroundColor: '#f44336',
+  },
+  voteStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  voteText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  endDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  voteButtons: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  voteForButton: {
+    flex: 1,
+    backgroundColor: '#4caf50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  voteAgainstButton: {
+    flex: 1,
+    backgroundColor: '#f44336',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  voteButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+
+  // Identity screen
+  identityContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  identityCard: {
+    backgroundColor: '#4A90A4',
+    padding: 24,
+    alignItems: 'center',
+  },
+  identityAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatarText: {
+    fontSize: 40,
+  },
+  identityName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  identityDid: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  identityStats: {
+    flexDirection: 'row',
+    marginTop: 20,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  identityStat: {
+    alignItems: 'center',
+  },
+  identityStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  identityStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  proofSection: {
+    padding: 16,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  proofTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  proofTypeSelected: {
+    borderWidth: 2,
+    borderColor: '#4A90A4',
+  },
+  proofTypeIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  proofTypeContent: {
+    flex: 1,
+  },
+  proofTypeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  proofTypeDesc: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  checkmark: {
+    fontSize: 24,
+    color: '#4A90A4',
+    fontWeight: 'bold',
+  },
+  generateButton: {
+    backgroundColor: '#4A90A4',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  credentialsSection: {
+    padding: 16,
+  },
+  credentialItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  credentialIcon: {
+    fontSize: 24,
+    marginRight: 16,
+  },
+  credentialContent: {
+    flex: 1,
+  },
+  credentialLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  credentialValue: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  credentialStatus: {
+    fontSize: 20,
+  },
+
+  // Verify screen
+  verifyContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  verifyInstructions: {
+    padding: 16,
+  },
+  instructionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 24,
+  },
+  verifyResultContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 24,
+  },
+  verifyResultCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 24,
+  },
+  verifyValid: {
+    borderWidth: 3,
+    borderColor: '#4caf50',
+  },
+  verifyInvalid: {
+    borderWidth: 3,
+    borderColor: '#f44336',
+  },
+  verifyResultIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  verifyResultTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  placeholderText: {
+  verifyResultName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  verifyResultDid: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  verifyResultDetails: {
+    flexDirection: 'row',
+    marginTop: 24,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  verifyResultDetail: {
+    alignItems: 'center',
+  },
+  verifyDetailLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  verifyDetailValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 4,
+  },
+
+  // History screen
+  historyContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  historyStats: {
+    flexDirection: 'row',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+    justifyContent: 'space-around',
+  },
+  historyStat: {
+    alignItems: 'center',
+  },
+  historyStatNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  historyStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+  },
+  historyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  historyIconText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  historyDid: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  historyMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  historyStatus: {
+    fontSize: 20,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 48,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
   },
 });
