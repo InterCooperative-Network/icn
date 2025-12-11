@@ -1459,6 +1459,14 @@ async fn test_full_enrollment_flow() {
 - `docs/security/SDIS_AUDIT_CHECKLIST.md` - Code audit checklist for reviewers
 - `docs/security/SDIS_CRYPTO_REVIEW.md` - Cryptographic algorithm review
 
+**Completed (2025-12-11)**:
+- `enrollment.rs` - EnrollmentService for end-to-end enrollment orchestration
+- EnrollmentClient for client-side enrollment handling
+- Threshold PRF integration for VUI computation
+- VUI uniqueness checking via registry
+- Expanded gossip messages (ParticipationRequest, PrfPartialDelivery, UniquenessCheck/Response)
+- 57 steward tests passing (55 unit + 2 new enrollment flow tests)
+
 ---
 
 ## Milestone Summary
