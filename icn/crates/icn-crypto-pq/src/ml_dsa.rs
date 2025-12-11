@@ -50,7 +50,7 @@ impl MlDsaPublicKey {
     /// Convert to pqcrypto PublicKey
     fn to_pqcrypto(&self) -> Result<PublicKey> {
         PublicKey::from_bytes(&self.bytes)
-            .map_err(|e| CryptoError::InvalidKey(format!("Invalid ML-DSA public key: {:?}", e)))
+            .map_err(|e| CryptoError::InvalidKey(format!("Invalid ML-DSA public key: {e:?}")))
     }
 }
 
@@ -86,7 +86,7 @@ impl MlDsaSignature {
     /// Convert to pqcrypto DetachedSignature
     fn to_pqcrypto(&self) -> Result<DetachedSignature> {
         DetachedSignature::from_bytes(&self.bytes).map_err(|e| {
-            CryptoError::InvalidSignature(format!("Invalid ML-DSA signature: {:?}", e))
+            CryptoError::InvalidSignature(format!("Invalid ML-DSA signature: {e:?}"))
         })
     }
 }
@@ -144,7 +144,7 @@ impl MlDsaKeypair {
     /// Sign a message
     pub fn sign(&self, message: &[u8]) -> Result<MlDsaSignature> {
         let sk = SecretKey::from_bytes(&self.secret_key_bytes)
-            .map_err(|e| CryptoError::Signing(format!("Invalid secret key: {:?}", e)))?;
+            .map_err(|e| CryptoError::Signing(format!("Invalid secret key: {e:?}")))?;
 
         let sig = detached_sign(message, &sk);
 

@@ -421,7 +421,7 @@ impl StewardActor {
 
             // In real implementation, VUI would be computed here
             // For now, use a placeholder hash
-            let vui_hash = sha2::Sha256::digest(&ceremony_id).into();
+            let vui_hash = sha2::Sha256::digest(ceremony_id).into();
             ceremony.set_vui_hash(vui_hash)?;
 
             // Check uniqueness

@@ -465,50 +465,50 @@ impl SdisProposal {
             SdisProposal::AppointSteward {
                 candidate, region, ..
             } => {
-                format!("Appoint {} as steward for {}", candidate, region)
+                format!("Appoint {candidate} as steward for {region}")
             }
             SdisProposal::RemoveSteward {
                 steward, reason, ..
             } => {
-                format!("Remove steward {}: {}", steward, reason)
+                format!("Remove steward {steward}: {reason}")
             }
             SdisProposal::SanctionSteward {
                 steward, penalty, ..
             } => {
-                format!("Sanction steward {} with {:?}", steward, penalty)
+                format!("Sanction steward {steward} with {penalty:?}")
             }
             SdisProposal::ReconfirmSteward { steward, .. } => {
-                format!("Reconfirm steward {} for new term", steward)
+                format!("Reconfirm steward {steward} for new term")
             }
             SdisProposal::ModifyThreshold {
                 threshold_type,
                 new_value,
                 ..
             } => {
-                format!("Modify {:?} threshold to {}", threshold_type, new_value)
+                format!("Modify {threshold_type:?} threshold to {new_value}")
             }
             SdisProposal::ApproveAuthority { authority } => {
                 format!("Approve {} as attestation authority", authority.name)
             }
             SdisProposal::RevokeAuthority { authority_did, .. } => {
-                format!("Revoke authority {}", authority_did)
+                format!("Revoke authority {authority_did}")
             }
             SdisProposal::RevocationAppeal { target, .. } => {
-                format!("Appeal revocation of {:?}", target)
+                format!("Appeal revocation of {target:?}")
             }
             SdisProposal::SuspendSteward { steward, .. } => {
-                format!("Suspend steward {}", steward)
+                format!("Suspend steward {steward}")
             }
             SdisProposal::ReinstateSteward { steward, .. } => {
-                format!("Reinstate steward {}", steward)
+                format!("Reinstate steward {steward}")
             }
             SdisProposal::UpdateJurisdictionTier {
                 steward, new_tier, ..
             } => {
-                format!("Update {} to {:?}", steward, new_tier)
+                format!("Update {steward} to {new_tier:?}")
             }
             SdisProposal::ForceKeyRotation { steward, .. } => {
-                format!("Force key rotation for steward {}", steward)
+                format!("Force key rotation for steward {steward}")
             }
         }
     }

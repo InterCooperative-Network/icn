@@ -114,7 +114,7 @@ impl KeyBundle {
     /// from a seed, use `from_seed`.
     pub fn generate(anchor: Anchor, version: u32) -> anyhow::Result<Self> {
         let hybrid_keypair = HybridKeypair::generate()
-            .map_err(|e| anyhow::anyhow!("Failed to generate hybrid keypair: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to generate hybrid keypair: {e}"))?;
 
         let x25519_secret = X25519Secret::random_from_rng(rand::rngs::OsRng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
@@ -139,7 +139,7 @@ impl KeyBundle {
     /// so the same seed with different versions produces different keys.
     pub fn from_seed(anchor: Anchor, version: u32, seed: &[u8; 64]) -> anyhow::Result<Self> {
         let hybrid_keypair = HybridKeypair::from_seed(seed)
-            .map_err(|e| anyhow::anyhow!("Failed to generate hybrid keypair from seed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to generate hybrid keypair from seed: {e}"))?;
 
         // Derive X25519 key from seed
         let (_, _, x25519_seed) = icn_crypto_pq::derive_keybundle_keys(seed, version);
@@ -319,7 +319,7 @@ impl KeyBundle {
     ) -> anyhow::Result<Self> {
         let hybrid_keypair =
             HybridKeypair::from_bytes(classical_secret, classical_public, pq_secret, pq_public)
-                .map_err(|e| anyhow::anyhow!("Failed to reconstruct hybrid keypair: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to reconstruct hybrid keypair: {e}"))?;
 
         Ok(Self {
             anchor,

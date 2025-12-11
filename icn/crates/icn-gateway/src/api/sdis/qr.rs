@@ -78,8 +78,7 @@ pub fn decode_from_qr(data: &[u8]) -> Result<EphemeralProof, EphemeralError> {
     let v = data[2];
     if v != 1 {
         return Err(EphemeralError::InvalidFormat(format!(
-            "unsupported version: {}",
-            v
+            "unsupported version: {v}"
         )));
     }
 
@@ -161,8 +160,7 @@ fn byte_to_proof_type(byte: u8) -> Result<ProofType, EphemeralError> {
             circuit_id: [0u8; 32],
         }),
         _ => Err(EphemeralError::InvalidFormat(format!(
-            "unknown proof type: 0x{:02x}",
-            byte
+            "unknown proof type: 0x{byte:02x}"
         ))),
     }
 }

@@ -129,8 +129,7 @@ impl Circuit for MembershipProofCircuit {
                 Some(actual) if actual == required => {}
                 Some(actual) => {
                     return Err(CircuitError::ConstraintNotSatisfied(format!(
-                        "role '{}' does not match required '{}'",
-                        actual, required
+                        "role '{actual}' does not match required '{required}'"
                     )));
                 }
                 None => {
@@ -149,9 +148,9 @@ impl Circuit for MembershipProofCircuit {
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.member_did.as_str().as_bytes());
-            hasher.update(&private.member_since.to_le_bytes());
-            hasher.update(&private.blinding);
-            hasher.update(&public.nonce);
+            hasher.update(private.member_since.to_le_bytes());
+            hasher.update(private.blinding);
+            hasher.update(public.nonce);
             let commitment: [u8; 32] = hasher.finalize().into();
 
             let mut proof_data = Vec::with_capacity(1024);
@@ -181,7 +180,7 @@ impl Circuit for MembershipProofCircuit {
             if proof.proof_bytes.len() < 64 {
                 return Ok(false);
             }
-            if &proof.proof_bytes[32..64] != &expected_hash[..] {
+            if proof.proof_bytes[32..64] != expected_hash[..] {
                 return Ok(false);
             }
             Ok(true)

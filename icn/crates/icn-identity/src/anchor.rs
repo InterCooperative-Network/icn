@@ -188,7 +188,7 @@ impl Anchor {
 
     /// Get the anchor ID as a hex string
     pub fn id_hex(&self) -> String {
-        hex::encode(&self.id)
+        hex::encode(self.id)
     }
 }
 

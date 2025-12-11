@@ -205,21 +205,21 @@ impl ZkProver {
             ProofType::AgeAtLeast { threshold } => {
                 let age_att: AgeAttestation =
                     bincode::deserialize(&attestation.payload).map_err(|e| {
-                        ProverError::InvalidAttestation(format!("age attestation: {}", e))
+                        ProverError::InvalidAttestation(format!("age attestation: {e}"))
                     })?;
                 self.prove_age(*threshold, &age_att, issuer_pk, &context)?
             }
             ProofType::Citizenship { country_code } => {
                 let cit_att: CitizenshipAttestation = bincode::deserialize(&attestation.payload)
                     .map_err(|e| {
-                        ProverError::InvalidAttestation(format!("citizenship attestation: {}", e))
+                        ProverError::InvalidAttestation(format!("citizenship attestation: {e}"))
                     })?;
                 self.prove_citizenship(*country_code, &cit_att, issuer_pk, &context)?
             }
             ProofType::Membership { org_did } => {
                 let mem_att: MembershipAttestation = bincode::deserialize(&attestation.payload)
                     .map_err(|e| {
-                        ProverError::InvalidAttestation(format!("membership attestation: {}", e))
+                        ProverError::InvalidAttestation(format!("membership attestation: {e}"))
                     })?;
                 let holder_did = Did::from_anchor_id(&[0u8; 32]); // TODO: Get from keybundle
                 self.prove_membership(org_did.clone(), &mem_att, holder_did, &context)?

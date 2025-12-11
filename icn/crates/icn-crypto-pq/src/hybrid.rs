@@ -162,7 +162,7 @@ impl HybridPublicKey {
         // Validate classical key
         let classical_bytes: [u8; 32] = classical.try_into().unwrap();
         let _ = VerifyingKey::from_bytes(&classical_bytes)
-            .map_err(|e| CryptoError::InvalidKey(format!("Invalid Ed25519 public key: {}", e)))?;
+            .map_err(|e| CryptoError::InvalidKey(format!("Invalid Ed25519 public key: {e}")))?;
 
         let pq = MlDsaPublicKey::from_bytes(pq)?;
 
@@ -180,7 +180,7 @@ impl HybridPublicKey {
             .try_into()
             .map_err(|_| CryptoError::InvalidKey("Invalid classical key length".to_string()))?;
         VerifyingKey::from_bytes(&bytes)
-            .map_err(|e| CryptoError::InvalidKey(format!("Invalid Ed25519 public key: {}", e)))
+            .map_err(|e| CryptoError::InvalidKey(format!("Invalid Ed25519 public key: {e}")))
     }
 
     /// Total size in bytes

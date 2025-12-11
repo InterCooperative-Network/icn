@@ -88,9 +88,7 @@ impl StewardConfig {
     pub fn with_threshold(threshold: u32, total_shares: u32) -> Self {
         assert!(
             threshold > 0 && threshold <= total_shares,
-            "Invalid threshold: {} of {}",
-            threshold,
-            total_shares
+            "Invalid threshold: {threshold} of {total_shares}"
         );
 
         Self {

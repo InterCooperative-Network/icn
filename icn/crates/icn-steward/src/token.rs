@@ -99,16 +99,12 @@ impl EnrollmentToken {
             .unwrap()
             .as_secs();
 
-        if now >= self.expires_at {
-            0
-        } else {
-            self.expires_at - now
-        }
+        self.expires_at.saturating_sub(now)
     }
 
     /// Get token ID as hex string
     pub fn token_id_hex(&self) -> String {
-        hex::encode(&self.token_id)
+        hex::encode(self.token_id)
     }
 
     /// Create the message that was signed (for verification)

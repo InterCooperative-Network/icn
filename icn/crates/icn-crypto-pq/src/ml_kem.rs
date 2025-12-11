@@ -51,7 +51,7 @@ impl MlKemPublicKey {
     /// Convert to pqcrypto PublicKey
     fn to_pqcrypto(&self) -> Result<PublicKey> {
         PublicKey::from_bytes(&self.bytes)
-            .map_err(|e| CryptoError::InvalidKey(format!("Invalid ML-KEM public key: {:?}", e)))
+            .map_err(|e| CryptoError::InvalidKey(format!("Invalid ML-KEM public key: {e:?}")))
     }
 }
 
@@ -87,7 +87,7 @@ impl MlKemCiphertext {
     /// Convert to pqcrypto Ciphertext
     fn to_pqcrypto(&self) -> Result<Ciphertext> {
         Ciphertext::from_bytes(&self.bytes)
-            .map_err(|e| CryptoError::InvalidKey(format!("Invalid ML-KEM ciphertext: {:?}", e)))
+            .map_err(|e| CryptoError::InvalidKey(format!("Invalid ML-KEM ciphertext: {e:?}")))
     }
 }
 
@@ -167,7 +167,7 @@ impl MlKemKeypair {
     /// Decapsulate: recover the shared secret from a ciphertext
     pub fn decapsulate(&self, ciphertext: &MlKemCiphertext) -> Result<[u8; 32]> {
         let sk = SecretKey::from_bytes(&self.secret_key_bytes)
-            .map_err(|e| CryptoError::InvalidKey(format!("Invalid secret key: {:?}", e)))?;
+            .map_err(|e| CryptoError::InvalidKey(format!("Invalid secret key: {e:?}")))?;
 
         let ct = ciphertext.to_pqcrypto()?;
         let shared_secret = decapsulate(&ct, &sk);

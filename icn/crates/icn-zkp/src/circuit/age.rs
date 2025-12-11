@@ -141,8 +141,7 @@ impl Circuit for AgeProofCircuit {
 
         if age_in_days < required_days {
             return Err(CircuitError::ConstraintNotSatisfied(format!(
-                "age {} days < required {} days",
-                age_in_days, required_days
+                "age {age_in_days} days < required {required_days} days"
             )));
         }
 
@@ -171,9 +170,9 @@ impl Circuit for AgeProofCircuit {
             use sha3::{Digest, Sha3_256};
 
             let mut hasher = Sha3_256::new();
-            hasher.update(&private.birthdate_days.to_le_bytes());
-            hasher.update(&private.blinding);
-            hasher.update(&public.nonce);
+            hasher.update(private.birthdate_days.to_le_bytes());
+            hasher.update(private.blinding);
+            hasher.update(public.nonce);
             let commitment: [u8; 32] = hasher.finalize().into();
 
             // Create a deterministic "proof" for testing
@@ -212,7 +211,7 @@ impl Circuit for AgeProofCircuit {
             }
 
             // Verify the proof contains the expected public hash
-            if &proof.proof_bytes[32..64] != &expected_hash[..] {
+            if proof.proof_bytes[32..64] != expected_hash[..] {
                 return Ok(false);
             }
 

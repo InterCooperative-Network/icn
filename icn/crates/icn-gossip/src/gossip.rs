@@ -908,10 +908,7 @@ impl GossipActor {
                         );
                         icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
                         anyhow::bail!(
-                            "Message sender {} has insufficient trust ({:.3} < {:.3})",
-                            sender,
-                            score,
-                            MIN_TRUST_FOR_MESSAGE
+                            "Message sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
                         );
                     }
                     Ok(_) => {
@@ -925,7 +922,7 @@ impl GossipActor {
                             "Cannot compute trust score for message sender"
                         );
                         icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                        anyhow::bail!("Cannot verify trust for message sender {}: {}", sender, e);
+                        anyhow::bail!("Cannot verify trust for message sender {sender}: {e}");
                     }
                 }
             }

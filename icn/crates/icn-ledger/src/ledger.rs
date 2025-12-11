@@ -215,7 +215,7 @@ impl Ledger {
                     // For unknown peers, check against minimum threshold
                     if self.min_trust_for_entry > 0.0 {
                         icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
-                        anyhow::bail!("Cannot verify trust for entry author {}: {}", author_did, e);
+                        anyhow::bail!("Cannot verify trust for entry author {author_did}: {e}");
                     }
                 }
             }
@@ -1185,7 +1185,7 @@ impl Ledger {
         // Step 1: Verify target entry exists
         let target_entry = self
             .get_entry(target_hash)?
-            .ok_or_else(|| anyhow::anyhow!("Target entry {} not found", target_hash))?;
+            .ok_or_else(|| anyhow::anyhow!("Target entry {target_hash} not found"))?;
 
         let target_timestamp = target_entry.timestamp;
         info!(
@@ -1284,7 +1284,7 @@ impl Ledger {
 
     /// Get archived entries for a specific rollback timestamp
     pub fn get_archived_entries(&self, archive_timestamp: u64) -> Result<Vec<JournalEntry>> {
-        let prefix = format!("{}{}:", ARCHIVE_PREFIX, archive_timestamp);
+        let prefix = format!("{ARCHIVE_PREFIX}{archive_timestamp}:");
         let pairs = self.store.scan(prefix.as_bytes())?;
 
         let mut entries = Vec::new();

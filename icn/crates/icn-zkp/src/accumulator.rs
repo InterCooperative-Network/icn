@@ -122,7 +122,7 @@ impl RsaAccumulator {
     /// Get a 32-byte hash of the accumulator value
     pub fn value_hash(&self) -> [u8; 32] {
         let mut hasher = Sha3_256::new();
-        hasher.update(&self.value.to_bytes_be());
+        hasher.update(self.value.to_bytes_be());
         hasher.finalize().into()
     }
 

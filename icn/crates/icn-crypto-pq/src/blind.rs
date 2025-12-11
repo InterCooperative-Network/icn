@@ -92,8 +92,8 @@ impl BlindedMessage {
         // Create blinded hash = H(commitment || blinding_factor)
         let mut hasher = Sha3_256::new();
         hasher.update(b"icn-blind-hash");
-        hasher.update(&message_commitment);
-        hasher.update(&blinding_factor.value);
+        hasher.update(message_commitment);
+        hasher.update(blinding_factor.value);
         let blinded = hasher.finalize();
 
         let mut blinded_hash = [0u8; 32];
@@ -182,8 +182,8 @@ impl UnblindedSignature {
         // Recompute blinded hash
         let mut hasher = Sha3_256::new();
         hasher.update(b"icn-blind-hash");
-        hasher.update(&self.message_commitment);
-        hasher.update(&self.blinding_proof);
+        hasher.update(self.message_commitment);
+        hasher.update(self.blinding_proof);
         let blinded_hash = hasher.finalize();
 
         // Verify signature on blinded hash
@@ -199,8 +199,8 @@ impl UnblindedSignature {
         // Recompute blinded hash from commitment
         let mut hasher = Sha3_256::new();
         hasher.update(b"icn-blind-hash");
-        hasher.update(&self.message_commitment);
-        hasher.update(&self.blinding_proof);
+        hasher.update(self.message_commitment);
+        hasher.update(self.blinding_proof);
         let blinded_hash = hasher.finalize();
 
         // Verify signature

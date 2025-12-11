@@ -115,7 +115,7 @@ pub fn combine_prf_partials(partials: &[PrfPartial]) -> Result<[u8; 32]> {
     // Hash the combined result to get the final VUI
     use sha3::Digest;
     let mut hasher = Sha3_256::new();
-    hasher.update(&combined);
+    hasher.update(combined);
     let result = hasher.finalize();
 
     let mut vui = [0u8; 32];
@@ -207,7 +207,7 @@ impl ShareCommitment {
         use sha3::Digest;
         let mut hasher = Sha3_256::new();
         hasher.update([share.index]);
-        hasher.update(&share.value);
+        hasher.update(share.value);
         let result = hasher.finalize();
 
         let mut commitment = [0u8; 32];
@@ -228,7 +228,7 @@ impl ShareCommitment {
         use sha3::Digest;
         let mut hasher = Sha3_256::new();
         hasher.update([share.index]);
-        hasher.update(&share.value);
+        hasher.update(share.value);
         let result = hasher.finalize();
 
         result[..] == self.commitment

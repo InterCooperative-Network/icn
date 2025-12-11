@@ -48,7 +48,7 @@ impl Vui {
     pub fn commitment(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(b"icn-vui-commitment");
-        hasher.update(&self.0);
+        hasher.update(self.0);
         let result = hasher.finalize();
 
         let mut commitment = [0u8; 32];
@@ -62,13 +62,13 @@ impl Vui {
     /// from threshold number of stewards.
     pub fn from_partials(partials: &[PrfPartial]) -> anyhow::Result<Self> {
         let combined = combine_prf_partials(partials)
-            .map_err(|e| anyhow::anyhow!("Failed to combine PRF partials: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to combine PRF partials: {e}"))?;
         Ok(Vui(combined))
     }
 
     /// Get as hex string
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.0)
+        hex::encode(self.0)
     }
 
     /// Parse from hex string

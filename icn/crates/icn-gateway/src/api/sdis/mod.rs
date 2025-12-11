@@ -119,7 +119,7 @@ impl From<VerifyResult> for VerifyResponse {
         Self {
             valid: r.valid,
             level: r.level,
-            proof_type: r.proof_type.map(|pt| format!("{:?}", pt)),
+            proof_type: r.proof_type.map(|pt| format!("{pt:?}")),
             warnings: r.warnings,
             verified_at: r.verified_at,
         }

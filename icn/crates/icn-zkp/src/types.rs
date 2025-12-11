@@ -62,12 +62,12 @@ impl ProofType {
     /// Get a human-readable description
     pub fn description(&self) -> String {
         match self {
-            ProofType::AgeAtLeast { threshold } => format!("Age >= {} years", threshold),
+            ProofType::AgeAtLeast { threshold } => format!("Age >= {threshold} years"),
             ProofType::Citizenship { country_code } => {
                 let code = String::from_utf8_lossy(country_code);
-                format!("Citizen of {}", code)
+                format!("Citizen of {code}")
             }
-            ProofType::Membership { org_did } => format!("Member of {}", org_did),
+            ProofType::Membership { org_did } => format!("Member of {org_did}"),
             ProofType::NonRevocation => "Not revoked".to_string(),
             ProofType::Custom { circuit_id } => {
                 format!("Custom: {}", hex::encode(&circuit_id[..8]))

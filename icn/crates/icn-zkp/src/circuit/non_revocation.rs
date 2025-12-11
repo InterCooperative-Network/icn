@@ -117,10 +117,10 @@ impl Circuit for NonRevocationCircuit {
             use sha3::{Digest, Sha3_256};
 
             let mut hasher = Sha3_256::new();
-            hasher.update(&private.credential_id);
-            hasher.update(&private.witness.aux);
-            hasher.update(&private.blinding);
-            hasher.update(&public.nonce);
+            hasher.update(private.credential_id);
+            hasher.update(private.witness.aux);
+            hasher.update(private.blinding);
+            hasher.update(public.nonce);
             let commitment: [u8; 32] = hasher.finalize().into();
 
             let mut proof_data = Vec::with_capacity(1024);
@@ -150,7 +150,7 @@ impl Circuit for NonRevocationCircuit {
             if proof.proof_bytes.len() < 64 {
                 return Ok(false);
             }
-            if &proof.proof_bytes[32..64] != &expected_hash[..] {
+            if proof.proof_bytes[32..64] != expected_hash[..] {
                 return Ok(false);
             }
             Ok(true)

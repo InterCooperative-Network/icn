@@ -178,7 +178,7 @@ impl VuiRegistry {
     fn update_checkpoint(&mut self, new_vui_hash: &[u8; 32]) {
         let mut hasher = Sha256::new();
         hasher.update(b"icn-vui-checkpoint-v1");
-        hasher.update(&self.checkpoint_hash);
+        hasher.update(self.checkpoint_hash);
         hasher.update(new_vui_hash);
         hasher.update(self.sequence.to_le_bytes());
 
