@@ -1,3 +1,6 @@
+// Allow unused_assignments from Zeroize derive macro generated code
+#![allow(unused_assignments)]
+
 //! ICN Identity - DID management, key generation, and cryptographic operations
 //!
 //! This crate provides identity primitives for ICN, including:
@@ -318,8 +321,8 @@ mod tests {
         let result = Did::from_str(&did_str);
         // Note: All-zeros might actually be accepted by ed25519_dalek
         // This test documents the behavior even if it passes
-        if result.is_err() {
-            assert!(result.unwrap_err().to_string().contains("Ed25519"));
+        if let Err(e) = result {
+            assert!(e.to_string().contains("Ed25519"));
         }
     }
 
