@@ -1114,14 +1114,14 @@ pub fn generate_compound_proof(
 
 ### S4 Deliverables Checklist
 
-- [ ] `icn-zkp` crate compiles
-- [ ] Age proof circuit working
-- [ ] Citizenship proof circuit working
-- [ ] RSA accumulator implemented
-- [ ] Non-revocation proofs working
-- [ ] Compound proofs working
-- [ ] Proof size within budget (~50-100KB)
-- [ ] Benchmarks: proof generation <10s, verification <1s
+- [x] `icn-zkp` crate compiles
+- [x] Age proof circuit working (simulated, winterfell STARK via `stark` feature)
+- [x] Citizenship proof circuit working
+- [x] RSA accumulator implemented (with membership/non-membership witnesses)
+- [x] Non-revocation proofs working
+- [x] Compound proofs working
+- [ ] Proof size within budget (~50-100KB) - requires `stark` feature
+- [ ] Benchmarks: proof generation <10s, verification <1s - TODO when `stark` enabled
 
 ---
 

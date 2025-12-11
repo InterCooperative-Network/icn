@@ -1,0 +1,63 @@
+[package]
+name = "icn-zkp"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-knowledge proofs for ICN SDIS - attribute proofs and revocation"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# ICN dependencies
+icn-identity = { path = "../icn-identity" }
+icn-crypto-pq = { path = "../icn-crypto-pq" }
+
+# STARK proving system (pure Rust)
+winterfell = { version = "0.9", optional = true }
+winter-air = { version = "0.9", optional = true }
+winter-math = { version = "0.9", optional = true }
+winter-utils = { version = "0.9", optional = true }
+
+# Arbitrary precision for RSA accumulator
+num-bigint = { version = "0.4", features = ["serde"] }
+num-traits = "0.2"
+num-integer = "0.1"
+
+# Hashing
+sha3 = "0.10"
+sha2 = "0.10"
+
+# Encoding
+hex = "0.4"
+
+# Randomness
+rand = "0.8"
+rand_core = "0.6"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Security
+zeroize = { version = "1.7", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+criterion = "0.5"
+hex = "0.4"
+serde_json = "1.0"
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[features]
+default = []
+# Enable full STARK proving (adds ~10MB to binary)
+stark = ["winterfell", "winter-air", "winter-math", "winter-utils"]
+
+# Uncomment when benchmarks are implemented
+# [[bench]]
+# name = "proof_bench"
+# harness = false
