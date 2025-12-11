@@ -743,7 +743,11 @@ impl Supervisor {
                 if self.config.rate_limiting.enabled {
                     (
                         Some(trust_graph_handle.clone()), // Enable trust-gated rate limiting
-                        Some(self.config.rate_limiting.to_trust_gated_config()),
+                        Some(
+                            self.config
+                                .rate_limiting
+                                .to_trust_gated_config(self.config.network.min_trust_threshold),
+                        ),
                         Some(self.config.rate_limiting.to_fallback_config()),
                     )
                 } else {

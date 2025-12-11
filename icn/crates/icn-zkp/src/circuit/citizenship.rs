@@ -113,11 +113,11 @@ impl Circuit for CitizenshipProofCircuit {
             )));
         }
 
-        let public_hash = compute_public_inputs_hash(public);
-
         #[cfg(not(feature = "stark"))]
         {
             use sha3::{Digest, Sha3_256};
+
+            let public_hash = compute_public_inputs_hash(public);
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.actual_country);
@@ -137,6 +137,7 @@ impl Circuit for CitizenshipProofCircuit {
 
         #[cfg(feature = "stark")]
         {
+            let _public_hash = compute_public_inputs_hash(public);
             unimplemented!("Full STARK proofs require 'stark' feature");
         }
     }

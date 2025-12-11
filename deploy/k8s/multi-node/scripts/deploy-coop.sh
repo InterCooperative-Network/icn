@@ -117,6 +117,10 @@ data:
     rpc_port = ${RPC_PORT}
     mdns_enabled = true
     bootstrap_peers = []
+    # Set min_trust_threshold to 0.0 for cooperative deployment
+    # This allows nodes to connect without pre-established trust relationships
+    # For production deployments with external peers, consider using 0.1 or higher
+    min_trust_threshold = 0.0
 
     [observability]
     metrics_port = ${METRICS_PORT}
