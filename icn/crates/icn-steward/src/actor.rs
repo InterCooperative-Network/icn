@@ -365,7 +365,10 @@ impl StewardActor {
                 ceremony_id,
                 steward_did: self.own_did.clone(),
                 vui_commitment,
+                pathway_hash,
+                threshold: self.config.vui_threshold,
                 timestamp: now,
+                signature: Vec::new(), // TODO: Sign in production
             };
             send_gossip(crate::gossip::StewardMessage::Enrollment(msg));
         }

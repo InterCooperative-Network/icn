@@ -130,22 +130,74 @@ pub enum EnrollmentMessage {
     ParticipationRequest {
         /// Ceremony ID
         ceremony_id: [u8; 32],
-        /// Requesting steward
+        /// Requesting steward (coordinator)
         steward_did: Did,
         /// VUI commitment being enrolled
         vui_commitment: [u8; 32],
+        /// Pathway proof hash
+        pathway_hash: [u8; 8],
+        /// Threshold required
+        threshold: u32,
         /// Timestamp
         timestamp: u64,
+        /// Coordinator signature
+        signature: Vec<u8>,
     },
 
-    /// Acknowledge participation
+    /// Acknowledge participation with PRF partial
     ParticipationAck {
         /// Ceremony ID
         ceremony_id: [u8; 32],
         /// Acknowledging steward
         steward_did: Did,
-        /// Their pepper share contribution (encrypted)
-        encrypted_share: Vec<u8>,
+        /// Share index (for combination)
+        share_index: u8,
+        /// PRF partial (encrypted to user's public key)
+        encrypted_prf_partial: Vec<u8>,
+        /// Commitment to pepper share (for verification)
+        share_commitment: [u8; 32],
+        /// Timestamp
+        timestamp: u64,
+        /// Signature
+        signature: Vec<u8>,
+    },
+
+    /// PRF partial delivery to user (via coordinator)
+    PrfPartialDelivery {
+        /// Ceremony ID
+        ceremony_id: [u8; 32],
+        /// Originating steward
+        steward_did: Did,
+        /// Share index
+        share_index: u8,
+        /// Encrypted PRF partial (to user)
+        encrypted_partial: Vec<u8>,
+        /// Signature
+        signature: Vec<u8>,
+    },
+
+    /// Uniqueness verification request
+    UniquenessCheck {
+        /// Ceremony ID
+        ceremony_id: [u8; 32],
+        /// Requesting steward (coordinator)
+        steward_did: Did,
+        /// VUI hash to check
+        vui_hash: [u8; 32],
+        /// Timestamp
+        timestamp: u64,
+    },
+
+    /// Uniqueness verification response
+    UniquenessResponse {
+        /// Ceremony ID
+        ceremony_id: [u8; 32],
+        /// Responding steward
+        steward_did: Did,
+        /// VUI hash checked
+        vui_hash: [u8; 32],
+        /// Is unique (not found in registry)
+        is_unique: bool,
         /// Timestamp
         timestamp: u64,
         /// Signature
@@ -162,6 +214,20 @@ pub enum EnrollmentMessage {
         vui_hash: [u8; 32],
         /// Participating stewards
         participants: Vec<Did>,
+        /// Timestamp
+        timestamp: u64,
+        /// Coordinator signature
+        signature: Vec<u8>,
+    },
+
+    /// Ceremony failed
+    CeremonyFailed {
+        /// Ceremony ID
+        ceremony_id: [u8; 32],
+        /// Coordinating steward
+        coordinator_did: Did,
+        /// Failure reason
+        reason: String,
         /// Timestamp
         timestamp: u64,
         /// Coordinator signature
@@ -279,17 +345,61 @@ mod tests {
             ceremony_id: [1u8; 32],
             steward_did: steward_did.clone(),
             vui_commitment: [2u8; 32],
+            pathway_hash: [3u8; 8],
+            threshold: 3,
             timestamp: 12345,
+            signature: vec![4, 5, 6],
         };
 
         if let EnrollmentMessage::ParticipationRequest {
             ceremony_id,
             vui_commitment,
+            threshold,
             ..
         } = msg
         {
             assert_eq!(ceremony_id, [1u8; 32]);
             assert_eq!(vui_commitment, [2u8; 32]);
+            assert_eq!(threshold, 3);
+        }
+    }
+
+    #[test]
+    fn test_enrollment_prf_delivery() {
+        let steward_did = test_did();
+        let msg = EnrollmentMessage::PrfPartialDelivery {
+            ceremony_id: [1u8; 32],
+            steward_did,
+            share_index: 1,
+            encrypted_partial: vec![1, 2, 3, 4],
+            signature: vec![5, 6, 7, 8],
+        };
+
+        if let EnrollmentMessage::PrfPartialDelivery {
+            share_index,
+            encrypted_partial,
+            ..
+        } = msg
+        {
+            assert_eq!(share_index, 1);
+            assert_eq!(encrypted_partial, vec![1, 2, 3, 4]);
+        }
+    }
+
+    #[test]
+    fn test_uniqueness_check() {
+        let steward_did = test_did();
+        let msg = EnrollmentMessage::UniquenessResponse {
+            ceremony_id: [1u8; 32],
+            steward_did,
+            vui_hash: [42u8; 32],
+            is_unique: true,
+            timestamp: 12345,
+            signature: vec![1, 2, 3],
+        };
+
+        if let EnrollmentMessage::UniquenessResponse { is_unique, .. } = msg {
+            assert!(is_unique);
         }
     }
 
