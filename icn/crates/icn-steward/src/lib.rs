@@ -39,12 +39,14 @@
 //! - [`token`] - EnrollmentToken for blind signature-based enrollment
 //! - [`vui_registry`] - Distributed VUI uniqueness checking
 //! - [`ceremony`] - Enrollment and recovery ceremonies
+//! - [`enrollment`] - End-to-end enrollment service
 //! - [`gossip`] - Steward-specific gossip messages
 //! - [`config`] - StewardConfig for runtime configuration
 
 pub mod actor;
 pub mod ceremony;
 pub mod config;
+pub mod enrollment;
 pub mod gossip;
 pub mod handle;
 pub mod profile;
@@ -64,6 +66,12 @@ pub use handle::{StewardHandle, StewardMsg, StewardStats as ActorStats};
 pub use profile::{JurisdictionTier, StewardProfile, StewardStats, StewardStatus};
 pub use token::{EnrollmentToken, TokenIssuanceRecord, TokenRequest, TokenResponse};
 pub use vui_registry::{DistributedCheckResult, LocalCheckResult, VuiRegistry, VuiRegistryError};
+
+// Enrollment service exports
+pub use enrollment::{
+    BlindedTokenRequest, CeremonyStartResponse, EnrollmentClient, EnrollmentConfig,
+    EnrollmentRequest, EnrollmentService, EnrollmentStats,
+};
 
 /// Gossip topics for steward network
 pub mod topics {
