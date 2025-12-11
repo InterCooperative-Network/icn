@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Configurable Trust Threshold for Network Connections (2025-12-11)
+
+**Network Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):
+- Added `min_trust_threshold` field to `NetworkConfig` (default: 0.1)
+- Controls trust-gated TLS verification at the transport layer
+- Configurable per-node via TOML configuration files
+- Valid range: 0.0 (disabled) to 1.0 (maximum trust required)
+
+**Trust Threshold Values**:
+- `0.0` - Accept all authenticated DIDs (trust-gated TLS disabled, useful for cooperative deployments)
+- `0.1` - Require "Known" trust class (at least one trust edge)
+- `0.4` - Require "Partner" trust class
+- `0.7` - Require "Federated" trust class
+
+**Configuration Example**:
+```toml
+[network]
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
+mdns_enabled = true
+bootstrap_peers = []
+min_trust_threshold = 0.0  # For cooperative deployments
+```
+
+**Deployment Updates**:
+- Updated `deploy-coop.sh` to set `min_trust_threshold = 0.0` for cooperative deployments
+- Updated example config files with documentation
+- Updated `icn-alpha.toml` and `icn-beta.toml` for local development
+
+**Documentation**:
+- New guide: [trust-threshold-configuration.md](docs/trust-threshold-configuration.md)
+- Covers use cases, security considerations, and troubleshooting
+
+**Security Note**: Setting to 0.0 still provides DID-TLS binding, transport encryption, message signing, and replay protection. It only disables trust-based connection rejection.
+
+**Use Cases**:
+- **Cooperative Deployments**: Set to 0.0 for closed networks where all nodes are pre-authorized
+- **Local Development**: Set to 0.0 for easy testing without trust setup
+- **Public Networks**: Keep at 0.1 or higher for trust-based access control
+
+Fixes connection rejection issues in cooperative deployments where nodes have no pre-established trust relationships.
+
 ### Added - Dispute Management CLI (2025-12-05)
 
 **icnctl dispute subcommands** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
