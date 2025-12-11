@@ -42,6 +42,7 @@ icn-ledger.workspace = true
 icn-snapshot.workspace = true
 icn-governance.workspace = true
 icn-federation.workspace = true
+icn-steward.workspace = true
 
 [dev-dependencies]
 tempfile = "3.8"

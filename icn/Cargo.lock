@@ -3050,6 +3050,7 @@ dependencies = [
  "icn-obs",
  "icn-rpc",
  "icn-snapshot",
+ "icn-steward",
  "icn-store",
  "icn-trust",
  "rand 0.8.5",

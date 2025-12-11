@@ -135,6 +135,10 @@ enum Commands {
     #[command(subcommand)]
     Quota(QuotaCommands),
 
+    /// Steward network operations (SDIS Phase S3)
+    #[command(subcommand)]
+    Steward(StewardCommands),
+
     /// Generate shell completions
     Completions {
         /// Shell type
@@ -1081,6 +1085,77 @@ enum DisputeCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum StewardCommands {
+    /// Show steward status and statistics
+    Status,
+
+    /// Show steward configuration
+    Config,
+
+    /// Check if a VUI is already registered
+    CheckVui {
+        /// VUI hash (hex, 32 bytes)
+        vui_hash: String,
+    },
+
+    /// Start an enrollment ceremony
+    StartEnrollment {
+        /// VUI commitment (hex, 32 bytes)
+        #[arg(long)]
+        vui_commitment: String,
+
+        /// Biometric pathway hash (hex, 8 bytes)
+        #[arg(long)]
+        pathway_hash: String,
+    },
+
+    /// Get enrollment ceremony status
+    EnrollmentStatus {
+        /// Ceremony ID (hex, 32 bytes)
+        ceremony_id: String,
+    },
+
+    /// Start a recovery ceremony
+    StartRecovery {
+        /// Old DID being recovered
+        #[arg(long)]
+        old_did: String,
+
+        /// New DID to replace the old one
+        #[arg(long)]
+        new_did: String,
+
+        /// Evidence hash (hex, 32 bytes)
+        #[arg(long)]
+        evidence_hash: String,
+
+        /// Anchor commitment (hex, 32 bytes)
+        #[arg(long)]
+        anchor_commitment: String,
+    },
+
+    /// Get recovery ceremony status
+    RecoveryStatus {
+        /// Ceremony ID (hex, 32 bytes)
+        ceremony_id: String,
+    },
+
+    /// Issue an enrollment token (steward only)
+    IssueToken {
+        /// VUI commitment (hex, 32 bytes)
+        #[arg(long)]
+        vui_commitment: String,
+
+        /// Blinded message (hex)
+        #[arg(long)]
+        blinded_message: String,
+    },
+
+    /// List steward gossip topics
+    Topics,
+}
+
 fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(dir) = data_dir {
         Ok(dir)
@@ -1261,6 +1336,10 @@ async fn main() -> Result<()> {
 
         Commands::Dispute(dispute_cmd) => {
             handle_dispute_command(dispute_cmd, &args.endpoint).await?
+        }
+
+        Commands::Steward(steward_cmd) => {
+            handle_steward_command(steward_cmd, &data_dir, &args.endpoint).await?
         }
 
         Commands::Completions { shell } => {
@@ -5967,4 +6046,253 @@ async fn handle_dispute_command(cmd: DisputeCommands, endpoint: &str) -> Result<
     }
 
     Ok(())
+}
+
+async fn handle_steward_command(
+    cmd: StewardCommands,
+    data_dir: &Path,
+    endpoint: &str,
+) -> Result<()> {
+    match cmd {
+        StewardCommands::Status => {
+            println!("Steward Network Status");
+            println!("======================\n");
+
+            // Read config to check if steward is enabled
+            let config_path = data_dir.join("config.toml");
+            if config_path.exists() {
+                let config_content = std::fs::read_to_string(&config_path)?;
+                if config_content.contains("steward") && config_content.contains("enabled = true") {
+                    println!("Status:     ENABLED");
+                } else {
+                    println!("Status:     DISABLED");
+                    println!("\nTo enable steward mode, add to config.toml:");
+                    println!("  [steward]");
+                    println!("  enabled = true");
+                    println!("  vui_threshold = 3");
+                    println!("  vui_total_shares = 5");
+                    return Ok(());
+                }
+            } else {
+                println!("Status:     DISABLED (no config.toml found)");
+                return Ok(());
+            }
+
+            // Try to get steward stats via RPC
+            let mut client = create_rpc_client(endpoint, data_dir, false)?;
+            match client.get_status().await {
+                Ok(status) => {
+                    if status.running {
+                        println!("Daemon:     RUNNING");
+                    } else {
+                        println!("Daemon:     NOT RUNNING");
+                    }
+                    if !status.listen_addr.is_empty() {
+                        println!("Listen:     {}", status.listen_addr);
+                    }
+                }
+                Err(e) => {
+                    println!("Warning: Could not reach daemon: {e}");
+                }
+            }
+
+            println!("\nGossip Topics:");
+            println!("  steward:announce  - Steward announcements");
+            println!("  steward:vui-sync  - VUI registry synchronization");
+            println!("  steward:enrollment - Enrollment ceremony coordination");
+            println!("  steward:recovery  - Recovery ceremony coordination");
+        }
+
+        StewardCommands::Config => {
+            println!("Steward Configuration");
+            println!("=====================\n");
+
+            // Read config
+            let config_path = data_dir.join("config.toml");
+            if !config_path.exists() {
+                println!("No config.toml found at {}", config_path.display());
+                println!("\nDefault steward configuration:");
+                print_default_steward_config();
+                return Ok(());
+            }
+
+            let config_content = std::fs::read_to_string(&config_path)?;
+            if config_content.contains("[steward]") {
+                // Parse and display steward section
+                let config: toml::Value = toml::from_str(&config_content)?;
+                if let Some(steward) = config.get("steward") {
+                    let enabled = steward.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let threshold = steward.get("vui_threshold").and_then(|v| v.as_integer()).unwrap_or(3);
+                    let total = steward.get("vui_total_shares").and_then(|v| v.as_integer()).unwrap_or(5);
+                    let max_enroll = steward.get("max_concurrent_enrollments").and_then(|v| v.as_integer()).unwrap_or(100);
+                    let max_recover = steward.get("max_concurrent_recoveries").and_then(|v| v.as_integer()).unwrap_or(50);
+                    let token_validity = steward.get("token_validity_secs").and_then(|v| v.as_integer()).unwrap_or(604800);
+
+                    println!("enabled:                   {enabled}");
+                    println!("vui_threshold:             {threshold}");
+                    println!("vui_total_shares:          {total}");
+                    println!("max_concurrent_enrollments: {max_enroll}");
+                    println!("max_concurrent_recoveries:  {max_recover}");
+                    println!("token_validity_secs:       {token_validity} ({} days)", token_validity / 86400);
+                } else {
+                    println!("No [steward] section in config.toml");
+                    println!("\nDefault configuration:");
+                    print_default_steward_config();
+                }
+            } else {
+                println!("No [steward] section in config.toml");
+                println!("\nDefault configuration:");
+                print_default_steward_config();
+            }
+        }
+
+        StewardCommands::CheckVui { vui_hash } => {
+            // Parse VUI hash
+            let hash_bytes = hex::decode(&vui_hash)
+                .with_context(|| format!("Invalid VUI hash hex: {vui_hash}"))?;
+            if hash_bytes.len() != 32 {
+                bail!("VUI hash must be 32 bytes (64 hex chars), got {} bytes", hash_bytes.len());
+            }
+
+            println!("Checking VUI registry for hash: {}...", &vui_hash[..16]);
+
+            // Note: In a full implementation, this would query the steward network
+            // For now, we just validate the input and print a placeholder
+            println!("\n⚠️  VUI registry check requires running steward daemon.");
+            println!("   Start daemon with steward enabled in config.toml");
+        }
+
+        StewardCommands::StartEnrollment { vui_commitment, pathway_hash } => {
+            // Validate inputs
+            let commitment_bytes = hex::decode(&vui_commitment)
+                .with_context(|| format!("Invalid VUI commitment hex: {vui_commitment}"))?;
+            if commitment_bytes.len() != 32 {
+                bail!("VUI commitment must be 32 bytes");
+            }
+
+            let pathway_bytes = hex::decode(&pathway_hash)
+                .with_context(|| format!("Invalid pathway hash hex: {pathway_hash}"))?;
+            if pathway_bytes.len() != 8 {
+                bail!("Pathway hash must be 8 bytes");
+            }
+
+            println!("Starting enrollment ceremony...");
+            println!("  VUI commitment: {}...", &vui_commitment[..16]);
+            println!("  Pathway hash:   {pathway_hash}");
+
+            // Note: In a full implementation, this would interact with the steward network
+            println!("\n⚠️  Enrollment ceremony requires running steward daemon.");
+            println!("   This is a placeholder for the full SDIS enrollment flow.");
+        }
+
+        StewardCommands::EnrollmentStatus { ceremony_id } => {
+            let id_bytes = hex::decode(&ceremony_id)
+                .with_context(|| format!("Invalid ceremony ID hex: {ceremony_id}"))?;
+            if id_bytes.len() != 32 {
+                bail!("Ceremony ID must be 32 bytes");
+            }
+
+            println!("Checking enrollment ceremony status: {}...", &ceremony_id[..16]);
+            println!("\n⚠️  Ceremony status check requires running steward daemon.");
+        }
+
+        StewardCommands::StartRecovery { old_did, new_did, evidence_hash, anchor_commitment } => {
+            // Validate DIDs
+            if !old_did.starts_with("did:icn:") {
+                bail!("Invalid old DID format: {old_did}");
+            }
+            if !new_did.starts_with("did:icn:") {
+                bail!("Invalid new DID format: {new_did}");
+            }
+
+            // Validate evidence hash
+            let evidence_bytes = hex::decode(&evidence_hash)
+                .with_context(|| format!("Invalid evidence hash hex: {evidence_hash}"))?;
+            if evidence_bytes.len() != 32 {
+                bail!("Evidence hash must be 32 bytes");
+            }
+
+            // Validate anchor commitment
+            let anchor_bytes = hex::decode(&anchor_commitment)
+                .with_context(|| format!("Invalid anchor commitment hex: {anchor_commitment}"))?;
+            if anchor_bytes.len() != 32 {
+                bail!("Anchor commitment must be 32 bytes");
+            }
+
+            println!("Starting recovery ceremony...");
+            println!("  Old DID:           {old_did}");
+            println!("  New DID:           {new_did}");
+            println!("  Evidence hash:     {}...", &evidence_hash[..16]);
+            println!("  Anchor commitment: {}...", &anchor_commitment[..16]);
+
+            println!("\n⚠️  Recovery ceremony requires running steward daemon.");
+            println!("   This is a placeholder for the full SDIS recovery flow.");
+        }
+
+        StewardCommands::RecoveryStatus { ceremony_id } => {
+            let id_bytes = hex::decode(&ceremony_id)
+                .with_context(|| format!("Invalid ceremony ID hex: {ceremony_id}"))?;
+            if id_bytes.len() != 32 {
+                bail!("Ceremony ID must be 32 bytes");
+            }
+
+            println!("Checking recovery ceremony status: {}...", &ceremony_id[..16]);
+            println!("\n⚠️  Ceremony status check requires running steward daemon.");
+        }
+
+        StewardCommands::IssueToken { vui_commitment, blinded_message } => {
+            // Validate commitment
+            let commitment_bytes = hex::decode(&vui_commitment)
+                .with_context(|| format!("Invalid VUI commitment hex: {vui_commitment}"))?;
+            if commitment_bytes.len() != 32 {
+                bail!("VUI commitment must be 32 bytes");
+            }
+
+            // Validate blinded message (variable length)
+            let blinded_bytes = hex::decode(&blinded_message)
+                .with_context(|| format!("Invalid blinded message hex: {blinded_message}"))?;
+            if blinded_bytes.is_empty() {
+                bail!("Blinded message cannot be empty");
+            }
+
+            println!("Token issuance request...");
+            println!("  VUI commitment:   {}...", &vui_commitment[..16]);
+            println!("  Blinded message:  {} bytes", blinded_bytes.len());
+
+            println!("\n⚠️  Token issuance requires running steward daemon with steward privileges.");
+            println!("   This is a placeholder for the full SDIS token issuance flow.");
+        }
+
+        StewardCommands::Topics => {
+            println!("Steward Gossip Topics");
+            println!("=====================\n");
+
+            println!("Topic: {}", icn_steward::topics::STEWARD_ANNOUNCE);
+            println!("  Purpose: Steward announcements and status updates");
+            println!("  Access:  Public (any node can subscribe)\n");
+
+            println!("Topic: {}", icn_steward::topics::VUI_SYNC);
+            println!("  Purpose: VUI registry synchronization");
+            println!("  Access:  Steward nodes only\n");
+
+            println!("Topic: {}", icn_steward::topics::ENROLLMENT);
+            println!("  Purpose: Enrollment ceremony coordination");
+            println!("  Access:  Steward nodes and enrollees\n");
+
+            println!("Topic: {}", icn_steward::topics::RECOVERY);
+            println!("  Purpose: Recovery ceremony coordination");
+            println!("  Access:  Steward nodes and recovery requesters");
+        }
+    }
+
+    Ok(())
+}
+
+fn print_default_steward_config() {
+    println!("enabled:                   false");
+    println!("vui_threshold:             3");
+    println!("vui_total_shares:          5");
+    println!("max_concurrent_enrollments: 100");
+    println!("max_concurrent_recoveries:  50");
+    println!("token_validity_secs:       604800 (7 days)");
 }
