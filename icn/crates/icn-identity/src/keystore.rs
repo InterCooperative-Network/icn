@@ -1,5 +1,14 @@
 //! Secure key storage with encryption at rest
+//!
+//! Supports multiple keystore formats:
+//! - v1: Basic Ed25519 keypair only
+//! - v2: Added TLS binding
+//! - v2.1: Added X25519 encryption keys
+//! - v3: Added DID Document and multi-device support
+//! - v4: Added SDIS Anchor and KeyBundle with hybrid signatures
 
+use crate::anchor::Anchor;
+use crate::keybundle::KeyBundle;
 use crate::{Did, DidDocument, IdentityBundle, KeyPair, RotationEvent};
 use anyhow::{Context, Result};
 use secrecy::{Secret, Zeroize};
@@ -114,6 +123,91 @@ impl Drop for StoredKeyV3 {
     }
 }
 
+/// Keystore v4 format: SDIS support with Anchor and KeyBundles
+#[derive(Serialize, Deserialize)]
+struct StoredKeyV4 {
+    /// Format version (always 4 for this struct)
+    version: u8,
+
+    // === Legacy fields from v3 (for backward compatibility) ===
+    /// This device's Ed25519 identity keys (SENSITIVE)
+    secret_bytes: [u8; 32],
+    public_bytes: [u8; 32],
+    did: String,
+
+    /// TLS binding (SENSITIVE)
+    tls_cert_der: Vec<u8>,
+    tls_key_der: Vec<u8>,
+    tls_binding_sig: Vec<u8>,
+    created_at: u64,
+
+    /// X25519 encryption keys (SENSITIVE)
+    x25519_secret: Vec<u8>,
+    x25519_public: [u8; 32],
+
+    /// DID Document
+    did_document: DidDocument,
+
+    /// This device's ID
+    device_id: String,
+
+    /// Rotation event history
+    rotation_chain: Vec<RotationEvent>,
+
+    // === SDIS fields (v4 additions) ===
+    /// SDIS Anchor (None for legacy identities)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    anchor: Option<Anchor>,
+
+    /// Stored KeyBundles (hybrid signature keys)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    keybundles: Vec<StoredKeyBundleV4>,
+
+    /// Current active KeyBundle version (0 if no SDIS keys)
+    #[serde(default)]
+    current_keybundle_version: u32,
+}
+
+/// Stored KeyBundle for v4 keystore
+#[derive(Serialize, Deserialize)]
+struct StoredKeyBundleV4 {
+    /// KeyBundle version
+    version: u32,
+
+    /// Ed25519 signing key (from hybrid keypair) (SENSITIVE)
+    classical_secret: Vec<u8>,
+    classical_public: Vec<u8>,
+
+    /// ML-DSA signing key (from hybrid keypair) (SENSITIVE)
+    pq_secret: Vec<u8>,
+    pq_public: Vec<u8>,
+
+    /// X25519 encryption key for this bundle (SENSITIVE)
+    bundle_x25519_secret: Vec<u8>,
+    bundle_x25519_public: [u8; 32],
+
+    /// Timestamps
+    issued_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    expires_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    revoked_at: Option<u64>,
+}
+
+impl Drop for StoredKeyV4 {
+    fn drop(&mut self) {
+        // Zeroize sensitive fields
+        self.secret_bytes.zeroize();
+        self.x25519_secret.zeroize();
+        self.tls_key_der.zeroize();
+        for kb in &mut self.keybundles {
+            kb.classical_secret.zeroize();
+            kb.pq_secret.zeroize();
+            kb.bundle_x25519_secret.zeroize();
+        }
+    }
+}
+
 /// Age-encrypted key storage
 pub struct AgeKeyStore {
     path: PathBuf,
@@ -121,6 +215,11 @@ pub struct AgeKeyStore {
     did_document: Option<DidDocument>,
     device_id: Option<String>,
     rotation_chain: Vec<RotationEvent>,
+
+    // SDIS fields (v4)
+    anchor: Option<Anchor>,
+    keybundles: Vec<KeyBundle>,
+    current_keybundle_version: u32,
 }
 
 impl AgeKeyStore {
@@ -132,6 +231,9 @@ impl AgeKeyStore {
             did_document: None,
             device_id: None,
             rotation_chain: Vec::new(),
+            anchor: None,
+            keybundles: Vec::new(),
+            current_keybundle_version: 0,
         }
     }
 
@@ -159,6 +261,207 @@ impl AgeKeyStore {
     /// Get the rotation event chain
     pub fn get_rotation_chain(&self) -> &[RotationEvent] {
         &self.rotation_chain
+    }
+
+    // === SDIS Methods (v4) ===
+
+    /// Get the SDIS anchor (if this identity has one)
+    pub fn get_anchor(&self) -> Option<&Anchor> {
+        self.anchor.as_ref()
+    }
+
+    /// Check if this keystore has SDIS support enabled
+    pub fn has_sdis(&self) -> bool {
+        self.anchor.is_some()
+    }
+
+    /// Get the current KeyBundle (fails if no SDIS or locked)
+    pub fn get_current_keybundle(&self) -> Result<&KeyBundle> {
+        if self.identity_bundle.is_none() {
+            anyhow::bail!("Keystore is locked");
+        }
+        if self.keybundles.is_empty() {
+            anyhow::bail!("No SDIS KeyBundles available");
+        }
+        self.keybundles
+            .iter()
+            .find(|kb| kb.version == self.current_keybundle_version)
+            .ok_or_else(|| anyhow::anyhow!("Current KeyBundle version not found"))
+    }
+
+    /// Get all KeyBundles
+    pub fn get_keybundles(&self) -> &[KeyBundle] {
+        &self.keybundles
+    }
+
+    /// Get the current KeyBundle version
+    pub fn get_current_keybundle_version(&self) -> u32 {
+        self.current_keybundle_version
+    }
+
+    /// Initialize SDIS support for this identity
+    ///
+    /// Creates an anchor and initial KeyBundle. This is a one-time operation
+    /// that cannot be undone. The anchor is derived from the provided VUI.
+    pub fn init_sdis(&mut self, anchor: Anchor, passphrase: &[u8]) -> Result<&KeyBundle> {
+        if self.identity_bundle.is_none() {
+            anyhow::bail!("Keystore must be unlocked to initialize SDIS");
+        }
+        if self.anchor.is_some() {
+            anyhow::bail!("SDIS already initialized for this identity");
+        }
+
+        // Generate initial KeyBundle (v1)
+        let keybundle = KeyBundle::generate(anchor.clone(), 1)?;
+
+        self.anchor = Some(anchor);
+        self.keybundles = vec![keybundle];
+        self.current_keybundle_version = 1;
+
+        // Save to disk
+        self.save_v4(passphrase)?;
+
+        info!(
+            "Initialized SDIS for identity: {}",
+            self.get_keypair()?.did()
+        );
+
+        Ok(&self.keybundles[0])
+    }
+
+    /// Rotate to a new KeyBundle
+    ///
+    /// Creates a new KeyBundle with incremented version and sets it as current.
+    /// The old KeyBundle is retained for verification of old signatures.
+    pub fn rotate_keybundle(&mut self, passphrase: &[u8]) -> Result<&KeyBundle> {
+        let anchor = self
+            .anchor
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("SDIS not initialized"))?
+            .clone();
+
+        let new_version = self.current_keybundle_version + 1;
+        let new_keybundle = KeyBundle::generate(anchor, new_version)?;
+
+        self.keybundles.push(new_keybundle);
+        self.current_keybundle_version = new_version;
+
+        // Save to disk
+        self.save_v4(passphrase)?;
+
+        info!("Rotated to KeyBundle v{}", new_version);
+
+        Ok(self.keybundles.last().unwrap())
+    }
+
+    /// Save keystore in v4 format
+    fn save_v4(&self, passphrase: &[u8]) -> Result<()> {
+        let identity_bundle = self
+            .identity_bundle
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Keystore is locked"))?;
+        let did_document = self
+            .did_document
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("DID document not available"))?;
+        let device_id = self
+            .device_id
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Device ID not available"))?;
+
+        // Convert KeyBundles to stored format
+        let stored_keybundles: Vec<StoredKeyBundleV4> = self
+            .keybundles
+            .iter()
+            .map(|kb| StoredKeyBundleV4 {
+                version: kb.version,
+                classical_secret: kb.classical_secret_bytes().to_vec(),
+                classical_public: kb.classical_public_bytes(),
+                pq_secret: kb.pq_secret_bytes().to_vec(),
+                pq_public: kb.pq_public_bytes(),
+                bundle_x25519_secret: kb.x25519_secret_bytes().to_vec(),
+                bundle_x25519_public: kb.x25519_public(),
+                issued_at: kb.issued_at,
+                expires_at: kb.expires_at,
+                revoked_at: None,
+            })
+            .collect();
+
+        let stored = StoredKeyV4 {
+            version: 4,
+            secret_bytes: *identity_bundle.keypair().secret_bytes(),
+            public_bytes: identity_bundle.keypair().verifying_key().to_bytes(),
+            did: identity_bundle.did().as_str().to_string(),
+            tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
+            tls_key_der: identity_bundle.tls_key_der_bytes().to_vec(),
+            tls_binding_sig: identity_bundle.binding_info().tls_binding_sig.clone(),
+            created_at: identity_bundle.binding_info().created_at,
+            x25519_secret: identity_bundle.x25519_secret_bytes().to_vec(),
+            x25519_public: *identity_bundle.x25519_public_bytes(),
+            did_document: did_document.clone(),
+            device_id: device_id.clone(),
+            rotation_chain: self.rotation_chain.clone(),
+            anchor: self.anchor.clone(),
+            keybundles: stored_keybundles,
+            current_keybundle_version: self.current_keybundle_version,
+        };
+
+        Self::encrypt_and_save_v4(&self.path, &stored, passphrase)
+    }
+
+    /// Encrypt and save v4 key material
+    fn encrypt_and_save_v4(path: &Path, stored: &StoredKeyV4, passphrase: &[u8]) -> Result<()> {
+        let json = Zeroizing::new(serde_json::to_vec(stored)?);
+
+        let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
+            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?,
+        ));
+
+        let mut encrypted = Vec::new();
+        let mut writer = encryptor
+            .wrap_output(&mut encrypted)
+            .context("Failed to create age writer")?;
+
+        std::io::copy(&mut json.as_slice(), &mut writer)
+            .context("Failed to encrypt key material")?;
+
+        writer
+            .finish()
+            .map(|_| ())
+            .context("Failed to finalize encryption")?;
+
+        std::fs::write(path, encrypted).context("Failed to write keystore file")?;
+
+        Ok(())
+    }
+
+    /// Decrypt and load v4 key material
+    fn decrypt_and_load_v4(path: &Path, passphrase: &[u8]) -> Result<StoredKeyV4> {
+        // Read encrypted file
+        let encrypted = std::fs::read(path).context("Failed to read keystore file")?;
+
+        // Create age decryptor
+        let decryptor = match age::Decryptor::new(encrypted.as_slice())? {
+            age::Decryptor::Passphrase(d) => d,
+            _ => anyhow::bail!("Unsupported age encryption type"),
+        };
+
+        // Decrypt
+        let passphrase_str =
+            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?;
+
+        let mut decrypted = Vec::new();
+        let mut reader = decryptor
+            .decrypt(&Secret::new(passphrase_str), None)
+            .context("Failed to decrypt (wrong passphrase?)")?;
+
+        std::io::copy(&mut reader, &mut decrypted).context("Failed to read decrypted data")?;
+
+        // Deserialize
+        let stored: StoredKeyV4 =
+            serde_json::from_slice(&decrypted).context("Failed to parse v4 key material")?;
+
+        Ok(stored)
     }
 
     /// Update the DID document and save to disk
@@ -314,6 +617,9 @@ impl AgeKeyStore {
             did_document: Some(did_document),
             device_id: Some("device-1".to_string()),
             rotation_chain: Vec::new(),
+            anchor: None,
+            keybundles: Vec::new(),
+            current_keybundle_version: 0,
         })
     }
 
@@ -331,6 +637,9 @@ impl AgeKeyStore {
             did_document: None,
             device_id: None,
             rotation_chain: Vec::new(),
+            anchor: None,
+            keybundles: Vec::new(),
+            current_keybundle_version: 0,
         })
     }
 
@@ -463,7 +772,76 @@ impl KeyStore for AgeKeyStore {
             return Ok(());
         }
 
-        // Try loading as v3 first
+        // Try loading as v4 first (newest format with SDIS support)
+        if let Ok(stored_v4) = Self::decrypt_and_load_v4(&self.path, passphrase) {
+            info!(
+                "Unlocked v4 keystore (SDIS support) for DID: {}",
+                stored_v4.did
+            );
+
+            // Reconstruct keypair
+            let keypair = KeyPair::from_bytes(&stored_v4.secret_bytes, &stored_v4.public_bytes)?;
+
+            // Reconstruct IdentityBundle
+            let identity_bundle = IdentityBundle::from_stored(
+                keypair,
+                stored_v4.tls_cert_der.clone(),
+                stored_v4.tls_key_der.clone(),
+                stored_v4.tls_binding_sig.clone(),
+                stored_v4.created_at,
+                stored_v4.x25519_secret.clone(),
+                stored_v4.x25519_public,
+            )?;
+
+            // Reconstruct KeyBundles if present
+            let mut keybundles = Vec::new();
+            for stored_kb in &stored_v4.keybundles {
+                if let Some(ref anchor) = stored_v4.anchor {
+                    let classical_secret: [u8; 32] = stored_kb
+                        .classical_secret
+                        .as_slice()
+                        .try_into()
+                        .context("Invalid classical secret key length")?;
+                    let classical_public: [u8; 32] = stored_kb
+                        .classical_public
+                        .as_slice()
+                        .try_into()
+                        .context("Invalid classical public key length")?;
+                    let x25519_secret: [u8; 32] = stored_kb
+                        .bundle_x25519_secret
+                        .as_slice()
+                        .try_into()
+                        .context("Invalid X25519 secret key length")?;
+
+                    let kb = KeyBundle::from_stored(
+                        anchor.clone(),
+                        stored_kb.version,
+                        &classical_secret,
+                        &classical_public,
+                        &stored_kb.pq_secret,
+                        &stored_kb.pq_public,
+                        x25519_secret,
+                        stored_kb.bundle_x25519_public,
+                        stored_kb.issued_at,
+                        stored_kb.expires_at,
+                    )?;
+                    keybundles.push(kb);
+                }
+            }
+
+            // Load all data
+            self.identity_bundle = Some(identity_bundle);
+            self.did_document = Some(stored_v4.did_document.clone());
+            self.device_id = Some(stored_v4.device_id.clone());
+            self.rotation_chain = stored_v4.rotation_chain.clone();
+            self.anchor = stored_v4.anchor.clone();
+            self.keybundles = keybundles;
+            self.current_keybundle_version = stored_v4.current_keybundle_version;
+
+            return Ok(());
+        }
+
+        // Try loading as v3
         if let Ok(stored_v3) = Self::decrypt_and_load_v3(&self.path, passphrase) {
             // V3 keystore: has multi-device support
             info!(
@@ -601,6 +979,10 @@ impl KeyStore for AgeKeyStore {
             self.did_document = None;
             self.device_id = None;
             self.rotation_chain.clear();
+            // Clear SDIS fields
+            self.anchor = None;
+            self.keybundles.clear();
+            self.current_keybundle_version = 0;
         }
     }
 
@@ -871,5 +1253,204 @@ mod tests {
         let did_doc2 = ks.get_did_document().unwrap();
         assert_eq!(did_doc2.id, did_doc_id);
         assert_eq!(did_doc2.version, did_doc_version);
+    }
+
+    // === SDIS / v4 Keystore Tests ===
+
+    #[test]
+    fn test_sdis_init() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Initialize keystore
+        let mut ks = AgeKeyStore::init(&path, passphrase).unwrap();
+
+        // Should not have SDIS initially
+        assert!(!ks.has_sdis());
+        assert!(ks.get_anchor().is_none());
+        assert!(ks.get_current_keybundle().is_err());
+
+        // Initialize SDIS
+        let anchor = Anchor::genesis("test");
+        let anchor_id = anchor.id;
+        ks.init_sdis(anchor, passphrase).unwrap();
+
+        // Should now have SDIS
+        assert!(ks.has_sdis());
+        assert!(ks.get_anchor().is_some());
+        assert_eq!(ks.get_anchor().unwrap().id, anchor_id);
+
+        // Should have a KeyBundle
+        let kb = ks.get_current_keybundle().unwrap();
+        assert_eq!(kb.version, 1);
+        assert_eq!(ks.get_current_keybundle_version(), 1);
+
+        // KeyBundle should be able to sign
+        let message = b"test message";
+        let sig = kb.sign(message);
+        let pub_bundle = kb.public_bundle();
+        assert!(pub_bundle.verify(message, &sig));
+    }
+
+    #[test]
+    fn test_sdis_persistence() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Initialize keystore and SDIS
+        let mut ks = AgeKeyStore::init(&path, passphrase).unwrap();
+        let anchor = Anchor::genesis("test");
+        let anchor_id = anchor.id;
+        ks.init_sdis(anchor, passphrase).unwrap();
+
+        // Get KeyBundle info before locking
+        let kb_version = ks.get_current_keybundle_version();
+        let kb_x25519_public = ks.get_current_keybundle().unwrap().x25519_public();
+
+        // Lock and reopen
+        ks.lock();
+
+        let mut ks2 = AgeKeyStore::open(&path).unwrap();
+        ks2.unlock(passphrase).unwrap();
+
+        // SDIS should be restored
+        assert!(ks2.has_sdis());
+        assert_eq!(ks2.get_anchor().unwrap().id, anchor_id);
+        assert_eq!(ks2.get_current_keybundle_version(), kb_version);
+
+        // KeyBundle should be restored with same keys
+        let kb2 = ks2.get_current_keybundle().unwrap();
+        assert_eq!(kb2.version, kb_version);
+        assert_eq!(kb2.x25519_public(), kb_x25519_public);
+    }
+
+    #[test]
+    fn test_sdis_keybundle_rotation() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Initialize keystore and SDIS
+        let mut ks = AgeKeyStore::init(&path, passphrase).unwrap();
+        let anchor = Anchor::genesis("test");
+        ks.init_sdis(anchor, passphrase).unwrap();
+
+        // Get v1 KeyBundle
+        let kb_v1_x25519 = ks.get_current_keybundle().unwrap().x25519_public();
+        assert_eq!(ks.get_current_keybundle_version(), 1);
+
+        // Rotate to v2
+        ks.rotate_keybundle(passphrase).unwrap();
+
+        // Should now have v2 as current
+        assert_eq!(ks.get_current_keybundle_version(), 2);
+        let kb_v2_x25519 = ks.get_current_keybundle().unwrap().x25519_public();
+        let kb_v2_version = ks.get_current_keybundle().unwrap().version;
+        assert_eq!(kb_v2_version, 2);
+
+        // V2 should have different keys
+        assert_ne!(kb_v2_x25519, kb_v1_x25519);
+
+        // Should have both bundles in history
+        assert_eq!(ks.get_keybundles().len(), 2);
+
+        // Lock and reopen to verify persistence
+        ks.lock();
+        let mut ks2 = AgeKeyStore::open(&path).unwrap();
+        ks2.unlock(passphrase).unwrap();
+
+        // Should have both KeyBundles restored
+        assert_eq!(ks2.get_keybundles().len(), 2);
+        assert_eq!(ks2.get_current_keybundle_version(), 2);
+        assert_eq!(
+            ks2.get_current_keybundle().unwrap().x25519_public(),
+            kb_v2_x25519
+        );
+    }
+
+    #[test]
+    fn test_sdis_keybundle_sign_verify() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Initialize keystore and SDIS
+        let mut ks = AgeKeyStore::init(&path, passphrase).unwrap();
+        let anchor = Anchor::genesis("test");
+        ks.init_sdis(anchor, passphrase).unwrap();
+
+        // Sign a message
+        let message = b"important message to sign";
+        let kb = ks.get_current_keybundle().unwrap();
+        let signature = kb.sign(message);
+        let pub_bundle = kb.public_bundle();
+
+        // Verify signature
+        assert!(pub_bundle.verify(message, &signature));
+
+        // Lock, reopen, and verify signature still works with restored keys
+        ks.lock();
+        let mut ks2 = AgeKeyStore::open(&path).unwrap();
+        ks2.unlock(passphrase).unwrap();
+
+        let kb2 = ks2.get_current_keybundle().unwrap();
+        let pub_bundle2 = kb2.public_bundle();
+
+        // Old signature should still verify
+        assert!(pub_bundle2.verify(message, &signature));
+
+        // New signature should verify
+        let signature2 = kb2.sign(message);
+        assert!(pub_bundle2.verify(message, &signature2));
+    }
+
+    #[test]
+    fn test_sdis_cannot_reinitialize() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Initialize keystore and SDIS
+        let mut ks = AgeKeyStore::init(&path, passphrase).unwrap();
+        let anchor = Anchor::genesis("first");
+        ks.init_sdis(anchor, passphrase).unwrap();
+
+        // Try to reinitialize - should fail
+        let anchor2 = Anchor::genesis("second");
+        let result = ks.init_sdis(anchor2, passphrase);
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.err());
+        assert!(
+            err_msg.contains("already initialized"),
+            "Expected 'already initialized' in: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_sdis_requires_unlocked() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("keypair.age");
+        let passphrase = b"test-passphrase";
+
+        // Initialize keystore
+        let _ks = AgeKeyStore::init(&path, passphrase).unwrap();
+
+        // Open locked keystore
+        let mut ks2 = AgeKeyStore::open(&path).unwrap();
+        assert!(ks2.is_locked());
+
+        // Try to init SDIS while locked - should fail
+        let anchor = Anchor::genesis("test");
+        let result = ks2.init_sdis(anchor, passphrase);
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.err());
+        assert!(
+            err_msg.contains("unlocked"),
+            "Expected 'unlocked' in: {}",
+            err_msg
+        );
     }
 }

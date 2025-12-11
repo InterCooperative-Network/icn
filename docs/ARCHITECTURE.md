@@ -2,7 +2,7 @@
 
 **Status:** Living Document
 **Version:** 0.1.0
-**Last Updated:** 2025-11-24
+**Last Updated:** 2025-12-10
 
 **Abstract:**
 ICNd is a decentralized coordination substrate providing identity, trust computation, encrypted P2P transport, cooperative ledgering, contract execution, gossip-based synchronization, and a distributed compute fabric for federated cooperatives.
@@ -28,6 +28,7 @@ These principles ensure ICN remains decentralized, resilient, and aligned with c
 ## Table of Contents
 
 1. [Identity & Key Management](#1-identity--key-management)
+    - 1.5 [SDIS Identity Extensions](#15-sdis-identity-extensions-experimental)
 2. [Trust Graph Model](#2-trust-graph-model)
 3. [Network Transport](#3-network-transport)
 4. [Ledger Design](#4-ledger-design)
@@ -235,6 +236,212 @@ pub struct Delegation {
 ```
 
 **v1 compromise:** Manual key export/import with clear warnings
+
+---
+
+### 1.5 SDIS Identity Extensions (Experimental)
+
+**Status:** Phase S1-S2 implemented, integration ongoing
+
+ICN is evolving toward SDIS (Sovereign Digital Identity System) to provide:
+- **Permanent anchor-based identity**: Key rotation without identity change
+- **Post-quantum signatures**: Defense-in-depth against quantum threats
+- **Sybil resistance**: VUI-based uniqueness verification
+
+#### 1.5.1 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         Anchor                               │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ ID: H(VUI || genesis)                                    ││
+│  │ Created: timestamp                                       ││
+│  │ Pathway: enrollment method                               ││
+│  │ VUI Commitment: H(VUI)                                   ││
+│  └─────────────────────────────────────────────────────────┘│
+│                           │                                  │
+│                           ▼                                  │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │              KeyBundle v1 (current)                      ││
+│  │  Ed25519 + ML-DSA hybrid signatures                      ││
+│  │  X25519 encryption keys                                  ││
+│  └─────────────────────────────────────────────────────────┘│
+│                           │                                  │
+│                           ▼                                  │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │              KeyBundle v2 (after rotation)               ││
+│  │  New hybrid keys, same anchor                            ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 1.5.2 Anchor-Based Identity
+
+**Problem:** Traditional DIDs couple identity to public key, requiring identity change on key rotation.
+
+**Solution:** Anchors are permanent identity roots derived from VUI (Verifiable Unique Identifier):
+- Anchor ID = H(VUI || genesis_random)
+- Keys bound to anchor via KeyBundles
+- Key rotation preserves anchor identity
+
+```rust
+pub struct Anchor {
+    id: [u8; 32],           // Permanent identifier
+    vui_commitment: [u8; 32], // H(VUI) for recovery verification
+    pathway: EnrollmentPathway, // How identity was verified
+    created_at: u64,
+}
+
+pub enum EnrollmentPathway {
+    GovernmentId { country: [u8; 2], doc_type_hash: [u8; 8] },
+    OrganizationalSponsorship { org_did: Did, org_internal_id_hash: [u8; 16] },
+    BiometricCommitment { template_hash: [u8; 32] },
+    WebOfTrust { vouchers: Vec<Did>, vouched_at: u64 },
+    Genesis { reason: String }, // Bootstrap/testing
+}
+```
+
+#### 1.5.3 Post-Quantum Hybrid Signatures
+
+**Threat Model:** Quantum computers could break Ed25519 within ICN's operational lifetime.
+
+**Solution:** Hybrid signatures combining classical and post-quantum algorithms:
+
+| Component | Classical | Post-Quantum |
+|-----------|-----------|--------------|
+| Signature | Ed25519 (64 bytes) | ML-DSA-65 (3293 bytes) |
+| Public Key | 32 bytes | 1952 bytes |
+| **Total** | ~100 bytes | ~5.2 KB |
+
+**Security:** Both signatures must verify—attacker must break both algorithms.
+
+```rust
+// icn-crypto-pq crate
+pub struct HybridSignature {
+    classical: Vec<u8>,  // Ed25519
+    pq: Vec<u8>,         // ML-DSA
+}
+
+pub struct HybridKeypair {
+    classical_signing: SigningKey,
+    pq_keypair: MlDsaKeypair,
+}
+
+impl HybridKeypair {
+    pub fn sign(&self, message: &[u8]) -> HybridSignature;
+    pub fn sign_classical_only(&self, message: &[u8]) -> Signature; // Ephemeral use
+}
+```
+
+#### 1.5.4 KeyBundle Rotation
+
+KeyBundles contain rotatable cryptographic keys bound to an anchor:
+
+```rust
+pub struct KeyBundle {
+    anchor: Anchor,
+    version: u32,           // Monotonically increasing
+    hybrid_keypair: HybridKeypair,
+    x25519_secret: [u8; 32], // Encryption
+    issued_at: u64,
+    expires_at: Option<u64>,
+}
+
+pub struct RotationRequest {
+    anchor_id: [u8; 32],
+    old_version: u32,
+    new_version: u32,       // Must be old + 1
+    new_public: KeyBundlePublic,
+    old_signature: HybridSignature, // Signed by old bundle
+    reason: Option<RotationReason>,
+}
+```
+
+**Rotation Protocol:**
+1. Generate new KeyBundle with incremented version
+2. Sign rotation request with old KeyBundle
+3. Publish rotation event to gossip network
+4. Stewards verify and attest to the rotation
+5. Old KeyBundle enters revocation period
+6. New KeyBundle becomes active
+
+#### 1.5.5 VUI (Verifiable Unique Identifier)
+
+**Problem:** Sybil attacks—one person creating many identities.
+
+**Solution:** VUI computed via threshold PRF by steward network:
+
+```rust
+// User provides identity data (hashed locally, never transmitted)
+let id_hash = IdDataHash::from_data(&identity_document, pathway);
+
+// Stewards compute PRF partials (threshold secret sharing)
+let partials: Vec<PrfPartial> = stewards.map(|s| s.compute_partial(&id_hash));
+
+// User combines partials to get VUI
+let vui = Vui::from_partials(&partials)?;
+
+// VUI commitment stored in anchor (privacy-preserving)
+let commitment = vui.commitment();
+```
+
+**Properties:**
+- Same person → same VUI (deterministic via threshold PRF)
+- VUI reveals nothing about person (PRF output)
+- Unlinkable without steward pepper shares
+- Distributed trust—no single steward knows full pepper
+
+#### 1.5.6 Keystore v4 Format
+
+The keystore now supports SDIS with v4 format:
+
+```rust
+struct StoredKeyV4 {
+    version: u8,  // 4
+    // Legacy fields (v3 compatibility)
+    secret_bytes: [u8; 32],
+    did_document: DidDocument,
+    // ...
+
+    // SDIS additions
+    anchor: Option<Anchor>,
+    keybundles: Vec<StoredKeyBundleV4>,
+    current_keybundle_version: u32,
+}
+```
+
+**API:**
+```rust
+impl AgeKeyStore {
+    // SDIS initialization
+    pub fn init_sdis(&mut self, anchor: Anchor, passphrase: &[u8]) -> Result<&KeyBundle>;
+
+    // KeyBundle rotation
+    pub fn rotate_keybundle(&mut self, passphrase: &[u8]) -> Result<&KeyBundle>;
+
+    // Accessors
+    pub fn get_anchor(&self) -> Option<&Anchor>;
+    pub fn get_current_keybundle(&self) -> Result<&KeyBundle>;
+    pub fn has_sdis(&self) -> bool;
+}
+```
+
+**Migration:** Keystore auto-detects format and loads appropriately (v1→v2→v2.1→v3→v4).
+
+#### 1.5.7 Implementation Status
+
+| Component | Crate | Status |
+|-----------|-------|--------|
+| ML-DSA signatures | icn-crypto-pq | ✅ Complete |
+| ML-KEM key exchange | icn-crypto-pq | ✅ Complete |
+| Hybrid signatures | icn-crypto-pq | ✅ Complete |
+| Threshold PRF | icn-crypto-pq | ✅ Complete |
+| Anchor types | icn-identity | ✅ Complete |
+| KeyBundle | icn-identity | ✅ Complete |
+| VUI types | icn-identity | ✅ Complete |
+| Keystore v4 | icn-identity | ✅ Complete |
+| Steward network | icn-steward | 🚧 Planned |
+| Enrollment flow | icn-enrollment | 🚧 Planned |
 
 ---
 

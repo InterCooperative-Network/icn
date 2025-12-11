@@ -284,6 +284,51 @@ impl HybridKeypair {
     pub fn sign_classical_only(&self, message: &[u8]) -> Ed25519Signature {
         self.classical_signing.sign(message)
     }
+
+    /// Get the classical (Ed25519) secret key bytes
+    ///
+    /// WARNING: Handle with care - this exposes secret key material.
+    /// Used for keystore serialization.
+    pub fn classical_secret_bytes(&self) -> [u8; 32] {
+        self.classical_signing.to_bytes()
+    }
+
+    /// Get the post-quantum (ML-DSA) secret key bytes
+    ///
+    /// WARNING: Handle with care - this exposes secret key material.
+    /// Used for keystore serialization.
+    pub fn pq_secret_bytes(&self) -> &[u8] {
+        self.pq_keypair.secret_key_bytes()
+    }
+
+    /// Reconstruct a HybridKeypair from stored bytes
+    ///
+    /// Used when loading from keystore.
+    pub fn from_bytes(
+        classical_secret: &[u8; 32],
+        classical_public: &[u8; 32],
+        pq_secret: &[u8],
+        pq_public: &[u8],
+    ) -> Result<Self> {
+        // Reconstruct Ed25519 signing key
+        let classical_signing = SigningKey::from_bytes(classical_secret);
+
+        // Verify public key matches
+        let expected_public = classical_signing.verifying_key();
+        if expected_public.as_bytes() != classical_public {
+            return Err(CryptoError::InvalidKey(
+                "Classical public key doesn't match secret key".to_string(),
+            ));
+        }
+
+        // Reconstruct ML-DSA keypair
+        let pq_keypair = MlDsaKeypair::from_bytes(pq_secret, pq_public)?;
+
+        Ok(Self {
+            classical_signing,
+            pq_keypair,
+        })
+    }
 }
 
 impl Clone for HybridKeypair {

@@ -268,6 +268,69 @@ impl KeyBundle {
             false
         }
     }
+
+    // === Secret key extraction (for keystore serialization) ===
+
+    /// Get the classical (Ed25519) secret key bytes
+    ///
+    /// WARNING: Handle with care - this exposes secret key material.
+    pub fn classical_secret_bytes(&self) -> [u8; 32] {
+        self.hybrid_keypair.classical_secret_bytes()
+    }
+
+    /// Get the classical (Ed25519) public key bytes
+    pub fn classical_public_bytes(&self) -> Vec<u8> {
+        self.hybrid_keypair.public_key().classical.clone()
+    }
+
+    /// Get the post-quantum (ML-DSA) secret key bytes
+    ///
+    /// WARNING: Handle with care - this exposes secret key material.
+    pub fn pq_secret_bytes(&self) -> &[u8] {
+        self.hybrid_keypair.pq_secret_bytes()
+    }
+
+    /// Get the post-quantum (ML-DSA) public key bytes
+    pub fn pq_public_bytes(&self) -> Vec<u8> {
+        self.hybrid_keypair.pq_public().as_bytes().to_vec()
+    }
+
+    /// Get the X25519 secret key bytes
+    ///
+    /// WARNING: Handle with care - this exposes secret key material.
+    pub fn x25519_secret_bytes(&self) -> [u8; 32] {
+        self.x25519_secret
+    }
+
+    /// Reconstruct a KeyBundle from stored bytes
+    ///
+    /// Used when loading from keystore.
+    pub fn from_stored(
+        anchor: Anchor,
+        version: u32,
+        classical_secret: &[u8; 32],
+        classical_public: &[u8; 32],
+        pq_secret: &[u8],
+        pq_public: &[u8],
+        x25519_secret: [u8; 32],
+        x25519_public: [u8; 32],
+        issued_at: u64,
+        expires_at: Option<u64>,
+    ) -> anyhow::Result<Self> {
+        let hybrid_keypair =
+            HybridKeypair::from_bytes(classical_secret, classical_public, pq_secret, pq_public)
+                .map_err(|e| anyhow::anyhow!("Failed to reconstruct hybrid keypair: {}", e))?;
+
+        Ok(Self {
+            anchor,
+            version,
+            hybrid_keypair,
+            x25519_secret,
+            x25519_public,
+            issued_at,
+            expires_at,
+        })
+    }
 }
 
 /// Internal rotation message for signing
