@@ -1,3 +1,6 @@
+// Allow unused_assignments from Zeroize derive macro generated code
+#![allow(unused_assignments)]
+
 //! ICN Post-Quantum Cryptography
 //!
 //! This crate provides hybrid classical/post-quantum cryptography for the

@@ -34,7 +34,6 @@ use crate::{CryptoError, Result};
 
 /// A share of the enrollment pepper
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-#[allow(unused_assignments)] // Zeroize derive generates code that triggers this warning
 pub struct PepperShare {
     /// Share index (1-indexed, for Lagrange interpolation)
     #[zeroize(skip)]

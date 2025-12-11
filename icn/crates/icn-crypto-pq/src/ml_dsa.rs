@@ -92,7 +92,6 @@ impl MlDsaSignature {
 
 /// ML-DSA keypair (Dilithium3)
 #[derive(Zeroize, ZeroizeOnDrop)]
-#[allow(unused_assignments)] // Zeroize derive generates code that triggers this warning
 pub struct MlDsaKeypair {
     #[zeroize(skip)]
     public_key: MlDsaPublicKey,

@@ -194,7 +194,6 @@ impl HybridPublicKey {
 /// Contains both classical (Ed25519) and post-quantum (ML-DSA) keypairs.
 /// Secret keys are zeroized on drop for security.
 #[derive(Zeroize, ZeroizeOnDrop)]
-#[allow(unused_assignments)] // Zeroize derive generates code that triggers this warning
 pub struct HybridKeypair {
     /// Ed25519 signing key (zeroized on drop)
     #[zeroize(skip)]
