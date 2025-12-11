@@ -1465,8 +1465,12 @@ async fn test_full_enrollment_flow() {
 - Threshold PRF integration for VUI computation
 - VUI uniqueness checking via registry
 - Expanded gossip messages (ParticipationRequest, PrfPartialDelivery, UniquenessCheck/Response)
-- 73 steward tests passing (57 unit + 16 integration tests)
-- `enrollment_integration.rs` - Comprehensive integration tests:
+- `recovery.rs` - RecoveryService for end-to-end identity recovery
+- RecoveryClient for client-side recovery handling
+- RecoveryEvidence with VUI-based proof of ownership
+- Revocation record tracking and double-recovery prevention
+- 96 steward tests passing (66 unit + 30 integration tests)
+- `enrollment_integration.rs` - 16 enrollment integration tests:
   - Single steward enrollment end-to-end
   - Multi-steward enrollment simulation with coordinator pattern
   - 3-of-5 threshold PRF combination
@@ -1477,6 +1481,15 @@ async fn test_full_enrollment_flow() {
   - Client-side blinded request creation
   - Error handling (missing pepper share, no partials)
   - Share commitment and VUI registry operations
+- `recovery_integration.rs` - 14 recovery integration tests:
+  - Single steward recovery end-to-end
+  - 3-of-5 threshold recovery
+  - Mixed attestations (supporting + rejecting)
+  - Double-recovery prevention
+  - Revocation chain tracking
+  - Duplicate attestation rejection
+  - Gossip message serialization
+  - Concurrent recovery limits
 
 ---
 

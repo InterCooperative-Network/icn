@@ -40,6 +40,7 @@
 //! - [`vui_registry`] - Distributed VUI uniqueness checking
 //! - [`ceremony`] - Enrollment and recovery ceremonies
 //! - [`enrollment`] - End-to-end enrollment service
+//! - [`recovery`] - End-to-end identity recovery service
 //! - [`gossip`] - Steward-specific gossip messages
 //! - [`config`] - StewardConfig for runtime configuration
 
@@ -50,6 +51,7 @@ pub mod enrollment;
 pub mod gossip;
 pub mod handle;
 pub mod profile;
+pub mod recovery;
 pub mod token;
 pub mod vui_registry;
 
@@ -71,6 +73,12 @@ pub use vui_registry::{DistributedCheckResult, LocalCheckResult, VuiRegistry, Vu
 pub use enrollment::{
     BlindedTokenRequest, CeremonyStartResponse, EnrollmentClient, EnrollmentConfig,
     EnrollmentRequest, EnrollmentService, EnrollmentStats,
+};
+
+// Recovery service exports
+pub use recovery::{
+    RecoveryClient, RecoveryConfig, RecoveryEvidence, RecoveryRequest, RecoveryService,
+    RecoveryStartResponse, RecoveryStats, RevocationRecord,
 };
 
 /// Gossip topics for steward network
