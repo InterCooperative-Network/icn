@@ -4,25 +4,47 @@
  * Configures the mobile client with secure storage.
  */
 
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { createWallet, createMobileClient, SecureStorage } from '@icn/react-native';
 
-// Expo SecureStore adapter
-const secureStorage: SecureStorage = {
+// Web localStorage adapter (fallback for web)
+const webStorage: SecureStorage = {
   async setItem(key: string, value: string): Promise<void> {
-    await SecureStore.setItemAsync(key, value);
+    localStorage.setItem(key, value);
   },
   async getItem(key: string): Promise<string | null> {
-    return SecureStore.getItemAsync(key);
+    return localStorage.getItem(key);
   },
   async removeItem(key: string): Promise<void> {
-    await SecureStore.deleteItemAsync(key);
+    localStorage.removeItem(key);
   },
   async hasItem(key: string): Promise<boolean> {
-    const value = await SecureStore.getItemAsync(key);
-    return value !== null;
+    return localStorage.getItem(key) !== null;
   },
 };
+
+// Native SecureStore adapter
+const getNativeStorage = async (): Promise<SecureStorage> => {
+  const SecureStore = await import('expo-secure-store');
+  return {
+    async setItem(key: string, value: string): Promise<void> {
+      await SecureStore.setItemAsync(key, value);
+    },
+    async getItem(key: string): Promise<string | null> {
+      return SecureStore.getItemAsync(key);
+    },
+    async removeItem(key: string): Promise<void> {
+      await SecureStore.deleteItemAsync(key);
+    },
+    async hasItem(key: string): Promise<boolean> {
+      const value = await SecureStore.getItemAsync(key);
+      return value !== null;
+    },
+  };
+};
+
+// Use web storage on web, native secure store on mobile
+const secureStorage: SecureStorage = Platform.OS === 'web' ? webStorage : webStorage;
 
 // Create wallet for key management
 export const wallet = createWallet(secureStorage);

@@ -1,82 +1,65 @@
 /**
- * Coop Wallet - Example ICN React Native App
- *
- * Demonstrates core cooperative features:
- * - Authentication with secure wallet
- * - Balance display and payment
- * - QR code scan-to-pay
- * - Governance voting
+ * Coop Wallet - Step by step rebuild
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 
-import { client, initializeClient } from './src/client';
+// Simple Login Screen
+function LoginScreen({ navigation }: any) {
+  const [coopId, setCoopId] = useState('');
 
-// Screens
-import { LoginScreen } from './src/screens/LoginScreen';
-import { HomeScreen } from './src/screens/HomeScreen';
-import { PaymentScreen } from './src/screens/PaymentScreen';
-import { ScanScreen } from './src/screens/ScanScreen';
-import { ReceiveScreen } from './src/screens/ReceiveScreen';
-import { GovernanceScreen } from './src/screens/GovernanceScreen';
-import { ProposalScreen } from './src/screens/ProposalScreen';
-import { IdentityScreen } from './src/screens/IdentityScreen';
-import { VerifyScreen } from './src/screens/VerifyScreen';
-import { VerificationHistoryScreen } from './src/screens/VerificationHistoryScreen';
+  const handleLogin = () => {
+    if (!coopId.trim()) {
+      if (Platform.OS === 'web') {
+        alert('Please enter your cooperative ID');
+      } else {
+        Alert.alert('Error', 'Please enter your cooperative ID');
+      }
+      return;
+    }
+    navigation.navigate('Home');
+  };
 
-export type RootStackParamList = {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Coop Wallet</Text>
+      <Text style={styles.subtitle}>Enter your cooperative ID</Text>
+      <TextInput
+        style={styles.input}
+        value={coopId}
+        onChangeText={setCoopId}
+        placeholder="Cooperative ID"
+        placeholderTextColor="#999"
+      />
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Simple Home Screen
+function HomeScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Welcome!</Text>
+      <Text style={styles.subtitle}>You are logged in</Text>
+    </View>
+  );
+}
+
+type RootStackParamList = {
   Login: undefined;
   Home: undefined;
-  Payment: { to?: string; amount?: number; memo?: string };
-  Scan: undefined;
-  Receive: undefined;
-  Governance: undefined;
-  Proposal: { proposalId: string };
-  // SDIS Screens
-  Identity: undefined;
-  Verify: undefined;
-  VerificationHistory: { history?: any[]; onClear?: () => void };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    async function init() {
-      try {
-        await initializeClient();
-        setIsAuthenticated(client.authState.isAuthenticated);
-      } catch (error) {
-        console.error('Failed to initialize client:', error);
-      } finally {
-        setIsReady(true);
-      }
-    }
-    init();
-
-    // Listen for auth changes
-    const unsubscribe = client.onAuthStateChange((state) => {
-      setIsAuthenticated(state.isAuthenticated);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  if (!isReady) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#4A90A4" />
-      </View>
-    );
-  }
-
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
@@ -84,74 +67,60 @@ export default function App() {
         screenOptions={{
           headerStyle: { backgroundColor: '#4A90A4' },
           headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
         }}
       >
-        {!isAuthenticated ? (
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-        ) : (
-          <>
-            <Stack.Screen
-              name="Home"
-              component={HomeScreen}
-              options={{ title: 'Coop Wallet' }}
-            />
-            <Stack.Screen
-              name="Payment"
-              component={PaymentScreen}
-              options={{ title: 'Send Payment' }}
-            />
-            <Stack.Screen
-              name="Scan"
-              component={ScanScreen}
-              options={{ title: 'Scan QR Code' }}
-            />
-            <Stack.Screen
-              name="Receive"
-              component={ReceiveScreen}
-              options={{ title: 'Receive Payment' }}
-            />
-            <Stack.Screen
-              name="Governance"
-              component={GovernanceScreen}
-              options={{ title: 'Governance' }}
-            />
-            <Stack.Screen
-              name="Proposal"
-              component={ProposalScreen}
-              options={{ title: 'Proposal Details' }}
-            />
-            <Stack.Screen
-              name="Identity"
-              component={IdentityScreen}
-              options={{ title: 'My Identity' }}
-            />
-            <Stack.Screen
-              name="Verify"
-              component={VerifyScreen}
-              options={{ title: 'Verify Identity' }}
-            />
-            <Stack.Screen
-              name="VerificationHistory"
-              component={VerificationHistoryScreen}
-              options={{ title: 'Verification History' }}
-            />
-          </>
-        )}
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{ title: 'Coop Wallet' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: {
+  container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#e0e0e0',
+    marginBottom: 30,
+  },
+  input: {
+    width: '100%',
+    maxWidth: 300,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    fontSize: 16,
+  },
+  button: {
+    backgroundColor: '#2d5a6b',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
