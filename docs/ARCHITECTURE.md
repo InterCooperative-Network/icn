@@ -440,8 +440,112 @@ impl AgeKeyStore {
 | KeyBundle | icn-identity | ✅ Complete |
 | VUI types | icn-identity | ✅ Complete |
 | Keystore v4 | icn-identity | ✅ Complete |
-| Steward network | icn-steward | 🚧 Planned |
+| Steward network | icn-steward | ✅ Phase S3.1 |
 | Enrollment flow | icn-enrollment | 🚧 Planned |
+
+#### 1.5.8 Steward Network (Phase S3)
+
+The steward network provides essential services for SDIS including VUI computation, enrollment ceremonies, and key recovery.
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Steward Network                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │  Steward A   │  │  Steward B   │  │  Steward C   │  ...      │
+│  │              │  │              │  │              │           │
+│  │ PepperShare  │  │ PepperShare  │  │ PepperShare  │           │
+│  │     [1]      │  │     [2]      │  │     [3]      │           │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
+│         │                 │                 │                    │
+│         └─────────────────┼─────────────────┘                    │
+│                           │                                      │
+│                    ┌──────▼───────┐                              │
+│                    │ VUI Registry │                              │
+│                    │   (Bloom)    │                              │
+│                    └──────────────┘                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Core Components:**
+
+| Component | Purpose |
+|-----------|---------|
+| `StewardProfile` | Steward identity, status, jurisdiction, stats |
+| `EnrollmentToken` | Blind signature-based enrollment credentials |
+| `VuiRegistry` | Bloom filter + exact set for uniqueness checks |
+| `EnrollmentCeremony` | Threshold VUI computation workflow |
+| `RecoveryCeremony` | Social recovery attestation workflow |
+
+**Steward Profile:**
+```rust
+pub struct StewardProfile {
+    steward_did: Did,           // Node identity
+    citizen_did: Did,           // Operator identity
+    status: StewardStatus,      // Active/Suspended/Revoked/Pending
+    jurisdiction_tier: JurisdictionTier,  // Tier1/Tier2/Tier3
+    bond_amount: i64,           // Stake for honest behavior
+    region: String,             // ISO 3166-1 alpha-2
+    stats: StewardStats,        // Operational metrics
+    token_signing_key: Vec<u8>, // For enrollment tokens
+    pepper_share_commitment: [u8; 32], // Commitment to pepper share
+}
+```
+
+**Enrollment Flow:**
+1. User generates VUI commitment from identity data
+2. User presents proof-of-personhood to steward
+3. Steward initiates enrollment ceremony
+4. Threshold of stewards contribute pepper shares
+5. VUI computed and checked against registry (Bloom filter)
+6. If unique, token issued via blind signature
+7. Token unblinded by user (unlinkable to issuance)
+
+**Blind Signature Tokens:**
+```rust
+pub struct EnrollmentToken {
+    token_id: [u8; 32],        // Unique identifier
+    signature: Vec<u8>,        // Unblinded signature
+    issuing_steward: Did,      // Public knowledge
+    issued_at: u64,
+    expires_at: u64,           // Default: 7 days
+    vui_commitment: [u8; 32],  // Links to identity
+}
+```
+
+**Recovery Ceremony:**
+```rust
+pub enum RecoveryPhase {
+    WaitingForAttestations,  // Collecting steward votes
+    VerifyingEvidence,       // ZK proof verification
+    BindingKeys,             // New keys → anchor
+    RevokingOldKeys,         // Old keys invalidated
+    Completed,
+    Failed,
+    Rejected,
+}
+```
+
+**Gossip Topics:**
+- `steward:announce` - Steward status broadcasts
+- `steward:vui-sync` - VUI registry synchronization
+- `steward:enrollment` - Enrollment ceremony coordination
+- `steward:recovery` - Recovery ceremony coordination
+
+**Configuration:**
+```rust
+pub struct StewardConfig {
+    vui_threshold: u32,              // Default: 3-of-5
+    vui_total_shares: u32,
+    token_validity_secs: u64,        // Default: 7 days
+    bloom_expected_items: usize,     // Default: 1M
+    bloom_false_positive_rate: f64,  // Default: 0.0001
+    min_bond_amount: i64,            // Default: 1000
+    heartbeat_interval_secs: u64,    // Default: 30
+}
+```
 
 ---
 

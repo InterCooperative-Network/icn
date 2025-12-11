@@ -24,6 +24,7 @@ members = [
     "crates/icn-privacy",
     "crates/icn-federation",
     "crates/icn-crypto-pq",
+    "crates/icn-steward",
 ]
 
 [workspace.package]
@@ -109,3 +110,4 @@ icn-time = { path = "crates/icn-time" }
 icn-privacy = { path = "crates/icn-privacy" }
 icn-federation = { path = "crates/icn-federation" }
 icn-crypto-pq = { path = "crates/icn-crypto-pq" }
+icn-steward = { path = "crates/icn-steward" }

@@ -1,0 +1,41 @@
+[package]
+name = "icn-steward"
+version = "0.1.0"
+edition = "2021"
+description = "SDIS Steward Network - enrollment ceremonies, VUI registry, token issuance"
+license = "Apache-2.0"
+repository = "https://github.com/icn-foundation/icn"
+
+[dependencies]
+# ICN crates
+icn-identity = { path = "../icn-identity" }
+icn-crypto-pq = { path = "../icn-crypto-pq" }
+icn-store = { path = "../icn-store" }
+
+# Async runtime
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+
+# Cryptography
+ed25519-dalek = { version = "2", features = ["rand_core", "serde"] }
+rand = "0.8"
+sha2 = "0.10"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Logging
+tracing = "0.1"
+
+# Data structures
+bloomfilter = "1"
+hex = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }

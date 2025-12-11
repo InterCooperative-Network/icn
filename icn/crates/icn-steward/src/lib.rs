@@ -1,0 +1,73 @@
+//! ICN Steward Network
+//!
+//! The steward network provides essential services for SDIS (Sovereign Digital Identity System):
+//!
+//! - **VUI Computation**: Threshold PRF for Verifiable Unique Identifiers
+//! - **Enrollment Ceremonies**: Proof-of-Personhood verification
+//! - **Token Issuance**: Blind signatures for privacy-preserving enrollment
+//! - **Key Recovery**: Social recovery through steward attestations
+//! - **VUI Registry**: Distributed uniqueness checking
+//!
+//! # Architecture
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────────┐
+//! │                      Steward Network                             │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │                                                                  │
+//! │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+//! │  │  Steward A   │  │  Steward B   │  │  Steward C   │  ...      │
+//! │  │              │  │              │  │              │           │
+//! │  │ PepperShare  │  │ PepperShare  │  │ PepperShare  │           │
+//! │  │     [1]      │  │     [2]      │  │     [3]      │           │
+//! │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
+//! │         │                 │                 │                    │
+//! │         └─────────────────┼─────────────────┘                    │
+//! │                           │                                      │
+//! │                    ┌──────▼───────┐                              │
+//! │                    │ VUI Registry │                              │
+//! │                    │   (Bloom)    │                              │
+//! │                    └──────────────┘                              │
+//! └─────────────────────────────────────────────────────────────────┘
+//! ```
+//!
+//! # Modules
+//!
+//! - [`profile`] - StewardProfile with status, jurisdiction, and statistics
+//! - [`token`] - EnrollmentToken for blind signature-based enrollment
+//! - [`vui_registry`] - Distributed VUI uniqueness checking
+//! - [`ceremony`] - Enrollment and recovery ceremonies
+//! - [`gossip`] - Steward-specific gossip messages
+//! - [`config`] - StewardConfig for runtime configuration
+
+pub mod ceremony;
+pub mod config;
+pub mod gossip;
+pub mod profile;
+pub mod token;
+pub mod vui_registry;
+
+// Re-exports
+pub use ceremony::{CeremonyError, CeremonyState, EnrollmentCeremony, RecoveryCeremony};
+pub use config::StewardConfig;
+pub use gossip::{
+    EnrollmentMessage, RecoveryMessage, StewardAnnouncement, StewardMessage, VuiSyncMessage,
+};
+pub use profile::{JurisdictionTier, StewardProfile, StewardStats, StewardStatus};
+pub use token::{EnrollmentToken, TokenIssuanceRecord, TokenRequest, TokenResponse};
+pub use vui_registry::{DistributedCheckResult, LocalCheckResult, VuiRegistry, VuiRegistryError};
+
+/// Gossip topics for steward network
+pub mod topics {
+    /// Topic for steward announcements and status updates
+    pub const STEWARD_ANNOUNCE: &str = "steward:announce";
+
+    /// Topic for VUI registry synchronization
+    pub const VUI_SYNC: &str = "steward:vui-sync";
+
+    /// Topic for enrollment ceremony coordination
+    pub const ENROLLMENT: &str = "steward:enrollment";
+
+    /// Topic for recovery ceremony coordination
+    pub const RECOVERY: &str = "steward:recovery";
+}
