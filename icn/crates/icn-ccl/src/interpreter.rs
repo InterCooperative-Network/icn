@@ -454,7 +454,7 @@ impl Interpreter {
                 }
             }
         }
-        bail!("WriteState capability required for key '{}'", key)
+        bail!("WriteState capability required for key '{key}'")
     }
 }
 

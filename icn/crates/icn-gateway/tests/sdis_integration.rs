@@ -452,7 +452,7 @@ async fn test_level1_verification_api_invalid_qr_data() {
     .await;
 
     // Valid base64 but invalid QR data (too short)
-    let invalid_qr = base64::engine::general_purpose::STANDARD.encode(&[0u8; 50]);
+    let invalid_qr = base64::engine::general_purpose::STANDARD.encode([0u8; 50]);
 
     let req = actix_web::test::TestRequest::post()
         .uri("/v1/sdis/verify/level1")
@@ -474,7 +474,7 @@ fn test_multiple_identities_independent_verification() {
     // Test that multiple identities can generate and verify proofs independently
     let keybundles: Vec<KeyBundle> = (0..5)
         .map(|i| {
-            let anchor = Anchor::genesis(&format!("test-identity-{}", i));
+            let anchor = Anchor::genesis(&format!("test-identity-{i}"));
             KeyBundle::generate(anchor, 1).unwrap()
         })
         .collect();
@@ -503,11 +503,11 @@ fn test_multiple_identities_independent_verification() {
 
         // L1 verification (with first proof)
         let result = verifier.verify_level1(&proof_l1);
-        assert!(result.valid, "Identity {} should pass L1", i);
+        assert!(result.valid, "Identity {i} should pass L1");
 
         // L2 verification (with second proof - L2 internally calls L1)
         let result = verifier.verify_level2(&proof_l2, &binding);
-        assert!(result.valid, "Identity {} should pass L2", i);
+        assert!(result.valid, "Identity {i} should pass L2");
     }
 }
 
@@ -559,7 +559,7 @@ fn test_binding_size() {
 
     // Binding size should be reasonable for NFC/BLE transfer
     let size = binding.size();
-    assert!(size < 5000, "Binding size {} too large for NFC", size);
+    assert!(size < 5000, "Binding size {size} too large for NFC");
 
     // Should have both classical and hybrid signatures
     assert!(

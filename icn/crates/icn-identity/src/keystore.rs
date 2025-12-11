@@ -1424,8 +1424,7 @@ mod tests {
         let err_msg = format!("{:?}", result.err());
         assert!(
             err_msg.contains("already initialized"),
-            "Expected 'already initialized' in: {}",
-            err_msg
+            "Expected 'already initialized' in: {err_msg}"
         );
     }
 
@@ -1449,8 +1448,7 @@ mod tests {
         let err_msg = format!("{:?}", result.err());
         assert!(
             err_msg.contains("unlocked"),
-            "Expected 'unlocked' in: {}",
-            err_msg
+            "Expected 'unlocked' in: {err_msg}"
         );
     }
 }

@@ -27,7 +27,8 @@ pub struct VuiRegistry {
     /// Sequence number for sync ordering
     sequence: u64,
 
-    /// Configuration
+    /// Configuration (reserved for future use)
+    #[allow(dead_code)]
     config: StewardConfig,
 }
 

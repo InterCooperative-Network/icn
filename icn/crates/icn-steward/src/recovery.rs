@@ -76,7 +76,7 @@ impl RecoveryEvidence {
         let mut proof_hasher = Sha256::new();
         proof_hasher.update(b"icn-recovery-proof-v1");
         proof_hasher.update(vui);
-        proof_hasher.update(&anchor_commitment);
+        proof_hasher.update(anchor_commitment);
         let proof = proof_hasher.finalize().to_vec();
 
         Self {
@@ -99,7 +99,7 @@ impl RecoveryEvidence {
     pub fn hash(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(b"icn-recovery-evidence");
-        hasher.update(&self.vui_hash);
+        hasher.update(self.vui_hash);
         hasher.update(&self.zk_proof);
         let hash = hasher.finalize();
 
