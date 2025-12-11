@@ -1849,6 +1849,8 @@ SDIS extends ICN's identity layer with:
 | Enrollment flow | ✅ Complete | EnrollmentService + EnrollmentClient + 16 integration tests |
 | Multi-steward ceremonies | ✅ Complete | Threshold PRF, gossip coordination, coordinator pattern |
 | Key recovery integration | ✅ Complete | RecoveryService + RecoveryClient + 14 integration tests |
+| Supervisor integration | ✅ Complete | StewardActor spawning in icn-core, gossip topic subscriptions |
+| CLI commands | ✅ Complete | icnctl steward subcommand (9 operations) |
 | Operational steward network | 🚧 Planned | Deployment infrastructure for production |
 
 ### Security Properties

@@ -885,13 +885,15 @@ impl StewardHandle {
 
 ### S3 Deliverables Checklist
 
-- [x] `icn-steward` crate compiles (73 tests passing)
+- [x] `icn-steward` crate compiles (96 tests: 66 unit + 30 integration)
 - [x] VUI registry with distributed checking (Bloom filter + exact set)
 - [x] Enrollment ceremony state machine
 - [x] Recovery ceremony state machine
 - [x] StewardActor with gossip integration
-- [x] Integration tests with multiple stewards (16 integration tests)
+- [x] Integration tests with multiple stewards (16 enrollment + 14 recovery)
 - [x] Threshold operations tested (3-of-5 PRF combination)
+- [x] Supervisor integration in icn-core (steward actor spawning)
+- [x] Steward CLI commands in icnctl (9 subcommands)
 
 ---
 
