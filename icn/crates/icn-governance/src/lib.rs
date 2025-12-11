@@ -32,6 +32,7 @@ pub mod message;
 pub mod profile;
 pub mod proposal;
 pub mod resolver;
+pub mod sdis;
 pub mod store;
 pub mod tally;
 pub mod vote;
@@ -47,6 +48,10 @@ pub use proposal::{
     ProposalPayload, ProposalState,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
+pub use sdis::{
+    AttestationType, InstitutionalAuthority, JurisdictionTier, RevocationTarget, SdisProposal,
+    SdisVotingRequirements, StewardPenalty, StewardStats, ThresholdOp, ThresholdType,
+};
 pub use store::{GovernanceStore, InMemoryGovernanceStore};
 pub use tally::VoteTally;
 pub use vote::{Vote, VoteChoice};

@@ -230,6 +230,16 @@ pub enum ProposalPayload {
         /// Proposed resolution outcome if the proposal passes
         proposed_outcome: DisputeResolutionOutcome,
     },
+
+    // === SDIS Governance (Phase S6) ===
+    /// SDIS-specific governance proposal
+    ///
+    /// Handles steward management, threshold modifications, and identity
+    /// governance through the SDIS module.
+    Sdis {
+        /// The SDIS-specific proposal
+        proposal: crate::sdis::SdisProposal,
+    },
 }
 
 /// Possible outcomes for a dispute resolution governance proposal
