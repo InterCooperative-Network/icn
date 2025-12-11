@@ -93,6 +93,7 @@ impl MlKemCiphertext {
 
 /// ML-KEM keypair (Kyber768)
 #[derive(Zeroize, ZeroizeOnDrop)]
+#[allow(unused_assignments)] // Zeroize derive generates code that triggers this warning
 pub struct MlKemKeypair {
     #[zeroize(skip)]
     public_key: MlKemPublicKey,

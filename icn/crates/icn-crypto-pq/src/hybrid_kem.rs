@@ -109,6 +109,7 @@ impl HybridKemCiphertext {
 /// Contains both classical (X25519) and post-quantum (ML-KEM) keypairs.
 /// Secret keys are zeroized on drop for security.
 #[derive(Zeroize, ZeroizeOnDrop)]
+#[allow(unused_assignments)] // Zeroize derive generates code that triggers this warning
 pub struct HybridKemKeypair {
     /// X25519 secret key (zeroized on drop)
     classical_secret: [u8; 32],
