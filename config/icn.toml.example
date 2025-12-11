@@ -43,6 +43,24 @@ bootstrap_peers = []
 #     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@203.0.113.51:7777"
 # ]
 
+# Minimum trust score required for TLS connection acceptance (0.0 to 1.0)
+# This setting controls trust-gated TLS verification at the transport layer:
+#   0.0 = Accept all authenticated DIDs (trust-gated TLS disabled)
+#   0.1 = Require "Known" trust class (at least one trust edge)
+#   0.4 = Require "Partner" trust class
+#   0.7 = Require "Federated" trust class
+# 
+# Recommendation:
+#   - Development/testing: 0.0 (allows easy local testing)
+#   - Controlled cooperative networks: 0.0 (if all nodes are pre-authorized)
+#   - Public networks: 0.1 or higher (protect against untrusted connections)
+# 
+# Note: This is separate from rate limiting thresholds. Even with 0.0, you still
+# get DID-TLS binding (cryptographic authentication), just without trust-based rejection.
+# 
+# Default: 0.1
+min_trust_threshold = 0.1
+
 # ============================================================================
 # Observability Configuration
 # ============================================================================

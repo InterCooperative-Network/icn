@@ -9,6 +9,8 @@ listen_addr = "0.0.0.0:7777"
 rpc_port = 5601
 mdns_enabled = true
 bootstrap_peers = []
+# For local development, set to 0.0 to allow connections without pre-established trust
+min_trust_threshold = 0.0
 
 [observability]
 metrics_port = 9100

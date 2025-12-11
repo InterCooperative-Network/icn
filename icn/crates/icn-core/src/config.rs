@@ -138,6 +138,16 @@ pub struct NetworkConfig {
     /// Multiple servers enable majority vote consensus for public endpoint discovery
     #[serde(default = "default_stun_servers")]
     pub stun_servers: Vec<String>,
+
+    /// Minimum trust score required for TLS connection acceptance (0.0 to 1.0)
+    /// - 0.0 = Accept all authenticated DIDs (trust-gated TLS disabled)
+    /// - 0.1 = Require at least "Known" trust class (one trust edge)
+    /// - 0.4 = Require "Partner" trust class
+    /// - 0.7 = Require "Federated" trust class
+    /// Default: 0.1 (require at least one trust relationship)
+    /// For controlled/trusted environments, set to 0.0 to disable trust gating
+    #[serde(default = "default_min_trust_threshold")]
+    pub min_trust_threshold: f64,
 }
 
 fn default_rpc_port() -> u16 {
@@ -151,6 +161,10 @@ fn default_stun_servers() -> Vec<String> {
         "stun.l.google.com:19302".to_string(),
         "stun1.l.google.com:19302".to_string(),
     ]
+}
+
+fn default_min_trust_threshold() -> f64 {
+    0.1 // Require at least "Known" trust class by default
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -553,6 +567,7 @@ impl Default for Config {
                 rpc_port: 5601,
                 bootstrap_peers: vec![],
                 stun_servers: default_stun_servers(),
+                min_trust_threshold: default_min_trust_threshold(),
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,
@@ -572,7 +587,10 @@ impl Default for Config {
 
 impl RateLimitingConfig {
     /// Convert to trust-gated rate limit config for icn-net
-    pub fn to_trust_gated_config(&self) -> icn_net::TrustGatedRateLimitConfig {
+    /// 
+    /// # Arguments
+    /// * `min_trust_threshold` - Minimum trust score required for TLS connections (from network config)
+    pub fn to_trust_gated_config(&self, min_trust_threshold: f64) -> icn_net::TrustGatedRateLimitConfig {
         use std::time::Duration;
 
         let refill_interval = Duration::from_millis(self.refill_interval_ms);
@@ -583,10 +601,8 @@ impl RateLimitingConfig {
             partner: self.partner.to_rate_limit_config(refill_interval),
             federated: self.federated.to_rate_limit_config(refill_interval),
             refill_interval,
-            // Default minimum trust threshold for rate limiting (H6 fix)
-            // 0.1 requires "Known" trust class (at least one explicit trust edge)
-            // This prevents completely unknown DIDs from bypassing rate limits
-            min_trust_threshold: 0.1,
+            // Use the configurable trust threshold from network config
+            min_trust_threshold,
         }
     }
 
@@ -692,8 +708,8 @@ mod tests {
     fn test_rate_limiting_config_conversion() {
         let config = RateLimitingConfig::default();
 
-        // Convert to icn-net types
-        let trust_gated = config.to_trust_gated_config();
+        // Convert to icn-net types with default trust threshold
+        let trust_gated = config.to_trust_gated_config(0.1);
         let fallback = config.to_fallback_config();
 
         // Verify trust-gated config
@@ -706,6 +722,8 @@ mod tests {
         assert_eq!(trust_gated.federated.max_messages_per_second, 200);
         assert_eq!(trust_gated.federated.burst_capacity, 50);
         assert_eq!(trust_gated.refill_interval.as_millis(), 100);
+        // Verify the passed trust threshold is used
+        assert!((trust_gated.min_trust_threshold - 0.1).abs() < f64::EPSILON);
 
         // Verify fallback config
         assert_eq!(fallback.max_messages_per_second, 100);
@@ -1029,5 +1047,42 @@ token_validity_secs = 86400
         let deserialized: Config = toml::from_str(&toml_str).unwrap();
         assert!(!deserialized.steward.enabled);
         assert_eq!(deserialized.steward.vui_threshold, 3);
+    }
+
+    #[test]
+    fn test_min_trust_threshold_config() {
+        // Test default value
+        let config = Config::default();
+        assert!((config.network.min_trust_threshold - 0.1).abs() < f64::EPSILON);
+
+        // Test serialization with default
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        assert!(toml_str.contains("min_trust_threshold"));
+
+        // Test custom value parsing
+        let custom_toml = r#"
+data_dir = "/tmp/icn"
+
+[network]
+mdns_enabled = true
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
+bootstrap_peers = []
+min_trust_threshold = 0.0
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = "info"
+"#;
+
+        let config: Config = toml::from_str(custom_toml).unwrap();
+        assert!((config.network.min_trust_threshold - 0.0).abs() < f64::EPSILON);
+
+        // Test that trust threshold is passed through to rate limiting config
+        let trust_gated = config.rate_limiting.to_trust_gated_config(
+            config.network.min_trust_threshold
+        );
+        assert!((trust_gated.min_trust_threshold - 0.0).abs() < f64::EPSILON);
     }
 }
