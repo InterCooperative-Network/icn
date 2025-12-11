@@ -7,14 +7,14 @@
 
 ---
 
-**Status**: **PILOT-READY** ✅ - Phase 18 Complete (Pre-Pilot Hardening), Phase 17 ✅ (Storage Replication), Phase 16 ✅ (Scheduler Evolution), Phase 15 ✅ (Compute), Phase 14 ✅ (Gateway), **Federation Layer ✅**, Phases 11-12 ✅, Tracks B1-B3 ✅, Pilot Tooling ✅ - All 1134 Tests Passing
+**Status**: **PILOT-READY** ✅ - Phase 18 Complete (Pre-Pilot Hardening), Phase 17 ✅ (Storage Replication), Phase 16 ✅ (Scheduler Evolution), Phase 15 ✅ (Compute), Phase 14 ✅ (Gateway), **Federation Layer ✅**, Phases 11-12 ✅, Tracks B1-B3 ✅, Pilot Tooling ✅, **Track S (SDIS) S1-S6 ✅** (2025-12-10)
 **Next**: Track C1 Pilot Community Selection → Track C2 Pilot MVP → 3-month Pilot Deployment
 
 ## Executive Summary
 
 **Substrate Status**: **PILOT-READY** ✅ - All critical infrastructure complete (Phases 1-18).
 
-**Completed Infrastructure** (1134 tests passing):
+**Completed Infrastructure**:
 - Three-layer security (transport/message/application encryption)
 - Multi-device identity with key rotation
 - Economic safety rails (dynamic credit limits, disputes, quotas)
@@ -27,6 +27,7 @@
 - **Network partition healing with conflict resolution** (Phase 18 ✅)
 - **Storage quotas with priority-based eviction** (Phase 18 ✅)
 - **Federation layer with inter-coop coordination** (Federation ✅)
+- **SDIS post-quantum identity** (Track S ✅ - 2025-12-10)
 
 **Pre-Pilot Infrastructure: COMPLETE** ✅ (2025-11-27)
 
@@ -41,11 +42,12 @@
 
 ## Roadmap Structure
 
-ICN's development follows three parallel tracks:
+ICN's development follows four parallel tracks:
 
 - **Track A: Substrate Evolution** - Core protocol and security features (sequential)
 - **Track B: Operational & Legal Backbone** - Production readiness (parallel)
 - **Track C: Pilot Community** - Real-world deployment and learning (convergent)
+- **Track S: SDIS Identity** - Post-quantum identity with steward network (complete)
 
 **Guiding Principle**: Track C (pilot deployment) drives priorities in Tracks A and B. We build what real communities need, not what the architecture diagram suggests.
 
@@ -1761,6 +1763,98 @@ These features are **NOT on the roadmap** until pilot communities demonstrate ne
 
 ---
 
+## Track S: Sovereign Digital Identity System (SDIS)
+
+### Overview
+**Status**: Phase S1-S6 Complete ✅ (2025-12-10)
+**Purpose**: Post-quantum secure identity with recoverable anchors and zero-knowledge credentials
+
+SDIS extends ICN's identity layer with:
+- **Anchor-based identity**: Permanent identity roots that survive key rotation
+- **Post-quantum cryptography**: Hybrid Ed25519 + ML-DSA signatures
+- **Steward network**: Distributed VUI computation and enrollment
+- **Zero-knowledge proofs**: Privacy-preserving attribute verification
+- **Three-tier credential presentation**: QR (L1) → NFC/BLE (L2) → Network (L3)
+
+### Phase S1: Cryptographic Foundations ✅ COMPLETE
+**Crate**: `icn-crypto-pq`
+
+- ✅ Hybrid signatures (Ed25519 + ML-DSA-65)
+- ✅ ML-KEM key encapsulation
+- ✅ Threshold PRF for VUI computation
+- ✅ Blind signatures for enrollment tokens
+
+### Phase S2: Identity Extensions ✅ COMPLETE
+**Crate**: `icn-identity`
+
+- ✅ Anchor types (permanent identity roots)
+- ✅ KeyBundle (rotatable key containers)
+- ✅ VUI types (Verifiable Unique Identifier)
+- ✅ Keystore v4 with SDIS support
+
+### Phase S3: Steward Network ✅ COMPLETE
+**Crate**: `icn-steward`
+
+- ✅ StewardProfile and status management
+- ✅ EnrollmentToken with blind signatures
+- ✅ VuiRegistry (Bloom filter + exact set)
+- ✅ EnrollmentCeremony and RecoveryCeremony
+- ✅ StewardActor with handle pattern
+
+### Phase S4: Zero-Knowledge Proofs ✅ COMPLETE
+**Crate**: `icn-zkp`
+
+- ✅ STARK proof generation/verification
+- ✅ ProofType enum (Age, Citizenship, Membership, NonRevocation)
+- ✅ 128-bit security with Goldilocks field
+- ✅ Configurable proof parameters
+
+### Phase S5: Credential Presentation ✅ COMPLETE
+**Crate**: `icn-gateway` (api/sdis module)
+
+- ✅ EphemeralProof with 137-byte QR encoding
+- ✅ EphemeralBinding for L2 verification
+- ✅ Three-tier verification (L1/L2/L3)
+- ✅ Replay protection with nonce cache
+- ✅ REST API endpoints (/v1/sdis/*)
+
+### Phase S6: Governance & Polish ✅ COMPLETE
+**Crate**: `icn-governance` (sdis module)
+
+- ✅ SdisProposal enum (12 proposal types)
+- ✅ Voting requirements per proposal type
+- ✅ StewardPenalty and JurisdictionTier types
+- ✅ 19 integration tests
+- ✅ Security audit materials (threat model, checklist, crypto review)
+
+### Documentation
+
+| Document | Location |
+|----------|----------|
+| Implementation Plan | [docs/SDIS_IMPLEMENTATION_PLAN.md](docs/SDIS_IMPLEMENTATION_PLAN.md) |
+| User Guide | [docs/SDIS_USER_GUIDE.md](docs/SDIS_USER_GUIDE.md) |
+| Threat Model | [docs/security/SDIS_THREAT_MODEL.md](docs/security/SDIS_THREAT_MODEL.md) |
+| Audit Checklist | [docs/security/SDIS_AUDIT_CHECKLIST.md](docs/security/SDIS_AUDIT_CHECKLIST.md) |
+| Crypto Review | [docs/security/SDIS_CRYPTO_REVIEW.md](docs/security/SDIS_CRYPTO_REVIEW.md) |
+
+### Remaining Work
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Enrollment flow | 🚧 Planned | Requires operational steward network |
+| Multi-steward ceremonies | 🚧 Planned | Depends on enrollment |
+| Key recovery integration | 🚧 Planned | Social recovery via stewards |
+
+### Security Properties
+
+- **128-bit classical security** (Ed25519)
+- **128-bit post-quantum security** (ML-DSA-65 at L2+)
+- **Replay protection** via 16-byte nonces
+- **Privacy-preserving** via zero-knowledge proofs
+- **Recoverable** via steward-assisted ceremonies
+
+---
+
 ## Critical Path Summary
 
 **Completed Prerequisites for Pilot Deployment:**
@@ -1935,5 +2029,5 @@ See [Strategic Gap Analysis](docs/strategic-gap-analysis.md) for complete 15-gap
 
 ---
 
-**Last Updated**: 2025-11-28 (Federation Layer Complete - ICN is PILOT-READY with inter-coop capabilities)
+**Last Updated**: 2025-12-10 (Track S SDIS Complete - Post-quantum identity with steward network, ZKP credentials, and three-tier verification)
 **Next Review**: After pilot community selection (Track C1) or pilot MVP completion (Track C2)
