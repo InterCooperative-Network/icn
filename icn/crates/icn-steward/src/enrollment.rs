@@ -209,6 +209,11 @@ impl EnrollmentService {
         self.share_commitment.as_ref()
     }
 
+    /// Get this steward's DID
+    pub fn steward_did(&self) -> &Did {
+        &self.steward_did
+    }
+
     /// Start a new enrollment ceremony (coordinator role)
     pub fn start_ceremony(&mut self, request: &EnrollmentRequest) -> Result<CeremonyStartResponse> {
         let now = SystemTime::now()
