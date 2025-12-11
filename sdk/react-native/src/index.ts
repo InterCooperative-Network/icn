@@ -72,6 +72,33 @@ export {
 // Types
 export * from './types';
 
+// SDIS Types
+export * from './sdis-types';
+
+// SDIS QR Code utilities
+export {
+  generateSdisQR,
+  parseSdisQR,
+  isSdisQR,
+  isIcnQR,
+  getIcnQRType,
+  formatTimeRemaining,
+  isProofExpired,
+  formatVerificationResult,
+} from './sdis-qr';
+export type { ParsedSdisQR } from './sdis-qr';
+
+// SDIS React Hooks
+export {
+  useSdisProof,
+  useSdisVerifier,
+  useSdisHealth,
+  useSdisHistory,
+  useSdisProofWithHistory,
+  useSdisVerifierWithHistory,
+} from './sdis-hooks';
+export type { HistoryEntry } from './sdis-hooks';
+
 // Re-export core SDK types for convenience
 export {
   ICNClient,

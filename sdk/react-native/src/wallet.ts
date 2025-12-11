@@ -225,7 +225,7 @@ export class ICNWalletImpl implements ICNWallet {
    */
   private async sha256(data: Uint8Array): Promise<Uint8Array> {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data.buffer as ArrayBuffer);
       return new Uint8Array(hashBuffer);
     }
     throw new Error('No SHA-256 implementation available');

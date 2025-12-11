@@ -5,8 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { Camera, CameraView } from 'expo-camera';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
+import { Camera, CameraType, BarCodeScanningResult } from 'expo-camera';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { parsePaymentQR, isPaymentQR } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
@@ -27,7 +27,7 @@ export function ScanScreen({ navigation }: Props) {
     getCameraPermission();
   }, []);
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = ({ data }: BarCodeScanningResult) => {
     if (scanned) return;
     setScanned(true);
 
@@ -74,13 +74,29 @@ export function ScanScreen({ navigation }: Props) {
     );
   }
 
+  // Web platform doesn't support camera
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>Camera scanning is not available on web.</Text>
+        <Text style={[styles.message, { marginTop: 8, fontSize: 14 }]}>
+          Please use the mobile app to scan QR codes.
+        </Text>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <CameraView
+      <Camera
         style={styles.camera}
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['qr'],
+        type={CameraType.back}
+        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barCodeScannerSettings={{
+          barCodeTypes: ['qr'],
         }}
       >
         <View style={styles.overlay}>
@@ -92,7 +108,7 @@ export function ScanScreen({ navigation }: Props) {
           </View>
           <Text style={styles.hint}>Point camera at ICN payment QR code</Text>
         </View>
-      </CameraView>
+      </Camera>
     </View>
   );
 }

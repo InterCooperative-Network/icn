@@ -15,6 +15,13 @@ import {
   Unsubscribe,
   WsMessage,
 } from './types';
+import {
+  GenerateProofRequest,
+  EphemeralProof,
+  VerifyResult,
+  SdisHealth,
+  ProofType,
+} from './sdis-types';
 
 const TOKEN_KEY = '@icn/auth_token';
 const DID_KEY = '@icn/did';
@@ -379,7 +386,7 @@ export class ICNMobileClient extends ICNClient {
   private notifyEventListeners(message: WsMessage): void {
     // For Event messages, extract the actual event type from the nested payload
     // WsEventMessage has { type: 'Event', event: { type: 'PaymentCreated', ... } }
-    let eventType = message.type;
+    let eventType: string = message.type;
     if (message.type === 'Event' && 'event' in message && message.event?.type) {
       eventType = message.event.type;
     }
@@ -402,6 +409,133 @@ export class ICNMobileClient extends ICNClient {
     const wildcardListeners = this.wsListeners.get('*');
     if (wildcardListeners) {
       wildcardListeners.forEach((listener) => listener(message));
+    }
+  }
+
+  // ===========================================================================
+  // SDIS Methods
+  // ===========================================================================
+
+  /**
+   * Generate an ephemeral proof for SDIS verification
+   *
+   * @param request - Proof generation parameters
+   * @returns Generated proof with QR data
+   */
+  async generateEphemeralProof(request: GenerateProofRequest): Promise<EphemeralProof> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/ephemeral/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        proof_type: this.formatProofTypeForApi(request.proof_type),
+        validity_secs: request.validity_secs ?? 3600,
+        channels: request.channels ?? [],
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to generate proof: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Verify a proof at Level 1 (QR scan only)
+   *
+   * Fast verification using only the QR code data.
+   * No network required beyond this API call.
+   *
+   * @param qrData - Base64-encoded QR data
+   * @returns Verification result
+   */
+  async verifyLevel1(qrData: string): Promise<VerifyResult> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/verify/level1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ qr_data: qrData }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Verification failed: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Verify a proof at Level 2 (with binding)
+   *
+   * Enhanced verification using both QR data and binding.
+   * Binding can be provided or retrieved from server cache.
+   *
+   * @param qrData - Base64-encoded QR data
+   * @param binding - Optional base64-encoded binding data
+   * @returns Verification result
+   */
+  async verifyLevel2(qrData: string, binding?: string): Promise<VerifyResult> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/verify/level2`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        qr_data: qrData,
+        binding: binding,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Verification failed: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Check SDIS service health
+   */
+  async getSdisHealth(): Promise<SdisHealth> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/health`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error('SDIS service unavailable');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Format proof type for API request
+   */
+  private formatProofTypeForApi(proofType: ProofType): string {
+    switch (proofType.type) {
+      case 'age':
+        return `age_${proofType.threshold}`;
+      case 'citizenship':
+        return `citizenship_${proofType.country_code}`;
+      case 'membership':
+        return 'membership';
+      case 'non_revocation':
+        return 'non_revocation';
+      case 'custom':
+        return `custom_${proofType.circuit_id}`;
+      default:
+        return 'unknown';
     }
   }
 

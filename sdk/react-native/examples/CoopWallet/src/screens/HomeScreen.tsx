@@ -95,6 +95,34 @@ export function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* SDIS Actions */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>SDIS Identity</Text>
+        <View style={styles.sdisActions}>
+          <TouchableOpacity
+            style={styles.sdisButton}
+            onPress={() => navigation.navigate('Identity')}
+          >
+            <Text style={styles.sdisIcon}>ID</Text>
+            <View style={styles.sdisButtonContent}>
+              <Text style={styles.sdisButtonTitle}>Show Proof</Text>
+              <Text style={styles.sdisButtonDesc}>Generate QR code to prove your identity</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.sdisButton}
+            onPress={() => navigation.navigate('Verify')}
+          >
+            <Text style={styles.sdisIcon}>✓</Text>
+            <View style={styles.sdisButtonContent}>
+              <Text style={styles.sdisButtonTitle}>Verify Others</Text>
+              <Text style={styles.sdisButtonDesc}>Scan QR codes to verify identity</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Identity Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your Identity</Text>
@@ -231,5 +259,45 @@ const styles = StyleSheet.create({
     color: '#e53935',
     fontSize: 16,
     fontWeight: '500',
+  },
+  sdisActions: {
+    gap: 12,
+  },
+  sdisButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sdisIcon: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4A90A4',
+    width: 40,
+    height: 40,
+    lineHeight: 40,
+    textAlign: 'center',
+    backgroundColor: '#E3F2FD',
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  sdisButtonContent: {
+    flex: 1,
+  },
+  sdisButtonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  sdisButtonDesc: {
+    fontSize: 12,
+    color: '#666',
   },
 });

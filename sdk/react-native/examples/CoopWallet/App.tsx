@@ -24,6 +24,9 @@ import { ScanScreen } from './src/screens/ScanScreen';
 import { ReceiveScreen } from './src/screens/ReceiveScreen';
 import { GovernanceScreen } from './src/screens/GovernanceScreen';
 import { ProposalScreen } from './src/screens/ProposalScreen';
+import { IdentityScreen } from './src/screens/IdentityScreen';
+import { VerifyScreen } from './src/screens/VerifyScreen';
+import { VerificationHistoryScreen } from './src/screens/VerificationHistoryScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -33,6 +36,10 @@ export type RootStackParamList = {
   Receive: undefined;
   Governance: undefined;
   Proposal: { proposalId: string };
+  // SDIS Screens
+  Identity: undefined;
+  Verify: undefined;
+  VerificationHistory: { history?: any[]; onClear?: () => void };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -117,6 +124,21 @@ export default function App() {
               name="Proposal"
               component={ProposalScreen}
               options={{ title: 'Proposal Details' }}
+            />
+            <Stack.Screen
+              name="Identity"
+              component={IdentityScreen}
+              options={{ title: 'My Identity' }}
+            />
+            <Stack.Screen
+              name="Verify"
+              component={VerifyScreen}
+              options={{ title: 'Verify Identity' }}
+            />
+            <Stack.Screen
+              name="VerificationHistory"
+              component={VerificationHistoryScreen}
+              options={{ title: 'Verification History' }}
             />
           </>
         )}

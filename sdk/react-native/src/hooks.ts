@@ -443,8 +443,14 @@ export function usePayment(client: ICNMobileClient, coopId: string, defaultCurre
       setIsPaying(true);
       setError(null);
       try {
+        // Get sender DID from auth state
+        const senderDid = client.authState.did;
+        if (!senderDid) {
+          throw new Error('Not authenticated - no DID available');
+        }
         // Build full payment request with required fields
         const fullRequest = {
+          from: senderDid,
           to: request.to,
           amount: request.amount,
           currency: request.currency || defaultCurrency,
