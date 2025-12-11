@@ -21,6 +21,13 @@ data:
     health_port = 8080
     log_level = "info"
 
+    [gateway]
+    enabled = true
+    bind_addr = "0.0.0.0:8080"
+    token_expiry_hours = 24
+    challenge_ttl_minutes = 5
+    # jwt_secret is loaded from ICN_GATEWAY_JWT_SECRET environment variable
+
     [rate_limiting]
     enabled = true
     refill_interval_ms = 100
