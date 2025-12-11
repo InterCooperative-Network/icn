@@ -16,23 +16,42 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useAuth } from '@icn/react-native';
 import { client } from '../client';
 
 export function LoginScreen() {
   const [coopId, setCoopId] = useState('');
-  const { login, isLoading, error } = useAuth(client);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!coopId.trim()) {
-      Alert.alert('Error', 'Please enter your cooperative ID');
+      if (Platform.OS === 'web') {
+        alert('Please enter your cooperative ID');
+      } else {
+        Alert.alert('Error', 'Please enter your cooperative ID');
+      }
       return;
     }
 
+    if (!client) {
+      setError('Client not initialized');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
     try {
-      await login(coopId.trim());
+      await client.login(coopId.trim());
     } catch (err) {
-      Alert.alert('Login Failed', (err as Error).message);
+      const message = (err as Error).message;
+      setError(message);
+      if (Platform.OS === 'web') {
+        alert('Login Failed: ' + message);
+      } else {
+        Alert.alert('Login Failed', message);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
