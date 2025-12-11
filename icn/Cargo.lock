@@ -2658,22 +2658,28 @@ dependencies = [
  "actix-web-httpauth",
  "anyhow",
  "base64 0.22.1",
+ "bincode",
  "ed25519-dalek",
  "futures-util",
  "hex",
  "icn-compute",
+ "icn-crypto-pq",
  "icn-federation",
  "icn-governance",
  "icn-identity",
  "icn-ledger",
  "icn-obs",
  "icn-rpc",
+ "icn-steward",
  "icn-store",
+ "icn-zkp",
  "jsonwebtoken",
+ "lru",
  "metrics 0.22.4",
  "rand 0.8.5",
  "reqwest 0.11.27",
  "serde",
+ "serde_bytes",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
@@ -5032,6 +5038,16 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
