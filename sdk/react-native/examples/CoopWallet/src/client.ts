@@ -6,6 +6,7 @@
 
 import { Platform } from 'react-native';
 import { createWallet, createMobileClient, SecureStorage, ICNWallet, ICNMobileClient } from '@icn/react-native';
+import { GATEWAY_URL, APP_CONFIG } from './config';
 
 // Web localStorage adapter (fallback for web)
 const webStorage: SecureStorage = {
@@ -43,9 +44,6 @@ const getNativeStorage = async (): Promise<SecureStorage> => {
   };
 };
 
-// Gateway URL - ICN production gateway
-const GATEWAY_URL = 'https://api.icn.zone';
-
 // Storage, wallet, and client are initialized asynchronously
 let secureStorage: SecureStorage | null = null;
 export let wallet: ICNWallet | null = null;
@@ -53,9 +51,11 @@ export let client: ICNMobileClient | null = null;
 
 // Initialize client (call on app startup)
 export async function initializeClient(): Promise<void> {
-  console.log('Initializing client...');
-  console.log('Platform:', Platform.OS);
-  console.log('Gateway URL:', GATEWAY_URL);
+  if (APP_CONFIG.debug) {
+    console.log('Initializing client...');
+    console.log('Platform:', Platform.OS);
+    console.log('Gateway URL:', GATEWAY_URL);
+  }
 
   // Get platform-appropriate storage
   if (Platform.OS === 'web') {
@@ -64,20 +64,20 @@ export async function initializeClient(): Promise<void> {
     // Use native secure storage on iOS/Android
     secureStorage = await getNativeStorage();
   }
-  console.log('Storage initialized');
+  if (APP_CONFIG.debug) console.log('Storage initialized');
 
   // Create wallet for key management
   wallet = createWallet(secureStorage);
-  console.log('Wallet created');
+  if (APP_CONFIG.debug) console.log('Wallet created');
 
   // Ensure wallet has a key pair
   if (!(await wallet.hasKeyPair())) {
-    console.log('Generating new key pair...');
+    if (APP_CONFIG.debug) console.log('Generating new key pair...');
     const keyPair = await wallet.generateKeyPair();
-    console.log('Key pair generated, DID:', keyPair.did);
+    if (APP_CONFIG.debug) console.log('Key pair generated, DID:', keyPair.did);
   } else {
     const keyPair = await wallet.getKeyPair();
-    console.log('Existing key pair found, DID:', keyPair?.did);
+    if (APP_CONFIG.debug) console.log('Existing key pair found, DID:', keyPair?.did);
   }
 
   // Create mobile client
@@ -86,9 +86,9 @@ export async function initializeClient(): Promise<void> {
     wallet,
     storage: secureStorage,
   });
-  console.log('Mobile client created');
+  if (APP_CONFIG.debug) console.log('Mobile client created');
 
   // Load persisted auth state
   await client.initialize();
-  console.log('Client initialized, auth state:', client.authState);
+  if (APP_CONFIG.debug) console.log('Client initialized, auth state:', client.authState);
 }
