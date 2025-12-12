@@ -290,7 +290,32 @@ function HomeScreen({
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+
+    // Connect to WebSocket for real-time updates
+    const client = getClient();
+    if (client && coopId) {
+      try {
+        client.connectRealtime(coopId);
+        console.log('Connected to real-time updates for', coopId);
+
+        // Listen for payment events
+        const unsubscribe = client.onEvent('PaymentCreated', (event: any) => {
+          console.log('Payment event received:', event);
+          // Refresh data when a payment is created
+          if (event.from === userDid || event.to === userDid) {
+            fetchData();
+          }
+        });
+
+        return () => {
+          unsubscribe();
+          client.disconnectRealtime();
+        };
+      } catch (error) {
+        console.warn('Failed to connect WebSocket:', error);
+      }
+    }
+  }, [fetchData, coopId, userDid]);
 
   const refresh = () => {
     fetchData();
@@ -865,7 +890,32 @@ function GovernanceScreen({ coopId }: { coopId: string }) {
 
   useEffect(() => {
     fetchProposals();
-  }, [fetchProposals]);
+
+    // Connect to WebSocket for real-time governance updates
+    const client = getClient();
+    if (client && coopId) {
+      try {
+        const unsubVote = client.onEvent('GovernanceVoteCast', (event: any) => {
+          console.log('Vote cast event:', event);
+          // Refresh proposals when a vote is cast
+          fetchProposals();
+        });
+
+        const unsubProposal = client.onEvent('GovernanceProposalCreated', (event: any) => {
+          console.log('New proposal event:', event);
+          // Refresh proposals when a new one is created
+          fetchProposals();
+        });
+
+        return () => {
+          unsubVote();
+          unsubProposal();
+        };
+      } catch (error) {
+        console.warn('Failed to connect WebSocket for governance:', error);
+      }
+    }
+  }, [fetchProposals, coopId]);
 
   const handleVote = async (proposalId: string, voteType: 'for' | 'against') => {
     const client = getClient();
