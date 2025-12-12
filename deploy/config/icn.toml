@@ -14,7 +14,7 @@ listen_addr = "0.0.0.0:7777"
 rpc_port = 5601
 
 # Bootstrap peers (add known peers here for distributed deployment)
-# bootstrap_peers = ["icn://did:icn:abc@192.168.1.1:7777"]
+bootstrap_peers = []
 
 # For Docker/K8s deployments, consider setting min_trust_threshold to 0.0
 # if all nodes in the deployment are pre-authorized and trusted
@@ -24,6 +24,9 @@ min_trust_threshold = 0.0
 [observability]
 # Prometheus metrics
 metrics_port = 9090
+
+# Health check port
+health_port = 9091
 
 # Log level
 log_level = "info"
