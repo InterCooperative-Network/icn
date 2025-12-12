@@ -19,7 +19,7 @@ import { useAuth, generateReceiveQR } from '@icn/react-native';
 import { client } from '../client';
 
 export function ReceiveScreen() {
-  const { did, coopId } = useAuth(client);
+  const { did, coopId } = useAuth(client!);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
 

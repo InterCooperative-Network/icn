@@ -31,6 +31,8 @@ import {
   Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { TrustAttestationScreen } from './src/screens/TrustAttestationScreen';
+import { ICNProvider } from './src/contexts/ICNContext';
 
 // QR Code - conditionally import for web compatibility
 let QRCode: any = null;
@@ -2046,6 +2048,9 @@ export type RootStackParamList = {
   VerificationHistory: undefined;
   Transactions: undefined;
   Settings: undefined;
+  TrustAttestation: { targetDid?: string; targetName?: string } | undefined;
+  Proposal: { proposalId: string };
+  History: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -2142,15 +2147,16 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="auto" />
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: { backgroundColor: '#4A90A4' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
-        }}
-      >
+    <ICNProvider client={getClient()}>
+      <NavigationContainer>
+        <StatusBar style="auto" />
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: '#4A90A4' },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: 'bold' },
+          }}
+        >
         {!isAuthenticated ? (
           <Stack.Screen name="Login" options={{ headerShown: false }}>
             {() => <LoginScreen onLogin={handleLogin} />}
@@ -2194,10 +2200,16 @@ export default function App() {
             <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
               {() => <SettingsScreen onLogout={handleLogout} userDid={userDid} />}
             </Stack.Screen>
+            <Stack.Screen 
+              name="TrustAttestation" 
+              component={TrustAttestationScreen} 
+              options={{ title: 'Trust Attestation' }} 
+            />
           </>
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </ICNProvider>
   );
 }
 

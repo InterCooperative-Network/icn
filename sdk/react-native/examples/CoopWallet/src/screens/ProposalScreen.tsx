@@ -27,7 +27,7 @@ type Props = {
 
 export function ProposalScreen({ route, navigation }: Props) {
   const { proposalId } = route.params;
-  const { proposals, vote, isLoading } = useProposals(client);
+  const { proposals, vote, isLoading } = useProposals(client!);
   const [voting, setVoting] = useState(false);
 
   const proposal = proposals.find((p) => p.id === proposalId);

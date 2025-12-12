@@ -28,8 +28,8 @@ type Props = {
 };
 
 export function PaymentScreen({ navigation, route }: Props) {
-  const { coopId } = useAuth(client);
-  const { pay, isPaying, error } = usePayment(client, coopId || '');
+  const { coopId } = useAuth(client!);
+  const { pay, isPaying, error } = usePayment(client!, coopId || '');
 
   const [recipient, setRecipient] = useState(route.params?.to || '');
   const [amount, setAmount] = useState(route.params?.amount?.toString() || '');

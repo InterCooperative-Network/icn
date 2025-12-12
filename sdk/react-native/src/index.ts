@@ -76,6 +76,8 @@ export {
   useMemberProfile,
   useNetworkState,
   useQueue,
+  useTrustScore,
+  useTrustNetwork,
   SimplePaymentRequest,
 } from './hooks';
 

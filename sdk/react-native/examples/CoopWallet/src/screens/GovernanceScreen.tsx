@@ -23,9 +23,9 @@ type Props = {
 };
 
 export function GovernanceScreen({ navigation }: Props) {
-  const { coopId } = useAuth(client);
+  const { coopId } = useAuth(client!);
   const domainId = coopId ? `coop:${coopId}` : undefined;
-  const { proposals, isLoading, refresh } = useProposals(client, domainId);
+  const { proposals, isLoading, refresh } = useProposals(client!, domainId);
 
   const renderProposal = ({ item }: { item: any }) => {
     const statusColor = {

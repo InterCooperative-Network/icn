@@ -32,7 +32,7 @@ const SCANNER_SIZE = SCREEN_WIDTH * 0.75;
 
 export function VerifyScreen({ navigation }: Props) {
   const { verify, result, isVerifying, error, reset, history, clearHistory } =
-    useSdisVerifierWithHistory(client);
+    useSdisVerifierWithHistory(client!);
 
   const [verificationLevel, setVerificationLevel] = useState<VerificationLevel>(1);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);

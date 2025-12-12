@@ -25,14 +25,14 @@ type Props = {
 };
 
 export function HomeScreen({ navigation }: Props) {
-  const { did, coopId, logout } = useAuth(client);
-  const { balance, isLoading: balanceLoading, refresh: refreshBalance } = useBalance(client, coopId || '', did || '');
-  const { transactions, isLoading: txLoading, refresh: refreshTx } = useTransactions(client, coopId || '', 5);
-  const { isConnected } = useRealtime(client);
-  const { profile, isLoading: profileLoading, refresh: refreshProfile } = useMemberProfile(client, coopId || '', did || '');
-  const { networkState, isOnline, isOffline } = useNetworkState(client);
-  const { pendingCount, failedCount, clearFailed } = useQueue(client);
-  const { data: trustData } = useTrustScore(client, did);
+  const { did, coopId, logout } = useAuth(client!);
+  const { balance, isLoading: balanceLoading, refresh: refreshBalance } = useBalance(client!!, coopId || '', did || '');
+  const { transactions, isLoading: txLoading, refresh: refreshTx } = useTransactions(client!, coopId || '', 5);
+  const { isConnected } = useRealtime(client!);
+  const { profile, isLoading: profileLoading, refresh: refreshProfile } = useMemberProfile(client!!, coopId || '', did || '');
+  const { networkState, isOnline, isOffline } = useNetworkState(client!);
+  const { pendingCount, failedCount, clearFailed } = useQueue(client!);
+  const { data: trustData } = useTrustScore(client!, did);
 
   const isLoading = balanceLoading || txLoading;
   const refresh = () => {
@@ -42,7 +42,7 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   // Auto-refresh on payment events
-  useEvent(client, 'PaymentCreated', () => {
+  useEvent(client!, 'PaymentCreated', () => {
     refreshBalance();
     refreshTx();
     refreshProfile();
@@ -131,6 +131,14 @@ export function HomeScreen({ navigation }: Props) {
         >
           <Text style={styles.actionIcon}>🗳️</Text>
           <Text style={styles.actionText}>Vote</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('TrustAttestation', {})}
+        >
+          <Text style={styles.actionIcon}>🤝</Text>
+          <Text style={styles.actionText}>Trust</Text>
         </TouchableOpacity>
       </View>
 

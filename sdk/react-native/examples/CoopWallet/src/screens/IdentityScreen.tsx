@@ -47,8 +47,8 @@ const VALIDITY_OPTIONS = [
 
 export function IdentityScreen({ navigation }: Props) {
   const { proof, qrData, proofType, isGenerating, error, timeRemaining, isExpired, generate, clear } =
-    useSdisProof(client);
-  const { isAvailable, isChecking, check } = useSdisHealth(client);
+    useSdisProof(client!);
+  const { isAvailable, isChecking, check } = useSdisHealth(client!);
 
   const [showProofPicker, setShowProofPicker] = useState(false);
   const [showValidityPicker, setShowValidityPicker] = useState(false);
