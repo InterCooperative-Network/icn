@@ -1,0 +1,10 @@
+node_modules
+tests
+.git
+.gitignore
+*.md
+*.log
+npm-debug.log*
+playwright.config.js
+seed-demo-data.sh
+deploy-ui.sh

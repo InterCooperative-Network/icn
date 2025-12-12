@@ -1,0 +1,197 @@
+# Complete ICN Stack - Full Integration
+# Includes: ICN nodes, Web UI, Gateway API, Monitoring
+#
+# Usage:
+#   docker compose -f docker-compose.full.yml up -d
+#   docker compose -f docker-compose.full.yml logs -f
+#   docker compose -f docker-compose.full.yml down
+#
+# Access:
+#   Web UI:       http://localhost:3001
+#   Gateway API:  http://localhost:8080
+#   Grafana:      http://localhost:3000 (admin/admin)
+#   Prometheus:   http://localhost:9090
+
+services:
+  # ICN Node 1 (Primary with Gateway enabled)
+  icn-node1:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node1
+    hostname: node1
+    volumes:
+      - node1_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
+      - RUST_BACKTRACE=1
+      - RUST_LOG=info,icn_gateway=debug,icn_gossip=debug
+      - ICN_GATEWAY_ENABLE=true
+      - ICN_GATEWAY_PORT=8080
+      - ICN_GATEWAY_WS_PORT=8080
+    command: ["--config", "/config/node1.toml"]
+    ports:
+      - "5001:5001"    # P2P
+      - "8080:8080"    # Gateway (REST + WebSocket)
+      - "9100:9100"    # Metrics
+    networks:
+      - icn_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ICN Node 2 (Peer)
+  icn-node2:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node2
+    hostname: node2
+    volumes:
+      - node2_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
+      - RUST_BACKTRACE=1
+      - RUST_LOG=info
+    command: ["--config", "/config/node2.toml"]
+    ports:
+      - "5002:5002"
+      - "9101:9100"
+    networks:
+      - icn_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ICN Node 3 (Peer)
+  icn-node3:
+    build:
+      context: ./icn
+      dockerfile: ../Dockerfile
+    container_name: icn-node3
+    hostname: node3
+    volumes:
+      - node3_data:/data
+      - ./config:/config:ro
+    environment:
+      - ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
+      - RUST_BACKTRACE=1
+      - RUST_LOG=info
+    command: ["--config", "/config/node3.toml"]
+    ports:
+      - "5003:5003"
+      - "9102:9100"
+    networks:
+      - icn_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9100/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Web UI (pilot-ui)
+  web-ui:
+    build:
+      context: ./web/pilot-ui
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8080
+        - NEXT_PUBLIC_WS_URL=ws://localhost:8080
+    container_name: icn-web-ui
+    hostname: web-ui
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://icn-node1:8080
+      - NEXT_PUBLIC_WS_URL=ws://icn-node1:8080
+    ports:
+      - "3001:3000"
+    networks:
+      - icn_network
+    depends_on:
+      icn-node1:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Prometheus (metrics collection)
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: icn-prometheus
+    hostname: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "9090:9090"
+    networks:
+      - icn_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Grafana (visualization)
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: icn-grafana
+    hostname: grafana
+    volumes:
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/icn-dashboard.json:ro
+      - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitoring/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    ports:
+      - "3000:3000"
+    networks:
+      - icn_network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  icn_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:
+  prometheus_data:
+  grafana_data:
