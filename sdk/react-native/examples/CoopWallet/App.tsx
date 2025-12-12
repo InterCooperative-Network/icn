@@ -1924,6 +1924,79 @@ function SettingsScreen({ onLogout, userDid }: { onLogout: () => void; userDid: 
 }
 
 // ============================================================================
+// Biometric Lock Screen
+// ============================================================================
+function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  const handleBiometricAuth = async () => {
+    if (Platform.OS === 'web') {
+      onUnlock();
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setError(null);
+
+    try {
+      const { LocalAuthentication } = await import('expo-local-authentication');
+      
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Coop Wallet',
+        fallbackLabel: 'Use passcode',
+        cancelLabel: 'Cancel',
+      });
+
+      if (result.success) {
+        onUnlock();
+      } else {
+        setError('Authentication failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Biometric auth error:', err);
+      setError('Authentication failed. Please try again.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  return (
+    <View style={styles.biometricContainer}>
+      <View style={styles.biometricContent}>
+        <Text style={styles.biometricIcon}>🔒</Text>
+        <Text style={styles.biometricTitle}>Wallet Locked</Text>
+        <Text style={styles.biometricSubtitle}>
+          Use your fingerprint or face to unlock
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.biometricButton, isAuthenticating && styles.buttonDisabled]}
+          onPress={handleBiometricAuth}
+          disabled={isAuthenticating}
+        >
+          {isAuthenticating ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.biometricButtonIcon}>🔓</Text>
+              <Text style={styles.buttonText}>Unlock</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
 // Navigation Setup
 // ============================================================================
 
@@ -1946,6 +2019,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isBiometricLocked, setIsBiometricLocked] = useState(false);
   const [coopId, setCoopId] = useState<string>('');
   const [userDid, setUserDid] = useState<string>('');
 
@@ -1965,6 +2039,23 @@ export default function App() {
         console.log('Client:', client ? 'exists' : 'null');
         if (client?.authState?.isAuthenticated) {
           console.log('User is authenticated');
+          
+          // Check if biometric auth is available and enabled
+          if (Platform.OS !== 'web') {
+            try {
+              const { LocalAuthentication } = await import('expo-local-authentication');
+              const hasHardware = await LocalAuthentication.hasHardwareAsync();
+              const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+              
+              if (hasHardware && isEnrolled) {
+                console.log('Biometric available, requiring unlock');
+                setIsBiometricLocked(true);
+              }
+            } catch (error) {
+              console.warn('Biometric check failed:', error);
+            }
+          }
+          
           setIsAuthenticated(true);
           setCoopId(client.authState.coopId || '');
           setUserDid(client.authState.did || '');
@@ -2009,6 +2100,11 @@ export default function App() {
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
+  }
+
+  // Show biometric lock if authenticated but locked
+  if (isAuthenticated && isBiometricLocked) {
+    return <BiometricLockScreen onUnlock={() => setIsBiometricLocked(false)} />;
   }
 
   return (
@@ -2086,6 +2182,50 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: '#666',
+  },
+
+  // Biometric lock screen
+  biometricContainer: {
+    flex: 1,
+    backgroundColor: '#4A90A4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  biometricContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  biometricIcon: {
+    fontSize: 80,
+    marginBottom: 24,
+  },
+  biometricTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  biometricSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 48,
+    textAlign: 'center',
+  },
+  biometricButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 200,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  biometricButtonIcon: {
+    fontSize: 24,
+    marginRight: 12,
   },
 
   // Login
