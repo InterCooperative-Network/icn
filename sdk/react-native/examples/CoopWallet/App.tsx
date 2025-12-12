@@ -32,6 +32,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { TrustAttestationScreen } from './src/screens/TrustAttestationScreen';
+import { MemberProfileScreen } from './src/screens/MemberProfileScreen';
+import { ContactsScreen } from './src/screens/ContactsScreen';
 import { ICNProvider } from './src/contexts/ICNContext';
 
 // QR Code - conditionally import for web compatibility
@@ -546,6 +548,23 @@ function HomeScreen({
             </View>
           ))
         )}
+      </View>
+
+      {/* Contacts Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>People</Text>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('Contacts')}
+        >
+          <Text style={styles.menuIcon}>👥</Text>
+          <View style={styles.menuContent}>
+            <Text style={styles.menuLabel}>Contacts</Text>
+            <Text style={styles.menuDescription}>Saved recipients for quick payments</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* SDIS Section */}
@@ -2039,7 +2058,7 @@ function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
-  Payment: { recipient?: string; amount?: string; memo?: string } | undefined;
+  Payment: { recipient?: string; amount?: string; memo?: string; recipientDid?: string } | undefined;
   Scan: undefined;
   Receive: undefined;
   Governance: undefined;
@@ -2051,6 +2070,8 @@ export type RootStackParamList = {
   TrustAttestation: { targetDid?: string; targetName?: string } | undefined;
   Proposal: { proposalId: string };
   History: undefined;
+  MemberProfile: { memberDid: string };
+  Contacts: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -2200,11 +2221,24 @@ export default function App() {
             <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
               {() => <SettingsScreen onLogout={handleLogout} userDid={userDid} />}
             </Stack.Screen>
-            <Stack.Screen 
-              name="TrustAttestation" 
-              component={TrustAttestationScreen} 
-              options={{ title: 'Trust Attestation' }} 
+            <Stack.Screen
+              name="TrustAttestation"
+              component={TrustAttestationScreen}
+              options={{ title: 'Trust Attestation' }}
             />
+            <Stack.Screen name="MemberProfile" options={{ title: 'Member Profile' }}>
+              {({ route }) => (
+                <MemberProfileScreen
+                  client={getClient()!}
+                  coopId={coopId}
+                  memberDid={(route.params as any)?.memberDid || userDid}
+                  userDid={userDid}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Contacts" options={{ title: 'Contacts' }}>
+              {() => <ContactsScreen client={getClient()!} coopId={coopId} />}
+            </Stack.Screen>
           </>
         )}
       </Stack.Navigator>
