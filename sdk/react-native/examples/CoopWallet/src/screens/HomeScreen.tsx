@@ -15,7 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useAuth, useBalance, useRealtime, useTransactions } from '@icn/react-native';
+import { useAuth, useBalance, useRealtime, useTransactions, useMemberProfile, useEvent, useNetworkState, useQueue } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
 
@@ -28,12 +28,23 @@ export function HomeScreen({ navigation }: Props) {
   const { balance, isLoading: balanceLoading, refresh: refreshBalance } = useBalance(client, coopId || '', did || '');
   const { transactions, isLoading: txLoading, refresh: refreshTx } = useTransactions(client, coopId || '', 5);
   const { isConnected } = useRealtime(client);
+  const { profile, isLoading: profileLoading, refresh: refreshProfile } = useMemberProfile(client, coopId || '', did || '');
+  const { networkState, isOnline, isOffline } = useNetworkState(client);
+  const { pendingCount, failedCount, clearFailed } = useQueue(client);
 
   const isLoading = balanceLoading || txLoading;
   const refresh = () => {
     refreshBalance();
     refreshTx();
+    refreshProfile();
   };
+
+  // Auto-refresh on payment events
+  useEvent(client, 'PaymentCreated', () => {
+    refreshBalance();
+    refreshTx();
+    refreshProfile();
+  });
 
   const formatDid = (did: string) => {
     if (did.length > 20) {
@@ -51,10 +62,29 @@ export function HomeScreen({ navigation }: Props) {
     >
       {/* Connection Status */}
       <View style={styles.statusBar}>
-        <View style={[styles.statusDot, isConnected && styles.statusConnected]} />
-        <Text style={styles.statusText}>
-          {isConnected ? 'Connected' : 'Offline'}
-        </Text>
+        <View style={styles.statusLeft}>
+          <View style={[styles.statusDot, isConnected && styles.statusConnected]} />
+          <Text style={styles.statusText}>
+            {isConnected ? 'Connected' : 'Offline'}
+          </Text>
+        </View>
+        <View style={styles.statusRight}>
+          {isOffline && (
+            <View style={styles.offlineBadge}>
+              <Text style={styles.offlineText}>⚠️ Offline Mode</Text>
+            </View>
+          )}
+          {pendingCount > 0 && (
+            <View style={styles.queueBadge}>
+              <Text style={styles.queueText}>{pendingCount} pending</Text>
+            </View>
+          )}
+          {failedCount > 0 && (
+            <TouchableOpacity style={styles.failedBadge} onPress={clearFailed}>
+              <Text style={styles.failedText}>{failedCount} failed - tap to clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Balance Card */}
@@ -167,10 +197,30 @@ export function HomeScreen({ navigation }: Props) {
 
       {/* Identity Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your Identity</Text>
+        <Text style={styles.sectionTitle}>Your Profile</Text>
         <View style={styles.identityCard}>
-          <Text style={styles.identityLabel}>DID</Text>
-          <Text style={styles.identityValue}>{formatDid(did || '')}</Text>
+          <View style={styles.profileRow}>
+            <Text style={styles.identityLabel}>DID</Text>
+            <Text style={styles.identityValue}>{formatDid(did || '')}</Text>
+          </View>
+          {profile && (
+            <>
+              <View style={styles.profileRow}>
+                <Text style={styles.identityLabel}>Role</Text>
+                <Text style={styles.profileValue}>{profile.role}</Text>
+              </View>
+              <View style={styles.profileRow}>
+                <Text style={styles.identityLabel}>Transactions</Text>
+                <Text style={styles.profileValue}>{profile.transaction_count}</Text>
+              </View>
+              {profile.trust_score !== undefined && (
+                <View style={styles.profileRow}>
+                  <Text style={styles.identityLabel}>Trust Score</Text>
+                  <Text style={styles.profileValue}>{profile.trust_score.toFixed(2)}</Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
       </View>
 
@@ -190,9 +240,18 @@ const styles = StyleSheet.create({
   statusBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     padding: 8,
     backgroundColor: '#fff',
+  },
+  statusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   statusDot: {
     width: 8,
@@ -207,6 +266,39 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     color: '#666',
+  },
+  offlineBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  offlineText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  queueBadge: {
+    backgroundColor: '#2196f3',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  queueText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  failedBadge: {
+    backgroundColor: '#f44336',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  failedText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
   },
   balanceCard: {
     backgroundColor: '#4A90A4',
@@ -281,15 +373,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
   },
+  profileRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   identityLabel: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
   },
   identityValue: {
     fontSize: 14,
     color: '#333',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  profileValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
   },
   logoutButton: {
     marginHorizontal: 16,
