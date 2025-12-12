@@ -41,6 +41,7 @@ pub mod enrollment;
 pub mod ephemeral;
 pub mod qr;
 pub mod recovery;
+pub mod simple_enrollment;
 pub mod verify;
 
 use actix_web::{get, post, web, HttpResponse};

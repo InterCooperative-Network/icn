@@ -38,6 +38,9 @@ jsonwebtoken = "9"
 # UUID generation
 uuid = { version = "1", features = ["v4"] }
 
+# Time
+chrono = "0.4"
+
 # Cryptography
 hex = "0.4"
 rand = "0.8"

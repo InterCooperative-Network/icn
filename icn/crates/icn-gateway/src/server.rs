@@ -123,6 +123,7 @@ impl GatewayServer {
 
         // Create SDIS state for identity verification
         let sdis_state = Arc::new(crate::api::sdis::SdisState::new());
+        let enrollment_store = Arc::new(crate::api::sdis::simple_enrollment::EnrollmentStore::new());
 
         // Create ledger manager with persistent storage if data_dir is set
         let ledger_manager = if let Some(data_dir) = self.data_dir {
@@ -227,6 +228,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(sdis_state.clone()))
+                .app_data(web::Data::new(enrollment_store.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
@@ -263,6 +265,7 @@ impl GatewayServer {
                                 .service(api::sdis::sdis_health)
                                 .service(api::sdis::verify_level1)
                                 .service(api::sdis::verify_level2)
+                                .configure(api::sdis::simple_enrollment::configure)
                                 .configure(api::sdis::enrollment::configure)
                                 .configure(api::sdis::recovery::configure)
                                 .configure(api::sdis::anchor::configure),
