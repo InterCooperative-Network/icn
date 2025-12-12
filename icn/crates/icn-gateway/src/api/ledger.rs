@@ -48,6 +48,7 @@ pub async fn create_payment(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
+    event_broadcaster: web::Data<Arc<crate::events::EventBroadcaster>>,
     coop_id: web::Path<String>,
     req: web::Json<CreatePaymentRequest>,
 ) -> Result<HttpResponse> {
@@ -95,6 +96,35 @@ pub async fn create_payment(
     // Track payment creation metrics
     gateway::payments_created_inc();
     gateway::payment_amount_record(&req.currency, req.amount);
+
+    // Broadcast TransactionCompleted event to both sender and recipient
+    let from_did_str = req.from.clone();
+    let to_did_str = req.to.clone();
+    let amount_val = req.amount;
+    let currency_val = req.currency.clone();
+    let hash_val = hash.clone();
+    let coop_id_val = coop_id.to_string();
+    let broadcaster = event_broadcaster.into_inner();
+    
+    tokio::spawn(async move {
+        use crate::events::GatewayEvent;
+        
+        let event = GatewayEvent::TransactionCompleted {
+            coop_id: coop_id_val.clone(),
+            hash: hash_val,
+            from: from_did_str.clone(),
+            to: to_did_str.clone(),
+            amount: amount_val,
+            currency: currency_val,
+        };
+        
+        // Send to cooperative channel (all members can see)
+        broadcaster.broadcast(&coop_id_val, event.clone()).await;
+        
+        // Also send to personal channels for sender and recipient
+        broadcaster.broadcast(&from_did_str, event.clone()).await;
+        broadcaster.broadcast(&to_did_str, event).await;
+    });
 
     // Send push notifications (async, don't block response)
     let notif_service = notification_service.into_inner();
@@ -202,6 +232,7 @@ pub async fn get_history(
 mod tests {
     use super::*;
     use crate::auth::TokenClaims;
+    use crate::events::EventBroadcaster;
     use actix_web::{test, App, HttpMessage};
     use icn_identity::IdentityBundle;
 
@@ -209,6 +240,7 @@ mod tests {
     async fn test_create_payment_and_get_balance() {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
@@ -216,6 +248,7 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
@@ -338,12 +371,14 @@ mod tests {
     async fn test_authorization_scope_check() {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
@@ -399,6 +434,7 @@ mod tests {
     async fn test_create_payment_from_other_account_fails() {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
         let charlie = IdentityBundle::generate().unwrap();
@@ -407,6 +443,7 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
         )
         .await;
@@ -442,6 +479,7 @@ mod tests {
     async fn test_cross_cooperative_ledger_privacy() {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
@@ -460,6 +498,7 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
@@ -525,12 +564,14 @@ mod tests {
     async fn test_self_payment_rejected() {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
         )
         .await;
