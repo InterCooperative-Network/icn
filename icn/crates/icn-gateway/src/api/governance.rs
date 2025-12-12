@@ -998,6 +998,7 @@ mod tests {
     async fn test_proposal_lifecycle() {
         let gov_mgr = Arc::new(GovernanceManager::new());
         let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
@@ -1017,6 +1018,7 @@ mod tests {
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .service(
                     web::scope("/gov")
                         .service(create_proposal)

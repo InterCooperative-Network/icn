@@ -208,12 +208,14 @@ mod tests {
     #[actix_web::test]
     async fn test_create_payment_and_get_balance() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
@@ -335,11 +337,13 @@ mod tests {
     #[actix_web::test]
     async fn test_authorization_scope_check() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let alice = IdentityBundle::generate().unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
@@ -394,6 +398,7 @@ mod tests {
     #[actix_web::test]
     async fn test_create_payment_from_other_account_fails() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
         let charlie = IdentityBundle::generate().unwrap();
@@ -401,6 +406,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
         )
         .await;
@@ -435,6 +441,7 @@ mod tests {
     #[actix_web::test]
     async fn test_cross_cooperative_ledger_privacy() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
@@ -452,6 +459,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .service(
                     web::scope("/ledger")
                         .service(create_payment)
@@ -516,11 +524,13 @@ mod tests {
     #[actix_web::test]
     async fn test_self_payment_rejected() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let alice = IdentityBundle::generate().unwrap();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
         )
         .await;
