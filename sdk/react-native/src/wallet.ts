@@ -6,11 +6,17 @@
  */
 
 import * as ed from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha2';
 import { ICNWallet, KeyPair, SecureStorage } from './types';
 
-const PRIVATE_KEY_KEY = '@icn/wallet/private_key';
-const PUBLIC_KEY_KEY = '@icn/wallet/public_key';
-const DID_KEY = '@icn/wallet/did';
+// Configure @noble/ed25519 to use synchronous SHA-512 from @noble/hashes
+// This is required for React Native which doesn't have crypto.subtle
+ed.hashes.sha512 = (message: Uint8Array) => sha512(message);
+
+// SecureStore keys must be alphanumeric with periods, underscores, or hyphens only (no slashes)
+const PRIVATE_KEY_KEY = 'icn_wallet_private_key';
+const PUBLIC_KEY_KEY = 'icn_wallet_public_key';
+const DID_KEY = 'icn_wallet_did';
 
 /**
  * Wallet implementation using secure storage and @noble/ed25519
@@ -56,8 +62,8 @@ export class ICNWalletImpl implements ICNWallet {
     // Generate 32 random bytes for the private key
     const privateKey = ed.utils.randomSecretKey();
 
-    // Derive public key from private key
-    const publicKey = await ed.getPublicKeyAsync(privateKey);
+    // Derive public key from private key (sync version - uses hashes.sha512)
+    const publicKey = ed.getPublicKey(privateKey);
 
     // Convert to hex strings for storage
     const privateKeyHex = this.bytesToHex(privateKey);
@@ -89,8 +95,8 @@ export class ICNWalletImpl implements ICNWallet {
       throw new Error('Invalid private key length. Expected 32 bytes.');
     }
 
-    // Derive public key from private key
-    const publicKey = await ed.getPublicKeyAsync(privateKey);
+    // Derive public key from private key (sync version - uses hashes.sha512)
+    const publicKey = ed.getPublicKey(privateKey);
     const publicKeyHex = this.bytesToHex(publicKey);
     const did = `did:icn:${this.base58btcEncode(publicKey)}`;
 
@@ -168,8 +174,8 @@ export class ICNWalletImpl implements ICNWallet {
     // We need to sign the raw bytes of the nonce
     const messageBytes = this.hexToBytes(message);
 
-    // Sign with Ed25519
-    const signature = await ed.signAsync(messageBytes, privateKey);
+    // Sign with Ed25519 (sync version - uses hashes.sha512)
+    const signature = ed.sign(messageBytes, privateKey);
 
     // Return signature as hex string
     return this.bytesToHex(signature);

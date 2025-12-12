@@ -23,10 +23,11 @@ import {
   ProofType,
 } from './sdis-types';
 
-const TOKEN_KEY = '@icn/auth_token';
-const DID_KEY = '@icn/did';
-const COOP_KEY = '@icn/coop_id';
-const EXPIRES_KEY = '@icn/expires_at';
+// SecureStore keys must be alphanumeric with periods, underscores, or hyphens only (no @ or slashes)
+const TOKEN_KEY = 'icn_auth_token';
+const DID_KEY = 'icn_auth_did';
+const COOP_KEY = 'icn_coop_id';
+const EXPIRES_KEY = 'icn_expires_at';
 
 /**
  * Mobile-optimized ICN client with persistent auth and wallet integration
