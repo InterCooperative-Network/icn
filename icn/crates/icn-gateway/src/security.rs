@@ -71,9 +71,15 @@ pub fn configure_cors(config: &SecurityConfig) -> Cors {
 
         cors
     } else {
-        // Production mode: permissive CORS to work behind reverse proxy (Cloudflare)
-        // The reverse proxy handles actual CORS policy enforcement
-        Cors::permissive()
+        // Production mode: permissive CORS
+        // allow_any_origin() accepts any origin (echoes it back)
+        // Cloudflare Transform Rules also add headers - browser should handle duplicates
+        Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .expose_any_header()
+            .max_age(3600)
     }
 }
 
@@ -178,6 +184,18 @@ where
                     HeaderName::from_static("strict-transport-security"),
                     HeaderValue::from_static("max-age=31536000; includeSubDomains"),
                 );
+
+                // When behind Cloudflare (which adds CORS headers via Transform Rules),
+                // remove the ACAO header from our response to avoid duplicates.
+                // Cloudflare will add the proper "*" header.
+                if std::env::var("ICN_SKIP_CORS").map(|v| v == "1" || v == "true").unwrap_or(false) {
+                    headers.remove(HeaderName::from_static("access-control-allow-origin"));
+                    headers.remove(HeaderName::from_static("access-control-allow-methods"));
+                    headers.remove(HeaderName::from_static("access-control-allow-headers"));
+                    headers.remove(HeaderName::from_static("access-control-max-age"));
+                    headers.remove(HeaderName::from_static("access-control-allow-credentials"));
+                    headers.remove(HeaderName::from_static("access-control-expose-headers"));
+                }
             }
 
             Ok(res)

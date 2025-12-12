@@ -318,11 +318,16 @@ export class ICNClient {
     coopId?: string,
     scopes?: string[]
   ): Promise<VerifyResponse> {
-    return this.post<VerifyResponse>(
+    const response = await this.post<{ token: string; expires_in: number }>(
       '/auth/verify',
       { did, signature, coop_id: coopId, scopes },
       false
     );
+    // Convert expires_in (seconds) to expires_at (timestamp ms)
+    return {
+      ...response,
+      expires_at: Date.now() + response.expires_in * 1000,
+    };
   }
 
   /**
@@ -338,7 +343,7 @@ export class ICNClient {
     scopes?: string[]
   ): Promise<VerifyResponse> {
     const challenge = await this.getChallenge(did);
-    const signature = await signer.sign(challenge.challenge);
+    const signature = await signer.sign(challenge.nonce);
     const auth = await this.verify(did, signature, coopId, scopes);
     this.setToken(auth.token, auth.expires_at);
 

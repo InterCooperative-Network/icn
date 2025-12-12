@@ -62,6 +62,7 @@ export {
   useRealtime,
   useEvent,
   useBalance,
+  useTransactions,
   useCoop,
   useProposals,
   useDomains,

@@ -15,7 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useAuth, useBalance, useRealtime } from '@icn/react-native';
+import { useAuth, useBalance, useRealtime, useTransactions } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
 
@@ -25,8 +25,15 @@ type Props = {
 
 export function HomeScreen({ navigation }: Props) {
   const { did, coopId, logout } = useAuth(client);
-  const { balance, isLoading, refresh } = useBalance(client, coopId || '', did || '');
+  const { balance, isLoading: balanceLoading, refresh: refreshBalance } = useBalance(client, coopId || '', did || '');
+  const { transactions, isLoading: txLoading, refresh: refreshTx } = useTransactions(client, coopId || '', 5);
   const { isConnected } = useRealtime(client);
+
+  const isLoading = balanceLoading || txLoading;
+  const refresh = () => {
+    refreshBalance();
+    refreshTx();
+  };
 
   const formatDid = (did: string) => {
     if (did.length > 20) {
@@ -93,6 +100,41 @@ export function HomeScreen({ navigation }: Props) {
           <Text style={styles.actionIcon}>🗳️</Text>
           <Text style={styles.actionText}>Vote</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Recent Transactions */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('History')}>
+            <Text style={styles.seeAllText}>See All</Text>
+          </TouchableOpacity>
+        </View>
+        {transactions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No transactions yet</Text>
+          </View>
+        ) : (
+          transactions.map((tx) => {
+            const isSent = tx.from === did;
+            return (
+              <View key={tx.id} style={styles.txRow}>
+                <View style={styles.txIcon}>
+                  <Text style={styles.txIconText}>{isSent ? '↑' : '↓'}</Text>
+                </View>
+                <View style={styles.txDetails}>
+                  <Text style={styles.txTitle}>
+                    {isSent ? `To: ${formatDid(tx.to)}` : `From: ${formatDid(tx.from)}`}
+                  </Text>
+                  {tx.memo && <Text style={styles.txMemo}>{tx.memo}</Text>}
+                </View>
+                <Text style={[styles.txAmount, isSent ? styles.txSent : styles.txReceived]}>
+                  {isSent ? '-' : '+'}{tx.amount}
+                </Text>
+              </View>
+            );
+          })
+        )}
       </View>
 
       {/* SDIS Actions */}
@@ -259,6 +301,71 @@ const styles = StyleSheet.create({
     color: '#e53935',
     fontSize: 16,
     fontWeight: '500',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  seeAllText: {
+    color: '#4A90A4',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    color: '#999',
+    fontSize: 14,
+  },
+  txRow: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  txIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  txIconText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  txDetails: {
+    flex: 1,
+  },
+  txTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  txMemo: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  txAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  txSent: {
+    color: '#e53935',
+  },
+  txReceived: {
+    color: '#4caf50',
   },
   sdisActions: {
     gap: 12,

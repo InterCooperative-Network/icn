@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - CoopWallet Real API Integration (2025-12-11)
+
+**React Native SDK Enhancements** ([sdk/react-native/src/hooks.ts](sdk/react-native/src/hooks.ts)):
+- Added `useTransactions` hook for fetching transaction history with pagination
+- Auto-refreshes on `PaymentCreated` WebSocket events
+- Supports `loadMore` for infinite scroll patterns
+
+**TypeScript SDK Fixes** ([sdk/typescript/src/types.ts](sdk/typescript/src/types.ts)):
+- Fixed `ChallengeResponse` to use `nonce` field (matches gateway API)
+- Fixed `VerifyResponse` to compute `expires_at` from `expires_in`
+
+**CoopWallet App Integration** ([sdk/react-native/examples/CoopWallet/App.tsx](sdk/react-native/examples/CoopWallet/App.tsx)):
+- HomeScreen displays real balance from ledger API
+- HomeScreen shows real transaction history (pull-to-refresh supported)
+- PaymentScreen sends real payments via `client.pay()` API
+- ReceiveScreen generates QR codes with real user DID
+- ScanScreen processes payment QR codes and pre-fills payment form
+- IdentityScreen and SettingsScreen show real user DID
+- All screens use authenticated user's DID instead of demo values
+
+**Gateway CORS Fix** ([icn/crates/icn-gateway/src/security.rs](icn/crates/icn-gateway/src/security.rs)):
+- Added `ICN_SKIP_CORS` environment variable for reverse proxy deployments
+- Prevents duplicate CORS headers when Cloudflare adds its own
+- Reordered middleware to ensure SecurityHeaders runs after CORS layer
+
 ### Added - Configurable Trust Threshold for Network Connections (2025-12-11)
 
 **Network Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):

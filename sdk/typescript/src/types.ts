@@ -13,8 +13,8 @@ export interface ChallengeRequest {
 }
 
 export interface ChallengeResponse {
-  challenge: string;
-  expires_at: number;
+  nonce: string;
+  expires_in: number;
 }
 
 export interface VerifyRequest {
@@ -26,6 +26,8 @@ export interface VerifyRequest {
 
 export interface VerifyResponse {
   token: string;
+  expires_in: number;
+  /** Computed expires_at timestamp (added by SDK) */
   expires_at: number;
 }
 

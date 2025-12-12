@@ -94,20 +94,55 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
 
     try {
       const client = getClient();
+      console.log('Client:', client);
+      console.log('Client baseUrl:', (client as any)?.baseUrl);
+
+      // Debug: Test direct fetch to gateway first
+      const baseUrl = (client as any)?.baseUrl || 'https://api.icn.zone';
+      console.log('Testing direct fetch to:', `${baseUrl}/v1/health`);
+      try {
+        const testResponse = await fetch(`${baseUrl}/v1/health`);
+        console.log('Health check status:', testResponse.status);
+        const healthData = await testResponse.json();
+        console.log('Health check response:', healthData);
+      } catch (fetchErr) {
+        console.error('Direct fetch error:', fetchErr);
+        console.error('Fetch error name:', (fetchErr as Error).name);
+        console.error('Fetch error message:', (fetchErr as Error).message);
+      }
+
       if (client) {
+        // Get the wallet's DID for debugging
+        const walletModule = require('./src/client');
+        const wallet = walletModule.wallet;
+        if (wallet) {
+          const keyPair = await wallet.getKeyPair();
+          console.log('Wallet DID:', keyPair?.did);
+          if (keyPair?.did) {
+            console.log('DID length:', keyPair.did.length);
+            // Show first 50 chars to verify format
+            console.log('DID preview:', keyPair.did.substring(0, 50) + '...');
+          }
+        }
+
         // Use real authentication with the gateway
+        console.log('Attempting login to:', coopId.trim());
         const authState = await client.login(coopId.trim(), [
           'coop:read',
           'coop:write',
           'ledger:read',
           'ledger:write',
         ]);
+        console.log('Login successful:', authState);
         onLogin(coopId.trim(), authState.did || '');
       } else {
         throw new Error('Client not initialized. Please refresh the page.');
       }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('Login error details:', err);
+      console.error('Error name:', (err as Error).name);
+      console.error('Error message:', (err as Error).message);
+      console.error('Error stack:', (err as Error).stack);
       setError((err as Error).message);
     } finally {
       setIsLoading(false);
@@ -152,9 +187,47 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
         <Text style={styles.footerText}>
           Your keys are stored securely on your device.
         </Text>
+
+        <TouchableOpacity
+          style={[styles.secondaryButton, { marginTop: 20 }]}
+          onPress={async () => {
+            try {
+              // Clear localStorage on web
+              if (Platform.OS === 'web') {
+                localStorage.clear();
+                console.log('localStorage cleared');
+              }
+              // Reinitialize client
+              await initializeClient();
+              setError(null);
+              // Alert doesn't work on web, use console and update UI
+              console.log('Wallet reset! New keys generated.');
+              if (Platform.OS === 'web') {
+                window.alert('Wallet reset! New keys generated. Please try logging in again.');
+              } else {
+                Alert.alert('Wallet Reset', 'New keys generated. Please try logging in again.');
+              }
+            } catch (e) {
+              console.error('Reset error:', e);
+              setError('Failed to reset wallet: ' + (e as Error).message);
+            }
+          }}
+        >
+          <Text style={[styles.buttonText, { color: '#666' }]}>Reset Wallet</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
+}
+
+interface Transaction {
+  id: string;
+  type: 'sent' | 'received';
+  from: string;
+  to: string;
+  amount: number;
+  memo: string;
+  date: string;
 }
 
 function HomeScreen({
@@ -169,32 +242,58 @@ function HomeScreen({
   onLogout: () => void;
 }) {
   const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    // Try to fetch real balance from API
-    async function fetchBalance() {
-      const client = getClient();
-      if (client && coopId && userDid) {
-        try {
-          const result = await client.getBalance(coopId, userDid);
-          setBalance(result?.balance ?? 0);
-        } catch (e) {
-          console.warn('Failed to fetch balance, using default:', e);
-          setBalance(0);
+  const fetchData = useCallback(async () => {
+    const client = getClient();
+    if (!client || !coopId || !userDid) return;
+
+    setIsLoading(true);
+    try {
+      // Fetch balance
+      const balanceResult = await client.getBalance(coopId, userDid);
+      setBalance(balanceResult?.balance ?? 0);
+
+      // Fetch recent transactions
+      try {
+        const historyResult = await client.getHistory(coopId, { limit: 10 });
+        if (historyResult?.transactions) {
+          const txs: Transaction[] = historyResult.transactions.map((tx: any, idx: number) => ({
+            id: tx.id || `tx-${idx}`,
+            type: tx.to === userDid ? 'received' : 'sent',
+            from: formatDidShort(tx.from),
+            to: formatDidShort(tx.to),
+            amount: tx.amount,
+            memo: tx.memo || '',
+            date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
+          }));
+          setTransactions(txs);
         }
+      } catch (e) {
+        console.warn('Failed to fetch transactions:', e);
+        // Keep existing transactions or empty
       }
+    } catch (e) {
+      console.warn('Failed to fetch balance:', e);
+    } finally {
+      setIsLoading(false);
     }
-    fetchBalance();
   }, [coopId, userDid]);
 
-  const refresh = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setBalance(Math.floor(Math.random() * 100));
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const refresh = () => {
+    fetchData();
+  };
+
+  const formatDidShort = (did: string) => {
+    if (!did) return 'Unknown';
+    if (did.length > 16) return `${did.slice(0, 10)}...${did.slice(-4)}`;
+    return did;
+  };
 
   const handleLogout = async () => {
     onLogout();
@@ -269,31 +368,37 @@ function HomeScreen({
           </TouchableOpacity>
         </View>
 
-        {DEMO_TRANSACTIONS.slice(0, 3).map((tx) => (
-          <View key={tx.id} style={styles.transactionItem}>
-            <View style={[
-              styles.txIcon,
-              tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
-            ]}>
-              <Text style={styles.txIconText}>{tx.type === 'received' ? '↓' : '↑'}</Text>
-            </View>
-            <View style={styles.txContent}>
-              <Text style={styles.txPerson}>
-                {tx.type === 'received' ? `From ${tx.from}` : `To ${tx.to}`}
-              </Text>
-              <Text style={styles.txMemo}>{tx.memo}</Text>
-            </View>
-            <View style={styles.txAmountContainer}>
-              <Text style={[
-                styles.txAmount,
-                tx.type === 'received' ? styles.txAmountReceived : styles.txAmountSent
-              ]}>
-                {tx.type === 'received' ? '+' : '-'}{tx.amount}h
-              </Text>
-              <Text style={styles.txDate}>{tx.date}</Text>
-            </View>
+        {transactions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No transactions yet</Text>
           </View>
-        ))}
+        ) : (
+          transactions.slice(0, 3).map((tx) => (
+            <View key={tx.id} style={styles.transactionItem}>
+              <View style={[
+                styles.txIcon,
+                tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
+              ]}>
+                <Text style={styles.txIconText}>{tx.type === 'received' ? '↓' : '↑'}</Text>
+              </View>
+              <View style={styles.txContent}>
+                <Text style={styles.txPerson}>
+                  {tx.type === 'received' ? `From ${tx.from}` : `To ${tx.to}`}
+                </Text>
+                <Text style={styles.txMemo}>{tx.memo}</Text>
+              </View>
+              <View style={styles.txAmountContainer}>
+                <Text style={[
+                  styles.txAmount,
+                  tx.type === 'received' ? styles.txAmountReceived : styles.txAmountSent
+                ]}>
+                  {tx.type === 'received' ? '+' : '-'}{tx.amount}h
+                </Text>
+                <Text style={styles.txDate}>{tx.date}</Text>
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* SDIS Section */}
@@ -361,31 +466,62 @@ function HomeScreen({
 // ============================================================================
 // Payment Screen - Send hours to another member
 // ============================================================================
-function PaymentScreen({ navigation }: { navigation: any }) {
-  const [recipient, setRecipient] = useState('');
-  const [amount, setAmount] = useState('');
-  const [memo, setMemo] = useState('');
+function PaymentScreen({
+  navigation,
+  route,
+  coopId,
+  userDid,
+}: {
+  navigation: any;
+  route?: { params?: { recipient?: string; amount?: string; memo?: string } };
+  coopId: string;
+  userDid: string;
+}) {
+  const params = route?.params;
+  const [recipient, setRecipient] = useState(params?.recipient || '');
+  const [amount, setAmount] = useState(params?.amount || '');
+  const [memo, setMemo] = useState(params?.memo || '');
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSend = async () => {
     if (!recipient.trim() || !amount.trim()) {
-      alert('Please enter recipient and amount');
+      setError('Please enter recipient and amount');
       return;
     }
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert('Please enter a valid amount');
+      setError('Please enter a valid amount');
       return;
     }
 
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    setError(null);
+
+    try {
+      const client = getClient();
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Make real payment via API
+      await client.pay(coopId, {
+        from: userDid,
+        to: recipient.trim(),
+        amount: amountNum,
+        currency: 'hours',
+        memo: memo.trim() || undefined,
+      });
+
       setSuccess(true);
-    }, 1500);
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (success) {
@@ -446,6 +582,8 @@ function PaymentScreen({ navigation }: { navigation: any }) {
           />
         </View>
 
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
         <TouchableOpacity
           style={[styles.primaryButton, styles.sendButton, isLoading && styles.buttonDisabled]}
           onPress={handleSend}
@@ -465,14 +603,15 @@ function PaymentScreen({ navigation }: { navigation: any }) {
 // ============================================================================
 // Receive Screen - Display QR code for receiving payments
 // ============================================================================
-function ReceiveScreen({ route }: { route: any }) {
+function ReceiveScreen({ userDid, coopId }: { userDid: string; coopId: string }) {
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
-  const did = 'did:icn:demo123456789abcdef';
+  const did = userDid || 'did:icn:unknown';
 
   const qrData = JSON.stringify({
     type: 'icn-payment-request',
     recipient: did,
+    coopId: coopId,
     amount: amount ? parseFloat(amount) : undefined,
     timestamp: Date.now(),
   });
@@ -563,8 +702,49 @@ function ReceiveScreen({ route }: { route: any }) {
 // ============================================================================
 // Scan Screen - QR code scanner
 // ============================================================================
-function ScanScreen({ navigation }: { navigation: any }) {
+function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: string; userDid: string }) {
   const [manualEntry, setManualEntry] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const processQRData = (data: string) => {
+    try {
+      // Try to parse as JSON (payment request format)
+      const parsed = JSON.parse(data);
+
+      if (parsed.type === 'icn-payment-request') {
+        // Navigate to payment screen with prefilled data
+        navigation.navigate('Payment', {
+          recipient: parsed.recipient,
+          amount: parsed.amount?.toString() || '',
+          memo: parsed.memo || '',
+        });
+        return;
+      }
+
+      // If it looks like a DID, go to payment screen with recipient
+      if (data.startsWith('did:icn:')) {
+        navigation.navigate('Payment', {
+          recipient: data,
+          amount: '',
+          memo: '',
+        });
+        return;
+      }
+
+      setError('Unrecognized QR code format');
+    } catch {
+      // Not JSON, check if it's a DID
+      if (data.trim().startsWith('did:icn:')) {
+        navigation.navigate('Payment', {
+          recipient: data.trim(),
+          amount: '',
+          memo: '',
+        });
+        return;
+      }
+      setError('Could not parse QR code data');
+    }
+  };
 
   if (Platform.OS === 'web') {
     return (
@@ -576,18 +756,23 @@ function ScanScreen({ navigation }: { navigation: any }) {
 
         <View style={styles.manualEntrySection}>
           <Text style={styles.sectionTitle}>Manual Entry</Text>
+          <Text style={styles.sectionSubtitle}>Paste a DID or payment request JSON</Text>
           <TextInput
             style={styles.input}
-            placeholder="Paste DID or payment request"
+            placeholder="did:icn:... or JSON payment request"
             value={manualEntry}
-            onChangeText={setManualEntry}
+            onChangeText={(text) => {
+              setManualEntry(text);
+              setError(null);
+            }}
             multiline
           />
+          {error && <Text style={styles.errorText}>{error}</Text>}
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => {
               if (manualEntry.trim()) {
-                alert('Processing: ' + manualEntry.slice(0, 50) + '...');
+                processQRData(manualEntry.trim());
               }
             }}
           >
@@ -746,9 +931,9 @@ function GovernanceScreen({ navigation }: { navigation: any }) {
 // ============================================================================
 // Identity Screen - View and share your SDIS identity
 // ============================================================================
-function IdentityScreen({ navigation }: { navigation: any }) {
+function IdentityScreen({ navigation, userDid }: { navigation: any; userDid: string }) {
   const [proofType, setProofType] = useState<'membership' | 'age' | 'reputation'>('membership');
-  const did = 'did:icn:demo123456789abcdef';
+  const did = userDid || 'did:icn:unknown';
 
   const proofTypes = [
     { id: 'membership', label: 'Membership', icon: '🏠', desc: 'Prove you are a member' },
@@ -1097,10 +1282,10 @@ function TransactionsScreen() {
 // ============================================================================
 // Settings Screen - App preferences
 // ============================================================================
-function SettingsScreen({ onLogout }: { onLogout: () => void }) {
+function SettingsScreen({ onLogout, userDid }: { onLogout: () => void; userDid: string }) {
   const [notifications, setNotifications] = useState(true);
   const [biometrics, setBiometrics] = useState(false);
-  const did = 'did:icn:demo123456789abcdef';
+  const did = userDid || 'did:icn:unknown';
 
   const handleExportKeys = async () => {
     if (Platform.OS === 'web') {
@@ -1223,7 +1408,7 @@ function SettingsScreen({ onLogout }: { onLogout: () => void }) {
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
-  Payment: undefined;
+  Payment: { recipient?: string; amount?: string; memo?: string } | undefined;
   Scan: undefined;
   Receive: undefined;
   Governance: undefined;
@@ -1316,16 +1501,28 @@ export default function App() {
                 />
               )}
             </Stack.Screen>
-            <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Send Payment' }} />
-            <Stack.Screen name="Scan" component={ScanScreen} options={{ title: 'Scan QR Code' }} />
-            <Stack.Screen name="Receive" component={ReceiveScreen} options={{ title: 'Receive Payment' }} />
+            <Stack.Screen name="Payment" options={{ title: 'Send Payment' }}>
+              {({ navigation, route }) => (
+                <PaymentScreen navigation={navigation} route={route} coopId={coopId} userDid={userDid} />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Scan" options={{ title: 'Scan QR Code' }}>
+              {({ navigation }) => (
+                <ScanScreen navigation={navigation} coopId={coopId} userDid={userDid} />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Receive" options={{ title: 'Receive Payment' }}>
+              {() => <ReceiveScreen userDid={userDid} coopId={coopId} />}
+            </Stack.Screen>
             <Stack.Screen name="Governance" component={GovernanceScreen} options={{ title: 'Governance' }} />
-            <Stack.Screen name="Identity" component={IdentityScreen} options={{ title: 'My Identity' }} />
+            <Stack.Screen name="Identity" options={{ title: 'My Identity' }}>
+              {({ navigation }) => <IdentityScreen navigation={navigation} userDid={userDid} />}
+            </Stack.Screen>
             <Stack.Screen name="Verify" component={VerifyScreen} options={{ title: 'Verify Identity' }} />
             <Stack.Screen name="VerificationHistory" component={VerificationHistoryScreen} options={{ title: 'History' }} />
             <Stack.Screen name="Transactions" component={TransactionsScreen} options={{ title: 'Transactions' }} />
             <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
-              {() => <SettingsScreen onLogout={handleLogout} />}
+              {() => <SettingsScreen onLogout={handleLogout} userDid={userDid} />}
             </Stack.Screen>
           </>
         )}
@@ -1397,6 +1594,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   buttonDisabled: {
     opacity: 0.7,

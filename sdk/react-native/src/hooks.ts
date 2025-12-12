@@ -15,6 +15,7 @@ import {
   Member,
   Proposal,
   GovernanceDomain,
+  Transaction,
 } from './types';
 
 /**
@@ -395,6 +396,86 @@ export function useDomains(client: ICNMobileClient) {
     isLoading,
     error,
     refresh: fetchDomains,
+  };
+}
+
+/**
+ * Hook for fetching transaction history
+ *
+ * @example
+ * ```tsx
+ * function TransactionList() {
+ *   const { transactions, isLoading, error, refresh, loadMore, hasMore } = useTransactions(client, 'my-coop');
+ *
+ *   if (isLoading && transactions.length === 0) return <ActivityIndicator />;
+ *
+ *   return (
+ *     <FlatList
+ *       data={transactions}
+ *       renderItem={({ item }) => <TransactionRow tx={item} />}
+ *       onEndReached={loadMore}
+ *       ListFooterComponent={hasMore ? <ActivityIndicator /> : null}
+ *     />
+ *   );
+ * }
+ * ```
+ */
+export function useTransactions(client: ICNMobileClient, coopId: string, limit = 20) {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTransactions = useCallback(async (reset = false) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const currentOffset = reset ? 0 : offset;
+      const result = await client.getHistory(coopId, { offset: currentOffset, limit });
+      if (reset) {
+        setTransactions(result.transactions);
+        setOffset(limit);
+      } else {
+        setTransactions(prev => [...prev, ...result.transactions]);
+        setOffset(currentOffset + limit);
+      }
+      setTotal(result.total);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client, coopId, limit, offset]);
+
+  // Use ref to avoid dependency cycles
+  const fetchRef = useRef(fetchTransactions);
+  fetchRef.current = fetchTransactions;
+
+  useEffect(() => {
+    fetchRef.current(true);
+  }, [client, coopId]);
+
+  const refresh = useCallback(() => fetchRef.current(true), []);
+  const loadMore = useCallback(() => {
+    if (!isLoading && transactions.length < total) {
+      fetchRef.current(false);
+    }
+  }, [isLoading, transactions.length, total]);
+
+  // Auto-refresh on payment events
+  useEvent(client, 'PaymentCreated', () => {
+    fetchRef.current(true);
+  });
+
+  return {
+    transactions,
+    total,
+    isLoading,
+    error,
+    refresh,
+    loadMore,
+    hasMore: transactions.length < total,
   };
 }
 

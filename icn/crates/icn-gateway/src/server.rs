@@ -217,10 +217,11 @@ impl GatewayServer {
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
-                // Middleware (order: last wrapped runs first, so metrics wraps everything)
+                // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
+                // For CORS header removal when behind reverse proxy, SecurityHeaders must run AFTER cors
                 .wrap(crate::middleware::MetricsMiddleware)
-                .wrap(SecurityHeaders::new(security_config.clone()))
                 .wrap(cors)
+                .wrap(SecurityHeaders::new(security_config.clone()))
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
                 // API v1 - single scope with public and protected routes
