@@ -18,6 +18,7 @@ use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
 use crate::governance_mgr::GovernanceManager;
 use crate::ledger_mgr::LedgerManager;
+use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use icn_compute::ComputeHandle;
@@ -144,6 +145,10 @@ impl GatewayServer {
         // Create IP-based rate limiter for auth endpoints (more aggressive limits)
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
+        // Create notification service (FCM credentials would be loaded from config in production)
+        let notification_service = Arc::new(NotificationService::new(None));
+        info!("Notification service initialized");
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
@@ -203,6 +208,7 @@ impl GatewayServer {
         let server = HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
+            let auth_for_notifications = HttpAuthentication::bearer(crate::middleware::jwt_auth);
 
             // Configure CORS based on security config
             let cors = configure_cors(&security_config);
@@ -217,6 +223,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(sdis_state.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
@@ -332,6 +339,13 @@ impl GatewayServer {
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
                                 .wrap(auth),
+                        )
+                        // Protected notification endpoints (auth required)
+                        .service(
+                            web::scope("/notifications")
+                                .service(api::notifications::register_device)
+                                .service(api::notifications::unregister_device)
+                                .wrap(auth_for_notifications),
                         ),
                 )
                 // Static files and root route

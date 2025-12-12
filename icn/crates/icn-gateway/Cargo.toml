@@ -53,12 +53,14 @@ icn-obs = { path = "../icn-obs" }
 icn-governance = { path = "../icn-governance" }
 icn-compute = { path = "../icn-compute" }
 icn-federation = { path = "../icn-federation" }
+icn-trust = { path = "../icn-trust" }
 icn-zkp = { path = "../icn-zkp" }
 icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
 
 # Caching
 lru = "0.12"
+dashmap = "6.0"
 
 # Metrics
 metrics = "0.22"

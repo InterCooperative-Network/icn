@@ -9,5 +9,7 @@ pub mod health;
 pub mod identity;
 pub mod ledger;
 pub mod members;
+pub mod notifications;
 pub mod sdis;
+pub mod trust;
 pub mod websocket;

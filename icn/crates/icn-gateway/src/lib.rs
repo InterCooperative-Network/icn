@@ -22,9 +22,11 @@ pub mod governance_mgr;
 pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;
+pub mod notifications;
 pub mod rate_limit;
 pub mod security;
 pub mod server;
+pub mod trust_mgr;
 pub mod validation;
 pub mod websocket;
 

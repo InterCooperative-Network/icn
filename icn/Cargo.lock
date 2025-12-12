@@ -1487,6 +1487,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core 0.9.12",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2430,7 +2444,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc1f8715195dffc4caddcf1cf3128da15fe5d8a137606ea8856c9300047d5a2"
 dependencies = [
- "dashmap",
+ "dashmap 5.5.3",
  "find-crate",
  "fluent",
  "fluent-syntax",
@@ -2660,6 +2674,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "bincode",
+ "dashmap 6.1.0",
  "ed25519-dalek",
  "futures-util",
  "hex",
@@ -2673,6 +2688,7 @@ dependencies = [
  "icn-rpc",
  "icn-steward",
  "icn-store",
+ "icn-trust",
  "icn-zkp",
  "jsonwebtoken",
  "lru",
