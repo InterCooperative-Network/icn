@@ -796,69 +796,108 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
 // ============================================================================
 // Governance Screen - View and vote on proposals
 // ============================================================================
-function GovernanceScreen({ navigation }: { navigation: any }) {
-  const [proposals, setProposals] = useState([
-    {
-      id: '1',
-      title: 'Increase new member credit limit',
-      description: 'Raise the initial credit limit for new members from 10 to 20 hours.',
-      status: 'active',
-      votesFor: 23,
-      votesAgainst: 5,
-      endDate: '2025-12-20',
-      myVote: null as 'for' | 'against' | null,
-    },
-    {
-      id: '2',
-      title: 'Add childcare service category',
-      description: 'Create a new service category for childcare and babysitting services.',
-      status: 'active',
-      votesFor: 45,
-      votesAgainst: 2,
-      endDate: '2025-12-18',
-      myVote: null as 'for' | 'against' | null,
-    },
-    {
-      id: '3',
-      title: 'Monthly community meetup',
-      description: 'Establish a monthly in-person meetup for cooperative members.',
-      status: 'passed',
-      votesFor: 67,
-      votesAgainst: 8,
-      endDate: '2025-12-01',
-      myVote: 'for' as 'for' | 'against' | null,
-    },
-  ]);
+interface DisplayProposal {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  votesFor: number;
+  votesAgainst: number;
+  endDate: string;
+  myVote: 'for' | 'against' | null;
+}
 
-  const handleVote = (proposalId: string, voteType: 'for' | 'against') => {
-    setProposals(prev => prev.map(p => {
-      if (p.id !== proposalId) return p;
+function GovernanceScreen({ coopId }: { coopId: string }) {
+  const [proposals, setProposals] = useState<DisplayProposal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isVoting, setIsVoting] = useState<string | null>(null);
 
-      // If already voted, don't allow changing
-      if (p.myVote !== null) {
-        if (Platform.OS === 'web') {
-          alert('You have already voted on this proposal');
-        } else {
-          Alert.alert('Already Voted', 'You have already voted on this proposal');
-        }
-        return p;
+  const fetchProposals = useCallback(async () => {
+    const client = getClient();
+    if (!client) return;
+
+    setIsLoading(true);
+    try {
+      // Get domain ID for the coop (format: coop:<coopId>)
+      const domainId = `coop:${coopId}`;
+      const proposalList = await client.listProposals(domainId);
+
+      // Map API proposals to display format
+      const displayProposals: DisplayProposal[] = await Promise.all(
+        proposalList.map(async (p: any) => {
+          // Try to fetch vote tally
+          let tally = { votes_for: 0, votes_against: 0, votes_abstain: 0 };
+          try {
+            tally = await client.getVotes(p.id);
+          } catch {
+            // Vote tally not available yet
+          }
+
+          return {
+            id: p.id,
+            title: p.title,
+            description: p.description || '',
+            status: p.state === 'open' ? 'active' : p.state,
+            votesFor: tally.votes_for,
+            votesAgainst: tally.votes_against,
+            endDate: p.closed_at
+              ? new Date(p.closed_at).toLocaleDateString()
+              : 'Open',
+            myVote: null, // Would need separate API to track user's vote
+          };
+        })
+      );
+
+      setProposals(displayProposals);
+    } catch (e) {
+      console.warn('Failed to fetch proposals:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [coopId]);
+
+  useEffect(() => {
+    fetchProposals();
+  }, [fetchProposals]);
+
+  const handleVote = async (proposalId: string, voteType: 'for' | 'against') => {
+    const client = getClient();
+    if (!client) return;
+
+    setIsVoting(proposalId);
+    try {
+      await client.vote(proposalId, { choice: voteType });
+
+      // Refresh to get updated vote counts
+      await fetchProposals();
+
+      if (Platform.OS === 'web') {
+        alert('Vote recorded!');
+      } else {
+        Alert.alert('Success', 'Your vote has been recorded');
       }
-
-      // Record vote
-      return {
-        ...p,
-        myVote: voteType,
-        votesFor: voteType === 'for' ? p.votesFor + 1 : p.votesFor,
-        votesAgainst: voteType === 'against' ? p.votesAgainst + 1 : p.votesAgainst,
-      };
-    }));
+    } catch (e) {
+      const message = (e as Error).message;
+      if (Platform.OS === 'web') {
+        alert('Failed to vote: ' + message);
+      } else {
+        Alert.alert('Error', 'Failed to vote: ' + message);
+      }
+    } finally {
+      setIsVoting(null);
+    }
   };
 
   const totalVotes = proposals.reduce((sum, p) => sum + p.votesFor + p.votesAgainst, 0);
   const activeCount = proposals.filter(p => p.status === 'active').length;
 
   return (
-    <ScrollView style={styles.governanceContainer}>
+    <ScrollView
+      style={styles.governanceContainer}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={fetchProposals} />
+      }
+    >
       <View style={styles.govStats}>
         <View style={styles.govStat}>
           <Text style={styles.govStatNumber}>{proposals.length}</Text>
@@ -909,21 +948,38 @@ function GovernanceScreen({ navigation }: { navigation: any }) {
           {proposal.status === 'active' && !proposal.myVote && (
             <View style={styles.voteButtons}>
               <TouchableOpacity
-                style={styles.voteForButton}
+                style={[styles.voteForButton, isVoting === proposal.id && styles.buttonDisabled]}
                 onPress={() => handleVote(proposal.id, 'for')}
+                disabled={isVoting === proposal.id}
               >
-                <Text style={styles.voteButtonText}>Vote For</Text>
+                {isVoting === proposal.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.voteButtonText}>Vote For</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.voteAgainstButton}
+                style={[styles.voteAgainstButton, isVoting === proposal.id && styles.buttonDisabled]}
                 onPress={() => handleVote(proposal.id, 'against')}
+                disabled={isVoting === proposal.id}
               >
-                <Text style={styles.voteButtonText}>Vote Against</Text>
+                {isVoting === proposal.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.voteButtonText}>Vote Against</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}
         </View>
       ))}
+
+      {proposals.length === 0 && !isLoading && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>🗳️</Text>
+          <Text style={styles.emptyText}>No proposals yet</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -1203,21 +1259,64 @@ function VerificationHistoryScreen() {
 // ============================================================================
 // Transactions Screen - Full transaction history
 // ============================================================================
-function TransactionsScreen() {
+function TransactionsScreen({ coopId, userDid }: { coopId: string; userDid: string }) {
   const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTx = DEMO_TRANSACTIONS.filter(tx => {
+  const fetchTransactions = useCallback(async () => {
+    const client = getClient();
+    if (!client || !coopId) return;
+
+    setIsLoading(true);
+    try {
+      const historyResult = await client.getHistory(coopId, { limit: 50 });
+      if (historyResult?.transactions) {
+        const txs: Transaction[] = historyResult.transactions.map((tx: any, idx: number) => ({
+          id: tx.id || `tx-${idx}`,
+          type: tx.to === userDid ? 'received' : 'sent',
+          from: tx.from,
+          to: tx.to,
+          amount: tx.amount,
+          memo: tx.memo || '',
+          date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
+        }));
+        setTransactions(txs);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch transactions:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [coopId, userDid]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const filteredTx = transactions.filter(tx => {
     if (filter === 'all') return true;
     return tx.type === filter;
   });
 
-  const totalSent = DEMO_TRANSACTIONS.filter(t => t.type === 'sent')
+  const totalSent = transactions.filter(t => t.type === 'sent')
     .reduce((sum, t) => sum + t.amount, 0);
-  const totalReceived = DEMO_TRANSACTIONS.filter(t => t.type === 'received')
+  const totalReceived = transactions.filter(t => t.type === 'received')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const formatDid = (did: string) => {
+    if (!did) return 'Unknown';
+    if (did.length > 16) return `${did.slice(0, 10)}...${did.slice(-4)}`;
+    return did;
+  };
+
   return (
-    <ScrollView style={styles.transactionsContainer}>
+    <ScrollView
+      style={styles.transactionsContainer}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={fetchTransactions} />
+      }
+    >
       <View style={styles.txSummary}>
         <View style={styles.txSummaryItem}>
           <Text style={styles.txSummaryLabel}>Total Received</Text>
@@ -1253,9 +1352,9 @@ function TransactionsScreen() {
           </View>
           <View style={styles.txContent}>
             <Text style={styles.txPerson}>
-              {tx.type === 'received' ? `From ${tx.from}` : `To ${tx.to}`}
+              {tx.type === 'received' ? `From ${formatDid(tx.from)}` : `To ${formatDid(tx.to)}`}
             </Text>
-            <Text style={styles.txMemo}>{tx.memo}</Text>
+            {tx.memo ? <Text style={styles.txMemo}>{tx.memo}</Text> : null}
           </View>
           <View style={styles.txAmountContainer}>
             <Text style={[
@@ -1269,7 +1368,7 @@ function TransactionsScreen() {
         </View>
       ))}
 
-      {filteredTx.length === 0 && (
+      {filteredTx.length === 0 && !isLoading && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📭</Text>
           <Text style={styles.emptyText}>No transactions found</Text>
@@ -1514,13 +1613,17 @@ export default function App() {
             <Stack.Screen name="Receive" options={{ title: 'Receive Payment' }}>
               {() => <ReceiveScreen userDid={userDid} coopId={coopId} />}
             </Stack.Screen>
-            <Stack.Screen name="Governance" component={GovernanceScreen} options={{ title: 'Governance' }} />
+            <Stack.Screen name="Governance" options={{ title: 'Governance' }}>
+              {() => <GovernanceScreen coopId={coopId} />}
+            </Stack.Screen>
             <Stack.Screen name="Identity" options={{ title: 'My Identity' }}>
               {({ navigation }) => <IdentityScreen navigation={navigation} userDid={userDid} />}
             </Stack.Screen>
             <Stack.Screen name="Verify" component={VerifyScreen} options={{ title: 'Verify Identity' }} />
             <Stack.Screen name="VerificationHistory" component={VerificationHistoryScreen} options={{ title: 'History' }} />
-            <Stack.Screen name="Transactions" component={TransactionsScreen} options={{ title: 'Transactions' }} />
+            <Stack.Screen name="Transactions" options={{ title: 'Transactions' }}>
+              {() => <TransactionsScreen coopId={coopId} userDid={userDid} />}
+            </Stack.Screen>
             <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
               {() => <SettingsScreen onLogout={handleLogout} userDid={userDid} />}
             </Stack.Screen>

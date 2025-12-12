@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PaymentScreen sends real payments via `client.pay()` API
 - ReceiveScreen generates QR codes with real user DID
 - ScanScreen processes payment QR codes and pre-fills payment form
+- TransactionsScreen fetches full transaction history with filtering
+- GovernanceScreen lists real proposals and submits votes via API
 - IdentityScreen and SettingsScreen show real user DID
 - All screens use authenticated user's DID instead of demo values
 
