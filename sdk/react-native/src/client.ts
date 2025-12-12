@@ -703,6 +703,145 @@ export class ICNMobileClient extends ICNClient {
     return response.json();
   }
 
+  // ===========================================================================
+  // Trust Graph Methods
+  // ===========================================================================
+
+  /**
+   * Get trust score for a DID
+   * 
+   * Returns the trust score and classification from the authenticated user's perspective.
+   * Requires authentication.
+   * 
+   * @param did - Target DID to get trust score for
+   * @returns Trust score response with score and classification
+   */
+  async getTrustScore(did: string): Promise<{
+    did: string;
+    trust_score: number;
+    trust_class: 'Isolated' | 'Known' | 'Partner' | 'Federated';
+  }> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/trust/${did}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get trust score: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get trust edges from a DID
+   * 
+   * Returns all outgoing trust edges (attestations) from the specified DID.
+   * 
+   * @param did - DID to get trust edges from
+   * @returns Array of trust edges
+   */
+  async getTrustEdges(did: string): Promise<Array<{
+    from: string;
+    to: string;
+    score: number;
+    created_at: number;
+    labels?: string[];
+  }>> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/trust/${did}/edges`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get trust edges: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create a trust attestation
+   * 
+   * Creates a trust edge from the authenticated user to another DID.
+   * Score should be between 0.0 (no trust) and 1.0 (full trust).
+   * Requires authentication.
+   * 
+   * @param to - Target DID to attest
+   * @param score - Trust score (0.0 - 1.0)
+   * @param memo - Optional reason/memo for the attestation
+   */
+  async createTrustAttestation(
+    to: string,
+    score: number,
+    memo?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/trust/attest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ to, score, memo }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create attestation: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get trust network for visualization
+   * 
+   * Returns nodes and edges in the trust network around a DID,
+   * useful for visualizing trust relationships.
+   * 
+   * @param did - Center DID for the network
+   * @param depth - Maximum distance to explore (default: 2, max: 5)
+   * @returns Trust network with nodes and edges
+   */
+  async getTrustNetwork(
+    did: string,
+    depth: number = 2
+  ): Promise<{
+    nodes: Array<{
+      did: string;
+      trust_score: number;
+      distance: number;
+    }>;
+    edges: Array<{
+      from: string;
+      to: string;
+      score: number;
+      created_at: number;
+      labels?: string[];
+    }>;
+  }> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(
+      `${baseUrl}/v1/trust/${did}/network?depth=${depth}`,
+      {
+        method: 'GET',
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get trust network: ${error}`);
+    }
+
+    return response.json();
+  }
+
   /**
    * Format proof type for API request
    */

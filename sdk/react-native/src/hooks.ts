@@ -699,3 +699,158 @@ export function useQueue(client: ICNMobileClient) {
     clearFailed,
   };
 }
+
+// ===========================================================================
+// Trust Graph Hooks
+// ===========================================================================
+
+/**
+ * Hook for trust score
+ * 
+ * Fetches and tracks the trust score for a specific DID.
+ * Requires authentication.
+ * 
+ * @param client - ICN mobile client
+ * @param did - Target DID to get trust score for
+ * @returns Trust score data, loading state, and error
+ * 
+ * @example
+ * ```tsx
+ * function TrustDisplay({ did }: { did: string }) {
+ *   const { data, isLoading, refresh } = useTrustScore(client, did);
+ *
+ *   if (isLoading) return <Text>Loading...</Text>;
+ *   if (!data) return null;
+ *
+ *   return (
+ *     <View>
+ *       <Text>Trust Score: {data.trust_score.toFixed(2)}</Text>
+ *       <Text>Class: {data.trust_class}</Text>
+ *       <Button onPress={refresh} title="Refresh" />
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useTrustScore(client: ICNMobileClient | null, did: string | null) {
+  const [data, setData] = useState<{
+    did: string;
+    trust_score: number;
+    trust_class: 'Isolated' | 'Known' | 'Partner' | 'Federated';
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!client || !did) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    client
+      .getTrustScore(did)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setIsLoading(false));
+  }, [client, did]);
+
+  const refresh = useCallback(() => {
+    if (!client || !did) return;
+    
+    setIsLoading(true);
+    setError(null);
+    client
+      .getTrustScore(did)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setIsLoading(false));
+  }, [client, did]);
+
+  return { data, isLoading, error, refresh };
+}
+
+/**
+ * Hook for trust network
+ * 
+ * Fetches the trust network around a DID for visualization.
+ * 
+ * @param client - ICN mobile client
+ * @param did - Center DID for the network
+ * @param depth - Maximum distance to explore (default: 2)
+ * @returns Network data, loading state, and error
+ * 
+ * @example
+ * ```tsx
+ * function TrustNetworkGraph({ did }: { did: string }) {
+ *   const { data, isLoading } = useTrustNetwork(client, did, 2);
+ *
+ *   if (isLoading) return <Text>Loading network...</Text>;
+ *   if (!data) return null;
+ *
+ *   return (
+ *     <View>
+ *       <Text>{data.nodes.length} nodes</Text>
+ *       <Text>{data.edges.length} edges</Text>
+ *       {data.nodes.map(node => (
+ *         <Text key={node.did}>
+ *           {node.did}: {node.trust_score.toFixed(2)}
+ *         </Text>
+ *       ))}
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useTrustNetwork(
+  client: ICNMobileClient | null,
+  did: string | null,
+  depth: number = 2
+) {
+  const [data, setData] = useState<{
+    nodes: Array<{
+      did: string;
+      trust_score: number;
+      distance: number;
+    }>;
+    edges: Array<{
+      from: string;
+      to: string;
+      score: number;
+      created_at: number;
+      labels?: string[];
+    }>;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!client || !did) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    client
+      .getTrustNetwork(did, depth)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setIsLoading(false));
+  }, [client, did, depth]);
+
+  const refresh = useCallback(() => {
+    if (!client || !did) return;
+    
+    setIsLoading(true);
+    setError(null);
+    client
+      .getTrustNetwork(did, depth)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setIsLoading(false));
+  }, [client, did, depth]);
+
+  return { data, isLoading, error, refresh };
+}
