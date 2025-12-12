@@ -78,6 +78,7 @@ export {
   useQueue,
   useTrustScore,
   useTrustNetwork,
+  useTrustAttestation,
   SimplePaymentRequest,
 } from './hooks';
 

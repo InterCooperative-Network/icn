@@ -162,7 +162,7 @@ export interface QueuedOperation {
   /** Unique ID for the operation */
   id: string;
   /** Type of operation */
-  type: 'payment' | 'vote' | 'proposal';
+  type: 'payment' | 'vote' | 'proposal' | 'trust_attestation';
   /** Operation data */
   data: unknown;
   /** Timestamp when queued */

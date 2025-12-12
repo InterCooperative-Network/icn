@@ -800,6 +800,13 @@ export class ICNMobileClient extends ICNClient {
   }
 
   /**
+   * Alias for createTrustAttestation with different parameter names (for hook compatibility)
+   */
+  async attestTrust(targetDid: string, score: number, context?: string): Promise<void> {
+    await this.createTrustAttestation(targetDid, score, context);
+  }
+
+  /**
    * Get trust network for visualization
    * 
    * Returns nodes and edges in the trust network around a DID,

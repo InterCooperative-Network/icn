@@ -19,29 +19,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useICNContext } from '../contexts/ICNContext';
+import { useTrustAttestation } from '@icn/react-native';
 import { TrustBadge } from '../components/TrustBadge';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrustAttestation'>;
 
 export function TrustAttestationScreen({ navigation, route }: Props) {
   const { client } = useICNContext();
+  const { attest, isSubmitting, error: attestError, success } = useTrustAttestation(client);
   const { targetDid, targetName } = route.params || {};
 
   const [recipientDid, setRecipientDid] = useState(targetDid || '');
   const [trustScore, setTrustScore] = useState('0.5');
   const [memo, setMemo] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const handleScorePreset = (score: number) => {
     setTrustScore(score.toFixed(1));
   };
 
   const handleSubmit = async () => {
-    if (!client) {
-      Alert.alert('Error', 'Not connected to ICN');
-      return;
-    }
-
     if (!recipientDid.trim()) {
       Alert.alert('Error', 'Please enter a recipient DID');
       return;
@@ -58,10 +55,12 @@ export function TrustAttestationScreen({ navigation, route }: Props) {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      await client.createTrustAttestation(recipientDid.trim(), score, memo.trim());
+      await attest({
+        targetDid: recipientDid.trim(),
+        score,
+        context: memo.trim(),
+      });
 
       Alert.alert('Success', 'Trust attestation created successfully', [
         {
@@ -75,8 +74,6 @@ export function TrustAttestationScreen({ navigation, route }: Props) {
         'Error',
         error instanceof Error ? error.message : 'Failed to create trust attestation'
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

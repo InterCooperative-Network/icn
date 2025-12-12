@@ -854,3 +854,71 @@ export function useTrustNetwork(
 
   return { data, isLoading, error, refresh };
 }
+
+/**
+ * Hook for creating trust attestations with offline queue support
+ *
+ * @example
+ * ```tsx
+ * function TrustScreen() {
+ *   const { attest, isSubmitting, error, success } = useTrustAttestation(client);
+ *
+ *   const handleAttest = async () => {
+ *     await attest({
+ *       targetDid: 'did:icn:alice',
+ *       score: 0.8,
+ *       context: 'Helped me with garden work'
+ *     });
+ *   };
+ *
+ *   return (
+ *     <Button onPress={handleAttest} disabled={isSubmitting}>
+ *       Attest Trust
+ *     </Button>
+ *   );
+ * }
+ * ```
+ */
+export function useTrustAttestation(client: ICNMobileClient | null) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const attest = useCallback(async (attestation: {
+    targetDid: string;
+    score: number;
+    context?: string;
+  }) => {
+    if (!client) {
+      throw new Error('Client not initialized');
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
+      // Try to submit directly
+      await client.attestTrust(attestation.targetDid, attestation.score, attestation.context);
+      setSuccess(true);
+    } catch (err) {
+      // If network error, queue for later
+      if (err instanceof Error && err.message.includes('network')) {
+        await client.queueOperation('trust_attestation', attestation);
+        setSuccess(true); // Queued successfully
+      } else {
+        setError(err as Error);
+        throw err;
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [client]);
+
+  const reset = useCallback(() => {
+    setError(null);
+    setSuccess(false);
+  }, []);
+
+  return { attest, isSubmitting, error, success, reset };
+}
