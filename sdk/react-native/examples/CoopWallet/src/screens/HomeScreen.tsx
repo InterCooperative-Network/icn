@@ -15,9 +15,10 @@ import {
   Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useAuth, useBalance, useRealtime, useTransactions, useMemberProfile, useEvent, useNetworkState, useQueue } from '@icn/react-native';
+import { useAuth, useBalance, useRealtime, useTransactions, useMemberProfile, useEvent, useNetworkState, useQueue, useTrustScore } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { TrustBadge } from '../components/TrustBadge';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -31,6 +32,7 @@ export function HomeScreen({ navigation }: Props) {
   const { profile, isLoading: profileLoading, refresh: refreshProfile } = useMemberProfile(client, coopId || '', did || '');
   const { networkState, isOnline, isOffline } = useNetworkState(client);
   const { pendingCount, failedCount, clearFailed } = useQueue(client);
+  const { data: trustData } = useTrustScore(client, did);
 
   const isLoading = balanceLoading || txLoading;
   const refresh = () => {
@@ -213,10 +215,20 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.identityLabel}>Transactions</Text>
                 <Text style={styles.profileValue}>{profile.transaction_count}</Text>
               </View>
-              {profile.trust_score !== undefined && (
+              {profile.trust_score !== undefined && profile.trust_score !== null && (
                 <View style={styles.profileRow}>
                   <Text style={styles.identityLabel}>Trust Score</Text>
-                  <Text style={styles.profileValue}>{profile.trust_score.toFixed(2)}</Text>
+                  <TrustBadge trustScore={profile.trust_score} size="small" />
+                </View>
+              )}
+              {trustData && (
+                <View style={styles.profileRow}>
+                  <Text style={styles.identityLabel}>Trust Class</Text>
+                  <TrustBadge 
+                    trustScore={trustData.trust_score} 
+                    trustClass={trustData.trust_class}
+                    size="medium"
+                  />
                 </View>
               )}
             </>
