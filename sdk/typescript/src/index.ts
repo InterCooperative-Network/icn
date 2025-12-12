@@ -43,6 +43,7 @@ import {
   CreateCoopRequest,
   UpdateCoopRequest,
   Member,
+  MemberProfile,
   AddMemberRequest,
   UpdateMemberRequest,
   Balance,
@@ -447,6 +448,13 @@ export class ICNClient {
    */
   async removeMember(coopId: string, did: string): Promise<void> {
     return this.delete<void>(`/coops/${coopId}/members/${encodeURIComponent(did)}`);
+  }
+
+  /**
+   * Get member profile
+   */
+  async getMemberProfile(coopId: string, did: string): Promise<MemberProfile> {
+    return this.get<MemberProfile>(`/members/${coopId}/${encodeURIComponent(did)}`);
   }
 
   // ===========================================================================

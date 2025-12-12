@@ -243,6 +243,8 @@ impl GatewayServer {
                                 .service(api::identity::resolve_did)
                                 .service(api::identity::identity_health),
                         )
+                        // Public member profiles (read-only)
+                        .service(api::members::get_member_profile)
                         // Public SDIS endpoints (verification)
                         .service(
                             web::scope("/sdis")

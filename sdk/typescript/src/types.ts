@@ -77,6 +77,22 @@ export interface Member {
   joined_at: number;
 }
 
+export interface Member {
+  did: string;
+  role: MemberRole;
+  joined_at: number;
+}
+
+export interface MemberProfile {
+  did: string;
+  name?: string;
+  role: 'Steward' | 'Facilitator' | 'Participant';
+  joined_at: number;
+  balance: number;
+  transaction_count: number;
+  trust_score?: number;
+}
+
 export interface AddMemberRequest {
   did: string;
   role: MemberRole;
