@@ -4,6 +4,23 @@
 //!
 //! # Endpoints
 //!
+//! ## Enrollment
+//! - `POST /v1/sdis/enrollment/start` - Start enrollment ceremony
+//! - `GET /v1/sdis/enrollment/{id}` - Get ceremony status
+//! - `POST /v1/sdis/enrollment/{id}/finalize` - Finalize enrollment
+//!
+//! ## Recovery
+//! - `POST /v1/sdis/recovery/start` - Start recovery ceremony
+//! - `GET /v1/sdis/recovery/{id}` - Get recovery status
+//! - `POST /v1/sdis/recovery/{id}/complete` - Complete recovery
+//!
+//! ## Anchor Management
+//! - `GET /v1/sdis/anchor/{id}` - Get anchor details
+//! - `POST /v1/sdis/anchor/rotate-keys` - Rotate keys
+//! - `GET /v1/sdis/anchor/{id}/history` - Get rotation history
+//! - `POST /v1/sdis/anchor/devices/add` - Add device
+//! - `GET /v1/sdis/anchor/{id}/devices` - List devices
+//!
 //! ## Ephemeral Proofs
 //! - `POST /v1/sdis/ephemeral/generate` - Generate ephemeral proof
 //! - `POST /v1/sdis/ephemeral/refresh` - Refresh existing proof
@@ -19,8 +36,11 @@
 //! ## Health
 //! - `GET /v1/sdis/health` - Service health check
 
+pub mod anchor;
+pub mod enrollment;
 pub mod ephemeral;
 pub mod qr;
+pub mod recovery;
 pub mod verify;
 
 use actix_web::{get, post, web, HttpResponse};

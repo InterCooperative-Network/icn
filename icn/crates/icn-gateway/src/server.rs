@@ -257,12 +257,15 @@ impl GatewayServer {
                         )
                         // Public member profiles (read-only)
                         .service(api::members::get_member_profile)
-                        // Public SDIS endpoints (verification)
+                        // Public SDIS endpoints (verification + enrollment)
                         .service(
                             web::scope("/sdis")
                                 .service(api::sdis::sdis_health)
                                 .service(api::sdis::verify_level1)
-                                .service(api::sdis::verify_level2),
+                                .service(api::sdis::verify_level2)
+                                .configure(api::sdis::enrollment::configure)
+                                .configure(api::sdis::recovery::configure)
+                                .configure(api::sdis::anchor::configure),
                         )
                         // Protected coop endpoints (auth + rate limiting)
                         .service(
