@@ -12,7 +12,7 @@
 // Crypto polyfill for React Native (must be before any crypto imports)
 import 'react-native-get-random-values';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -28,6 +28,7 @@ import {
   KeyboardAvoidingView,
   Clipboard,
   Alert,
+  Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
@@ -79,6 +80,68 @@ try {
   console.log('Client module loaded successfully');
 } catch (e) {
   console.error('Failed to import client:', e);
+}
+
+// ============================================================================
+// Toast Notification Component
+// ============================================================================
+interface ToastProps {
+  message: string;
+  type?: 'success' | 'info' | 'warning' | 'error';
+  duration?: number;
+  onHide?: () => void;
+}
+
+function Toast({ message, type = 'info', duration = 3000, onHide }: ToastProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Fade in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto-hide after duration
+    const timer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        onHide?.();
+      });
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [fadeAnim, duration, onHide]);
+
+  const backgroundColor = {
+    success: '#4caf50',
+    info: '#2196f3',
+    warning: '#ff9800',
+    error: '#f44336',
+  }[type];
+
+  const icon = {
+    success: '✅',
+    info: 'ℹ️',
+    warning: '⚠️',
+    error: '❌',
+  }[type];
+
+  return (
+    <Animated.View
+      style={[
+        styles.toastContainer,
+        { opacity: fadeAnim, backgroundColor },
+      ]}
+    >
+      <Text style={styles.toastIcon}>{icon}</Text>
+      <Text style={styles.toastMessage}>{message}</Text>
+    </Animated.View>
+  );
 }
 
 // ============================================================================
@@ -251,6 +314,11 @@ function HomeScreen({
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'info' = 'info') => {
+    setToast({ message, type });
+  };
 
   const fetchData = useCallback(async () => {
     const client = getClient();
@@ -301,8 +369,16 @@ function HomeScreen({
         // Listen for payment events
         const unsubscribe = client.onEvent('PaymentCreated', (event: any) => {
           console.log('Payment event received:', event);
-          // Refresh data when a payment is created
-          if (event.from === userDid || event.to === userDid) {
+          // Show toast notification
+          if (event.to === userDid) {
+            const amount = event.amount || 0;
+            const from = event.from?.substring(0, 12) || 'Someone';
+            showToast(`💰 Received ${amount} hours from ${from}...`, 'success');
+            fetchData();
+          } else if (event.from === userDid) {
+            const amount = event.amount || 0;
+            const to = event.to?.substring(0, 12) || 'recipient';
+            showToast(`📤 Sent ${amount} hours to ${to}...`, 'info');
             fetchData();
           }
         });
@@ -491,6 +567,15 @@ function HomeScreen({
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -1044,9 +1129,44 @@ function GovernanceScreen({ coopId }: { coopId: string }) {
 // ============================================================================
 // Identity Screen - View and share your SDIS identity
 // ============================================================================
-function IdentityScreen({ navigation, userDid }: { navigation: any; userDid: string }) {
+function IdentityScreen({ navigation, userDid, coopId }: { navigation: any; userDid: string; coopId: string }) {
   const [proofType, setProofType] = useState<'membership' | 'age' | 'reputation'>('membership');
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const did = userDid || 'did:icn:unknown';
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const client = getClient();
+      if (!client || !coopId || !userDid) return;
+
+      setIsLoading(true);
+      try {
+        const profileData = await client.getMemberProfile(coopId, userDid);
+        setProfile(profileData);
+      } catch (error) {
+        console.warn('Failed to fetch profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [coopId, userDid]);
+
+  const formatMemberSince = (timestamp?: number) => {
+    if (!timestamp) return 'Unknown';
+    const now = Date.now();
+    const seconds = Math.floor((now - timestamp * 1000) / 1000);
+    const days = Math.floor(seconds / 86400);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+
+    if (years > 0) return `${years}y`;
+    if (months > 0) return `${months}mo`;
+    if (days > 0) return `${days}d`;
+    return 'New';
+  };
 
   const proofTypes = [
     { id: 'membership', label: 'Membership', icon: '🏠', desc: 'Prove you are a member' },
@@ -1061,19 +1181,34 @@ function IdentityScreen({ navigation, userDid }: { navigation: any; userDid: str
         <View style={styles.identityAvatar}>
           <Text style={styles.avatarText}>👤</Text>
         </View>
-        <Text style={styles.identityName}>Demo User</Text>
+        <Text style={styles.identityName}>{profile?.name || 'Member'}</Text>
         <Text style={styles.identityDid} selectable>{did}</Text>
+        {profile && (
+          <View style={styles.identityBadge}>
+            <Text style={styles.identityBadgeText}>
+              {profile.role === 'Steward' ? '👑 Steward' : 
+               profile.role === 'Facilitator' ? '⚙️ Facilitator' : 
+               '👥 Participant'}
+            </Text>
+          </View>
+        )}
         <View style={styles.identityStats}>
           <View style={styles.identityStat}>
-            <Text style={styles.identityStatValue}>4.8</Text>
+            <Text style={styles.identityStatValue}>
+              {profile?.trust_score?.toFixed(1) || '—'}
+            </Text>
             <Text style={styles.identityStatLabel}>Trust Score</Text>
           </View>
           <View style={styles.identityStat}>
-            <Text style={styles.identityStatValue}>127</Text>
+            <Text style={styles.identityStatValue}>
+              {isLoading ? '...' : profile?.transaction_count || 0}
+            </Text>
             <Text style={styles.identityStatLabel}>Transactions</Text>
           </View>
           <View style={styles.identityStat}>
-            <Text style={styles.identityStatValue}>2y</Text>
+            <Text style={styles.identityStatValue}>
+              {isLoading ? '...' : formatMemberSince(profile?.joined_at)}
+            </Text>
             <Text style={styles.identityStatLabel}>Member Since</Text>
           </View>
         </View>
@@ -1688,7 +1823,7 @@ export default function App() {
               {() => <GovernanceScreen coopId={coopId} />}
             </Stack.Screen>
             <Stack.Screen name="Identity" options={{ title: 'My Identity' }}>
-              {({ navigation }) => <IdentityScreen navigation={navigation} userDid={userDid} />}
+              {({ navigation }) => <IdentityScreen navigation={navigation} userDid={userDid} coopId={coopId} />}
             </Stack.Screen>
             <Stack.Screen name="Verify" component={VerifyScreen} options={{ title: 'Verify Identity' }} />
             <Stack.Screen name="VerificationHistory" component={VerificationHistoryScreen} options={{ title: 'History' }} />
@@ -2223,6 +2358,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  identityBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  identityBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   identityStats: {
     flexDirection: 'row',
@@ -2769,5 +2916,33 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginBottom: 48,
     lineHeight: 20,
+  },
+
+  // Toast notification
+  toastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  toastIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  toastMessage: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
