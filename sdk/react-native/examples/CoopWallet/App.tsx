@@ -9,6 +9,9 @@
  * - SDIS Identity verification
  */
 
+// Crypto polyfill for React Native (must be before any crypto imports)
+import 'react-native-get-random-values';
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -62,14 +65,18 @@ const DEMO_TRANSACTIONS = [
 
 // Import client module - client is set after initializeClient() is called
 let clientModule: any = null;
-let initializeClient: () => Promise<void> = async () => {};
+let initializeClient: () => Promise<void> = async () => {
+  console.log('initializeClient not loaded');
+};
 
 // Getter to always get the current client value
 const getClient = () => clientModule?.client || null;
 
 try {
+  console.log('Loading client module...');
   clientModule = require('./src/client');
   initializeClient = clientModule.initializeClient;
+  console.log('Client module loaded successfully');
 } catch (e) {
   console.error('Failed to import client:', e);
 }
@@ -1528,17 +1535,31 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      console.log('App init starting...');
       try {
-        await initializeClient();
+        console.log('Calling initializeClient...');
+        // Add timeout to prevent infinite hang
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Init timeout after 10s')), 10000)
+        );
+        await Promise.race([initializeClient(), timeoutPromise]);
+        console.log('initializeClient completed');
+
         const client = getClient();
+        console.log('Client:', client ? 'exists' : 'null');
         if (client?.authState?.isAuthenticated) {
+          console.log('User is authenticated');
           setIsAuthenticated(true);
           setCoopId(client.authState.coopId || '');
           setUserDid(client.authState.did || '');
+        } else {
+          console.log('User not authenticated, authState:', client?.authState);
         }
       } catch (error) {
         console.error('Init error:', error);
+        // Still mark as ready so user can see login screen
       } finally {
+        console.log('Setting isReady=true');
         setIsReady(true);
       }
     }
