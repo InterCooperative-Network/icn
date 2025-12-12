@@ -15,10 +15,23 @@ React Native SDK for the InterCooperative Network - mobile-first mutual credit a
 ```bash
 npm install @icn/react-native @icn/client
 
+# Required: crypto polyfill for React Native
+npm install react-native-get-random-values
+
 # For secure storage (choose one):
 npm install react-native-keychain
 # or
 expo install expo-secure-store
+```
+
+**Important:** Import the crypto polyfill at the very top of your app entry point (before any other imports):
+
+```typescript
+// App.tsx - MUST be the first import
+import 'react-native-get-random-values';
+
+// Then other imports...
+import React from 'react';
 ```
 
 ## Quick Start
@@ -269,6 +282,68 @@ Fetch and manage governance proposals.
 const { proposals, isLoading, vote, refresh } = useProposals(client, 'coop:my-coop');
 ```
 
+### Offline Support
+
+The SDK automatically queues operations when offline and syncs when back online.
+
+#### Network State
+
+```typescript
+// Subscribe to network changes
+client.onNetworkStateChange((state) => {
+  console.log('Network:', state); // 'online' | 'offline' | 'slow'
+});
+
+// Check current state
+console.log(client.networkState);
+```
+
+#### Operation Queue
+
+```typescript
+// Operations are automatically queued when offline
+await client.pay(coopId, paymentRequest); // Queued if offline
+
+// Monitor queue
+client.onQueueChange((queue) => {
+  console.log(`${queue.length} operations pending`);
+});
+
+// Process queue manually
+await client.processQueue();
+
+// Clear failed operations
+await client.clearFailedOperations();
+```
+
+### Trust Graph
+
+#### Get Trust Score
+
+```typescript
+const trust = await client.getTrustScore('did:icn:alice');
+console.log(trust.trust_score);  // 0.0 - 1.0
+console.log(trust.trust_class);  // 'Isolated' | 'Known' | 'Partner' | 'Federated'
+```
+
+#### Create Trust Attestation
+
+```typescript
+await client.createTrustAttestation(
+  'did:icn:alice',  // Target DID
+  0.8,              // Score (0.0 - 1.0)
+  'Great collaborator'  // Optional memo
+);
+```
+
+#### Visualize Trust Network
+
+```typescript
+const network = await client.getTrustNetwork('did:icn:alice', 2);
+// network.nodes - Array of DIDs with trust scores
+// network.edges - Array of trust relationships
+```
+
 ## Example App
 
 See [examples/](./examples/) for a complete React Native example app.
@@ -284,7 +359,8 @@ See [examples/](./examples/) for a complete React Native example app.
 
 - iOS 13+
 - Android 6.0+ (API 23+)
-- Expo SDK 49+
+- Expo SDK 54+
+- React Native 0.76+ (New Architecture supported)
 
 ## License
 
