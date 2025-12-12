@@ -1,12 +1,14 @@
 //! Member profile API endpoints
 
-use actix_web::{get, web, HttpResponse};
+use actix_web::{get, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::coop::{CoopManager, MemberRole};
 use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
+use crate::middleware::get_claims;
+use crate::trust_mgr::TrustManager;
 use icn_identity::Did;
 
 /// Member profile response
@@ -32,11 +34,14 @@ pub struct MemberProfile {
 /// GET /v1/members/{coop_id}/{did} - Get member profile
 ///
 /// Returns profile information for a member within a cooperative.
+/// If authenticated, includes trust score from requester's perspective.
 #[get("/members/{coop_id}/{did}")]
 pub async fn get_member_profile(
+    http_req: HttpRequest,
     path: web::Path<(String, String)>,
     coop_manager: web::Data<Arc<CoopManager>>,
     ledger_manager: web::Data<Arc<LedgerManager>>,
+    trust_manager: web::Data<Arc<TrustManager>>,
 ) -> Result<HttpResponse> {
     let (coop_id, did) = path.into_inner();
 
@@ -65,6 +70,22 @@ pub async fn get_member_profile(
         .unwrap_or_else(|_| Vec::new());
     let transaction_count = history.len();
 
+    // Compute trust score if authenticated (from requester's perspective)
+    let trust_score = if let Some(claims) = get_claims(&http_req) {
+        if let Ok(requester_did) = claims.sub.parse::<Did>() {
+            // Don't compute self-trust
+            if requester_did != did_obj {
+                Some(trust_manager.compute_trust_score(&requester_did, &did_obj))
+            } else {
+                Some(1.0) // Self-trust is always 1.0
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let profile = MemberProfile {
         did: did.clone(),
         name: None, // TODO: Integrate with identity system for display names
@@ -72,7 +93,7 @@ pub async fn get_member_profile(
         joined_at: member.joined_at,
         balance,
         transaction_count,
-        trust_score: None, // TODO: Integrate with trust graph when available
+        trust_score,
     };
 
     Ok(HttpResponse::Ok().json(profile))
@@ -101,13 +122,21 @@ mod tests {
             .as_secs();
 
         coop_manager
-            .create_coop(coop_id.to_string(), "Test Coop".to_string(), did, timestamp)
+            .create_coop(
+                coop_id.to_string(),
+                "Test Coop".to_string(),
+                did.clone(),
+                timestamp,
+            )
             .unwrap();
+
+        let trust_manager = Arc::new(TrustManager::new());
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_manager))
                 .app_data(web::Data::new(ledger_manager))
+                .app_data(web::Data::new(trust_manager))
                 .service(get_member_profile),
         )
         .await;
@@ -128,11 +157,13 @@ mod tests {
     async fn test_get_member_profile_not_found() {
         let coop_manager = Arc::new(CoopManager::new());
         let ledger_manager = Arc::new(LedgerManager::new());
+        let trust_manager = Arc::new(TrustManager::new());
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_manager))
                 .app_data(web::Data::new(ledger_manager))
+                .app_data(web::Data::new(trust_manager))
                 .service(get_member_profile),
         )
         .await;
