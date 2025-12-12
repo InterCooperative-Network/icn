@@ -750,6 +750,7 @@ pub async fn cast_vote(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     id: web::Path<String>,
     req: web::Json<CastVoteRequest>,
 ) -> Result<HttpResponse> {
@@ -802,17 +803,23 @@ pub async fn cast_vote(
     })?;
 
     // Broadcast event to WebSocket subscribers
+    let vote_event = GatewayEvent::GovernanceVoteCast {
+        proposal_id: proposal_id.0.clone(),
+        domain_id: proposal.domain_id.0.clone(),
+        voter: voter_did.to_string(),
+        choice: req.choice.clone(),
+    };
+
     event_broadcaster
-        .broadcast(
-            &proposal.domain_id.0,
-            GatewayEvent::GovernanceVoteCast {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: proposal.domain_id.0.clone(),
-                voter: voter_did.to_string(),
-                choice: req.choice.clone(),
-            },
-        )
+        .broadcast(&proposal.domain_id.0, vote_event.clone())
         .await;
+
+    // Send push notification (async, don't block response)
+    let notif_service = notification_service.into_inner();
+    tokio::spawn(async move {
+        use crate::notification_listener::handle_event_for_notifications;
+        handle_event_for_notifications(&vote_event, &notif_service).await;
+    });
 
     Ok(HttpResponse::Ok().json(proposal))
 }

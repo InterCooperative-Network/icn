@@ -47,6 +47,7 @@ pub async fn get_balance(
 pub async fn create_payment(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
+    notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     coop_id: web::Path<String>,
     req: web::Json<CreatePaymentRequest>,
 ) -> Result<HttpResponse> {
@@ -94,6 +95,29 @@ pub async fn create_payment(
     // Track payment creation metrics
     gateway::payments_created_inc();
     gateway::payment_amount_record(&req.currency, req.amount);
+
+    // Send push notifications (async, don't block response)
+    let notif_service = notification_service.into_inner();
+    let from_str = req.from.clone();
+    let to_str = req.to.clone();
+    let amount = req.amount;
+    let hash_str = hash.clone();
+    let coop_str = coop_id.to_string();
+    tokio::spawn(async move {
+        use crate::notification_listener::handle_event_for_notifications;
+        use crate::events::GatewayEvent;
+
+        let event = GatewayEvent::PaymentCreated {
+            coop_id: coop_str,
+            hash: hash_str,
+            from: from_str,
+            to: to_str,
+            amount,
+            currency: "hours".to_string(),
+        };
+
+        handle_event_for_notifications(&event, &notif_service).await;
+    });
 
     Ok(HttpResponse::Created().json(serde_json::json!({
         "hash": hash,
