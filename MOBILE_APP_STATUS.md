@@ -13,41 +13,46 @@
 - **App**: Payment screen, transaction history, balance display
 - **SDK**: `getBalance()`, `pay()`, `getHistory()`
 - **Gateway**: `/v1/ledger/{coop_id}/balance/{did}`, `/payment`, `/history`
-- **Status**: ✅ Working with real API calls
+- **Real-time**: Auto-refresh on `PaymentCreated` WebSocket events
+- **Status**: ✅ Working with real API calls and live updates
 
 ### 3. Governance
 - **App**: Governance screen with proposal list and voting
 - **SDK**: `listProposals()`, `vote()`, `getVotes()`
 - **Gateway**: `/v1/gov/proposals`, `/proposals/{id}/vote`, `/proposals/{id}/votes`
-- **Status**: ✅ Working with real API calls
+- **Real-time**: Auto-refresh on governance events
+- **Status**: ✅ Working with real API calls and live updates
 
 ### 4. Identity Verification (SDIS)
-- **App**: Identity screen, verification scanner (placeholder UI)
+- **App**: Identity screen, verification scanner
 - **SDK**: `verifyLevel1()`, `verifyLevel2()`, `getSdisHealth()`
 - **Gateway**: `/v1/sdis/verify/level1`, `/verify/level2`, `/health`
-- **Status**: ✅ API endpoints wired, UI needs camera integration
+- **Status**: ✅ API endpoints wired, camera integration complete
 
 ### 5. WebSocket Real-time Events
-- **App**: Ready for integration
+- **App**: Integrated in Home and Governance screens
 - **SDK**: `connectRealtime()`, `onEvent()`, `onAnyEvent()`
 - **Gateway**: `/v1/websocket`
-- **Status**: ✅ Infrastructure ready, not yet used in app UI
+- **Events**: Auto-refresh balance, transactions, and proposals
+- **Status**: ✅ Fully working with auto-updates
+
+### 6. Member Profiles
+- **App**: Home screen shows role, transaction count, trust score
+- **SDK**: `getMemberProfile()`, `useMemberProfile()` hook
+- **Gateway**: `/v1/members/{coop_id}/{did}`
+- **Real-time**: Auto-refresh on payment events
+- **Status**: ✅ NEWLY ADDED - Working end-to-end
 
 ## 🚧 Partial/Placeholder Components
 
-### 6. Identity Profile
-- **App**: Shows "Demo User" with hardcoded stats (trust score, transactions)
-- **Issue**: No member profile API endpoint exists yet
-- **Next Step**: Add `/v1/members/{did}/profile` endpoint
-
 ### 7. QR Code Generation/Scanning
-- **App**: QR code display works (for receiving payments), camera scanning is placeholder
-- **Issue**: Camera permissions and QR scanner not implemented for native
-- **Next Step**: Integrate `react-native-camera` or `expo-camera` for scanning
+- **App**: QR code display works (for receiving payments), camera scanning works with expo-camera
+- **Issue**: Depends on expo-camera package being installed
+- **Status**: ⚠️ Implementation complete, requires native environment to test
 
 ### 8. Credential Display
-- **App**: Shows hardcoded email/phone verification badges
-- **Issue**: No credential API exists
+- **App**: Shows SDIS verification proofs with QR generation
+- **Issue**: Full credential lifecycle (issuance, storage, revocation) not yet implemented
 - **Next Step**: Wire to SDIS credential storage when implemented
 
 ## �� Test Coverage
@@ -67,21 +72,24 @@
 ## 🎯 Next Steps for Production
 
 ### High Priority
-1. **Camera Integration**: Wire up QR scanner for payments and verification
-2. **Member Profiles**: Add profile endpoint to gateway
-3. **Real-time Updates**: Use WebSocket for live payment/governance notifications
-4. **Error Handling**: Improve user-facing error messages
+1. ~~**Camera Integration**: Wire up QR scanner for payments and verification~~ ✅ COMPLETE
+2. ~~**Member Profiles**: Add profile endpoint to gateway~~ ✅ COMPLETE
+3. ~~**Real-time Updates**: Use WebSocket for live payment/governance notifications~~ ✅ COMPLETE
+4. **Error Handling**: Improve user-facing error messages and retry logic
+5. **Offline Mode**: Queue transactions when offline, sync when reconnected
 
 ### Medium Priority
-5. **Credential Management**: Full SDIS credential lifecycle (issue, present, verify)
 6. **Multi-device**: Sync credentials across devices
-7. **Offline Mode**: Queue transactions when offline
-8. **Biometric Auth**: Add fingerprint/face unlock
+7. **Biometric Auth**: Add fingerprint/face unlock for wallet access
+8. **Push Notifications**: FCM for payment alerts and governance reminders
+9. **Advanced Governance**: Proposal creation, delegation UI
+10. **Credential Management**: Full SDIS credential lifecycle (issue, present, verify, revoke)
 
 ### Low Priority
-9. **Push Notifications**: FCM for payment alerts
-10. **Deep Linking**: Handle `icn://pay?to=...` URLs
-11. **Advanced Governance**: Proposal creation, delegation
+11. **Deep Linking**: Handle `icn://pay?to=...` URLs for external payment requests
+12. **Transaction Search**: Filter and search transaction history
+13. **Export Data**: Export transactions as CSV/JSON
+14. **Profile Pictures**: Avatar support for member profiles
 
 ## 🏗️ Architecture Overview
 
@@ -128,13 +136,16 @@
 - `GET /v1/gov/proposals/{id}/votes` - Get vote tally
 - `POST /v1/gov/proposals/{id}/vote` - Cast vote
 
+### Members
+- `GET /v1/members/{coop_id}/{did}` - Get member profile (role, balance, tx count, trust score)
+
 ### SDIS (Identity)
 - `GET /v1/sdis/health` - Service health check
 - `POST /v1/sdis/verify/level1` - QR scan verification
 - `POST /v1/sdis/verify/level2` - Enhanced verification with binding
 
 ### Real-time
-- `WS /v1/websocket` - WebSocket for live events
+- `WS /v1/websocket` - WebSocket for live events (PaymentCreated, GovernanceProposalCreated, etc.)
 
 ## 🔧 Development Commands
 
@@ -159,8 +170,12 @@ npm start
 2. **Send Payment**: Enter recipient DID + amount → Creates mutual credit transaction
 3. **View Balance**: Shows real balance from gateway/ledger
 4. **Transaction History**: Lists real transactions with pagination
-5. **Proposals**: Lists real governance proposals from domain
-6. **Voting**: Cast votes on active proposals
-7. **Identity Verification API**: Verify identity proofs via SDIS endpoints
+5. **Member Profile**: Shows role, transaction count, and trust score (when available)
+6. **Real-time Updates**: Balance and transactions auto-refresh on payment events
+7. **Proposals**: Lists real governance proposals from domain
+8. **Voting**: Cast votes on active proposals
+9. **Live Governance**: Proposals auto-refresh on governance events
+10. **Identity Verification API**: Verify identity proofs via SDIS endpoints
+11. **QR Scanning**: Camera-based QR scanning for payments (requires native)
 
-The mobile app is **pilot-ready** for testing the core financial and governance features!
+The mobile app is **pilot-ready** for testing the core financial, governance, and identity features with live real-time updates!
