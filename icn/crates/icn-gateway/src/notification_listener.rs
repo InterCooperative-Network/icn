@@ -56,7 +56,10 @@ pub async fn handle_event_for_notifications(
                 // Notify recipient
                 let recipient_notif =
                     NotificationService::payment_received_notification(*amount, &from_did, "");
-                if let Err(e) = notification_service.send_to_did(&to_did, recipient_notif).await {
+                if let Err(e) = notification_service
+                    .send_to_did(&to_did, recipient_notif)
+                    .await
+                {
                     warn!("Failed to send payment notification to recipient: {}", e);
                 } else {
                     info!("Sent payment received notification to {}", to);
@@ -65,7 +68,10 @@ pub async fn handle_event_for_notifications(
                 // Notify sender (confirmation)
                 let sender_notif =
                     NotificationService::payment_sent_notification(*amount, &to_did, "");
-                if let Err(e) = notification_service.send_to_did(&from_did, sender_notif).await {
+                if let Err(e) = notification_service
+                    .send_to_did(&from_did, sender_notif)
+                    .await
+                {
                     warn!("Failed to send payment confirmation to sender: {}", e);
                 } else {
                     info!("Sent payment confirmation to {}", from);
@@ -82,12 +88,8 @@ pub async fn handle_event_for_notifications(
             // Send notification to all domain members
             // For now, we'll just notify the proposer as a confirmation
             if let Ok(proposer_did) = proposer.parse::<Did>() {
-                let notif =
-                    NotificationService::proposal_created_notification(proposal_id, title);
-                if let Err(e) = notification_service
-                    .send_to_did(&proposer_did, notif)
-                    .await
-                {
+                let notif = NotificationService::proposal_created_notification(proposal_id, title);
+                if let Err(e) = notification_service.send_to_did(&proposer_did, notif).await {
                     warn!("Failed to send proposal notification: {}", e);
                 } else {
                     info!("Sent proposal created notification for {}", proposal_id);
@@ -101,17 +103,12 @@ pub async fn handle_event_for_notifications(
             ..
         } => {
             // Could notify all voters about the outcome
-            info!(
-                "Proposal {} closed with outcome: {}",
-                proposal_id, outcome
-            );
+            info!("Proposal {} closed with outcome: {}", proposal_id, outcome);
             // TODO: Query voters and send notifications
         }
 
         GatewayEvent::GovernanceVoteCast {
-            proposal_id,
-            voter,
-            ..
+            proposal_id, voter, ..
         } => {
             // Send vote confirmation to voter
             if let Ok(voter_did) = voter.parse::<Did>() {

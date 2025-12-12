@@ -188,7 +188,10 @@ where
                 // When behind Cloudflare (which adds CORS headers via Transform Rules),
                 // remove the ACAO header from our response to avoid duplicates.
                 // Cloudflare will add the proper "*" header.
-                if std::env::var("ICN_SKIP_CORS").map(|v| v == "1" || v == "true").unwrap_or(false) {
+                if std::env::var("ICN_SKIP_CORS")
+                    .map(|v| v == "1" || v == "true")
+                    .unwrap_or(false)
+                {
                     headers.remove(HeaderName::from_static("access-control-allow-origin"));
                     headers.remove(HeaderName::from_static("access-control-allow-methods"));
                     headers.remove(HeaderName::from_static("access-control-allow-headers"));

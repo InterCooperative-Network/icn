@@ -122,7 +122,11 @@ impl NotificationService {
     }
 
     /// Send notification to specific DID (all their devices)
-    pub async fn send_to_did(&self, did: &Did, notification: Notification) -> Result<usize, String> {
+    pub async fn send_to_did(
+        &self,
+        did: &Did,
+        notification: Notification,
+    ) -> Result<usize, String> {
         let tokens = self.get_device_tokens(did);
         if tokens.is_empty() {
             return Ok(0);
@@ -130,7 +134,11 @@ impl NotificationService {
 
         let mut sent = 0;
         for token in tokens {
-            if self.send_to_token(&token, notification.clone()).await.is_ok() {
+            if self
+                .send_to_token(&token, notification.clone())
+                .await
+                .is_ok()
+            {
                 sent += 1;
             }
         }
@@ -139,7 +147,11 @@ impl NotificationService {
     }
 
     /// Send notification to specific device token
-    pub async fn send_to_token(&self, token: &str, notification: Notification) -> Result<(), String> {
+    pub async fn send_to_token(
+        &self,
+        token: &str,
+        notification: Notification,
+    ) -> Result<(), String> {
         // For now, just log the notification (FCM integration would go here)
         tracing::info!(
             "📱 Sending notification to {}: {} - {}",
@@ -162,7 +174,11 @@ impl NotificationService {
     ) -> Notification {
         Notification {
             title: "Payment Received".to_string(),
-            body: format!("You received {} hours from {}", amount, format_did(from_did)),
+            body: format!(
+                "You received {} hours from {}",
+                amount,
+                format_did(from_did)
+            ),
             data: Some(serde_json::json!({
                 "type": "payment",
                 "payment_id": payment_id,
@@ -173,11 +189,7 @@ impl NotificationService {
     }
 
     /// Create notification for payment sent
-    pub fn payment_sent_notification(
-        amount: i64,
-        to_did: &Did,
-        payment_id: &str,
-    ) -> Notification {
+    pub fn payment_sent_notification(amount: i64, to_did: &Did, payment_id: &str) -> Notification {
         Notification {
             title: "Payment Confirmed".to_string(),
             body: format!("Sent {} hours to {}", amount, format_did(to_did)),
@@ -191,10 +203,7 @@ impl NotificationService {
     }
 
     /// Create notification for new proposal
-    pub fn proposal_created_notification(
-        proposal_id: &str,
-        title: &str,
-    ) -> Notification {
+    pub fn proposal_created_notification(proposal_id: &str, title: &str) -> Notification {
         Notification {
             title: "New Proposal".to_string(),
             body: format!("{} - vote now", title),
@@ -206,10 +215,7 @@ impl NotificationService {
     }
 
     /// Create notification for proposal closing soon
-    pub fn proposal_closing_notification(
-        proposal_id: &str,
-        title: &str,
-    ) -> Notification {
+    pub fn proposal_closing_notification(proposal_id: &str, title: &str) -> Notification {
         Notification {
             title: "Proposal Closing Soon".to_string(),
             body: format!("{} closes in 24 hours", title),
@@ -221,10 +227,7 @@ impl NotificationService {
     }
 
     /// Create notification for vote recorded
-    pub fn vote_recorded_notification(
-        proposal_id: &str,
-        proposal_title: &str,
-    ) -> Notification {
+    pub fn vote_recorded_notification(proposal_id: &str, proposal_title: &str) -> Notification {
         Notification {
             title: "Vote Recorded".to_string(),
             body: format!("Your vote on {} was recorded", proposal_title),

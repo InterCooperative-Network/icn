@@ -109,10 +109,7 @@ impl TrustManager {
     /// - 30% transitive trust (average of weighted paths)
     pub fn compute_trust_score(&self, from: &Did, to: &Did) -> f64 {
         // Direct trust
-        let direct_score = self
-            .get_edge(from, to)
-            .map(|e| e.score)
-            .unwrap_or(0.0);
+        let direct_score = self.get_edge(from, to).map(|e| e.score).unwrap_or(0.0);
 
         // Transitive trust (via intermediates)
         let outgoing = self.get_outgoing_edges(from);

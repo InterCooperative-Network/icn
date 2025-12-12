@@ -72,7 +72,7 @@ mod tests {
     async fn test_register_device() {
         let notification_service = Arc::new(NotificationService::new(None));
         let keypair = icn_identity::KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
+        let _did = keypair.did().clone();
 
         let app = test::init_service(
             App::new()
@@ -85,7 +85,7 @@ mod tests {
                                 // Use test DID directly
                                 let keypair = icn_identity::KeyPair::generate().unwrap();
                                 let did = keypair.did().clone();
-                                
+
                                 notification_service.register_device(
                                     did,
                                     req.device_token.clone(),

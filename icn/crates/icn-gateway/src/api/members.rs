@@ -46,7 +46,8 @@ pub async fn get_member_profile(
     let (coop_id, did) = path.into_inner();
 
     // Parse DID
-    let did_obj = did.parse::<Did>()
+    let did_obj = did
+        .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     // Get cooperative

@@ -105,10 +105,10 @@ pub async fn create_payment(
     let hash_val = hash.clone();
     let coop_id_val = coop_id.to_string();
     let broadcaster = event_broadcaster.into_inner();
-    
+
     tokio::spawn(async move {
         use crate::events::GatewayEvent;
-        
+
         let event = GatewayEvent::TransactionCompleted {
             coop_id: coop_id_val.clone(),
             hash: hash_val,
@@ -117,10 +117,10 @@ pub async fn create_payment(
             amount: amount_val,
             currency: currency_val,
         };
-        
+
         // Send to cooperative channel (all members can see)
         broadcaster.broadcast(&coop_id_val, event.clone()).await;
-        
+
         // Also send to personal channels for sender and recipient
         broadcaster.broadcast(&from_did_str, event.clone()).await;
         broadcaster.broadcast(&to_did_str, event).await;
@@ -134,8 +134,8 @@ pub async fn create_payment(
     let hash_str = hash.clone();
     let coop_str = coop_id.to_string();
     tokio::spawn(async move {
-        use crate::notification_listener::handle_event_for_notifications;
         use crate::events::GatewayEvent;
+        use crate::notification_listener::handle_event_for_notifications;
 
         let event = GatewayEvent::PaymentCreated {
             coop_id: coop_str,

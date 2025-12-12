@@ -81,13 +81,15 @@ pub async fn get_trust_edges(
 
     let response: Vec<_> = edges
         .into_iter()
-        .map(|e| serde_json::json!({
-            "from": e.source.to_string(),
-            "to": e.target.to_string(),
-            "score": e.score,
-            "created_at": e.created_at,
-            "labels": if e.labels.is_empty() { None } else { Some(e.labels) },
-        }))
+        .map(|e| {
+            serde_json::json!({
+                "from": e.source.to_string(),
+                "to": e.target.to_string(),
+                "score": e.score,
+                "created_at": e.created_at,
+                "labels": if e.labels.is_empty() { None } else { Some(e.labels) },
+            })
+        })
         .collect();
 
     Ok(HttpResponse::Ok().json(response))
@@ -125,7 +127,7 @@ pub async fn create_trust_attestation(
 
     trust_manager
         .add_edge(edge)
-        .map_err(|e| GatewayError::InternalError(e))?;
+        .map_err(GatewayError::InternalError)?;
 
     // Broadcast event to target DID (they received a trust attestation)
     // Use target's DID as the "coop_id" for personal notifications
@@ -135,7 +137,9 @@ pub async fn create_trust_attestation(
         score: req.score,
         memo: req.memo.clone(),
     };
-    event_broadcaster.broadcast(&to_did.to_string(), event).await;
+    event_broadcaster
+        .broadcast(&to_did.to_string(), event)
+        .await;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
@@ -193,17 +197,19 @@ pub async fn revoke_trust_attestation(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
 
     let from = from_did.into_inner();
-    
+
     trust_manager
         .remove_edge(&from, &to_did)
-        .map_err(|e| GatewayError::InternalError(e))?;
+        .map_err(GatewayError::InternalError)?;
 
     // Broadcast event to target DID (they lost a trust attestation)
     let event = GatewayEvent::TrustRevoked {
         from: from.to_string(),
         to: to_did.to_string(),
     };
-    event_broadcaster.broadcast(&to_did.to_string(), event).await;
+    event_broadcaster
+        .broadcast(&to_did.to_string(), event)
+        .await;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
