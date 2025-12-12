@@ -22,6 +22,7 @@ pub mod governance_mgr;
 pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;
+pub mod notification_listener;
 pub mod notifications;
 pub mod rate_limit;
 pub mod security;
