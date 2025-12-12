@@ -24,7 +24,11 @@
  * ```
  */
 
-import WebSocket from 'ws';
+// Use global WebSocket (available in browsers and React Native)
+// Falls back to 'ws' package only in Node.js where global WebSocket doesn't exist
+const WebSocketImpl: typeof WebSocket = typeof WebSocket !== 'undefined'
+  ? WebSocket
+  : require('ws');
 import {
   ICNClientOptions,
   ICNError,
@@ -713,32 +717,33 @@ export class ICNClient {
     }
   ): WebSocket {
     const wsUrl = this.baseUrl.replace(/^http/, 'ws');
-    const ws = new WebSocket(`${wsUrl}/v1/ws/${coopId}`);
+    const ws = new WebSocketImpl(`${wsUrl}/v1/ws/${coopId}`) as WebSocket;
 
-    ws.on('open', () => {
+    ws.onopen = () => {
       // Send auth message
       if (this.token) {
         ws.send(JSON.stringify({ type: 'Auth', token: this.token }));
       }
       handlers.onOpen?.();
-    });
+    };
 
-    ws.on('message', (data) => {
+    ws.onmessage = (event: MessageEvent) => {
       try {
-        const message = JSON.parse(data.toString()) as WsMessage;
+        const data = typeof event.data === 'string' ? event.data : event.data.toString();
+        const message = JSON.parse(data) as WsMessage;
         handlers.onMessage?.(message);
       } catch (error) {
         handlers.onError?.(error as Error);
       }
-    });
+    };
 
-    ws.on('error', (error) => {
-      handlers.onError?.(error);
-    });
+    ws.onerror = (event: Event) => {
+      handlers.onError?.(new Error('WebSocket error'));
+    };
 
-    ws.on('close', () => {
+    ws.onclose = () => {
       handlers.onClose?.();
-    });
+    };
 
     return ws;
   }
