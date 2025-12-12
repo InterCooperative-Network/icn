@@ -144,10 +144,10 @@ describe('ICNMobileClient', () => {
     it('should load persisted auth state', async () => {
       // Pre-populate storage
       const futureExpiry = Date.now() + 3600000; // 1 hour from now
-      storage.store.set('@icn/auth_token', 'test-token');
-      storage.store.set('@icn/did', 'did:icn:test');
-      storage.store.set('@icn/coop_id', 'test-coop');
-      storage.store.set('@icn/expires_at', futureExpiry.toString());
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:test');
+      storage.store.set('icn_coop_id', 'test-coop');
+      storage.store.set('icn_expires_at', futureExpiry.toString());
 
       await client.initialize();
 
@@ -160,14 +160,14 @@ describe('ICNMobileClient', () => {
     it('should clear expired auth state', async () => {
       // Pre-populate storage with expired token
       const pastExpiry = Date.now() - 3600000; // 1 hour ago
-      storage.store.set('@icn/auth_token', 'expired-token');
-      storage.store.set('@icn/did', 'did:icn:test');
-      storage.store.set('@icn/expires_at', pastExpiry.toString());
+      storage.store.set('icn_auth_token', 'expired-token');
+      storage.store.set('icn_auth_did', 'did:icn:test');
+      storage.store.set('icn_expires_at', pastExpiry.toString());
 
       await client.initialize();
 
       expect(client.authState.isAuthenticated).toBe(false);
-      expect(storage.store.has('@icn/auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
     });
   });
 
@@ -204,13 +204,13 @@ describe('ICNMobileClient', () => {
     });
 
     it('should clear storage', async () => {
-      storage.store.set('@icn/auth_token', 'test-token');
-      storage.store.set('@icn/did', 'did:icn:test');
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:test');
 
       await client.logout();
 
-      expect(storage.store.has('@icn/auth_token')).toBe(false);
-      expect(storage.store.has('@icn/did')).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
     });
   });
 

@@ -117,6 +117,9 @@ impl GatewayServer {
         };
         let federation_manager = Arc::new(FederationManager::new());
 
+        // Create SDIS state for identity verification
+        let sdis_state = Arc::new(crate::api::sdis::SdisState::new());
+
         // Create ledger manager with persistent storage if data_dir is set
         let ledger_manager = if let Some(data_dir) = self.data_dir {
             Arc::new(LedgerManager::new_with_storage(data_dir))
@@ -212,6 +215,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
+                .app_data(web::Data::new(sdis_state.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
@@ -238,6 +242,13 @@ impl GatewayServer {
                             web::scope("/identity")
                                 .service(api::identity::resolve_did)
                                 .service(api::identity::identity_health),
+                        )
+                        // Public SDIS endpoints (verification)
+                        .service(
+                            web::scope("/sdis")
+                                .service(api::sdis::sdis_health)
+                                .service(api::sdis::verify_level1)
+                                .service(api::sdis::verify_level2),
                         )
                         // Protected coop endpoints (auth + rate limiting)
                         .service(
