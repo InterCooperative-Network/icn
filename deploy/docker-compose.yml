@@ -47,7 +47,7 @@ services:
     image: prom/prometheus:latest
     container_name: icn-prometheus
     ports:
-      - "9093:9090"
+      - "9095:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -63,7 +63,7 @@ services:
     image: grafana/grafana-oss:latest
     container_name: icn-grafana
     ports:
-      - "3001:3000"
+      - "3002:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ../monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/icn.json:ro
