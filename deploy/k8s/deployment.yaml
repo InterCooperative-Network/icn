@@ -41,6 +41,8 @@ spec:
           value: "/data"
         - name: HOME
           value: "/data"
+        - name: ICN_SKIP_CORS
+          value: "1"
         ports:
         - name: quic
           containerPort: 7777

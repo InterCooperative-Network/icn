@@ -53,6 +53,10 @@ export let client: ICNMobileClient | null = null;
 
 // Initialize client (call on app startup)
 export async function initializeClient(): Promise<void> {
+  console.log('Initializing client...');
+  console.log('Platform:', Platform.OS);
+  console.log('Gateway URL:', GATEWAY_URL);
+
   // Get platform-appropriate storage
   if (Platform.OS === 'web') {
     secureStorage = webStorage;
@@ -60,13 +64,20 @@ export async function initializeClient(): Promise<void> {
     // Use native secure storage on iOS/Android
     secureStorage = await getNativeStorage();
   }
+  console.log('Storage initialized');
 
   // Create wallet for key management
   wallet = createWallet(secureStorage);
+  console.log('Wallet created');
 
   // Ensure wallet has a key pair
   if (!(await wallet.hasKeyPair())) {
-    await wallet.generateKeyPair();
+    console.log('Generating new key pair...');
+    const keyPair = await wallet.generateKeyPair();
+    console.log('Key pair generated, DID:', keyPair.did);
+  } else {
+    const keyPair = await wallet.getKeyPair();
+    console.log('Existing key pair found, DID:', keyPair?.did);
   }
 
   // Create mobile client
@@ -75,7 +86,9 @@ export async function initializeClient(): Promise<void> {
     wallet,
     storage: secureStorage,
   });
+  console.log('Mobile client created');
 
   // Load persisted auth state
   await client.initialize();
+  console.log('Client initialized, auth state:', client.authState);
 }

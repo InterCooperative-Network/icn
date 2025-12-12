@@ -148,6 +148,11 @@ export class ICNWalletImpl implements ICNWallet {
    * Returns the signature as a hex-encoded string.
    */
   async sign(message: string): Promise<string> {
+    // Validate message
+    if (!message || typeof message !== 'string') {
+      throw new Error(`Invalid message to sign: expected hex string, got ${typeof message}`);
+    }
+
     // Get private key from cache or storage
     let privateKey = this.cachedPrivateKey;
     if (!privateKey) {
