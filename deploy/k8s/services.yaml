@@ -9,6 +9,7 @@ spec:
   type: ClusterIP
   selector:
     app: icn
+    component: daemon
   ports:
   - name: quic
     port: 7777
@@ -38,6 +39,7 @@ spec:
   type: NodePort
   selector:
     app: icn
+    component: daemon
   ports:
   - name: quic
     port: 7777

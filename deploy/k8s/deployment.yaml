@@ -41,8 +41,10 @@ spec:
           value: "/data"
         - name: HOME
           value: "/data"
-        - name: ICN_SKIP_CORS
-          value: "1"
+        # CORS is handled by the gateway directly (not via reverse proxy)
+        # Uncomment ICN_SKIP_CORS=1 only when behind Cloudflare or similar proxy
+        # - name: ICN_SKIP_CORS
+        #   value: "1"
         ports:
         - name: quic
           containerPort: 7777
