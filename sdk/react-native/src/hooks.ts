@@ -555,3 +555,147 @@ export function usePayment(client: ICNMobileClient, coopId: string, defaultCurre
     error,
   };
 }
+
+/**
+ * Hook for fetching member profile information
+ *
+ * @param client - ICN client instance
+ * @param coopId - Cooperative ID
+ * @param did - Member DID
+ *
+ * @example
+ * ```tsx
+ * function MemberProfile({ did }: { did: string }) {
+ *   const { profile, isLoading, error, refresh } = useMemberProfile(client, 'my-coop', did);
+ *
+ *   if (isLoading) return <Spinner />;
+ *   if (error) return <Text>Error: {error}</Text>;
+ *   if (!profile) return null;
+ *
+ *   return (
+ *     <View>
+ *       <Text>DID: {profile.did}</Text>
+ *       <Text>Role: {profile.role}</Text>
+ *       <Text>Balance: {profile.balance}</Text>
+ *       <Text>Transactions: {profile.transaction_count}</Text>
+ *       {profile.trust_score && <Text>Trust: {profile.trust_score}</Text>}
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useMemberProfile(client: ICNMobileClient, coopId: string, did: string) {
+  const [profile, setProfile] = useState<import('@icn/client').MemberProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfile = useCallback(async () => {
+    if (!coopId || !did) {
+      setProfile(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await client.getMemberProfile(coopId, did);
+      setProfile(data);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client, coopId, did]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const refresh = useCallback(() => {
+    return fetchProfile();
+  }, [fetchProfile]);
+
+  return {
+    profile,
+    isLoading,
+    error,
+    refresh,
+  };
+}
+
+/**
+ * Hook for monitoring network state
+ *
+ * @param client - ICN client instance
+ *
+ * @example
+ * ```tsx
+ * function NetworkIndicator() {
+ *   const { networkState, isOnline, isOffline } = useNetworkState(client);
+ *
+ *   return (
+ *     <View style={{ backgroundColor: isOnline ? 'green' : 'red' }}>
+ *       <Text>{networkState}</Text>
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useNetworkState(client: ICNMobileClient) {
+  const [networkState, setNetworkState] = useState<import('./types').NetworkState>(client.networkState);
+
+  useEffect(() => {
+    return client.onNetworkStateChange(setNetworkState);
+  }, [client]);
+
+  return {
+    networkState,
+    isOnline: networkState === 'online',
+    isOffline: networkState === 'offline',
+    isSlow: networkState === 'slow',
+  };
+}
+
+/**
+ * Hook for monitoring operation queue
+ *
+ * @param client - ICN client instance
+ *
+ * @example
+ * ```tsx
+ * function QueueStatus() {
+ *   const { queue, pendingCount, clearFailed } = useQueue(client);
+ *
+ *   if (pendingCount === 0) return null;
+ *
+ *   return (
+ *     <View>
+ *       <Text>{pendingCount} operations pending</Text>
+ *       <Button onPress={clearFailed} title="Clear Failed" />
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useQueue(client: ICNMobileClient) {
+  const [queue, setQueue] = useState<import('./types').QueuedOperation[]>(client.queue);
+
+  useEffect(() => {
+    return client.onQueueChange(setQueue);
+  }, [client]);
+
+  const clearFailed = useCallback(async () => {
+    await client.clearFailedOperations();
+  }, [client]);
+
+  const pendingCount = queue.filter((op) => op.status === 'pending' || op.status === 'processing').length;
+  const failedCount = queue.filter((op) => op.status === 'failed').length;
+
+  return {
+    queue,
+    pendingCount,
+    failedCount,
+    clearFailed,
+  };
+}

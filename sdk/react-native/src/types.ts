@@ -140,3 +140,61 @@ export type EventListener<T> = (event: T) => void;
  * Unsubscribe function
  */
 export type Unsubscribe = () => void;
+
+/**
+ * WebSocket message from the gateway
+ */
+export interface WsMessage {
+  type: string;
+  data?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Network connection state
+ */
+export type NetworkState = 'online' | 'offline' | 'slow';
+
+/**
+ * Queued operation for offline support
+ */
+export interface QueuedOperation {
+  /** Unique ID for the operation */
+  id: string;
+  /** Type of operation */
+  type: 'payment' | 'vote' | 'proposal';
+  /** Operation data */
+  data: unknown;
+  /** Timestamp when queued */
+  queuedAt: number;
+  /** Number of retry attempts */
+  retries: number;
+  /** Status of the operation */
+  status: 'pending' | 'processing' | 'failed' | 'completed';
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Error types for better error handling
+ */
+export enum ICNErrorType {
+  Network = 'network',
+  Authentication = 'authentication',
+  Validation = 'validation',
+  NotFound = 'not_found',
+  RateLimit = 'rate_limit',
+  ServerError = 'server_error',
+  Unknown = 'unknown',
+}
+
+/**
+ * Structured error for better handling
+ */
+export interface ICNError {
+  type: ICNErrorType;
+  message: string;
+  userMessage: string;
+  retryable: boolean;
+  originalError?: Error;
+}

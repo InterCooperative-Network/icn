@@ -14,6 +14,8 @@ import {
   EventListener,
   Unsubscribe,
   WsMessage,
+  NetworkState,
+  QueuedOperation,
 } from './types';
 import {
   GenerateProofRequest,
@@ -22,6 +24,8 @@ import {
   SdisHealth,
   ProofType,
 } from './sdis-types';
+import { QueueManager } from './queue-manager';
+import { parseError, createError, isNetworkError } from './error-utils';
 
 // SecureStore keys must be alphanumeric with periods, underscores, or hyphens only (no @ or slashes)
 const TOKEN_KEY = 'icn_auth_token';
@@ -35,13 +39,16 @@ const EXPIRES_KEY = 'icn_expires_at';
 export class ICNMobileClient extends ICNClient {
   private wallet?: ICNWallet;
   private storage?: SecureStorage;
+  private queueManager: QueueManager;
   private _authState: AuthState = {
     isAuthenticated: false,
     did: null,
     coopId: null,
     expiresAt: null,
   };
+  private _networkState: NetworkState = 'online';
   private authListeners: Set<EventListener<AuthState>> = new Set();
+  private networkListeners: Set<EventListener<NetworkState>> = new Set();
   private wsSocket: WebSocket | null = null;
   private wsState: WebSocketState = 'disconnected';
   private wsListeners: Map<string, Set<EventListener<WsMessage>>> = new Map();
@@ -63,6 +70,10 @@ export class ICNMobileClient extends ICNClient {
 
     this.wallet = options.wallet;
     this.storage = options.storage;
+    this.queueManager = new QueueManager(options.storage);
+    
+    // Setup network state monitoring if available
+    this.setupNetworkMonitoring();
   }
 
   /**
@@ -77,6 +88,27 @@ export class ICNMobileClient extends ICNClient {
    */
   get connectionState(): WebSocketState {
     return this.wsState;
+  }
+
+  /**
+   * Get current network state
+   */
+  get networkState(): NetworkState {
+    return this._networkState;
+  }
+
+  /**
+   * Get operation queue
+   */
+  get queue(): QueuedOperation[] {
+    return this.queueManager.getQueue();
+  }
+
+  /**
+   * Get count of pending operations
+   */
+  get pendingOperations(): number {
+    return this.queueManager.getPendingCount();
   }
 
   /**
@@ -110,9 +142,99 @@ export class ICNMobileClient extends ICNClient {
           expiresAt,
         });
       }
+
+      // Initialize queue manager
+      await this.queueManager.initialize();
     } catch (error) {
       console.warn('Failed to load persisted auth state:', error);
     }
+  }
+
+  /**
+   * Setup network state monitoring
+   */
+  private setupNetworkMonitoring(): void {
+    // Try to access @react-native-community/netinfo if available
+    try {
+      // @ts-ignore - dynamic import
+      const NetInfo = require('@react-native-community/netinfo');
+      
+      NetInfo.addEventListener((state: any) => {
+        const newState: NetworkState = state.isConnected
+          ? state.isInternetReachable === false
+            ? 'slow'
+            : 'online'
+          : 'offline';
+
+        if (newState !== this._networkState) {
+          this._networkState = newState;
+          this.notifyNetworkListeners();
+
+          // Process queue when coming back online
+          if (newState === 'online') {
+            this.processQueue();
+          }
+        }
+      });
+    } catch (error) {
+      // NetInfo not available - use basic fetch-based detection
+      this.startBasicNetworkMonitoring();
+    }
+  }
+
+  /**
+   * Basic network monitoring using periodic checks
+   */
+  private startBasicNetworkMonitoring(): void {
+    setInterval(async () => {
+      try {
+        const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        await fetch(`${baseUrl}/v1/health`, {
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeout);
+
+        if (this._networkState !== 'online') {
+          this._networkState = 'online';
+          this.notifyNetworkListeners();
+          this.processQueue();
+        }
+      } catch {
+        if (this._networkState !== 'offline') {
+          this._networkState = 'offline';
+          this.notifyNetworkListeners();
+        }
+      }
+    }, 30000); // Check every 30 seconds
+  }
+
+  /**
+   * Process queued operations
+   */
+  async processQueue(): Promise<void> {
+    if (this._networkState === 'offline') return;
+
+    await this.queueManager.processQueue(async (op) => {
+      switch (op.type) {
+        case 'payment':
+          // Re-execute payment
+          const paymentData = op.data as any;
+          await this.pay(paymentData.coopId, paymentData.request);
+          break;
+        case 'vote':
+          // Re-execute vote
+          const voteData = op.data as any;
+          await this.vote(voteData.proposalId, voteData.request);
+          break;
+        // Add other operation types as needed
+        default:
+          throw new Error(`Unknown operation type: ${op.type}`);
+      }
+    });
   }
 
   /**
@@ -200,6 +322,35 @@ export class ICNMobileClient extends ICNClient {
   onAuthStateChange(listener: EventListener<AuthState>): Unsubscribe {
     this.authListeners.add(listener);
     return () => this.authListeners.delete(listener);
+  }
+
+  /**
+   * Subscribe to network state changes
+   */
+  onNetworkStateChange(listener: EventListener<NetworkState>): Unsubscribe {
+    this.networkListeners.add(listener);
+    return () => this.networkListeners.delete(listener);
+  }
+
+  /**
+   * Subscribe to queue changes
+   */
+  onQueueChange(listener: (queue: QueuedOperation[]) => void): Unsubscribe {
+    return this.queueManager.onChange(listener);
+  }
+
+  /**
+   * Manually queue an operation for later execution
+   */
+  async queueOperation(type: QueuedOperation['type'], data: unknown): Promise<string> {
+    return this.queueManager.enqueue({ type, data });
+  }
+
+  /**
+   * Clear failed operations from queue
+   */
+  async clearFailedOperations(): Promise<void> {
+    await this.queueManager.clearFailed();
   }
 
   // ===========================================================================
@@ -296,6 +447,10 @@ export class ICNMobileClient extends ICNClient {
     this.authListeners.forEach((listener) => listener(state));
   }
 
+  private notifyNetworkListeners(): void {
+    this.networkListeners.forEach((listener) => listener(this._networkState));
+  }
+
   private createWebSocket(coopId: string): void {
     const wsUrl = this.getWebSocketUrl(coopId);
     this.setWsState('connecting');
@@ -388,8 +543,8 @@ export class ICNMobileClient extends ICNClient {
     // For Event messages, extract the actual event type from the nested payload
     // WsEventMessage has { type: 'Event', event: { type: 'PaymentCreated', ... } }
     let eventType: string = message.type;
-    if (message.type === 'Event' && 'event' in message && message.event?.type) {
-      eventType = message.event.type;
+    if (message.type === 'Event' && 'event' in message && typeof message.event === 'object' && message.event && 'type' in message.event) {
+      eventType = (message.event as { type: string }).type;
     }
 
     // Notify specific event listeners (e.g., 'PaymentCreated', 'MemberAdded')
@@ -515,6 +670,34 @@ export class ICNMobileClient extends ICNClient {
 
     if (!response.ok) {
       throw new Error('SDIS service unavailable');
+    }
+
+    return response.json();
+  }
+
+  // ===========================================================================
+  // Member Methods
+  // ===========================================================================
+
+  /**
+   * Get member profile information
+   *
+   * @param coopId - Cooperative ID
+   * @param did - Member DID to lookup
+   * @returns Member profile with balance, transaction count, and role
+   */
+  async getMemberProfile(coopId: string, did: string): Promise<import('@icn/client').MemberProfile> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/members/${coopId}/${did}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get member profile: ${error}`);
     }
 
     return response.json();

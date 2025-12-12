@@ -45,6 +45,12 @@
 // Client
 export { ICNMobileClient, createMobileClient } from './client';
 
+// Queue Manager
+export { QueueManager } from './queue-manager';
+
+// Error utilities
+export { parseError, createError, isNetworkError, isAuthError } from './error-utils';
+
 // Wallet
 export { ICNWalletImpl, createWallet } from './wallet';
 
@@ -67,6 +73,9 @@ export {
   useProposals,
   useDomains,
   usePayment,
+  useMemberProfile,
+  useNetworkState,
+  useQueue,
   SimplePaymentRequest,
 } from './hooks';
 
