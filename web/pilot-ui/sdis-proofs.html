@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDIS Proof Generator - ICN Pilot</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="sdis-proofs.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📜 Verifiable Proofs</h1>
+            <button id="backBtn" class="secondary-btn">← Back</button>
+        </header>
+
+        <!-- Proof Type Selection -->
+        <div id="proofTypeSelection" class="card">
+            <h2>Generate Proof</h2>
+            <p>Create a verifiable proof to share specific information without revealing everything.</p>
+            
+            <div class="proof-types">
+                <button class="proof-type-card" data-type="identity">
+                    <span class="proof-icon">🆔</span>
+                    <h3>Identity Proof</h3>
+                    <p>Prove your DID ownership</p>
+                </button>
+
+                <button class="proof-type-card" data-type="attribute">
+                    <span class="proof-icon">📋</span>
+                    <h3>Attribute Proof</h3>
+                    <p>Prove specific attributes</p>
+                </button>
+
+                <button class="proof-type-card" data-type="membership">
+                    <span class="proof-icon">👥</span>
+                    <h3>Membership Proof</h3>
+                    <p>Prove cooperative membership</p>
+                </button>
+
+                <button class="proof-type-card" data-type="age">
+                    <span class="proof-icon">🎂</span>
+                    <h3>Age Proof</h3>
+                    <p>Prove age range (18+, 21+)</p>
+                </button>
+
+                <button class="proof-type-card" data-type="credential">
+                    <span class="proof-icon">🎓</span>
+                    <h3>Credential Proof</h3>
+                    <p>Prove you hold a credential</p>
+                </button>
+
+                <button class="proof-type-card" data-type="custom">
+                    <span class="proof-icon">⚙️</span>
+                    <h3>Custom Proof</h3>
+                    <p>Build your own proof</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- Proof Configuration -->
+        <div id="proofConfiguration" class="card" style="display: none;">
+            <h2>Configure Proof</h2>
+            
+            <form id="proofForm">
+                <div class="form-group">
+                    <label>Proof Type</label>
+                    <input type="text" id="proofTypeDisplay" readonly>
+                </div>
+
+                <div id="proofOptions"></div>
+
+                <div class="form-group">
+                    <label>Recipient (Optional)</label>
+                    <input type="text" id="recipientDid" 
+                           placeholder="did:icn:...">
+                    <small>Leave empty for a public proof</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Expiration</label>
+                    <select id="proofExpiration">
+                        <option value="1h">1 hour</option>
+                        <option value="24h" selected>24 hours</option>
+                        <option value="7d">7 days</option>
+                        <option value="30d">30 days</option>
+                        <option value="never">Never expires</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="requireChallenge">
+                        Require challenge-response verification
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn" id="cancelProofBtn">
+                        Cancel
+                    </button>
+                    <button type="submit" class="primary-btn">
+                        Generate Proof
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Generated Proof Display -->
+        <div id="generatedProof" class="card" style="display: none;">
+            <h2>✅ Proof Generated</h2>
+            
+            <div class="proof-display">
+                <div class="proof-header">
+                    <span class="proof-badge" id="proofBadge"></span>
+                    <span class="proof-id" id="proofId"></span>
+                </div>
+
+                <div class="proof-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Issuer:</span>
+                        <span class="detail-value" id="proofIssuer"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Created:</span>
+                        <span class="detail-value" id="proofCreated"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Expires:</span>
+                        <span class="detail-value" id="proofExpires"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Recipient:</span>
+                        <span class="detail-value" id="proofRecipient"></span>
+                    </div>
+                </div>
+
+                <div class="proof-claims" id="proofClaims"></div>
+
+                <div class="proof-signature">
+                    <h3>Digital Signature</h3>
+                    <div class="signature-display">
+                        <code id="proofSignature"></code>
+                        <button class="copy-btn" data-copy="signature">📋</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="proof-actions">
+                <button class="secondary-btn" id="downloadProofBtn">
+                    💾 Download JSON
+                </button>
+                <button class="secondary-btn" id="shareProofBtn">
+                    🔗 Copy Share Link
+                </button>
+                <button class="secondary-btn" id="showProofQrBtn">
+                    📱 Show QR Code
+                </button>
+                <button class="primary-btn" id="newProofBtn">
+                    + New Proof
+                </button>
+            </div>
+        </div>
+
+        <!-- Proof History -->
+        <div id="proofHistory" class="card">
+            <h2>Proof History</h2>
+            <div id="proofHistoryList"></div>
+        </div>
+
+        <!-- Verification Section -->
+        <div id="verificationSection" class="card">
+            <h2>🔍 Verify Proof</h2>
+            <p>Paste a proof JSON or scan a QR code to verify</p>
+
+            <div class="verification-options">
+                <button class="secondary-btn" id="pasteProofBtn">
+                    📋 Paste Proof
+                </button>
+                <button class="secondary-btn" id="scanQrBtn">
+                    📱 Scan QR Code
+                </button>
+                <button class="secondary-btn" id="uploadProofBtn">
+                    📁 Upload File
+                </button>
+            </div>
+
+            <div id="verificationResult" style="display: none;"></div>
+        </div>
+
+        <!-- Proof QR Modal -->
+        <div id="proofQrModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Share Proof</h2>
+                <div id="proofQrCode"></div>
+                <p class="qr-instructions">
+                    Scan this code to share the proof
+                </p>
+            </div>
+        </div>
+
+        <!-- Paste Proof Modal -->
+        <div id="pasteProofModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Verify Proof</h2>
+                <textarea id="proofJsonInput" 
+                          placeholder="Paste proof JSON here..."
+                          rows="10"></textarea>
+                <button class="primary-btn" id="verifyPastedBtn">
+                    Verify Proof
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="sdis-proofs.js"></script>
+</body>
+</html>
