@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steward Dashboard - ICN Pilot</title>
+    <link rel="stylesheet" href="steward-dashboard.css">
+</head>
+<body>
+    <div class="steward-dashboard">
+        <header class="dashboard-header">
+            <h1>🛡️ Steward Dashboard</h1>
+            <div class="steward-info">
+                <span class="steward-badge">Active Steward</span>
+                <span class="steward-id" id="stewardId">Loading...</span>
+            </div>
+        </header>
+
+        <nav class="dashboard-nav">
+            <button class="nav-btn active" data-tab="pending">
+                Pending Enrollments
+                <span class="badge" id="pendingCount">0</span>
+            </button>
+            <button class="nav-btn" data-tab="history">
+                Vouch History
+            </button>
+            <button class="nav-btn" data-tab="stats">
+                Statistics
+            </button>
+        </nav>
+
+        <!-- Pending Enrollments Tab -->
+        <section id="pending-tab" class="tab-content active">
+            <div class="section-header">
+                <h2>Pending Enrollment Requests</h2>
+                <button class="refresh-btn" id="refreshPending">↻ Refresh</button>
+            </div>
+
+            <div class="filters">
+                <select id="coopFilter">
+                    <option value="all">All Cooperatives</option>
+                    <option value="pilot-coop">Pilot Coop</option>
+                </select>
+                <select id="levelFilter">
+                    <option value="all">All Levels</option>
+                    <option value="0">Level 0 - New</option>
+                    <option value="1">Level 1 - Device Verified</option>
+                </select>
+            </div>
+
+            <div class="enrollment-list" id="enrollmentList">
+                <div class="loading">Loading pending enrollments...</div>
+            </div>
+        </section>
+
+        <!-- Enrollment Detail Modal -->
+        <div class="modal" id="enrollmentModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Enrollment Details</h3>
+                    <button class="close-btn" id="closeModal">&times;</button>
+                </div>
+                <div class="modal-body" id="enrollmentDetails">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="rejectBtn">Reject</button>
+                    <button class="btn btn-primary" id="vouchBtn">Vouch for Identity</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vouch Confirmation Modal -->
+        <div class="modal" id="vouchModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Confirm Vouch</h3>
+                    <button class="close-btn" id="closeVouchModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to vouch for this identity. This action:</p>
+                    <ul>
+                        <li>Confirms you have verified this person's identity</li>
+                        <li>Will be recorded permanently on the trust graph</li>
+                        <li>May affect your steward reputation if fraudulent</li>
+                    </ul>
+                    <div class="vouch-form">
+                        <label for="vouchStatement">Vouch Statement (required):</label>
+                        <textarea id="vouchStatement" placeholder="I personally verify that this person is who they claim to be because..."></textarea>
+                        <div class="verification-checklist">
+                            <label>
+                                <input type="checkbox" id="check1" required>
+                                I have verified this person's identity in person or via trusted channel
+                            </label>
+                            <label>
+                                <input type="checkbox" id="check2" required>
+                                I understand the implications of vouching
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelVouch">Cancel</button>
+                    <button class="btn btn-primary" id="confirmVouch" disabled>Submit Vouch</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <section id="history-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Your Vouch History</h2>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="empty-state">
+                    <p>No vouches recorded yet.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Tab -->
+        <section id="stats-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Steward Statistics</h2>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Vouches</h3>
+                    <div class="stat-value" id="totalVouches">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>This Month</h3>
+                    <div class="stat-value" id="monthlyVouches">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Reputation Score</h3>
+                    <div class="stat-value" id="reputationScore">100%</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Response Time</h3>
+                    <div class="stat-value" id="avgResponseTime">--</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="steward-dashboard.js"></script>
+</body>
+</html>

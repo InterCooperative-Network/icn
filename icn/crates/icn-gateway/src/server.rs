@@ -263,10 +263,12 @@ impl GatewayServer {
                         .service(
                             web::scope("/sdis")
                                 .service(api::sdis::sdis_health)
-                                .service(api::sdis::verify_level1)
-                                .service(api::sdis::verify_level2)
+                                // Note: verify_level1/2 from mod.rs disabled - using simple_enrollment versions
+                                // .service(api::sdis::verify_level1)
+                                // .service(api::sdis::verify_level2)
                                 .configure(api::sdis::simple_enrollment::configure)
-                                .configure(api::sdis::enrollment::configure)
+                                // Note: enrollment::configure disabled - using simple_enrollment as primary API
+                                // .configure(api::sdis::enrollment::configure)
                                 .configure(api::sdis::recovery::configure)
                                 .configure(api::sdis::anchor::configure),
                         )

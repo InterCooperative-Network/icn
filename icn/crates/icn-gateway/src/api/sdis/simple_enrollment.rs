@@ -273,6 +273,111 @@ fn format_timestamp(ts: u64) -> String {
 }
 
 // ============================================================================
+// Steward API Endpoints
+// ============================================================================
+
+/// GET /pending - List pending enrollments for stewards
+#[actix_web::get("/pending")]
+pub async fn list_pending_enrollments(
+    store: web::Data<Arc<EnrollmentStore>>,
+) -> Result<HttpResponse> {
+    let enrollments = store.enrollments.read().await;
+    let pending: Vec<_> = enrollments
+        .values()
+        .filter(|s| s.level < 2)
+        .map(|s| serde_json::json!({
+            "enrollment_id": s.enrollment_id,
+            "identity_name": s.identity_name,
+            "coop_id": s.coop_id,
+            "level": s.level,
+            "created_at": format_timestamp(s.created_at),
+            "expires_at": format_timestamp(s.expires_at),
+        }))
+        .collect();
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "pending_count": pending.len(),
+        "enrollments": pending
+    })))
+}
+
+/// POST /vouch/{enrollment_id} - Steward vouches for an enrollment
+#[post("/vouch/{enrollment_id}")]
+pub async fn steward_vouch(
+    store: web::Data<Arc<EnrollmentStore>>,
+    enrollment_id: web::Path<String>,
+    req: web::Json<StewardVouchRequest>,
+) -> Result<HttpResponse> {
+    let mut enrollments = store.enrollments.write().await;
+    let session = enrollments
+        .get_mut(enrollment_id.as_str())
+        .ok_or_else(|| GatewayError::NotFound("Enrollment not found".to_string()))?;
+
+    // Must be level 1 first
+    if session.level < 1 {
+        return Err(GatewayError::BadRequest(
+            "Enrollment must complete Level 1 verification first".to_string(),
+        ));
+    }
+
+    // Check not expired
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    if now > session.expires_at {
+        return Err(GatewayError::BadRequest("Enrollment expired".to_string()));
+    }
+
+    // Record the vouch
+    session.level = 2;
+    session.steward_vouch = Some(req.vouch_statement.clone());
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "vouched",
+        "enrollment_id": enrollment_id.as_str(),
+        "level": 2,
+        "message": "Steward vouch recorded. Enrollment ready for completion."
+    })))
+}
+
+/// Steward vouch request
+#[derive(Debug, Deserialize)]
+pub struct StewardVouchRequest {
+    pub vouch_statement: String,
+    #[serde(default)]
+    pub steward_did: Option<String>,
+}
+
+/// GET /status/{enrollment_id} - Get enrollment status
+#[actix_web::get("/status/{enrollment_id}")]
+pub async fn get_enrollment_status(
+    store: web::Data<Arc<EnrollmentStore>>,
+    enrollment_id: web::Path<String>,
+) -> Result<HttpResponse> {
+    let enrollments = store.enrollments.read().await;
+    let session = enrollments
+        .get(enrollment_id.as_str())
+        .ok_or_else(|| GatewayError::NotFound("Enrollment not found".to_string()))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "enrollment_id": session.enrollment_id,
+        "identity_name": session.identity_name,
+        "coop_id": session.coop_id,
+        "level": session.level,
+        "status": match session.level {
+            0 => "pending_device_verification",
+            1 => "pending_steward_vouch",
+            2 => "ready_for_completion",
+            _ => "unknown"
+        },
+        "has_steward_vouch": session.steward_vouch.is_some(),
+        "created_at": format_timestamp(session.created_at),
+        "expires_at": format_timestamp(session.expires_at),
+    })))
+}
+
+// ============================================================================
 // Configuration
 // ============================================================================
 
@@ -280,5 +385,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(start_enrollment)
         .service(verify_level1)
         .service(verify_level2)
-        .service(complete_enrollment);
+        .service(complete_enrollment)
+        .service(list_pending_enrollments)
+        .service(steward_vouch)
+        .service(get_enrollment_status);
 }
