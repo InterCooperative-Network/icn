@@ -61,7 +61,12 @@ export function ProposalScreen({ route, navigation }: Props) {
   }
 
   const isOpen = proposal.state === 'open';
-  const tally = proposal.tally || { for: 0, against: 0, abstain: 0 };
+  // Cast to extended type that may include tally from API
+  const extendedProposal = proposal as typeof proposal & {
+    tally?: { for: number; against: number; abstain: number };
+    outcome?: 'accepted' | 'rejected';
+  };
+  const tally = extendedProposal.tally || { for: 0, against: 0, abstain: 0 };
   const totalVotes = tally.for + tally.against + tally.abstain;
 
   return (
@@ -88,7 +93,7 @@ export function ProposalScreen({ route, navigation }: Props) {
       {/* Author */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Proposed by</Text>
-        <Text style={styles.author}>{proposal.author}</Text>
+        <Text style={styles.author}>{proposal.created_by}</Text>
       </View>
 
       {/* Voting Results */}
@@ -164,7 +169,7 @@ export function ProposalScreen({ route, navigation }: Props) {
       )}
 
       {/* Outcome (for closed proposals) */}
-      {proposal.state === 'closed' && proposal.outcome && (
+      {proposal.state === 'closed' && extendedProposal.outcome && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Outcome</Text>
           <View
@@ -172,11 +177,11 @@ export function ProposalScreen({ route, navigation }: Props) {
               styles.outcomeBadge,
               {
                 backgroundColor:
-                  proposal.outcome === 'accepted' ? '#4caf50' : '#f44336',
+                  extendedProposal.outcome === 'accepted' ? '#4caf50' : '#f44336',
               },
             ]}
           >
-            <Text style={styles.outcomeText}>{proposal.outcome}</Text>
+            <Text style={styles.outcomeText}>{extendedProposal.outcome}</Text>
           </View>
         </View>
       )}

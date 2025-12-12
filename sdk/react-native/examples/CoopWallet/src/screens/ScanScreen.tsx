@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
-import { Camera, CameraType, BarCodeScanningResult } from 'expo-camera';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { parsePaymentQR, isPaymentQR } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
@@ -16,18 +16,16 @@ type Props = {
 };
 
 export function ScanScreen({ navigation }: Props) {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
-    const getCameraPermission = async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    };
-    getCameraPermission();
-  }, []);
+    if (!permission) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
 
-  const handleBarCodeScanned = ({ data }: BarCodeScanningResult) => {
+  const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
     if (scanned) return;
     setScanned(true);
 
@@ -49,13 +47,13 @@ export function ScanScreen({ navigation }: Props) {
 
     // Navigate to payment screen with pre-filled data
     navigation.navigate('Payment', {
-      to: payment.to,
-      amount: payment.amount,
+      recipient: payment.to,
+      amount: payment.amount?.toString(),
       memo: payment.memo,
     });
   };
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.container}>
         <Text>Requesting camera permission...</Text>
@@ -63,11 +61,14 @@ export function ScanScreen({ navigation }: Props) {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
         <Text style={styles.message}>Camera access is required to scan QR codes.</Text>
-        <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, { marginTop: 12, backgroundColor: '#666' }]} onPress={() => navigation.goBack()}>
           <Text style={styles.buttonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -91,12 +92,12 @@ export function ScanScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <Camera
+      <CameraView
         style={styles.camera}
-        type={CameraType.back}
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barCodeScannerSettings={{
-          barCodeTypes: ['qr'],
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
         }}
       >
         <View style={styles.overlay}>
@@ -108,7 +109,7 @@ export function ScanScreen({ navigation }: Props) {
           </View>
           <Text style={styles.hint}>Point camera at ICN payment QR code</Text>
         </View>
-      </Camera>
+      </CameraView>
     </View>
   );
 }

@@ -31,7 +31,7 @@ export function PaymentScreen({ navigation, route }: Props) {
   const { coopId } = useAuth(client!);
   const { pay, isPaying, error } = usePayment(client!, coopId || '');
 
-  const [recipient, setRecipient] = useState(route.params?.to || '');
+  const [recipient, setRecipient] = useState(route.params?.recipient || route.params?.recipientDid || '');
   const [amount, setAmount] = useState(route.params?.amount?.toString() || '');
   const [memo, setMemo] = useState(route.params?.memo || '');
 

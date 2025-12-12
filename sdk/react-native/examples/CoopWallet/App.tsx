@@ -940,8 +940,7 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
     if (Platform.OS !== 'web') {
       // Import camera components only on native
       import('expo-camera').then((module) => {
-        setCamera(() => module.Camera);
-        setBarCodeScanner(() => module.BarCodeScanner);
+        setCamera(() => module.CameraView);
       }).catch((err) => {
         console.error('Failed to load camera:', err);
       });
@@ -1995,8 +1994,8 @@ function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
     setError(null);
 
     try {
-      const { LocalAuthentication } = await import('expo-local-authentication');
-      
+      const LocalAuthentication = await import('expo-local-authentication');
+
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Unlock Coop Wallet',
         fallbackLabel: 'Use passcode',
@@ -2103,7 +2102,7 @@ export default function App() {
           // Check if biometric auth is available and enabled
           if (Platform.OS !== 'web') {
             try {
-              const { LocalAuthentication } = await import('expo-local-authentication');
+              const LocalAuthentication = await import('expo-local-authentication');
               const hasHardware = await LocalAuthentication.hasHardwareAsync();
               const isEnrolled = await LocalAuthentication.isEnrolledAsync();
               
@@ -3065,6 +3064,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginTop: 4,
+  },
+  verifyWarnings: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    width: '100%',
+  },
+  verifyWarningTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+    marginBottom: 8,
+  },
+  verifyWarningText: {
+    fontSize: 13,
+    color: '#E65100',
+    marginBottom: 4,
+  },
+  verifyResultTime: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 16,
   },
 
   // History screen

@@ -17,16 +17,13 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HistoryEntry } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'VerificationHistory'> & {
-  history: HistoryEntry[];
-  onClear: () => void;
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'VerificationHistory'>;
 
-export function VerificationHistoryScreen({ navigation, route }: Props) {
-  // Note: In a real implementation, history would come from navigation params
-  // or a global state manager. For now, we'll show an empty state.
-  const history: HistoryEntry[] = route.params?.history || [];
-  const onClear = route.params?.onClear || (() => {});
+export function VerificationHistoryScreen({ navigation }: Props) {
+  // Note: In a real implementation, history would come from a global state manager
+  // or persisted storage. For now, we'll show an empty state.
+  const history: HistoryEntry[] = [];
+  const onClear = () => {};
 
   const handleClear = () => {
     Alert.alert(
