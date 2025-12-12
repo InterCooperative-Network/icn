@@ -24,11 +24,16 @@
  * ```
  */
 
-// Use global WebSocket (available in browsers and React Native)
-// Falls back to 'ws' package only in Node.js where global WebSocket doesn't exist
-const WebSocketImpl: typeof WebSocket = typeof WebSocket !== 'undefined'
-  ? WebSocket
-  : require('ws');
+// Use global WebSocket (available in browsers, React Native, and Node.js 18+)
+// For older Node.js, users must polyfill global.WebSocket with 'ws' package
+declare const WebSocket: {
+  new(url: string): WebSocket;
+  prototype: WebSocket;
+  readonly CONNECTING: 0;
+  readonly OPEN: 1;
+  readonly CLOSING: 2;
+  readonly CLOSED: 3;
+};
 import {
   ICNClientOptions,
   ICNError,
@@ -717,7 +722,7 @@ export class ICNClient {
     }
   ): WebSocket {
     const wsUrl = this.baseUrl.replace(/^http/, 'ws');
-    const ws = new WebSocketImpl(`${wsUrl}/v1/ws/${coopId}`) as WebSocket;
+    const ws = new WebSocket(`${wsUrl}/v1/ws/${coopId}`);
 
     ws.onopen = () => {
       // Send auth message

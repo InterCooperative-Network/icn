@@ -31,9 +31,7 @@
     "url": "https://github.com/InterCooperative-Network/icn.git",
     "directory": "sdk/typescript"
   },
-  "dependencies": {
-    "ws": "^8.16.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.10.0",
