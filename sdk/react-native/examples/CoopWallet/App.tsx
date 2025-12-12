@@ -152,10 +152,21 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
   const [coopId, setCoopId] = useState('test-coop');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const handleLogin = async () => {
     if (!coopId.trim()) {
       setError('Please enter your cooperative ID');
+      return;
+    }
+
+    if (coopId.trim().length < 3) {
+      setError('Cooperative ID must be at least 3 characters');
+      return;
+    }
+
+    if (!/^[a-z0-9-]+$/.test(coopId.trim())) {
+      setError('Cooperative ID can only contain lowercase letters, numbers, and hyphens');
       return;
     }
 
@@ -213,7 +224,23 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
       console.error('Error name:', (err as Error).name);
       console.error('Error message:', (err as Error).message);
       console.error('Error stack:', (err as Error).stack);
-      setError((err as Error).message);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Login failed. Please try again.';
+      const errMsg = (err as Error).message;
+      
+      if (errMsg?.includes('not found') || errMsg?.includes('404')) {
+        errorMessage = 'Cooperative not found. Check the ID and try again.';
+      } else if (errMsg?.includes('network') || errMsg?.includes('fetch')) {
+        errorMessage = 'Network error. Check your internet connection.';
+      } else if (errMsg?.includes('timeout')) {
+        errorMessage = 'Connection timeout. Please try again.';
+      } else if (errMsg) {
+        errorMessage = errMsg;
+      }
+      
+      setError(errorMessage);
+      setRetryCount(prev => prev + 1);
     } finally {
       setIsLoading(false);
     }
@@ -239,7 +266,15 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
             autoCorrect={false}
           />
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              {retryCount > 0 && retryCount < 5 && (
+                <Text style={styles.errorHint}>Attempt {retryCount} of 5</Text>
+              )}
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
@@ -249,7 +284,9 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Login</Text>
+              <Text style={styles.buttonText}>
+                {error && retryCount > 0 ? 'Retry Login' : 'Login'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -601,16 +638,37 @@ function PaymentScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const validateRecipient = (did: string): string | null => {
+    if (!did.trim()) return 'Recipient is required';
+    if (!did.startsWith('did:icn:')) return 'Invalid DID format (must start with did:icn:)';
+    if (did.length < 20) return 'DID appears too short';
+    if (did === userDid) return 'Cannot send payment to yourself';
+    return null;
+  };
+
+  const validateAmount = (amountStr: string): { error: string | null; value: number } => {
+    if (!amountStr.trim()) return { error: 'Amount is required', value: 0 };
+    const amountNum = parseFloat(amountStr);
+    if (isNaN(amountNum)) return { error: 'Amount must be a number', value: 0 };
+    if (amountNum <= 0) return { error: 'Amount must be greater than zero', value: 0 };
+    if (amountNum > 1000000) return { error: 'Amount too large (max: 1,000,000)', value: 0 };
+    return { error: null, value: amountNum };
+  };
 
   const handleSend = async () => {
-    if (!recipient.trim() || !amount.trim()) {
-      setError('Please enter recipient and amount');
+    // Validate recipient
+    const recipientError = validateRecipient(recipient);
+    if (recipientError) {
+      setError(recipientError);
       return;
     }
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Please enter a valid amount');
+    // Validate amount
+    const { error: amountError, value: amountNum } = validateAmount(amount);
+    if (amountError) {
+      setError(amountError);
       return;
     }
 
@@ -620,7 +678,7 @@ function PaymentScreen({
     try {
       const client = getClient();
       if (!client) {
-        throw new Error('Client not initialized');
+        throw new Error('Client not initialized. Please restart the app.');
       }
 
       // Make real payment via API
@@ -633,9 +691,27 @@ function PaymentScreen({
       });
 
       setSuccess(true);
-    } catch (err) {
+      setRetryCount(0);
+    } catch (err: any) {
       console.error('Payment error:', err);
-      setError((err as Error).message);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (err.message?.includes('not found')) {
+        errorMessage = 'Recipient not found in this cooperative';
+      } else if (err.message?.includes('balance') || err.message?.includes('credit')) {
+        errorMessage = 'Insufficient balance or credit limit exceeded';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = 'Network error. Check your connection and try again.';
+      } else if (err.message?.includes('auth') || err.message?.includes('token')) {
+        errorMessage = 'Session expired. Please log out and log in again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setRetryCount(prev => prev + 1);
     } finally {
       setIsLoading(false);
     }
@@ -699,7 +775,15 @@ function PaymentScreen({
           />
         </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            {retryCount > 0 && retryCount < 3 && (
+              <Text style={styles.errorHint}>Attempt {retryCount} of 3</Text>
+            )}
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.primaryButton, styles.sendButton, isLoading && styles.buttonDisabled]}
@@ -709,7 +793,9 @@ function PaymentScreen({
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Send Payment</Text>
+            <Text style={styles.buttonText}>
+              {error && retryCount > 0 ? 'Retry Payment' : 'Send Payment'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -1920,11 +2006,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  errorText: {
-    color: '#e53935',
-    fontSize: 14,
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 16,
-    textAlign: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#e53935',
+  },
+  errorIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  errorText: {
+    color: '#c62828',
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  errorHint: {
+    color: '#e53935',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   footerText: {
     color: 'rgba(255,255,255,0.7)',
