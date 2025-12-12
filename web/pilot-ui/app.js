@@ -21,6 +21,7 @@ const state = {
 const elements = {
     // Screens
     loginScreen: document.getElementById('login-screen'),
+    joinScreen: document.getElementById('join-screen'),
     mainScreen: document.getElementById('main-screen'),
 
     // Login form
@@ -31,6 +32,15 @@ const elements = {
     loginBtn: document.getElementById('login-btn'),
     loginError: document.getElementById('login-error'),
     logoutBtn: document.getElementById('logout-btn'),
+    showJoinBtn: document.getElementById('show-join-btn'),
+    backToLoginBtn: document.getElementById('back-to-login-btn'),
+
+    // Join form
+    joinGatewayUrl: document.getElementById('join-gateway-url'),
+    inviteCode: document.getElementById('invite-code'),
+    joinBtn: document.getElementById('join-btn'),
+    joinError: document.getElementById('join-error'),
+    joinSuccess: document.getElementById('join-success'),
 
     // Header
     coopName: document.getElementById('coop-name'),
@@ -88,6 +98,38 @@ const elements = {
     connectionStatus: document.getElementById('connection-status'),
     lastUpdate: document.getElementById('last-update'),
 };
+
+// Clipboard helper with fallback for HTTP contexts
+async function copyToClipboard(text) {
+    // Try modern clipboard API first (works in HTTPS or localhost)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (err) {
+            console.warn('Clipboard API failed, trying fallback:', err);
+        }
+    }
+
+    // Fallback: create a temporary textarea
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (success) return true;
+    } catch (err) {
+        console.error('Fallback clipboard copy failed:', err);
+    }
+
+    return false;
+}
 
 // Toast Notification System
 function showToast(message, type = 'info', duration = 5000) {
@@ -303,12 +345,13 @@ function closeAuthHelpModal() {
     elements.authHelpModal.classList.add('hidden');
 }
 
-function copyAuthCommand() {
+async function copyAuthCommand() {
     const gateway = elements.helpGateway.textContent;
     const coop = elements.helpCoop.textContent;
     const command = `icnctl auth login --gateway ${gateway} --coop ${coop}`;
 
-    navigator.clipboard.writeText(command).then(() => {
+    const success = await copyToClipboard(command);
+    if (success) {
         const btn = elements.copyCommand;
         const originalText = btn.textContent;
         btn.textContent = 'Copied!';
@@ -316,9 +359,9 @@ function copyAuthCommand() {
             btn.textContent = originalText;
         }, 2000);
         showToast('Command copied to clipboard', 'success', 3000);
-    }).catch(() => {
+    } else {
         showToast('Failed to copy. Please select and copy manually.', 'error');
-    });
+    }
 }
 
 // Login
@@ -416,18 +459,24 @@ async function loadAllData() {
 
 async function loadBalance() {
     try {
-        const balance = await apiRequest(
+        const response = await apiRequest(
             'GET',
             `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`
         );
 
-        const value = balance.balance.toFixed(1);
+        // API returns { did: "...", balances: { "hours": 10, ... } }
+        // Values are stored as whole hours (integers)
+        const balances = response.balances || {};
+        // Sum all currency balances
+        const totalBalance = Object.values(balances).reduce((sum, val) => sum + (val || 0), 0);
+
+        const value = totalBalance;
         const trend = calculateBalanceTrend();
         const trendIcon = trend > 0 ? '↑' : trend < 0 ? '↓' : '→';
         const trendClass = trend > 0 ? 'trend-up' : trend < 0 ? 'trend-down' : 'trend-stable';
 
         elements.myBalance.innerHTML = `${value} <span class="balance-trend ${trendClass}">${trendIcon}</span>`;
-        elements.myBalance.className = `stat-value ${balance.balance >= 0 ? 'positive' : 'negative'}`;
+        elements.myBalance.className = `stat-value ${totalBalance >= 0 ? 'positive' : 'negative'}`;
 
     } catch (error) {
         console.error('Failed to load balance:', error);
@@ -468,12 +517,23 @@ function calculateBalanceTrend() {
 
 async function loadMembers() {
     try {
-        const members = await apiRequest('GET', `/coops/${state.coopId}/members`);
+        // Members are embedded in coop response, not a separate endpoint
+        const coop = await apiRequest('GET', `/coops/${state.coopId}`);
+        const members = coop.members || [];
         state.members = members;
 
         // Determine current user's role
+        // API returns: Steward (owner), Facilitator (admin), Participant (member)
         const currentUser = members.find(m => m.did === state.did);
-        state.userRole = currentUser?.role || 'member';
+        const rawRole = currentUser?.role?.toLowerCase() || 'member';
+        // Normalize role names
+        if (rawRole === 'steward' || rawRole === 'owner') {
+            state.userRole = 'owner';
+        } else if (rawRole === 'facilitator' || rawRole === 'admin') {
+            state.userRole = 'admin';
+        } else {
+            state.userRole = 'member';
+        }
 
         // Update body class for admin-only elements
         document.body.classList.remove('is-owner', 'is-admin');
@@ -521,17 +581,38 @@ async function loadTransactions() {
             'GET',
             `/ledger/${state.coopId}/history?limit=50`
         );
-        state.transactions = history.transactions;
+        // API returns array of entries with accounts array
+        const rawEntries = Array.isArray(history) ? history : (history.transactions || []);
+
+        // Transform API format to UI format
+        // API: { id, timestamp, author, accounts: [{account_id, currency, debit, credit}] }
+        // UI: { id, timestamp, from, to, amount, currency, memo }
+        const transactions = rawEntries.map(entry => {
+            // Find debit and credit accounts
+            const debitAccount = entry.accounts?.find(a => a.debit != null);
+            const creditAccount = entry.accounts?.find(a => a.credit != null);
+
+            return {
+                id: entry.id,
+                timestamp: entry.timestamp / 1000, // Convert ms to seconds
+                from: debitAccount?.account_id || entry.author,
+                to: creditAccount?.account_id || '',
+                amount: debitAccount?.debit || creditAccount?.credit || 0, // Whole hours
+                currency: debitAccount?.currency || creditAccount?.currency || 'hours',
+                memo: entry.memo || '',
+            };
+        });
+        state.transactions = transactions;
 
         // Calculate monthly hours
         const oneMonthAgo = Date.now() / 1000 - 30 * 24 * 60 * 60;
-        const monthlyTx = history.transactions.filter(tx => tx.timestamp > oneMonthAgo);
+        const monthlyTx = transactions.filter(tx => tx.timestamp > oneMonthAgo);
         const totalHours = monthlyTx.reduce((sum, tx) => sum + tx.amount, 0);
-        elements.monthlyHours.textContent = totalHours.toFixed(1);
+        elements.monthlyHours.textContent = totalHours;
 
         // Render lists
-        renderRecentActivity(history.transactions.slice(0, 5));
-        renderTransactionList(history.transactions);
+        renderRecentActivity(transactions.slice(0, 5));
+        renderTransactionList(transactions);
 
     } catch (error) {
         console.error('Failed to load transactions:', error);
@@ -542,7 +623,9 @@ async function loadTransactions() {
 async function loadProposals() {
     try {
         // Try to load proposals from governance API
-        const proposals = await apiRequest('GET', '/gov/proposals');
+        const response = await apiRequest('GET', '/gov/proposals');
+        // API returns { data: [...], pagination: {...} }
+        const proposals = Array.isArray(response) ? response : (response.data || []);
         state.proposals = proposals;
 
         // Split into open and closed
@@ -971,7 +1054,8 @@ async function renderDashboardProposals() {
     if (!elements.dashboardProposals) return;
 
     try {
-        const proposals = await apiRequest('GET', '/gov/proposals');
+        const response = await apiRequest('GET', '/gov/proposals');
+        const proposals = Array.isArray(response) ? response : (response.data || []);
         const openProposals = proposals.filter(p => p.state === 'Open').slice(0, 3);
 
         if (openProposals.length === 0) {
@@ -1068,7 +1152,11 @@ function renderMemberList(members) {
     }
 
     const html = members.map(member => {
-        const roleClass = member.role === 'owner' ? 'owner' : member.role === 'admin' ? 'admin' : '';
+        // Handle both old (owner/admin) and new (Steward/Facilitator) role names
+        const role = member.role?.toLowerCase() || '';
+        const roleClass = (role === 'owner' || role === 'steward') ? 'owner' :
+                          (role === 'admin' || role === 'facilitator') ? 'admin' : '';
+        const displayRole = member.role || 'Member';
 
         return `
             <div class="member-item" data-did="${member.did}">
@@ -1076,7 +1164,7 @@ function renderMemberList(members) {
                     <div class="member-did" title="${member.did}">${truncateDid(member.did)}</div>
                     <button class="btn-copy-did" data-did="${member.did}" title="Copy full DID">📋</button>
                 </div>
-                <div class="member-role ${roleClass}">${member.role}</div>
+                <div class="member-role ${roleClass}">${displayRole}</div>
             </div>
         `;
     }).join('');
@@ -1218,21 +1306,24 @@ async function logHours(event) {
     }
 
     try {
+        // Convert hours to integer (API expects i64, whole hours)
+        const amountInt = Math.round(hours);
+
         const payment = await apiRequest('POST', `/ledger/${state.coopId}/payment`, {
-            from: recipient,  // They owe you
-            to: state.did,    // You receive credit
-            amount: hours,
+            from: state.did,   // You send from your account
+            to: recipient,     // To the person who helped you
+            amount: amountInt,
             currency: 'hours',
             memo: memo || undefined,
         });
 
         showResult(
             elements.logResult,
-            `Logged ${hours} hours! Transaction ID: ${payment.id.slice(0, 8)}...`,
+            `Sent ${hours} hours! Transaction ID: ${payment.hash?.slice(0, 8) || 'complete'}...`,
             true
         );
 
-        showToast(`Successfully logged ${hours} hours`, 'success', 3000);
+        showToast(`Successfully sent ${hours} hours`, 'success', 3000);
 
         // Reset form
         elements.logHoursForm.reset();
@@ -1331,11 +1422,12 @@ document.addEventListener('click', (e) => {
     if (e.target.classList.contains('btn-copy-did')) {
         const did = e.target.dataset.did;
         if (did) {
-            navigator.clipboard.writeText(did).then(() => {
-                showToast('DID copied to clipboard!', 'success', 2000);
-            }).catch(err => {
-                console.error('Failed to copy DID:', err);
-                showToast('Failed to copy DID', 'error');
+            copyToClipboard(did).then(success => {
+                if (success) {
+                    showToast('DID copied to clipboard!', 'success', 2000);
+                } else {
+                    showToast('Failed to copy DID', 'error');
+                }
             });
         }
     }
@@ -2945,9 +3037,8 @@ function initializeMemberPagination() {
     });
 }
 
-// Update the existing renderTransactionHistory function to use pagination
-const originalRenderTransactionHistory = renderTransactionHistory;
-renderTransactionHistory = function() {
+// Define renderTransactionHistory function with pagination support
+let renderTransactionHistory = function() {
     if (!transactionPagination) {
         initializeTransactionPagination();
     }
@@ -4117,3 +4208,268 @@ function initializeMemberManagement() {
 
 // Initialize member management after DOM loads
 document.addEventListener('DOMContentLoaded', initializeMemberManagement);
+
+// ============================================================================
+// Invite System
+// ============================================================================
+
+// Show join screen
+elements.showJoinBtn?.addEventListener('click', () => {
+    elements.loginScreen.classList.add('hidden');
+    elements.joinScreen.classList.remove('hidden');
+});
+
+// Back to login
+elements.backToLoginBtn?.addEventListener('click', () => {
+    elements.joinScreen.classList.add('hidden');
+    elements.loginScreen.classList.remove('hidden');
+    elements.joinError.textContent = '';
+    elements.joinSuccess.classList.add('hidden');
+});
+
+// Handle join via invite
+document.getElementById('join-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const gatewayUrl = elements.joinGatewayUrl.value.trim();
+    const inviteCode = elements.inviteCode.value.trim().toUpperCase();
+    
+    elements.joinError.textContent = '';
+    elements.joinSuccess.classList.add('hidden');
+    elements.joinBtn.disabled = true;
+    elements.joinBtn.textContent = 'Joining...';
+    
+    try {
+        // Generate a new keypair client-side
+        const keypair = await generateKeypair();
+        const did = `did:icn:${keypair.publicKeyBase58}`;
+        
+        // Join via invite
+        const response = await fetch(`${gatewayUrl}/v1/invites/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                invite_code: inviteCode,
+                did: did
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to join cooperative');
+        }
+        
+        const data = await response.json();
+        
+        // Store credentials
+        localStorage.setItem('icn_keypair', JSON.stringify(keypair));
+        localStorage.setItem('icn_did', did);
+        localStorage.setItem('icn_token', data.token);
+        localStorage.setItem('icn_coop_id', data.coop_id);
+        localStorage.setItem('icn_gateway_url', gatewayUrl);
+        
+        // Show success message with credentials
+        elements.joinSuccess.innerHTML = `
+            <h3>✅ Successfully Joined!</h3>
+            <p><strong>Cooperative:</strong> ${data.coop_id}</p>
+            <p><strong>Your DID:</strong> <code>${did}</code></p>
+            <p><strong>Role:</strong> ${data.role}</p>
+            <p class="help-text">Save these credentials securely. You can now sign in.</p>
+            <div class="credential-box">
+                <label>Private Key (keep secret!):</label>
+                <textarea readonly rows="3">${keypair.privateKeyHex}</textarea>
+            </div>
+        `;
+        elements.joinSuccess.classList.remove('hidden');
+        
+        // Clear form
+        elements.inviteCode.value = '';
+        
+        // Auto-login after 3 seconds
+        setTimeout(() => {
+            elements.joinScreen.classList.add('hidden');
+            elements.loginScreen.classList.remove('hidden');
+            elements.gatewayUrl.value = gatewayUrl;
+            elements.coopId.value = data.coop_id;
+            elements.did.value = did;
+            elements.token.value = data.token;
+            // Trigger login
+            document.getElementById('login-form').dispatchEvent(new Event('submit'));
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Join error:', error);
+        elements.joinError.textContent = error.message;
+    } finally {
+        elements.joinBtn.disabled = false;
+        elements.joinBtn.textContent = 'Join Cooperative';
+    }
+});
+
+// Generate keypair (simplified - in production use icn-identity properly)
+async function generateKeypair() {
+    // This is a placeholder - in a real implementation, 
+    // you'd use the icn-identity library properly
+    // For now, just generate random bytes and encode
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const hex = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+    const base58 = btoa(String.fromCharCode(...array))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+    
+    return {
+        privateKeyHex: hex,
+        publicKeyBase58: base58
+    };
+}
+
+// Create invite modal
+const createInviteModal = document.getElementById('create-invite-modal');
+const closeCreateInvite = document.getElementById('close-create-invite');
+const createInviteCancel = document.getElementById('create-invite-cancel-btn');
+const createInviteSubmit = document.getElementById('create-invite-submit-btn');
+const createInviteDone = document.getElementById('create-invite-done-btn');
+const inviteResult = document.getElementById('invite-result');
+const createInviteForm = document.getElementById('create-invite-form');
+
+document.getElementById('create-invite-btn')?.addEventListener('click', () => {
+    createInviteModal?.classList.remove('hidden');
+    inviteResult?.classList.add('hidden');
+    createInviteForm?.reset();
+    createInviteSubmit.classList.remove('hidden');
+    createInviteCancel.classList.remove('hidden');
+    createInviteDone.classList.add('hidden');
+});
+
+closeCreateInvite?.addEventListener('click', () => {
+    createInviteModal?.classList.add('hidden');
+});
+
+createInviteCancel?.addEventListener('click', () => {
+    createInviteModal?.classList.add('hidden');
+});
+
+createInviteDone?.addEventListener('click', () => {
+    createInviteModal?.classList.add('hidden');
+    loadInvites(); // Refresh invite list
+});
+
+createInviteSubmit?.addEventListener('click', async () => {
+    const role = document.getElementById('invite-role').value;
+    const expiresIn = parseInt(document.getElementById('invite-expiration').value);
+    
+    createInviteSubmit.disabled = true;
+    createInviteSubmit.textContent = 'Creating...';
+    
+    try {
+        const response = await fetch(`${state.gatewayUrl}/v1/invites`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({
+                coop_id: state.coopId,
+                role: role,
+                expires_in_seconds: expiresIn
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create invite');
+        }
+        
+        const data = await response.json();
+        
+        // Show result
+        document.getElementById('generated-invite-code').textContent = data.code;
+        document.getElementById('generated-invite-url').value = data.invite_url;
+        inviteResult.classList.remove('hidden');
+        
+        // Hide create button, show done button
+        createInviteSubmit.classList.add('hidden');
+        createInviteCancel.classList.add('hidden');
+        createInviteDone.classList.remove('hidden');
+        
+        showToast('Invite created successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Create invite error:', error);
+        showToast(error.message, 'error');
+    } finally {
+        createInviteSubmit.disabled = false;
+        createInviteSubmit.textContent = 'Create Invite';
+    }
+});
+
+// Copy invite code
+document.getElementById('copy-invite-code')?.addEventListener('click', async () => {
+    const code = document.getElementById('generated-invite-code').textContent;
+    if (await copyToClipboard(code)) {
+        showToast('Invite code copied!', 'success');
+    }
+});
+
+// Copy invite URL
+document.getElementById('copy-invite-url')?.addEventListener('click', async () => {
+    const url = document.getElementById('generated-invite-url').value;
+    if (await copyToClipboard(url)) {
+        showToast('Invite link copied!', 'success');
+    }
+});
+
+// Load invites
+async function loadInvites() {
+    const inviteList = document.getElementById('invite-list');
+    if (!inviteList) return;
+    
+    try {
+        const response = await fetch(`${state.gatewayUrl}/v1/invites?coop_id=${state.coopId}`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        
+        if (!response.ok) throw new Error('Failed to load invites');
+        
+        const data = await response.json();
+        
+        if (data.invites.length === 0) {
+            inviteList.innerHTML = '<p class="empty-state">No invites created yet.</p>';
+            return;
+        }
+        
+        inviteList.innerHTML = data.invites.map(invite => {
+            const expired = Date.now() / 1000 > invite.expires_at;
+            const expiresDate = new Date(invite.expires_at * 1000).toLocaleString();
+            const status = invite.used ? 'Used' : expired ? 'Expired' : 'Active';
+            const statusClass = invite.used ? 'used' : expired ? 'expired' : 'active';
+            
+            return `
+                <div class="invite-item">
+                    <div class="invite-code">
+                        <code>${invite.code}</code>
+                        <span class="invite-status ${statusClass}">${status}</span>
+                    </div>
+                    <div class="invite-details">
+                        <span>Role: <strong>${invite.role}</strong></span>
+                        <span>Created by: ${invite.created_by}</span>
+                        <span>Expires: ${expiresDate}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Load invites error:', error);
+        inviteList.innerHTML = '<p class="error">Failed to load invites</p>';
+    }
+}
+
+// Load invites when members tab is shown
+document.querySelector('[data-tab="members"]')?.addEventListener('click', () => {
+    if (state.userRole === 'admin' || state.userRole === 'owner') {
+        loadInvites();
+    }
+});

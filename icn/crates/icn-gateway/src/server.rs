@@ -110,6 +110,7 @@ impl GatewayServer {
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
         let governance_manager = Arc::new(GovernanceManager::new());
+        let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let trust_manager = Arc::new(TrustManager::new());
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
@@ -220,6 +221,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
+                .app_data(web::Data::new(invite_manager.clone()))
                 .app_data(web::Data::new(trust_manager.clone()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
@@ -306,6 +308,17 @@ impl GatewayServer {
                                 .service(api::governance::close_proposal)
                                 .service(api::governance::cast_vote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected invite endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/invites")
+                                .service(api::invites::create_invite)
+                                .service(api::invites::list_invites)
+                                .service(api::invites::join_via_invite)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

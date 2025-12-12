@@ -235,6 +235,33 @@ pub fn validate_credit_policy(policy: &str) -> Result<()> {
     Ok(())
 }
 
+/// Validate role string (for invite system)
+pub fn validate_role(role: &str) -> Result<()> {
+    if role.is_empty() || role.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Role cannot be empty or whitespace-only".to_string(),
+        ));
+    }
+
+    if role.len() > 32 {
+        return Err(GatewayError::BadRequest(
+            "Role exceeds maximum length of 32 characters".to_string(),
+        ));
+    }
+
+    // Optional: Validate against known roles
+    let valid_roles = ["member", "admin", "participant", "facilitator"];
+    if !valid_roles.contains(&role) {
+        return Err(GatewayError::BadRequest(format!(
+            "Invalid role '{}'. Must be one of: {}",
+            role,
+            valid_roles.join(", ")
+        )));
+    }
+
+    Ok(())
+}
+
 /// Validate member count doesn't exceed limit
 pub fn validate_member_count(current_count: usize) -> Result<()> {
     if current_count >= MAX_MEMBERS_PER_COOP {

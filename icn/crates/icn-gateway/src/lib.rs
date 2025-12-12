@@ -19,6 +19,7 @@ pub mod error;
 pub mod events;
 pub mod federation_mgr;
 pub mod governance_mgr;
+pub mod invite;
 pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;

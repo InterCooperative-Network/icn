@@ -80,6 +80,53 @@
 
                     <div id="login-error" class="error-message" role="alert" aria-live="assertive"></div>
                 </form>
+
+                <div class="login-divider">
+                    <span>or</span>
+                </div>
+
+                <button id="show-join-btn" type="button" class="btn btn-secondary">Join with Invite Code</button>
+            </div>
+        </div>
+
+        <!-- Join Screen -->
+        <div id="join-screen" class="screen hidden">
+            <div class="card login-card">
+                <h1>Join a Cooperative</h1>
+                <p class="subtitle">Enter your invite code to get started</p>
+
+                <form id="join-form" aria-label="Join cooperative with invite code">
+                    <div class="form-group">
+                        <label for="join-gateway-url">Gateway URL</label>
+                        <input
+                            type="url"
+                            id="join-gateway-url"
+                            value="http://localhost:8080"
+                            aria-required="true"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="invite-code">Invite Code</label>
+                        <input
+                            type="text"
+                            id="invite-code"
+                            placeholder="XXXX-XXXX-XXXX"
+                            aria-required="true"
+                            aria-describedby="invite-code-hint"
+                            maxlength="12"
+                            style="text-transform: uppercase;"
+                        />
+                        <small id="invite-code-hint">12-character code from your cooperative admin</small>
+                    </div>
+
+                    <button id="join-btn" type="submit" class="btn btn-primary">Join Cooperative</button>
+
+                    <div id="join-error" class="error-message" role="alert" aria-live="assertive"></div>
+                    <div id="join-success" class="success-message hidden" role="alert" aria-live="polite"></div>
+                </form>
+
+                <button id="back-to-login-btn" type="button" class="btn btn-link">Back to Sign In</button>
             </div>
         </div>
 
@@ -596,11 +643,12 @@
             <!-- Log Hours Tab -->
             <main id="log-hours" class="tab-content">
                 <div class="card">
-                    <h2>Log Service Hours</h2>
+                    <h2>Send Hours</h2>
+                    <p class="help-text">Give hours to a member who provided a service to you.</p>
 
                     <form id="log-hours-form">
                         <div class="form-group">
-                            <label for="recipient">Service Provided To</label>
+                            <label for="recipient">Send To (who helped you)</label>
                             <select id="recipient" required>
                                 <option value="">Select member...</option>
                             </select>
@@ -613,10 +661,10 @@
 
                         <div class="form-group">
                             <label for="memo">Description</label>
-                            <textarea id="memo" rows="3" placeholder="What service did you provide?"></textarea>
+                            <textarea id="memo" rows="3" placeholder="What service did they provide?"></textarea>
                         </div>
 
-                        <button type="submit" class="btn btn-primary">Log Hours</button>
+                        <button type="submit" class="btn btn-primary">Send Hours</button>
                     </form>
 
                     <div id="log-result" class="result-message"></div>
@@ -721,6 +769,17 @@
                                 ⟩⟩
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Invites Card (Admin Only) -->
+                <div class="card admin-only hidden" id="invites-card">
+                    <div class="card-header">
+                        <h2>Member Invitations</h2>
+                        <button id="create-invite-btn" class="btn btn-primary">+ Create Invite</button>
+                    </div>
+                    <div id="invite-list" class="invite-list">
+                        <p class="loading">Loading invites...</p>
                     </div>
                 </div>
 
@@ -902,6 +961,67 @@ did:icn:charlie789,member,0</code></pre>
                         <div class="modal-footer">
                             <button id="remove-member-cancel-btn" class="btn btn-secondary">Cancel</button>
                             <button id="remove-member-submit-btn" class="btn btn-danger">Remove Member</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Invite Modal -->
+                <div id="create-invite-modal" class="modal hidden" role="dialog" aria-labelledby="create-invite-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="create-invite-title">Create Invite Code</h2>
+                            <button id="close-create-invite" class="modal-close" aria-label="Close create invite dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="create-invite-form">
+                                <div class="form-group">
+                                    <label for="invite-role">Member Role</label>
+                                    <select id="invite-role" required>
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="participant">Participant</option>
+                                        <option value="facilitator">Facilitator</option>
+                                    </select>
+                                    <p class="help-text">The role this invite will grant</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="invite-expiration">Expires In</label>
+                                    <select id="invite-expiration" required>
+                                        <option value="86400">1 day</option>
+                                        <option value="259200">3 days</option>
+                                        <option value="604800" selected>7 days</option>
+                                        <option value="1209600">14 days</option>
+                                        <option value="2592000">30 days</option>
+                                    </select>
+                                    <p class="help-text">How long this invite code will be valid</p>
+                                </div>
+                            </form>
+
+                            <div id="invite-result" class="invite-result hidden">
+                                <div class="invite-code-display">
+                                    <label>Invite Code:</label>
+                                    <div class="code-box">
+                                        <code id="generated-invite-code"></code>
+                                        <button id="copy-invite-code" class="btn-copy" title="Copy code">Copy</button>
+                                    </div>
+                                </div>
+                                <div class="invite-url-display">
+                                    <label>Share Link:</label>
+                                    <div class="url-box">
+                                        <input type="text" id="generated-invite-url" readonly />
+                                        <button id="copy-invite-url" class="btn-copy" title="Copy link">Copy</button>
+                                    </div>
+                                </div>
+                                <p class="help-text">Share this code or link with the person you want to invite.</p>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="create-invite-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="create-invite-submit-btn" class="btn btn-primary">Create Invite</button>
+                            <button id="create-invite-done-btn" class="btn btn-primary hidden">Done</button>
                         </div>
                     </div>
                 </div>

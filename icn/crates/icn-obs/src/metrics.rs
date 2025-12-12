@@ -2173,6 +2173,24 @@ pub mod gateway {
     pub fn governance_votes_cast_inc() {
         counter!("icn_gateway_governance_votes_cast_total").increment(1);
     }
+
+    /// Increment the number of invites created for a cooperative
+    pub fn invites_created(coop_id: &str) {
+        counter!(
+            "icn_gateway_invites_created_total",
+            "coop_id" => coop_id.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment the number of invites used for a cooperative
+    pub fn invites_used(coop_id: &str) {
+        counter!(
+            "icn_gateway_invites_used_total",
+            "coop_id" => coop_id.to_string()
+        )
+        .increment(1);
+    }
 }
 
 /// NAT traversal metrics

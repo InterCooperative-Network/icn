@@ -3120,3 +3120,178 @@ html[dir="rtl"] .language-menu {
         font-size: 0.85rem;
     }
 }
+
+/* ============================================================================
+   Invite System Styles
+   ============================================================================ */
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: var(--text-muted);
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border);
+}
+
+.login-divider span {
+    padding: 0 1rem;
+    font-size: 0.875rem;
+}
+
+.invite-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.invite-item {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+}
+
+.invite-code {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.invite-code code {
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.invite-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.invite-status.active {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.invite-status.expired {
+    background: var(--warning-bg);
+    color: var(--warning);
+}
+
+.invite-status.used {
+    background: var(--muted-bg);
+    color: var(--text-muted);
+}
+
+.invite-details {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.invite-result {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 2px solid var(--success);
+    border-radius: 8px;
+    background: var(--success-bg);
+}
+
+.invite-code-display,
+.invite-url-display {
+    margin-bottom: 1rem;
+}
+
+.invite-code-display label,
+.invite-url-display label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.code-box,
+.url-box {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.code-box code {
+    flex: 1;
+    padding: 0.75rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+.url-box input {
+    flex: 1;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.credential-box {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: 4px;
+}
+
+.credential-box label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--warning);
+}
+
+.credential-box textarea {
+    width: 100%;
+    padding: 0.5rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    border: 1px solid var(--warning);
+    border-radius: 4px;
+    background: white;
+}
+
+.success-message {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--success-bg);
+    border: 1px solid var(--success);
+    border-radius: 4px;
+    color: var(--success);
+}
+
+.success-message h3 {
+    margin-top: 0;
+    color: var(--success);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}

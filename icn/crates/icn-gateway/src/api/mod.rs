@@ -7,6 +7,7 @@ pub mod federation;
 pub mod governance;
 pub mod health;
 pub mod identity;
+pub mod invites;
 pub mod ledger;
 pub mod members;
 pub mod notifications;

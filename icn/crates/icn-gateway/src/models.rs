@@ -188,3 +188,61 @@ pub enum VoteChoiceResponse {
     Against,
     Abstain,
 }
+
+// === Invite System ===
+
+/// Create an invite for someone to join the coop
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateInviteRequest {
+    pub coop_id: String,
+    /// Role for the invitee: "member", "admin", "participant", "facilitator"
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in_seconds: Option<u64>,
+}
+
+/// Join via invite code - request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JoinRequest {
+    pub invite_code: String,
+    pub did: String, // Client provides their own DID
+}
+
+/// Invite response with generated code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InviteResponse {
+    pub code: String,
+    pub coop_id: String,
+    pub coop_name: String,
+    pub role: String,
+    pub expires_at: u64,
+    pub invite_url: String,
+}
+
+/// List of invites
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InviteListResponse {
+    pub invites: Vec<InviteInfo>,
+}
+
+/// Individual invite info (for listing)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InviteInfo {
+    pub code: String,
+    pub role: String,
+    pub created_by: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+    pub used: bool,
+}
+
+/// Join via invite - creates identity and returns credentials
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JoinResponse {
+    pub did: String,
+    pub token: String,
+    pub token_expires_in: u64,
+    pub coop_id: String,
+    pub role: String,
+    pub private_key: String,
+}

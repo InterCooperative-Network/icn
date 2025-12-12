@@ -163,7 +163,7 @@ impl AuthManager {
     }
 
     /// Issue a JWT capability token
-    fn issue_token(&self, did: &Did, coop_id: &str, scopes: Vec<String>) -> Result<String> {
+    pub fn issue_token(&self, did: &Did, coop_id: &str, scopes: Vec<String>) -> Result<String> {
         let now = Self::current_timestamp()?;
         let claims = TokenClaims {
             sub: did.to_string(),

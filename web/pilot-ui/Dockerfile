@@ -9,13 +9,19 @@ COPY sw.js /usr/share/nginx/html/
 COPY manifest.json /usr/share/nginx/html/
 COPY offline.html /usr/share/nginx/html/
 
-# Add custom nginx config for SPA routing
+# Add custom nginx config for SPA routing with no-cache for JS/CSS
 RUN echo 'server { \
     listen 3000; \
     root /usr/share/nginx/html; \
     index index.html; \
     location / { \
         try_files $uri $uri/ /index.html; \
+    } \
+    # Disable caching for JS and CSS files during development \
+    location ~* \.(js|css)$ { \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
+        add_header Pragma "no-cache"; \
+        add_header Expires "0"; \
     } \
     # Security headers \
     add_header X-Frame-Options "SAMEORIGIN" always; \
