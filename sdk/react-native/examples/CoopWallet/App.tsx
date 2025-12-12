@@ -1513,23 +1513,41 @@ function IdentityScreen({ navigation, userDid, coopId }: { navigation: any; user
 function VerifyScreen({ navigation }: { navigation: any }) {
   const [verificationResult, setVerificationResult] = useState<null | {
     valid: boolean;
-    name: string;
-    did: string;
-    proofType: string;
-    trustScore: number;
+    level: number;
+    proof_type?: string;
+    warnings: string[];
+    verified_at: number;
+    did?: string;
   }>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [manualQrData, setManualQrData] = useState('');
+
+  const handleScan = async (qrData: string) => {
+    setIsScanning(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Call SDIS verification API
+      const result = await client.verifyLevel1(qrData);
+      setVerificationResult(result);
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      setError(err.message || 'Verification failed. Please try again.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   const simulateVerification = () => {
-    // Simulate scanning a QR code
-    setTimeout(() => {
-      setVerificationResult({
-        valid: true,
-        name: 'Alice Member',
-        did: 'did:icn:alice789xyz',
-        proofType: 'Membership',
-        trustScore: 4.5,
-      });
-    }, 1000);
+    // For demo purposes - generate a test QR data
+    const testQrData = 'test-qr-data-base64';
+    handleScan(testQrData);
   };
 
   if (verificationResult) {
@@ -1548,19 +1566,35 @@ function VerifyScreen({ navigation }: { navigation: any }) {
 
           {verificationResult.valid && (
             <>
-              <Text style={styles.verifyResultName}>{verificationResult.name}</Text>
-              <Text style={styles.verifyResultDid}>{verificationResult.did}</Text>
+              {verificationResult.did && (
+                <Text style={styles.verifyResultDid}>{verificationResult.did}</Text>
+              )}
 
               <View style={styles.verifyResultDetails}>
                 <View style={styles.verifyResultDetail}>
-                  <Text style={styles.verifyDetailLabel}>Proof Type</Text>
-                  <Text style={styles.verifyDetailValue}>{verificationResult.proofType}</Text>
+                  <Text style={styles.verifyDetailLabel}>Verification Level</Text>
+                  <Text style={styles.verifyDetailValue}>Level {verificationResult.level}</Text>
                 </View>
-                <View style={styles.verifyResultDetail}>
-                  <Text style={styles.verifyDetailLabel}>Trust Score</Text>
-                  <Text style={styles.verifyDetailValue}>⭐ {verificationResult.trustScore}</Text>
-                </View>
+                {verificationResult.proof_type && (
+                  <View style={styles.verifyResultDetail}>
+                    <Text style={styles.verifyDetailLabel}>Proof Type</Text>
+                    <Text style={styles.verifyDetailValue}>{verificationResult.proof_type}</Text>
+                  </View>
+                )}
               </View>
+
+              {verificationResult.warnings.length > 0 && (
+                <View style={styles.verifyWarnings}>
+                  <Text style={styles.verifyWarningTitle}>⚠️ Warnings:</Text>
+                  {verificationResult.warnings.map((warning, idx) => (
+                    <Text key={idx} style={styles.verifyWarningText}>• {warning}</Text>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.verifyResultTime}>
+                Verified {new Date(verificationResult.verified_at * 1000).toLocaleString()}
+              </Text>
             </>
           )}
         </View>
