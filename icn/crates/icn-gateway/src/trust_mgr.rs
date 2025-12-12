@@ -72,6 +72,16 @@ impl TrustManager {
         self.edges.get(&key).map(|e| e.clone())
     }
 
+    /// Remove a trust edge
+    pub fn remove_edge(&self, from: &Did, to: &Did) -> Result<(), String> {
+        let key = format!("{}:{}", from.as_str(), to.as_str());
+        if self.edges.remove(&key).is_some() {
+            Ok(())
+        } else {
+            Err("Trust edge not found".to_string())
+        }
+    }
+
     /// Get all edges from a DID
     pub fn get_outgoing_edges(&self, from: &Did) -> Vec<TrustEdge> {
         let prefix = format!("{}:", from.as_str());

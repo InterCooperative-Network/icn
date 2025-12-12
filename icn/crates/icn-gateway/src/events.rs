@@ -99,6 +99,24 @@ pub enum GatewayEvent {
         submitter: String,
         reason: String,
     },
+    /// A trust attestation was created
+    TrustAttested {
+        from: String,
+        to: String,
+        score: f64,
+        memo: Option<String>,
+    },
+    /// A trust attestation was revoked
+    TrustRevoked { from: String, to: String },
+    /// A transaction was completed
+    TransactionCompleted {
+        coop_id: String,
+        hash: String,
+        from: String,
+        to: String,
+        amount: i64,
+        currency: String,
+    },
 }
 
 /// Event with sequence number for backfill support

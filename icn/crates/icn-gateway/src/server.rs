@@ -21,6 +21,7 @@ use crate::ledger_mgr::LedgerManager;
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
+use crate::trust_mgr::TrustManager;
 use icn_compute::ComputeHandle;
 
 /// Gateway server configuration
@@ -109,6 +110,7 @@ impl GatewayServer {
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         let coop_manager = Arc::new(CoopManager::new());
         let governance_manager = Arc::new(GovernanceManager::new());
+        let trust_manager = Arc::new(TrustManager::new());
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
             Arc::new(ComputeManager::with_handle(handle))
@@ -218,6 +220,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
+                .app_data(web::Data::new(trust_manager.clone()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
@@ -338,7 +341,20 @@ impl GatewayServer {
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
-                                .wrap(auth),
+                                .wrap(auth.clone()),
+                        )
+                        // Protected trust endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/trust")
+                                .service(api::trust::get_trust_score)
+                                .service(api::trust::get_trust_edges)
+                                .service(api::trust::create_trust_attestation)
+                                .service(api::trust::revoke_trust_attestation)
+                                .service(api::trust::get_trust_network)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         )
                         // Protected notification endpoints (auth required)
                         .service(

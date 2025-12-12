@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::error::{GatewayError, Result};
+use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::trust_mgr::TrustManager;
 use icn_identity::Did;
 use icn_trust::TrustEdge;
@@ -100,6 +101,7 @@ pub async fn create_trust_attestation(
     req: web::Json<CreateTrustEdgeRequest>,
     from_did: web::ReqData<Did>,
     trust_manager: web::Data<Arc<TrustManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
 ) -> Result<HttpResponse> {
     let to_did = req
         .to
@@ -114,7 +116,7 @@ pub async fn create_trust_attestation(
     }
 
     let from = from_did.into_inner();
-    let mut edge = TrustEdge::new(from, to_did, req.score);
+    let mut edge = TrustEdge::new(from.clone(), to_did.clone(), req.score);
 
     // Add memo as label if provided
     if let Some(ref memo) = req.memo {
@@ -124,6 +126,16 @@ pub async fn create_trust_attestation(
     trust_manager
         .add_edge(edge)
         .map_err(|e| GatewayError::InternalError(e))?;
+
+    // Broadcast event to target DID (they received a trust attestation)
+    // Use target's DID as the "coop_id" for personal notifications
+    let event = GatewayEvent::TrustAttested {
+        from: from.to_string(),
+        to: to_did.to_string(),
+        score: req.score,
+        memo: req.memo.clone(),
+    };
+    event_broadcaster.broadcast(&to_did.to_string(), event).await;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
@@ -156,6 +168,47 @@ pub async fn get_trust_network(
 pub struct NetworkQuery {
     /// Maximum distance (hops) to explore
     depth: Option<u32>,
+}
+
+/// Revoke trust edge request
+#[derive(Debug, Deserialize)]
+pub struct RevokeTrustEdgeRequest {
+    /// Target DID to revoke attestation for
+    pub to: String,
+}
+
+/// POST /v1/trust/revoke - Revoke a trust attestation
+///
+/// Removes a trust edge from the authenticated DID to another DID.
+#[post("/trust/revoke")]
+pub async fn revoke_trust_attestation(
+    req: web::Json<RevokeTrustEdgeRequest>,
+    from_did: web::ReqData<Did>,
+    trust_manager: web::Data<Arc<TrustManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+) -> Result<HttpResponse> {
+    let to_did = req
+        .to
+        .parse::<Did>()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
+
+    let from = from_did.into_inner();
+    
+    trust_manager
+        .remove_edge(&from, &to_did)
+        .map_err(|e| GatewayError::InternalError(e))?;
+
+    // Broadcast event to target DID (they lost a trust attestation)
+    let event = GatewayEvent::TrustRevoked {
+        from: from.to_string(),
+        to: to_did.to_string(),
+    };
+    event_broadcaster.broadcast(&to_did.to_string(), event).await;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "Trust attestation revoked"
+    })))
 }
 
 #[cfg(test)]
