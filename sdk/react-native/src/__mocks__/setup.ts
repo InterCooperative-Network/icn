@@ -37,4 +37,4 @@ class MockWebSocket {
   }
 }
 
-(global as unknown as { WebSocket: typeof MockWebSocket }).WebSocket = MockWebSocket;
+(globalThis as unknown as { WebSocket: typeof MockWebSocket }).WebSocket = MockWebSocket;
