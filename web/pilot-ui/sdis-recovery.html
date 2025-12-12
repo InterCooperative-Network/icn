@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDIS Identity Recovery - ICN Pilot</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="sdis-recovery.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🆘 Identity Recovery</h1>
+            <p class="subtitle">Recover access to your decentralized identity</p>
+        </header>
+
+        <!-- Recovery Method Selection -->
+        <div id="recoveryMethodSelection" class="card">
+            <h2>Choose Recovery Method</h2>
+            <p>Select how you want to recover your identity:</p>
+
+            <div class="recovery-methods">
+                <button class="recovery-method-card" data-method="recovery-code">
+                    <span class="method-icon">🔑</span>
+                    <h3>Recovery Codes</h3>
+                    <p>Use your saved recovery codes</p>
+                    <span class="recommended-badge">Recommended</span>
+                </button>
+
+                <button class="recovery-method-card" data-method="anchor">
+                    <span class="method-icon">⚓</span>
+                    <h3>Identity Anchor</h3>
+                    <p>Verify via email, phone, or social</p>
+                </button>
+
+                <button class="recovery-method-card" data-method="steward">
+                    <span class="method-icon">👤</span>
+                    <h3>Steward Assistance</h3>
+                    <p>Request help from your steward</p>
+                </button>
+
+                <button class="recovery-method-card" data-method="social">
+                    <span class="method-icon">👥</span>
+                    <h3>Social Recovery</h3>
+                    <p>Recover with trusted contacts</p>
+                </button>
+
+                <button class="recovery-method-card" data-method="backup">
+                    <span class="method-icon">💾</span>
+                    <h3>Backup File</h3>
+                    <p>Import identity from backup</p>
+                </button>
+            </div>
+
+            <div class="help-section">
+                <h3>Need Help?</h3>
+                <p>If you've lost access to all recovery methods, contact your cooperative's support team.</p>
+                <button class="secondary-btn" id="contactSupportBtn">Contact Support</button>
+            </div>
+        </div>
+
+        <!-- Recovery Code Entry -->
+        <div id="recoveryCodeEntry" class="card" style="display: none;">
+            <button class="back-btn" data-back="method-selection">← Back</button>
+            
+            <h2>Enter Recovery Codes</h2>
+            <p>Enter the recovery codes provided during enrollment</p>
+
+            <form id="recoveryCodeForm">
+                <div class="code-entry-grid">
+                    <input type="text" class="code-input" maxlength="8" placeholder="Code 1" required>
+                    <input type="text" class="code-input" maxlength="8" placeholder="Code 2" required>
+                    <input type="text" class="code-input" maxlength="8" placeholder="Code 3" required>
+                    <input type="text" class="code-input" maxlength="8" placeholder="Code 4" required>
+                    <input type="text" class="code-input" maxlength="8" placeholder="Code 5" required>
+                    <input type="text" class="code-input" maxlength="8" placeholder="Code 6" required>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">Verify Codes</button>
+                </div>
+            </form>
+
+            <div class="security-note">
+                <strong>⚠️ Security Note:</strong> Recovery codes can only be used once. After successful recovery, new codes will be generated.
+            </div>
+        </div>
+
+        <!-- Anchor Recovery -->
+        <div id="anchorRecovery" class="card" style="display: none;">
+            <button class="back-btn" data-back="method-selection">← Back</button>
+            
+            <h2>Anchor Recovery</h2>
+            <p>Verify your identity using one of your registered anchors</p>
+
+            <form id="anchorRecoveryForm">
+                <div class="form-group">
+                    <label>Anchor Type</label>
+                    <select id="anchorTypeSelect" required>
+                        <option value="">Select anchor type...</option>
+                        <option value="email">Email Address</option>
+                        <option value="phone">Phone Number</option>
+                        <option value="domain">Domain Name</option>
+                        <option value="social">Social Media</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Anchor Value</label>
+                    <input type="text" id="anchorValueInput" required 
+                           placeholder="Enter your registered anchor">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">Send Verification</button>
+                </div>
+            </form>
+
+            <div id="verificationCodeSection" style="display: none;">
+                <h3>Verification Code</h3>
+                <p>Enter the code sent to your anchor:</p>
+                
+                <div class="verification-input-group">
+                    <input type="text" class="verification-digit" maxlength="1">
+                    <input type="text" class="verification-digit" maxlength="1">
+                    <input type="text" class="verification-digit" maxlength="1">
+                    <input type="text" class="verification-digit" maxlength="1">
+                    <input type="text" class="verification-digit" maxlength="1">
+                    <input type="text" class="verification-digit" maxlength="1">
+                </div>
+
+                <button class="primary-btn" id="verifyAnchorCodeBtn">Verify Code</button>
+                <button class="secondary-btn" id="resendCodeBtn">Resend Code</button>
+            </div>
+        </div>
+
+        <!-- Steward Recovery -->
+        <div id="stewardRecovery" class="card" style="display: none;">
+            <button class="back-btn" data-back="method-selection">← Back</button>
+            
+            <h2>Steward-Assisted Recovery</h2>
+            <p>Request your steward to verify your identity</p>
+
+            <form id="stewardRecoveryForm">
+                <div class="form-group">
+                    <label>Your DID (if known)</label>
+                    <input type="text" id="recoveryDid" 
+                           placeholder="did:icn:...">
+                </div>
+
+                <div class="form-group">
+                    <label>Steward Contact Information</label>
+                    <input type="text" id="stewardContact" required 
+                           placeholder="Email or phone of your steward">
+                </div>
+
+                <div class="form-group">
+                    <label>Verification Details</label>
+                    <textarea id="verificationDetails" rows="4" required
+                              placeholder="Provide information to help your steward verify your identity (e.g., enrollment date, shared information, etc.)"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="primary-btn">Request Recovery</button>
+                </div>
+            </form>
+
+            <div id="stewardRequestStatus" style="display: none;">
+                <div class="status-message success">
+                    <h3>✅ Recovery Request Sent</h3>
+                    <p>Your steward has been notified. They will contact you to verify your identity.</p>
+                    <p><strong>Reference ID:</strong> <code id="requestReferenceId"></code></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Recovery -->
+        <div id="socialRecovery" class="card" style="display: none;">
+            <button class="back-btn" data-back="method-selection">← Back</button>
+            
+            <h2>Social Recovery</h2>
+            <p>Recover your identity with help from trusted contacts (requires 3 of 5 guardians)</p>
+
+            <div class="guardian-setup">
+                <h3>Your Recovery Guardians</h3>
+                <p>Contact these people and request their approval:</p>
+
+                <div id="guardiansList">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <div class="recovery-progress">
+                    <h4>Recovery Progress</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="recoveryProgressBar" style="width: 0%"></div>
+                    </div>
+                    <p><span id="approvalCount">0</span> of <span id="requiredApprovals">3</span> approvals received</p>
+                </div>
+
+                <button class="secondary-btn" id="checkRecoveryStatusBtn">Check Status</button>
+            </div>
+        </div>
+
+        <!-- Backup Import -->
+        <div id="backupImport" class="card" style="display: none;">
+            <button class="back-btn" data-back="method-selection">← Back</button>
+            
+            <h2>Import Backup</h2>
+            <p>Restore your identity from a backup file</p>
+
+            <div class="import-options">
+                <button class="import-option-btn" id="selectBackupFileBtn">
+                    <span class="icon">📁</span>
+                    <span>Select Backup File</span>
+                </button>
+
+                <div class="divider">OR</div>
+
+                <button class="import-option-btn" id="pasteBackupBtn">
+                    <span class="icon">📋</span>
+                    <span>Paste Backup JSON</span>
+                </button>
+            </div>
+
+            <div id="backupPreview" style="display: none;">
+                <h3>Backup Preview</h3>
+                <div class="backup-info">
+                    <p><strong>DID:</strong> <span id="backupDid"></span></p>
+                    <p><strong>Exported:</strong> <span id="backupDate"></span></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Backup Passphrase (if encrypted)</label>
+                    <input type="password" id="backupPassphrase" 
+                           placeholder="Enter passphrase">
+                </div>
+
+                <div class="form-actions">
+                    <button class="danger-btn" id="cancelImportBtn">Cancel</button>
+                    <button class="primary-btn" id="importBackupBtn">Import Identity</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recovery Success -->
+        <div id="recoverySuccess" class="card success-card" style="display: none;">
+            <div class="success-icon">✅</div>
+            <h2>Recovery Successful!</h2>
+            <p>Your identity has been recovered successfully.</p>
+
+            <div class="recovery-summary">
+                <h3>What's Next?</h3>
+                <ul>
+                    <li>✓ New recovery codes have been generated</li>
+                    <li>✓ Download and securely store the new codes</li>
+                    <li>✓ Update your recovery anchors if needed</li>
+                    <li>✓ Review your security settings</li>
+                </ul>
+            </div>
+
+            <div class="form-actions">
+                <button class="secondary-btn" id="downloadNewCodesBtn">
+                    Download Recovery Codes
+                </button>
+                <button class="primary-btn" id="continueToIdentityBtn">
+                    Continue to Identity
+                </button>
+            </div>
+        </div>
+
+        <!-- Paste Backup Modal -->
+        <div id="pasteBackupModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Paste Backup JSON</h2>
+                <textarea id="backupJsonInput" 
+                          placeholder="Paste your backup JSON here..."
+                          rows="10"></textarea>
+                <button class="primary-btn" id="processBackupBtn">
+                    Process Backup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="sdis-recovery.js"></script>
+</body>
+</html>
