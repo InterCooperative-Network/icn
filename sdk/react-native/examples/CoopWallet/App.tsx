@@ -908,6 +908,38 @@ function ReceiveScreen({ userDid, coopId }: { userDid: string; coopId: string })
 function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: string; userDid: string }) {
   const [manualEntry, setManualEntry] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanned, setScanned] = useState(false);
+
+  // Dynamic import of camera to avoid web errors
+  const [Camera, setCamera] = useState<any>(null);
+  const [BarCodeScanner, setBarCodeScanner] = useState<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      // Import camera components only on native
+      import('expo-camera').then((module) => {
+        setCamera(() => module.Camera);
+        setBarCodeScanner(() => module.BarCodeScanner);
+      }).catch((err) => {
+        console.error('Failed to load camera:', err);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' && Camera) {
+      (async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(status === 'granted');
+      })();
+    }
+  }, [Camera]);
+
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    setScanned(true);
+    processQRData(data);
+  };
 
   const processQRData = (data: string) => {
     try {
@@ -986,11 +1018,124 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
     );
   }
 
+  // Native camera scanner
+  if (hasPermission === null) {
+    return (
+      <View style={styles.scanContainer}>
+        <ActivityIndicator size="large" color="#4A90A4" />
+        <Text style={styles.cameraText}>Requesting camera permission...</Text>
+      </View>
+    );
+  }
+
+  if (hasPermission === false) {
+    return (
+      <View style={styles.scanContainer}>
+        <Text style={styles.cameraIcon}>🚫</Text>
+        <Text style={styles.cameraText}>Camera permission denied</Text>
+        <Text style={styles.sectionSubtitle}>
+          Please enable camera access in your device settings to scan QR codes.
+        </Text>
+        
+        {/* Fallback to manual entry */}
+        <View style={styles.manualEntrySection}>
+          <Text style={styles.sectionTitle}>Manual Entry</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Paste DID or payment request"
+            value={manualEntry}
+            onChangeText={(text) => {
+              setManualEntry(text);
+              setError(null);
+            }}
+            multiline
+          />
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => {
+              if (manualEntry.trim()) {
+                processQRData(manualEntry.trim());
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>Process</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!Camera || !BarCodeScanner) {
+    return (
+      <View style={styles.scanContainer}>
+        <ActivityIndicator size="large" color="#4A90A4" />
+        <Text style={styles.cameraText}>Loading camera...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.scanContainer}>
-      <View style={styles.cameraPlaceholder}>
-        <Text style={styles.cameraIcon}>📷</Text>
-        <Text style={styles.cameraText}>Point at QR Code</Text>
+      <Camera
+        style={styles.camera}
+        type={Camera.Constants?.Type?.back || 0}
+        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barCodeScannerSettings={{
+          barCodeTypes: [BarCodeScanner.Constants?.BarCodeType?.qr || 'qr'],
+        }}
+      >
+        <View style={styles.scanOverlay}>
+          <View style={styles.scanFrame} />
+          <Text style={styles.scanInstructions}>
+            {scanned ? '✓ Scanned!' : 'Point camera at QR code'}
+          </Text>
+          
+          {scanned && (
+            <TouchableOpacity
+              style={styles.scanAgainButton}
+              onPress={() => setScanned(false)}
+            >
+              <Text style={styles.scanAgainText}>Scan Again</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Camera>
+
+      {/* Manual entry fallback */}
+      <View style={styles.manualEntrySection}>
+        <Text style={styles.sectionTitle}>Or Enter Manually</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Paste DID or payment request"
+          value={manualEntry}
+          onChangeText={(text) => {
+            setManualEntry(text);
+            setError(null);
+          }}
+          multiline
+        />
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => {
+            if (manualEntry.trim()) {
+              processQRData(manualEntry.trim());
+            }
+          }}
+        >
+          <Text style={styles.buttonText}>Process</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -2298,6 +2443,45 @@ const styles = StyleSheet.create({
   scanContainer: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  camera: {
+    flex: 1,
+    minHeight: 400,
+  },
+  scanOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#4A90A4',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  scanInstructions: {
+    fontSize: 16,
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  scanAgainButton: {
+    backgroundColor: '#4A90A4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  scanAgainText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   cameraPlaceholder: {
     flex: 1,
