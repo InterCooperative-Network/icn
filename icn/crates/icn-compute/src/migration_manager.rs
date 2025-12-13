@@ -42,6 +42,7 @@
 use crate::actor_model::{
     ActorCheckpoint, ActorId, ActorRuntimeState, MigrationDecision, MigrationReason, MigrationState,
 };
+use crate::actor_runtime::{ActorRuntimeCallback, ActorRuntimeCommand, PauseReason};
 use crate::checkpoint_store::CheckpointStore;
 use crate::error::ComputeError;
 use crate::migration_policy::MigrationPolicy;
@@ -72,6 +73,9 @@ pub struct ActorMigrationManager {
 
     /// This executor's DID
     own_did: String,
+
+    /// Callback to control actor runtime (pause/resume)
+    actor_runtime: Option<ActorRuntimeCallback>,
 }
 
 impl ActorMigrationManager {
@@ -88,7 +92,67 @@ impl ActorMigrationManager {
             checkpoints,
             send_message,
             own_did,
+            actor_runtime: None,
         }
+    }
+
+    /// Set actor runtime callback for pause/resume operations.
+    pub fn set_actor_runtime(&mut self, callback: ActorRuntimeCallback) {
+        self.actor_runtime = Some(callback);
+    }
+
+    /// Pause an actor for migration.
+    fn pause_actor(&self, actor_id: ActorId) -> Result<(), ComputeError> {
+        if let Some(ref callback) = self.actor_runtime {
+            callback(ActorRuntimeCommand::Pause {
+                actor_id,
+                reason: PauseReason::MigrationPending,
+            })?;
+            tracing::debug!(
+                actor_id = %hex::encode(actor_id),
+                "Actor paused for migration"
+            );
+        } else {
+            tracing::warn!(
+                actor_id = %hex::encode(actor_id),
+                "No actor runtime callback set, skipping pause"
+            );
+        }
+        Ok(())
+    }
+
+    /// Resume a paused actor (e.g., after migration rejection).
+    fn resume_actor(&self, actor_id: ActorId) -> Result<(), ComputeError> {
+        if let Some(ref callback) = self.actor_runtime {
+            callback(ActorRuntimeCommand::Resume { actor_id })?;
+            tracing::debug!(
+                actor_id = %hex::encode(actor_id),
+                "Actor resumed after migration cancellation"
+            );
+        } else {
+            tracing::warn!(
+                actor_id = %hex::encode(actor_id),
+                "No actor runtime callback set, skipping resume"
+            );
+        }
+        Ok(())
+    }
+
+    /// Restore an actor from checkpoint (target executor).
+    fn restore_actor(&self, actor_id: ActorId, checkpoint: ActorCheckpoint) -> Result<(), ComputeError> {
+        if let Some(ref callback) = self.actor_runtime {
+            callback(ActorRuntimeCommand::Restore { actor_id, checkpoint })?;
+            tracing::debug!(
+                actor_id = %hex::encode(actor_id),
+                "Actor restored from checkpoint"
+            );
+        } else {
+            tracing::warn!(
+                actor_id = %hex::encode(actor_id),
+                "No actor runtime callback set, skipping restore"
+            );
+        }
+        Ok(())
     }
 
     /// Evaluate if actor should migrate (called periodically).
@@ -299,7 +363,8 @@ impl ActorMigrationManager {
         );
         drop(migrations);
 
-        // TODO: Pause actor execution here (Week 4 - actor runtime integration)
+        // Pause actor execution before creating final checkpoint
+        self.pause_actor(actor_id)?;
 
         // Create final checkpoint
         let final_checkpoint = self
@@ -374,7 +439,8 @@ impl ActorMigrationManager {
         );
         drop(migrations);
 
-        // TODO: Resume actor execution here (Week 4)
+        // Resume actor execution since migration was rejected
+        self.resume_actor(actor_id)?;
 
         Ok(())
     }
@@ -414,11 +480,12 @@ impl ActorMigrationManager {
         );
         drop(migrations);
 
-        // TODO: Resume actor execution with checkpoint state (Week 4)
+        // Restore and resume actor execution with checkpoint state
+        self.restore_actor(actor_id, final_checkpoint)?;
 
         tracing::info!(
             actor_id = %hex::encode(actor_id),
-            "Actor migrated successfully, ready to resume"
+            "Actor migrated successfully and resumed"
         );
 
         Ok(())

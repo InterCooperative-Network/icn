@@ -23,6 +23,7 @@
 
 mod actor;
 mod actor_model;
+mod actor_runtime;
 mod checkpoint_store;
 mod error;
 mod executor;
@@ -42,6 +43,10 @@ pub use actor::{
 pub use actor_model::{
     ActorCheckpoint, ActorEvent, ActorId, ActorMode, ActorRuntimeState, MigrationDecision,
     MigrationReason, MigrationState, TerminationReason,
+};
+pub use actor_runtime::{
+    ActorRuntimeCallback, ActorRuntimeCommand, PauseReason, StatefulActorInfo, StatefulActorRegistry,
+    StatefulActorState,
 };
 pub use checkpoint_store::{
     CheckpointBackend, CheckpointStore, InMemoryBackend, SledCheckpointBackend,
