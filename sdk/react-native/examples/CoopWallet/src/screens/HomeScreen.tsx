@@ -15,10 +15,11 @@ import {
   Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useAuth, useBalance, useRealtime, useTransactions, useMemberProfile, useEvent, useNetworkState, useQueue, useTrustScore } from '@icn/react-native';
+import { useAuth, useBalance, useRealtime, useTransactions, useMemberProfile, useEvent, useNetworkState, useQueue, useTrustScore, usePendingEnrollments } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
 import { TrustBadge } from '../components/TrustBadge';
+import { BottomNavBar } from '../components/BottomNavBar';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -33,6 +34,7 @@ export function HomeScreen({ navigation }: Props) {
   const { networkState, isOnline, isOffline } = useNetworkState(client!);
   const { pendingCount, failedCount, clearFailed } = useQueue(client!);
   const { data: trustData } = useTrustScore(client!, did);
+  const { pendingCount: stewardPendingCount } = usePendingEnrollments(client!);
 
   const isLoading = balanceLoading || txLoading;
   const refresh = () => {
@@ -56,12 +58,14 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={isLoading} onRefresh={refresh} />
-      }
-    >
+    <View style={styles.screenContainer}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={isLoading} onRefresh={refresh} />
+        }
+      >
       {/* Connection Status */}
       <View style={styles.statusBar}>
         <View style={styles.statusLeft}>
@@ -259,14 +263,27 @@ export function HomeScreen({ navigation }: Props) {
       <TouchableOpacity style={styles.logoutButton} onPress={logout}>
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+      <BottomNavBar
+        navigation={navigation}
+        activeTab="Home"
+        pendingEnrollments={stewardPendingCount}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    paddingBottom: 70, // Space for bottom nav bar
   },
   statusBar: {
     flexDirection: 'row',
