@@ -2115,13 +2115,22 @@ impl ComputeActor {
                     return;
                 }
 
-                // Select highest score
+                // Select highest score with deterministic tie-breaking
+                // When scores are equal (within epsilon), use lexicographic DID comparison
+                // This ensures consistent selection across different platforms
                 let winner = offers
                     .iter()
                     .max_by(|a, b| {
-                        a.score
-                            .partial_cmp(&b.score)
-                            .unwrap_or(std::cmp::Ordering::Equal)
+                        const EPSILON: f64 = 1e-9;
+                        let score_diff = a.score - b.score;
+                        if score_diff.abs() < EPSILON {
+                            // Scores are effectively equal, use DID as tie-breaker
+                            a.executor.cmp(&b.executor)
+                        } else if score_diff > 0.0 {
+                            std::cmp::Ordering::Greater
+                        } else {
+                            std::cmp::Ordering::Less
+                        }
                     })
                     .unwrap();
 
