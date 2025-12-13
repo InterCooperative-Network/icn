@@ -20,6 +20,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 const CONTACTS_KEY = 'icn_contacts';
 
@@ -47,6 +48,8 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
 };
 
 export function TransactionDetailScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { transaction } = route.params;
   const { did: userDid } = useAuth(client!);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -355,10 +358,10 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -368,10 +371,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
   headerSent: {
-    backgroundColor: '#ffebee',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(229, 57, 53, 0.15)' : '#ffebee',
   },
   headerReceived: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(67, 160, 71, 0.15)' : '#e8f5e9',
   },
   headerIcon: {
     fontSize: 32,
@@ -383,15 +386,15 @@ const styles = StyleSheet.create({
   headerType: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   headerTime: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   amountCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     margin: 16,
     padding: 24,
     borderRadius: 16,
@@ -407,18 +410,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   amountSent: {
-    color: '#d32f2f',
+    color: theme.colors.error,
   },
   amountReceived: {
-    color: '#388e3c',
+    color: theme.colors.success,
   },
   currency: {
     fontSize: 18,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     margin: 16,
     marginTop: 0,
     padding: 16,
@@ -427,7 +430,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 16,
   },
   detailRow: {
@@ -436,11 +439,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.borderLight,
   },
   detailLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   detailValueRow: {
     flexDirection: 'row',
@@ -448,11 +451,11 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   youBadge: {
-    color: '#4a90d9',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   copyIcon: {
@@ -463,14 +466,14 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   memoBox: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.borderLight,
     padding: 12,
     borderRadius: 8,
     marginTop: 8,
   },
   memoText: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     lineHeight: 20,
   },
   actions: {
@@ -481,7 +484,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -497,7 +500,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 12,
-    color: '#333',
+    color: theme.colors.text,
     textAlign: 'center',
   },
   statusSection: {
@@ -508,17 +511,17 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e8f5e9',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(56, 142, 60, 0.2)' : '#e8f5e9',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
   statusIcon: {
-    color: '#388e3c',
+    color: theme.colors.success,
     marginRight: 6,
   },
   statusText: {
-    color: '#388e3c',
+    color: theme.colors.success,
     fontWeight: '500',
   },
 });

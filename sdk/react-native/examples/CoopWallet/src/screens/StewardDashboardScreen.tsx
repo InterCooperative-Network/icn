@@ -18,12 +18,15 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePendingEnrollments, useStewardStats, Enrollment } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'StewardDashboard'>;
 };
 
 export function StewardDashboardScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const [activeTab, setActiveTab] = useState<'pending' | 'stats'>('pending');
 
   const {
@@ -211,16 +214,16 @@ function getLevelStyle(level: number) {
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   tab: {
     flex: 1,
@@ -232,14 +235,14 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#4A90A4',
+    borderBottomColor: theme.colors.primary,
   },
   tabText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   activeTabText: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   badge: {
@@ -260,7 +263,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   enrollmentCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -279,7 +282,7 @@ const styles = StyleSheet.create({
   identityName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     flex: 1,
   },
   levelBadge: {
@@ -308,7 +311,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   statusRow: {
     flexDirection: 'row',
@@ -316,11 +319,11 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   statusValue: {
     fontSize: 13,
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   loadingContainer: {
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   errorContainer: {
     padding: 40,
@@ -338,12 +341,12 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#e53935',
+    color: theme.colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -365,12 +368,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   statsContainer: {
@@ -384,7 +387,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     flex: 1,
@@ -399,15 +402,15 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#4A90A4',
+    color: theme.colors.primary,
   },
   statLabel: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   responseTimeCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
@@ -420,16 +423,16 @@ const styles = StyleSheet.create({
   },
   responseTimeLabel: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   responseTimeValue: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   historyButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

@@ -18,7 +18,7 @@ import {
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { ICNMobileClient } from '@icn/react-native';
-import { useTheme, ThemeMode } from '../contexts/ThemeContext';
+import { useTheme, ThemeMode, Theme } from '../contexts/ThemeContext';
 
 interface SettingsScreenProps {
   client: ICNMobileClient;
@@ -30,6 +30,7 @@ const BIOMETRICS_ENABLED_KEY = 'icn_biometrics_enabled';
 
 export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProps) {
   const { theme, themeMode, setThemeMode, isDark } = useTheme();
+  const styles = createStyles(theme);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [biometricType, setBiometricType] = useState<string>('Biometrics');
@@ -237,7 +238,7 @@ export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProp
               <Switch
                 value={biometricsEnabled}
                 onValueChange={toggleBiometrics}
-                trackColor={{ false: '#ccc', true: '#4A90A4' }}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
               />
             )}
           {renderSettingRow(
@@ -297,7 +298,7 @@ export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProp
             <Switch
               value={true}
               onValueChange={() => Alert.alert('Not Implemented', 'Notification settings coming soon.')}
-              trackColor={{ false: '#ccc', true: '#4A90A4' }}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
             />
           )}
           {renderSettingRow(
@@ -306,7 +307,7 @@ export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProp
             <Switch
               value={true}
               onValueChange={() => {}}
-              trackColor={{ false: '#ccc', true: '#4A90A4' }}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
             />
           )}
         </>
@@ -364,10 +365,10 @@ export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProp
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   content: {
     paddingBottom: 32,
@@ -378,17 +379,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#999',
+    color: theme.colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginHorizontal: 16,
     marginBottom: 8,
   },
   sectionContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.border,
   },
   settingRow: {
     flexDirection: 'row',
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   settingInfo: {
     flex: 1,
@@ -405,16 +406,16 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   settingDescription: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   chevron: {
     fontSize: 20,
-    color: '#ccc',
+    color: theme.colors.textMuted,
   },
   themeButtons: {
     flexDirection: 'row',
@@ -424,44 +425,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   themeButtonActive: {
-    backgroundColor: '#4A90A4',
-    borderColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   themeButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   themeButtonTextActive: {
     color: '#fff',
   },
   versionText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   dangerButton: {
     margin: 16,
     marginBottom: 8,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E53935',
+    borderColor: theme.colors.error,
     alignItems: 'center',
   },
   dangerButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#E53935',
+    color: theme.colors.error,
   },
   deleteButton: {
-    backgroundColor: '#E53935',
-    borderColor: '#E53935',
+    backgroundColor: theme.colors.error,
+    borderColor: theme.colors.error,
     marginTop: 0,
   },
   deleteButtonText: {
@@ -477,11 +478,11 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   footerSubtext: {
     fontSize: 12,
-    color: '#ccc',
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
 });

@@ -17,8 +17,11 @@ import {
   Platform,
 } from 'react-native';
 import { client } from '../client';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 export function LoginScreen() {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const [coopId, setCoopId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,10 +101,10 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
   },
   content: {
     flex: 1,
@@ -122,7 +125,7 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   form: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 24,
     shadowColor: '#000',
@@ -134,18 +137,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 8,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
+    color: theme.colors.text,
   },
   button: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -159,7 +163,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   error: {
-    color: '#e53935',
+    color: theme.colors.error,
     fontSize: 14,
     marginBottom: 16,
     textAlign: 'center',

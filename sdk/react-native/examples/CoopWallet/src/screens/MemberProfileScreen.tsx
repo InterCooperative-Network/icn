@@ -18,6 +18,7 @@ import {
 import { ICNMobileClient } from '@icn/react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Identicon } from '../components/Identicon';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 interface MemberProfileScreenProps {
   client: ICNMobileClient;
@@ -41,6 +42,8 @@ interface TrustScore {
 }
 
 export function MemberProfileScreen({ client, coopId, memberDid, userDid }: MemberProfileScreenProps) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const navigation = useNavigation();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [trustScore, setTrustScore] = useState<TrustScore | null>(null);
@@ -238,10 +241,10 @@ export function MemberProfileScreen({ client, coopId, memberDid, userDid }: Memb
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 16,
@@ -251,34 +254,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    backgroundColor: theme.colors.background,
   },
   errorTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#E53935',
+    color: theme.colors.error,
     marginBottom: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
   },
   retryText: {
@@ -286,7 +291,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   headerCard: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
@@ -351,7 +356,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -364,7 +369,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#999',
+    color: theme.colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 12,
@@ -377,7 +382,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
@@ -385,11 +390,11 @@ const styles = StyleSheet.create({
   trustScoreValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#333',
+    color: theme.colors.text,
   },
   trustScoreLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginLeft: 2,
   },
   trustInfo: {
@@ -410,7 +415,7 @@ const styles = StyleSheet.create({
   },
   trustDescription: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -423,33 +428,33 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#333',
+    color: theme.colors.text,
   },
   statLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.border,
   },
   joinedInfo: {
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.colors.borderLight,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   joinedLabel: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   joinedDate: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   actionsContainer: {
@@ -457,7 +462,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -468,21 +473,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#4A90A4',
+    borderColor: theme.colors.primary,
   },
   secondaryButtonText: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
   fullDid: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontFamily: 'monospace',
     lineHeight: 18,
   },

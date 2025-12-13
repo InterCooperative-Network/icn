@@ -24,6 +24,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth, usePayment, useTransactions } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 const CONTACTS_KEY = 'icn_contacts';
 
@@ -45,6 +46,8 @@ type Props = {
 };
 
 export function PaymentScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { coopId, did: userDid } = useAuth(client!);
   const { pay, isPaying, error } = usePayment(client!, coopId || '');
   const { transactions } = useTransactions(client!, coopId || '', 20);
@@ -245,10 +248,10 @@ export function PaymentScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   scrollContainer: {
     flex: 1,
@@ -260,30 +263,30 @@ const styles = StyleSheet.create({
   quickTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   quickChip: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.border,
   },
   quickChipName: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   moreChip: {
-    backgroundColor: '#f0f0f0',
-    borderColor: '#ddd',
+    backgroundColor: theme.colors.borderLight,
+    borderColor: theme.colors.border,
   },
   moreChipText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   form: {
     padding: 24,
@@ -292,17 +295,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 8,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.border,
+    color: theme.colors.text,
   },
   clearButton: {
     position: 'absolute',
@@ -310,7 +314,7 @@ const styles = StyleSheet.create({
     top: 44,
   },
   clearButtonText: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontSize: 14,
   },
   memoInput: {
@@ -318,7 +322,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   button: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -333,7 +337,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   error: {
-    color: '#e53935',
+    color: theme.colors.error,
     fontSize: 14,
     marginBottom: 16,
     textAlign: 'center',
@@ -344,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scanButtonText: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontSize: 16,
   },
 });

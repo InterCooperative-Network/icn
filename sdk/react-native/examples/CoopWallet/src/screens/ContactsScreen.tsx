@@ -19,6 +19,7 @@ import * as SecureStore from 'expo-secure-store';
 import { ICNMobileClient } from '@icn/react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Identicon } from '../components/Identicon';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 interface ContactsScreenProps {
   client: ICNMobileClient;
@@ -34,6 +35,8 @@ interface Contact {
 const CONTACTS_KEY = 'icn_contacts';
 
 export function ContactsScreen({ client, coopId }: ContactsScreenProps) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const navigation = useNavigation();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -268,38 +271,39 @@ export function ContactsScreen({ client, coopId }: ContactsScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   listContent: {
     paddingBottom: 24,
   },
   headerContainer: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   searchContainer: {
     marginBottom: 12,
   },
   searchInput: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   addButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -310,20 +314,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   addForm: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 8,
     padding: 16,
   },
   addInput: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.border,
   },
   addFormButtons: {
     flexDirection: 'row',
@@ -336,21 +340,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.border,
   },
   cancelButtonText: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
   },
   saveButtonText: {
     color: '#fff',
     fontWeight: '600',
   },
   contactCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 12,
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -388,11 +392,11 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   contactDid: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
     fontFamily: 'monospace',
     marginTop: 2,
   },
@@ -401,7 +405,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
@@ -412,11 +416,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   deleteButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     paddingHorizontal: 12,
   },
   deleteButtonText: {
-    color: '#999',
+    color: theme.colors.textMuted,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -433,12 +437,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
 });

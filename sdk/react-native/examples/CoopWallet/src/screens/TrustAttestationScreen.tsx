@@ -21,10 +21,13 @@ import { RootStackParamList } from '../../App';
 import { useICNContext } from '../contexts/ICNContext';
 import { useTrustAttestation } from '@icn/react-native';
 import { TrustBadge } from '../components/TrustBadge';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrustAttestation'>;
 
 export function TrustAttestationScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { client } = useICNContext();
   const { attest, isSubmitting, error: attestError, success } = useTrustAttestation(client);
   const { targetDid, targetName } = route.params || {};
@@ -232,10 +235,10 @@ export function TrustAttestationScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: theme.colors.background,
   },
   content: {
     flex: 1,
@@ -247,12 +250,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   section: {
     marginBottom: 24,
@@ -260,17 +263,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.card,
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   memoInput: {
     minHeight: 100,
@@ -278,7 +281,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
   },
@@ -287,12 +290,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     padding: 12,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 8,
   },
   previewLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginRight: 12,
   },
   presets: {
@@ -301,7 +304,7 @@ const styles = StyleSheet.create({
   presetsLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   presetButtons: {
@@ -317,19 +320,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   presetIsolated: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(239, 68, 68, 0.2)' : '#FEF2F2',
     borderColor: '#EF4444',
   },
   presetKnown: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
     borderColor: '#F59E0B',
   },
   presetPartner: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5',
     borderColor: '#10B981',
   },
   presetFederated: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(59, 130, 246, 0.2)' : '#DBEAFE',
     borderColor: '#3B82F6',
   },
   presetText: {
@@ -339,10 +342,10 @@ const styles = StyleSheet.create({
   },
   presetScore: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   infoBox: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
     borderLeftWidth: 4,
     borderLeftColor: '#3B82F6',
     padding: 16,
@@ -352,12 +355,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E40AF',
+    color: theme.mode === 'dark' ? '#93C5FD' : '#1E40AF',
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: '#1E40AF',
+    color: theme.mode === 'dark' ? '#93C5FD' : '#1E40AF',
     marginBottom: 4,
   },
   submitButton: {
@@ -368,7 +371,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   submitButtonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: theme.colors.border,
   },
   submitButtonText: {
     color: '#FFF',
@@ -382,7 +385,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   cancelButtonText: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },

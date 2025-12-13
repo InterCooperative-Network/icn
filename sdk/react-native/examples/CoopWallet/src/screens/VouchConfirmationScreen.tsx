@@ -21,6 +21,7 @@ import { RouteProp } from '@react-navigation/native';
 import { useVouch } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'VouchConfirmation'>;
@@ -28,6 +29,8 @@ type Props = {
 };
 
 export function VouchConfirmationScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { enrollmentId, identityName } = route.params;
   const [statement, setStatement] = useState('');
   const [check1, setCheck1] = useState(false);

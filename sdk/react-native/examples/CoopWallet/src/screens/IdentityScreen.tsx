@@ -26,6 +26,7 @@ import {
 } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Identity'>;
 
@@ -46,6 +47,8 @@ const VALIDITY_OPTIONS = [
 ];
 
 export function IdentityScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { proof, qrData, proofType, isGenerating, error, timeRemaining, isExpired, generate, clear } =
     useSdisProof(client!);
   const { isAvailable, isChecking, check } = useSdisHealth(client!);
@@ -214,10 +217,10 @@ export function IdentityScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     padding: 16,
   },
   statusBar: {
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     padding: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderRadius: 8,
   },
   statusItem: {
@@ -241,16 +244,16 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
   },
   refreshLink: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontSize: 14,
   },
   qrContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 24,
     marginBottom: 16,
@@ -270,20 +273,20 @@ const styles = StyleSheet.create({
   },
   qrPlaceholderIcon: {
     fontSize: 48,
-    color: '#ccc',
+    color: theme.colors.textMuted,
     marginBottom: 12,
     fontWeight: 'bold',
   },
   qrPlaceholderText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
   expiryBadge: {
     marginTop: 16,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 20,
   },
   expiryText: {
@@ -292,7 +295,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   proofInfo: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
@@ -300,32 +303,32 @@ const styles = StyleSheet.create({
   },
   proofInfoLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   proofInfoValue: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(198, 40, 40, 0.2)' : '#ffebee',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   errorText: {
-    color: '#c62828',
+    color: theme.colors.error,
     fontSize: 14,
   },
   sectionLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     marginLeft: 4,
   },
   selector: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
@@ -335,18 +338,18 @@ const styles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   selectorArrow: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   buttonContainer: {
     marginTop: 8,
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -357,19 +360,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
   },
   secondaryButtonText: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 16,
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.border,
   },
   modalOverlay: {
     flex: 1,
@@ -377,7 +380,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 16,
@@ -385,17 +388,18 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: theme.colors.text,
     marginBottom: 16,
     textAlign: 'center',
   },
   modalOption: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.borderLight,
   },
   modalOptionText: {
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   modalCancel: {
     padding: 16,
@@ -404,6 +408,6 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
 });

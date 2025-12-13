@@ -22,6 +22,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTransactions, Transaction } from '@icn/react-native';
 import { ICNMobileClient } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 interface TransactionsScreenProps {
   client: ICNMobileClient;
@@ -33,6 +34,8 @@ interface TransactionsScreenProps {
 type FilterType = 'all' | 'sent' | 'received';
 
 export function TransactionsScreen({ client, coopId, userDid, navigation }: TransactionsScreenProps) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -284,27 +287,27 @@ export function TransactionsScreen({ client, coopId, userDid, navigation }: Tran
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   headerContainer: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   searchContainer: {
     marginBottom: 12,
   },
   searchInput: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -316,16 +319,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     alignItems: 'center',
   },
   filterButtonActive: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
   },
   filterText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   filterTextActive: {
     color: '#fff',
@@ -337,21 +340,21 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   exportButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
   },
   exportButtonText: {
     fontSize: 12,
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   transactionCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     marginHorizontal: 16,
     marginVertical: 6,
     borderRadius: 12,
@@ -374,7 +377,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontSize: 20,
-    color: '#ccc',
+    color: theme.colors.textMuted,
     marginLeft: 8,
   },
   typeIndicator: {
@@ -383,19 +386,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   sentIndicator: {
-    backgroundColor: '#FFE5E5',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(229, 57, 53, 0.2)' : '#FFE5E5',
   },
   receivedIndicator: {
-    backgroundColor: '#E5FFE5',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(67, 160, 71, 0.2)' : '#E5FFE5',
   },
   typeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   transactionDate: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   transactionBody: {
     marginBottom: 12,
@@ -410,14 +413,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   sentAmount: {
-    color: '#E53935',
+    color: theme.colors.error,
   },
   receivedAmount: {
-    color: '#43A047',
+    color: theme.colors.success,
   },
   currency: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginLeft: 6,
   },
   partyInfo: {
@@ -427,28 +430,28 @@ const styles = StyleSheet.create({
   },
   partyLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginRight: 6,
   },
   partyDid: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontFamily: 'monospace',
   },
   memoContainer: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 6,
   },
   memoLabel: {
     fontSize: 10,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginBottom: 2,
   },
   memoText: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
   },
   transactionFooter: {
     flexDirection: 'row',
@@ -456,11 +459,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.colors.borderLight,
   },
   hashText: {
     fontSize: 10,
-    color: '#999',
+    color: theme.colors.textMuted,
     fontFamily: 'monospace',
   },
   statusBadge: {
@@ -472,17 +475,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   confirmed: {
-    backgroundColor: '#E8F5E9',
-    color: '#2E7D32',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(46, 125, 50, 0.2)' : '#E8F5E9',
+    color: theme.colors.success,
   },
   pending: {
-    backgroundColor: '#FFF3E0',
-    color: '#EF6C00',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(239, 108, 0, 0.2)' : '#FFF3E0',
+    color: theme.colors.warning,
   },
   loadMoreButton: {
     margin: 16,
     padding: 16,
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -503,12 +506,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
   errorContainer: {
@@ -516,23 +519,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    backgroundColor: theme.colors.background,
   },
   errorText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#E53935',
+    color: theme.colors.error,
     marginBottom: 8,
   },
   errorDetail: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
   },
   retryText: {

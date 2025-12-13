@@ -15,8 +15,11 @@ import {
 } from 'react-native';
 import { useVouchHistory, VouchRecord } from '@icn/react-native';
 import { client } from '../client';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 export function VouchHistoryScreen() {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { history, total, isLoading, error, refresh } = useVouchHistory(client!, 100);
 
   const renderVouchItem = ({ item }: { item: VouchRecord }) => (

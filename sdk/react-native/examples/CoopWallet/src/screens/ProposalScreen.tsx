@@ -19,6 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useProposals } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Proposal'>;
@@ -26,6 +27,8 @@ type Props = {
 };
 
 export function ProposalScreen({ route, navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { proposalId } = route.params;
   const { proposals, vote, isLoading } = useProposals(client!);
   const [voting, setVoting] = useState(false);
@@ -189,24 +192,25 @@ export function ProposalScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   loading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -221,40 +225,40 @@ const styles = StyleSheet.create({
   },
   type: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textTransform: 'capitalize',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     padding: 16,
     paddingBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     lineHeight: 24,
     paddingHorizontal: 16,
     paddingBottom: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     marginTop: 12,
   },
   sectionLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   author: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontFamily: 'monospace',
   },
   tallyContainer: {
@@ -268,16 +272,16 @@ const styles = StyleSheet.create({
   tallyCount: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   tallyLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.border,
     flexDirection: 'row',
     overflow: 'hidden',
   },
@@ -291,7 +295,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#9e9e9e',
   },
   voteSection: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     marginTop: 12,
     marginBottom: 32,

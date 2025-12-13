@@ -16,10 +16,13 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HistoryEntry } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VerificationHistory'>;
 
 export function VerificationHistoryScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   // Note: In a real implementation, history would come from a global state manager
   // or persisted storage. For now, we'll show an empty state.
   const history: HistoryEntry[] = [];
@@ -157,17 +160,17 @@ export function VerificationHistoryScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   listContent: {
     padding: 16,
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -185,20 +188,20 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#eee',
+    backgroundColor: theme.colors.borderLight,
   },
   historyItem: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -223,33 +226,33 @@ const styles = StyleSheet.create({
   proofType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   timestamp: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   levelBadge: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(74, 144, 164, 0.2)' : '#E3F2FD',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   levelBadgeText: {
     fontSize: 12,
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   warningsContainer: {
     marginTop: 12,
     padding: 8,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(255, 152, 0, 0.2)' : '#FFF3E0',
     borderRadius: 8,
   },
   warningText: {
     fontSize: 12,
-    color: '#E65100',
+    color: theme.colors.warning,
   },
   separator: {
     height: 12,
@@ -267,18 +270,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
   },
   primaryButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -290,18 +293,18 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: theme.colors.borderLight,
   },
   clearButton: {
-    backgroundColor: '#ffebee',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(198, 40, 40, 0.2)' : '#ffebee',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   clearButtonText: {
-    color: '#c62828',
+    color: theme.colors.error,
     fontSize: 14,
     fontWeight: '500',
   },

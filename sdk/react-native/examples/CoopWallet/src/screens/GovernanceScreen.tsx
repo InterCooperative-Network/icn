@@ -17,12 +17,15 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth, useProposals } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Governance'>;
 };
 
 export function GovernanceScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { coopId } = useAuth(client!);
   const domainId = coopId ? `coop:${coopId}` : undefined;
   const { proposals, isLoading, refresh } = useProposals(client!, domainId);
@@ -92,16 +95,16 @@ export function GovernanceScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   list: {
     padding: 16,
   },
   proposalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -130,13 +133,13 @@ const styles = StyleSheet.create({
   },
   proposalType: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textTransform: 'capitalize',
   },
   proposalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
   },
   proposalMeta: {
@@ -145,13 +148,14 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    backgroundColor: theme.colors.background,
   },
   emptyIcon: {
     fontSize: 64,
@@ -160,17 +164,17 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },
   refreshButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

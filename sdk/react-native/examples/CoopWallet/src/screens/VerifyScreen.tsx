@@ -24,6 +24,7 @@ import {
 } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Verify'>;
 
@@ -31,6 +32,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SCANNER_SIZE = SCREEN_WIDTH * 0.75;
 
 export function VerifyScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { verify, result, isVerifying, error, reset, history, clearHistory } =
     useSdisVerifierWithHistory(client!);
 
@@ -246,7 +249,7 @@ export function VerifyScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -255,7 +258,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     padding: 32,
   },
   icon: {
@@ -264,7 +267,7 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginTop: 16,
   },
@@ -286,7 +289,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     height: 40,
-    borderColor: '#4A90A4',
+    borderColor: theme.colors.primary,
   },
   topLeft: {
     top: 0,
@@ -324,7 +327,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     padding: 32,
   },
   resultIcon: {
@@ -347,31 +350,31 @@ const styles = StyleSheet.create({
   },
   resultText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 16,
   },
   resultDetails: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   warningsContainer: {
     marginTop: 16,
     padding: 12,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(255, 152, 0, 0.2)' : '#FFF3E0',
     borderRadius: 8,
   },
   warningText: {
     fontSize: 14,
-    color: '#E65100',
+    color: theme.colors.warning,
   },
   errorText: {
     fontSize: 14,
-    color: '#c62828',
+    color: theme.colors.error,
     textAlign: 'center',
   },
   controls: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     padding: 16,
   },
   levelSelector: {
@@ -379,7 +382,7 @@ const styles = StyleSheet.create({
   },
   levelLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   levelButtons: {
@@ -388,35 +391,35 @@ const styles = StyleSheet.create({
   },
   levelButton: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
   },
   levelButtonActive: {
-    borderColor: '#4A90A4',
-    backgroundColor: '#E3F2FD',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.mode === 'dark' ? 'rgba(74, 144, 164, 0.2)' : '#E3F2FD',
   },
   levelButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   levelButtonTextActive: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
   },
   levelButtonDesc: {
     fontSize: 11,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   actionButtons: {
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -427,15 +430,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
   },
   secondaryButtonText: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 16,
   },
 });

@@ -10,12 +10,15 @@ import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-ca
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { parsePaymentQR, isPaymentQR } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Scan'>;
 };
 
 export function ScanScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
@@ -114,7 +117,7 @@ export function ScanScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   button: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

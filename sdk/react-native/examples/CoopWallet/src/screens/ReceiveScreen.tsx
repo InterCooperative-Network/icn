@@ -21,8 +21,11 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { useAuth, generateReceiveQR } from '@icn/react-native';
 import { client } from '../client';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 export function ReceiveScreen() {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { did, coopId } = useAuth(client!);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -148,10 +151,10 @@ export function ReceiveScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 24,
@@ -170,7 +173,7 @@ const styles = StyleSheet.create({
   },
   instruction: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -195,12 +198,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#4A90A4',
+    borderColor: theme.colors.primary,
     gap: 8,
   },
   shareIcon: {
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   copyButtonText: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -223,32 +226,33 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 8,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.border,
+    color: theme.colors.text,
   },
   info: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     width: '100%',
   },
   infoLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });

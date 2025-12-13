@@ -21,12 +21,15 @@ import { RootStackParamList } from '../../App';
 import { TrustBadge } from '../components/TrustBadge';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { SkeletonBalance, SkeletonList } from '../components/Skeleton';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
 export function HomeScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { did, coopId, logout } = useAuth(client!);
   const { balance, isLoading: balanceLoading, refresh: refreshBalance } = useBalance(client!!, coopId || '', did || '');
   const { transactions, isLoading: txLoading, refresh: refreshTx } = useTransactions(client!, coopId || '', 5);
@@ -288,14 +291,14 @@ export function HomeScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     paddingBottom: 70, // Space for bottom nav bar
@@ -305,7 +308,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
   },
   statusLeft: {
     flexDirection: 'row',
@@ -320,18 +323,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.textMuted,
     marginRight: 6,
   },
   statusConnected: {
-    backgroundColor: '#4caf50',
+    backgroundColor: theme.colors.success,
   },
   statusText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   offlineBadge: {
-    backgroundColor: '#ff9800',
+    backgroundColor: theme.colors.warning,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -353,7 +356,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   failedBadge: {
-    backgroundColor: '#f44336',
+    backgroundColor: theme.colors.error,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   balanceCard: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     margin: 16,
     borderRadius: 16,
     padding: 24,
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   actionButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -418,7 +421,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 12,
-    color: '#333',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   section: {
@@ -428,11 +431,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
   },
   identityCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
   },
@@ -444,16 +447,16 @@ const styles = StyleSheet.create({
   },
   identityLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   identityValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   profileValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   logoutButton: {
@@ -463,7 +466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutText: {
-    color: '#e53935',
+    color: theme.colors.error,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -474,22 +477,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   seeAllText: {
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '500',
   },
   emptyState: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
   },
   emptyStateText: {
-    color: '#999',
+    color: theme.colors.textMuted,
     fontSize: 14,
   },
   txRow: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -500,7 +503,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -508,6 +511,7 @@ const styles = StyleSheet.create({
   txIconText: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: theme.colors.text,
   },
   txDetails: {
     flex: 1,
@@ -515,11 +519,11 @@ const styles = StyleSheet.create({
   txTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: theme.colors.text,
   },
   txMemo: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   txAmount: {
@@ -527,10 +531,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   txSent: {
-    color: '#e53935',
+    color: theme.colors.error,
   },
   txReceived: {
-    color: '#4caf50',
+    color: theme.colors.success,
   },
   txRight: {
     flexDirection: 'row',
@@ -538,14 +542,14 @@ const styles = StyleSheet.create({
   },
   txChevron: {
     fontSize: 20,
-    color: '#ccc',
+    color: theme.colors.textMuted,
     marginLeft: 8,
   },
   sdisActions: {
     gap: 12,
   },
   sdisButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -559,12 +563,12 @@ const styles = StyleSheet.create({
   sdisIcon: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4A90A4',
+    color: theme.colors.primary,
     width: 40,
     height: 40,
     lineHeight: 40,
     textAlign: 'center',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(90, 163, 181, 0.2)' : '#E3F2FD',
     borderRadius: 20,
     marginRight: 12,
   },
@@ -574,11 +578,11 @@ const styles = StyleSheet.create({
   sdisButtonTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 2,
   },
   sdisButtonDesc: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
 });

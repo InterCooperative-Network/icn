@@ -21,6 +21,7 @@ import { RouteProp } from '@react-navigation/native';
 import { useEnrollmentDetail, useReject } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'EnrollmentDetail'>;
@@ -28,6 +29,8 @@ type Props = {
 };
 
 export function EnrollmentDetailScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const { enrollmentId } = route.params;
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
