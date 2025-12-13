@@ -184,11 +184,17 @@ These affect robustness but system can function.
 
 These don't cause immediate bugs but make the system harder to maintain.
 
-### A1. Supervisor God Object
-**Location**: `icn-core/src/supervisor.rs` (3000+ lines)
+### A1. Supervisor God Object - IN PROGRESS
+**Location**: `icn-core/src/supervisor/` (now modular)
 **Issue**: Creates, wires, and manages 12+ subsystems with 38+ lock acquisitions
 **Impact**: Can't test components in isolation, high-risk changes
-**Fix**: Extract to service registry pattern with dependency injection
+**Status**: Phase 1 complete (2025-12-13). Extracted to supervisor/ directory with modules:
+- `init_trust.rs` - Trust graph and misbehavior detector
+- `init_gossip.rs` - Gossip actor, partitions, replication
+- `init_ledger.rs` - Ledger, disputes, contracts
+- `registry.rs` - Service container types
+- `mod.rs` - Main supervisor (reduced from 3571 to 3341 lines)
+**Remaining**: Network/message handlers, governance subscriptions, compute callbacks have deeply embedded closures requiring fuller ServiceRegistry integration
 
 ### A2. Circular Crate Dependencies
 **Locations**: icn-net ↔ icn-gossip ↔ icn-ledger
