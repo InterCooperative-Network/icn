@@ -76,9 +76,15 @@ const DEMO_TRANSACTIONS = [
 
 // Import client module - client is set after initializeClient() is called
 let clientModule: any = null;
-let initializeClient: () => Promise<void> = async () => {
+let initializeClient: () => Promise<boolean> = async () => {
   console.log('initializeClient not loaded');
+  return false;
 };
+let retryInitialization: () => Promise<boolean> = async () => false;
+let resetClientState: () => void = () => {};
+let isClientReady: () => boolean = () => false;
+let getClientState: () => string = () => 'uninitialized';
+let getLastInitError: () => any = () => null;
 
 // Getter to always get the current client value
 const getClient = () => clientModule?.client || null;
@@ -87,6 +93,11 @@ try {
   console.log('Loading client module...');
   clientModule = require('./src/client');
   initializeClient = clientModule.initializeClient;
+  retryInitialization = clientModule.retryInitialization || (async () => initializeClient());
+  resetClientState = clientModule.resetClientState || (() => {});
+  isClientReady = clientModule.isClientReady || (() => getClient() !== null);
+  getClientState = () => clientModule?.clientState || 'uninitialized';
+  getLastInitError = () => clientModule?.lastInitError || null;
   console.log('Client module loaded successfully');
 } catch (e) {
   console.error('Failed to import client:', e);
@@ -227,7 +238,7 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
         console.log('Login successful:', authState);
         onLogin(coopId.trim(), authState.did || '');
       } else {
-        throw new Error('Client not initialized. Please refresh the page.');
+        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
       }
     } catch (err) {
       console.error('Login error details:', err);
@@ -732,7 +743,7 @@ function PaymentScreen({
     try {
       const client = getClient();
       if (!client) {
-        throw new Error('Client not initialized. Please restart the app.');
+        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
       }
 
       // Make real payment via API
@@ -1583,7 +1594,7 @@ function VerifyScreen({ navigation }: { navigation: any }) {
     try {
       const client = getClient();
       if (!client) {
-        throw new Error('Client not initialized');
+        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
       }
 
       // Call SDIS verification API
@@ -2102,6 +2113,80 @@ function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
 }
 
 // ============================================================================
+// Initialization Error Screen
+// ============================================================================
+interface InitErrorInfo {
+  message: string;
+  code: string;
+  retriable: boolean;
+  details?: string;
+}
+
+function InitializationErrorScreen({
+  error,
+  onRetry,
+  onReset
+}: {
+  error: InitErrorInfo | null;
+  onRetry: () => void;
+  onReset: () => void;
+}) {
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    await onRetry();
+    setIsRetrying(false);
+  };
+
+  return (
+    <View style={styles.initErrorContainer}>
+      <View style={styles.initErrorContent}>
+        <Text style={styles.initErrorIcon}>⚠️</Text>
+        <Text style={styles.initErrorTitle}>Unable to Start</Text>
+        <Text style={styles.initErrorMessage}>
+          {error?.message || 'Failed to initialize the app'}
+        </Text>
+        {error?.details && (
+          <Text style={styles.initErrorDetails}>
+            Details: {error.details}
+          </Text>
+        )}
+
+        <View style={styles.initErrorActions}>
+          {(error?.retriable !== false) && (
+            <TouchableOpacity
+              style={[styles.initErrorButton, styles.initErrorPrimaryButton]}
+              onPress={handleRetry}
+              disabled={isRetrying}
+            >
+              {isRetrying ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.initErrorButtonText}>Try Again</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.initErrorButton, styles.initErrorSecondaryButton]}
+            onPress={onReset}
+          >
+            <Text style={[styles.initErrorButtonText, { color: '#666' }]}>
+              Reset Wallet
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.initErrorHint}>
+          If problems persist, try resetting your wallet. This will generate new keys.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
 // Navigation Setup
 // ============================================================================
 
@@ -2149,6 +2234,61 @@ export default function App() {
   const [isBiometricLocked, setIsBiometricLocked] = useState(false);
   const [coopId, setCoopId] = useState<string>('');
   const [userDid, setUserDid] = useState<string>('');
+  const [initFailed, setInitFailed] = useState(false);
+  const [initError, setInitError] = useState<InitErrorInfo | null>(null);
+
+  const handleInitRetry = useCallback(async () => {
+    setInitFailed(false);
+    setInitError(null);
+
+    try {
+      const success = await retryInitialization();
+      if (success) {
+        const client = getClient();
+        if (client?.authState?.isAuthenticated) {
+          setIsAuthenticated(true);
+          setCoopId(client.authState.coopId || '');
+          setUserDid(client.authState.did || '');
+        }
+      } else {
+        setInitFailed(true);
+        setInitError(getLastInitError());
+      }
+    } catch (error) {
+      console.error('Retry init error:', error);
+      setInitFailed(true);
+      setInitError({
+        message: 'Retry failed',
+        code: 'RETRY_ERROR',
+        retriable: true,
+        details: (error as Error).message,
+      });
+    }
+  }, []);
+
+  const handleInitReset = useCallback(async () => {
+    resetClientState();
+
+    // Clear localStorage on web
+    if (Platform.OS === 'web') {
+      try {
+        localStorage.clear();
+        console.log('localStorage cleared');
+      } catch (e) {
+        console.error('Failed to clear localStorage:', e);
+      }
+    }
+
+    // Retry initialization
+    setInitFailed(false);
+    setInitError(null);
+
+    const success = await initializeClient();
+    if (!success) {
+      setInitFailed(true);
+      setInitError(getLastInitError());
+    }
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -2156,11 +2296,19 @@ export default function App() {
       try {
         console.log('Calling initializeClient...');
         // Add timeout to prevent infinite hang
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Init timeout after 10s')), 10000)
+        const timeoutPromise = new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error('Init timeout after 15s')), 15000)
         );
-        await Promise.race([initializeClient(), timeoutPromise]);
-        console.log('initializeClient completed');
+        const success = await Promise.race([initializeClient(), timeoutPromise]);
+        console.log('initializeClient completed, success:', success);
+
+        if (!success) {
+          console.log('Initialization failed');
+          setInitFailed(true);
+          setInitError(getLastInitError());
+          setIsReady(true);
+          return;
+        }
 
         const client = getClient();
         console.log('Client:', client ? 'exists' : 'null');
@@ -2226,6 +2374,17 @@ export default function App() {
         <ActivityIndicator size="large" color="#4A90A4" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
+    );
+  }
+
+  // Show initialization error screen if init failed
+  if (initFailed) {
+    return (
+      <InitializationErrorScreen
+        error={initError}
+        onRetry={handleInitRetry}
+        onReset={handleInitReset}
+      />
     );
   }
 
@@ -2400,6 +2559,80 @@ const styles = StyleSheet.create({
   biometricButtonIcon: {
     fontSize: 24,
     marginRight: 12,
+  },
+
+  // Initialization Error
+  initErrorContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  initErrorContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  initErrorIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  initErrorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  initErrorMessage: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  initErrorDetails: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 24,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  initErrorActions: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 16,
+  },
+  initErrorButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initErrorPrimaryButton: {
+    backgroundColor: '#4A90A4',
+  },
+  initErrorSecondaryButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  initErrorButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  initErrorHint: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
   },
 
   // Login
