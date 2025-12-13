@@ -4,6 +4,7 @@ pub mod init_gossip;
 pub mod init_ledger;
 pub mod init_trust;
 pub mod registry;
+pub mod shutdown;
 
 use anyhow::{bail, Context, Result};
 use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
@@ -3158,137 +3159,19 @@ impl Supervisor {
         info!("Supervisor shutting down actors");
 
         // Save state snapshot before actors are dropped
-        // Errors during state export should not prevent graceful shutdown
-        if gossip_handle.is_some() || network_handle.is_some() {
-            info!("Saving state snapshot before shutdown");
-            let snapshot_result = async {
-                let mut snapshot = icn_snapshot::StateSnapshot::new();
+        shutdown::save_shutdown_snapshot(
+            gossip_handle.as_ref(),
+            network_handle.as_ref(),
+            &self.config.store_path(),
+        )
+        .await;
 
-                // Export gossip state
-                if let Some(ref gossip_handle) = gossip_handle {
-                    let gossip_state = gossip_handle.read().await.export_state();
-                    info!(
-                        "Exported gossip state: {} vector clock entries, {} subscriptions",
-                        gossip_state.vector_clock.len(),
-                        gossip_state.subscriptions.len()
-                    );
-                    snapshot.gossip_state = Some(gossip_state);
-                }
-
-                // Export network state
-                if let Some(ref network_handle) = network_handle {
-                    // Need to use blocking context for async export_state
-                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current()
-                                .block_on(async { network_handle.export_state().await })
-                        })
-                    })) {
-                        Ok(state) => {
-                            info!(
-                                "Exported network state: {} peer X25519 keys",
-                                state.peer_x25519_keys.len()
-                            );
-                            snapshot.network_state = Some(state);
-                        }
-                        Err(e) => {
-                            warn!("Failed to export network state (panic): {:?}", e);
-                        }
-                    }
-                }
-
-                Ok::<_, anyhow::Error>(snapshot)
-            }
-            .await;
-
-            match snapshot_result {
-                Ok(snapshot) => {
-                    // Record snapshot metrics before saving
-                    if let Some(ref gossip_state) = snapshot.gossip_state {
-                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(
-                            gossip_state.vector_clock.len(),
-                        );
-                        icn_obs::metrics::snapshot::gossip_subscriptions_set(
-                            gossip_state.subscriptions.len(),
-                        );
-                        icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
-                    }
-                    if let Some(ref network_state) = snapshot.network_state {
-                        icn_obs::metrics::snapshot::network_x25519_keys_set(
-                            network_state.peer_x25519_keys.len(),
-                        );
-                    }
-
-                    // Save snapshot to disk
-                    let data_dir = self.config.store_path();
-                    let save_start = std::time::Instant::now();
-                    let save_result = icn_snapshot::save_snapshot(&snapshot, &data_dir);
-                    let save_duration = save_start.elapsed();
-
-                    match save_result {
-                        Ok(()) => {
-                            icn_obs::metrics::snapshot::save_total_inc();
-                            icn_obs::metrics::snapshot::save_duration_record(
-                                save_duration.as_secs_f64(),
-                            );
-
-                            // Record snapshot file size
-                            let snapshot_path = data_dir.join("state.snapshot");
-                            if let Ok(metadata) = std::fs::metadata(&snapshot_path) {
-                                icn_obs::metrics::snapshot::size_bytes_set(metadata.len());
-                            }
-
-                            info!(
-                                "✅ State snapshot saved to {}/state.snapshot in {:.3}s",
-                                data_dir.display(),
-                                save_duration.as_secs_f64()
-                            );
-
-                            // Save timestamped backup for archival
-                            if let Err(e) =
-                                icn_snapshot::save_timestamped_snapshot(&snapshot, &data_dir)
-                            {
-                                warn!("Failed to save timestamped snapshot backup: {}", e);
-                            }
-
-                            // Cleanup old snapshots (keep last 3)
-                            match icn_snapshot::cleanup_old_snapshots(&data_dir, 3) {
-                                Ok(deleted) if deleted > 0 => {
-                                    info!("Cleaned up {} old snapshot(s)", deleted);
-                                }
-                                Ok(_) => {}
-                                Err(e) => {
-                                    warn!("Failed to cleanup old snapshots: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            icn_obs::metrics::snapshot::save_errors_inc();
-                            warn!("Failed to save state snapshot: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("Failed to export actor state during shutdown: {}", e);
-                    // Continue with shutdown even if state export failed
-                }
-            }
-        }
-
-        // Network actor will shut down gracefully via the shutdown signal
-        // The actor's run loop listens for shutdown_rx and cleans up properly
-        if network_handle.is_some() {
-            info!("Network actor will shut down via shutdown signal");
-        }
-
-        // Gossip and Ledger are wrapped in Arc<RwLock> and will be dropped when
-        // all references are released
-        if gossip_handle.is_some() {
-            info!("Gossip actor will be dropped when all references are released");
-        }
-        if ledger_handle.is_some() {
-            info!("Ledger will be dropped when all references are released");
-        }
+        // Log actor shutdown status
+        shutdown::log_actor_shutdown_status(
+            network_handle.as_ref(),
+            gossip_handle.as_ref(),
+            ledger_handle.is_some(),
+        );
 
         // Governance event subscriptions are kept alive by holding their handles
         // for the lifetime of this function. When this function returns, the handles
