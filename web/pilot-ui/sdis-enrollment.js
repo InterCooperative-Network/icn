@@ -230,6 +230,16 @@ const SDISEnrollment = {
     },
 
     /**
+     * Get device type from user agent
+     */
+    getDeviceType() {
+        const ua = navigator.userAgent.toLowerCase();
+        if (/mobile|android|iphone|ipad/.test(ua)) return 'mobile';
+        if (/tablet/.test(ua)) return 'tablet';
+        return 'desktop';
+    },
+
+    /**
      * Submit enrollment to gateway
      */
     async submitEnrollment() {
@@ -253,7 +263,9 @@ const SDISEnrollment = {
             }
 
             const data = await response.json();
-            this.state.ceremonyId = data.ceremony_id;
+            // Backend returns enrollment_id (not ceremony_id)
+            this.state.enrollmentId = data.enrollment_id;
+            this.state.ephemeralDid = data.ephemeral_did;
 
             showToast('Enrollment submitted! Waiting for steward approval...', 'success');
 
@@ -293,14 +305,14 @@ const SDISEnrollment = {
     },
 
     /**
-     * Check ceremony status
+     * Check enrollment status
      */
     async checkCeremonyStatus() {
         const gatewayUrl = state.gatewayUrl || 'http://localhost:8080';
 
         try {
             const response = await fetch(
-                `${gatewayUrl}/v1/sdis/enrollment/${this.state.ceremonyId}`
+                `${gatewayUrl}/v1/sdis/status/${this.state.enrollmentId}`
             );
 
             if (!response.ok) return;
@@ -341,18 +353,29 @@ const SDISEnrollment = {
     },
 
     /**
-     * Finalize enrollment and receive anchor
+     * Complete enrollment and receive anchor
      */
     async finalizeEnrollment() {
         const gatewayUrl = state.gatewayUrl || 'http://localhost:8080';
 
         try {
+            // Get device info
+            const deviceInfo = {
+                device_type: this.getDeviceType(),
+                os: navigator.platform || 'unknown',
+            };
+
             const response = await fetch(
-                `${gatewayUrl}/v1/sdis/enrollment/${this.state.ceremonyId}/finalize`,
+                `${gatewayUrl}/v1/sdis/enrollment/complete`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ vui_commitment: null }),
+                    body: JSON.stringify({
+                        enrollment_id: this.state.enrollmentId,
+                        ephemeral_did: this.state.ephemeralDid,
+                        ephemeral_signature: this.generateMockKey('ed25519'), // TODO: actual signature
+                        device_info: deviceInfo,
+                    }),
                 }
             );
 

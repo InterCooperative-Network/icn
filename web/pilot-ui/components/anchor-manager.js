@@ -154,7 +154,7 @@ export class AnchorManager {
 
   async loadAnchors() {
     try {
-      const response = await this.api.get('/api/v1/sdis/anchors');
+      const response = await this.api.get('/v1/sdis/anchors');
       this.anchors = response.anchors || [];
       this.renderAnchors();
       this.updateStats();
@@ -244,7 +244,7 @@ export class AnchorManager {
       const payload = { anchor_type: type, label, pubkey };
       if (type === 'contact' && contactDid) payload.contact_did = contactDid;
 
-      await this.api.post('/api/v1/sdis/anchors', payload);
+      await this.api.post('/v1/sdis/anchors', payload);
       this.hideAddModal();
       await this.loadAnchors();
       alert('Anchor added successfully');
@@ -257,7 +257,7 @@ export class AnchorManager {
     if (!this.currentAnchor) return;
     
     try {
-      await this.api.post(`/api/v1/sdis/anchors/${this.currentAnchor.anchor_id}/revoke`);
+      await this.api.post(`/v1/sdis/anchors/${this.currentAnchor.anchor_id}/revoke`);
       this.hideRevokeModal();
       await this.loadAnchors();
       alert('Anchor revoked successfully');
