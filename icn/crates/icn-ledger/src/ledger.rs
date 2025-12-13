@@ -34,6 +34,9 @@ pub struct ForkStats {
 /// Key prefix for cached balances in storage
 const BALANCE_PREFIX: &str = "ledger:balance:";
 
+/// Key prefix for cleared volume index (total credits received per account/currency)
+const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
+
 /// Key prefix for archived entries (from rollback operations)
 const ARCHIVE_PREFIX: &str = "ledger:archive:";
 
@@ -59,6 +62,10 @@ pub struct Ledger {
 
     /// Cached balances (in-memory for fast queries)
     cached_balances: HashMap<Did, AccountBalances>,
+
+    /// Cleared volume index: tracks total credits received per (account, currency)
+    /// Used for O(1) credit limit calculations based on transaction history
+    cleared_volume_index: HashMap<(Did, String), i64>,
 
     /// Optional gossip handle for distributed synchronization
     gossip: Option<GossipHandle>,
@@ -97,6 +104,7 @@ impl Ledger {
         let mut ledger = Ledger {
             store,
             cached_balances: HashMap::new(),
+            cleared_volume_index: HashMap::new(),
             gossip: None,
             quarantine,
             last_merge: None,
@@ -110,6 +118,9 @@ impl Ledger {
 
         // Load cached balances from storage
         ledger.load_cached_balances()?;
+
+        // Load cleared volume index from storage
+        ledger.load_cleared_volume_index()?;
 
         // Index existing entries for fork detection
         ledger.rebuild_fork_index()?;
@@ -232,7 +243,7 @@ impl Ledger {
             "Appended journal entry to store"
         );
 
-        // Update cached balances
+        // Update cached balances and cleared volume index
         for delta in &entry.accounts {
             let account_balances = self
                 .cached_balances
@@ -240,10 +251,17 @@ impl Ledger {
                 .or_insert_with(|| AccountBalances::new(delta.account_id.clone()));
 
             account_balances.apply_delta(delta);
+
+            // Update cleared volume index (track total credits received)
+            if let Some(credit) = delta.credit {
+                let key = (delta.account_id.clone(), delta.currency.clone());
+                *self.cleared_volume_index.entry(key).or_insert(0) += credit;
+            }
         }
 
-        // Persist updated balances
+        // Persist updated balances and cleared volume index
         self.save_cached_balances()?;
+        self.save_cleared_volume_index()?;
 
         info!(
             entry_hash = %hash,
@@ -753,50 +771,53 @@ impl Ledger {
         self.cached_balances.clone()
     }
 
-    /// Get total cleared volume for an account in a currency
+    /// Get total cleared volume for an account in a currency (O(1) lookup)
     ///
-    /// This sums all credit (positive contribution) deltas for the account,
+    /// This returns the total credits received by the account in the specified currency,
     /// which represents their total historical contributions to the system.
     /// Used for calculating credit limit bonuses based on transaction history.
     ///
     /// Example: If Alice has received 500 hours of credits over time,
     /// this returns 500 (even if her current balance is lower due to debits).
+    ///
+    /// Performance: O(1) - uses the pre-computed cleared volume index
     pub fn total_cleared_by(&self, account_id: &Did, currency: &str) -> Result<i64> {
-        let entries = self.get_all_entries()?;
-
-        let mut total_credits: i64 = 0;
-
-        for entry in entries {
-            for delta in &entry.accounts {
-                if delta.account_id == *account_id && delta.currency == currency {
-                    // Sum only credits (positive contributions)
-                    if let Some(credit) = delta.credit {
-                        total_credits += credit;
-                    }
-                }
-            }
-        }
-
-        Ok(total_credits)
+        let key = (account_id.clone(), currency.to_string());
+        Ok(*self.cleared_volume_index.get(&key).unwrap_or(&0))
     }
 
-    /// Recompute all balances from journal entries (for verification)
+    /// Recompute all balances and cleared volumes from journal entries (for verification)
     pub fn recompute_balances(&mut self) -> Result<()> {
         info!(
             cached_account_count = self.cached_balances.len(),
-            "Recomputing all balances from journal"
+            cleared_volume_count = self.cleared_volume_index.len(),
+            "Recomputing all balances and cleared volumes from journal"
         );
 
         let entries = self.get_all_entries()?;
         let balances = compute_all_balances(&entries);
 
+        // Also recompute cleared volume index
+        let mut cleared_volumes: HashMap<(Did, String), i64> = HashMap::new();
+        for entry in &entries {
+            for delta in &entry.accounts {
+                if let Some(credit) = delta.credit {
+                    let key = (delta.account_id.clone(), delta.currency.clone());
+                    *cleared_volumes.entry(key).or_insert(0) += credit;
+                }
+            }
+        }
+
         self.cached_balances = balances;
+        self.cleared_volume_index = cleared_volumes;
         self.save_cached_balances()?;
+        self.save_cleared_volume_index()?;
 
         info!(
             entry_count = entries.len(),
             account_count = self.cached_balances.len(),
-            "Balance recomputation complete"
+            cleared_volume_count = self.cleared_volume_index.len(),
+            "Balance and cleared volume recomputation complete"
         );
         Ok(())
     }
@@ -851,6 +872,50 @@ impl Ledger {
         for (account_id, balances) in &self.cached_balances {
             let key = format!("{}{}", BALANCE_PREFIX, serde_json::to_string(account_id)?);
             let value = serde_json::to_vec(balances)?;
+            self.store.put(key.as_bytes(), &value)?;
+        }
+
+        Ok(())
+    }
+
+    /// Load cleared volume index from storage
+    fn load_cleared_volume_index(&mut self) -> Result<()> {
+        let prefix = CLEARED_VOLUME_PREFIX.as_bytes();
+        let pairs = self.store.scan(prefix)?;
+
+        for (key, value) in pairs {
+            // Key format: "ledger:cleared_volume:{did}:{currency}"
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(rest) = key_str.strip_prefix(CLEARED_VOLUME_PREFIX) {
+                // Parse the composite key - format is "did:currency"
+                // Use rfind to find the last colon, since DIDs can contain colons
+                if let Some(last_colon) = rest.rfind(':') {
+                    let did_str = &rest[..last_colon];
+                    let currency = &rest[last_colon + 1..];
+
+                    if let Ok(did) = serde_json::from_str::<Did>(&format!("\"{}\"", did_str)) {
+                        if let Ok(volume) = serde_json::from_slice::<i64>(&value) {
+                            self.cleared_volume_index
+                                .insert((did, currency.to_string()), volume);
+                        }
+                    }
+                }
+            }
+        }
+
+        debug!(
+            "Loaded {} cleared volume entries",
+            self.cleared_volume_index.len()
+        );
+        Ok(())
+    }
+
+    /// Save cleared volume index to storage
+    fn save_cleared_volume_index(&self) -> Result<()> {
+        for ((account_id, currency), volume) in &self.cleared_volume_index {
+            // Store with composite key: "{prefix}{did}:{currency}"
+            let key = format!("{}{}:{}", CLEARED_VOLUME_PREFIX, account_id, currency);
+            let value = serde_json::to_vec(volume)?;
             self.store.put(key.as_bytes(), &value)?;
         }
 
