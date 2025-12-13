@@ -202,6 +202,17 @@ export function HomeScreen({ navigation }: Props) {
               <Text style={styles.sdisButtonDesc}>Scan QR codes to verify identity</Text>
             </View>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.sdisButton}
+            onPress={() => navigation.navigate('StewardDashboard')}
+          >
+            <Text style={styles.sdisIcon}>S</Text>
+            <View style={styles.sdisButtonContent}>
+              <Text style={styles.sdisButtonTitle}>Steward Dashboard</Text>
+              <Text style={styles.sdisButtonDesc}>Review and approve enrollments</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 

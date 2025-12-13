@@ -453,11 +453,58 @@ body {
 .history-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     padding: 16px 20px;
     background: var(--card-bg);
     border-radius: 12px;
     box-shadow: var(--shadow);
+}
+
+/* Vouch Statement in History */
+.vouch-statement {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: var(--bg-color);
+    border-radius: 8px;
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* Rejection Badge */
+.rejection-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--danger-color);
+    color: white;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.rejection-info {
+    padding: 12px;
+    background: #fff5f5;
+    border-radius: 8px;
+    border-left: 4px solid var(--danger-color);
+    margin-bottom: 16px;
+}
+
+/* Reject Button Style */
+#rejectBtn {
+    background: transparent;
+    color: var(--danger-color);
+    border: 1px solid var(--danger-color);
+}
+
+#rejectBtn:hover:not(:disabled) {
+    background: var(--danger-color);
+    color: white;
+}
+
+#rejectBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Empty State */

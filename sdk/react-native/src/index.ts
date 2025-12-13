@@ -112,6 +112,19 @@ export {
 } from './sdis-hooks';
 export type { HistoryEntry } from './sdis-hooks';
 
+// Steward Types
+export * from './steward-types';
+
+// Steward React Hooks
+export {
+  usePendingEnrollments,
+  useVouch,
+  useReject,
+  useStewardStats,
+  useVouchHistory,
+  useEnrollmentDetail,
+} from './steward-hooks';
+
 // Re-export core SDK types for convenience
 export {
   ICNClient,

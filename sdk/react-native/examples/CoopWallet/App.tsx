@@ -34,6 +34,10 @@ import { StatusBar } from 'expo-status-bar';
 import { TrustAttestationScreen } from './src/screens/TrustAttestationScreen';
 import { MemberProfileScreen } from './src/screens/MemberProfileScreen';
 import { ContactsScreen } from './src/screens/ContactsScreen';
+import { StewardDashboardScreen } from './src/screens/StewardDashboardScreen';
+import { EnrollmentDetailScreen } from './src/screens/EnrollmentDetailScreen';
+import { VouchConfirmationScreen } from './src/screens/VouchConfirmationScreen';
+import { VouchHistoryScreen } from './src/screens/VouchHistoryScreen';
 import { ICNProvider } from './src/contexts/ICNContext';
 
 // QR Code - conditionally import for web compatibility
@@ -2071,6 +2075,11 @@ export type RootStackParamList = {
   History: undefined;
   MemberProfile: { memberDid: string };
   Contacts: undefined;
+  // Steward screens
+  StewardDashboard: undefined;
+  EnrollmentDetail: { enrollmentId: string };
+  VouchConfirmation: { enrollmentId: string; identityName: string };
+  VouchHistory: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -2238,6 +2247,26 @@ export default function App() {
             <Stack.Screen name="Contacts" options={{ title: 'Contacts' }}>
               {() => <ContactsScreen client={getClient()!} coopId={coopId} />}
             </Stack.Screen>
+            <Stack.Screen
+              name="StewardDashboard"
+              component={StewardDashboardScreen}
+              options={{ title: 'Steward Dashboard' }}
+            />
+            <Stack.Screen
+              name="EnrollmentDetail"
+              component={EnrollmentDetailScreen}
+              options={{ title: 'Enrollment Details' }}
+            />
+            <Stack.Screen
+              name="VouchConfirmation"
+              component={VouchConfirmationScreen}
+              options={{ title: 'Confirm Vouch' }}
+            />
+            <Stack.Screen
+              name="VouchHistory"
+              component={VouchHistoryScreen}
+              options={{ title: 'Vouch History' }}
+            />
           </>
         )}
       </Stack.Navigator>

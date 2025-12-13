@@ -6,6 +6,8 @@ class StewardDashboard {
         this.currentEnrollment = null;
         this.enrollments = [];
         this.vouchHistory = [];
+        this.stats = null;
+        this.autoRefreshInterval = null;
 
         this.init();
     }
@@ -18,11 +20,43 @@ class StewardDashboard {
         return window.location.origin;
     }
 
+    getAuthToken() {
+        return localStorage.getItem('authToken');
+    }
+
+    getHeaders() {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        const token = this.getAuthToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+    }
+
     async init() {
         this.setupEventListeners();
         this.loadStewardInfo();
         await this.loadPendingEnrollments();
-        this.loadVouchHistory();
+        await this.loadStewardStats();
+        await this.loadVouchHistory();
+        this.startAutoRefresh();
+    }
+
+    startAutoRefresh() {
+        // Auto-refresh every 30 seconds
+        this.autoRefreshInterval = setInterval(() => {
+            this.loadPendingEnrollments();
+            this.loadStewardStats();
+        }, 30000);
+    }
+
+    stopAutoRefresh() {
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+        }
     }
 
     setupEventListeners() {
@@ -34,6 +68,7 @@ class StewardDashboard {
         // Refresh button
         document.getElementById('refreshPending').addEventListener('click', () => {
             this.loadPendingEnrollments();
+            this.loadStewardStats();
         });
 
         // Filters
@@ -65,6 +100,16 @@ class StewardDashboard {
                 }
             });
         });
+
+        // Handle page visibility change (pause auto-refresh when hidden)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.stopAutoRefresh();
+            } else {
+                this.startAutoRefresh();
+                this.loadPendingEnrollments();
+            }
+        });
     }
 
     switchTab(tabName) {
@@ -87,9 +132,79 @@ class StewardDashboard {
     }
 
     loadStewardInfo() {
-        // TODO: Load from auth token
-        const stewardId = localStorage.getItem('stewardDid') || 'did:icn:steward-' + Math.random().toString(36).substr(2, 8);
-        document.getElementById('stewardId').textContent = stewardId.substring(0, 20) + '...';
+        // Load from auth token if available
+        const token = this.getAuthToken();
+        let stewardId = 'Not authenticated';
+
+        if (token) {
+            try {
+                // Decode JWT payload (base64)
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                stewardId = payload.sub || 'Unknown';
+            } catch (e) {
+                console.warn('Could not decode auth token:', e);
+                stewardId = localStorage.getItem('stewardDid') || 'did:icn:steward-' + Math.random().toString(36).substr(2, 8);
+            }
+        } else {
+            stewardId = localStorage.getItem('stewardDid') || 'did:icn:steward-' + Math.random().toString(36).substr(2, 8);
+        }
+
+        document.getElementById('stewardId').textContent = stewardId.length > 20
+            ? stewardId.substring(0, 20) + '...'
+            : stewardId;
+    }
+
+    async loadStewardStats() {
+        try {
+            const response = await fetch(`${this.apiBase}/v1/sdis/steward/stats`, {
+                headers: this.getHeaders()
+            });
+
+            if (!response.ok) {
+                // Fall back to localStorage stats if API fails
+                this.updateStatsFromLocal();
+                return;
+            }
+
+            this.stats = await response.json();
+            this.updateStatsDisplay();
+        } catch (error) {
+            console.error('Error loading steward stats:', error);
+            this.updateStatsFromLocal();
+        }
+    }
+
+    updateStatsDisplay() {
+        if (!this.stats) return;
+
+        document.getElementById('totalVouches').textContent = this.stats.total_vouches || 0;
+        document.getElementById('monthlyVouches').textContent = this.stats.monthly_vouches || 0;
+        document.getElementById('reputationScore').textContent =
+            Math.round((this.stats.reputation_score || 1) * 100) + '%';
+
+        const avgHours = this.stats.avg_response_hours || 0;
+        if (avgHours < 1) {
+            document.getElementById('avgResponseTime').textContent = '< 1 hour';
+        } else if (avgHours < 24) {
+            document.getElementById('avgResponseTime').textContent = `${Math.round(avgHours)} hours`;
+        } else {
+            document.getElementById('avgResponseTime').textContent = `${Math.round(avgHours / 24)} days`;
+        }
+    }
+
+    updateStatsFromLocal() {
+        // Fallback to localStorage-based stats
+        const history = JSON.parse(localStorage.getItem('vouchHistory') || '[]');
+
+        document.getElementById('totalVouches').textContent = history.length;
+
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthlyCount = history.filter(h => new Date(h.timestamp || h.vouched_at) >= monthStart).length;
+        document.getElementById('monthlyVouches').textContent = monthlyCount;
+
+        document.getElementById('reputationScore').textContent = '100%';
+        document.getElementById('avgResponseTime').textContent = history.length > 0 ? '< 1 day' : '-';
     }
 
     async loadPendingEnrollments() {
@@ -97,7 +212,9 @@ class StewardDashboard {
         listEl.innerHTML = '<div class="loading">Loading pending enrollments...</div>';
 
         try {
-            const response = await fetch(`${this.apiBase}/v1/sdis/pending`);
+            const response = await fetch(`${this.apiBase}/v1/sdis/pending`, {
+                headers: this.getHeaders()
+            });
             if (!response.ok) throw new Error('Failed to load enrollments');
 
             const data = await response.json();
@@ -165,13 +282,36 @@ class StewardDashboard {
 
     async openEnrollmentDetail(enrollmentId) {
         try {
-            const response = await fetch(`${this.apiBase}/v1/sdis/status/${enrollmentId}`);
+            const response = await fetch(`${this.apiBase}/v1/sdis/status/${enrollmentId}`, {
+                headers: this.getHeaders()
+            });
             if (!response.ok) throw new Error('Failed to load enrollment details');
 
             this.currentEnrollment = await response.json();
 
             const detailsEl = document.getElementById('enrollmentDetails');
+            let rejectionHtml = '';
+            if (this.currentEnrollment.rejected) {
+                rejectionHtml = `
+                    <div class="detail-item rejection-info">
+                        <label>Rejection Status</label>
+                        <div class="value rejection-badge">REJECTED</div>
+                    </div>
+                    ${this.currentEnrollment.rejection_reason ? `
+                    <div class="detail-item">
+                        <label>Rejection Reason</label>
+                        <div class="value">${this.escapeHtml(this.currentEnrollment.rejection_reason)}</div>
+                    </div>` : ''}
+                    ${this.currentEnrollment.rejected_at ? `
+                    <div class="detail-item">
+                        <label>Rejected At</label>
+                        <div class="value">${this.formatDate(this.currentEnrollment.rejected_at)}</div>
+                    </div>` : ''}
+                `;
+            }
+
             detailsEl.innerHTML = `
+                ${rejectionHtml}
                 <div class="detail-item">
                     <label>Enrollment ID</label>
                     <div class="value">${this.currentEnrollment.enrollment_id}</div>
@@ -209,15 +349,28 @@ class StewardDashboard {
 
             // Update button states
             const vouchBtn = document.getElementById('vouchBtn');
-            if (this.currentEnrollment.level < 1) {
+            const rejectBtn = document.getElementById('rejectBtn');
+
+            if (this.currentEnrollment.rejected) {
+                vouchBtn.disabled = true;
+                vouchBtn.textContent = 'Enrollment Rejected';
+                rejectBtn.disabled = true;
+                rejectBtn.style.display = 'none';
+            } else if (this.currentEnrollment.level < 1) {
                 vouchBtn.disabled = true;
                 vouchBtn.textContent = 'Awaiting Device Verification';
+                rejectBtn.disabled = false;
+                rejectBtn.style.display = '';
             } else if (this.currentEnrollment.has_steward_vouch) {
                 vouchBtn.disabled = true;
                 vouchBtn.textContent = 'Already Vouched';
+                rejectBtn.disabled = true;
+                rejectBtn.style.display = 'none';
             } else {
                 vouchBtn.disabled = false;
                 vouchBtn.textContent = 'Vouch for Identity';
+                rejectBtn.disabled = false;
+                rejectBtn.style.display = '';
             }
 
             this.openModal('enrollmentModal');
@@ -240,7 +393,8 @@ class StewardDashboard {
         const statusMap = {
             'pending_device_verification': 'Pending Device Verification',
             'pending_steward_vouch': 'Pending Steward Vouch',
-            'ready_for_completion': 'Ready for Completion'
+            'ready_for_completion': 'Ready for Completion',
+            'rejected': 'Rejected'
         };
         return statusMap[status] || status;
     }
@@ -276,9 +430,7 @@ class StewardDashboard {
 
             const response = await fetch(`${this.apiBase}/v1/sdis/vouch/${enrollmentId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: this.getHeaders(),
                 body: JSON.stringify({
                     vouch_statement: statement,
                     steward_did: localStorage.getItem('stewardDid') || null
@@ -295,11 +447,10 @@ class StewardDashboard {
             this.showToast(`Successfully vouched for ${this.currentEnrollment.identity_name}`, 'success');
             this.closeModal('vouchModal');
 
-            // Add to history
-            this.addToHistory(this.currentEnrollment, statement);
-
-            // Refresh the list
+            // Refresh data
             await this.loadPendingEnrollments();
+            await this.loadStewardStats();
+            await this.loadVouchHistory();
 
         } catch (error) {
             console.error('Error submitting vouch:', error);
@@ -314,33 +465,74 @@ class StewardDashboard {
         if (!this.currentEnrollment) return;
 
         const reason = prompt('Please provide a reason for rejection:');
-        if (!reason) return;
+        if (!reason || reason.trim().length === 0) return;
 
-        // TODO: Implement rejection API
-        this.showToast('Rejection functionality coming soon', 'error');
+        const enrollmentId = this.currentEnrollment.enrollment_id;
+
+        try {
+            document.getElementById('rejectBtn').disabled = true;
+            document.getElementById('rejectBtn').textContent = 'Rejecting...';
+
+            const response = await fetch(`${this.apiBase}/v1/sdis/reject/${enrollmentId}`, {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify({
+                    reason: reason.trim()
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to reject enrollment');
+            }
+
+            this.showToast(`Enrollment for ${this.currentEnrollment.identity_name} has been rejected`, 'success');
+            this.closeModal('enrollmentModal');
+
+            // Refresh data
+            await this.loadPendingEnrollments();
+            await this.loadStewardStats();
+
+        } catch (error) {
+            console.error('Error rejecting enrollment:', error);
+            this.showToast(error.message, 'error');
+        } finally {
+            document.getElementById('rejectBtn').disabled = false;
+            document.getElementById('rejectBtn').textContent = 'Reject';
+        }
     }
 
-    addToHistory(enrollment, statement) {
-        const historyItem = {
-            enrollment_id: enrollment.enrollment_id,
-            identity_name: enrollment.identity_name,
-            coop_id: enrollment.coop_id,
-            statement: statement,
-            timestamp: new Date().toISOString()
-        };
+    async loadVouchHistory() {
+        const listEl = document.getElementById('historyList');
 
-        // Store in localStorage for now
-        const history = JSON.parse(localStorage.getItem('vouchHistory') || '[]');
-        history.unshift(historyItem);
-        localStorage.setItem('vouchHistory', JSON.stringify(history.slice(0, 100))); // Keep last 100
+        try {
+            const response = await fetch(`${this.apiBase}/v1/sdis/steward/history?limit=50&offset=0`, {
+                headers: this.getHeaders()
+            });
 
-        this.vouchHistory = history;
-        this.updateStats();
+            if (!response.ok) {
+                // Fall back to localStorage history if API fails
+                this.loadVouchHistoryFromLocal();
+                return;
+            }
+
+            const data = await response.json();
+            this.vouchHistory = data.vouches || [];
+
+            this.renderVouchHistory();
+        } catch (error) {
+            console.error('Error loading vouch history:', error);
+            this.loadVouchHistoryFromLocal();
+        }
     }
 
-    loadVouchHistory() {
+    loadVouchHistoryFromLocal() {
+        // Fallback to localStorage-based history
         this.vouchHistory = JSON.parse(localStorage.getItem('vouchHistory') || '[]');
+        this.renderVouchHistory();
+    }
 
+    renderVouchHistory() {
         const listEl = document.getElementById('historyList');
 
         if (this.vouchHistory.length === 0) {
@@ -358,34 +550,16 @@ class StewardDashboard {
                     <div class="enrollment-name">${this.escapeHtml(item.identity_name)}</div>
                     <div class="enrollment-meta">
                         <span>Coop: ${this.escapeHtml(item.coop_id)}</span>
-                        <span>Date: ${this.formatDate(item.timestamp)}</span>
+                        <span>Date: ${this.formatDate(item.vouched_at || item.timestamp)}</span>
                     </div>
+                    ${item.vouch_statement ? `
+                    <div class="vouch-statement">
+                        "${this.escapeHtml(item.vouch_statement)}"
+                    </div>` : ''}
                 </div>
                 <div class="level-badge level-2">Vouched</div>
             </div>
         `).join('');
-
-        this.updateStats();
-    }
-
-    updateStats() {
-        const history = this.vouchHistory;
-
-        document.getElementById('totalVouches').textContent = history.length;
-
-        // Calculate monthly vouches
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthlyCount = history.filter(h => new Date(h.timestamp) >= monthStart).length;
-        document.getElementById('monthlyVouches').textContent = monthlyCount;
-
-        // Reputation is always 100% for now
-        document.getElementById('reputationScore').textContent = '100%';
-
-        // Average response time
-        if (history.length > 0) {
-            document.getElementById('avgResponseTime').textContent = '< 1 day';
-        }
     }
 
     openModal(modalId) {
@@ -409,11 +583,13 @@ class StewardDashboard {
     }
 
     formatDate(dateString) {
+        if (!dateString) return '-';
         const date = new Date(dateString);
         return date.toLocaleString();
     }
 
     escapeHtml(text) {
+        if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;

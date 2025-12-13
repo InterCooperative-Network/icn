@@ -676,6 +676,182 @@ export class ICNMobileClient extends ICNClient {
   }
 
   // ===========================================================================
+  // Steward Methods
+  // ===========================================================================
+
+  /**
+   * Get pending enrollments for steward review
+   *
+   * @param filter - Optional filters for coop_id or level
+   * @returns Pending enrollments response
+   */
+  async getPendingEnrollments(filter?: {
+    coop_id?: string;
+    level?: number;
+  }): Promise<import('./steward-types').PendingEnrollmentsResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (filter?.coop_id) params.set('coop_id', filter.coop_id);
+    if (filter?.level !== undefined) params.set('level', filter.level.toString());
+
+    const url = `${baseUrl}/v1/sdis/pending${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get pending enrollments: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get enrollment status by ID
+   *
+   * @param enrollmentId - Enrollment ID to check
+   * @returns Enrollment details
+   */
+  async getEnrollmentStatus(
+    enrollmentId: string
+  ): Promise<import('./steward-types').Enrollment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/status/${enrollmentId}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get enrollment status: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Submit a vouch for an enrollment
+   *
+   * @param enrollmentId - Enrollment ID to vouch for
+   * @param statement - Vouch statement explaining verification
+   * @returns Vouch response
+   */
+  async submitVouch(
+    enrollmentId: string,
+    statement: string
+  ): Promise<import('./steward-types').VouchResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/vouch/${enrollmentId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        vouch_statement: statement,
+        steward_did: this._authState.did,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to submit vouch: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Reject an enrollment
+   *
+   * @param enrollmentId - Enrollment ID to reject
+   * @param reason - Reason for rejection
+   * @returns Reject response
+   */
+  async rejectEnrollment(
+    enrollmentId: string,
+    reason: string
+  ): Promise<import('./steward-types').RejectResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/reject/${enrollmentId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        reason,
+        steward_did: this._authState.did,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to reject enrollment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get steward statistics
+   *
+   * @returns Steward stats including vouch counts and reputation
+   */
+  async getStewardStats(): Promise<import('./steward-types').StewardStats> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/sdis/steward/stats`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get steward stats: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get vouch history
+   *
+   * @param limit - Maximum number of records to return (default 50)
+   * @param offset - Number of records to skip (default 0)
+   * @returns Vouch history response
+   */
+  async getVouchHistory(
+    limit = 50,
+    offset = 0
+  ): Promise<import('./steward-types').VouchHistoryResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(
+      `${baseUrl}/v1/sdis/steward/history?limit=${limit}&offset=${offset}`,
+      {
+        method: 'GET',
+        headers: {
+          ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get vouch history: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  // ===========================================================================
   // Member Methods
   // ===========================================================================
 
