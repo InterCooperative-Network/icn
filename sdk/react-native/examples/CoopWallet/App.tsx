@@ -344,6 +344,8 @@ interface Transaction {
   amount: number;
   memo: string;
   date: string;
+  timestamp: number;
+  currency: string;
 }
 
 function HomeScreen({
@@ -388,6 +390,8 @@ function HomeScreen({
             amount: tx.amount,
             memo: tx.memo || '',
             date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
+            timestamp: tx.timestamp || Date.now() / 1000,
+            currency: tx.currency || 'hours',
           }));
           setTransactions(txs);
         }
@@ -1741,7 +1745,7 @@ function VerificationHistoryScreen() {
 // ============================================================================
 // Transactions Screen - Full transaction history
 // ============================================================================
-function TransactionsScreen({ coopId, userDid }: { coopId: string; userDid: string }) {
+function TransactionsScreen({ coopId, userDid, navigation }: { coopId: string; userDid: string; navigation: any }) {
   const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1762,6 +1766,8 @@ function TransactionsScreen({ coopId, userDid }: { coopId: string; userDid: stri
           amount: tx.amount,
           memo: tx.memo || '',
           date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
+          timestamp: tx.timestamp || Date.now() / 1000,
+          currency: tx.currency || 'hours',
         }));
         setTransactions(txs);
       }
@@ -1825,7 +1831,22 @@ function TransactionsScreen({ coopId, userDid }: { coopId: string; userDid: stri
       </View>
 
       {filteredTx.map((tx) => (
-        <View key={tx.id} style={styles.transactionItem}>
+        <TouchableOpacity
+          key={tx.id}
+          style={styles.transactionItem}
+          onPress={() => navigation.navigate('TransactionDetail', {
+            transaction: {
+              id: tx.id,
+              from: tx.from,
+              to: tx.to,
+              amount: tx.amount,
+              memo: tx.memo,
+              timestamp: tx.timestamp,
+              currency: tx.currency,
+            }
+          })}
+          activeOpacity={0.7}
+        >
           <View style={[
             styles.txIcon,
             tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
@@ -1847,7 +1868,8 @@ function TransactionsScreen({ coopId, userDid }: { coopId: string; userDid: stri
             </Text>
             <Text style={styles.txDate}>{tx.date}</Text>
           </View>
-        </View>
+          <Text style={styles.txChevron}>›</Text>
+        </TouchableOpacity>
       ))}
 
       {filteredTx.length === 0 && !isLoading && (
@@ -2237,7 +2259,7 @@ export default function App() {
             <Stack.Screen name="Verify" component={VerifyScreen} options={{ title: 'Verify Identity' }} />
             <Stack.Screen name="VerificationHistory" component={VerificationHistoryScreen} options={{ title: 'History' }} />
             <Stack.Screen name="Transactions" options={{ title: 'Transactions' }}>
-              {() => <TransactionsScreen coopId={coopId} userDid={userDid} />}
+              {({ navigation }) => <TransactionsScreen coopId={coopId} userDid={userDid} navigation={navigation} />}
             </Stack.Screen>
             <Stack.Screen
               name="TransactionDetail"
@@ -3286,6 +3308,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#999',
     marginTop: 2,
+  },
+  txChevron: {
+    fontSize: 20,
+    color: '#ccc',
+    marginLeft: 8,
   },
 
   // QR Code styles

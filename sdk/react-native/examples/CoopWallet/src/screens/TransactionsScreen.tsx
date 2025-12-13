@@ -15,18 +15,21 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTransactions, Transaction } from '@icn/react-native';
 import { ICNMobileClient } from '@icn/react-native';
+import { RootStackParamList } from '../../App';
 
 interface TransactionsScreenProps {
   client: ICNMobileClient;
   coopId: string;
   userDid: string;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Transactions'>;
 }
 
 type FilterType = 'all' | 'sent' | 'received';
 
-export function TransactionsScreen({ client, coopId, userDid }: TransactionsScreenProps) {
+export function TransactionsScreen({ client, coopId, userDid, navigation }: TransactionsScreenProps) {
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -75,12 +78,19 @@ export function TransactionsScreen({ client, coopId, userDid }: TransactionsScre
       const otherParty = isSent ? tx.to : tx.from;
 
       return (
-        <View style={styles.transactionCard}>
+        <TouchableOpacity
+          style={styles.transactionCard}
+          onPress={() => navigation.navigate('TransactionDetail', { transaction: tx })}
+          activeOpacity={0.7}
+        >
           <View style={styles.transactionHeader}>
             <View style={[styles.typeIndicator, isSent ? styles.sentIndicator : styles.receivedIndicator]}>
               <Text style={styles.typeText}>{isSent ? 'SENT' : 'RECEIVED'}</Text>
             </View>
-            <Text style={styles.transactionDate}>{formatDate(tx.timestamp)}</Text>
+            <View style={styles.headerRight}>
+              <Text style={styles.transactionDate}>{formatDate(tx.timestamp)}</Text>
+              <Text style={styles.chevron}>›</Text>
+            </View>
           </View>
 
           <View style={styles.transactionBody}>
@@ -110,10 +120,10 @@ export function TransactionsScreen({ client, coopId, userDid }: TransactionsScre
               confirmed
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     },
-    [userDid]
+    [userDid, navigation]
   );
 
   const renderHeader = () => (
@@ -285,6 +295,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chevron: {
+    fontSize: 20,
+    color: '#ccc',
+    marginLeft: 8,
   },
   typeIndicator: {
     paddingHorizontal: 8,
