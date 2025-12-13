@@ -16,6 +16,7 @@ use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
+use crate::dead_letter::{DeadLetterQueue, FailedOperation, FailureType};
 use crate::runtime::ShutdownTx;
 
 /// Gossip topic for NAT traversal connection candidate announcements
@@ -1927,6 +1928,12 @@ impl Supervisor {
 
             info!("✓ Governance actor spawned at {}", gov_store_path.display());
 
+            // Create dead-letter queue for failed operations recovery
+            let dlq_store_path = self.config.store_path().join("dead_letter");
+            let dlq_store = Arc::new(SledStore::open(&dlq_store_path)?);
+            let dead_letter_queue = Arc::new(DeadLetterQueue::new(dlq_store));
+            info!("✓ Dead-letter queue initialized at {}", dlq_store_path.display());
+
             // Subscribe to governance events for ledger execution
             // CRITICAL: Must store handle to keep subscription alive for daemon lifetime
             governance_event_subscription = Some({
@@ -1935,6 +1942,7 @@ impl Supervisor {
 
                 let ledger_clone = ledger_handle.clone();
                 let audit_store = gov_store.clone();
+                let dlq = dead_letter_queue.clone();
                 let gov_handle_clone = governance_handle.clone();
                 let dispute_manager_clone = dispute_manager_handle.clone();
 
@@ -1967,6 +1975,7 @@ impl Supervisor {
                                     // Use treasury DID for budget payouts (or node DID if not configured)
                                     let from_did = treasury_did.clone();
                                     let store = audit_store.clone();
+                                    let dlq_clone = dlq.clone();
                                     let decision_time = decided_at;
                                     let amount = *amount;
                                     let recipient = recipient.clone();
@@ -1997,7 +2006,16 @@ impl Supervisor {
                                                 error!("🚨 CRITICAL: Failed to check audit trail for proposal {}: {}", prop_id.0, e);
                                                 error!("   Cannot verify if proposal was already executed");
                                                 error!("   Refusing to execute to prevent potential duplicate");
-                                                error!("   ACTION REQUIRED: Fix storage issue and manually verify proposal execution status");
+
+                                                // Write to dead-letter queue for recovery
+                                                let failed_op = FailedOperation::idempotency_check_failure(
+                                                    &prop_id.0,
+                                                    &e.to_string(),
+                                                );
+                                                if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                                                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                                                }
+
                                                 icn_obs::metrics::governance::execution_failures_inc("audit_check_failed");
                                                 return;
                                             }
@@ -2049,7 +2067,6 @@ impl Supervisor {
                                                                     }
                                                                     Err(e) => {
                                                                         // CRITICAL ERROR: Ledger updated but audit trail failed
-                                                                        // Manual reconciliation required!
                                                                         error!(
                                                                             "🚨 CRITICAL: Ledger updated but audit trail write failed for proposal {}",
                                                                             prop_id.0
@@ -2058,8 +2075,19 @@ impl Supervisor {
                                                                         error!("   Amount: {} {}", amount, currency);
                                                                         error!("   Recipient: {}", recipient);
                                                                         error!("   Error: {}", e);
-                                                                        error!("   ACTION REQUIRED: Manual reconciliation needed");
-                                                                        // TODO: Write to dead-letter queue for automated reconciliation
+
+                                                                        // Write to dead-letter queue for automated reconciliation
+                                                                        let failed_op = FailedOperation::audit_trail_failure(
+                                                                            &prop_id.0,
+                                                                            &hex::encode(entry_hash.0),
+                                                                            amount,
+                                                                            &currency,
+                                                                            &recipient.to_string(),
+                                                                            &e.to_string(),
+                                                                        );
+                                                                        if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                                                                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                                                                        }
 
                                                                         // Metrics: audit trail failure
                                                                         icn_obs::metrics::governance::audit_failures_inc();
@@ -2074,13 +2102,48 @@ impl Supervisor {
                                                                 error!("   Ledger entry hash: {}", hex::encode(entry_hash.0));
                                                                 error!("   ACTION REQUIRED: Manual reconciliation needed");
 
+                                                                // Write to dead-letter queue for automated reconciliation
+                                                                let failed_op = FailedOperation::new(
+                                                                    format!("serialize:{}", prop_id.0),
+                                                                    FailureType::AuditTrailSerialize,
+                                                                    serde_json::json!({
+                                                                        "proposal_id": prop_id.0,
+                                                                        "ledger_hash": hex::encode(entry_hash.0),
+                                                                        "amount": amount,
+                                                                        "currency": currency,
+                                                                        "recipient": recipient.to_string(),
+                                                                    }),
+                                                                    e.to_string(),
+                                                                );
+                                                                if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                                                                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                                                                }
+
                                                                 // Metrics: audit trail failure
                                                                 icn_obs::metrics::governance::audit_failures_inc();
                                                             }
                                                         }
                                                     }
                                                     Err(e) => {
-                                                        warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
+                                                        error!("🚨 CRITICAL: Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
+                                                        error!("   Amount: {} {} to {}", amount, currency, recipient);
+
+                                                        // Write to dead-letter queue for retry
+                                                        let failed_op = FailedOperation::new(
+                                                            format!("ledger:{}", prop_id.0),
+                                                            FailureType::LedgerAppendFailed,
+                                                            serde_json::json!({
+                                                                "proposal_id": prop_id.0,
+                                                                "amount": amount,
+                                                                "currency": currency,
+                                                                "recipient": recipient.to_string(),
+                                                                "from_did": from_did.to_string(),
+                                                            }),
+                                                            e.to_string(),
+                                                        );
+                                                        if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                                                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                                                        }
 
                                                         // Metrics: ledger append failure
                                                         icn_obs::metrics::governance::execution_failures_inc("ledger_append");
