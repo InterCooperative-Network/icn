@@ -1,9 +1,12 @@
 //! Supervisor for managing actors
 
+pub mod init_gossip;
+pub mod init_ledger;
+pub mod init_trust;
+pub mod registry;
+
 use anyhow::{bail, Context, Result};
-use icn_gossip::GossipActor;
 use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
-use icn_ledger::{DisputeManager, Ledger};
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
 use icn_time::ClockSync;
@@ -129,280 +132,47 @@ impl Supervisor {
                 node_profile.capacity.storage_mb_available,
             );
 
-            // Create trust graph
-            // Note: Phase 21 adds TrustGraphFacade for multi-graph support (Social, Economic, Technical).
-            // Currently using TrustGraph directly. Migration to TrustGraphFacade requires updating
-            // consumer type signatures. See docs/trust-multi-graph-migration.md for migration guide.
-            let trust_store_path = self.config.store_path().join("trust");
-            let trust_store: Arc<dyn icn_store::Store> =
-                Arc::new(SledStore::open(&trust_store_path)?);
-            let trust_graph = icn_trust::TrustGraph::new(trust_store, did.clone());
-            let trust_graph_handle = Arc::new(tokio::sync::RwLock::new(trust_graph));
-
-            info!("Trust graph initialized at {}", trust_store_path.display());
-
-            // Create recovery store for social recovery events
-            let recovery_store_path = self.config.store_path().join("recovery");
-            let recovery_store: Arc<dyn icn_store::Store> =
-                Arc::new(SledStore::open(&recovery_store_path)?);
-            info!(
-                "Recovery store initialized at {}",
-                recovery_store_path.display()
-            );
-
-            // Create shared MisbehaviorDetector for Byzantine fault detection (Phase 18)
-            // This is shared between NetworkActor and GossipActor to ensure unified tracking
-            let mut detector = icn_security::MisbehaviorDetector::new(
-                icn_security::MisbehaviorThresholds::default(),
-            );
-
-            // Set up trust penalty callback to update trust graph (Phase 18)
-            // NOTE: This callback is synchronous (uses block_in_place) to prevent race conditions
-            // with gossip-received trust updates. The caller waits for the trust update to complete.
-            let trust_graph_for_penalty = trust_graph_handle.clone();
-            let own_did_for_penalty = did.clone();
-            let trust_penalty_callback: icn_security::TrustPenaltyCallback =
-                Arc::new(move |peer_did: &icn_identity::Did, reputation_score: f64| {
-                    let graph = trust_graph_for_penalty.clone();
-                    let peer = peer_did.clone();
-                    let own = own_did_for_penalty.clone();
-
-                    // Use block_in_place to synchronously update trust graph
-                    // This prevents races with gossip-received trust updates
-                    tokio::task::block_in_place(|| {
-                        let rt = tokio::runtime::Handle::current();
-                        rt.block_on(async {
-                            // Map reputation (0.0-1.0) to trust score (0.0-1.0)
-                            // Reputation below 0.5 becomes untrusted (<0.1)
-                            let trust_score = if reputation_score < 0.5 {
-                                reputation_score * 0.2 // 0.5 → 0.1, 0.0 → 0.0
-                            } else {
-                                reputation_score // Keep 0.5-1.0 range
-                            };
-
-                            let mut graph = graph.write().await;
-                            let edge =
-                                icn_trust::TrustEdge::new(own.clone(), peer.clone(), trust_score);
-
-                            if let Err(e) = graph.add_edge(edge) {
-                                warn!(
-                                    "Failed to update trust graph for {} (reputation: {:.2}): {}",
-                                    peer, reputation_score, e
-                                );
-                            } else {
-                                debug!(
-                                    "Updated trust for {} to {:.2} (reputation: {:.2})",
-                                    peer, trust_score, reputation_score
-                                );
-                            }
-                        })
-                    });
-                });
-
-            detector.set_trust_penalty_callback(trust_penalty_callback);
-
-            let misbehavior_detector = Arc::new(tokio::sync::RwLock::new(detector));
-            info!("Shared Byzantine fault detector created with trust graph integration");
+            // Initialize trust graph, recovery store, and misbehavior detector
+            let trust_services =
+                init_trust::init_trust_services(&self.config, did.clone()).await?;
+            let trust_graph_handle = trust_services.trust_graph.clone();
+            let misbehavior_detector = trust_services.misbehavior_detector.clone();
+            let recovery_store = trust_services.recovery_store.clone();
 
             // Create trust lookup closure for gossip actor
-            let trust_graph_for_gossip = trust_graph_handle.clone();
-            let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
-                // Use a blocking task since we're in a sync context
-                let graph = trust_graph_for_gossip.clone();
-                let peer = peer_did.clone();
-                tokio::task::block_in_place(|| {
-                    let rt = tokio::runtime::Handle::current();
-                    rt.block_on(async {
-                        let graph = graph.read().await;
-                        graph.trust_class(&peer).ok()
-                    })
-                })
-            });
+            let trust_lookup = init_trust::create_trust_lookup(trust_graph_handle.clone());
 
-            // Spawn Gossip actor with trust graph for fine-grained trust-based subscription control
-            let gossip_handle = GossipActor::spawn_with_trust_graph(
+            // Initialize gossip services
+            let gossip_services = init_gossip::init_gossip_services(
+                &self.config,
                 did.clone(),
-                trust_lookup,
-                Some(trust_graph_handle.clone()),
-            );
+                init_gossip::GossipDeps {
+                    trust_graph: trust_graph_handle.clone(),
+                    trust_lookup,
+                    misbehavior_detector: misbehavior_detector.clone(),
+                    identity_bundle: identity_bundle.clone(),
+                },
+            )
+            .await?;
+            let gossip_handle = gossip_services.gossip_handle.clone();
+            let _gossip_store = gossip_services.gossip_store.clone(); // Kept for potential future use
+            let loaded_snapshot = gossip_services.loaded_snapshot;
 
-            info!("Gossip actor spawned with trust-gated subscription support");
-
-            // Set keypair for signing outgoing gossip messages
-            {
-                let mut gossip = gossip_handle.write().await;
-                gossip.set_keypair(identity_bundle.keypair().clone());
-            }
-
-            info!("Gossip actor configured with signing keypair");
-
-            // Restore gossip state from snapshot if available
-            let data_dir = self.config.store_path();
-            let load_start = std::time::Instant::now();
-            let load_result = icn_snapshot::load_snapshot(&data_dir);
-            let load_duration = load_start.elapsed();
-
-            let loaded_snapshot = match load_result {
-                Ok(Some(snapshot)) => {
-                    icn_obs::metrics::snapshot::load_total_inc();
-                    icn_obs::metrics::snapshot::load_duration_record(load_duration.as_secs_f64());
-
-                    info!(
-                        "Found state snapshot (version {}, created at {}) - loaded in {:.3}s",
-                        snapshot.version,
-                        snapshot.created_at,
-                        load_duration.as_secs_f64()
-                    );
-
-                    // Warn if checksum file is missing (legacy snapshot)
-                    let checksum_path = data_dir.join("state.snapshot.sha256");
-                    if !checksum_path.exists() {
-                        warn!("⚠️  Snapshot loaded without checksum verification (legacy snapshot). Run 'icnctl snapshot create' to generate checksum.");
-                    } else {
-                        info!("✅ Snapshot checksum verified");
-                    }
-
-                    // Record snapshot contents metrics
-                    if let Some(ref gossip_state) = snapshot.gossip_state {
-                        icn_obs::metrics::snapshot::gossip_vector_clock_entries_set(
-                            gossip_state.vector_clock.len(),
-                        );
-                        icn_obs::metrics::snapshot::gossip_subscriptions_set(
-                            gossip_state.subscriptions.len(),
-                        );
-                        icn_obs::metrics::snapshot::gossip_topics_set(gossip_state.topics.len());
-                    }
-                    if let Some(ref network_state) = snapshot.network_state {
-                        icn_obs::metrics::snapshot::network_x25519_keys_set(
-                            network_state.peer_x25519_keys.len(),
-                        );
-                    }
-
-                    if let Some(gossip_state) = snapshot.gossip_state.clone() {
-                        let mut gossip = gossip_handle.write().await;
-                        if let Err(e) = gossip.restore_state(gossip_state) {
-                            warn!("Failed to restore gossip state: {}", e);
-                        } else {
-                            info!("✅ Gossip state restored from snapshot");
-                        }
-                    }
-
-                    Some(snapshot)
-                }
-                Ok(None) => {
-                    debug!("No state snapshot found, starting with fresh state");
-                    None
-                }
-                Err(e) => {
-                    icn_obs::metrics::snapshot::load_errors_inc();
-                    warn!("Failed to load state snapshot: {}", e);
-                    None
-                }
-            };
-
-            // Set up gossip store for replica metadata tracking (Phase 17)
-            let gossip_store_path = self.config.store_path().join("gossip");
-            let gossip_store: Arc<dyn icn_store::Store> =
-                Arc::new(SledStore::open(&gossip_store_path)?);
-            {
-                let mut gossip = gossip_handle.write().await;
-                gossip.set_store(gossip_store.clone());
-            }
-            info!(
-                "Gossip store initialized at {} for replica tracking",
-                gossip_store_path.display()
-            );
-
-            // Spawn ReplicationManager for monitoring and maintaining data durability (Phase 17 Week 3)
-            let replication_config = crate::replication::ReplicationConfig::default();
-            let _replication_handle = crate::replication::ReplicationManager::spawn(
+            // Initialize ledger and contract services
+            let ledger_services = init_ledger::init_ledger_services(
+                &self.config,
                 did.clone(),
-                replication_config.clone(),
-                gossip_store.clone(),
-                trust_graph_handle.clone(),
-                gossip_handle.clone(),
-            );
-
-            info!(
-                "ReplicationManager spawned (target: {} replicas, health check: {}s)",
-                replication_config.target_replicas, replication_config.health_check_interval_secs
-            );
-
-            // Phase 18 Week 3: Initialize PartitionDetector and PartitionHealer
-            let partition_config = icn_gossip::PartitionConfig::default(); // 5 min threshold, 30s check interval
-            let partition_detector = icn_gossip::PartitionDetector::new(partition_config.clone());
-            let partition_detector_handle = Arc::new(tokio::sync::RwLock::new(partition_detector));
-
-            // Create partition healer with new vector clock (will be merged during healing)
-            let partition_healer = icn_gossip::PartitionHealer::new(icn_gossip::VectorClock::new());
-            let partition_healer_handle = Arc::new(tokio::sync::RwLock::new(partition_healer));
-
-            // Set partition detector and healer on gossip actor
-            {
-                let mut gossip = gossip_handle.write().await;
-                gossip.set_partition_detector(partition_detector_handle.clone());
-                gossip.set_partition_healer(partition_healer_handle.clone());
-            }
-
-            info!(
-                "Partition detector and healer initialized (threshold: {:?})",
-                partition_config.partition_threshold
-            );
-
-            // Set shared misbehavior detector on gossip actor for unified Byzantine fault tracking
-            {
-                let mut gossip = gossip_handle.write().await;
-                gossip.set_misbehavior_detector(misbehavior_detector.clone());
-            }
-            info!("Gossip actor configured with shared Byzantine fault detector");
-
-            // Phase 18 Week 6: Initialize StorageQuotaManager for gossip entries
-            // Default: 1GB global limit, 90% eviction threshold, 10MB per-DID quota
-            let storage_quota_manager = icn_store::StorageQuotaManager::new(
-                1024 * 1024 * 1024, // 1GB global limit
-                0.9,                // Start evicting at 90% capacity
-            );
-            let storage_quota_handle = Arc::new(tokio::sync::RwLock::new(storage_quota_manager));
-
-            // Set storage quota manager on gossip actor
-            {
-                let mut gossip = gossip_handle.write().await;
-                gossip.set_storage_quota_manager(storage_quota_handle.clone());
-            }
-
-            info!("Storage quota manager initialized (global limit: 1GB, eviction threshold: 90%)");
-
-            // Spawn Ledger
-            let store_path = self.config.store_path().join("ledger");
-            let store = Arc::new(SledStore::open(&store_path)?);
-            let mut ledger = Ledger::new(store.clone())?;
-            ledger.set_gossip(gossip_handle.clone());
-            ledger.set_misbehavior_detector(misbehavior_detector.clone());
-            let ledger_handle = Arc::new(tokio::sync::RwLock::new(ledger));
-
-            info!("Ledger initialized at {}", store_path.display());
-
-            // Initialize DisputeManager (shares store with Ledger)
-            let dispute_manager = DisputeManager::new(store.clone())?;
-            let dispute_manager_handle = Arc::new(tokio::sync::RwLock::new(dispute_manager));
-
-            info!("Dispute manager initialized");
-
-            // Initialize Contract Runtime
-            let contract_runtime = icn_ccl::ContractRuntime::new(ledger_handle.clone());
-            let contract_runtime_handle = Arc::new(tokio::sync::RwLock::new(contract_runtime));
-
-            info!("Contract runtime initialized");
-
-            // Create ContractActor
-            let contract_actor = icn_ccl::ContractActor::new(
-                did.clone(),
-                contract_runtime_handle.clone(),
-                Some(trust_graph_handle.clone()),
-            );
-            let contract_actor_handle = Arc::new(tokio::sync::RwLock::new(contract_actor));
-
-            info!("Contract actor created");
+                init_ledger::LedgerDeps {
+                    gossip_handle: gossip_handle.clone(),
+                    misbehavior_detector: misbehavior_detector.clone(),
+                    trust_graph: trust_graph_handle.clone(),
+                },
+            )
+            .await?;
+            let ledger_handle = ledger_services.ledger_handle.clone();
+            let dispute_manager_handle = ledger_services.dispute_manager.clone();
+            let contract_runtime_handle = ledger_services.contract_runtime.clone();
+            let contract_actor_handle = ledger_services.contract_actor.clone();
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(
