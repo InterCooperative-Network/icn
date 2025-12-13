@@ -28,6 +28,8 @@ struct ExecutorInfo {
     last_seen: u64,
     /// Number of tasks currently executing
     tasks_executing: usize,
+    /// Current capacity (CPU, memory, storage, GPU)
+    capacity: Option<crate::scheduler::NodeCapacity>,
 }
 
 /// Consensus tracking for task results
@@ -1487,6 +1489,7 @@ impl ComputeActor {
             trust_score,
             last_seen: now,
             tasks_executing: 0,
+            capacity: None,
         };
 
         let mut registry = self.executor_registry.lock().await;
@@ -1512,6 +1515,32 @@ impl ComputeActor {
                     .all(|cap| info.capabilities.contains(cap))
             })
             .map(|info| info.did.clone())
+            .collect()
+    }
+
+    /// Get capacity information for an executor
+    ///
+    /// Returns None if the executor is not registered or has no capacity info.
+    #[allow(dead_code)]
+    pub async fn get_executor_capacity(
+        &self,
+        executor_did: &str,
+    ) -> Option<crate::scheduler::NodeCapacity> {
+        let registry = self.executor_registry.lock().await;
+        registry.get(executor_did).and_then(|info| info.capacity.clone())
+    }
+
+    /// Get capacity information for all registered executors
+    ///
+    /// Returns a map of executor DID to capacity. Executors without capacity info are excluded.
+    #[allow(dead_code)]
+    pub async fn get_all_executor_capacities(
+        &self,
+    ) -> HashMap<String, crate::scheduler::NodeCapacity> {
+        let registry = self.executor_registry.lock().await;
+        registry
+            .iter()
+            .filter_map(|(did, info)| info.capacity.clone().map(|cap| (did.clone(), cap)))
             .collect()
     }
 
@@ -2212,8 +2241,39 @@ impl ComputeActor {
             "Received capacity announcement"
         );
 
-        // TODO: Store capacity in executor registry for placement decisions
-        // For now, this is a stub
+        // Store capacity in executor registry for placement decisions
+        let mut registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get_mut(&executor) {
+            info.capacity = Some(capacity.clone());
+            info.last_seen = capacity.updated_at;
+            tracing::debug!(
+                executor = %executor,
+                cpu_cores = capacity.cpu_cores_available,
+                memory_mb = capacity.memory_mb_available,
+                storage_mb = capacity.storage_mb_available,
+                gpus = capacity.gpu_devices.len(),
+                "Updated executor capacity in registry"
+            );
+        } else {
+            // Executor not yet registered - create entry with capacity
+            let trust_score = (self.trust_callback)(&executor);
+            let info = ExecutorInfo {
+                did: executor.clone(),
+                capabilities: Vec::new(), // Will be populated on ExecutorAvailable message
+                trust_score,
+                last_seen: capacity.updated_at,
+                tasks_executing: 0,
+                capacity: Some(capacity.clone()),
+            };
+            registry.insert(executor.clone(), info);
+            tracing::debug!(
+                executor = %executor,
+                "Created executor entry from capacity announcement"
+            );
+        }
+
+        // Update metrics for executor capacity
+        icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
 
         Ok(())
     }

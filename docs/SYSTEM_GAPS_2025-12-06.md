@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. A1 Phase 1 complete (supervisor modularization started).
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started).
 
 ---
 
@@ -148,10 +148,10 @@ These affect robustness but system can function.
 **Issue**: Failed ledger entries logged but no recovery path
 **Fix**: Implemented `DeadLetterQueue` with persistent storage, failure type tracking, retry support, and Prometheus metrics. Provides `FailedOperation` entries with context for manual review or automated retry.
 
-### M4. Executor Capacity Not Tracked
+### M4. Executor Capacity Not Tracked - FIXED
 **Location**: `icn-compute/src/actor.rs:2206`
 **Issue**: Scheduler can't make informed placement decisions
-**Fix**: Track and report executor capacity
+**Fix**: Added `capacity` field to `ExecutorInfo` struct. `on_capacity_announce()` now stores capacity in the executor registry. Added `get_executor_capacity()` and `get_all_executor_capacities()` methods for scheduler placement decisions.
 
 ### M5. Locality/Region Constraints Incomplete
 **Location**: `icn-compute/src/actor.rs:1881-1896`
