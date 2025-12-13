@@ -701,6 +701,8 @@ impl Supervisor {
                     tokio::sync::RwLock<std::collections::HashMap<Did, crate::node::NodeProfile>>,
                 > = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
                 let profile_cache_for_notifications = profile_cache.clone();
+                let node_profile_for_notifications = node_profile_handle.clone();
+                let gossip_for_profile_response = gossip_handle.clone();
 
                 // Create FederationGossipHandler if federation is enabled
                 let federation_handler_for_notifications: Option<
@@ -1340,6 +1342,9 @@ impl Supervisor {
                             };
 
                             let profile_cache = profile_cache_for_notifications.clone();
+                            let node_profile = node_profile_for_notifications.clone();
+                            let gossip = gossip_for_profile_response.clone();
+                            let own_did = own_did_for_notifications.clone();
                             tokio::spawn(async move {
                                 match serde_json::from_slice::<crate::node::ProfileMessage>(
                                     &entry_data,
@@ -1358,9 +1363,36 @@ impl Supervisor {
                                             peer_did, roles_count, extended_count
                                         );
                                     }
-                                    Ok(crate::node::ProfileMessage::Query(_)) => {
-                                        // TODO: Respond to profile queries
-                                        debug!("Received profile query (response not implemented)");
+                                    Ok(crate::node::ProfileMessage::Query(queried_did)) => {
+                                        // Respond to profile queries
+                                        debug!("Received profile query for {}", queried_did);
+
+                                        // Look up the profile
+                                        let profile_opt = if queried_did == own_did {
+                                            // Query for our own profile
+                                            Some(node_profile.read().await.clone())
+                                        } else {
+                                            // Query for cached peer profile
+                                            profile_cache.read().await.get(&queried_did).cloned()
+                                        };
+
+                                        // Publish response
+                                        let response_msg = crate::node::ProfileMessage::Response(profile_opt.clone());
+                                        if let Ok(response_data) = serde_json::to_vec(&response_msg) {
+                                            let mut gossip_write = gossip.write().await;
+                                            if let Err(e) = gossip_write.publish(
+                                                crate::node::TOPIC_NODE_PROFILES,
+                                                response_data,
+                                            ) {
+                                                warn!("Failed to publish profile response: {}", e);
+                                            } else {
+                                                debug!(
+                                                    "Published profile response for {}: {}",
+                                                    queried_did,
+                                                    if profile_opt.is_some() { "found" } else { "not found" }
+                                                );
+                                            }
+                                        }
                                     }
                                     Ok(crate::node::ProfileMessage::Response(_)) => {
                                         // Profile responses are handled by the requester

@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. A1 Phase 1 complete (supervisor modularization started).
 
 ---
 
@@ -138,10 +138,10 @@ These affect robustness but system can function.
 **Issue**: TURN relay not implemented (Phase 4 TODO)
 **Impact**: Nodes behind symmetric NAT can't connect
 
-### M2. Profile Query Responses Not Implemented
-**Location**: `icn-core/src/supervisor.rs:1576`
+### M2. Profile Query Responses Not Implemented - FIXED
+**Location**: `icn-core/src/supervisor/mod.rs:1363`
 **Issue**: Profile queries received but not answered
-**Impact**: Node profile discovery incomplete
+**Fix**: Implemented profile query response handler. When a Query message is received, looks up the requested DID (own profile or cached peer profile) and publishes a Response message via gossip.
 
 ### M3. Dead-Letter Queue Missing - FIXED
 **Location**: `icn-core/src/dead_letter.rs`
