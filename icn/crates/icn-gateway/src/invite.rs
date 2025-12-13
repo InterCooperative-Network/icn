@@ -29,6 +29,12 @@ pub struct InviteManager {
     invites: RwLock<HashMap<String, Invite>>,
 }
 
+impl Default for InviteManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InviteManager {
     /// Create a new invite manager with in-memory storage
     pub fn new() -> Self {

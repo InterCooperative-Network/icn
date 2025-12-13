@@ -381,9 +381,11 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
     let node_c = TestNode::spawn(23402, "us-west".to_string(), "lax-1".to_string()).await?; // Regional
     let node_d = TestNode::spawn(23403, "eu-central".to_string(), "fra-1".to_string()).await?; // Backbone
 
-    // Node A connects to all
+    // Node A connects to all (with delays to avoid QUIC handshake race conditions)
     node_a.dial(&node_b).await?;
+    tokio::time::sleep(Duration::from_millis(200)).await;
     node_a.dial(&node_c).await?;
+    tokio::time::sleep(Duration::from_millis(200)).await;
     node_a.dial(&node_d).await?;
 
     // Wait for connections to be established with retry logic for CI environments

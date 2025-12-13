@@ -143,7 +143,7 @@ mod tests {
         .await;
 
         let req = test::TestRequest::get()
-            .uri(&format!("/members/{}/{}", coop_id, did_str))
+            .uri(&format!("/members/{coop_id}/{did_str}"))
             .to_request();
         let resp = test::call_service(&app, req).await;
 
@@ -174,7 +174,7 @@ mod tests {
         let did_str = keypair.did().to_string();
 
         let req = test::TestRequest::get()
-            .uri(&format!("/members/nonexistent/{}", did_str))
+            .uri(&format!("/members/nonexistent/{did_str}"))
             .to_request();
         let resp = test::call_service(&app, req).await;
 

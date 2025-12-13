@@ -152,6 +152,12 @@ pub struct EnrollmentStore {
     ceremonies: RwLock<HashMap<String, EnrollmentCeremony>>,
 }
 
+impl Default for EnrollmentStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnrollmentStore {
     pub fn new() -> Self {
         Self {

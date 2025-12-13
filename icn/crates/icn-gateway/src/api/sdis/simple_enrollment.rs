@@ -165,7 +165,7 @@ pub async fn start_enrollment(
     Ok(HttpResponse::Ok().json(StartEnrollmentResponse {
         enrollment_id,
         verification_code,
-        qr_code: format!("data:image/png;base64,{}", qr_data.to_string()),
+        qr_code: format!("data:image/png;base64,{qr_data}"),
         expires_at: format_timestamp(expires_at),
     }))
 }
@@ -280,7 +280,7 @@ fn generate_verification_code() -> String {
 fn format_timestamp(ts: u64) -> String {
     use chrono::{DateTime, Utc};
     DateTime::from_timestamp(ts as i64, 0)
-        .unwrap_or_else(|| Utc::now())
+        .unwrap_or_else(Utc::now)
         .to_rfc3339()
 }
 

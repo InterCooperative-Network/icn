@@ -106,6 +106,12 @@ pub struct RecoveryStore {
     ceremonies: RwLock<HashMap<String, RecoveryCeremony>>,
 }
 
+impl Default for RecoveryStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecoveryStore {
     pub fn new() -> Self {
         Self {

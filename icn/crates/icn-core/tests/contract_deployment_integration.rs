@@ -715,50 +715,27 @@ async fn test_three_participant_contract_deployment() {
         .await
         .expect("Failed to trust A from C");
 
-    // Connect nodes bidirectionally (full mesh)
-    // A ↔ B
-    let addr_a: std::net::SocketAddr = "127.0.0.1:19007".parse().unwrap();
+    // Connect nodes in a star topology from node A (deployer)
+    // Node A needs to reach B and C to collect signatures and announce
     let addr_b: std::net::SocketAddr = "127.0.0.1:19008".parse().unwrap();
     let addr_c: std::net::SocketAddr = "127.0.0.1:19009".parse().unwrap();
 
+    // A → B
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
         .await
         .expect("Failed to dial B from A");
-    node_b
-        .network_handle
-        .dial(addr_a, node_a.did.clone())
-        .await
-        .expect("Failed to dial A from B");
 
-    // B ↔ C
-    node_b
-        .network_handle
-        .dial(addr_c, node_c.did.clone())
-        .await
-        .expect("Failed to dial C from B");
-    node_c
-        .network_handle
-        .dial(addr_b, node_b.did.clone())
-        .await
-        .expect("Failed to dial B from C");
-
-    // A ↔ C
+    // A → C
     node_a
         .network_handle
         .dial(addr_c, node_c.did.clone())
         .await
         .expect("Failed to dial C from A");
-    node_c
-        .network_handle
-        .dial(addr_a, node_a.did.clone())
-        .await
-        .expect("Failed to dial A from C");
 
-    // Give connections time to establish (full mesh = 6 connections)
-    // Increased timeout for CI environments where handshakes may take longer
-    sleep(Duration::from_millis(1500)).await;
+    // Give connections time to establish
+    sleep(Duration::from_millis(2000)).await;
 
     // Create contract with all 3 participants
     let contract = Contract::new("TriPartyAgreement".to_string())

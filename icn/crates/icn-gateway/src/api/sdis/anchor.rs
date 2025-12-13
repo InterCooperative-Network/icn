@@ -144,6 +144,12 @@ pub struct AnchorStore {
     anchors: RwLock<HashMap<String, AnchorRecord>>,
 }
 
+impl Default for AnchorStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnchorStore {
     pub fn new() -> Self {
         Self {

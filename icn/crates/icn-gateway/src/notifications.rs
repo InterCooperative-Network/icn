@@ -206,7 +206,7 @@ impl NotificationService {
     pub fn proposal_created_notification(proposal_id: &str, title: &str) -> Notification {
         Notification {
             title: "New Proposal".to_string(),
-            body: format!("{} - vote now", title),
+            body: format!("{title} - vote now"),
             data: Some(serde_json::json!({
                 "type": "proposal",
                 "proposal_id": proposal_id,
@@ -218,7 +218,7 @@ impl NotificationService {
     pub fn proposal_closing_notification(proposal_id: &str, title: &str) -> Notification {
         Notification {
             title: "Proposal Closing Soon".to_string(),
-            body: format!("{} closes in 24 hours", title),
+            body: format!("{title} closes in 24 hours"),
             data: Some(serde_json::json!({
                 "type": "proposal",
                 "proposal_id": proposal_id,
@@ -230,7 +230,7 @@ impl NotificationService {
     pub fn vote_recorded_notification(proposal_id: &str, proposal_title: &str) -> Notification {
         Notification {
             title: "Vote Recorded".to_string(),
-            body: format!("Your vote on {} was recorded", proposal_title),
+            body: format!("Your vote on {proposal_title} was recorded"),
             data: Some(serde_json::json!({
                 "type": "vote",
                 "proposal_id": proposal_id,
