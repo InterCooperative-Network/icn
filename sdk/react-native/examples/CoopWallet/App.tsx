@@ -40,6 +40,7 @@ import { VouchConfirmationScreen } from './src/screens/VouchConfirmationScreen';
 import { VouchHistoryScreen } from './src/screens/VouchHistoryScreen';
 import { TransactionDetailScreen } from './src/screens/TransactionDetailScreen';
 import { ICNProvider } from './src/contexts/ICNContext';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 
 // QR Code - conditionally import for web compatibility
 let QRCode: any = null;
@@ -2234,8 +2235,9 @@ export default function App() {
   }
 
   return (
-    <ICNProvider client={getClient()}>
-      <NavigationContainer>
+    <ThemeProvider>
+      <ICNProvider client={getClient()}>
+        <NavigationContainer>
         <StatusBar style="auto" />
         <Stack.Navigator
           screenOptions={{
@@ -2332,9 +2334,10 @@ export default function App() {
             />
           </>
         )}
-      </Stack.Navigator>
-      </NavigationContainer>
-    </ICNProvider>
+        </Stack.Navigator>
+        </NavigationContainer>
+      </ICNProvider>
+    </ThemeProvider>
   );
 }
 
