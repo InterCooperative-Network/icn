@@ -363,6 +363,7 @@ const SDISEnrollment = {
             const deviceInfo = {
                 device_type: this.getDeviceType(),
                 os: navigator.platform || 'unknown',
+                app_version: '1.0.0',
             };
 
             const response = await fetch(
