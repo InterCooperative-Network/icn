@@ -245,7 +245,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/v1/sdis")
             .service(sdis_health)
             .service(verify_level1)
-            .service(verify_level2),
+            .service(verify_level2)
+            .configure(simple_enrollment::configure),
     );
 }
 
