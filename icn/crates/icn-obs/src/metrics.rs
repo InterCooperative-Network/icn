@@ -598,6 +598,20 @@ pub fn init_descriptions() {
     describe_gauge!("icn_system_uptime_seconds", "System uptime in seconds");
     describe_gauge!("icn_system_actors_active", "Number of active actors");
 
+    // Core infrastructure metrics (dead-letter queue)
+    describe_counter!(
+        "icn_core_dead_letter_enqueued_total",
+        "Total number of operations added to dead-letter queue"
+    );
+    describe_counter!(
+        "icn_core_dead_letter_resolved_total",
+        "Total number of dead-letter queue entries resolved"
+    );
+    describe_counter!(
+        "icn_core_dead_letter_retried_total",
+        "Total number of dead-letter queue retry attempts"
+    );
+
     // Snapshot metrics (graceful restart)
     describe_histogram!(
         "icn_snapshot_save_duration_seconds",
@@ -1917,6 +1931,27 @@ pub mod system {
 
     pub fn actors_active_set(value: u64) {
         gauge!("icn_system_actors_active").set(value as f64);
+    }
+}
+
+/// Core infrastructure metrics (dead-letter queue, etc.)
+pub mod core {
+    use metrics::counter;
+
+    /// Increment dead-letter queue enqueue counter by failure type
+    pub fn dead_letter_enqueued_inc(failure_type: &str) {
+        counter!("icn_core_dead_letter_enqueued_total", "failure_type" => failure_type.to_string()).increment(1);
+    }
+
+    /// Increment dead-letter queue resolved counter
+    pub fn dead_letter_resolved_inc() {
+        counter!("icn_core_dead_letter_resolved_total").increment(1);
+    }
+
+    /// Increment dead-letter queue retry counter
+    pub fn dead_letter_retried_inc(success: bool) {
+        let result = if success { "success" } else { "failure" };
+        counter!("icn_core_dead_letter_retried_total", "result" => result).increment(1);
     }
 }
 

@@ -2,6 +2,7 @@
 
 pub mod anti_entropy;
 pub mod config;
+pub mod dead_letter;
 pub mod events;
 pub mod governance;
 pub mod identity;
@@ -14,6 +15,7 @@ pub mod trust_propagation;
 
 pub use anti_entropy::{spawn_anti_entropy_task, AntiEntropyConfig};
 pub use config::Config;
+pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};
 pub use events::{EventBus, EventCallback, SystemEvent};
 pub use governance::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
 pub use identity::{IdentityActor, IdentityHandle, IdentityMsg};

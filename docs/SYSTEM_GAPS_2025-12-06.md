@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented.
 
 ---
 
@@ -143,10 +143,10 @@ These affect robustness but system can function.
 **Issue**: Profile queries received but not answered
 **Impact**: Node profile discovery incomplete
 
-### M3. Dead-Letter Queue Missing
-**Location**: `icn-core/src/supervisor.rs:2042`
+### M3. Dead-Letter Queue Missing - FIXED
+**Location**: `icn-core/src/dead_letter.rs`
 **Issue**: Failed ledger entries logged but no recovery path
-**Fix**: Implement queue for automated reconciliation
+**Fix**: Implemented `DeadLetterQueue` with persistent storage, failure type tracking, retry support, and Prometheus metrics. Provides `FailedOperation` entries with context for manual review or automated retry.
 
 ### M4. Executor Capacity Not Tracked
 **Location**: `icn-compute/src/actor.rs:2206`
