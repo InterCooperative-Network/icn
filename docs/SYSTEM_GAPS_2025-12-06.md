@@ -1,7 +1,7 @@
 # ICN System Gaps - Comprehensive Analysis
 
 **Date**: 2025-12-06
-**Updated**: 2025-12-07
+**Updated**: 2025-12-13
 **Purpose**: Complete inventory of incomplete functionality, architectural issues, and design oversights
 **Scope**: Core systems only (not pilot UX gaps)
 
@@ -18,6 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking.
 
 ---
 
@@ -37,11 +38,11 @@ These must be fixed before any real-world use.
 **Impact**: Accepted dispute decisions have no effect
 **Fix**: Supervisor now maps governance `DisputeResolutionOutcome` to ledger `DisputeOutcome` and calls `DisputeManager::resolve_escalated_dispute()` when proposals are accepted.
 
-### C3. Actor Pause/Resume Missing (Compute Migration)
-**Location**: `icn-compute/src/migration_manager.rs:302, 377, 417`
+### C3. Actor Pause/Resume Missing (Compute Migration) - FIXED
+**Location**: `icn-compute/src/migration_manager.rs`, `icn-compute/src/actor_runtime.rs`
 **Issue**: Actor migration has TODO for "Week 4 integration" - no pause/resume
 **Impact**: Live migration will corrupt actor state
-**Fix**: Implement actor execution control (pause before migration, resume after)
+**Fix**: Implemented actor execution control. `MigrationManager` has `pause_actor()`, `resume_actor()`, and `restore_actor()` methods that send `ActorRuntimeCommand` variants. `StatefulActorRegistry` handles these commands via `create_callback()` integration. Full state machine: Running → Paused → Migrating → (transferred to target) with proper checkpoint coordination.
 
 ### C4. Gossip Handle Race in Ledger - FIXED
 **Location**: `icn-ledger/src/ledger.rs`
@@ -167,10 +168,10 @@ These affect robustness but system can function.
 **Issue**: Full recompute during quarantine can cause lost updates
 **Fix**: Use async recompute with snapshot isolation
 
-### M8. Floating Point Offer Selection
+### M8. Floating Point Offer Selection - FIXED
 **Location**: `icn-compute/src/actor.rs:2118-2126`
 **Issue**: f64 comparison non-deterministic across platforms
-**Fix**: Use deterministic tie-breaker (executor DID)
+**Fix**: Implemented deterministic tie-breaking with epsilon-based float comparison (1e-9 threshold) and lexicographic DID comparison as tie-breaker for equal scores.
 
 ### M9. Deliberation Period Clock Skew
 **Location**: `icn-compute/src/actor.rs:1990-2036`
