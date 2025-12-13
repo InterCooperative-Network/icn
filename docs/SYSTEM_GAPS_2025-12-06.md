@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues.
 
 ---
 
@@ -158,10 +158,10 @@ These affect robustness but system can function.
 **Issue**: Network RTT and blob registry integration missing
 **Fix**: Implement data locality scoring
 
-### M6. Fork Detection Index Not Atomic
+### M6. Fork Detection Index Not Atomic - VERIFIED NON-ISSUE
 **Location**: `icn-ledger/src/ledger.rs:119-176`
 **Issue**: Entry stored before fork index updated - crash window
-**Fix**: Make index update synchronous or use batch
+**Status**: The ForkDetector is an in-memory structure that is rebuilt from persistent entries on startup via `rebuild_fork_index()`. Any crash window is recovered on restart. Not a data consistency issue.
 
 ### M7. Balance Recomputation Race
 **Location**: `icn-ledger/src/ledger.rs:531-578`
@@ -212,10 +212,10 @@ These don't cause immediate bugs but make the system harder to maintain.
 **Issue**: Errors logged but not propagated
 **Fix**: Return Result<>, use error context
 
-### A7. Panic! in Production Code
+### A7. Panic! in Production Code - VERIFIED NON-ISSUE
 **Locations**: icn-ledger/sync.rs:86, icn-ledger/dispute.rs:553,625, icn-net/protocol.rs (6 places)
 **Issue**: Panics instead of error returns
-**Fix**: Convert to Result<>
+**Status**: All reported panics are inside `#[cfg(test)]` modules (test code only). No panics exist in production code paths. Verified 2025-12-13.
 
 ### A8. Byzantine Detector Ownership Unclear
 **Issue**: Created in supervisor, shared to Network, Gossip, Ledger
