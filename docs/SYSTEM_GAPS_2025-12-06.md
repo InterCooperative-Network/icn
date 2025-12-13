@@ -193,7 +193,8 @@ These don't cause immediate bugs but make the system harder to maintain.
 - `init_gossip.rs` - Gossip actor, partitions, replication
 - `init_ledger.rs` - Ledger, disputes, contracts
 - `registry.rs` - Service container types
-- `mod.rs` - Main supervisor (reduced from 3571 to 3341 lines)
+- `shutdown.rs` - Graceful shutdown and snapshot management
+- `mod.rs` - Main supervisor (reduced from 3571 to 3256 lines, -315 lines)
 **Remaining**: Network/message handlers, governance subscriptions, compute callbacks have deeply embedded closures requiring fuller ServiceRegistry integration
 
 ### A2. Circular Crate Dependencies
