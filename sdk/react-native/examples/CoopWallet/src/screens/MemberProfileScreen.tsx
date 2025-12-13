@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { ICNMobileClient } from '@icn/react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Identicon } from '../components/Identicon';
 
 interface MemberProfileScreenProps {
   client: ICNMobileClient;
@@ -140,11 +141,7 @@ export function MemberProfileScreen({ client, coopId, memberDid, userDid }: Memb
       {/* Header Card */}
       <View style={styles.headerCard}>
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {memberDid.slice(-2).toUpperCase()}
-            </Text>
-          </View>
+          <Identicon did={memberDid} size={80} />
           {isOwnProfile && (
             <View style={styles.selfBadge}>
               <Text style={styles.selfBadgeText}>You</Text>

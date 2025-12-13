@@ -1,7 +1,7 @@
 /**
  * Receive Screen
  *
- * Generate QR code for receiving payments.
+ * Generate QR code for receiving payments with share functionality.
  */
 
 import React, { useState } from 'react';
@@ -13,6 +13,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
+  Share,
+  Alert,
+  Clipboard,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useAuth, generateReceiveQR } from '@icn/react-native';
@@ -22,11 +26,63 @@ export function ReceiveScreen() {
   const { did, coopId } = useAuth(client!);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const qrData = generateReceiveQR(did || '', coopId || '', {
     suggestedAmount: amount ? parseFloat(amount) : undefined,
     memo: memo || undefined,
   });
+
+  // Generate a shareable payment link
+  const generatePaymentLink = () => {
+    const params = new URLSearchParams();
+    params.set('to', did || '');
+    params.set('coop', coopId || '');
+    if (amount) params.set('amount', amount);
+    if (memo) params.set('memo', memo);
+    return `icn://pay?${params.toString()}`;
+  };
+
+  // Generate human-readable request text
+  const generateRequestText = () => {
+    let text = `Payment request from ${did?.slice(0, 20)}...`;
+    if (amount) text += `\nAmount: ${amount} hours`;
+    if (memo) text += `\nFor: ${memo}`;
+    text += `\n\nOpen in CoopWallet: ${generatePaymentLink()}`;
+    return text;
+  };
+
+  const handleShare = async () => {
+    try {
+      const result = await Share.share({
+        message: generateRequestText(),
+        title: 'Payment Request',
+      });
+
+      if (result.action === Share.sharedAction) {
+        // Shared successfully
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share payment request');
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const link = generatePaymentLink();
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        alert('Failed to copy');
+      }
+    } else {
+      Clipboard.setString(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -46,6 +102,21 @@ export function ReceiveScreen() {
         <Text style={styles.instruction}>
           Show this QR code to receive a payment
         </Text>
+
+        {/* Share Actions */}
+        <View style={styles.shareActions}>
+          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+            <Text style={styles.shareIcon}>📤</Text>
+            <Text style={styles.shareButtonText}>Share Request</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
+            <Text style={styles.shareIcon}>{copied ? '✓' : '📋'}</Text>
+            <Text style={styles.copyButtonText}>
+              {copied ? 'Copied!' : 'Copy Link'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.form}>
           <Text style={styles.label}>Suggested Amount (optional)</Text>
@@ -101,7 +172,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
+  },
+  shareActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  shareButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4A90A4',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 8,
+  },
+  copyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#4A90A4',
+    gap: 8,
+  },
+  shareIcon: {
+    fontSize: 16,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  copyButtonText: {
+    color: '#4A90A4',
+    fontSize: 14,
+    fontWeight: '600',
   },
   form: {
     width: '100%',

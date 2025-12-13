@@ -348,6 +348,13 @@ interface Transaction {
   currency: string;
 }
 
+// Helper to format DIDs for display
+const formatDidDisplay = (did: string) => {
+  if (!did) return 'Unknown';
+  if (did.length > 16) return `${did.slice(0, 10)}...${did.slice(-4)}`;
+  return did;
+};
+
 function HomeScreen({
   navigation,
   coopId,
@@ -385,8 +392,8 @@ function HomeScreen({
           const txs: Transaction[] = historyResult.transactions.map((tx: any, idx: number) => ({
             id: tx.id || `tx-${idx}`,
             type: tx.to === userDid ? 'received' : 'sent',
-            from: formatDidShort(tx.from),
-            to: formatDidShort(tx.to),
+            from: tx.from,
+            to: tx.to,
             amount: tx.amount,
             memo: tx.memo || '',
             date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
@@ -532,7 +539,22 @@ function HomeScreen({
           </View>
         ) : (
           transactions.slice(0, 3).map((tx) => (
-            <View key={tx.id} style={styles.transactionItem}>
+            <TouchableOpacity
+              key={tx.id}
+              style={styles.transactionItem}
+              onPress={() => navigation.navigate('TransactionDetail', {
+                transaction: {
+                  id: tx.id,
+                  from: tx.from,
+                  to: tx.to,
+                  amount: tx.amount,
+                  memo: tx.memo,
+                  timestamp: tx.timestamp,
+                  currency: tx.currency,
+                }
+              })}
+              activeOpacity={0.7}
+            >
               <View style={[
                 styles.txIcon,
                 tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
@@ -541,9 +563,9 @@ function HomeScreen({
               </View>
               <View style={styles.txContent}>
                 <Text style={styles.txPerson}>
-                  {tx.type === 'received' ? `From ${tx.from}` : `To ${tx.to}`}
+                  {tx.type === 'received' ? `From ${formatDidDisplay(tx.from)}` : `To ${formatDidDisplay(tx.to)}`}
                 </Text>
-                <Text style={styles.txMemo}>{tx.memo}</Text>
+                {tx.memo ? <Text style={styles.txMemo}>{tx.memo}</Text> : null}
               </View>
               <View style={styles.txAmountContainer}>
                 <Text style={[
@@ -554,7 +576,8 @@ function HomeScreen({
                 </Text>
                 <Text style={styles.txDate}>{tx.date}</Text>
               </View>
-            </View>
+              <Text style={styles.txChevron}>›</Text>
+            </TouchableOpacity>
           ))
         )}
       </View>

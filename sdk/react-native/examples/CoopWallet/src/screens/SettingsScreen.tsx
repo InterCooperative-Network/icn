@@ -18,6 +18,7 @@ import {
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { ICNMobileClient } from '@icn/react-native';
+import { useTheme, ThemeMode } from '../contexts/ThemeContext';
 
 interface SettingsScreenProps {
   client: ICNMobileClient;
@@ -28,9 +29,23 @@ interface SettingsScreenProps {
 const BIOMETRICS_ENABLED_KEY = 'icn_biometrics_enabled';
 
 export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProps) {
+  const { theme, themeMode, setThemeMode, isDark } = useTheme();
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [biometricType, setBiometricType] = useState<string>('Biometrics');
+
+  const themeModeLabel = {
+    light: 'Light',
+    dark: 'Dark',
+    system: 'System',
+  };
+
+  const cycleThemeMode = () => {
+    const modes: ThemeMode[] = ['system', 'light', 'dark'];
+    const currentIndex = modes.indexOf(themeMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setThemeMode(modes[nextIndex]);
+  };
 
   useEffect(() => {
     checkBiometrics();
@@ -240,6 +255,38 @@ export function SettingsScreen({ client, userDid, onLogout }: SettingsScreenProp
         </>
       )}
 
+      {/* Appearance Section */}
+      {renderSection(
+        'Appearance',
+        <>
+          {renderSettingRow(
+            'Theme',
+            `Current: ${themeModeLabel[themeMode]}${themeMode === 'system' ? ` (${isDark ? 'Dark' : 'Light'})` : ''}`,
+            <View style={styles.themeButtons}>
+              {(['system', 'light', 'dark'] as ThemeMode[]).map((mode) => (
+                <TouchableOpacity
+                  key={mode}
+                  style={[
+                    styles.themeButton,
+                    themeMode === mode && styles.themeButtonActive,
+                  ]}
+                  onPress={() => setThemeMode(mode)}
+                >
+                  <Text
+                    style={[
+                      styles.themeButtonText,
+                      themeMode === mode && styles.themeButtonTextActive,
+                    ]}
+                  >
+                    {themeModeLabel[mode]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+
       {/* Notifications Section */}
       {renderSection(
         'Notifications',
@@ -368,6 +415,30 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 20,
     color: '#ccc',
+  },
+  themeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  themeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  themeButtonActive: {
+    backgroundColor: '#4A90A4',
+    borderColor: '#4A90A4',
+  },
+  themeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  themeButtonTextActive: {
+    color: '#fff',
   },
   versionText: {
     fontSize: 14,

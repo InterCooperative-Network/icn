@@ -4,7 +4,7 @@
  * Shows full details of a transaction with options to view profiles and copy data.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,18 @@ import {
   Clipboard,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '@icn/react-native';
 import { client } from '../client';
 import { RootStackParamList } from '../../App';
+
+const CONTACTS_KEY = 'icn_contacts';
+
+interface Contact {
+  did: string;
+  name: string;
+  addedAt: number;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TransactionDetail'>;
 
@@ -41,9 +50,115 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const { transaction } = route.params;
   const { did: userDid } = useAuth(client!);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isContact, setIsContact] = useState(false);
+  const [contactName, setContactName] = useState<string | null>(null);
 
   const isSent = transaction.from === userDid;
   const otherPartyDid = isSent ? transaction.to : transaction.from;
+
+  // Check if other party is already a contact
+  useEffect(() => {
+    const checkContact = async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(CONTACTS_KEY);
+        if (stored) {
+          const contacts: Contact[] = JSON.parse(stored);
+          const existing = contacts.find(c => c.did === otherPartyDid);
+          if (existing) {
+            setIsContact(true);
+            setContactName(existing.name);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to check contacts:', e);
+      }
+    };
+    checkContact();
+  }, [otherPartyDid]);
+
+  const handleAddToContacts = async () => {
+    const promptForName = () => {
+      if (Platform.OS === 'web') {
+        const name = prompt('Enter a name for this contact:');
+        if (name) saveContact(name);
+      } else {
+        Alert.prompt(
+          'Add Contact',
+          'Enter a name for this contact:',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Save', onPress: (name: string | undefined) => name && saveContact(name) },
+          ],
+          'plain-text',
+          formatDid(otherPartyDid)
+        );
+      }
+    };
+
+    const saveContact = async (name: string) => {
+      try {
+        const stored = await SecureStore.getItemAsync(CONTACTS_KEY);
+        const contacts: Contact[] = stored ? JSON.parse(stored) : [];
+
+        // Check if already exists
+        if (contacts.some(c => c.did === otherPartyDid)) {
+          Alert.alert('Already Saved', 'This contact is already in your list.');
+          return;
+        }
+
+        contacts.push({
+          did: otherPartyDid,
+          name: name.trim(),
+          addedAt: Date.now(),
+        });
+
+        await SecureStore.setItemAsync(CONTACTS_KEY, JSON.stringify(contacts));
+        setIsContact(true);
+        setContactName(name.trim());
+
+        if (Platform.OS === 'web') {
+          alert('Contact saved!');
+        } else {
+          Alert.alert('Saved', `${name} has been added to your contacts.`);
+        }
+      } catch (e) {
+        console.warn('Failed to save contact:', e);
+        Alert.alert('Error', 'Failed to save contact');
+      }
+    };
+
+    promptForName();
+  };
+
+  const handleRemoveContact = async () => {
+    const remove = async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(CONTACTS_KEY);
+        if (stored) {
+          const contacts: Contact[] = JSON.parse(stored);
+          const filtered = contacts.filter(c => c.did !== otherPartyDid);
+          await SecureStore.setItemAsync(CONTACTS_KEY, JSON.stringify(filtered));
+          setIsContact(false);
+          setContactName(null);
+        }
+      } catch (e) {
+        console.warn('Failed to remove contact:', e);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Remove this contact?')) remove();
+    } else {
+      Alert.alert(
+        'Remove Contact',
+        `Remove ${contactName || 'this contact'} from your contacts?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: remove },
+        ]
+      );
+    }
+  };
 
   const formatDid = (did: string) => {
     if (did.length > 24) {
@@ -187,6 +302,23 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
           </Text>
         </TouchableOpacity>
 
+        {isContact ? (
+          <TouchableOpacity style={styles.actionButton} onPress={handleRemoveContact}>
+            <Text style={styles.actionIcon}>⭐</Text>
+            <Text style={styles.actionText}>
+              {contactName || 'Saved'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.actionButton} onPress={handleAddToContacts}>
+            <Text style={styles.actionIcon}>➕</Text>
+            <Text style={styles.actionText}>Add to Contacts</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Quick Actions */}
+      <View style={styles.actions}>
         {isSent ? (
           <TouchableOpacity
             style={styles.actionButton}

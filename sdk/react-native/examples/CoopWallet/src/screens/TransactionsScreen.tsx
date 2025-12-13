@@ -14,6 +14,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  Share,
+  Alert,
+  Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTransactions, Transaction } from '@icn/react-native';
@@ -55,6 +58,59 @@ export function TransactionsScreen({ client, coopId, userDid, navigation }: Tran
 
     return true;
   });
+
+  // Export transactions as CSV
+  const exportTransactions = async () => {
+    if (filteredTransactions.length === 0) {
+      Alert.alert('No Transactions', 'There are no transactions to export.');
+      return;
+    }
+
+    // Build CSV content
+    const headers = ['Date', 'Type', 'Amount', 'Currency', 'From', 'To', 'Memo', 'Transaction ID'];
+    const rows = filteredTransactions.map((tx) => {
+      const date = new Date(tx.timestamp).toISOString();
+      const type = tx.from === userDid ? 'Sent' : 'Received';
+      return [
+        date,
+        type,
+        tx.amount.toString(),
+        tx.currency || 'hours',
+        tx.from,
+        tx.to,
+        `"${(tx.memo || '').replace(/"/g, '""')}"`,
+        tx.id,
+      ].join(',');
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+
+    if (Platform.OS === 'web') {
+      // Web: Create download link
+      try {
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        // Fallback to copy
+        alert('CSV data copied to clipboard');
+      }
+    } else {
+      // Mobile: Share as text (CSV)
+      try {
+        await Share.share({
+          message: csv,
+          title: 'Transaction Export',
+        });
+      } catch (err) {
+        Alert.alert('Export Failed', 'Could not export transactions');
+      }
+    }
+  };
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -154,11 +210,14 @@ export function TransactionsScreen({ client, coopId, userDid, navigation }: Tran
         ))}
       </View>
 
-      {/* Summary */}
+      {/* Summary & Export */}
       <View style={styles.summaryContainer}>
         <Text style={styles.summaryText}>
           {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
         </Text>
+        <TouchableOpacity style={styles.exportButton} onPress={exportTransactions}>
+          <Text style={styles.exportButtonText}>Export CSV</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -272,11 +331,24 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   summaryText: {
     fontSize: 14,
     color: '#999',
+  },
+  exportButton: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  exportButtonText: {
+    fontSize: 12,
+    color: '#4A90A4',
+    fontWeight: '600',
   },
   transactionCard: {
     backgroundColor: '#fff',

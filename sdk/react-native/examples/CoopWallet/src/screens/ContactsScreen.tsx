@@ -18,6 +18,7 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import { ICNMobileClient } from '@icn/react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Identicon } from '../components/Identicon';
 
 interface ContactsScreenProps {
   client: ICNMobileClient;
@@ -137,11 +138,7 @@ export function ContactsScreen({ client, coopId }: ContactsScreenProps) {
           style={styles.contactInfo}
           onPress={() => handleViewProfile(contact)}
         >
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {contact.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          <Identicon did={contact.did} size={44} />
           <View style={styles.contactDetails}>
             <Text style={styles.contactName}>{contact.name}</Text>
             <Text style={styles.contactDid}>{formatDid(contact.did)}</Text>

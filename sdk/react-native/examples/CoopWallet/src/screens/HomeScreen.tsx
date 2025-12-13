@@ -20,6 +20,7 @@ import { client } from '../client';
 import { RootStackParamList } from '../../App';
 import { TrustBadge } from '../components/TrustBadge';
 import { BottomNavBar } from '../components/BottomNavBar';
+import { SkeletonBalance, SkeletonList } from '../components/Skeleton';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -94,14 +95,18 @@ export function HomeScreen({ navigation }: Props) {
       </View>
 
       {/* Balance Card */}
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Available Balance</Text>
-        <Text style={styles.balanceAmount}>
-          {balance?.balance ?? 0}
-          <Text style={styles.balanceCurrency}> hours</Text>
-        </Text>
-        <Text style={styles.coopName}>{coopId}</Text>
-      </View>
+      {balanceLoading && !balance ? (
+        <SkeletonBalance />
+      ) : (
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>Available Balance</Text>
+          <Text style={styles.balanceAmount}>
+            {balance?.balance ?? 0}
+            <Text style={styles.balanceCurrency}> hours</Text>
+          </Text>
+          <Text style={styles.coopName}>{coopId}</Text>
+        </View>
+      )}
 
       {/* Quick Actions */}
       <View style={styles.actions}>
@@ -154,7 +159,9 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={styles.seeAllText}>See All</Text>
           </TouchableOpacity>
         </View>
-        {transactions.length === 0 ? (
+        {txLoading && transactions.length === 0 ? (
+          <SkeletonList count={3} />
+        ) : transactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No transactions yet</Text>
           </View>
