@@ -8,6 +8,7 @@ export { ProposalScreen } from './ProposalScreen';
 
 // Transaction & Account Screens
 export { TransactionsScreen } from './TransactionsScreen';
+export { TransactionDetailScreen } from './TransactionDetailScreen';
 export { SettingsScreen } from './SettingsScreen';
 export { MemberProfileScreen } from './MemberProfileScreen';
 export { ContactsScreen } from './ContactsScreen';

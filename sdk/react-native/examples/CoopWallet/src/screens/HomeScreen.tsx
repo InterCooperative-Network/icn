@@ -162,7 +162,12 @@ export function HomeScreen({ navigation }: Props) {
           transactions.map((tx) => {
             const isSent = tx.from === did;
             return (
-              <View key={tx.id} style={styles.txRow}>
+              <TouchableOpacity
+                key={tx.id}
+                style={styles.txRow}
+                onPress={() => navigation.navigate('TransactionDetail', { transaction: tx })}
+                activeOpacity={0.7}
+              >
                 <View style={styles.txIcon}>
                   <Text style={styles.txIconText}>{isSent ? '↑' : '↓'}</Text>
                 </View>
@@ -172,10 +177,13 @@ export function HomeScreen({ navigation }: Props) {
                   </Text>
                   {tx.memo && <Text style={styles.txMemo}>{tx.memo}</Text>}
                 </View>
-                <Text style={[styles.txAmount, isSent ? styles.txSent : styles.txReceived]}>
-                  {isSent ? '-' : '+'}{tx.amount}
-                </Text>
-              </View>
+                <View style={styles.txRight}>
+                  <Text style={[styles.txAmount, isSent ? styles.txSent : styles.txReceived]}>
+                    {isSent ? '-' : '+'}{tx.amount}
+                  </Text>
+                  <Text style={styles.txChevron}>›</Text>
+                </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -516,6 +524,15 @@ const styles = StyleSheet.create({
   },
   txReceived: {
     color: '#4caf50',
+  },
+  txRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  txChevron: {
+    fontSize: 20,
+    color: '#ccc',
+    marginLeft: 8,
   },
   sdisActions: {
     gap: 12,

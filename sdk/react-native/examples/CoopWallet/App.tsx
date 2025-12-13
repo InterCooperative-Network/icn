@@ -38,6 +38,7 @@ import { StewardDashboardScreen } from './src/screens/StewardDashboardScreen';
 import { EnrollmentDetailScreen } from './src/screens/EnrollmentDetailScreen';
 import { VouchConfirmationScreen } from './src/screens/VouchConfirmationScreen';
 import { VouchHistoryScreen } from './src/screens/VouchHistoryScreen';
+import { TransactionDetailScreen } from './src/screens/TransactionDetailScreen';
 import { ICNProvider } from './src/contexts/ICNContext';
 
 // QR Code - conditionally import for web compatibility
@@ -2058,6 +2059,17 @@ function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
 // Navigation Setup
 // ============================================================================
 
+// Transaction type for navigation params
+export interface TransactionParam {
+  id: string;
+  from: string;
+  to: string;
+  amount: number;
+  currency: string;
+  memo?: string;
+  timestamp: number;
+}
+
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
@@ -2069,6 +2081,7 @@ export type RootStackParamList = {
   Verify: undefined;
   VerificationHistory: undefined;
   Transactions: undefined;
+  TransactionDetail: { transaction: TransactionParam };
   Settings: undefined;
   TrustAttestation: { targetDid?: string; targetName?: string } | undefined;
   Proposal: { proposalId: string };
@@ -2226,6 +2239,11 @@ export default function App() {
             <Stack.Screen name="Transactions" options={{ title: 'Transactions' }}>
               {() => <TransactionsScreen coopId={coopId} userDid={userDid} />}
             </Stack.Screen>
+            <Stack.Screen
+              name="TransactionDetail"
+              component={TransactionDetailScreen}
+              options={{ title: 'Transaction Details' }}
+            />
             <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
               {() => <SettingsScreen onLogout={handleLogout} userDid={userDid} />}
             </Stack.Screen>
