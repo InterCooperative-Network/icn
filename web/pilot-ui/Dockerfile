@@ -9,6 +9,16 @@ COPY sw.js /usr/share/nginx/html/
 COPY manifest.json /usr/share/nginx/html/
 COPY offline.html /usr/share/nginx/html/
 
+# SDIS pages
+COPY sdis-*.html /usr/share/nginx/html/
+COPY sdis-*.css /usr/share/nginx/html/
+COPY sdis-*.js /usr/share/nginx/html/
+
+# Steward dashboard
+COPY steward-dashboard.html /usr/share/nginx/html/
+COPY steward-dashboard.css /usr/share/nginx/html/
+COPY steward-dashboard.js /usr/share/nginx/html/
+
 # Add custom nginx config for SPA routing with no-cache for JS/CSS
 RUN echo 'server { \
     listen 3000; \
