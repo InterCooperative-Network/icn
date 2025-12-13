@@ -59,6 +59,52 @@ SDIS (Secure Distributed Identity System) enables secure multi-device identity m
 
 ---
 
+## For Stewards
+
+### Steward Dashboard
+
+Stewards review and vouch for identity enrollments. Access the dashboard at:
+- **Web**: `http://<gateway-host>:30030/steward-dashboard.html`
+- **Mobile**: CoopWallet app → Home → Steward Dashboard
+
+### Reviewing Enrollments
+
+1. Open the Steward Dashboard
+2. View **Pending** tab for enrollments awaiting vouch
+3. Click an enrollment to see details:
+   - Identity name and coop
+   - Current verification level
+   - Expiration time
+4. Choose to **Vouch** or **Reject**
+
+### Vouching for an Identity
+
+1. Select a pending enrollment (must be Level 1+)
+2. Click **Vouch**
+3. Enter your verification statement (how you verified the person)
+4. Confirm the verification checklist:
+   - ✅ Identity verified in person or via video call
+   - ✅ Person matches their stated identity
+   - ✅ No suspicious behavior observed
+5. Submit your vouch
+
+### Rejecting an Enrollment
+
+1. Select a pending enrollment
+2. Click **Reject**
+3. Enter the rejection reason
+4. Confirm rejection
+
+### Steward Statistics
+
+View your steward metrics:
+- Total vouches and monthly activity
+- Rejection count
+- Reputation score
+- Average response time
+
+---
+
 ## For Developers
 
 ### API Examples
@@ -310,6 +356,23 @@ User needs: Recover identity
 
 ## API Quick Reference
 
+### Simple Enrollment (with Steward Network)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/v1/sdis/enrollment/start` | POST | Start new enrollment |
+| `/v1/sdis/verify/level1` | POST | Verify device (Level 1) |
+| `/v1/sdis/verify/level2` | POST | Steward vouch (Level 2) |
+| `/v1/sdis/enrollment/complete` | POST | Complete enrollment |
+| `/v1/sdis/status/{id}` | GET | Get enrollment status |
+| `/v1/sdis/pending` | GET | List pending enrollments |
+| `/v1/sdis/vouch/{id}` | POST | Submit steward vouch |
+| `/v1/sdis/reject/{id}` | POST | Reject enrollment |
+| `/v1/sdis/steward/stats` | GET | Steward statistics |
+| `/v1/sdis/steward/history` | GET | Vouch history |
+
+### Device Enrollment (Advanced)
+
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/v1/sdis/enroll` | POST | Start enrollment |
@@ -345,6 +408,12 @@ User needs: Recover identity
 
 ---
 
-**Last Updated**: December 12, 2025  
-**Version**: 1.0.0  
+**Last Updated**: December 13, 2025
+**Version**: 1.1.0
 **Status**: Production Ready ✅
+
+**What's New in 1.1.0**:
+- Steward Dashboard for enrollment review
+- Web and mobile dashboard interfaces
+- Steward vouch and reject workflows
+- Statistics and history tracking

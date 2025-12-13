@@ -102,6 +102,61 @@ TOKEN=$(icnctl auth token --gateway http://10.8.10.40:30080 --coop pilot-coop)
 curl -H "Authorization: Bearer $TOKEN" http://10.8.10.40:30080/v1/gov/domains
 ```
 
+## SDIS & Steward Dashboard (deployed 2025-12-13)
+
+**Sovereign Digital Identity System** with steward verification network.
+
+| Component | Access |
+|-----------|--------|
+| **Pilot UI** | http://10.8.10.40:30030 |
+| **Steward Dashboard** | http://10.8.10.40:30030/steward-dashboard.html |
+| **SDIS Enrollment** | http://10.8.10.40:30030/sdis-enrollment.html |
+| **Gateway API** | http://10.8.10.40:30080/v1/sdis/* |
+
+### SDIS API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/v1/sdis/health` | GET | Service health check |
+| `/v1/sdis/enrollment/start` | POST | Start new enrollment |
+| `/v1/sdis/verify/level1` | POST | Device proof verification |
+| `/v1/sdis/verify/level2` | POST | Steward vouch verification |
+| `/v1/sdis/enrollment/complete` | POST | Complete enrollment |
+| `/v1/sdis/pending` | GET | List pending enrollments (steward) |
+| `/v1/sdis/status/{id}` | GET | Get enrollment status |
+| `/v1/sdis/vouch/{id}` | POST | Submit steward vouch |
+| `/v1/sdis/reject/{id}` | POST | Reject enrollment |
+| `/v1/sdis/steward/stats` | GET | Steward statistics |
+| `/v1/sdis/steward/history` | GET | Vouch history |
+
+### Quick Test Commands
+
+```bash
+# Check SDIS health
+curl http://10.8.10.40:30080/v1/sdis/health
+
+# List pending enrollments
+curl http://10.8.10.40:30080/v1/sdis/pending
+
+# Get steward stats
+curl http://10.8.10.40:30080/v1/sdis/steward/stats
+
+# Start an enrollment
+curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+  -H "Content-Type: application/json" \
+  -d '{"identity_name":"Test User","coop_id":"pilot-coop"}'
+```
+
+### Verification Levels
+
+| Level | Description | Required |
+|-------|-------------|----------|
+| **0** | Enrollment started | Identity name, coop ID |
+| **1** | Device verified | Device signature proof |
+| **2** | Steward vouched | Steward approval + statement |
+
+---
+
 ## Deployment History
 
 ### Initial Deployment (2025-12-03)

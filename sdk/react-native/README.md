@@ -9,6 +9,8 @@ React Native SDK for the InterCooperative Network - mobile-first mutual credit a
 - **Real-time Events** - WebSocket with auto-reconnect
 - **QR Payments** - Generate and scan payment QR codes
 - **React Hooks** - Easy integration with React Native apps
+- **SDIS Steward** - Review and vouch for identity enrollments
+- **Trust Graph** - View and create trust attestations
 
 ## Installation
 
@@ -342,6 +344,86 @@ await client.createTrustAttestation(
 const network = await client.getTrustNetwork('did:icn:alice', 2);
 // network.nodes - Array of DIDs with trust scores
 // network.edges - Array of trust relationships
+```
+
+### SDIS Steward Hooks
+
+Hooks for stewards to review and vouch for SDIS enrollments.
+
+#### `usePendingEnrollments(client, options?)`
+
+Fetch pending enrollments for steward review.
+
+```typescript
+import { usePendingEnrollments } from '@icn/react-native';
+
+const {
+  enrollments,
+  pendingCount,
+  isLoading,
+  error,
+  refresh,
+} = usePendingEnrollments(client, { autoRefresh: true, refreshInterval: 30000 });
+```
+
+#### `useVouch(client)`
+
+Submit a steward vouch for an enrollment.
+
+```typescript
+import { useVouch } from '@icn/react-native';
+
+const { vouch, isSubmitting, error, success, reset } = useVouch(client);
+
+await vouch(enrollmentId, 'I verified this person in a video call');
+```
+
+#### `useReject(client)`
+
+Reject an enrollment.
+
+```typescript
+import { useReject } from '@icn/react-native';
+
+const { reject, isSubmitting, error, success, reset } = useReject(client);
+
+await reject(enrollmentId, 'Could not verify identity - suspicious behavior');
+```
+
+#### `useStewardStats(client)`
+
+Fetch steward statistics.
+
+```typescript
+import { useStewardStats } from '@icn/react-native';
+
+const { stats, isLoading, error, refresh } = useStewardStats(client);
+
+// stats.total_vouches - Total vouches submitted
+// stats.monthly_vouches - Vouches this month
+// stats.total_rejections - Rejection count
+// stats.reputation_score - Steward reputation (0-100)
+// stats.avg_response_hours - Average response time
+```
+
+#### `useVouchHistory(client, limit?)`
+
+Fetch steward vouch history.
+
+```typescript
+import { useVouchHistory } from '@icn/react-native';
+
+const { history, total, isLoading, error, refresh } = useVouchHistory(client, 50);
+```
+
+#### `useEnrollmentDetail(client, enrollmentId)`
+
+Fetch details for a specific enrollment.
+
+```typescript
+import { useEnrollmentDetail } from '@icn/react-native';
+
+const { enrollment, isLoading, error, refresh } = useEnrollmentDetail(client, enrollmentId);
 ```
 
 ## Example App
