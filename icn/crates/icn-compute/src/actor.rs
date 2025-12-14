@@ -92,8 +92,7 @@ pub type EventCallback = Arc<dyn Fn(ComputeEvent) + Send + Sync>;
 /// - RTT to the peer (from network topology)
 /// - Blob locality information
 /// - Region information
-pub type LocalityCallback =
-    Arc<dyn Fn(&str) -> crate::scheduler::LocalityContext + Send + Sync>;
+pub type LocalityCallback = Arc<dyn Fn(&str) -> crate::scheduler::LocalityContext + Send + Sync>;
 
 /// Convert an ExecutionOutcome to a CCL Value for dispute evidence
 fn outcome_to_value(outcome: &crate::types::ExecutionOutcome) -> icn_ccl::Value {

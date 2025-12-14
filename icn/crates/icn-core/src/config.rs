@@ -174,9 +174,11 @@ impl NetworkConfig {
     pub fn turn_config(&self) -> Option<icn_net::TurnConfig> {
         let server = self.turn_server.as_ref()?;
         let server_addr = server.parse().ok()?;
-        Some(icn_net::TurnConfig::new(server_addr)
-            .with_username(self.turn_username.clone())
-            .with_password(self.turn_password.clone()))
+        Some(
+            icn_net::TurnConfig::new(server_addr)
+                .with_username(self.turn_username.clone())
+                .with_password(self.turn_password.clone()),
+        )
     }
 }
 

@@ -1571,7 +1571,7 @@ impl Supervisor {
 
                 // Spawn candidate cache cleanup task
                 let cache_cleanup_interval = std::time::Duration::from_secs(
-                    self.config.supervisor.candidate_cleanup_interval_secs
+                    self.config.supervisor.candidate_cleanup_interval_secs,
                 );
                 let mut cache_cleanup_shutdown = self.shutdown_tx.subscribe();
                 tokio::spawn(async move {
@@ -1645,7 +1645,7 @@ impl Supervisor {
                     };
 
                     let peer_exchange_delay = std::time::Duration::from_millis(
-                        self.config.supervisor.peer_exchange_delay_ms
+                        self.config.supervisor.peer_exchange_delay_ms,
                     );
                     let peer_exchange_max = self.config.supervisor.peer_exchange_max_peers;
 
@@ -1654,7 +1654,11 @@ impl Supervisor {
                         tokio::time::sleep(peer_exchange_delay).await;
 
                         match network_handle
-                            .request_peer_exchange(&peer_did, Some(peer_exchange_max), network_filter.clone())
+                            .request_peer_exchange(
+                                &peer_did,
+                                Some(peer_exchange_max),
+                                network_filter.clone(),
+                            )
                             .await
                         {
                             Ok(_) => info!("✓ Requested peer exchange from {}", peer_did),
@@ -3044,9 +3048,8 @@ impl Supervisor {
 
             // Still spawn metrics update task for system metrics
             let start_time = std::time::Instant::now();
-            let metrics_interval = std::time::Duration::from_secs(
-                self.config.supervisor.metrics_update_interval_secs
-            );
+            let metrics_interval =
+                std::time::Duration::from_secs(self.config.supervisor.metrics_update_interval_secs);
             let mut metrics_shutdown = self.shutdown_tx.subscribe();
             background_tasks.spawn(async move {
                 let mut interval = tokio::time::interval(metrics_interval);
@@ -3154,9 +3157,8 @@ impl Supervisor {
 
         // Wait for background tasks to complete gracefully (with timeout)
         info!("Waiting for background tasks to complete...");
-        let shutdown_timeout = tokio::time::Duration::from_secs(
-            self.config.supervisor.shutdown_timeout_secs
-        );
+        let shutdown_timeout =
+            tokio::time::Duration::from_secs(self.config.supervisor.shutdown_timeout_secs);
         match tokio::time::timeout(shutdown_timeout, async {
             while background_tasks.join_next().await.is_some() {
                 // Task completed successfully

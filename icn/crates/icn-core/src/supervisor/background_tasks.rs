@@ -142,7 +142,7 @@ pub fn spawn_metrics_update_task(
 /// Steward gossip topic routing helper
 pub mod steward {
     use super::*;
-    use icn_steward::{StewardMessage, StewardHandle};
+    use icn_steward::{StewardHandle, StewardMessage};
 
     /// Create a send callback for steward messages via gossip
     pub fn create_send_callback(
@@ -181,10 +181,7 @@ pub mod steward {
     }
 
     /// Subscribe to steward gossip topics
-    pub async fn subscribe_to_topics(
-        gossip_handle: &Arc<RwLock<GossipActor>>,
-        did: &Did,
-    ) {
+    pub async fn subscribe_to_topics(gossip_handle: &Arc<RwLock<GossipActor>>, did: &Did) {
         let mut gossip = gossip_handle.write().await;
         for topic in &[
             icn_steward::topics::STEWARD_ANNOUNCE,

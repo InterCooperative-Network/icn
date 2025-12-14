@@ -906,8 +906,7 @@ impl Ledger {
                 Err(e) if attempt < max_retries && e.to_string().contains("Journal modified") => {
                     warn!(
                         attempt = attempt + 1,
-                        max_retries,
-                        "Balance recomputation retry due to concurrent modification"
+                        max_retries, "Balance recomputation retry due to concurrent modification"
                     );
                     // Small delay to reduce contention
                     std::thread::sleep(std::time::Duration::from_millis(10));

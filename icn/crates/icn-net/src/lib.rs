@@ -33,9 +33,9 @@ pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;
 pub use session::SessionManager;
 pub use stun::StunClient;
-pub use turn::{TurnAllocation, TurnClient, TurnConfig};
 pub use topology::{
     FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NetworkMetrics, NodeRole,
     PeerId, TopologyConfig, TopologyInfo,
 };
+pub use turn::{TurnAllocation, TurnClient, TurnConfig};
 pub use version::{common_capabilities, negotiate_version, CapabilityFlags, VersionInfo};

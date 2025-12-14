@@ -592,7 +592,11 @@ impl TurnClient {
         })
     }
 
-    fn verify_refresh_response(&self, data: &[u8], expected_transaction_id: &[u8; 12]) -> Result<()> {
+    fn verify_refresh_response(
+        &self,
+        data: &[u8],
+        expected_transaction_id: &[u8; 12],
+    ) -> Result<()> {
         if data.len() < 20 {
             anyhow::bail!("TURN response too short");
         }
@@ -671,11 +675,7 @@ impl TurnClient {
     // XOR address encoding/decoding (per RFC 5389)
     // =========================================================================
 
-    fn xor_encode_address(
-        &self,
-        addr: SocketAddr,
-        transaction_id: &[u8; 12],
-    ) -> Result<Vec<u8>> {
+    fn xor_encode_address(&self, addr: SocketAddr, transaction_id: &[u8; 12]) -> Result<Vec<u8>> {
         let mut result = Vec::with_capacity(20);
 
         match addr {
@@ -709,11 +709,7 @@ impl TurnClient {
         Ok(result)
     }
 
-    fn xor_decode_address(
-        &self,
-        data: &[u8],
-        transaction_id: &[u8; 12],
-    ) -> Result<SocketAddr> {
+    fn xor_decode_address(&self, data: &[u8], transaction_id: &[u8; 12]) -> Result<SocketAddr> {
         if data.len() < 8 {
             anyhow::bail!("XOR address too short");
         }
@@ -807,7 +803,9 @@ mod tests {
         let addr: SocketAddr = "192.168.1.100:8080".parse().unwrap();
 
         let encoded = client.xor_encode_address(addr, &transaction_id).unwrap();
-        let decoded = client.xor_decode_address(&encoded, &transaction_id).unwrap();
+        let decoded = client
+            .xor_decode_address(&encoded, &transaction_id)
+            .unwrap();
 
         assert_eq!(addr, decoded);
     }
