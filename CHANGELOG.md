@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - System Gap Resolutions (2025-12-13)
+
+**Profile Query Responses (M2)** ([icn/crates/icn-core/src/supervisor/mod.rs](icn/crates/icn-core/src/supervisor/mod.rs)):
+- Nodes now respond to `ProfileMessage::Query` requests
+- Looks up own profile or cached peer profile and publishes response via gossip
+- Enables complete node profile discovery across the network
+
+**Executor Capacity Tracking (M4)** ([icn/crates/icn-compute/src/actor.rs](icn/crates/icn-compute/src/actor.rs)):
+- Added `capacity` field to `ExecutorInfo` struct storing `NodeCapacity`
+- `on_capacity_announce()` now stores CPU, memory, storage, and GPU capacity in registry
+- Added `get_executor_capacity()` for single executor lookup
+- Added `get_all_executor_capacities()` for scheduler placement decisions
+- Enables informed task placement based on actual executor resources
+
+### Changed - Supervisor Modularization (A1) (2025-12-13)
+
+**Supervisor Directory Structure** ([icn/crates/icn-core/src/supervisor/](icn/crates/icn-core/src/supervisor/)):
+- Extracted to `supervisor/` module directory with focused initialization modules
+- `init_trust.rs` - Trust graph and misbehavior detector initialization
+- `init_gossip.rs` - Gossip actor, partitions, replication setup
+- `init_ledger.rs` - Ledger, disputes, contracts initialization
+- `registry.rs` - Service container types for dependency injection
+- `shutdown.rs` - Graceful shutdown and snapshot management
+- `mod.rs` - Main supervisor reduced from 3,571 to 3,256 lines (-315 lines)
+- Improved testability and maintainability of supervisor code
+
 ### Added - CoopWallet Real API Integration (2025-12-11)
 
 **React Native SDK Enhancements** ([sdk/react-native/src/hooks.ts](sdk/react-native/src/hooks.ts)):
