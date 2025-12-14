@@ -292,6 +292,53 @@ function updateConnectionStatus(connected) {
     }
 }
 
+// Pending Transaction Management
+async function updatePendingCount() {
+    try {
+        const stats = await OfflineStorage.getStats();
+        const pendingCount = stats.pending_status.pending;
+        
+        // Update footer with pending count
+        const footer = document.querySelector('footer .container');
+        let pendingBadge = document.getElementById('pending-badge');
+        
+        if (pendingCount > 0) {
+            if (!pendingBadge) {
+                pendingBadge = document.createElement('span');
+                pendingBadge.id = 'pending-badge';
+                pendingBadge.className = 'pending-badge';
+                footer.appendChild(pendingBadge);
+            }
+            pendingBadge.textContent = `⏳ ${pendingCount} pending transaction${pendingCount > 1 ? 's' : ''}`;
+            pendingBadge.style.display = 'inline-block';
+        } else if (pendingBadge) {
+            pendingBadge.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Failed to update pending count:', error);
+    }
+}
+
+// Handle service worker messages
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', async (event) => {
+        const { type, transaction } = event.data;
+        
+        if (type === 'TRANSACTION_SYNCED') {
+            console.log('Transaction synced:', transaction);
+            showToast('Offline transaction synced successfully!', 'success', 3000);
+            
+            // Reload data to show the synced transaction
+            if (state.token) {
+                await loadAllData();
+            }
+            
+            // Update pending count
+            await updatePendingCount();
+        }
+    });
+}
+
 // Token Expiration Management
 function updateTokenExpiry() {
     if (!state.tokenExpiry || !elements.tokenExpires) return;
@@ -1309,27 +1356,79 @@ async function logHours(event) {
         // Convert hours to integer (API expects i64, whole hours)
         const amountInt = Math.round(hours);
 
-        const payment = await apiRequest('POST', `/ledger/${state.coopId}/payment`, {
+        const paymentData = {
             from: state.did,   // You send from your account
             to: recipient,     // To the person who helped you
             amount: amountInt,
             currency: 'hours',
             memo: memo || undefined,
-        });
+        };
 
-        showResult(
-            elements.logResult,
-            `Sent ${hours} hours! Transaction ID: ${payment.hash?.slice(0, 8) || 'complete'}...`,
-            true
-        );
+        try {
+            // Try online payment first
+            const payment = await apiRequest('POST', `/ledger/${state.coopId}/payment`, paymentData);
 
-        showToast(`Successfully sent ${hours} hours`, 'success', 3000);
+            showResult(
+                elements.logResult,
+                `Sent ${hours} hours! Transaction ID: ${payment.hash?.slice(0, 8) || 'complete'}...`,
+                true
+            );
 
-        // Reset form
-        elements.logHoursForm.reset();
+            showToast(`Successfully sent ${hours} hours`, 'success', 3000);
 
-        // Reload data
-        await loadAllData();
+            // Reset form
+            elements.logHoursForm.reset();
+
+            // Reload data
+            await loadAllData();
+
+        } catch (networkError) {
+            // If network error, save offline
+            if (networkError.message.includes('Failed to fetch') || 
+                networkError.message.includes('NetworkError') ||
+                networkError.message.includes('offline')) {
+                
+                console.log('Saving transaction offline...');
+                
+                // Store in IndexedDB for later sync
+                await OfflineStorage.addPendingTransaction({
+                    ...paymentData,
+                    gateway_url: state.gatewayUrl,
+                    coop_id: state.coopId,
+                    token: state.token,
+                    hours_display: hours, // Keep original decimal for display
+                });
+
+                showResult(
+                    elements.logResult,
+                    `⚠️ Saved offline: ${hours} hours will be sent when you're back online`,
+                    true
+                );
+
+                showToast('Saved offline - will sync when online', 'warning', 5000);
+
+                // Request background sync
+                if ('serviceWorker' in navigator && 'sync' in ServiceWorkerRegistration.prototype) {
+                    try {
+                        const registration = await navigator.serviceWorker.ready;
+                        await registration.sync.register('sync-transactions');
+                        console.log('Background sync registered');
+                    } catch (err) {
+                        console.warn('Background sync registration failed:', err);
+                    }
+                }
+
+                // Reset form
+                elements.logHoursForm.reset();
+
+                // Update pending count
+                updatePendingCount();
+
+            } else {
+                // Other errors (auth, validation, etc) - don't save offline
+                throw networkError;
+            }
+        }
 
     } catch (error) {
         const friendlyMessage = error.userMessage || error.message;
@@ -4473,3 +4572,103 @@ document.querySelector('[data-tab="members"]')?.addEventListener('click', () => 
         loadInvites();
     }
 });
+
+// ============================================================================
+// Offline Mode Detection
+// ============================================================================
+
+function showOfflineBanner() {
+    let banner = document.getElementById('offline-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'offline-banner';
+        banner.className = 'offline-banner';
+        banner.innerHTML = `
+            ⚠️ You are offline. Transactions will be saved and synced when you reconnect.
+            <button onclick="syncNow()">Sync Now</button>
+        `;
+        document.body.insertBefore(banner, document.body.firstChild);
+    }
+}
+
+function hideOfflineBanner() {
+    const banner = document.getElementById('offline-banner');
+    if (banner) {
+        banner.remove();
+    }
+}
+
+async function syncNow() {
+    if (!navigator.onLine) {
+        showToast('Cannot sync while offline', 'warning');
+        return;
+    }
+
+    try {
+        showToast('Syncing...', 'info', 2000);
+        
+        if ('serviceWorker' in navigator && 'sync' in ServiceWorkerRegistration.prototype) {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('sync-transactions');
+            
+            // Give it a moment to sync
+            setTimeout(async () => {
+                await updatePendingCount();
+                const stats = await OfflineStorage.getStats();
+                
+                if (stats.pending_status.pending === 0) {
+                    showToast('All transactions synced!', 'success');
+                } else {
+                    showToast(`${stats.pending_status.pending} transactions still pending`, 'warning');
+                }
+            }, 2000);
+        }
+    } catch (error) {
+        console.error('Sync failed:', error);
+        showToast('Sync failed. Will retry automatically.', 'error');
+    }
+}
+
+// Listen for online/offline events
+window.addEventListener('online', async () => {
+    console.log('Connection restored');
+    hideOfflineBanner();
+    updateConnectionStatus(true);
+    showToast('Back online! Syncing pending transactions...', 'success', 3000);
+    
+    // Trigger sync
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('sync-transactions');
+        } catch (err) {
+            console.warn('Background sync failed:', err);
+        }
+    }
+});
+
+window.addEventListener('offline', () => {
+    console.log('Connection lost');
+    showOfflineBanner();
+    updateConnectionStatus(false);
+    showToast('You are offline. Transactions will be saved locally.', 'warning', 5000);
+});
+
+// Check initial connection status
+if (!navigator.onLine) {
+    showOfflineBanner();
+    updateConnectionStatus(false);
+}
+
+// Update pending count on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    await updatePendingCount();
+    
+    // Update every 30 seconds
+    setInterval(updatePendingCount, 30000);
+});
+
+// Make syncNow available globally for button onclick
+window.syncNow = syncNow;
+
+console.log('Offline support initialized');

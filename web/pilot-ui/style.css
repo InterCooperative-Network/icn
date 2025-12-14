@@ -3295,3 +3295,83 @@ html[dir="rtl"] .language-menu {
     padding: 2rem;
     color: var(--text-muted);
 }
+
+/* ============================================================================
+   Offline Support & Pending Transactions
+   ========================================================================== */
+
+.pending-badge {
+    display: inline-block;
+    margin-left: 1rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: 12px;
+    font-size: 0.875rem;
+    color: var(--warning);
+    font-weight: 600;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.offline-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 0.5rem;
+    background: var(--warning);
+    color: white;
+    text-align: center;
+    font-weight: 600;
+    z-index: 10000;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+.offline-banner button {
+    margin-left: 1rem;
+    padding: 0.25rem 0.75rem;
+    background: white;
+    color: var(--warning);
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.offline-banner button:hover {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+/* Sync status in footer */
+footer .sync-status {
+    display: inline-block;
+    margin-left: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+footer .sync-status.syncing {
+    color: var(--primary);
+}
+
+footer .sync-status.error {
+    color: var(--danger);
+}
