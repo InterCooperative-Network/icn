@@ -14,7 +14,22 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+// Dynamic import to prevent crash if expo-camera has issues
+let CameraView: any = null;
+let requestCameraPermissionsAsync: (() => Promise<{ status: string }>) | null = null;
+
+try {
+  const expoCamera = require('expo-camera');
+  CameraView = expoCamera.CameraView;
+  requestCameraPermissionsAsync = expoCamera.requestCameraPermissionsAsync;
+  console.log('ScanScreen: expo-camera loaded successfully');
+  console.log('ScanScreen: CameraView:', typeof CameraView);
+  console.log('ScanScreen: requestCameraPermissionsAsync:', typeof requestCameraPermissionsAsync);
+} catch (e) {
+  console.error('ScanScreen: Failed to load expo-camera:', e);
+}
+
+type BarcodeScanningResult = { data: string };
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { parseQR } from '@icn/react-native';
@@ -28,29 +43,58 @@ type Props = {
 };
 
 export function ScanScreen({ navigation, route }: Props) {
+  console.log('ScanScreen: Component rendering');
+
   const { theme } = useTheme();
   const styles = createStyles(theme);
-  const [permission, requestPermission] = useCameraPermissions();
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Optional: scan mode can be passed as param to filter QR types
   const scanMode = route.params?.mode || 'all';
 
-  // Request permission on mount
+  // Request camera permission on mount
   useEffect(() => {
-    const setupCamera = async () => {
+    console.log('ScanScreen: useEffect running');
+    let timeoutId: NodeJS.Timeout;
+
+    const getPermission = async () => {
       try {
-        if (!permission?.granted) {
-          await requestPermission();
+        if (!requestCameraPermissionsAsync) {
+          console.error('ScanScreen: requestCameraPermissionsAsync not available');
+          setError('Camera API not available');
+          setHasPermission(false);
+          return;
         }
-      } catch (error) {
-        console.error('Camera permission error:', error);
-      } finally {
-        setIsLoading(false);
+
+        // Set a timeout in case permission request hangs
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Permission request timed out. Please check app permissions in device settings.'));
+          }, 10000);
+        });
+
+        console.log('ScanScreen: Requesting camera permission...');
+        const { status } = await Promise.race([
+          requestCameraPermissionsAsync(),
+          timeoutPromise,
+        ]);
+        clearTimeout(timeoutId);
+
+        console.log('ScanScreen: Camera permission status:', status);
+        setHasPermission(status === 'granted');
+      } catch (err) {
+        console.error('ScanScreen: Camera permission error:', err);
+        setError(String(err));
+        setHasPermission(false);
       }
     };
-    setupCamera();
+    getPermission();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
@@ -177,12 +221,18 @@ export function ScanScreen({ navigation, route }: Props) {
     }
   };
 
-  // Loading state
-  if (isLoading) {
+  // Camera not available (failed to load)
+  if (!requestCameraPermissionsAsync || !CameraView) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#fff" />
-        <Text style={styles.message}>Starting camera...</Text>
+        <Text style={styles.title}>📷</Text>
+        <Text style={styles.message}>Camera is not available.</Text>
+        <Text style={[styles.message, { fontSize: 14, opacity: 0.8 }]}>
+          expo-camera may not be properly installed or configured.
+        </Text>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -202,17 +252,35 @@ export function ScanScreen({ navigation, route }: Props) {
     );
   }
 
-  // Permission not granted
-  if (!permission?.granted) {
+  // Loading state - permission is null while loading
+  if (hasPermission === null) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text style={styles.message}>Requesting camera access...</Text>
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 20 }]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Permission denied or error
+  if (hasPermission === false) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>📷</Text>
-        <Text style={styles.message}>Camera access is required to scan QR codes.</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Camera Permission</Text>
-        </TouchableOpacity>
+        <Text style={styles.message}>
+          {error || 'Camera access is required to scan QR codes.'}
+        </Text>
+        <Text style={[styles.message, { fontSize: 14, opacity: 0.8 }]}>
+          Please enable camera access in your device settings.
+        </Text>
         <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
+          style={styles.button}
           onPress={() => navigation.goBack()}
         >
           <Text style={styles.buttonText}>Go Back</Text>

@@ -236,6 +236,110 @@ pub async fn verify_level2(
 }
 
 // ============================================================================
+// Ephemeral Proof Generation Endpoints
+// ============================================================================
+
+/// Request to generate an ephemeral proof
+#[derive(Debug, Deserialize)]
+pub struct GenerateProofRequest {
+    /// Type of proof to generate
+    pub proof_type: ProofTypeRequest,
+    /// Validity duration in seconds (default: 3600)
+    #[serde(default = "default_validity")]
+    pub validity_secs: u64,
+    /// Available upgrade channels
+    #[serde(default)]
+    pub channels: Vec<String>,
+}
+
+/// Proof type from client request
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProofTypeRequest {
+    Age { threshold: u8 },
+    Citizenship { country_code: String },
+    #[serde(rename = "non_revocation")]
+    NonRevocation,
+}
+
+impl From<ProofTypeRequest> for icn_zkp::ProofType {
+    fn from(req: ProofTypeRequest) -> Self {
+        match req {
+            ProofTypeRequest::Age { threshold } => icn_zkp::ProofType::AgeAtLeast { threshold },
+            ProofTypeRequest::Citizenship { country_code } => {
+                // Convert country code string to 2-byte array
+                let mut code = [0u8; 2];
+                let bytes = country_code.as_bytes();
+                if bytes.len() >= 2 {
+                    code[0] = bytes[0];
+                    code[1] = bytes[1];
+                }
+                icn_zkp::ProofType::Citizenship { country_code: code }
+            }
+            ProofTypeRequest::NonRevocation => icn_zkp::ProofType::NonRevocation,
+        }
+    }
+}
+
+/// Response for ephemeral proof generation
+#[derive(Debug, Serialize)]
+pub struct GenerateProofResponse {
+    /// Base64-encoded QR data
+    pub qr_data: String,
+    /// Expiry timestamp (unix seconds)
+    pub expires_at: u64,
+    /// What was proved
+    pub proof_type: String,
+}
+
+/// POST /v1/sdis/ephemeral/generate - Generate an ephemeral proof
+#[post("/ephemeral/generate")]
+pub async fn generate_ephemeral(
+    req: web::Json<GenerateProofRequest>,
+) -> Result<HttpResponse> {
+    use base64::Engine;
+    use icn_identity::{Anchor, KeyBundle};
+    use std::time::Duration;
+
+    // For demo purposes, create a temporary keybundle
+    // In production, this would use the authenticated user's keys
+    let anchor = Anchor::genesis("demo-user");
+    let keybundle = KeyBundle::generate(anchor, 1)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to generate keys: {e}")))?;
+
+    // Parse channels
+    let channels: Vec<Channel> = req
+        .channels
+        .iter()
+        .filter_map(|c| match c.to_lowercase().as_str() {
+            "nfc" => Some(Channel::Nfc),
+            "ble" => Some(Channel::Ble),
+            "wifi" | "wifi_direct" => Some(Channel::WifiDirect),
+            "http" => Some(Channel::Http),
+            _ => None,
+        })
+        .collect();
+
+    // Generate proof
+    let proof_type: icn_zkp::ProofType = req.proof_type.clone().into();
+    let validity = Duration::from_secs(req.validity_secs.min(86400)); // Max 24 hours
+
+    let (proof, _binding) = EphemeralProof::generate(&keybundle, proof_type.clone(), validity, channels)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to generate proof: {e}")))?;
+
+    // Encode for QR
+    let qr_bytes = encode_for_qr(&proof)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to encode proof: {e}")))?;
+    let qr_data = base64::engine::general_purpose::STANDARD.encode(&qr_bytes);
+
+    Ok(HttpResponse::Ok().json(GenerateProofResponse {
+        qr_data,
+        expires_at: proof.x,
+        proof_type: format!("{proof_type:?}"),
+    }))
+}
+
+// ============================================================================
 // Configuration
 // ============================================================================
 
@@ -246,6 +350,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(sdis_health)
             .service(verify_level1)
             .service(verify_level2)
+            .service(generate_ephemeral)
             .configure(simple_enrollment::configure),
     );
 }
@@ -378,5 +483,29 @@ mod tests {
         let body: VerifyResponse = test::read_body_json(resp).await;
         assert!(body.valid);
         assert_eq!(body.level, 2);
+    }
+
+    #[actix_web::test]
+    async fn test_generate_ephemeral() {
+        let app = test::init_service(
+            App::new()
+                .service(web::scope("/v1/sdis").service(generate_ephemeral)),
+        )
+        .await;
+
+        let req = test::TestRequest::post()
+            .uri("/v1/sdis/ephemeral/generate")
+            .set_json(serde_json::json!({
+                "proof_type": { "type": "age", "threshold": 18 },
+                "validity_secs": 3600,
+                "channels": []
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert!(resp.status().is_success(), "Expected 200, got {}", resp.status());
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["qr_data"].as_str().is_some());
+        assert!(body["expires_at"].as_u64().is_some());
     }
 }

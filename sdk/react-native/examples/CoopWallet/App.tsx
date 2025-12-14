@@ -977,28 +977,36 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
   const [scanned, setScanned] = useState(false);
 
   // Dynamic import of camera to avoid web errors
-  const [Camera, setCamera] = useState<any>(null);
-  const [BarCodeScanner, setBarCodeScanner] = useState<any>(null);
+  const [CameraView, setCameraView] = useState<any>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
-      // Import camera components only on native
-      import('expo-camera').then((module) => {
-        setCamera(() => module.CameraView);
+      console.log('ScanScreen: Loading expo-camera...');
+      import('expo-camera').then(async (module: any) => {
+        console.log('ScanScreen: expo-camera loaded, requesting permission...');
+        setCameraView(() => module.CameraView);
+
+        // Use the Camera object's method
+        try {
+          const requestPermission = module.Camera?.requestCameraPermissionsAsync || module.requestCameraPermissionsAsync;
+          if (requestPermission) {
+            const { status } = await requestPermission();
+            console.log('ScanScreen: Permission status:', status);
+            setHasPermission(status === 'granted');
+          } else {
+            console.error('ScanScreen: No permission function found');
+            setHasPermission(false);
+          }
+        } catch (err) {
+          console.error('ScanScreen: Permission error:', err);
+          setHasPermission(false);
+        }
       }).catch((err) => {
-        console.error('Failed to load camera:', err);
+        console.error('ScanScreen: Failed to load camera:', err);
+        setHasPermission(false);
       });
     }
   }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' && Camera) {
-      (async () => {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(status === 'granted');
-      })();
-    }
-  }, [Camera]);
 
   const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
     setScanned(true);
@@ -1135,7 +1143,7 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
     );
   }
 
-  if (!Camera || !BarCodeScanner) {
+  if (!CameraView) {
     return (
       <View style={styles.scanContainer}>
         <ActivityIndicator size="large" color="#4A90A4" />
@@ -1146,12 +1154,12 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
 
   return (
     <View style={styles.scanContainer}>
-      <Camera
+      <CameraView
         style={styles.camera}
-        type={Camera.Constants?.Type?.back || 0}
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barCodeScannerSettings={{
-          barCodeTypes: [BarCodeScanner.Constants?.BarCodeType?.qr || 'qr'],
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
         }}
       >
         <View style={styles.scanOverlay}>
@@ -1159,7 +1167,7 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
           <Text style={styles.scanInstructions}>
             {scanned ? '✓ Scanned!' : 'Point camera at QR code'}
           </Text>
-          
+
           {scanned && (
             <TouchableOpacity
               style={styles.scanAgainButton}
@@ -1169,7 +1177,7 @@ function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: 
             </TouchableOpacity>
           )}
         </View>
-      </Camera>
+      </CameraView>
 
       {/* Manual entry fallback */}
       <View style={styles.manualEntrySection}>
@@ -2107,6 +2115,13 @@ function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
+
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={onUnlock}
+        >
+          <Text style={styles.skipButtonText}>Skip for now</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -2559,6 +2574,15 @@ const styles = StyleSheet.create({
   biometricButtonIcon: {
     fontSize: 24,
     marginRight: 12,
+  },
+  skipButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  skipButtonText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
   },
 
   // Initialization Error

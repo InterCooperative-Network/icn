@@ -1028,20 +1028,20 @@ export class ICNMobileClient extends ICNClient {
   /**
    * Format proof type for API request
    */
-  private formatProofTypeForApi(proofType: ProofType): string {
+  private formatProofTypeForApi(proofType: ProofType): object {
     switch (proofType.type) {
       case 'age':
-        return `age_${proofType.threshold}`;
+        return { type: 'age', threshold: proofType.threshold };
       case 'citizenship':
-        return `citizenship_${proofType.country_code}`;
+        return { type: 'citizenship', country_code: proofType.country_code };
       case 'membership':
-        return 'membership';
+        return { type: 'membership' };
       case 'non_revocation':
-        return 'non_revocation';
+        return { type: 'non_revocation' };
       case 'custom':
-        return `custom_${proofType.circuit_id}`;
+        return { type: 'custom', circuit_id: proofType.circuit_id };
       default:
-        return 'unknown';
+        return { type: 'unknown' };
     }
   }
 
