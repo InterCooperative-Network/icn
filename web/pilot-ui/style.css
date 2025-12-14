@@ -3554,3 +3554,542 @@ footer .sync-status.error {
 .no-results button {
     margin-top: 0.5rem;
 }
+
+/* ============================================================================
+   Enhanced Mobile Responsiveness & Touch Optimization
+   ========================================================================== */
+
+/* Mobile: 320px - 480px (Small phones) */
+@media (max-width: 480px) {
+    /* Touch-friendly tap targets (minimum 44x44px) */
+    .btn,
+    .nav-btn,
+    button,
+    input[type="submit"],
+    input[type="button"] {
+        min-height: 44px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+
+    /* Larger form inputs for touch */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="url"],
+    input[type="date"],
+    select,
+    textarea {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 0.75rem;
+    }
+
+    /* Stats grid - single column on small screens */
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    /* Stat cards with better spacing */
+    .stat-card {
+        padding: 1.5rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    /* Cards with reduced padding */
+    .card {
+        margin: 0.75rem;
+        padding: 1rem;
+    }
+
+    .card-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+
+    .card-header h2 {
+        font-size: 1.25rem;
+    }
+
+    /* Transaction list - vertical layout */
+    .transaction-item {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+
+    .transaction-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+        width: 100%;
+    }
+
+    .transaction-arrow {
+        transform: rotate(90deg);
+        margin: 0.25rem 0;
+    }
+
+    .transaction-amount {
+        font-size: 1.25rem;
+        align-self: flex-start;
+    }
+
+    /* Member list - simplified mobile view */
+    .member-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+
+    .member-info {
+        width: 100%;
+    }
+
+    .member-actions {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 0.5rem;
+    }
+
+    /* Modal - full screen on mobile */
+    .modal-content {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        margin: 0;
+        border-radius: 0;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 1rem;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+
+    /* Form groups - full width */
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+
+    /* Filter controls - stack vertically */
+    .filter-row {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .filter-group {
+        width: 100%;
+    }
+
+    .filter-actions {
+        flex-direction: row;
+        gap: 0.5rem;
+    }
+
+    .filter-actions button {
+        flex: 1;
+    }
+
+    /* Navigation - horizontal scroll with indicators */
+    nav {
+        position: relative;
+    }
+
+    nav::after {
+        content: '→';
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 0 1rem;
+        background: linear-gradient(to left, var(--bg) 50%, transparent);
+        pointer-events: none;
+        color: var(--text-muted);
+    }
+
+    /* Toast notifications - bottom of screen on mobile */
+    #toast-container {
+        bottom: 1rem;
+        top: auto;
+        right: 1rem;
+        left: 1rem;
+        max-width: none;
+    }
+
+    .toast {
+        width: 100%;
+    }
+
+    /* Offline banner - more prominent on mobile */
+    .offline-banner {
+        padding: 1rem;
+        font-size: 0.875rem;
+    }
+
+    .offline-banner button {
+        display: block;
+        width: 100%;
+        margin: 0.5rem 0 0 0;
+    }
+
+    /* Footer - stack items */
+    footer .container {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+
+    .pending-badge {
+        margin: 0;
+    }
+
+    /* Proposal cards - simplified */
+    .proposal-card {
+        padding: 1rem;
+    }
+
+    .proposal-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .proposal-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .proposal-actions button {
+        width: 100%;
+    }
+
+    /* Vote buttons - larger and stacked */
+    .vote-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .btn-vote {
+        width: 100%;
+    }
+
+    /* Pagination - simplified */
+    .pagination-buttons {
+        gap: 0.25rem;
+    }
+
+    .pagination-buttons button {
+        padding: 0.5rem;
+        min-width: 44px;
+    }
+
+    .page-numbers {
+        display: none; /* Hide page numbers on very small screens */
+    }
+
+    /* Export controls - stack buttons */
+    .export-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .export-controls button {
+        width: 100%;
+    }
+
+    /* Service filters - stack vertically */
+    .service-filters {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .service-filters .filter-group {
+        width: 100%;
+    }
+
+    /* Chart - responsive sizing */
+    #balance-chart {
+        height: 200px !important;
+        max-width: 100%;
+    }
+
+    /* Table-like layouts - simplify */
+    .metric-card {
+        min-width: auto;
+        width: 100%;
+    }
+
+    /* Hide secondary content on small screens */
+    .member-contact,
+    .member-joined {
+        display: none;
+    }
+
+    /* Simplify member cards */
+    .member-name {
+        font-size: 1rem;
+    }
+
+    .member-role {
+        font-size: 0.875rem;
+    }
+}
+
+/* Mobile: 481px - 768px (Larger phones, small tablets) */
+@media (min-width: 481px) and (max-width: 768px) {
+    /* Two column stats on larger phones */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Two column filters */
+    .filter-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    /* Show more content */
+    .member-contact {
+        display: block;
+    }
+
+    /* Better modal sizing */
+    .modal-content {
+        width: 90%;
+        height: auto;
+        max-height: 90vh;
+        border-radius: 8px;
+    }
+
+    /* Transaction items - compact horizontal */
+    .transaction-item {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .transaction-details {
+        flex-direction: row;
+    }
+
+    .transaction-arrow {
+        transform: none;
+    }
+}
+
+/* Tablet: 769px - 1024px (iPad, etc.) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    /* Optimize for tablet landscape */
+    .container {
+        max-width: 90%;
+    }
+
+    /* Three column stats */
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Side-by-side content */
+    .card-header {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    /* Better use of horizontal space */
+    .filter-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+
+    /* Modal at comfortable reading width */
+    .modal-content {
+        width: 80%;
+        max-width: 700px;
+    }
+}
+
+/* Touch device optimizations (regardless of screen size) */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger tap targets */
+    button,
+    .btn,
+    .nav-btn,
+    a {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Remove hover effects that don't work on touch */
+    button:hover,
+    .btn:hover,
+    .nav-btn:hover {
+        transform: none;
+    }
+
+    /* Add active states instead */
+    button:active,
+    .btn:active,
+    .nav-btn:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+
+    /* Larger clickable areas for links */
+    a {
+        padding: 0.5rem;
+        margin: -0.5rem;
+    }
+
+    /* Disable selection on interactive elements */
+    .btn,
+    button,
+    .nav-btn {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Better scroll behavior */
+    * {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Fixed elements should be sticky */
+    header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    nav {
+        position: sticky;
+        top: var(--header-height, 60px);
+        z-index: 99;
+    }
+}
+
+/* Landscape orientation - optimize horizontal space */
+@media (max-width: 768px) and (orientation: landscape) {
+    /* Compact header */
+    header {
+        padding: 0.5rem 1rem;
+    }
+
+    .header-left h1 {
+        font-size: 0.875rem;
+    }
+
+    /* Compact navigation */
+    nav {
+        padding: 0.5rem 1rem;
+    }
+
+    .nav-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    /* Use full height for modals */
+    .modal-content {
+        max-height: 95vh;
+    }
+
+    /* Reduce vertical spacing */
+    .card {
+        margin: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+    }
+}
+
+/* High DPI displays - crisper rendering */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* Sharper icons and borders */
+    .btn,
+    .card,
+    .nav-btn {
+        border-width: 0.5px;
+    }
+
+    /* Crisper text */
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* Dark mode support (respects system preference) */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1a1a1a;
+        --bg-light: #2a2a2a;
+        --text: #e0e0e0;
+        --text-muted: #a0a0a0;
+        --border: #3a3a3a;
+        --primary: #4a9eff;
+        --primary-dark: #3a7edf;
+    }
+
+    .card {
+        background: var(--bg-light);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    input,
+    select,
+    textarea {
+        background: var(--bg);
+        color: var(--text);
+        border-color: var(--border);
+    }
+
+    .modal-content {
+        background: var(--bg-light);
+    }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .toast,
+    .modal,
+    .advanced-filters {
+        animation: none !important;
+    }
+}
