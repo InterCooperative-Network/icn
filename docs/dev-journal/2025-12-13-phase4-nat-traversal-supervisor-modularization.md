@@ -215,9 +215,42 @@ pub struct SupervisorConfig {
 - Easier to tune for different environments
 - Values documented with defaults
 
+### 8. Error Swallowing Observability Fix (A6)
+
+Added supervisor error metrics to make logged errors observable via Prometheus.
+
+**New Metrics Module** (`icn-obs/src/metrics.rs`):
+```rust
+pub mod supervisor {
+    pub fn error_inc(operation: &str)
+    pub fn startup_phase_inc(phase: &str)
+    pub fn state_set(state: u8)  // 0=stopped, 1=starting, 2=running, 3=stopping
+    pub fn actor_spawned_inc(actor: &str)
+    pub fn actor_spawn_failed_inc(actor: &str)
+}
+```
+
+**Instrumented Error Locations**:
+- `metrics_server_start` - Metrics server failed to start
+- `rpc_server` - RPC server error during operation
+- `gateway_server` - Gateway server error
+- `identity_bundle_missing` - No identity bundle available
+- `gateway_jwt_secret_missing` - JWT secret not configured
+- `shutdown_timeout` - Background tasks didn't complete in time
+
+**Actor Spawn Tracking**:
+- gossip, ledger, network, compute, rpc_server, gateway
+- Failures tracked with `actor_spawn_failed_inc()`
+
+**Lifecycle State**:
+- Supervisor state gauge tracks: stopped(0) → starting(1) → running(2) → stopping(3)
+
+**Rationale**:
+Most supervisor errors occur in async contexts where there's no caller to propagate to. Rather than changing the architecture, errors are now countable and alertable via Prometheus metrics.
+
 ## Next Steps
 
 From ROADMAP.md and SYSTEM_GAPS.md:
 - A1 continuation: Further supervisor refactoring if needed
-- A2, A3, A4, A6, A8: Remaining architectural cleanup items
+- A2, A3, A4, A8: Remaining architectural cleanup items
 - Track C1: Pilot community selection (business track)

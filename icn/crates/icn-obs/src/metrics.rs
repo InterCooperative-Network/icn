@@ -3033,3 +3033,50 @@ pub mod contribution {
         .set(timestamp as f64);
     }
 }
+
+/// Supervisor lifecycle and error metrics (A6 observability)
+pub mod supervisor {
+    use metrics::{counter, gauge};
+
+    /// Increment supervisor error counter by operation type
+    /// This makes logged errors observable for alerting
+    pub fn error_inc(operation: &str) {
+        counter!(
+            "icn_supervisor_errors_total",
+            "operation" => operation.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment supervisor startup phase counter
+    pub fn startup_phase_inc(phase: &str) {
+        counter!(
+            "icn_supervisor_startup_phases_total",
+            "phase" => phase.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Set supervisor state (0=stopped, 1=starting, 2=running, 3=stopping)
+    pub fn state_set(state: u8) {
+        gauge!("icn_supervisor_state").set(state as f64);
+    }
+
+    /// Increment actor spawn counter by actor type
+    pub fn actor_spawned_inc(actor: &str) {
+        counter!(
+            "icn_supervisor_actors_spawned_total",
+            "actor" => actor.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment actor spawn failure counter by actor type
+    pub fn actor_spawn_failed_inc(actor: &str) {
+        counter!(
+            "icn_supervisor_actor_spawn_failures_total",
+            "actor" => actor.to_string()
+        )
+        .increment(1);
+    }
+}

@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing. A5 (Configuration Sprawl) fixed with SupervisorConfig struct.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing. A5 (Configuration Sprawl) fixed with SupervisorConfig struct. A6 (Error Swallowing) fixed with supervisor error metrics for observability.
 
 ---
 
@@ -222,10 +222,16 @@ These don't cause immediate bugs but make the system harder to maintain.
 - `clock_sync_interval_secs` (default: 600)
 Updated supervisor.rs to use config values instead of hardcoded literals.
 
-### A6. Error Swallowing
+### A6. Error Swallowing - FIXED (OBSERVABILITY APPROACH)
 **Locations**: 8+ places in supervisor.rs
 **Issue**: Errors logged but not propagated
-**Fix**: Return Result<>, use error context
+**Analysis**: Most errors occur in async contexts (background tasks, notification handlers) where there's no caller to propagate to. Logging is the appropriate pattern for these cases.
+**Fix**: Added `icn_obs::metrics::supervisor` module with observability metrics:
+- `icn_supervisor_errors_total{operation}` - Error counter by operation type
+- `icn_supervisor_state` - State gauge (0=stopped, 1=starting, 2=running, 3=stopping)
+- `icn_supervisor_actors_spawned_total{actor}` - Actor spawn counter
+- `icn_supervisor_actor_spawn_failures_total{actor}` - Spawn failure counter
+Key error locations instrumented: metrics_server_start, rpc_server, gateway_server, identity_bundle_missing, gateway_jwt_secret_missing, shutdown_timeout. Errors are now alertable via Prometheus.
 
 ### A7. Panic! in Production Code - VERIFIED NON-ISSUE
 **Locations**: icn-ledger/sync.rs:86, icn-ledger/dispute.rs:553,625, icn-net/protocol.rs (6 places)

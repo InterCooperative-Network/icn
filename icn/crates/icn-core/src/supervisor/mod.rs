@@ -86,10 +86,14 @@ impl Supervisor {
         // Initialize metrics
         icn_obs::init_metrics()?;
 
+        // Set supervisor state to starting
+        icn_obs::metrics::supervisor::state_set(1);
+
         // Start metrics server
         let metrics_port = self.config.observability.metrics_port;
         if let Err(e) = icn_obs::start_metrics_server(metrics_port).await {
             warn!("Failed to start metrics server: {}", e);
+            icn_obs::metrics::supervisor::error_inc("metrics_server_start");
         }
 
         let mut shutdown_rx = self.shutdown_tx.subscribe();
@@ -154,6 +158,7 @@ impl Supervisor {
                 },
             )
             .await?;
+            icn_obs::metrics::supervisor::actor_spawned_inc("gossip");
             let gossip_handle = gossip_services.gossip_handle.clone();
             let _gossip_store = gossip_services.gossip_store.clone(); // Kept for potential future use
             let loaded_snapshot = gossip_services.loaded_snapshot;
@@ -169,6 +174,7 @@ impl Supervisor {
                 },
             )
             .await?;
+            icn_obs::metrics::supervisor::actor_spawned_inc("ledger");
             let ledger_handle = ledger_services.ledger_handle.clone();
             let dispute_manager_handle = ledger_services.dispute_manager.clone();
             let contract_runtime_handle = ledger_services.contract_runtime.clone();
@@ -580,6 +586,7 @@ impl Supervisor {
             // Initialize network handle for the incoming message handler
             *network_handle_for_handler.write().await = Some(network_handle.clone());
 
+            icn_obs::metrics::supervisor::actor_spawned_inc("network");
             info!("Network actor spawned on {}", listen_addr);
 
             // Restore network state from snapshot if available (re-use snapshot loaded earlier)
@@ -2651,6 +2658,7 @@ impl Supervisor {
             }
 
             let compute_handle = compute_actor.spawn();
+            icn_obs::metrics::supervisor::actor_spawned_inc("compute");
 
             // Fill compute handle holder for notification callback
             *compute_handle_holder.write().await = Some(compute_handle.clone());
@@ -2814,9 +2822,11 @@ impl Supervisor {
             background_tasks.spawn(async move {
                 if let Err(e) = rpc_server.run().await {
                     warn!("RPC server error: {}", e);
+                    icn_obs::metrics::supervisor::error_inc("rpc_server");
                 }
             });
 
+            icn_obs::metrics::supervisor::actor_spawned_inc("rpc_server");
             info!("RPC server spawned on {}", rpc_addr);
 
             // Spawn anti-entropy task
@@ -2989,6 +2999,7 @@ impl Supervisor {
                     }
                     Err(e) => {
                         error!("Failed to spawn steward actor: {}", e);
+                        icn_obs::metrics::supervisor::actor_spawn_failed_inc("steward");
                     }
                 }
             }
@@ -3025,6 +3036,7 @@ impl Supervisor {
         } else {
             warn!("No identity bundle available - actors not spawned");
             warn!("Run 'icnctl id init' to create an identity");
+            icn_obs::metrics::supervisor::error_inc("identity_bundle_missing");
 
             // No governance subscriptions when identity bundle unavailable
             governance_event_subscription = None;
@@ -3074,6 +3086,7 @@ impl Supervisor {
             if self.config.gateway.jwt_secret.is_empty() {
                 warn!("Gateway enabled but JWT secret not configured - gateway will not start");
                 warn!("Set jwt_secret in config or ICN_GATEWAY_JWT_SECRET environment variable");
+                icn_obs::metrics::supervisor::error_inc("gateway_jwt_secret_missing");
             } else {
                 info!("Gateway JWT secret verified, spawning server...");
 
@@ -3111,23 +3124,30 @@ impl Supervisor {
 
                         if let Err(e) = gateway_server.run().await {
                             warn!("Gateway server error: {}", e);
+                            icn_obs::metrics::supervisor::error_inc("gateway_server");
                         }
                     });
                 });
 
+                icn_obs::metrics::supervisor::actor_spawned_inc("gateway");
                 info!("Gateway API spawned on {}", gateway_addr);
             }
         } else {
             debug!("Gateway API disabled in configuration");
         }
 
+        // Set supervisor state to running
+        icn_obs::metrics::supervisor::state_set(2);
+
         // Wait for shutdown signal
         select! {
             _ = shutdown_rx.recv() => {
                 info!("Supervisor received shutdown signal");
+                icn_obs::metrics::supervisor::state_set(3); // stopping
             }
             _ = tokio::signal::ctrl_c() => {
                 info!("Supervisor received Ctrl+C");
+                icn_obs::metrics::supervisor::state_set(3); // stopping
                 let _ = self.shutdown_tx.send(());
             }
         }
@@ -3145,10 +3165,13 @@ impl Supervisor {
         .await
         {
             Ok(_) => info!("All background tasks completed successfully"),
-            Err(_) => warn!(
-                "Shutdown timeout reached, {} tasks may still be running",
-                background_tasks.len()
-            ),
+            Err(_) => {
+                warn!(
+                    "Shutdown timeout reached, {} tasks may still be running",
+                    background_tasks.len()
+                );
+                icn_obs::metrics::supervisor::error_inc("shutdown_timeout");
+            }
         }
 
         // Abort any remaining tasks that didn't finish
@@ -3179,6 +3202,8 @@ impl Supervisor {
         drop(governance_event_subscription);
         drop(policy_governance_subscription);
 
+        // Set supervisor state to stopped
+        icn_obs::metrics::supervisor::state_set(0);
         info!("Supervisor stopped");
         Ok(())
     }
