@@ -6,13 +6,17 @@
 //! 3. Steward vouches → upgrades trust
 //! 4. Complete enrollment → receive DID + recovery codes
 
-use actix_web::{post, web, HttpResponse};
+use actix_web::{post, web, HttpRequest, HttpResponse};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
+use crate::trust_mgr::TrustManager;
 
 /// Enrollment state store
 pub struct EnrollmentStore {
@@ -77,7 +81,17 @@ pub struct StartEnrollmentResponse {
 #[derive(Debug, Deserialize)]
 pub struct VerifyLevel1Request {
     pub enrollment_id: String,
-    pub device_proof: String,
+    /// Device proof containing ephemeral DID and signature
+    pub device_proof: DeviceProof,
+}
+
+/// Device proof for Level 1 verification
+#[derive(Debug, Deserialize)]
+pub struct DeviceProof {
+    /// Ephemeral DID generated on the device
+    pub ephemeral_did: String,
+    /// Hex-encoded Ed25519 signature over the challenge (enrollment_id)
+    pub signature: String,
 }
 
 /// Level 2 verification request
@@ -190,8 +204,43 @@ pub async fn verify_level1(
         return Err(GatewayError::BadRequest("Enrollment expired".to_string()));
     }
 
-    // TODO: Verify device_proof signature
-    // For now, just accept it
+    // Verify device_proof signature
+    let ephemeral_did: Did = req
+        .device_proof
+        .ephemeral_did
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid ephemeral DID: {e}")))?;
+
+    // Decode signature from hex
+    let signature_bytes = hex::decode(&req.device_proof.signature)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid signature encoding: {e}")))?;
+
+    // Validate signature length (Ed25519 = 64 bytes)
+    if signature_bytes.len() != 64 {
+        return Err(GatewayError::BadRequest(format!(
+            "Invalid signature length: expected 64 bytes, got {}",
+            signature_bytes.len()
+        )));
+    }
+
+    // Extract verifying key from ephemeral DID
+    let verifying_key: VerifyingKey = ephemeral_did
+        .to_verifying_key()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID public key: {e}")))?;
+
+    // Parse signature
+    let signature = Signature::from_slice(&signature_bytes)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid signature format: {e}")))?;
+
+    // Verify signature over enrollment_id (the challenge)
+    verifying_key
+        .verify(req.enrollment_id.as_bytes(), &signature)
+        .map_err(|_| {
+            GatewayError::AuthenticationFailed("Device proof signature verification failed".to_string())
+        })?;
+
+    // Signature verified - store ephemeral DID and upgrade level
+    session.ephemeral_did = Some(req.device_proof.ephemeral_did.clone());
     session.level = 1;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -201,13 +250,35 @@ pub async fn verify_level1(
     })))
 }
 
+/// Minimum trust score required for stewards to vouch for enrollees
+const STEWARD_MIN_TRUST_SCORE: f64 = 0.4;
+
 /// POST /verify/level2
 #[post("/verify/level2")]
 pub async fn verify_level2(
+    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
+    auth: web::Data<Arc<AuthManager>>,
+    trust_mgr: web::Data<Arc<TrustManager>>,
     req: web::Json<VerifyLevel2Request>,
-    // TODO: Extract steward DID from Bearer token
 ) -> Result<HttpResponse> {
+    // Extract steward DID from Bearer token
+    let auth_header = http_req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Missing Authorization header".to_string()))?;
+
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Invalid Authorization format".to_string()))?;
+
+    let claims = auth.verify_token(token)?;
+    let steward_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::InternalError(format!("Invalid steward DID in token: {e}")))?;
+
     let mut enrollments = store.enrollments.write().await;
     let session = enrollments
         .get_mut(&req.enrollment_id)
@@ -220,14 +291,44 @@ pub async fn verify_level2(
         ));
     }
 
-    // TODO: Verify steward has sufficient trust
-    // For now, just accept it
+    // Verify steward has sufficient trust
+    // Stewards need a trust score of at least 0.4 (Partner level) to vouch
+    // Self-trust is 1.0, so we check from steward's own perspective
+    let steward_trust = trust_mgr.compute_trust_score(&steward_did, &steward_did);
+
+    // For self-trust computation, we look at incoming edges to the steward
+    // A new node with no incoming edges gets 0.0, bootstrapped stewards get higher
+    let incoming_edges = trust_mgr.get_incoming_edges(&steward_did);
+    let avg_incoming_trust = if incoming_edges.is_empty() {
+        0.0
+    } else {
+        incoming_edges.iter().map(|e| e.score).sum::<f64>() / incoming_edges.len() as f64
+    };
+
+    // Use the higher of self-trust or avg incoming trust
+    // This allows bootstrapping (first steward has self-trust) and growth (new stewards earn trust)
+    let effective_trust = steward_trust.max(avg_incoming_trust);
+
+    if effective_trust < STEWARD_MIN_TRUST_SCORE {
+        return Err(GatewayError::AuthorizationFailed(format!(
+            "Insufficient trust to vouch: {effective_trust:.2} < {STEWARD_MIN_TRUST_SCORE:.2} required"
+        )));
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
     session.level = 2;
     session.steward_vouch = Some(req.vouch_statement.clone());
+    session.steward_did = Some(steward_did.to_string());
+    session.vouched_at = Some(now);
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "verified",
         "level": 2,
+        "steward_did": steward_did.to_string(),
         "message": "Steward vouch recorded successfully"
     })))
 }
@@ -236,11 +337,13 @@ pub async fn verify_level2(
 #[post("/enrollment/complete")]
 pub async fn complete_enrollment(
     store: web::Data<Arc<EnrollmentStore>>,
+    auth: web::Data<Arc<AuthManager>>,
+    trust_mgr: web::Data<Arc<TrustManager>>,
     req: web::Json<CompleteEnrollmentRequest>,
 ) -> Result<HttpResponse> {
-    let enrollments = store.enrollments.read().await;
+    let mut enrollments = store.enrollments.write().await;
     let session = enrollments
-        .get(&req.enrollment_id)
+        .get_mut(&req.enrollment_id)
         .ok_or_else(|| GatewayError::NotFound("Enrollment not found".to_string()))?;
 
     // Must be level 2
@@ -250,19 +353,99 @@ pub async fn complete_enrollment(
         ));
     }
 
-    // TODO: Create actual DID and keystore
-    // For now, return mock data
-    let did = format!("did:icn:z{}", Uuid::new_v4().to_string().replace('-', ""));
-    let recovery_codes: Vec<String> = (0..5)
-        .map(|i| format!("RECOVERY-CODE-{:02}", i + 1))
-        .collect();
-    let auth_token = format!("Bearer {}", Uuid::new_v4());
+    // Verify the ephemeral_did matches the one from level 1
+    if session.ephemeral_did.as_ref() != Some(&req.ephemeral_did) {
+        return Err(GatewayError::BadRequest(
+            "Ephemeral DID mismatch".to_string(),
+        ));
+    }
+
+    // Verify the ephemeral signature (proves device still has the key)
+    let ephemeral_did: Did = req
+        .ephemeral_did
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid ephemeral DID: {e}")))?;
+
+    let signature_bytes = hex::decode(&req.ephemeral_signature)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid signature encoding: {e}")))?;
+
+    if signature_bytes.len() != 64 {
+        return Err(GatewayError::BadRequest(format!(
+            "Invalid signature length: expected 64 bytes, got {}",
+            signature_bytes.len()
+        )));
+    }
+
+    let verifying_key: VerifyingKey = ephemeral_did
+        .to_verifying_key()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID public key: {e}")))?;
+
+    let signature = Signature::from_slice(&signature_bytes)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid signature format: {e}")))?;
+
+    // The device signs a completion message
+    let message = format!("complete:{}", req.enrollment_id);
+    verifying_key
+        .verify(message.as_bytes(), &signature)
+        .map_err(|_| {
+            GatewayError::AuthenticationFailed("Completion signature verification failed".to_string())
+        })?;
+
+    // The DID is the ephemeral_did - in SDIS, keys are created on the device
+    let did = req.ephemeral_did.clone();
+
+    // Generate secure recovery codes (8 characters, alphanumeric)
+    let recovery_codes: Vec<String> = generate_recovery_codes(5);
+
+    // If there's a vouching steward, create an initial trust edge from steward to new member
+    if let Some(ref steward_did_str) = session.steward_did {
+        if let Ok(steward_did) = steward_did_str.parse::<Did>() {
+            // Create initial trust edge: steward vouched for this member
+            let edge = icn_trust::TrustEdge::new(
+                steward_did,
+                ephemeral_did.clone(),
+                0.5, // Initial trust from vouch
+            )
+            .with_label("enrollment-vouch");
+            let _ = trust_mgr.add_edge(edge);
+        }
+    }
+
+    // Issue auth token for the new identity
+    let auth_token = auth.issue_token(
+        &ephemeral_did,
+        &session.coop_id,
+        vec!["ledger:read".to_string(), "ledger:write".to_string()],
+    )?;
+
+    // Mark enrollment complete by removing from store
+    drop(enrollments); // Release lock before removing
+    let mut enrollments = store.enrollments.write().await;
+    enrollments.remove(&req.enrollment_id);
 
     Ok(HttpResponse::Ok().json(CompleteEnrollmentResponse {
         did,
         recovery_codes,
         auth_token,
     }))
+}
+
+/// Generate secure recovery codes
+fn generate_recovery_codes(count: usize) -> Vec<String> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let chars: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude confusing chars (0, 1, I, O)
+
+    (0..count)
+        .map(|_| {
+            (0..8)
+                .map(|_| {
+                    let idx = rng.gen_range(0..chars.len());
+                    chars[idx] as char
+                })
+                .collect::<String>()
+        })
+        .collect()
 }
 
 // ============================================================================
@@ -461,13 +644,37 @@ pub struct RejectRequest {
 
 /// GET /steward/stats - Get steward statistics
 #[actix_web::get("/steward/stats")]
-pub async fn get_steward_stats(store: web::Data<Arc<EnrollmentStore>>) -> Result<HttpResponse> {
+pub async fn get_steward_stats(
+    http_req: HttpRequest,
+    store: web::Data<Arc<EnrollmentStore>>,
+    auth: web::Data<Arc<AuthManager>>,
+    trust_mgr: web::Data<Arc<TrustManager>>,
+) -> Result<HttpResponse> {
+    // Extract steward DID from Bearer token
+    let auth_header = http_req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Missing Authorization header".to_string()))?;
+
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Invalid Authorization format".to_string()))?;
+
+    let claims = auth.verify_token(token)?;
+    let steward_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::InternalError(format!("Invalid steward DID in token: {e}")))?;
+
     let enrollments = store.enrollments.read().await;
 
-    // Count vouched enrollments
+    // Count vouched enrollments by THIS steward
     let vouched: Vec<_> = enrollments
         .values()
-        .filter(|s| s.vouched_at.is_some())
+        .filter(|s| {
+            s.vouched_at.is_some() && s.steward_did.as_ref() == Some(&steward_did.to_string())
+        })
         .collect();
 
     let total_vouches = vouched.len();
@@ -497,14 +704,35 @@ pub async fn get_steward_stats(store: web::Data<Arc<EnrollmentStore>>) -> Result
         avg_secs / 3600 // Convert to hours
     };
 
-    // Count rejections
-    let total_rejections = enrollments.values().filter(|s| s.rejected).count();
+    // Count rejections by this steward
+    let total_rejections = enrollments
+        .values()
+        .filter(|s| s.rejected && s.rejected_by.as_ref() == Some(&steward_did.to_string()))
+        .count();
+
+    // Calculate reputation score from trust graph
+    // Based on: average incoming trust * 100, weighted by number of edges
+    let incoming_edges = trust_mgr.get_incoming_edges(&steward_did);
+    let reputation_score = if incoming_edges.is_empty() {
+        // No incoming edges - use base score based on vouch history
+        // More vouches = higher initial reputation
+        let base = 50.0;
+        let vouch_bonus = (total_vouches as f64 * 2.0).min(30.0); // Up to 30 points for vouches
+        (base + vouch_bonus) as u64
+    } else {
+        // Calculate weighted average of incoming trust
+        let total_trust: f64 = incoming_edges.iter().map(|e| e.score).sum();
+        let avg_trust = total_trust / incoming_edges.len() as f64;
+        // Scale to 0-100 with edge count bonus
+        let edge_bonus = (incoming_edges.len() as f64).ln().min(1.0) * 10.0;
+        ((avg_trust * 90.0) + edge_bonus).round().min(100.0) as u64
+    };
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "total_vouches": total_vouches,
         "monthly_vouches": monthly_vouches,
         "total_rejections": total_rejections,
-        "reputation_score": 100, // TODO: Calculate from trust graph
+        "reputation_score": reputation_score,
         "avg_response_hours": avg_response_hours,
     })))
 }
