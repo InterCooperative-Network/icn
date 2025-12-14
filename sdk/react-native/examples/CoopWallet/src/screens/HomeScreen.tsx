@@ -112,10 +112,13 @@ export function HomeScreen({ navigation }: Props) {
       )}
 
       {/* Quick Actions */}
-      <View style={styles.actions}>
+      <View style={styles.actions} accessibilityRole="toolbar" accessibilityLabel="Quick actions">
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Payment', {})}
+          accessibilityRole="button"
+          accessibilityLabel="Send payment"
+          accessibilityHint="Navigate to payment screen to send hours"
         >
           <Text style={styles.actionIcon}>💸</Text>
           <Text style={styles.actionText}>Send</Text>
@@ -124,6 +127,9 @@ export function HomeScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Receive')}
+          accessibilityRole="button"
+          accessibilityLabel="Receive payment"
+          accessibilityHint="Generate QR code to receive hours"
         >
           <Text style={styles.actionIcon}>📥</Text>
           <Text style={styles.actionText}>Receive</Text>
@@ -132,6 +138,9 @@ export function HomeScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Scan')}
+          accessibilityRole="button"
+          accessibilityLabel="Scan QR code"
+          accessibilityHint="Scan payment or contact QR codes"
         >
           <Text style={styles.actionIcon}>📷</Text>
           <Text style={styles.actionText}>Scan</Text>
@@ -140,6 +149,9 @@ export function HomeScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Governance')}
+          accessibilityRole="button"
+          accessibilityLabel="Vote on proposals"
+          accessibilityHint="View and vote on cooperative proposals"
         >
           <Text style={styles.actionIcon}>🗳️</Text>
           <Text style={styles.actionText}>Vote</Text>
@@ -148,6 +160,9 @@ export function HomeScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('TrustAttestation', {})}
+          accessibilityRole="button"
+          accessibilityLabel="Create trust attestation"
+          accessibilityHint="Attest trust for another member"
         >
           <Text style={styles.actionIcon}>🤝</Text>
           <Text style={styles.actionText}>Trust</Text>
@@ -206,6 +221,9 @@ export function HomeScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.sdisButton}
             onPress={() => navigation.navigate('Identity')}
+            accessibilityRole="button"
+            accessibilityLabel="Show identity proof"
+            accessibilityHint="Generate QR code to prove your identity"
           >
             <Text style={styles.sdisIcon}>ID</Text>
             <View style={styles.sdisButtonContent}>
@@ -217,6 +235,9 @@ export function HomeScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.sdisButton}
             onPress={() => navigation.navigate('Verify')}
+            accessibilityRole="button"
+            accessibilityLabel="Verify others"
+            accessibilityHint="Scan QR codes to verify identity"
           >
             <Text style={styles.sdisIcon}>✓</Text>
             <View style={styles.sdisButtonContent}>
@@ -228,6 +249,9 @@ export function HomeScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.sdisButton}
             onPress={() => navigation.navigate('StewardDashboard')}
+            accessibilityRole="button"
+            accessibilityLabel="Steward dashboard"
+            accessibilityHint="Review and approve member enrollments"
           >
             <Text style={styles.sdisIcon}>S</Text>
             <View style={styles.sdisButtonContent}>
@@ -278,7 +302,13 @@ export function HomeScreen({ navigation }: Props) {
       </View>
 
       {/* Logout */}
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={logout}
+        accessibilityRole="button"
+        accessibilityLabel="Logout"
+        accessibilityHint="Sign out from your cooperative account"
+      >
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
       </ScrollView>
@@ -345,7 +375,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '600',
   },
   queueBadge: {
-    backgroundColor: '#2196f3',
+    backgroundColor: theme.colors.info,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

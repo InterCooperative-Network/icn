@@ -31,12 +31,15 @@ export function GovernanceScreen({ navigation }: Props) {
   const { proposals, isLoading, refresh } = useProposals(client!, domainId);
 
   const renderProposal = ({ item }: { item: any }) => {
-    const statusColors: Record<string, string> = {
-      draft: '#9e9e9e',
-      open: '#4caf50',
-      closed: '#f44336',
+    const getStatusColor = (state: string) => {
+      switch (state) {
+        case 'draft': return theme.colors.textMuted;
+        case 'open': return theme.colors.success;
+        case 'closed': return theme.colors.error;
+        default: return theme.colors.textSecondary;
+      }
     };
-    const statusColor = statusColors[item.state as string] || '#666';
+    const statusColor = getStatusColor(item.state as string);
 
     return (
       <TouchableOpacity

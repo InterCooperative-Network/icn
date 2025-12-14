@@ -37,6 +37,7 @@ export const lightTheme = {
     warningBackground: '#fff9c4',
     warningCardBackground: '#FFF3E0',
     warningDark: '#E65100',
+    info: '#2196f3',
     infoBackground: '#E3F2FD',
 
     // Borders
@@ -76,6 +77,7 @@ export const darkTheme = {
     warningBackground: '#3d3d1b',
     warningCardBackground: '#3d2b1b',
     warningDark: '#ffb74d',
+    info: '#64b5f6',
     infoBackground: '#1b2d3d',
 
     // Borders

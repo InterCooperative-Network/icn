@@ -345,9 +345,9 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   infoBox: {
-    backgroundColor: theme.mode === 'dark' ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
+    backgroundColor: theme.colors.infoBackground,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: theme.colors.info,
     padding: 16,
     borderRadius: 8,
     marginBottom: 24,
@@ -355,16 +355,16 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.mode === 'dark' ? '#93C5FD' : '#1E40AF',
+    color: theme.colors.info,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: theme.mode === 'dark' ? '#93C5FD' : '#1E40AF',
+    color: theme.colors.info,
     marginBottom: 4,
   },
   submitButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: theme.colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',

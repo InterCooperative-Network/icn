@@ -8,6 +8,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
 
 interface Props {
   navigation: NativeStackNavigationProp<RootStackParamList, any>;
@@ -25,6 +26,9 @@ interface NavItem {
 }
 
 export function BottomNavBar({ navigation, activeTab = 'Home', pendingEnrollments = 0 }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+
   const navItems: NavItem[] = [
     { key: 'Home', icon: '🏠', label: 'Home', screen: 'Home' },
     { key: 'Governance', icon: '🗳️', label: 'Vote', screen: 'Governance' },
@@ -48,46 +52,56 @@ export function BottomNavBar({ navigation, activeTab = 'Home', pendingEnrollment
   };
 
   return (
-    <View style={styles.container}>
-      {navItems.map(item => (
-        <TouchableOpacity
-          key={item.key}
-          style={styles.navItem}
-          onPress={() => handlePress(item)}
-        >
-          <View style={styles.iconContainer}>
+    <View style={styles.container} accessibilityRole="tablist" accessibilityLabel="Main navigation">
+      {navItems.map(item => {
+        const isActive = activeTab === item.key;
+        const badgeLabel = item.badge && item.badge > 0
+          ? `, ${item.badge} pending notification${item.badge > 1 ? 's' : ''}`
+          : '';
+
+        return (
+          <TouchableOpacity
+            key={item.key}
+            style={styles.navItem}
+            onPress={() => handlePress(item)}
+            accessibilityRole="tab"
+            accessibilityLabel={`${item.label}${badgeLabel}`}
+            accessibilityState={{ selected: isActive }}
+          >
+            <View style={styles.iconContainer}>
+              <Text style={[
+                styles.icon,
+                isActive && styles.iconActive
+              ]}>
+                {item.icon}
+              </Text>
+              {item.badge && item.badge > 0 && (
+                <View style={styles.badge} accessibilityElementsHidden>
+                  <Text style={styles.badgeText}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={[
-              styles.icon,
-              activeTab === item.key && styles.iconActive
+              styles.label,
+              isActive && styles.labelActive
             ]}>
-              {item.icon}
+              {item.label}
             </Text>
-            {item.badge && item.badge > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {item.badge > 99 ? '99+' : item.badge}
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text style={[
-            styles.label,
-            activeTab === item.key && styles.labelActive
-          ]}>
-            {item.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: theme.colors.border,
     paddingVertical: 8,
     paddingHorizontal: 4,
     position: 'absolute',
@@ -113,18 +127,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
   labelActive: {
-    color: '#4a90d9',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   badge: {
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: '#f44336',
+    backgroundColor: theme.colors.error,
     borderRadius: 10,
     minWidth: 16,
     height: 16,
