@@ -4,7 +4,7 @@
  * Scans and verifies SDIS identity proofs from QR codes.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   useSdisVerifierWithHistory,
@@ -34,52 +34,60 @@ const SCANNER_SIZE = SCREEN_WIDTH * 0.75;
 export function VerifyScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
-  const { verify, result, isVerifying, error, reset, history, clearHistory } =
+  const { verify, result, isVerifying, error, reset, history } =
     useSdisVerifierWithHistory(client!);
 
   const [verificationLevel, setVerificationLevel] = useState<VerificationLevel>(1);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isScanning, setIsScanning] = useState(true);
   const [lastScannedData, setLastScannedData] = useState<string | null>(null);
+  const [CameraView, setCameraView] = useState<any>(null);
 
-  const device = useCameraDevice('back');
-
-  // Request camera permission
-  React.useEffect(() => {
-    Camera.requestCameraPermission().then((status) => {
-      setHasPermission(status === 'granted');
-    });
+  // Load expo-camera dynamically
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      import('expo-camera').then(async (module: any) => {
+        setCameraView(() => module.CameraView);
+        try {
+          const requestPermission = module.Camera?.requestCameraPermissionsAsync || module.requestCameraPermissionsAsync;
+          if (requestPermission) {
+            const { status } = await requestPermission();
+            setHasPermission(status === 'granted');
+          }
+        } catch (err) {
+          console.error('VerifyScreen: Permission error:', err);
+          setHasPermission(false);
+        }
+      }).catch((err) => {
+        console.error('Failed to load expo-camera:', err);
+        setHasPermission(false);
+      });
+    }
   }, []);
 
-  // Code scanner callback
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr'],
-    onCodeScanned: useCallback(
-      (codes) => {
-        if (!isScanning || isVerifying || codes.length === 0) return;
+  // Handle barcode scan
+  const handleBarCodeScanned = useCallback(
+    ({ data }: { data: string }) => {
+      if (!isScanning || isVerifying) return;
 
-        const qrData = codes[0].value;
-        if (!qrData) return;
+      // Prevent duplicate scans
+      if (data === lastScannedData) return;
+      setLastScannedData(data);
 
-        // Prevent duplicate scans
-        if (qrData === lastScannedData) return;
-        setLastScannedData(qrData);
+      // Check if it's an SDIS QR code
+      if (!isSdisQR(data)) {
+        return;
+      }
 
-        // Check if it's an SDIS QR code
-        if (!isSdisQR(qrData)) {
-          return;
-        }
-
-        // Parse and verify
-        const parsed = parseSdisQR(qrData);
-        if (parsed) {
-          setIsScanning(false);
-          verify(parsed.raw, verificationLevel, parsed.proofInfo?.proofTypeLabel);
-        }
-      },
-      [isScanning, isVerifying, lastScannedData, verificationLevel, verify],
-    ),
-  });
+      // Parse and verify
+      const parsed = parseSdisQR(data);
+      if (parsed) {
+        setIsScanning(false);
+        verify(parsed.raw, verificationLevel, parsed.proofInfo?.proofTypeLabel);
+      }
+    },
+    [isScanning, isVerifying, lastScannedData, verificationLevel, verify],
+  );
 
   const handleRescan = () => {
     reset();
@@ -92,7 +100,7 @@ export function VerifyScreen({ navigation }: Props) {
   };
 
   // Permission states
-  if (hasPermission === null) {
+  if (hasPermission === null || !CameraView) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4A90A4" />
@@ -104,22 +112,22 @@ export function VerifyScreen({ navigation }: Props) {
   if (hasPermission === false) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.icon}>&#128247;</Text>
+        <Text style={styles.icon}>📷</Text>
         <Text style={styles.message}>Camera permission is required to scan QR codes.</Text>
         <TouchableOpacity
           style={styles.primaryButton}
-          onPress={() => Camera.requestCameraPermission()}
+          onPress={() => {
+            import('expo-camera').then(async (module: any) => {
+              const requestPermission = module.Camera?.requestCameraPermissionsAsync || module.requestCameraPermissionsAsync;
+              if (requestPermission) {
+                const { status } = await requestPermission();
+                setHasPermission(status === 'granted');
+              }
+            });
+          }}
         >
           <Text style={styles.primaryButtonText}>Grant Permission</Text>
         </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!device) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.message}>No camera device found.</Text>
       </View>
     );
   }
@@ -130,11 +138,13 @@ export function VerifyScreen({ navigation }: Props) {
       <View style={styles.cameraContainer}>
         {isScanning ? (
           <>
-            <Camera
+            <CameraView
               style={StyleSheet.absoluteFill}
-              device={device}
-              isActive={isScanning}
-              codeScanner={codeScanner}
+              facing="back"
+              onBarcodeScanned={handleBarCodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr'],
+              }}
             />
             {/* Scanner Overlay */}
             <View style={styles.overlay}>

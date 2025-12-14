@@ -14,7 +14,6 @@ module.exports = async function (env, argv) {
 
   config.resolve.alias = {
     ...config.resolve.alias,
-    'react-native-vision-camera': path.resolve(__dirname, 'src/web-stubs/react-native-vision-camera.js'),
     '@icn/react-native': path.resolve(sdkReactNative, 'dist'),
     '@icn/client': path.resolve(sdkTypescript, 'dist'),
   };
