@@ -56,11 +56,25 @@ export { ICNWalletImpl, createWallet } from './wallet';
 
 // QR Code utilities
 export {
+  // Universal QR parsing
+  parseQR,
+  detectQRType,
+  isICNQR,
+  // Payment QR
   generatePaymentQR,
   parsePaymentQR,
   isPaymentQR,
   generateReceiveQR,
+  // Contact QR
+  generateContactQR,
+  parseContactQR,
+  isContactQR,
+  // Join/Coop QR
+  generateJoinQR,
+  parseJoinQR,
+  isJoinQR,
 } from './qr';
+export type { QRType, ContactQRData, JoinQRData, ParsedQRData } from './qr';
 
 // React Hooks
 export {

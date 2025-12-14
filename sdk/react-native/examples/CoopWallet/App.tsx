@@ -2202,10 +2202,10 @@ export interface TransactionParam {
 }
 
 export type RootStackParamList = {
-  Login: undefined;
+  Login: { coopId?: string; gateway?: string; coopName?: string } | undefined;
   Home: undefined;
   Payment: { recipient?: string; amount?: string; memo?: string; recipientDid?: string } | undefined;
-  Scan: undefined;
+  Scan: { mode?: 'all' | 'payment' | 'contact' | 'join' } | undefined;
   Receive: undefined;
   Governance: undefined;
   Identity: undefined;

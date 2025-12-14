@@ -275,3 +275,73 @@ export function useSdisStorage() {
     cleanupExpired: SdisStorage.cleanupExpired,
   };
 }
+
+// ============================================================================
+// Contact Storage
+// ============================================================================
+
+const CONTACTS_KEY = '@icn/contacts';
+
+export interface Contact {
+  did: string;
+  name: string;
+  coopId?: string;
+  addedAt?: number;
+}
+
+/**
+ * Save a contact to local storage
+ */
+export async function saveContact(contact: Contact): Promise<void> {
+  try {
+    const contacts = await getContacts();
+    // Check if contact already exists
+    const existingIndex = contacts.findIndex(c => c.did === contact.did);
+    if (existingIndex >= 0) {
+      // Update existing
+      contacts[existingIndex] = { ...contact, addedAt: contacts[existingIndex].addedAt };
+    } else {
+      // Add new
+      contacts.push({ ...contact, addedAt: Date.now() });
+    }
+    await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
+  } catch (error) {
+    console.error('Failed to save contact:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all saved contacts
+ */
+export async function getContacts(): Promise<Contact[]> {
+  try {
+    const json = await AsyncStorage.getItem(CONTACTS_KEY);
+    if (!json) return [];
+    return JSON.parse(json);
+  } catch (error) {
+    console.error('Failed to load contacts:', error);
+    return [];
+  }
+}
+
+/**
+ * Remove a contact by DID
+ */
+export async function removeContact(did: string): Promise<void> {
+  try {
+    const contacts = await getContacts();
+    const updated = contacts.filter(c => c.did !== did);
+    await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(updated));
+  } catch (error) {
+    console.error('Failed to remove contact:', error);
+  }
+}
+
+/**
+ * Get a single contact by DID
+ */
+export async function getContact(did: string): Promise<Contact | null> {
+  const contacts = await getContacts();
+  return contacts.find(c => c.did === did) || null;
+}

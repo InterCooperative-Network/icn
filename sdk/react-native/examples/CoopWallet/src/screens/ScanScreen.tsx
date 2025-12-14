@@ -1,26 +1,32 @@
 /**
  * Scan Screen
  *
- * QR code scanner for payments.
+ * Universal QR code scanner for payments, contacts, and coop joining.
  */
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { parsePaymentQR, isPaymentQR } from '@icn/react-native';
+import { RouteProp } from '@react-navigation/native';
+import { parseQR, isICNQR } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
 import { useTheme, Theme } from '../contexts/ThemeContext';
+import { saveContact } from '../storage';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Scan'>;
+  route: RouteProp<RootStackParamList, 'Scan'>;
 };
 
-export function ScanScreen({ navigation }: Props) {
+export function ScanScreen({ navigation, route }: Props) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+
+  // Optional: scan mode can be passed as param to filter QR types
+  const scanMode = route.params?.mode || 'all';
 
   useEffect(() => {
     if (!permission) {
@@ -32,34 +38,135 @@ export function ScanScreen({ navigation }: Props) {
     if (scanned) return;
     setScanned(true);
 
-    if (!isPaymentQR(data)) {
-      Alert.alert('Invalid QR Code', 'This is not a valid ICN payment QR code.', [
-        { text: 'Try Again', onPress: () => setScanned(false) },
-        { text: 'Cancel', onPress: () => navigation.goBack() },
-      ]);
-      return;
-    }
+    // Parse the QR code
+    const result = parseQR(data);
 
-    const payment = parsePaymentQR(data);
-    if (!payment) {
-      Alert.alert('Invalid Payment', 'Could not parse payment data.', [
+    switch (result.type) {
+      case 'payment':
+        if (scanMode !== 'all' && scanMode !== 'payment') {
+          Alert.alert('Wrong QR Type', 'This is a payment QR code. Please scan the correct type.', [
+            { text: 'Try Again', onPress: () => setScanned(false) },
+          ]);
+          return;
+        }
+        navigation.navigate('Payment', {
+          recipient: result.data.to,
+          amount: result.data.amount?.toString(),
+          memo: result.data.memo,
+        });
+        break;
+
+      case 'contact':
+        if (scanMode !== 'all' && scanMode !== 'contact') {
+          Alert.alert('Wrong QR Type', 'This is a contact QR code. Please scan the correct type.', [
+            { text: 'Try Again', onPress: () => setScanned(false) },
+          ]);
+          return;
+        }
+        // Add contact and navigate to their profile
+        handleAddContact(result.data);
+        break;
+
+      case 'join':
+        if (scanMode !== 'all' && scanMode !== 'join') {
+          Alert.alert('Wrong QR Type', 'This is a coop join QR code. Please scan the correct type.', [
+            { text: 'Try Again', onPress: () => setScanned(false) },
+          ]);
+          return;
+        }
+        // Handle coop joining
+        handleJoinCoop(result.data);
+        break;
+
+      default:
+        Alert.alert('Invalid QR Code', 'This QR code is not recognized as an ICN code.', [
+          { text: 'Try Again', onPress: () => setScanned(false) },
+          { text: 'Cancel', onPress: () => navigation.goBack() },
+        ]);
+    }
+  };
+
+  const handleAddContact = async (contactData: { did: string; name?: string; coopId?: string }) => {
+    try {
+      // Add to contacts using local storage
+      await saveContact({
+        did: contactData.did,
+        name: contactData.name || `Member ${contactData.did.slice(-8)}`,
+        coopId: contactData.coopId,
+      });
+
+      Alert.alert(
+        'Contact Added',
+        `${contactData.name || contactData.did.slice(0, 20)}... has been added to your contacts.`,
+        [
+          {
+            text: 'View Profile',
+            onPress: () => navigation.replace('MemberProfile', { memberDid: contactData.did }),
+          },
+          {
+            text: 'Done',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add contact. Please try again.', [
         { text: 'Try Again', onPress: () => setScanned(false) },
       ]);
-      return;
     }
+  };
 
-    // Navigate to payment screen with pre-filled data
-    navigation.navigate('Payment', {
-      recipient: payment.to,
-      amount: payment.amount?.toString(),
-      memo: payment.memo,
-    });
+  const handleJoinCoop = (joinData: { coopId: string; gateway: string; name?: string }) => {
+    Alert.alert(
+      'Join Cooperative',
+      `Would you like to join "${joinData.name || joinData.coopId}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => setScanned(false),
+        },
+        {
+          text: 'Join',
+          onPress: () => {
+            // Navigate back to login with pre-filled data
+            // The login screen will handle the actual join
+            navigation.reset({
+              index: 0,
+              routes: [
+                {
+                  name: 'Login',
+                  params: {
+                    coopId: joinData.coopId,
+                    gateway: joinData.gateway,
+                    coopName: joinData.name,
+                  },
+                },
+              ],
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  const getHintText = () => {
+    switch (scanMode) {
+      case 'payment':
+        return 'Point camera at payment QR code';
+      case 'contact':
+        return 'Point camera at contact QR code';
+      case 'join':
+        return 'Point camera at coop QR code';
+      default:
+        return 'Point camera at any ICN QR code';
+    }
   };
 
   if (!permission) {
     return (
       <View style={styles.container}>
-        <Text>Requesting camera permission...</Text>
+        <Text style={styles.message}>Requesting camera permission...</Text>
       </View>
     );
   }
@@ -71,7 +178,10 @@ export function ScanScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, { marginTop: 12, backgroundColor: '#666' }]} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 12, backgroundColor: '#666' }]}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.buttonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -110,86 +220,99 @@ export function ScanScreen({ navigation }: Props) {
             <View style={[styles.corner, styles.bottomLeft]} />
             <View style={[styles.corner, styles.bottomRight]} />
           </View>
-          <Text style={styles.hint}>Point camera at ICN payment QR code</Text>
+          <Text style={styles.hint}>{getHintText()}</Text>
+
+          {scanMode === 'all' && (
+            <Text style={styles.subHint}>
+              Payments • Contacts • Join Coop
+            </Text>
+          )}
         </View>
       </CameraView>
     </View>
   );
 }
 
-const createStyles = (theme: Theme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  camera: {
-    flex: 1,
-    width: '100%',
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scanArea: {
-    width: 250,
-    height: 250,
-    position: 'relative',
-  },
-  corner: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderColor: '#fff',
-  },
-  topLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-  },
-  topRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-  },
-  bottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-  },
-  bottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-  },
-  hint: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 24,
-    textAlign: 'center',
-  },
-  message: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 32,
-  },
-  button: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#000',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    camera: {
+      flex: 1,
+      width: '100%',
+    },
+    overlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scanArea: {
+      width: 250,
+      height: 250,
+      position: 'relative',
+    },
+    corner: {
+      position: 'absolute',
+      width: 40,
+      height: 40,
+      borderColor: '#fff',
+    },
+    topLeft: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 4,
+      borderLeftWidth: 4,
+    },
+    topRight: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 4,
+      borderRightWidth: 4,
+    },
+    bottomLeft: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 4,
+      borderLeftWidth: 4,
+    },
+    bottomRight: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: 4,
+      borderRightWidth: 4,
+    },
+    hint: {
+      color: '#fff',
+      fontSize: 16,
+      marginTop: 24,
+      textAlign: 'center',
+    },
+    subHint: {
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: 12,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    message: {
+      color: '#fff',
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 24,
+      paddingHorizontal: 32,
+    },
+    button: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    buttonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });

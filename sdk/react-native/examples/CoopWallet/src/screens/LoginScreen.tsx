@@ -2,9 +2,10 @@
  * Login Screen
  *
  * Handles cooperative selection and authentication.
+ * Supports QR code scanning for easy coop joining.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,15 +17,38 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import { client } from '../client';
 import { useTheme, Theme } from '../contexts/ThemeContext';
+import { RootStackParamList } from '../../App';
 
-export function LoginScreen() {
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
+  route: RouteProp<RootStackParamList, 'Login'>;
+};
+
+export function LoginScreen({ navigation, route }: Props) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
   const [coopId, setCoopId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle pre-filled data from QR scan
+  useEffect(() => {
+    if (route.params?.coopId) {
+      setCoopId(route.params.coopId);
+      // If we have gateway info from QR, show a message
+      if (route.params?.coopName) {
+        Alert.alert(
+          'Join Cooperative',
+          `Joining "${route.params.coopName}"`,
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  }, [route.params]);
 
   const handleLogin = async () => {
     if (!coopId.trim()) {
@@ -58,6 +82,10 @@ export function LoginScreen() {
     }
   };
 
+  const handleScanToJoin = () => {
+    navigation.navigate('Scan', { mode: 'join' });
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -72,6 +100,7 @@ export function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g., my-timebank"
+            placeholderTextColor={theme.colors.textSecondary}
             value={coopId}
             onChangeText={setCoopId}
             autoCapitalize="none"
@@ -90,6 +119,20 @@ export function LoginScreen() {
             ) : (
               <Text style={styles.buttonText}>Login</Text>
             )}
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={handleScanToJoin}
+          >
+            <Text style={styles.scanIcon}>📷</Text>
+            <Text style={styles.scanButtonText}>Scan QR to Join</Text>
           </TouchableOpacity>
         </View>
 
@@ -160,6 +203,41 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  dividerText: {
+    color: theme.colors.textSecondary,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  scanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.borderLight,
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    borderStyle: 'dashed',
+  },
+  scanIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  scanButtonText: {
+    color: theme.colors.primary,
+    fontSize: 16,
     fontWeight: '600',
   },
   error: {
