@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing. A5 (Configuration Sprawl) fixed with SupervisorConfig struct.
 
 ---
 
@@ -211,9 +211,16 @@ These don't cause immediate bugs but make the system harder to maintain.
 **Issue**: Each actor defines own callback types, no common abstraction
 **Fix**: Create ActorCallback trait hierarchy
 
-### A5. Configuration Sprawl
+### A5. Configuration Sprawl - FIXED
 **Issue**: Hardcoded values scattered across supervisor.rs
-**Fix**: Centralize in config struct with validation
+**Fix**: Created `SupervisorConfig` struct in `config.rs` centralizing:
+- `candidate_cleanup_interval_secs` (default: 300)
+- `peer_exchange_delay_ms` (default: 500)
+- `peer_exchange_max_peers` (default: 50)
+- `metrics_update_interval_secs` (default: 10)
+- `shutdown_timeout_secs` (default: 5)
+- `clock_sync_interval_secs` (default: 600)
+Updated supervisor.rs to use config values instead of hardcoded literals.
 
 ### A6. Error Swallowing
 **Locations**: 8+ places in supervisor.rs

@@ -42,6 +42,10 @@ pub struct Config {
     /// Steward configuration for SDIS steward network participation
     #[serde(default)]
     pub steward: StewardNodeConfig,
+
+    /// Supervisor configuration for background tasks and timeouts
+    #[serde(default)]
+    pub supervisor: SupervisorConfig,
 }
 
 /// Steward node configuration for SDIS steward network participation
@@ -610,6 +614,7 @@ impl Default for Config {
             privacy: PrivacyConfig::default(),
             cooperative: CooperativeConfig::default(),
             steward: StewardNodeConfig::default(),
+            supervisor: SupervisorConfig::default(),
         }
     }
 }
@@ -683,6 +688,73 @@ impl Config {
     /// Get the store path
     pub fn store_path(&self) -> PathBuf {
         self.data_dir.join("store")
+    }
+}
+
+/// Supervisor configuration for background tasks and timeouts (A5 fix)
+///
+/// Centralizes previously hardcoded values from supervisor.rs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupervisorConfig {
+    /// Candidate cache cleanup interval in seconds (default: 300 = 5 minutes)
+    #[serde(default = "default_candidate_cleanup_interval_secs")]
+    pub candidate_cleanup_interval_secs: u64,
+
+    /// Delay before requesting peer exchange in milliseconds (default: 500)
+    #[serde(default = "default_peer_exchange_delay_ms")]
+    pub peer_exchange_delay_ms: u64,
+
+    /// Maximum peers to request in peer exchange (default: 50)
+    #[serde(default = "default_peer_exchange_max_peers")]
+    pub peer_exchange_max_peers: usize,
+
+    /// Metrics update interval in seconds (default: 10)
+    #[serde(default = "default_metrics_update_interval_secs")]
+    pub metrics_update_interval_secs: u64,
+
+    /// Graceful shutdown timeout in seconds (default: 5)
+    #[serde(default = "default_shutdown_timeout_secs")]
+    pub shutdown_timeout_secs: u64,
+
+    /// Clock synchronization interval in seconds (default: 600 = 10 minutes)
+    #[serde(default = "default_clock_sync_interval_secs")]
+    pub clock_sync_interval_secs: u64,
+}
+
+fn default_candidate_cleanup_interval_secs() -> u64 {
+    300 // 5 minutes
+}
+
+fn default_peer_exchange_delay_ms() -> u64 {
+    500
+}
+
+fn default_peer_exchange_max_peers() -> usize {
+    50
+}
+
+fn default_metrics_update_interval_secs() -> u64 {
+    10
+}
+
+fn default_shutdown_timeout_secs() -> u64 {
+    5
+}
+
+fn default_clock_sync_interval_secs() -> u64 {
+    600 // 10 minutes
+}
+
+impl Default for SupervisorConfig {
+    fn default() -> Self {
+        SupervisorConfig {
+            candidate_cleanup_interval_secs: default_candidate_cleanup_interval_secs(),
+            peer_exchange_delay_ms: default_peer_exchange_delay_ms(),
+            peer_exchange_max_peers: default_peer_exchange_max_peers(),
+            metrics_update_interval_secs: default_metrics_update_interval_secs(),
+            shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            clock_sync_interval_secs: default_clock_sync_interval_secs(),
+        }
     }
 }
 

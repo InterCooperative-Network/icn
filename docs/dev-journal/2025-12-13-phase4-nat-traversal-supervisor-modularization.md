@@ -12,6 +12,7 @@ This session completed several key infrastructure improvements:
 - Balance recomputation race fix (M7)
 - Locality/RTT integration for compute placement (M5)
 - Deliberation period clock skew fix (M9)
+- Configuration sprawl fix with SupervisorConfig (A5)
 
 ## Changes Made
 
@@ -186,9 +187,37 @@ Fixed timing issue in placement offer deliberation period.
 - Network latency no longer disadvantages distant executors
 - More fair placement competition
 
+### 7. Configuration Sprawl Fix (A5)
+
+Centralized hardcoded configuration values from supervisor.rs.
+
+**New Struct** (`icn-core/src/config.rs`):
+```rust
+pub struct SupervisorConfig {
+    pub candidate_cleanup_interval_secs: u64,   // default: 300
+    pub peer_exchange_delay_ms: u64,            // default: 500
+    pub peer_exchange_max_peers: usize,         // default: 50
+    pub metrics_update_interval_secs: u64,      // default: 10
+    pub shutdown_timeout_secs: u64,             // default: 5
+    pub clock_sync_interval_secs: u64,          // default: 600
+}
+```
+
+**Supervisor Updates**:
+- Replaced hardcoded `Duration::from_secs(300)` with config value
+- Replaced hardcoded `Duration::from_millis(500)` with config value
+- Replaced hardcoded `Some(50)` peer exchange limit with config value
+- Replaced hardcoded `Duration::from_secs(10)` metrics interval with config value
+- Replaced hardcoded `Duration::from_secs(5)` shutdown timeout with config value
+
+**Benefits**:
+- All timing values now configurable via TOML
+- Easier to tune for different environments
+- Values documented with defaults
+
 ## Next Steps
 
 From ROADMAP.md and SYSTEM_GAPS.md:
 - A1 continuation: Further supervisor refactoring if needed
-- A2-A6: Architectural cleanup items
+- A2, A3, A4, A6, A8: Remaining architectural cleanup items
 - Track C1: Pilot community selection (business track)
