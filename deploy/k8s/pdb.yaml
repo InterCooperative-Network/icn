@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: icn-daemon-pdb
+  namespace: icn
+  labels:
+    app: icn
+    component: daemon
+spec:
+  # Ensure at least 1 pod is always available during voluntary disruptions
+  # (node drains, upgrades, etc.)
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: icn
+      component: daemon
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pilot-ui-pdb
+  namespace: icn
+  labels:
+    app: icn
+    component: pilot-ui
+spec:
+  # Allow all pilot-ui pods to be disrupted (non-critical UI)
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: icn
+      component: pilot-ui

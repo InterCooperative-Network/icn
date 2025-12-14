@@ -2,6 +2,100 @@
 
 This directory contains all Kubernetes manifests and deployment scripts for running ICN on a K3s cluster.
 
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         K3s Cluster (Hyperion)                          │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                        ICN Namespace                             │   │
+│  │                                                                  │   │
+│  │  ┌──────────────────┐      ┌──────────────────┐                 │   │
+│  │  │   ICN Daemon     │      │    Pilot UI      │                 │   │
+│  │  │   (Pod)          │◄────►│    (Pod)         │                 │   │
+│  │  │                  │      │                  │                 │   │
+│  │  │  ┌────────────┐  │      │  nginx serving   │                 │   │
+│  │  │  │ init:      │  │      │  React app       │                 │   │
+│  │  │  │ fix-perms  │  │      └────────┬─────────┘                 │   │
+│  │  │  └────────────┘  │               │                           │   │
+│  │  │  ┌────────────┐  │               │ :3000                     │   │
+│  │  │  │ icnd       │  │               ▼                           │   │
+│  │  │  │ (Rust)     │  │      ┌──────────────────┐                 │   │
+│  │  │  └────────────┘  │      │ pilot-ui-nodeport│ :30030          │   │
+│  │  │        │         │      └──────────────────┘                 │   │
+│  │  │   :7777 UDP (P2P)│                                           │   │
+│  │  │   :5601 TCP (RPC)│                                           │   │
+│  │  │   :8080 TCP (API)│                                           │   │
+│  │  │   :9100 TCP (metrics)                                        │   │
+│  │  │        │         │                                           │   │
+│  │  │        ▼         │                                           │   │
+│  │  │  ┌────────────┐  │      ┌──────────────────┐                 │   │
+│  │  │  │ Services   │  │      │  Network         │                 │   │
+│  │  │  │ ClusterIP  │  │      │  Policies        │                 │   │
+│  │  │  │ NodePort   │  │      │  (firewall)      │                 │   │
+│  │  │  └────────────┘  │      └──────────────────┘                 │   │
+│  │  │        │         │                                           │   │
+│  │  └────────┼─────────┘                                           │   │
+│  │           │                                                      │   │
+│  │           ▼                                                      │   │
+│  │  ┌─────────────────────────────────────────┐                    │   │
+│  │  │              PVCs (NFS)                  │                    │   │
+│  │  │  ┌─────────────┐    ┌─────────────┐     │                    │   │
+│  │  │  │ icn-data    │    │ icn-backups │     │                    │   │
+│  │  │  │ 10Gi        │    │ 20Gi        │     │                    │   │
+│  │  │  │ identity    │    │ daily .tar  │     │                    │   │
+│  │  │  │ ledgers     │    │ files       │     │                    │   │
+│  │  │  │ store       │    └─────────────┘     │                    │   │
+│  │  │  └─────────────┘                        │                    │   │
+│  │  └─────────────────────────────────────────┘                    │   │
+│  │                         │                                        │   │
+│  └─────────────────────────┼────────────────────────────────────────┘   │
+│                            │ NFS                                        │
+└────────────────────────────┼────────────────────────────────────────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │  Atlas (TrueNAS)│
+                    │  /mnt/ssd_pool/ │
+                    │  icn-vols       │
+                    └─────────────────┘
+```
+
+### Data Flow
+
+```
+User Browser
+     │
+     ▼ :30030 (NodePort)
+┌─────────────┐
+│  Pilot UI   │ React frontend
+└──────┬──────┘
+       │ HTTP API calls
+       ▼ :30080 or :8080
+┌─────────────┐
+│ ICN Gateway │ REST API (Actix-web)
+└──────┬──────┘
+       │ Internal calls
+       ▼
+┌─────────────┐
+│ ICN Core    │ Trust graph, ledger, gossip
+└──────┬──────┘
+       │ P2P
+       ▼ :7777 UDP (QUIC)
+┌─────────────┐
+│ Other Nodes │ Federation (future)
+└─────────────┘
+```
+
+### Health Probes
+
+| Probe | Endpoint | Interval | Purpose |
+|-------|----------|----------|---------|
+| Startup | `/v1/health` | 5s (max 155s) | Allows slow starts during key generation |
+| Readiness | `/v1/health` | 10s | Traffic routing control |
+| Liveness | `/v1/health` | 30s | Restart if stuck (3 failures) |
+
 ## Quick Start
 
 ### Prerequisites
@@ -15,73 +109,108 @@ This directory contains all Kubernetes manifests and deployment scripts for runn
 Deploy everything with one command:
 
 ```bash
-cd /home/matt/projects/icn/deploy/k8s/scripts
-./full-deploy.sh
+make full-deploy
+# Or with options:
+make full-deploy IMAGE_TAG=$(git rev-parse --short HEAD)
 ```
 
 This will:
 1. Build the Docker image from source
 2. Sync the image to all K3s nodes
 3. Apply Kubernetes manifests to deploy ICN
+4. Verify deployment health
 
-### Step-by-Step Deployment
-
-#### 1. Build Docker Image
+### Make Targets
 
 ```bash
-./scripts/build-image.sh [tag]
+# Core deployment
+make build              # Build Docker image
+make sync               # Sync image to K3s cluster
+make deploy             # Deploy ICN to K3s cluster
+make full-deploy        # Full pipeline: build, sync, deploy
+
+# Status & Logs
+make status             # Check deployment status
+make logs               # Tail ICN daemon logs
+make logs-recent        # Show recent logs
+
+# Deployment management
+make restart            # Restart ICN deployment
+make rollback           # Rollback to previous deployment
+make rollback-history   # Show deployment rollout history
+make verify             # Verify deployment is healthy
+
+# Backup
+make backup             # Backup ICN data from cluster
+make safe-deploy        # Deploy with backup and verification
+make deploy-history     # Show deployment audit log
+
+# Pilot UI
+make build-ui-image     # Build Pilot UI Docker image
+make sync-ui-image      # Sync Pilot UI to all nodes
+make deploy-ui          # Deploy Pilot UI
+make ui-status          # Check Pilot UI status
+make ui-logs            # Tail Pilot UI logs
+
+# Fresh builds (no cache)
+make build-fresh        # Build without Docker cache
+make full-deploy-fresh  # Full deploy with fresh build
 ```
 
-Examples:
+### Quick Commands
+
 ```bash
-./scripts/build-image.sh                           # Uses 'latest' tag
-./scripts/build-image.sh v1.0.0                    # Uses 'v1.0.0' tag
-./scripts/build-image.sh $(git rev-parse --short HEAD)  # Uses git hash
+# See what's running
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get all"
+
+# Check ICN health
+curl http://10.8.10.40:30080/v1/health
+
+# View ICN logs
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -l app=icn,component=daemon -f"
+
+# Trigger backup manually
+ssh ubuntu@10.8.10.40 "sudo kubectl -n icn create job --from=cronjob/icn-backup backup-now"
+
+# Access Grafana
+open http://10.8.10.40:30300  # ICN dashboard under dashboards
 ```
 
-#### 2. Sync Image to K3s Cluster
+## File Structure
 
-```bash
-./scripts/sync-image.sh [tag] [k3s-host]
 ```
-
-This exports the Docker image and imports it to containerd on all K3s nodes.
-
-Examples:
-```bash
-./scripts/sync-image.sh                            # Sync 'latest' to default host
-./scripts/sync-image.sh v1.0.0                     # Sync 'v1.0.0'
-./scripts/sync-image.sh latest ubuntu@10.8.10.40   # Custom host
-```
-
-#### 3. Deploy to Cluster
-
-```bash
-./scripts/deploy.sh [k3s-host] [image-tag]
-```
-
-This applies all Kubernetes manifests.
-
-Examples:
-```bash
-./scripts/deploy.sh                                # Deploy to default host
-./scripts/deploy.sh ubuntu@10.8.10.40 v1.0.0       # Custom host and tag
-```
-
-### Manual Deployment
-
-If you prefer to use kubectl directly:
-
-```bash
-# Apply all manifests
-kubectl apply -k .                    # Using kustomize
-# OR
-kubectl apply -f namespace.yaml
-kubectl apply -f configmap.yaml
-kubectl apply -f pvc.yaml
-kubectl apply -f deployment.yaml
-kubectl apply -f services.yaml
-kubectl apply -f monitoring/servicemonitor.yaml
+deploy/k8s/
+├── README.md                  # This file
+├── kustomization.yaml         # Kustomize configuration
+├── Makefile                   # Deployment automation
+│
+├── # Core Manifests
+├── namespace.yaml             # ICN namespace
+├── configmap.yaml             # ICN daemon configuration (icn.toml)
+├── pvc.yaml                   # 10Gi storage for identity, ledgers, store
+├── backup-pvc.yaml            # 20Gi storage for backups
+├── deployment.yaml            # ICN daemon pod spec, probes, security
+├── services.yaml              # ClusterIP + NodePort for external access
+├── pdb.yaml                   # Pod Disruption Budget
+├── network-policies.yaml      # Firewall rules for pod traffic
+│
+├── # Pilot UI
+├── pilot-ui-deployment.yaml   # Pilot UI deployment
+│
+├── # Operations
+├── backup-cronjob.yaml        # Daily backup automation (2am)
+│
+├── # Monitoring
+├── prometheusrule.yaml        # Alert definitions (9 rules)
+├── grafana-dashboard.yaml     # Metrics visualization
+├── monitoring/
+│   └── servicemonitor.yaml    # Prometheus ServiceMonitor
+│
+└── scripts/
+    ├── build-image.sh         # Build Docker image
+    ├── sync-image.sh          # Sync image to K3s nodes
+    ├── deploy.sh              # Apply Kubernetes manifests
+    └── full-deploy.sh         # Complete deployment pipeline
 ```
 
 ## Configuration
@@ -92,12 +221,13 @@ kubectl apply -f monitoring/servicemonitor.yaml
 
 ```bash
 cp secret.yaml.example secret.yaml
-# Edit secret.yaml with your passphrase
+# Edit secret.yaml with your passphrase and JWT secret
 kubectl apply -f secret.yaml
 ```
 
-The secret should contain:
-- `icn-secrets` with key `passphrase` for the ICN keystore passphrase
+Required secrets:
+- `icn-secrets.passphrase` - ICN keystore passphrase
+- `icn-secrets.jwt-secret` - Gateway JWT signing secret
 
 ### ConfigMap
 
@@ -108,48 +238,50 @@ Edit `configmap.yaml` to customize ICN configuration:
 - Topology settings
 - Log levels
 
-After editing, apply with:
+After editing:
 ```bash
 kubectl apply -f configmap.yaml
 kubectl rollout restart deployment/icn-daemon -n icn
 ```
 
-### Image Tag Updates
-
-To update the image tag used by the deployment:
-
-```bash
-# Using kubectl
-kubectl set image deployment/icn-daemon -n icn icnd=icn:v1.0.0
-
-# Or edit deployment.yaml and reapply
-kubectl apply -f deployment.yaml
-```
-
 ### Storage
 
-The deployment uses a PersistentVolumeClaim on the `atlas-nfs` storage class. 
+| PVC | Size | Purpose |
+|-----|------|---------|
+| `icn-data` | 10Gi | Identity, ledgers, store |
+| `icn-backups` | 20Gi | Daily backup archives |
 
-To change storage size or class, edit `pvc.yaml`:
-```yaml
-spec:
-  storageClassName: atlas-nfs
-  resources:
-    requests:
-      storage: 10Gi  # Change this
-```
-
-**Note**: Existing PVCs cannot be resized. You'll need to delete and recreate (data will be lost unless backed up).
+Both use the `nfs-client` storage class backed by Atlas (TrueNAS).
 
 ## Monitoring
 
-The deployment includes:
-- **ServiceMonitor** for Prometheus metrics scraping
-- **PrometheusRule** with ICN-specific alerts
+### Prometheus Alerts
 
-Metrics are exposed on port `9100` at `/metrics`.
+The `prometheusrule.yaml` defines these alerts:
 
-### View Metrics
+| Alert | Severity | Description |
+|-------|----------|-------------|
+| ICNDaemonDown | critical | Daemon unavailable > 2min |
+| ICNDaemonNotReady | warning | Pod not ready > 5min |
+| ICNHighMemory | warning | Memory > 85% limit |
+| ICNHighCPU | warning | CPU > 80% for 10min |
+| ICNFrequentRestarts | warning | > 3 restarts/hour |
+| ICNCrashLooping | critical | CrashLoopBackOff state |
+| ICNStorageAlmostFull | warning | Storage > 80% |
+| ICNStorageFull | critical | Storage > 95% |
+| ICNBackupFailed | warning | Backup job failed |
+
+### Grafana Dashboard
+
+The `grafana-dashboard.yaml` provides visualization for:
+- Daemon status and restarts
+- Memory and CPU usage over time
+- Storage usage gauges
+- Network I/O
+
+Access at: `http://10.8.10.40:30300`
+
+### View Metrics Directly
 
 ```bash
 # Port forward to access metrics locally
@@ -157,14 +289,44 @@ kubectl -n icn port-forward svc/icn 9100:9100
 # Then visit http://localhost:9100/metrics
 ```
 
-### Access Grafana
+## Backup System
 
-If Prometheus/Grafana is deployed in the `monitoring` namespace:
+### Automated Backups
+
+The `backup-cronjob.yaml` runs daily at 2am:
+1. Creates compressed tarball of `/data`
+2. Verifies archive integrity
+3. Deletes backups older than 7 days
+
+### Manual Backup
 
 ```bash
-kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80
-# Then visit http://localhost:3000
+# Using Makefile
+make backup
+
+# Or trigger cronjob manually
+kubectl -n icn create job --from=cronjob/icn-backup backup-$(date +%s)
 ```
+
+### Restore
+
+```bash
+# Get backup file
+kubectl -n icn exec deployment/icn-daemon -- ls /backups
+
+# Restore (stop daemon first!)
+kubectl -n icn scale deployment/icn-daemon --replicas=0
+kubectl -n icn exec <backup-pod> -- tar -xzf /backups/icn-backup-YYYYMMDD.tar.gz -C /data
+kubectl -n icn scale deployment/icn-daemon --replicas=1
+```
+
+## Network Policies
+
+The `network-policies.yaml` implements:
+- Default deny all ingress
+- Allow `:7777 UDP` from anywhere (P2P)
+- Allow `:8080` from pilot-ui and cluster nodes (Gateway)
+- Allow `:9100` from monitoring namespace only (Metrics)
 
 ## Troubleshooting
 
@@ -199,16 +361,16 @@ kubectl -n icn get events --sort-by='.lastTimestamp'
 - Check image exists: `crictl images | grep icn`
 
 **Image pull errors:**
-- Verify image was synced: Run `sync-image.sh` again
-- Check image name matches deployment: `kubectl -n icn get deployment icn-daemon -o yaml | grep image`
+- Verify image was synced: Run `make sync` again
+- Check image name matches deployment
 
-**Port conflicts:**
-- Check if ports are in use: `kubectl -n icn get svc`
-- Modify NodePort values in `services.yaml` if needed
+**Health check failing:**
+- Check logs for startup errors
+- Verify config is valid: `kubectl -n icn get configmap icn-config -o yaml`
 
 ### Manual Image Sync
 
-If the sync script fails, manually sync to a single node:
+If the sync script fails:
 
 ```bash
 # Export image
@@ -218,87 +380,27 @@ docker save icn:latest -o /tmp/icn.tar
 scp /tmp/icn.tar ubuntu@10.8.10.40:/tmp/
 
 # Import on node
-ssh ubuntu@10.8.10.40
-sudo ctr -n k8s.io images import /tmp/icn.tar
-# OR
-sudo ctr images import /tmp/icn.tar
+ssh ubuntu@10.8.10.40 "sudo ctr -n k8s.io images import /tmp/icn.tar"
 ```
 
-## Updating Deployment
+## Access Points
 
-### Update ICN Version
-
-1. Build new image:
-   ```bash
-   ./scripts/build-image.sh v1.0.1
-   ```
-
-2. Sync to cluster:
-   ```bash
-   ./scripts/sync-image.sh v1.0.1
-   ```
-
-3. Update deployment:
-   ```bash
-   kubectl set image deployment/icn-daemon -n icn icnd=icn:v1.0.1
-   ```
-
-### Update Configuration
-
-1. Edit `configmap.yaml`
-2. Apply changes:
-   ```bash
-   kubectl apply -f configmap.yaml
-   kubectl rollout restart deployment/icn-daemon -n icn
-   ```
-
-## File Structure
-
-```
-deploy/k8s/
-├── README.md                    # This file
-├── kustomization.yaml          # Kustomize configuration
-├── namespace.yaml              # ICN namespace
-├── configmap.yaml              # ICN configuration
-├── secret.yaml.example         # Secret template (DO NOT commit secret.yaml!)
-├── pvc.yaml                    # Persistent volume claim
-├── deployment.yaml             # ICN daemon deployment
-├── services.yaml               # ClusterIP and NodePort services
-├── monitoring/
-│   └── servicemonitor.yaml    # Prometheus ServiceMonitor and alerts
-└── scripts/
-    ├── build-image.sh         # Build Docker image
-    ├── sync-image.sh          # Sync image to K3s nodes
-    ├── deploy.sh              # Apply Kubernetes manifests
-    └── full-deploy.sh         # Complete deployment pipeline
-```
-
-## Development Workflow
-
-1. **Make code changes** in the ICN repository
-2. **Build new image**: `./scripts/build-image.sh dev-$(date +%s)`
-3. **Sync to cluster**: `./scripts/sync-image.sh dev-$(date +%s)`
-4. **Update deployment**: `kubectl set image deployment/icn-daemon -n icn icnd=icn:dev-$(date +%s)`
-5. **Watch rollout**: `kubectl -n icn rollout status deployment/icn-daemon`
-6. **Check logs**: `kubectl -n icn logs -f deployment/icn-daemon`
+| Service | URL | Description |
+|---------|-----|-------------|
+| Gateway API | http://10.8.10.40:30080 | REST API |
+| Pilot UI | http://10.8.10.40:30030 | Web interface |
+| Metrics | http://10.8.10.40:30091/metrics | Prometheus metrics |
+| Grafana | http://10.8.10.40:30300 | Dashboards |
 
 ## CI/CD Integration
 
-For automated deployments, you can integrate these scripts into CI/CD:
+The GitHub Actions workflow `.github/workflows/k3s-deploy.yml` automatically:
+1. Builds the Docker image on push to main
+2. Syncs to K3s cluster
+3. Deploys and verifies health
 
+For manual CI:
 ```bash
-# In your CI pipeline
 export IMAGE_TAG="$(git rev-parse --short HEAD)"
-./deploy/k8s/scripts/build-image.sh "$IMAGE_TAG"
-./deploy/k8s/scripts/sync-image.sh "$IMAGE_TAG"
-./deploy/k8s/scripts/deploy.sh "$K3S_HOST" "$IMAGE_TAG"
+make full-deploy IMAGE_TAG="$IMAGE_TAG"
 ```
-
-## Next Steps
-
-- [ ] Set up local container registry for faster image sync
-- [ ] Configure GitOps (Flux/ArgoCD) for automated deployments
-- [ ] Add health check endpoints
-- [ ] Set up automated backups of PVC data
-- [ ] Configure resource limits based on workload
-

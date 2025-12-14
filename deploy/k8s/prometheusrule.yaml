@@ -1,0 +1,158 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: icn-alerts
+  namespace: icn
+  labels:
+    app: icn
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+  - name: icn.rules
+    interval: 30s
+    rules:
+    # Pod availability alerts
+    - alert: ICNDaemonDown
+      expr: |
+        absent(up{job="icn-daemon"} == 1)
+      for: 2m
+      labels:
+        severity: critical
+        service: icn
+      annotations:
+        summary: "ICN daemon is down"
+        description: "ICN daemon has been unavailable for more than 2 minutes."
+
+    - alert: ICNDaemonNotReady
+      expr: |
+        kube_pod_status_ready{namespace="icn", pod=~"icn-daemon.*"} == 0
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN daemon pod is not ready"
+        description: "ICN daemon pod {{ $labels.pod }} has been not ready for 5 minutes."
+
+    # Resource alerts
+    - alert: ICNHighMemory
+      expr: |
+        container_memory_working_set_bytes{namespace="icn", container="icnd"}
+        / container_spec_memory_limit_bytes{namespace="icn", container="icnd"} > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN daemon high memory usage"
+        description: "ICN daemon is using {{ $value | humanizePercentage }} of its memory limit."
+
+    - alert: ICNHighCPU
+      expr: |
+        rate(container_cpu_usage_seconds_total{namespace="icn", container="icnd"}[5m])
+        / container_spec_cpu_quota{namespace="icn", container="icnd"} * 100000 > 0.8
+      for: 10m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN daemon high CPU usage"
+        description: "ICN daemon is using more than 80% CPU for 10 minutes."
+
+    # Restart alerts
+    - alert: ICNFrequentRestarts
+      expr: |
+        increase(kube_pod_container_status_restarts_total{namespace="icn", container="icnd"}[1h]) > 3
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN daemon restarting frequently"
+        description: "ICN daemon has restarted {{ $value }} times in the last hour."
+
+    - alert: ICNCrashLooping
+      expr: |
+        kube_pod_container_status_waiting_reason{namespace="icn", container="icnd", reason="CrashLoopBackOff"} == 1
+      for: 5m
+      labels:
+        severity: critical
+        service: icn
+      annotations:
+        summary: "ICN daemon is crash looping"
+        description: "ICN daemon container is in CrashLoopBackOff state."
+
+    # Storage alerts
+    - alert: ICNStorageAlmostFull
+      expr: |
+        kubelet_volume_stats_used_bytes{namespace="icn", persistentvolumeclaim="icn-data"}
+        / kubelet_volume_stats_capacity_bytes{namespace="icn", persistentvolumeclaim="icn-data"} > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN storage almost full"
+        description: "ICN data volume is {{ $value | humanizePercentage }} full."
+
+    - alert: ICNStorageFull
+      expr: |
+        kubelet_volume_stats_used_bytes{namespace="icn", persistentvolumeclaim="icn-data"}
+        / kubelet_volume_stats_capacity_bytes{namespace="icn", persistentvolumeclaim="icn-data"} > 0.95
+      for: 1m
+      labels:
+        severity: critical
+        service: icn
+      annotations:
+        summary: "ICN storage is full"
+        description: "ICN data volume is {{ $value | humanizePercentage }} full. Immediate action required!"
+
+    # Backup alerts
+    - alert: ICNBackupFailed
+      expr: |
+        kube_job_status_failed{namespace="icn", job_name=~"icn-backup.*"} > 0
+      for: 1m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN backup job failed"
+        description: "ICN backup job {{ $labels.job_name }} has failed."
+
+  - name: icn.application.rules
+    interval: 30s
+    rules:
+    # Application-level metrics (if exposed by icnd)
+    - alert: ICNHighGossipLatency
+      expr: |
+        histogram_quantile(0.95, rate(icn_gossip_message_latency_seconds_bucket[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "High gossip message latency"
+        description: "95th percentile gossip latency is {{ $value }}s."
+
+    - alert: ICNLedgerSyncBehind
+      expr: |
+        icn_ledger_sync_lag_seconds > 300
+      for: 10m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN ledger sync is behind"
+        description: "Ledger sync is {{ $value }}s behind."
+
+    - alert: ICNTrustComputationErrors
+      expr: |
+        rate(icn_trust_computation_errors_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "Trust computation errors detected"
+        description: "Trust computation error rate is {{ $value }}/s."

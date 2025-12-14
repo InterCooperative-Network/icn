@@ -7,8 +7,15 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - pvc.yaml
+  - backup-pvc.yaml
   - deployment.yaml
   - services.yaml
+  - pdb.yaml
+  - network-policies.yaml
+  - pilot-ui-deployment.yaml
+  - backup-cronjob.yaml
+  - prometheusrule.yaml
+  - grafana-dashboard.yaml
   - monitoring/servicemonitor.yaml
 
 # Images can be overridden with kustomize
